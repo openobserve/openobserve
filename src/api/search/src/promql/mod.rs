@@ -195,8 +195,18 @@ async fn query(
                     .into_response();
             }
         };
-        let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
+            log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                    e.to_string(),
+                    Some(trace_id),
+                )),
+            )
+                .into_response();
+        }
 
         if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
@@ -263,6 +273,7 @@ async fn query(
         search_type: None,
         regions: vec![],
         clusters: vec![],
+        search_event_context: Some(req.search_event_context),
     };
 
     search(&trace_id, org_id, req, user_email, timeout).await
@@ -484,8 +495,18 @@ async fn query_range(
                     .into_response();
             }
         };
-        let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
+            log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                    e.to_string(),
+                    Some(trace_id),
+                )),
+            )
+                .into_response();
+        }
 
         if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
@@ -593,6 +614,7 @@ async fn query_range(
         search_type: req.search_type,
         regions: req.regions,
         clusters: req.clusters,
+        search_event_context: Some(req.search_event_context),
     };
     if let Some(use_streaming) = req.use_streaming
         && use_streaming
@@ -1229,6 +1251,11 @@ fn validate_metadata_params(
     } else {
         now_micros()
     };
+    if start > end {
+        let err = "start must not be later than end";
+        log::error!("{err}");
+        return Err(err.to_owned());
+    }
     Ok((selector, start, end))
 }
 
@@ -1381,7 +1408,7 @@ async fn search(
 async fn search_streaming(
     trace_id: &str,
     org_id: &str,
-    req: core_promql::MetricsQueryRequest,
+    mut req: core_promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Response {
@@ -1394,6 +1421,12 @@ async fn search_streaming(
         .enabled;
 
     // adjust start and end time
+    // each partition is searched as its own query, which would read `end()` as the partition's end
+    if let Ok(Some(query)) =
+        promql::ast::at_modifier::resolve_query(&req.query, req.start, req.end, req.step)
+    {
+        req.query = query;
+    }
     let (start, end) = promql::adjust_start_end(req.start, req.end, req.step);
     // generate partitions
     let partitions = generate_search_partition(&req.query, start, end, req.step);
@@ -1641,7 +1674,7 @@ fn get_max_lookback_window(query: &str) -> i64 {
         }
     };
     let mut visitor = MaxLookbackWindowVisitor::default();
-    if let Err(err) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+    if let Err(err) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
         log::error!("visit promql expr error: {err}");
         return 0;
     }
@@ -1676,18 +1709,11 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
     type Error = &'static str;
 
     fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
-        match expr {
-            Expr::VectorSelector(_) => {
-                return Ok(false);
-            }
-            Expr::MatrixSelector(ms) => {
-                if ms.range > self.range {
-                    self.range = ms.range;
-                }
-                return Ok(false);
-            }
-            Expr::NumberLiteral(_) | Expr::StringLiteral(_) => return Ok(false),
-            _ => (),
+        // Ok(false) aborts the whole walk, so a leaf must not return it or later selectors are lost
+        if let Expr::MatrixSelector(ms) = expr
+            && ms.range > self.range
+        {
+            self.range = ms.range;
         }
         Ok(true)
     }
@@ -1774,6 +1800,22 @@ mod tests {
     fn test_visitor_new_range_is_zero() {
         let v = MaxLookbackWindowVisitor::new();
         assert_eq!(v.get_range_micros(), 0);
+    }
+
+    #[test]
+    fn test_lookback_window_seen_after_a_vector_selector() {
+        assert_eq!(
+            get_max_lookback_window("a + rate(b[24h])"),
+            24 * 3600 * 1_000_000
+        );
+    }
+
+    #[test]
+    fn test_lookback_window_seen_in_aggregation_param() {
+        assert_eq!(
+            get_max_lookback_window("topk(scalar(max_over_time(k[24h])), m)"),
+            24 * 3600 * 1_000_000
+        );
     }
 
     // --- generate_search_partition ---
@@ -1863,5 +1905,25 @@ mod tests {
         // A matcher without a metric name should error
         let result = validate_metadata_params(Some("{job=\"prometheus\"}".to_string()), None, None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_start_after_end() {
+        let result = validate_metadata_params(
+            None,
+            Some("1700000200".to_string()),
+            Some("1700000100".to_string()),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_start_equals_end() {
+        let result = validate_metadata_params(
+            None,
+            Some("1700000100".to_string()),
+            Some("1700000100".to_string()),
+        );
+        assert!(result.is_ok());
     }
 }

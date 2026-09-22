@@ -27,10 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="(v: number) => (splitterModel = v)"
       :limits="[0, 250]"
       unit="px"
+      :horizontal="isMobile"
       class="min-h-0 flex-1 overflow-hidden"
     >
       <template #before>
-        <div class="border-r4 border-border-default flex h-full flex-col border-r">
+        <div
+          class="border-r4 border-border-default flex h-full flex-col border-e max-md:overflow-y-auto max-md:border-e-0 max-md:border-b"
+        >
           <div class="sticky top-0 shrink-0 px-2">
             <div class="flex items-center justify-between p-2 text-lg">
               <span class="flex items-center gap-1">
@@ -179,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:selected-ids="handleSelectedStatusIdsUpdate"
                   >
                     <template #cell-name="{ row }">
-                      <span :class="statusIndicatorClass(row.name)" class="mr-1 self-stretch"></span
+                      <span :class="statusIndicatorClass(row.name)" class="me-1 self-stretch"></span
                       >{{ row.name }}
                     </template>
                   </OTable>
@@ -193,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('nodes.cpuusage')"
               >
                 <div class="px-1 pb-2">
-                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                  <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
                       data-test="nodes-filter-cpuusage-min"
                       type="number"
@@ -222,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxCPUUsage"
-                    class="mt-3 ml-3 w-[85%]"
+                    class="ms-3 mt-3 w-[85%]"
                   />
                 </div>
               </OCollapsible>
@@ -235,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('nodes.memoryusage')"
               >
                 <div class="px-1 pb-2">
-                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                  <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
                       data-test="nodes-filter-memoryusage-min"
                       type="number"
@@ -264,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxMemoryUsage"
-                    class="mt-3 ml-3 w-[85%]"
+                    class="ms-3 mt-3 w-[85%]"
                   />
                 </div>
               </OCollapsible>
@@ -282,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="establishedToggle"
                     :label="t('nodes.establishedLabel')"
                   />
-                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                  <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
                       :disable="!establishedToggle"
                       data-test="nodes-filter-established-min"
@@ -314,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxEstablished"
-                    class="mt-3 ml-3 w-[85%]"
+                    class="ms-3 mt-3 w-[85%]"
                   />
 
                   <OCheckbox
@@ -323,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="closewaitToggle"
                     :label="t('nodes.closewaitLabel')"
                   />
-                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                  <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
                       :disable="!closewaitToggle"
                       data-test="nodes-filter-closewait-min"
@@ -355,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxClosewait"
-                    class="mt-3 ml-3 w-[85%]"
+                    class="ms-3 mt-3 w-[85%]"
                   />
 
                   <OCheckbox
@@ -364,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="waittimeToggle"
                     :label="t('nodes.waittimeLabel')"
                   />
-                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                  <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
                       :disable="!waittimeToggle"
                       data-test="nodes-filter-waittime-min"
@@ -396,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxWaittime"
-                    class="mt-3 ml-3 w-[85%]"
+                    class="ms-3 mt-3 w-[85%]"
                   />
                 </div>
               </OCollapsible>
@@ -461,16 +464,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="loading"
+                :last-run-at="lastUpdatedAt"
+                :loading="fetching"
+                shortcut-id="nodesRefresh"
                 data-test="nodes-list-refresh-btn"
-                @click="() => getData(true)"
-              >
-                <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="nodesRefresh" />
-              </OButton>
+                @click="refreshData"
+              />
             </template>
             <template #empty>
               <OEmptyState
@@ -501,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template v-if="store.state.zoConfig.super_cluster_enabled" #cell-region="{ row }">
-              <OTag type="fieldTag" class="badge-region mr-1"
+              <OTag type="fieldTag" class="badge-region me-1"
                 >{{ row.region }}
                 <OTooltip :content="t('nodes.region')" />
               </OTag>
@@ -551,7 +553,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, computed } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { nodesQuery } from "@/services/common.queries";
+import { defineComponent, reactive, ref, computed, watch, nextTick } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -563,6 +569,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ORange from "@/lib/forms/Range/ORange.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -570,7 +577,6 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
-import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
@@ -587,6 +593,7 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ORefreshButton,
     OProgressBar,
     OInput,
     OCheckbox,
@@ -618,8 +625,37 @@ export default defineComponent({
 
     const tabledata: any = ref([]);
     const originalData: any = ref([]);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    // `applyNodes` seeds the usage-range sliders from the response, so the read
+    // must not start until the page asks for it — otherwise those bounds are
+    // rewritten before the component has finished initialising them. `enabled`
+    // holds the query until `getData()` runs; after that it is live, and any
+    // invalidation of the nodes scope repaints the table on its own.
+    const hasRequested = ref(false);
+    const lastFilterFlag = ref(false);
+    const nodesList = useQuery(() =>
+      Object.assign(nodesQuery(orgIdForList.value), {
+        enabled: hasRequested.value && !!orgIdForList.value,
+      }),
+    );
+
+    // `isLoading`, not `isPending`: a gated query stays "pending" forever, but
+    // `isLoading` is pending-AND-fetching — i.e. a cold read actually in flight.
+    const loading = nodesList.isLoading;
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = nodesList.isFetching;
+    // 0 until the gated first read; the button renders that as "not yet refreshed".
+    const lastUpdatedAt = nodesList.dataUpdatedAt;
     const splitterModel = ref(250);
+    const { isMobile } = useBreakpoint();
+    watch(
+      isMobile,
+      (mobile) => {
+        splitterModel.value = mobile ? 180 : 250;
+      },
+      { immediate: true },
+    );
     const filterQuery = ref("");
 
     const filterOTableColumns: OTableColumnDef[] = [
@@ -881,47 +917,81 @@ export default defineComponent({
       };
     }
 
-    const getData = (filterFlag: boolean = false) => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("settings.nodesPage.loadingData"),
-        timeout: 0,
-      });
+    // Bound to the refresh control: always hits the server.
+    // `true` for the filter flag: a refresh must re-apply whatever the user has
+    // selected, or the rows come back unfiltered while the chips still show the
+    // selection.
+    const refreshData = () => getData(true, true);
 
-      CommonService.list_nodes(store.state.selectedOrganization.identifier)
-        .then((response) => {
-          const responseData = response.data;
-          const { flattenedData, uniqueValues, maxValues } = flattenObject(responseData);
-          regionRows.value = uniqueValues.regions.map((name) => ({ name }));
-          clusterRows.value = uniqueValues.clusters.map((name) => ({ name }));
-          nodetypeRows.value = uniqueValues.nodeTypes.map((name) => ({ name }));
-          statusesRows.value = uniqueValues.statuses.map((name) => ({ name }));
-          tabledata.value = flattenedData;
-          originalData.value = flattenedData;
-          resultTotal.value = flattenedData.length;
-          loading.value = false;
-          maxCPUUsage.value = cpuUsage.value.max = maxValues.cpuUsage.value;
-          maxMemoryUsage.value = memoryUsage.value.max = maxValues.percentageMemoryUsage.value;
-          maxEstablished.value = establishedUsage.value.max = maxValues.tcpConnsEstablished.value;
-          maxClosewait.value = closewaitUsage.value.max = maxValues.tcpConnsCloseWait.value;
-          maxWaittime.value = waittimeUsage.value.max = maxValues.tcpConnsTimeWait.value;
-          if (filterFlag) {
-            applyFilter();
-          }
-          dismiss();
-        })
-        .catch((error) => {
-          loading.value = false;
-          dismiss();
-          if (error.status != 403) {
-            toast({
-              variant: "error",
-              message: error.response?.data?.message || t("settings.nodesPage.fetchFailed"),
-              timeout: 5000,
-            });
-          }
+    const applyNodes = (responseData: any, filterFlag: boolean) => {
+      const { flattenedData, uniqueValues, maxValues } = flattenObject(responseData);
+      regionRows.value = uniqueValues.regions.map((name) => ({ name }));
+      clusterRows.value = uniqueValues.clusters.map((name) => ({ name }));
+      nodetypeRows.value = uniqueValues.nodeTypes.map((name) => ({ name }));
+      statusesRows.value = uniqueValues.statuses.map((name) => ({ name }));
+      tabledata.value = flattenedData;
+      originalData.value = flattenedData;
+      resultTotal.value = flattenedData.length;
+      maxCPUUsage.value = cpuUsage.value.max = maxValues.cpuUsage.value;
+      maxMemoryUsage.value = memoryUsage.value.max = maxValues.percentageMemoryUsage.value;
+      maxEstablished.value = establishedUsage.value.max = maxValues.tcpConnsEstablished.value;
+      maxClosewait.value = closewaitUsage.value.max = maxValues.tcpConnsCloseWait.value;
+      maxWaittime.value = waittimeUsage.value.max = maxValues.tcpConnsTimeWait.value;
+      if (filterFlag) {
+        applyFilter();
+      }
+    };
+
+    // The table is the query now: once the page has asked once, anything that
+    // invalidates the nodes scope repaints it without asking again.
+    // Immediate: on a warm remount the value is already there, so a change-only watcher never fires.
+    watch(
+      nodesList.data,
+      (data: any) => {
+        if (data) applyNodes(data, lastFilterFlag.value);
+      },
+      { immediate: true },
+    );
+
+    // The cold-read toast, kept: shown only while there is nothing on screen.
+    let dismissLoadingToast: (() => void) | null = null;
+    watch(loading, (isCold) => {
+      if (isCold && hasRequested.value && !dismissLoadingToast) {
+        dismissLoadingToast = toast({
+          variant: "loading",
+          message: t("settings.nodesPage.loadingData"),
+          timeout: 0,
         });
+      } else if (!isCold && dismissLoadingToast) {
+        dismissLoadingToast();
+        dismissLoadingToast = null;
+      }
+    });
+
+    watch(nodesList.error, (error: any) => {
+      if (!error) return;
+      dismissLoadingToast?.();
+      dismissLoadingToast = null;
+      if (error.status != 403) {
+        toast({
+          variant: "error",
+          message: error.response?.data?.message || t("settings.nodesPage.fetchFailed"),
+          timeout: 5000,
+        });
+      }
+    });
+
+    const getData = async (filterFlag: boolean = false, _force: boolean = false) => {
+      lastFilterFlag.value = filterFlag;
+      if (!hasRequested.value) {
+        // First ask: enabling the query is what performs the read. `suspense()`
+        // waits for that initial fetch to settle without issuing a second one.
+        hasRequested.value = true;
+        await nextTick();
+        await nodesList.suspense();
+        return;
+      }
+      await nodesList.refetch();
     };
 
     if (isMetaOrg.value) {
@@ -1048,14 +1118,14 @@ export default defineComponent({
     // directly and the token is reached through its registered utility.
     // An unknown status yields no rail, exactly as an unmatched selector did.
     const statusIndicatorClass = (name: unknown): string => {
-      const base = "border-l-[0.3125rem]! border-solid";
+      const base = "border-s-[0.3125rem]! border-solid";
       switch (String(name ?? "").toLowerCase()) {
         case "online":
-          return `${base} border-l-status-positive!`;
+          return `${base} border-s-status-positive!`;
         case "offline":
-          return `${base} border-l-status-negative!`;
+          return `${base} border-s-status-negative!`;
         case "prepare":
-          return `${base} border-l-status-warning-text!`;
+          return `${base} border-s-status-warning-text!`;
         default:
           return "";
       }
@@ -1204,17 +1274,20 @@ export default defineComponent({
       {
         id: "nodesRefresh",
         handler: () => {
-          if (!isInputFocused()) getData(true);
+          if (!isInputFocused()) refreshData();
         },
       },
     ]);
 
     return {
+      refreshData,
+      lastUpdatedAt,
       t,
       raw,
       store,
       router,
       loading,
+      fetching,
       tabledata,
       computedOTableColumns,
       nodeHealth,
@@ -1227,6 +1300,7 @@ export default defineComponent({
       onStatSelect,
       summaryStats,
       splitterModel,
+      isMobile,
       getData,
       resultTotal,
       cpuUsage,

@@ -32,7 +32,7 @@ const { t } = useI18nTyped();
     <!-- Mirrors the "Result" card: accent-strip header bar + grid-cols-2 label/value cells -->
     <div class="rounded-default border-border-default border">
       <div class="border-border-default flex items-center border-b px-3 py-2">
-        <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+        <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
         <OSkeleton type="text" class="h-4 w-16" />
       </div>
       <div class="grid grid-cols-2 gap-3 px-3 py-3">

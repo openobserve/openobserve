@@ -6,7 +6,7 @@
 // These tests pin that behavior so the service stops silently returning []
 // if the API contract changes.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
 const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
   mockGet: vi.fn(),
@@ -24,7 +24,6 @@ vi.mock("@/services/http", () => ({
   }),
 }));
 
-import { describe, it, expect, beforeEach } from "vitest";
 import onlineEvalsService from "./online-evals.service";
 
 beforeEach(() => {
@@ -96,6 +95,41 @@ describe("unwrapList — three response shapes", () => {
 });
 
 describe("URL construction", () => {
+  it("tests inline provider configuration and unwraps the response message", async () => {
+    const payload = {
+      name: "Test provider",
+      providerType: "openai",
+      defaultModel: "gpt-4o-mini",
+      availableModels: ["gpt-4o-mini"],
+      authConfig: { api_key: "test-key" },
+      isDefault: false,
+    };
+    mockPost.mockResolvedValue({ data: { code: 200, message: "Connected" } });
+
+    const result = await onlineEvalsService.providers.testConfig("acme", payload);
+
+    expect(mockPost).toHaveBeenCalledWith("/api/acme/providers/test", payload);
+    expect(result).toBe("Connected");
+  });
+
+  it("includes the stored provider ID when requested", async () => {
+    const payload = {
+      name: "Test provider",
+      providerType: "openai",
+      defaultModel: "gpt-4o-mini",
+      availableModels: ["gpt-4o-mini"],
+      authConfig: { api_key: "" },
+      isDefault: false,
+    };
+    mockPost.mockResolvedValue({ data: { code: 200, message: "Connected" } });
+
+    await onlineEvalsService.providers.testConfig("acme", payload, "provider-1");
+
+    expect(mockPost).toHaveBeenCalledWith("/api/acme/providers/test", {
+      ...payload,
+      providerId: "provider-1",
+    });
+  });
   it("providers.list hits /api/{orgId}/providers", async () => {
     mockGet.mockResolvedValue({ data: [] });
     await onlineEvalsService.providers.list("acme");

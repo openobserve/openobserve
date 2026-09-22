@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 :name="isFrameExpanded(traceIndex, 0) ? 'expand-more' : 'chevron-right'"
                 size="xs"
-                class="text-icon-color mr-1"
+                class="text-icon-color me-1"
               />
               <div
                 v-if="stackTrace.stack[0].line"
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("rum.stackLine") }} {{ stackTrace.stack[0].source_info.stack_line }}:{{
                 stackTrace.stack[0].source_info.stack_col
               }}
-              <span class="ml-1">
+              <span class="ms-1">
                 ({{ t("rum.stackLines") }}
                 {{ stackTrace.stack[0].source_info.source_line_start }}-{{
                   stackTrace.stack[0].source_info.source_line_end
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="showFrames(traceIndex)"
           >
             <!-- eslint-enable local/no-hardcoded-px -->
-            <OIcon name="expand-more" size="xs" class="mr-1" />
+            <OIcon name="expand-more" size="xs" class="me-1" />
             <span class="text-text-secondary text-xs">
               {{ t("rum.showMoreFrame", { count: stackTrace.stack.length - 1 }) }}
             </span>
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand-more' : 'chevron-right'
                     "
                     size="xs"
-                    class="text-icon-color mr-1"
+                    class="text-icon-color me-1"
                   />
                   <div
                     v-if="frame.line"
@@ -248,12 +248,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="source-context bg-code-block-bg !px-4 !pt-0 !pb-4"
               >
                 <div
-                  class="source-location-header text-text-secondary text-2xs !mb-2.5 ml-4 text-xs font-semibold [letter-spacing:0.02em] opacity-80"
+                  class="source-location-header text-text-secondary text-2xs ms-4 !mb-2.5 text-xs font-semibold [letter-spacing:0.02em] opacity-80"
                 >
                   {{ t("rum.stackLine") }} {{ frame.source_info.stack_line }}:{{
                     frame.source_info.stack_col
                   }}
-                  <span class="ml-1">
+                  <span class="ms-1">
                     ({{ t("rum.stackLines") }} {{ frame.source_info.source_line_start }}-{{
                       frame.source_info.source_line_end
                     }})
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  class="source-code-box rounded-default ml-4 h-50 overflow-hidden border border-solid shadow-sm"
+                  class="source-code-box rounded-default ms-4 h-50 overflow-hidden border border-solid shadow-sm"
                   :style="{ 'border-color': borderColor }"
                 >
                   <CodeQueryEditor

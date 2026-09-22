@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
+      <div
+        class="border-border-default flex h-full w-full min-w-100 flex-col border-s max-md:min-w-0"
+      >
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -42,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alert_destinations.import.outputMessages") }}
         </div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto">
+        <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto max-md:min-w-0">
           <!-- Destination Errors Section -->
           <div class="error-section mb-2.5 p-2.5" v-if="destinationErrorsToDisplay.length > 0">
             <div class="error-list">
@@ -264,11 +266,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, ref, computed, reactive } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import destinationService from "@/services/alert_destination";
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -662,10 +666,15 @@ export default defineComponent({
       return true;
     };
 
+    const orgIdForWrites = useOrgId();
+    const createDestinationWrite = useMutation(() =>
+      saveDestinationMutation(orgIdForWrites.value, () => false),
+    );
+
     const createDestination = async (input: any, index: number) => {
       try {
-        await destinationService.create({
-          org_identifier: store.state.selectedOrganization.identifier,
+        // Was: invalidate, then create — the refetch raced the write.
+        await createDestinationWrite.mutateAsync({
           destination_name: input.name,
           data: input,
         });

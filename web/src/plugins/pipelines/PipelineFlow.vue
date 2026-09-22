@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="pipeline-flow-unsaved-changes-warning-text"
       v-show="pipelineObj.dirtyFlag"
-      class="text-status-warning-text border-status-warning-text rounded-default mr-3 flex items-center border px-2"
+      class="text-status-warning-text border-status-warning-text rounded-default me-3 flex items-center border px-2"
     >
-      <OIcon name="info" class="mr-1" size="sm" />
+      <OIcon name="info" class="me-1" size="sm" />
       {{ t("pipeline.unsavedChangesDetected") }}
     </div>
 
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showEdgeHelpNotification"
       class="edge-help-notification bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-lg dark:shadow-lg"
     >
-      <OIcon name="info" class="mr-1" size="sm" />
+      <OIcon name="info" class="me-1" size="sm" />
       {{ t("pipeline.edgeDeleteHint") }}
     </div>
   </div>
@@ -164,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, onMounted, watch, computed } from "vue";
 import type { Ref } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import type { VueFlowStore } from "@vue-flow/core";
 import { Controls, ControlButton } from "@vue-flow/controls";
@@ -271,15 +272,25 @@ export default {
         }
       },
     );
+    const fitToNodes = () => {
+      if (!vueFlowRef.value) return;
+      if (pipelineObj.currentSelectedPipeline.nodes.length > 4) {
+        vueFlowRef.value.fitView({ padding: 0.1 });
+      } else {
+        vueFlowRef.value.fitView({ padding: 1 });
+      }
+    };
     onMounted(async () => {
-      setTimeout(() => {
-        if (vueFlowRef.value && pipelineObj.currentSelectedPipeline.nodes.length > 4) {
-          vueFlowRef.value.fitView({ padding: 0.1 });
-        } else if (vueFlowRef.value) {
-          vueFlowRef.value.fitView({ padding: 1 });
-        }
-      }, 100);
+      setTimeout(fitToNodes, 100);
     });
+    // < lg a loaded pipeline (a new object, not a node pushed by the user) re-fits: desktop-saved coordinates land off-screen.
+    const { lgUp } = useBreakpoint();
+    watch(
+      () => pipelineObj.currentSelectedPipeline,
+      (pipeline) => {
+        if (!lgUp.value && pipeline?.nodes?.length) setTimeout(fitToNodes, 100);
+      },
+    );
 
     function resetTransform() {
       setViewport({ x: 0, y: 0, zoom: 1 });

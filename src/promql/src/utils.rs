@@ -24,11 +24,34 @@ use datafusion::{
     common::ScalarValue,
     error::Result,
     functions::regex::regexp_like,
-    logical_expr::expr_fn::cast,
+    logical_expr::utils::disjunction,
     prelude::{DataFrame, Expr, col, lit},
 };
 use hashbrown::HashSet;
-use promql_parser::label::{MatchOp, Matcher, Matchers};
+use promql_parser::{
+    label::{MatchOp, Matcher, Matchers},
+    parser::{Offset, VectorSelector},
+};
+
+use crate::micros;
+
+const OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER: i64 = 5;
+const OPTIMIZATION_MAX_STEPS: i64 = 30;
+
+/// The stream a selector reads from: the bare metric name, else an `__name__` equality matcher.
+pub fn metric_name(selector: &VectorSelector) -> Option<String> {
+    if let Some(name) = selector.name.as_ref() {
+        return Some(name.clone());
+    }
+    // only `=` resolves to one stream; a regex or negated `__name__` names a set the engine
+    // cannot read, so it must fail rather than authorize a stream no one has
+    selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .into_iter()
+        .find(|mat| matches!(mat.op, MatchOp::Equal))
+        .map(|mat| mat.value)
+}
 
 /// The schema field a residual matcher filters on; `None` when
 /// `matcher_predicates` skips the matcher entirely.
@@ -45,12 +68,6 @@ pub fn matcher_residual_field<'a>(schema: &'a Schema, matcher: &Matcher) -> Opti
     schema.field_with_name(&matcher.name).ok()
 }
 
-/// Whether `matcher_predicates` evaluates this matcher on the given schema.
-/// Index pruning may claim exactness only for matchers covered under this rule.
-pub fn matcher_is_residual(schema: &Schema, matcher: &Matcher) -> bool {
-    matcher_residual_field(schema, matcher).is_some()
-}
-
 /// Build the DataFusion predicates used for PromQL label matchers.
 ///
 /// Keeping predicate construction separate lets storage-side secondary
@@ -61,39 +78,27 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
         let Some(field) = matcher_residual_field(schema, mat) else {
             continue;
         };
-        let field_type = field.data_type().clone();
+        let field_type = field.data_type();
+        let column = col(mat.name.as_str());
         let literal = |value: String| -> Expr {
-            match &field_type {
-                // Explicitly type equality matcher literals to the label column;
-                // an untyped literal would become Utf8View == Utf8 at execution.
+            match field_type {
+                // the metrics_index pruner plans this without type coercion: literal must match
                 DataType::Utf8View => lit(ScalarValue::Utf8View(Some(value))),
                 DataType::LargeUtf8 => lit(ScalarValue::LargeUtf8(Some(value))),
                 _ => lit(value),
             }
         };
         let predicate = match &mat.op {
-            MatchOp::Equal => col(mat.name.clone()).eq(literal(mat.value.clone())),
-            MatchOp::NotEqual => col(mat.name.clone()).not_eq(literal(mat.value.clone())),
-            MatchOp::Re(regex) => {
+            MatchOp::Equal => column.eq(literal(mat.value.clone())),
+            MatchOp::NotEqual => column.not_eq(literal(mat.value.clone())),
+            MatchOp::Re(regex) | MatchOp::NotRe(regex) => {
                 let regex = format!("^{}$", regex.as_str());
-                // DataFusion 54 can lower a regex on Utf8View to a mixed-type
-                // equality/LIKE expression. Cast only regex matchers until that
-                // optimizer bug is fixed; equality matchers stay zero-copy views.
-                let value = if field_type == DataType::Utf8View {
-                    cast(col(mat.name.clone()), DataType::Utf8)
+                let predicate = regexp_like().call(vec![column, lit(regex)]);
+                if matches!(mat.op, MatchOp::NotRe(_)) {
+                    predicate.not()
                 } else {
-                    col(mat.name.clone())
-                };
-                regexp_like().call(vec![value, lit(regex)])
-            }
-            MatchOp::NotRe(regex) => {
-                let regex = format!("^{}$", regex.as_str());
-                let value = if field_type == DataType::Utf8View {
-                    cast(col(mat.name.clone()), DataType::Utf8)
-                } else {
-                    col(mat.name.clone())
-                };
-                regexp_like().call(vec![value, lit(regex)]).not()
+                    predicate
+                }
             }
         };
         predicates.push(predicate);
@@ -120,30 +125,18 @@ pub fn apply_label_selector(
         let schema_fields = schema
             .fields()
             .iter()
-            .map(|f| f.name())
+            .map(|f| f.name().as_str())
             .collect::<HashSet<_>>();
-        let mut def_labels = vec![
-            HASH_LABEL.to_string(),
-            VALUE_LABEL.to_string(),
-            BUCKET_LABEL.to_string(),
-            TIMESTAMP_COL_NAME.to_string(),
-        ];
-        for label in label_selector.iter() {
-            if def_labels.contains(label) {
-                def_labels.retain(|x| x != label);
-            }
-        }
+        let def_labels = [HASH_LABEL, VALUE_LABEL, BUCKET_LABEL, TIMESTAMP_COL_NAME]
+            .into_iter()
+            .filter(|label| !label_selector.contains(*label));
         // include only found columns and required _timestamp, hash, value, le cols
         let selected_cols: Vec<_> = label_selector
             .iter()
-            .chain(def_labels.iter())
-            .filter_map(|label| {
-                if schema_fields.contains(label) {
-                    Some(col(label))
-                } else {
-                    None
-                }
-            })
+            .map(String::as_str)
+            .chain(def_labels)
+            .filter(|label| schema_fields.contains(label))
+            .map(col)
             .collect();
         df = match df.select(selected_cols) {
             Ok(df) => df,
@@ -156,9 +149,73 @@ pub fn apply_label_selector(
     Some(df)
 }
 
+/// Restricts `df` to the rows the evaluation can observe: per-step lookback
+/// windows when the steps are sparse enough, the contiguous
+/// `[start - lookback, end]` range otherwise.
+pub(crate) fn apply_time_window(
+    df: DataFrame,
+    start: i64,
+    end: i64,
+    step: i64,
+    lookback: i64,
+) -> Result<DataFrame> {
+    // Optimization: When step > lookback, we don't need to load all data in
+    // [start-lookback, end] Instead, we only need to load data windows around
+    // each evaluation point
+    let use_optimization = start != end
+        && step > 0
+        && step >= lookback * OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER
+        && (((end - start) / step) + 1) < OPTIMIZATION_MAX_STEPS;
+    if use_optimization {
+        let num_steps = ((end - start) / step) + 1;
+        let mut conditions: Vec<Expr> = Vec::new();
+        for i in 0..num_steps {
+            let eval_ts = start + (step * i);
+            let window_start = eval_ts - lookback;
+            let window_end = eval_ts;
+
+            conditions.push(
+                col(TIMESTAMP_COL_NAME)
+                    .gt_eq(lit(window_start))
+                    .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(window_end))),
+            );
+        }
+
+        let filters = disjunction(conditions).unwrap();
+        df.filter(filters)
+    } else {
+        // Need to include lookback window before start for the first evaluation point
+        let query_start = start - lookback;
+        df.filter(
+            col(TIMESTAMP_COL_NAME)
+                .gt_eq(lit(query_start))
+                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
+        )
+    }
+}
+
+/// Length of the contiguous run of equal hashes starting at `start`.
+pub(crate) fn batch_run_len(hashes: &[u64], start: usize) -> usize {
+    let hash = hashes[start];
+    let mut end = start + 1;
+    while end < hashes.len() && hashes[end] == hash {
+        end += 1;
+    }
+    end - start
+}
+
+/// An `offset` in microseconds, positive into the past.
+pub(crate) fn offset_micros(offset: &Option<Offset>) -> i64 {
+    match offset {
+        Some(Offset::Pos(offset)) => micros(*offset),
+        Some(Offset::Neg(offset)) => -micros(*offset),
+        None => 0,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{sync::Arc, time::Duration};
 
     use datafusion::{
         arrow::{
@@ -172,6 +229,14 @@ mod tests {
     use promql_parser::label::Matchers;
 
     use super::*;
+
+    #[test]
+    fn test_batch_run_len() {
+        let hashes = [7u64, 7, 7, 9, 9, 1];
+        assert_eq!(batch_run_len(&hashes, 0), 3);
+        assert_eq!(batch_run_len(&hashes, 3), 2);
+        assert_eq!(batch_run_len(&hashes, 5), 1);
+    }
 
     fn make_df() -> (DataFrame, ArrowSchema) {
         let schema = Arc::new(ArrowSchema::new(vec![Field::new(
@@ -356,6 +421,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_apply_matchers_prefix_regex_supports_utf8_view() {
+        use promql_parser::label::Matcher;
+
+        let (df, _) = make_string_view_df();
+        let matchers = Matchers::new(vec![Matcher {
+            op: MatchOp::Re(regex::Regex::new("api.*").unwrap()),
+            name: "service".to_string(),
+            value: "api.*".to_string(),
+        }]);
+        let batches = apply_matchers(df, &matchers)
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+            2
+        );
+    }
+
+    #[tokio::test]
     async fn test_apply_matchers_equality_supports_utf8_view() {
         use promql_parser::label::Matcher;
 
@@ -415,5 +502,14 @@ mod tests {
             batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
             2
         );
+    }
+
+    #[test]
+    fn test_offset_micros() {
+        assert_eq!(offset_micros(&None), 0);
+        let past = Some(Offset::Pos(Duration::from_secs(60)));
+        assert_eq!(offset_micros(&past), 60_000_000);
+        let ahead = Some(Offset::Neg(Duration::from_secs(30)));
+        assert_eq!(offset_micros(&ahead), -30_000_000);
     }
 }

@@ -10,13 +10,21 @@ name: Update Translations
 # translations for a string that has already landed.
 on:
   pull_request:
-    # Deliberately NOT the default opened/synchronize/reopened. Generating on
-    # every push meant every edit to en-US.json produced its own translation
+    # Deliberately NOT the bare default opened/synchronize/reopened. Generating
+    # on every push meant every edit to en-US.json produced its own translation
     # commit, and each of those commits re-ran the PR's entire check suite
     # (playwright, unit-tests, api-testing, …) — on top of the merge queue
-    # running them all again at merge time. These two types fire once, at the
-    # point the author signals the PR is finished, so the translation commit
-    # costs one extra CI cycle per PR instead of one per edit.
+    # running them all again at merge time. auto_merge_enabled/ready_for_review
+    # fire once, at the point the author signals the PR is finished, so the
+    # translation commit costs one extra CI cycle per PR instead of one per edit.
+    #
+    # `synchronize` is included too, but the job-level `if` below only acts on
+    # it once auto-merge is already enabled. Without that, a push to en-US.json
+    # *after* enabling auto-merge (e.g. addressing review comments) retriggers
+    # nothing here — the PR can then reach the merge queue with strings that
+    # were never sent for translation, which verify-translations.yml can only
+    # reject, not fix, because a queued branch is frozen. Gating on auto_merge
+    # keeps the common case (pushes before auto-merge is on) free.
     #
     # `merge_group` cannot be used for this, which is the obvious thing to reach
     # for: merge-queue branches (gh-readonly-queue/*) are read-only and their
@@ -25,7 +33,7 @@ on:
     # queue is gated by verify-translations.yml instead, which only *checks*.
     #
     # `paths` still applies: a PR that never touches en-US.json creates no run.
-    types: [auto_merge_enabled, ready_for_review]
+    types: [auto_merge_enabled, ready_for_review, synchronize]
     paths:
       - 'web/src/locales/languages/en-US.json'
   workflow_dispatch:
@@ -55,10 +63,16 @@ jobs:
     # en-US.json are handled by a maintainer running this workflow manually
     # (workflow_dispatch) from the fork branch, or by the next same-repo PR that
     # touches en-US.json — the state file makes it pick up every pending key.
+    #
+    # The `synchronize` clause is the auto-merge gate described above: a plain
+    # push runs this job only once auto-merge is already on
+    # (`pull_request.auto_merge` is non-null), so ordinary editing of
+    # en-US.json before the author is ready still costs nothing.
     if: >-
       github.repository == 'openobserve/openobserve' &&
       (github.event_name == 'workflow_dispatch' ||
-       github.event.pull_request.head.repo.full_name == github.repository)
+       (github.event.pull_request.head.repo.full_name == github.repository &&
+        (github.event.action != 'synchronize' || github.event.pull_request.auto_merge != null)))
 
     permissions:
       contents: write
@@ -99,18 +113,23 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         # Two independent reasons to stop before spending anything.
         #
-        # 1. The head commit is already a complete translation commit. Our push no
-        #    longer re-triggers this workflow (it fires on auto_merge_enabled /
-        #    ready_for_review, not synchronize), so this is not the ping-pong guard
-        #    it used to be. It still matters for the paths that DO re-enter: a
-        #    workflow_dispatch re-run, or the author toggling auto-merge off and
-        #    back on. Except when the previous run left strings pending — main.py
-        #    exits 3 if any string failed validation, and the run marks its commit
-        #    with the partial trailer. Skipping that on subject alone would strand
-        #    those keys, so a re-run is allowed to pick them up.
+        # 1. The head commit is already a complete translation commit. `synchronize`
+        #    is a trigger now too, but only once auto_merge is on — and for
+        #    pull_request events `paths` is evaluated against the PR's full diff,
+        #    not just the latest push, so once en-US.json has been touched at all
+        #    our own translation-only push still matches it and re-triggers this
+        #    workflow. This guard is what actually breaks that loop: it sees its
+        #    own commit as HEAD and skips, so the re-entry costs one cheap,
+        #    immediately-skipped run rather than repeating. It also covers the
+        #    other ways the same situation arises: a workflow_dispatch re-run, or
+        #    the author toggling auto-merge off and back on. Except when the
+        #    previous run left strings pending — main.py exits 3 if any string
+        #    failed validation, and the run marks its commit with the partial
+        #    trailer. Skipping that on subject alone would strand those keys, so a
+        #    re-run is allowed to pick them up.
         #
         # 2. The PR is already in the merge queue. `auto_merge_enabled` — one of
-        #    the two events that start this workflow — fires on the SAME click that
+        #    the events that start this workflow — fires on the SAME click that
         #    enqueues the PR, and GitHub freezes a queued PR's branch: every push
         #    is rejected with GH006 no matter how often it is rebased. Translating
         #    anyway would spend the DeepSeek budget building a commit with nowhere
@@ -200,11 +219,16 @@ jobs:
         # differs from the hash recorded in .translation_state.json are sent, so a
         # PR pays only for the strings it actually added or changed.
         #
-        # Failed strings are retried in-process rather than on a later push,
-        # because there is no later push: this workflow no longer fires on
-        # synchronize, so our own commit does not bring us back here. Each retry
-        # re-derives what is pending from state, so it only re-sends the strings
-        # that actually failed — a retry after a near-complete run is nearly free.
+        # Failed strings are retried in-process rather than counting on a later
+        # push to catch them. Our own commit's push does re-trigger
+        # `synchronize` — `paths` matches the PR's full diff, not just the
+        # latest push — but the guard above only short-circuits when HEAD is a
+        # *complete* translation commit; a partial one (marked with
+        # PARTIAL_TRAILER) is allowed to re-enter. That re-entry is still a full
+        # extra workflow run, though, so retrying here first means most PRs
+        # never need it. Each retry re-derives what is pending from state, so it
+        # only re-sends the strings that actually failed — a retry after a
+        # near-complete run is nearly free.
         env:
           INPUT_LANGUAGES: ${{ inputs.languages }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}

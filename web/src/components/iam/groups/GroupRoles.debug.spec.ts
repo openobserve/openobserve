@@ -5,9 +5,12 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import fs from "fs";
 
-vi.mock("@/services/iam", () => ({
-  getRoles: vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] })),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    getRoles: vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] })),
+  });
+});
 
 vi.mock("@/composables/iam/usePermissions", () => ({
   default: vi.fn(() => ({

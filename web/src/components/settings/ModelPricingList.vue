@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showImportModelPricingPage"
       :existing-models="models.filter((m: any) => !isReadOnly(m)).map((m: any) => m.name)"
       @cancel:hideform="showImportModelPricingPage = false"
-      @update:list="fetchModels"
+      @update:list="refreshModels"
     />
 
     <!-- Test Match Dialog -->
@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Main List View -->
     <OPageLayout
+      overflow-first
       v-if="!showImportModelPricingPage"
       icon="paid"
       :subtitle="t('settings.modelPricingList.subtitle')"
@@ -36,12 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #title>
         {{ t("modelPricing.header") }}
-        <OButton variant="ghost" size="icon-sm" class="-ml-1" data-test="model-pricing-info-btn">
+        <OButton variant="ghost" size="icon-sm" class="-ms-1" data-test="model-pricing-info-btn">
           <OIcon name="info-outline" size="sm" />
           <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
         </OButton>
       </template>
-      <template #actions>
+      <template #actions-overflow>
         <OButton
           variant="outline"
           size="sm"
@@ -67,6 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("modelPricing.importBtn") }}
         </OButton>
+      </template>
+      <template #actions>
         <OButton
           variant="primary"
           size="sm"
@@ -87,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="id"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedIds"
           selection="multiple"
           pagination="client"
@@ -108,10 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Toolbar: Built-in/Custom tabs + search -->
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents md:max-lg:flex-wrap">
               <div class="app-tabs-container h-9">
                 <AppTabs
                   class="tabs-selection-container"
+                  mobile-dropdown
                   :tabs="tabOptions"
                   v-model:active-tab="selectedTab"
                   @update:active-tab="onTabChange"
@@ -119,26 +124,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSearchInput
                 v-model="filterQuery"
-                class="ml-auto w-64"
+                class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1 md:max-lg:ms-0 md:max-lg:w-full"
                 :placeholder="t('modelPricing.searchPlaceholder')"
               />
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="modelPricingRefresh"
               data-test="model-pricing-list-refresh-btn"
-              @click="fetchModels"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="modelPricingRefresh"
-              />
-            </OButton>
+              @click="refreshModels"
+            />
           </template>
           <template #tree-warning="{ row }">
             <div class="flex items-center gap-2 py-1 text-sm leading-none">
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="relative z-2 flex min-h-6 flex-nowrap items-center">
               <span
                 v-if="getSource(row) === 'built_in'"
-                class="mr-1 inline-flex shrink-0 cursor-default"
+                class="me-1 inline-flex shrink-0 cursor-default"
               >
                 <img :src="ooLogo" class="h-4 w-4" :alt="t('modelPricing.openObserveLogoAlt')" />
                 <OTooltip
@@ -166,12 +166,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   getSource(row) === 'meta_org' ||
                   (getSource(row) === 'org' && row.org_id !== orgIdentifier)
                 "
-                class="mr-1 inline-flex shrink-0 cursor-default"
+                class="me-1 inline-flex shrink-0 cursor-default"
               >
                 <OIcon name="corporate-fare" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
               </span>
-              <span v-else class="mr-1 inline-flex shrink-0 cursor-default">
+              <span v-else class="me-1 inline-flex shrink-0 cursor-default">
                 <OIcon name="person" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
               </span>
@@ -233,12 +233,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <thead>
                             <tr>
                               <th
-                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b pt-0 pr-4 pb-1 pl-0 text-left font-semibold"
+                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-4 pt-0 pb-1 text-left font-semibold"
                               >
                                 {{ t("modelPricing.usageType") }}
                               </th>
                               <th
-                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b pt-0 pr-0 pb-1 pl-0 text-right font-semibold"
+                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-0 pt-0 pb-1 text-right font-semibold"
                               >
                                 {{ t("modelPricing.colPricingSimple") }}
                               </th>
@@ -251,8 +251,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )"
                               :key="key"
                             >
-                              <td class="py-0.5 pr-4 pl-0 text-xs">{{ formatPriceKey(key) }}</td>
-                              <td class="py-0.5 pr-0 pl-0 text-right text-xs font-medium">
+                              <td class="py-0.5 ps-0 pe-4 text-xs">{{ formatPriceKey(key) }}</td>
+                              <td class="py-0.5 ps-0 pe-0 text-right text-xs font-medium">
                                 {{ formatPerMillion(price) }}
                               </td>
                             </tr>
@@ -305,8 +305,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 v-for="[key, price] in sortedPriceEntries(tier.prices || {})"
                                 :key="key"
                               >
-                                <td class="py-0.5 pr-4 pl-0 text-xs">{{ formatPriceKey(key) }}</td>
-                                <td class="py-0.5 pr-0 pl-0 text-right text-xs font-medium">
+                                <td class="py-0.5 ps-0 pe-4 text-xs">{{ formatPriceKey(key) }}</td>
+                                <td class="py-0.5 ps-0 pe-0 text-right text-xs font-medium">
                                   {{ formatPerMillion(price) }}
                                 </td>
                               </tr>
@@ -327,6 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="
                     row.enabled ? t('modelPricing.actionDisable') : t('modelPricing.actionEnable')
                   "
@@ -338,6 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('modelPricing.actionEdit')"
                   @click.stop="openEditor(row)"
                   data-test="model-pricing-edit-btn"
@@ -347,6 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost-destructive"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('modelPricing.actionDelete')"
                   @click.stop="confirmDelete(row)"
                   data-test="model-pricing-delete-btn"
@@ -356,12 +359,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('modelPricing.actionDuplicate')"
                   @click.stop="duplicateModel(row)"
                   data-test="model-pricing-duplicate-btn"
                   data-row-action="duplicate"
                   icon-left="content-copy"
                 />
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="model-pricing-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :variant="row.enabled ? 'destructive' : 'default'"
+                    class="md:hidden"
+                    data-test="model-pricing-toggle-btn-menu"
+                    @select="toggleEnabled(row, !row.enabled)"
+                  >
+                    <span>{{
+                      row.enabled ? t("modelPricing.actionDisable") : t("modelPricing.actionEnable")
+                    }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    data-test="model-pricing-edit-btn-menu"
+                    @select="openEditor(row)"
+                  >
+                    <span>{{ t("modelPricing.actionEdit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="model-pricing-delete-btn-menu"
+                    @select="confirmDelete(row)"
+                  >
+                    <span>{{ t("modelPricing.actionDelete") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="content-copy"
+                    class="md:hidden"
+                    data-test="model-pricing-duplicate-btn-menu"
+                    @select="duplicateModel(row)"
+                  >
+                    <span>{{ t("modelPricing.actionDuplicate") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </template>
               <template v-else>
                 <OButton
@@ -389,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom>
             <div class="flex h-12 w-full items-center gap-x-2">
-              <div class="flex w-25 items-center text-xs font-normal">
+              <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
                 {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
               </div>
               <OButton
@@ -501,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div v-if="tier.utc_windows?.length" class="mt-2">
                     <div class="text-2xs mb-1.5 opacity-55">
                       {{ t("modelPricing.timeWindows") }}
-                      <span class="ml-1 font-mono">{{ formatUtcWindows(tier.utc_windows) }}</span>
+                      <span class="ms-1 font-mono">{{ formatUtcWindows(tier.utc_windows) }}</span>
                     </div>
                     <div
                       v-if="tierWindowsLocal(tier)"
@@ -574,7 +626,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onBeforeMount, onActivated } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { modelPricingQuery } from "@/services/model_pricing.queries";
+import { modelPricingKeys } from "@/services/model_pricing.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -588,9 +644,12 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -611,8 +670,26 @@ const { isDark } = useTheme();
 const router = useRouter();
 
 const qTableRef = ref<any>(null);
-const models = ref<any[]>([]);
-const loading = ref(true);
+const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
+
+const modelsQuery = useQuery(() =>
+  Object.assign(modelPricingQuery(orgIdentifier.value), { enabled: !!orgIdentifier.value }),
+);
+
+// The list is the query, not a copy of it: any invalidation of the scope
+// repaints these rows with no wiring here.
+const models = computed(() => modelsQuery.data.value ?? []);
+const loading = modelsQuery.isPending;
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = modelsQuery.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = modelsQuery.dataUpdatedAt;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = modelsQuery.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 const refreshing = ref(false);
 
 const showPricingDialog = ref(false);
@@ -853,8 +930,6 @@ function getOverflowCount(model: any): number {
   return Math.max(0, total - MAX_VISIBLE_PRICES);
 }
 
-const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
-
 const ooLogo = computed(() =>
   isDark.value
     ? getImageURL("openobserve_favicon_dark.ico")
@@ -871,17 +946,21 @@ function notifyError(prefix: string, e: any) {
   });
 }
 
-async function fetchModels() {
-  loading.value = true;
-  try {
-    const res = await modelPricingService.list(orgIdentifier.value);
-    models.value = res.data || [];
-  } catch (e: any) {
-    notifyError(t("modelPricing.errLoadModels"), e);
-  } finally {
-    loading.value = false;
-  }
+// Bound to the refresh button and to child "list changed" events: both must
+// reach the server, and a named handler keeps the event payload out of `force`.
+const refreshModels = () => fetchModels(true);
+
+// `force` is only meaningful for an explicit refresh now: a write that
+// invalidates the model-pricing scope repaints these rows on its own.
+async function fetchModels(force = false) {
+  if (force) await modelsQuery.refetch();
 }
+
+// The query owns its failure, so this reports it once per error however the
+// read was triggered.
+watch(modelsQuery.error, (e: any) => {
+  if (e) notifyError(t("modelPricing.errLoadModels"), e);
+});
 
 function openEditor(model: any) {
   if (model) {
@@ -902,7 +981,7 @@ async function toggleEnabled(model: any, enabled: boolean) {
     const { __sectionStart, ...clean } = model;
     const updated = { ...clean, enabled };
     await modelPricingService.update(orgIdentifier.value, model.id, updated);
-    await fetchModels();
+    await fetchModels(true);
     const displayName = model.name.length > 30 ? model.name.slice(0, 30) + "…" : model.name;
     const message = enabled
       ? t("modelPricing.modelEnabledNotif", { name: displayName })
@@ -936,7 +1015,13 @@ function confirmDelete(model: any) {
           variant: "success",
           message: t("modelPricing.modelPricingDeleted"),
         });
-        await fetchModels();
+        // Drop the row from the cache first so it disappears now, not when the
+        // refetch lands; the forced reload re-persists the corrected list.
+        queryClient.setQueriesData(
+          { queryKey: modelPricingKeys.all(orgIdentifier.value) },
+          (list: any) => (Array.isArray(list) ? list.filter((m: any) => m.id !== model.id) : list),
+        );
+        await fetchModels(true);
       } catch (e: any) {
         notifyError(t("modelPricing.errDelete"), e);
       }
@@ -963,7 +1048,7 @@ async function refreshBuiltIn() {
       variant: "success",
       message: t("modelPricing.builtInRefreshed"),
     });
-    await fetchModels();
+    await fetchModels(true);
   } catch (e: any) {
     notifyError(t("modelPricing.errRefresh"), e);
   } finally {
@@ -1027,7 +1112,7 @@ function confirmDeleteSelected() {
             }),
           });
           selectedIds.value = [];
-          await fetchModels();
+          await fetchModels(true);
         }
       } finally {
         bulkDeleteLoading.value = false;
@@ -1054,7 +1139,7 @@ useShortcuts([
   {
     id: "modelPricingRefresh",
     handler: () => {
-      if (!isInputFocused()) fetchModels();
+      if (!isInputFocused()) fetchModels(true);
     },
   },
 ]);

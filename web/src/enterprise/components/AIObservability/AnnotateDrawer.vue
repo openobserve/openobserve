@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-heading min-w-0 truncate text-sm font-semibold">
           {{ targetLabel }}
         </span>
-        <OTag variant="default-soft" shape="rounded" class="ml-auto shrink-0">
+        <OTag variant="default-soft" shape="rounded" class="ms-auto shrink-0">
           {{ t("aiObservability.annotate.viaAnnotation") }}
         </OTag>
       </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-xs"
-              class="ml-auto"
+              class="ms-auto"
               :aria-label="t('common.remove')"
               :data-test="`annotate-drawer-remove-${dimension.id}`"
               @click="removeDimension(dimension.rowId)"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ numericDisplay(dimension) }}
               </span>
-              <span class="text-text-secondary text-2xs ml-auto">
+              <span class="text-text-secondary text-2xs ms-auto">
                 {{
                   t("aiObservability.annotate.range", {
                     min: dimension.min,

@@ -44,7 +44,7 @@
       <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
         {{ title }}<span v-if="required" class="text-text-body"> *</span>
       </span>
-      <div v-if="$slots.actions" class="ml-auto flex items-center gap-2">
+      <div v-if="$slots.actions" class="ms-auto flex items-center gap-2">
         <slot name="actions" />
       </div>
     </div>

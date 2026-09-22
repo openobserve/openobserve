@@ -216,6 +216,15 @@ describe("OButton", () => {
     expect(wrapper.element.tagName.toLowerCase()).toBe("a");
   });
 
+  // base-elements.css underlines every a:hover, which would make a link-button
+  // read as prose text rather than a control.
+  it('never underlines when as="a"', () => {
+    const wrapper = mount(OButton, { props: { as: "a" } });
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain("no-underline");
+    expect(classes).toContain("hover:no-underline");
+  });
+
   it('does not set type attribute when as="a"', () => {
     const wrapper = mount(OButton, { props: { as: "a" } });
     expect(wrapper.attributes("type")).toBeUndefined();
@@ -287,6 +296,25 @@ describe("OButton", () => {
   it("applies focus-visible:ring-3 on every styled variant", () => {
     const wrapper = mount(OButton, { props: { variant: "destructive" } });
     expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-3");
+  });
+
+  // --- Loading ---
+
+  // Regression: a child-mode OTooltip mounted mid-query anchored to an inline-flex wrapper that lost its box once loading ended, opening at (0,0)
+  it("keeps the slot wrapper display:contents while loading and only hides it", () => {
+    const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
+    const content = wrapper.find("span.contents");
+    expect(content.exists()).toBe(true);
+    expect(content.classes()).toContain("invisible");
+    expect(content.classes()).not.toContain("inline-flex");
+    expect(content.attributes("style")).toBeUndefined();
+  });
+
+  it("does not hide the slot wrapper when not loading", () => {
+    const wrapper = mount(OButton, { slots: { default: "Save" } });
+    const content = wrapper.find("span.contents");
+    expect(content.exists()).toBe(true);
+    expect(content.classes()).not.toContain("invisible");
   });
 
   // --- data attributes ---

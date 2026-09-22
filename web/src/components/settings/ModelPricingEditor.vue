@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OText>
               </div>
             </div>
-            <div class="flex flex-row gap-4 px-4 pt-2.5 pb-2">
+            <div class="flex flex-row gap-4 px-4 pt-2.5 pb-2 max-md:flex-col max-md:gap-2">
               <div class="flex-1">
                 <OFormInput
                   name="name"
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ tpl.name }}
                       <span
                         v-if="isTemplateActive(idx, tpl.keys)"
-                        class="ml-0.5 text-sm leading-none opacity-75 hover:opacity-100"
+                        class="ms-0.5 text-sm leading-none opacity-75 hover:opacity-100"
                         @click.stop="clearTemplate(idx, tpl.keys)"
                       >
                         {{ "×" }}</span
@@ -395,11 +395,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OText variant="meta"> {{ t("modelPricing.tokenPricesUnit") }}</OText>
                     </div>
 
-                    <div class="price-table overflow-hidden">
+                    <div class="price-table overflow-hidden max-lg:overflow-x-auto">
                       <!-- Column headers (only when rows exist) -->
                       <div
                         v-if="tier.prices.length"
-                        class="price-table-head text-2xs grid grid-cols-[1fr_10rem_auto] gap-2 px-3 py-1.5 font-semibold tracking-[0.01em] opacity-45"
+                        class="price-table-head text-2xs grid grid-cols-[1fr_10rem_auto] gap-2 px-3 py-1.5 font-semibold tracking-[0.01em] opacity-45 max-lg:grid-cols-[1fr_6rem_auto]"
                       >
                         <span>{{ t("modelPricing.usageKeyCol") }}</span>
                         <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         v-for="(_entry, entryIdx) in tier.prices"
                         :key="entryIdx"
-                        class="price-row grid grid-cols-[1fr_10rem_auto] items-start gap-2 px-3 py-0.5"
+                        class="price-row grid grid-cols-[1fr_10rem_auto] items-start gap-2 px-3 py-0.5 max-lg:grid-cols-[1fr_6rem_auto]"
                       >
                         <OFormInput
                           :name="`tiers[${idx}].prices[${entryIdx}].key`"
@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Add row (staging draft, form-owned) -->
                       <div
-                        class="price-add-row grid grid-cols-[1fr_10rem_auto] items-center gap-2 px-3 py-1"
+                        class="price-add-row grid grid-cols-[1fr_10rem_auto] items-center gap-2 px-3 py-1 max-lg:grid-cols-[1fr_6rem_auto]"
                         :class="{
                           'price-add-row--no-top': !tier.prices.length,
                         }"
@@ -609,6 +609,8 @@ import { useRouter, useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
+import { saveModelPricingMutation } from "@/services/model_pricing.queries";
+import { useMutation } from "@tanstack/vue-query";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -661,6 +663,7 @@ const patternExamples = [
 ];
 
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
+const saveModelPricing = useMutation(() => saveModelPricingMutation(orgIdentifier.value));
 
 // Scalar validation is schema-driven (name + match_pattern).
 const modelPricingSchema = makeModelPricingSchema(t);
@@ -1145,11 +1148,7 @@ async function save(value?: ModelPricingForm) {
   // Loading is form-driven: OForm awaits this handler, so the Save button's
   // spinner (isSubmitting) spans the POST — no manual flag needed.
   try {
-    if (m.id) {
-      await modelPricingService.update(orgIdentifier.value, m.id, m);
-    } else {
-      await modelPricingService.create(orgIdentifier.value, m);
-    }
+    await saveModelPricing.mutateAsync({ id: m.id, data: m });
     if (patternConflicts.length > 0) {
       const winner = patternConflicts[0].name;
       toast({

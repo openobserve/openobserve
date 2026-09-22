@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`${type}-index-dropdown-stream_type`"
       labelKey="label"
       valueKey="value"
-      class="mr-1 flex-1"
+      class="me-1 flex-1"
       :disabled="disableDropdown"
     >
       <!-- The trigger paints no per-option icon of its own, so the selected
@@ -67,12 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch } from "vue";
+import { defineComponent, onActivated, ref, watch, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddFolder from "./AddFolder.vue";
 import { useRoute } from "vue-router";
-import { computed } from "vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

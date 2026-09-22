@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div
         v-if="indexData.name"
-        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1"
+        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1 max-md:hidden"
       >
         <img
           :src="getTimelineIcon"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: calc(100vh - 3.75rem)"
           >
             <!-- this the grid section the tiles section -->
-            <div class="stats-grid mb-2 grid grid-cols-4 gap-2">
+            <div class="stats-grid mb-2 grid grid-cols-4 gap-2 max-md:grid-cols-2">
               <!-- Docs Count Tile -->
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -170,7 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default bg-surface-base border-border-default flex h-full min-h-0 w-full flex-col overflow-hidden border p-2"
               >
                 <div>
-                  <div class="flex justify-start">
+                  <!-- min-w-0/max-w-full let OTabs' own arrow-scroller engage instead of clipping silently. -->
+                  <div class="flex justify-start max-md:max-w-full max-md:min-w-0">
                     <OTabs v-model="activeMainTab" dense>
                       <!-- Schema Settings Tab with conditional class -->
                       <OTab
@@ -224,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div v-if="indexData.defaultFts" class="mt-3 font-normal">
                         <label
-                          class="bg-banner-warning-bg rounded-default border-banner-warning-border text-banner-warning-text border px-4 py-1 font-semibold"
+                          class="bg-banner-warning-bg rounded-default border-banner-warning-border text-banner-warning-text border px-4 py-1 font-semibold max-md:inline-block max-md:max-w-full"
                         >
                           {{ t("logStream.mapping") }}
                           {{ t("logStream.defaultFtsKeysUsed") }}</label
@@ -265,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OToggleGroup>
                         </div>
 
-                        <div v-if="hasUserDefinedSchema" class="ml-2 flex items-center">
+                        <div v-if="hasUserDefinedSchema" class="ms-2 flex items-center">
                           <OIcon
                             name="info"
                             size="sm"
@@ -283,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="schema-field-search-input"
                           v-model="filterField"
                           data-cy="schema-index-field-search-input"
-                          class="no-border o2-search-input ml-auto"
+                          class="no-border o2-search-input ms-auto"
                           :placeholder="t('search.searchField')"
                         />
                         <OButton
@@ -338,10 +339,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- OTable fills the remaining height inside the schemaSettings flex column -->
                     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+                      <!-- horizontal-scroll: otherwise the elastic name column collapses to 0 beside the fixed ones. -->
                       <OTable
                         data-test="schema-log-stream-field-mapping-table"
                         :data="filteredSchemaData"
                         :columns="columns"
+                        horizontal-scroll
                         row-key="name"
                         selection="multiple"
                         :selected-ids="selectedSchemaIds"
@@ -367,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                             <span
                               v-if="isEnvQuickModeField(row.name)"
-                              class="ml-1 flex items-center"
+                              class="ms-1 flex items-center"
                             >
                               <img
                                 :src="quickModeIcon"
@@ -571,7 +574,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="width: fit-content"
                     >
                       <span class="font-semibold">
-                        <OIcon name="info" class="mr-1" size="sm" />
+                        <OIcon name="info" class="me-1" size="sm" />
 
                         {{
                           t("logStream.extendedRetentionInfo", {
@@ -601,6 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="schema-log-stream-field-mapping-table"
                           :data="redBtnRows"
                           :columns="redBtnColumns"
+                          horizontal-scroll
                           row-key="index"
                           selection="multiple"
                           v-model:selected-ids="selectedDateIds"
@@ -646,8 +650,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="bg-card-glass-solid sticky bottom-0 z-1 mt-auto w-full flex-shrink-0 px-2 py-1"
                 >
-                  <div v-if="indexData.schema.length > 0" class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
+                  <div
+                    v-if="indexData.schema.length > 0"
+                    class="flex items-center justify-between max-md:flex-wrap max-md:gap-y-1"
+                  >
+                    <div class="flex items-center gap-2 max-md:flex-wrap">
                       <span v-if="activeMainTab == 'schemaSettings'" class="px-2 py-2"
                         ><strong> {{ selectedFields.length }}</strong>
                         {{ t("logStream.fieldsSelected") }}</span
@@ -660,7 +667,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="!selectedFields.length || hasUDSFieldInSelection"
                         @click="updateDefinedSchemaFields"
                       >
-                        <span class="mr-1 flex items-center justify-start gap-1">
+                        <span class="me-1 flex items-center justify-start gap-1">
                           <OIcon name="verified-user" size="sm" />
                           <OIcon name="format-list-bulleted" size="sm" />
                         </span>
@@ -795,7 +802,12 @@ import {
   convertUnixToDateFormat as convertUnixToFormat,
   formatTimestampInTimezone,
 } from "@/utils/date";
-import streamService from "../../services/stream";
+import {
+  deleteStreamFieldsMutation,
+  updateStreamSettingsMutation,
+} from "@/services/stream.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import segment from "../../services/segment_analytics";
 import {
   formatSizeFromMB,
@@ -939,6 +951,10 @@ export default defineComponent({
     const pendingSelectedFields = ref<string[]>([]);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
+
+    const streamOrgId = useOrgId();
+    const updateStreamSettings = useMutation(() => updateStreamSettingsMutation(streamOrgId.value));
+    const deleteStreamFields = useMutation(() => deleteStreamFieldsMutation(streamOrgId.value));
     const rowsPerPage = ref(20);
     const filterField = ref("");
     const qTable = ref(null);
@@ -1219,14 +1235,13 @@ export default defineComponent({
     };
     const deleteFields = async () => {
       loadingState.value = true;
-      await streamService
-        .deleteFields(
-          store.state.selectedOrganization.identifier,
-          indexData.value.name,
-          indexData.value.stream_type,
+      await deleteStreamFields
+        .mutateAsync({
+          name: indexData.value.name,
+          type: indexData.value.stream_type,
           // Cast: service signature mistypes `fields` as the empty tuple `[]`.
-          selectedFields.value.map((field: any) => field.name) as [],
-        )
+          fields: selectedFields.value.map((field: any) => field.name) as [],
+        })
         .then(async (res) => {
           loadingState.value = false;
           if (res.data.code == 200) {
@@ -1652,13 +1667,12 @@ export default defineComponent({
         };
       }
 
-      await streamService
-        .updateSettings(
-          store.state.selectedOrganization.identifier,
-          indexData.value.name,
-          indexData.value.stream_type,
-          modifiedSettings,
-        )
+      await updateStreamSettings
+        .mutateAsync({
+          name: indexData.value.name,
+          type: indexData.value.stream_type,
+          settings: modifiedSettings,
+        })
         .then(async () => {
           if (
             store.state.logs?.logs?.data?.stream?.selectedStream?.includes(indexData.value.name)

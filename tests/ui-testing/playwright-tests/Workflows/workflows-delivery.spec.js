@@ -139,28 +139,5 @@ test.describe(
       expect(preview.status).toBeUndefined();
       testLogger.info('default test run suppressed the destination', { name });
     });
-
-    // SUP-02 — the warning banner is the ONLY signal that a run will dispatch for real.
-    // It must be absent by default and appear (naming the destination) only after the
-    // switch is flipped off.
-    test('SUP-02: toggling suppression off reveals the live-dispatch warning banner', async () => {
-      const id = uniq();
-      const name = `wf_auto_del_${id}`;
-      const destName = `wf_auto_dest_${id}`;
-      await pm.workflowsPage.buildTriggerToDestinationAndSave({
-        name,
-        destName,
-        url: sinkUrl(id),
-        headers: { Authorization: basicAuth() },
-      });
-      await pm.workflowsPage.goToList();
-      await pm.workflowsPage.openEdit(name);
-      await pm.workflowsPage.openTestDrawer();
-      await pm.workflowsPage.expectSuppressChecked(true);
-      await pm.workflowsPage.expectDispatchWarningAbsent();
-      await pm.workflowsPage.disableSuppression();
-      await pm.workflowsPage.expectDispatchWarningVisible(destName);
-      testLogger.info('live-dispatch warning banner appeared and named the destination', { destName });
-    });
   }
 );

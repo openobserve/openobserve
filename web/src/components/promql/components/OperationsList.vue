@@ -1,16 +1,16 @@
 <template>
-  <div class="flex flex-row pl-2">
+  <div class="flex flex-row ps-2">
     <div
       data-test="promql-operations-list-label"
       class="flex min-w-24 items-center whitespace-nowrap"
     >
       <span
-        class="rounded-default bg-badge-purple-ol-text mr-1.5 h-2 w-2 shrink-0"
+        class="rounded-default bg-badge-purple-ol-text me-1.5 h-2 w-2 shrink-0"
         aria-hidden="true"
       ></span>
       {{ t("panel.operations") }}
     </div>
-    <span class="mr-0.5 ml-0.5 flex items-center">:</span>
+    <span class="ms-0.5 me-0.5 flex items-center">:</span>
     <div class="scroll m-0.5 flex min-h-8 flex-wrap items-center gap-2">
       <!-- Operations with Drag and Drop -->
       <draggable

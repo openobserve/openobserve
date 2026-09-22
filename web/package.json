@@ -48,7 +48,9 @@
     "@openobserve/node-sql-parser": "^0.1.5",
     "@openobserve/rrweb-player": "^0.2.1",
     "@rudderstack/analytics-js": "3.6.0",
+    "@tanstack/query-persist-client-core": "^5.101.4",
     "@tanstack/vue-form": "^1.33.3",
+    "@tanstack/vue-query": "^5.101.4",
     "@tanstack/vue-table": "^8.21.3",
     "@tanstack/vue-virtual": "^3.13.35",
     "@types/js-yaml": "^4.0.9",
@@ -165,7 +167,7 @@
     "vite": "^7.3.2",
     "vite-plugin-istanbul": "^7.2.1",
     "vite-plugin-monaco-editor": "^1.1.0",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "vitest-canvas-mock": "^1.1.4",
     "vue-tsc": "^3.3.9"
   },

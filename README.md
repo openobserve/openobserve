@@ -206,7 +206,7 @@ Deploy in High Availability mode with clustering for mission-critical workloads 
 | Aspect | OpenObserve | Datadog |
 | --- | --- | --- |
 | Deployment | Self-hosted or Cloud | SaaS only |
-| Pricing model | Per-GB (free up to 200 GB/day) | Per-host + per-GB |
+| Pricing model | Per-GB (free up to 50 GB/day) | Per-host + per-GB |
 | Open source | Yes (AGPL-3.0) | No |
 | OpenTelemetry | Native OTLP | Supported |
 | Query language | SQL + PromQL | Proprietary |

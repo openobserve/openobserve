@@ -57,7 +57,7 @@ const sessionReplay = computed({
           :label="t('synthetics.rum.collectRUM')"
           data-test="synthetics-check-rum-collect-switch"
         />
-        <p class="text-text-secondary mt-1 pl-9 text-xs!">
+        <p class="text-text-secondary mt-1 ps-9 text-xs!">
           {{ t("synthetics.rum.collectRUMDesc") }}
         </p>
       </div>

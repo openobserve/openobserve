@@ -207,7 +207,7 @@ function download() {
         <!-- The filename is the one piece of chrome worth keeping from the static
              block: it says what the download will be called. -->
         <div
-          class="border-border-default bg-surface-panel flex shrink-0 items-center gap-2 border-b py-1 pr-1 pl-3"
+          class="border-border-default bg-surface-panel flex shrink-0 items-center gap-2 border-b py-1 ps-3 pe-1"
         >
           <OIcon :name="isTerraform ? terraformIcon : 'data-object'" size="xs" />
           <span class="font-mono text-xs font-semibold opacity-75">{{ fileName }}</span>

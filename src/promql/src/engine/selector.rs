@@ -18,26 +18,74 @@
 
 use std::{sync::Arc, time::Duration};
 
-use config::meta::promql::{NAME_LABEL, value::*};
-use datafusion::error::{DataFusionError, Result};
-use futures::future::{pending, try_join_all};
+use config::meta::{
+    promql::{NAME_LABEL, value::*},
+    search::ScanStats,
+};
+use datafusion::{
+    arrow::datatypes::Schema,
+    error::{DataFusionError, Result},
+    prelude::SessionContext,
+};
+use futures::future::try_join_all;
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes};
+use infra::errors::ErrorCodes;
 use promql_parser::{
     label::{MatchOp, Matchers},
-    parser::{LabelModifier, MatrixSelector, Offset, VectorSelector},
+    parser::VectorSelector,
 };
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::Engine;
 use crate::{
-    functions, fused,
-    load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
+    ast::rewrite::remove_filter_all,
     micros,
-    promql::rewrite::remove_filter_all,
+    series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
+    utils::{metric_name, offset_micros},
 };
 
+/// One context per selected schema with its scan stats and whether the matchers still apply.
+pub(super) type SelectorContexts = Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>;
+
 impl Engine {
+    pub(super) fn selector_time_range(
+        &self,
+        selector: &VectorSelector,
+        range: Option<Duration>,
+    ) -> (i64, i64, i64) {
+        let offset = offset_micros(&selector.offset);
+        (
+            self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) - offset,
+            self.ctx.end - offset,
+            offset,
+        )
+    }
+
+    pub(super) fn selector_labels(&self) -> hashbrown::HashSet<String> {
+        let mut labels = self.label_selector.clone();
+        labels.extend(self.ctx.label_selector.iter().cloned());
+        labels
+    }
+
+    pub(super) async fn create_selector_contexts(
+        &self,
+        selector: &VectorSelector,
+        time_range: (i64, i64),
+        labels: &hashbrown::HashSet<String>,
+    ) -> Result<SelectorContexts> {
+        self.ctx
+            .table_provider
+            .create_context(
+                &self.ctx.query_ctx.org_id,
+                selector.name.as_deref().unwrap(),
+                time_range,
+                selector.matchers.clone(),
+                labels.clone(),
+                &mut equal_matcher_filters(&selector.matchers),
+            )
+            .await
+    }
+
     /// Instant vector selector --- select a single sample at each evaluation
     /// timestamp.
     ///
@@ -45,63 +93,34 @@ impl Engine {
     pub(super) async fn eval_vector_selector(
         &mut self,
         selector: &VectorSelector,
+        ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
         }
 
-        let mut selector = selector.clone();
-        if selector.name.is_none() {
-            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
-                Some(mat) => mat.value.clone(),
-                None => {
-                    return Err(DataFusionError::Plan(
-                        "VectorSelector: metric name is required".into(),
-                    ));
-                }
-            };
-            selector.name = Some(name);
-            // the matcher is fully consumed by stream selection; leaving it in
-            // would filter on the stored `__name__` column (which may keep the
-            // pre-`format_stream_name` case), leak into partition pruning, and
-            // make the selector's PromQL text unparseable on super-cluster peers
-            selector
-                .matchers
-                .matchers
-                .retain(|mat| mat.name != NAME_LABEL);
+        let selector = named_selector(selector.clone(), "VectorSelector")?;
+
+        let metrics_cache = self.selector_load_data_owned(&selector, None, ctxs).await?;
+        if metrics_cache.is_empty() {
+            return Ok(vec![]);
         }
 
-        let data = self.selector_load_data_owned(&selector, None).await?;
-
-        let metrics_cache = match data.get_range_values() {
-            Some(v) => v,
-            None => return Ok(vec![]),
-        };
-
-        let mut offset_modifier = 0;
-        if let Some(offset) = selector.offset {
-            match offset {
-                Offset::Pos(offset) => {
-                    offset_modifier = micros(offset);
-                }
-                Offset::Neg(offset) => {
-                    offset_modifier = -micros(offset);
-                }
-            }
-        };
+        let offset_modifier = offset_micros(&selector.offset);
 
         // Get all evaluation timestamps from the context
         let eval_timestamps = self.eval_ctx.timestamps();
 
-        // For each metric, select appropriate samples at each evaluation timestamp
-        // TODO: make it parallel
-        let mut result = Vec::with_capacity(metrics_cache.len());
-        for metric in metrics_cache {
+        let lookback_delta = self.ctx.lookback_delta;
+        // exemplar series carry no samples, so they must survive an empty selection
+        let keep_sampleless = self.ctx.query_ctx.query_exemplars;
+        // every series selects independently, so fan the selection out
+        let result = metrics_cache.into_par_iter().filter_map(|metric| {
             let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
 
             for &eval_ts in &eval_timestamps {
                 // Calculate lookback window for this evaluation timestamp
-                let start = eval_ts - self.ctx.lookback_delta;
+                let start = eval_ts - lookback_delta;
 
                 // Find the sample for this evaluation timestamp
                 // Binary search for the last sample before or at eval_ts (considering offset)
@@ -112,7 +131,7 @@ impl Engine {
                 let match_sample = if end_index > 0 {
                     metric.samples.get(end_index - 1).and_then(|sample| {
                         let adjusted_ts = sample.timestamp + offset_modifier;
-                        if adjusted_ts >= start && adjusted_ts <= eval_ts {
+                        if adjusted_ts > start && adjusted_ts <= eval_ts {
                             Some(sample)
                         } else {
                             None
@@ -130,18 +149,15 @@ impl Engine {
                 }
             }
 
-            // Only include metrics that have at least one sample
-            if !selected_samples.is_empty() {
-                result.push(RangeValue {
-                    labels: metric.labels,
-                    samples: selected_samples,
-                    exemplars: metric.exemplars,
-                    time_window: metric.time_window,
-                });
-            }
-        }
+            (keep_sampleless || !selected_samples.is_empty()).then_some(RangeValue {
+                labels: metric.labels,
+                samples: selected_samples,
+                exemplars: metric.exemplars,
+                time_window: metric.time_window,
+            })
+        });
 
-        Ok(result)
+        Ok(result.collect())
     }
 
     /// Range vector selector --- select a whole time range at each evaluation
@@ -150,54 +166,30 @@ impl Engine {
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
     ///
     /// MatrixSelector is a special case of VectorSelector that returns a matrix
-    /// of samples.
+    /// of samples. `ctxs` reuses contexts already created for this selector.
     pub(super) async fn eval_matrix_selector(
         &mut self,
         selector: &VectorSelector,
         range: Duration,
+        ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("matrix".to_string());
         }
 
-        let mut selector = selector.clone();
-        if selector.name.is_none() {
-            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
-                Some(mat) => mat.value.clone(),
-                None => {
-                    return Err(DataFusionError::Plan(
-                        "MatrixSelector: metric name is required".into(),
-                    ));
-                }
-            };
+        let selector = named_selector(selector.clone(), "MatrixSelector")?;
 
-            selector.name = Some(name);
-            // see eval_vector_selector: the matcher is consumed by stream selection
-            selector
-                .matchers
-                .matchers
-                .retain(|mat| mat.name != NAME_LABEL);
+        let mut values = self
+            .selector_load_data_owned(&selector, Some(range), ctxs)
+            .await?;
+        if values.is_empty() {
+            return Ok(vec![]);
         }
 
-        let data = self
-            .selector_load_data_owned(&selector, Some(range))
-            .await?;
-
-        let values = match data.get_range_values() {
-            Some(v) => v,
-            None => return Ok(vec![]),
-        };
-
         let start = std::time::Instant::now();
-        let mut values = values
-            .into_par_iter()
-            .map(|rv| RangeValue {
-                labels: rv.labels,
-                samples: rv.samples,
-                exemplars: rv.exemplars,
-                time_window: Some(TimeWindow::new(range)),
-            })
-            .collect::<Vec<_>>();
+        values.par_iter_mut().for_each(|rv| {
+            rv.time_window = Some(TimeWindow::new(range));
+        });
 
         log::info!(
             "[trace_id: {}] [PromQL Timing] eval_matrix_selector() processing took: {:?}",
@@ -206,7 +198,7 @@ impl Engine {
         );
 
         // apply offset to samples
-        let offset_modifier = get_offset_modifier(selector.offset);
+        let offset_modifier = offset_micros(&selector.offset);
         if offset_modifier != 0 {
             values.par_iter_mut().for_each(|rv| {
                 rv.samples
@@ -223,8 +215,9 @@ impl Engine {
         &mut self,
         selector: &VectorSelector,
         range: Option<Duration>,
-    ) -> Result<Value> {
-        let mut metric_values = match self.selector_load_data_inner(selector, range).await {
+        ctxs: Option<SelectorContexts>,
+    ) -> Result<Vec<RangeValue>> {
+        let mut metric_values = match self.selector_load_data_inner(selector, range, ctxs).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -237,7 +230,7 @@ impl Engine {
 
         // no data, return immediately
         if metric_values.is_empty() {
-            return Ok(Value::None);
+            return Ok(metric_values);
         }
 
         let start = std::time::Instant::now();
@@ -249,17 +242,12 @@ impl Engine {
                 exemplars.sort_by_key(|k| k.timestamp);
             }
         });
-        let values = if metric_values.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(metric_values)
-        };
         log::info!(
             "[trace_id: {}] [PromQL] sort samples by timestamps took: {:?}",
             self.trace_id,
             start.elapsed()
         );
-        Ok(values)
+        Ok(metric_values)
     }
 
     #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
@@ -267,15 +255,13 @@ impl Engine {
         &self,
         selector: &VectorSelector,
         range: Option<Duration>,
+        ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
-        let offset_modifier = get_offset_modifier(selector.offset.clone());
         // Positive offset (e.g. `offset 10m`) looks into the past, so we shift
         // the data-load window backwards by `offset_modifier`.
-        let start =
-            self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) - offset_modifier;
-        let end = self.ctx.end - offset_modifier;
+        let (start, end, offset_modifier) = self.selector_time_range(selector, range);
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
@@ -284,8 +270,6 @@ impl Engine {
             self.trace_id,
             selector.to_string(),
         );
-
-        let mut filters = equal_matcher_filters(&selector.matchers);
 
         // check for super cluster
         let trace_id = self.ctx.query_ctx.trace_id.clone();
@@ -322,18 +306,15 @@ impl Engine {
             drop(super_tx);
         }
 
-        let ctxs = self
-            .ctx
-            .table_provider
-            .create_context(
-                &self.ctx.query_ctx.org_id,
-                table_name,
-                (start, end),
-                selector.matchers.clone(),
-                self.label_selector.clone(),
-                &mut filters,
-            )
-            .await?;
+        let label_selector = self.selector_labels();
+
+        let ctxs = match ctxs {
+            Some(ctxs) => ctxs,
+            None => {
+                self.create_selector_contexts(selector, (start, end), &label_selector)
+                    .await?
+            }
+        };
 
         // check if we need to load data from local cluster
         #[cfg(feature = "enterprise")]
@@ -348,9 +329,6 @@ impl Engine {
         } else {
             ctxs
         };
-
-        let mut label_selector = self.label_selector.clone();
-        label_selector.extend(self.ctx.label_selector.iter().cloned());
 
         // Calculate step and lookback for the optimization
         let start = self.eval_ctx.start - offset_modifier;
@@ -403,7 +381,7 @@ impl Engine {
         let timeout = self.ctx.query_ctx.timeout;
         let query_task = try_join_all(tasks);
         tokio::pin!(query_task);
-        let task_results = tokio::select! {
+        let task_results: Result<Vec<_>> = tokio::select! {
             ret = &mut query_task => {
                 match ret {
                     Ok(ret) => {
@@ -412,15 +390,16 @@ impl Engine {
                         for result in ret {
                             match result {
                                 Ok(Ok(data)) => unwrapped_results.push(data),
-                                Ok(Err(_)) => {
-                                    log::error!("[trace_id {trace_id}] [PromQL] grpc search load data task timeout");
-                                    return Err(DataFusionError::Plan(
-                                        Error::ErrorCode(ErrorCodes::SearchTimeout("[PromQL] grpc search load data task timeout".to_string())).to_string()
-                                    ));
+                                Ok(Err(err)) => {
+                                    log::error!("[trace_id {trace_id}] [PromQL] grpc search load data error: {err}");
+                                    return Err(err);
                                 }
-                                Err(err) => {
-                                    log::error!("[trace_id {trace_id}] [PromQL] grpc search execute error: {err}");
-                                    return Err(DataFusionError::Plan(format!("task error: {err}")));
+                                Err(_) => {
+                                    log::error!("[trace_id {trace_id}] [PromQL] grpc search load data task timeout");
+                                    return Err(ErrorCodes::SearchTimeout(
+                                        "[PromQL] grpc search load data task timeout".to_string(),
+                                    )
+                                    .into());
                                 }
                             }
                         }
@@ -428,7 +407,7 @@ impl Engine {
                     },
                     Err(err) => {
                         log::error!("[trace_id {trace_id}] [PromQL] grpc search execute error: {err}");
-                        Err(Error::Message(err.to_string()))
+                        Err(ErrorCodes::ServerInternalError(err.to_string()).into())
                     }
                 }
             },
@@ -437,7 +416,7 @@ impl Engine {
                     handle.abort();
                 }
                 log::error!("[trace_id {trace_id}] [PromQL] grpc search timeout");
-                Err(Error::ErrorCode(ErrorCodes::SearchTimeout("[PromQL] grpc search timeout".to_string())))
+                Err(ErrorCodes::SearchTimeout("[PromQL] grpc search timeout".to_string()).into())
             },
             _ = async {
                 match abort_receiver.as_mut() {
@@ -451,12 +430,11 @@ impl Engine {
                     handle.abort();
                 }
                 log::info!("[trace_id {trace_id}] [PromQL] grpc search canceled");
-                Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery("[PromQL] grpc search canceled".to_string())))
+                Err(ErrorCodes::SearchCancelQuery("[PromQL] grpc search canceled".to_string()).into())
             }
         };
 
-        let task_results =
-            task_results.map_err(|e| DataFusionError::Plan(format!("task error: {e}")))?;
+        let task_results = task_results?;
 
         // check for super cluster
         #[cfg(feature = "enterprise")]
@@ -507,147 +485,42 @@ impl Engine {
 
         Ok(metrics)
     }
+}
 
-    /// Attempts the streaming fused path: series arrive whole from
-    /// `(__hash__, _timestamp)` ordered scans and fold straight into the
-    /// aggregation, so the sample matrix is never materialized. `None` means
-    /// the query shape or the storage layout requires the materializing path.
-    pub(super) async fn try_streaming_fused_agg(
-        &mut self,
-        matrix_selector: &MatrixSelector,
-        modifier: &Option<LabelModifier>,
-        func: Arc<dyn functions::RangeFunc>,
-        op: fused::FusedAggOp,
-    ) -> Result<Option<Value>> {
-        let query_ctx = &self.ctx.query_ctx;
-        // need_wal bails early: WAL would split series and double the context-creation cost
-        if !config::get_config()
-            .search
-            .feature_metrics_streaming_agg_enabled
-            || query_ctx.query_exemplars
-            || query_ctx.query_data
-            || query_ctx.is_super_cluster
-            || query_ctx.need_wal
-            || matches!(modifier, Some(LabelModifier::Exclude(_)))
-        {
-            return Ok(None);
-        }
-        let MatrixSelector { vs, range } = matrix_selector;
-        let range = *range;
-        let mut selector = vs.clone();
-        remove_filter_all(&mut selector);
-        if !selector.matchers.or_matchers.is_empty() || selector.at.is_some() {
-            return Ok(None);
-        }
-        if selector.name.is_none() {
-            let names = selector.matchers.find_matchers(NAME_LABEL);
-            let Some(matcher) = names.first() else {
-                return Ok(None);
-            };
-            selector.name = Some(matcher.value.clone());
-            selector
-                .matchers
-                .matchers
-                .retain(|mat| mat.name != NAME_LABEL);
-        }
-        let table_name = selector.name.clone().unwrap();
-
-        let offset = get_offset_modifier(selector.offset.clone());
-        let start = self.ctx.start - micros(range) - offset;
-        let end = self.ctx.end - offset;
-        let mut filters = equal_matcher_filters(&selector.matchers);
-        let mut label_selector = self.label_selector.clone();
-        label_selector.extend(self.ctx.label_selector.iter().cloned());
-
-        let ctxs = self
-            .ctx
-            .table_provider
-            .create_context(
-                &query_ctx.org_id,
-                &table_name,
-                (start, end),
-                selector.matchers.clone(),
-                label_selector,
-                &mut filters,
-            )
-            .await?;
-        // a second context would split series and evaluate rate windows on partial data
-        if ctxs.len() != 1 {
-            return Ok(None);
-        }
-        let (ctx, schema, scan_stats, keep_filters) = ctxs.into_iter().next().unwrap();
-        if !keep_filters {
-            selector.matchers = Matchers::empty();
-        }
-
-        let run = fused::stream::fused_agg(
-            &ctx,
-            &schema,
-            fused::stream::StreamingSelector {
-                table_name: &table_name,
-                matchers: &selector.matchers,
-                offset,
-            },
-            fused::stream::FusedShape { op, func, range },
-            modifier,
-            &self.eval_ctx,
-        );
-        let value = self.run_cancellable(run, query_ctx.timeout).await?;
-        if value.is_some() {
-            let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
-            ctx_scan_stats.add(&scan_stats);
-            if self.result_type.is_none() {
-                self.result_type = Some("matrix".to_string());
-            }
-        }
-        Ok(value)
+/// Strips placeholder matchers and rejects the selector forms no loader supports.
+pub(super) fn plain_selector(selector: &VectorSelector, kind: &str) -> Result<VectorSelector> {
+    let mut selector = selector.clone();
+    remove_filter_all(&mut selector);
+    if !selector.matchers.or_matchers.is_empty() {
+        return Err(DataFusionError::Plan(format!(
+            "{kind}: or_matchers is not supported"
+        )));
     }
-
-    /// Runs the streaming fold under the query timeout and the host's cancel signal; dropping
-    /// the future aborts the shard folds.
-    async fn run_cancellable<T>(
-        &self,
-        run: impl Future<Output = Result<T>>,
-        timeout: u64,
-    ) -> Result<T> {
-        let trace_id = &self.ctx.query_ctx.trace_id;
-        let mut abort_receiver = self
-            .ctx
-            .table_provider
-            .register_cancellation(trace_id)
-            .await?;
-        tokio::pin!(run);
-        // a cancel or an expired budget wins over a fold that happens to be ready
-        tokio::select! {
-            biased;
-            _ = async {
-                match abort_receiver.as_mut() {
-                    Some(receiver) => {
-                        let _ = receiver.await;
-                    }
-                    None => pending::<()>().await,
-                }
-            } => {
-                log::info!("[trace_id {trace_id}] [PromQL] streaming fused agg canceled");
-                Err(DataFusionError::Plan(
-                    Error::ErrorCode(ErrorCodes::SearchCancelQuery(
-                        "[PromQL] streaming fused agg canceled".to_string(),
-                    ))
-                    .to_string(),
-                ))
-            }
-            _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                log::error!("[trace_id {trace_id}] [PromQL] streaming fused agg timeout");
-                Err(DataFusionError::Plan(
-                    Error::ErrorCode(ErrorCodes::SearchTimeout(
-                        "[PromQL] streaming fused agg timeout".to_string(),
-                    ))
-                    .to_string(),
-                ))
-            }
-            ret = &mut run => ret,
-        }
+    if selector.at.is_some() {
+        return Err(DataFusionError::NotImplemented(format!(
+            "{kind}: @ modifier is not supported"
+        )));
     }
+    Ok(selector)
+}
+
+/// Lifts the `__name__` matcher into the selector name; kept as a matcher it would filter the
+/// stored column, which may hold the pre-`format_stream_name` case.
+pub(super) fn named_selector(mut selector: VectorSelector, kind: &str) -> Result<VectorSelector> {
+    if selector.name.is_some() {
+        return Ok(selector);
+    }
+    let Some(name) = metric_name(&selector) else {
+        return Err(DataFusionError::Plan(format!(
+            "{kind}: metric name is required"
+        )));
+    };
+    selector.name = Some(name);
+    selector
+        .matchers
+        .matchers
+        .retain(|mat| mat.name != NAME_LABEL);
+    Ok(selector)
 }
 
 /// Discard the already-partitioned series hashes without rebuilding a global
@@ -680,7 +553,7 @@ fn collect_loaded_metrics(mut results: Vec<LoadedMetrics>) -> Vec<RangeValue> {
     }
 }
 
-fn equal_matcher_filters(matchers: &Matchers) -> Vec<(String, Vec<String>)> {
+pub(super) fn equal_matcher_filters(matchers: &Matchers) -> Vec<(String, Vec<String>)> {
     matchers
         .matchers
         .iter()
@@ -722,21 +595,11 @@ fn merge_loaded_metrics(results: Vec<LoadedMetrics>) -> HashMap<u64, RangeValue>
     metrics
 }
 
-fn get_offset_modifier(offset: Option<Offset>) -> i64 {
-    if let Some(offset) = offset {
-        match offset {
-            Offset::Pos(offset) => micros(offset),
-            Offset::Neg(offset) => -micros(offset),
-        }
-    } else {
-        0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{sync::Arc, time::Duration};
 
+    use config::meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL};
     use promql_parser::{
         label::{MatchOp, Matchers},
         parser::{Offset, VectorSelector},
@@ -821,7 +684,7 @@ mod tests {
             at: None,
         };
 
-        engine.eval_vector_selector(&selector).await.unwrap();
+        engine.eval_vector_selector(&selector, None).await.unwrap();
 
         let matchers = captured.lock().unwrap().take().unwrap();
         assert!(matchers.matchers.iter().all(|m| m.name != NAME_LABEL));
@@ -859,7 +722,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -895,7 +758,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -931,7 +794,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -968,7 +831,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();
@@ -1004,7 +867,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
 
         assert!(result.is_err(), "expected an error, not a panic");
         assert!(
@@ -1046,7 +909,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
             .await;
 
         assert!(result.is_err(), "expected an error, not a panic");
@@ -1090,183 +953,89 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
     }
 
-    #[test]
-    fn test_get_offset_modifier_none() {
-        assert_eq!(get_offset_modifier(None), 0);
-    }
+    /// Serves one series that carries only an exemplar, as the exemplar loader produces.
+    struct ExemplarProvider;
 
-    #[test]
-    fn test_get_offset_modifier_positive() {
-        let result = get_offset_modifier(Some(Offset::Pos(Duration::from_secs(60))));
-        assert_eq!(result, 60_000_000); // 60s in micros
-    }
-
-    #[test]
-    fn test_get_offset_modifier_negative() {
-        let result = get_offset_modifier(Some(Offset::Neg(Duration::from_secs(30))));
-        assert_eq!(result, -30_000_000); // -30s in micros
-    }
-
-    mod streaming_fused_agg {
-        use config::{
-            TIMESTAMP_COL_NAME,
-            meta::{
-                promql::{HASH_LABEL, STREAMING_AGG_TABLE_SUFFIX, VALUE_LABEL},
-                search::ScanStats,
-            },
-        };
-        use datafusion::{
-            arrow::{
-                array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
-                datatypes::{DataType, Field, Schema},
-            },
-            datasource::MemTable,
-            prelude::{SessionConfig, SessionContext, col},
-        };
-        use hashbrown::HashSet;
-        use tokio::sync::oneshot;
-
-        use super::*;
-
-        const SECOND: i64 = 1_000_000;
-        const BASE: i64 = 1_000 * SECOND;
-
-        /// Serves one hash-sorted context and can hand out an already-fired cancel signal.
-        struct StreamingProvider {
-            ctx: SessionContext,
-            canceled: bool,
-            // a dropped sender reads as a cancel, so a live registration keeps it
-            cancel: std::sync::Mutex<Option<oneshot::Sender<()>>>,
-        }
-
-        #[async_trait::async_trait]
-        impl crate::TableProvider for StreamingProvider {
-            async fn create_context(
-                &self,
-                _org_id: &str,
-                _stream_name: &str,
-                _time_range: (i64, i64),
-                _matchers: Matchers,
-                _label_selector: HashSet<String>,
-                _filters: &mut [(String, Vec<String>)],
-            ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
-                Ok(vec![(
-                    self.ctx.clone(),
-                    metrics_schema(),
-                    ScanStats::default(),
-                    true,
-                )])
-            }
-
-            async fn register_cancellation(
-                &self,
-                _trace_id: &str,
-            ) -> Result<Option<oneshot::Receiver<()>>> {
-                let (sender, receiver) = oneshot::channel();
-                if self.canceled {
-                    let _ = sender.send(());
-                } else {
-                    *self.cancel.lock().unwrap() = Some(sender);
-                }
-                Ok(Some(receiver))
-            }
-        }
-
-        fn metrics_schema() -> Arc<Schema> {
-            Arc::new(Schema::new(vec![
-                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-                Field::new(HASH_LABEL, DataType::UInt64, false),
+    #[async_trait::async_trait]
+    impl crate::TableProvider for ExemplarProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            stream_name: &str,
+            _time_range: (i64, i64),
+            _matchers: Matchers,
+            _label_selector: hashbrown::HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+            use datafusion::arrow::{
+                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+                datatypes::{DataType, Field},
+            };
+            let schema = Arc::new(Schema::new(vec![
+                Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
                 Field::new(VALUE_LABEL, DataType::Float64, false),
-            ]))
-        }
-
-        /// Two counters sampled every 20 s, registered as the hash-sorted table.
-        fn provider(canceled: bool) -> StreamingProvider {
-            let rows: Vec<(i64, u64, f64)> = [7u64, u64::MAX / 2]
-                .into_iter()
-                .flat_map(|hash| {
-                    (0..10).map(move |step| (BASE + step * 20 * SECOND, hash, (step * 3) as f64))
-                })
-                .collect();
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+                Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+                Field::new("env", DataType::Utf8, false),
+            ]));
+            let ts = 1640995200000000i64 - 60_000_000;
             let batch = RecordBatch::try_new(
-                metrics_schema(),
+                schema.clone(),
                 vec![
-                    Arc::new(Int64Array::from_iter_values(rows.iter().map(|row| row.0))),
-                    Arc::new(UInt64Array::from_iter_values(rows.iter().map(|row| row.1))),
-                    Arc::new(Float64Array::from_iter_values(rows.iter().map(|row| row.2))),
+                    Arc::new(Int64Array::from(vec![ts])),
+                    Arc::new(Float64Array::from(vec![1.0])),
+                    Arc::new(UInt64Array::from(vec![7])),
+                    Arc::new(StringArray::from(vec![Some(format!(
+                        r#"[{{"_timestamp":{ts},"value":1.5,"trace_id":"abc"}}]"#
+                    ))])),
+                    Arc::new(StringArray::from(vec!["prod"])),
                 ],
             )
             .unwrap();
-            let table = MemTable::try_new(metrics_schema(), vec![vec![batch]])
-                .unwrap()
-                .with_sort_order(vec![vec![
-                    col(HASH_LABEL).sort(true, false),
-                    col(TIMESTAMP_COL_NAME).sort(true, false),
-                ]]);
-            let mut config = SessionConfig::new().with_target_partitions(3);
-            config.options_mut().optimizer.prefer_existing_sort = true;
-            let ctx = SessionContext::new_with_config(config);
-            ctx.register_table(format!("m{STREAMING_AGG_TABLE_SUFFIX}"), Arc::new(table))
-                .unwrap();
-            StreamingProvider {
-                ctx,
-                canceled,
-                cancel: Default::default(),
-            }
+            let ctx = SessionContext::new();
+            ctx.register_batch(stream_name, batch).unwrap();
+            Ok(vec![(ctx, schema, ScanStats::default(), true)])
         }
+    }
 
-        /// The flag defaults to off; flip it once for this process before the engine reads it.
-        fn enable_streaming() {
-            static ENABLE: std::sync::Once = std::sync::Once::new();
-            ENABLE.call_once(|| {
-                unsafe { std::env::set_var("ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED", "true") };
-                config::refresh_config().expect("config refresh");
-            });
-        }
-
-        async fn eval_sum_rate(provider: StreamingProvider, timeout: u64) -> Result<Value> {
-            enable_streaming();
-            let eval_ctx = EvalContext::new(
-                BASE + 60 * SECOND,
-                BASE + 180 * SECOND,
-                60 * SECOND,
-                "test_trace".into(),
-            );
-            let mut ctx = PromqlContext::new(
-                create_test_query_ctx("test_trace", "test_org", timeout),
-                provider,
+    #[tokio::test]
+    async fn test_eval_vector_selector_keeps_sampleless_series_for_exemplars() {
+        let trace_id = "test_trace_exemplars";
+        let mut query_ctx = (*create_test_query_ctx(trace_id, "test_org_exemplars", 30)).clone();
+        query_ctx.query_exemplars = true;
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                Arc::new(query_ctx),
+                ExemplarProvider,
                 vec![],
-            );
-            ctx.start = eval_ctx.start;
-            ctx.end = eval_ctx.end;
-            let mut engine = Engine::new("test_trace", Arc::new(ctx), eval_ctx);
-            let expr = promql_parser::parser::parse("sum(rate(m[1m]))").unwrap();
-            engine.exec(&expr).await.map(|(value, _)| value)
-        }
+            )),
+            create_test_eval_ctx(),
+        );
 
-        #[tokio::test]
-        async fn test_streaming_run_stops_on_cancel() {
-            let err = eval_sum_rate(provider(true), 30)
-                .await
-                .unwrap_err()
-                .to_string();
-            assert!(err.contains("canceled"), "unexpected error: {err}");
-        }
+        let selector = VectorSelector {
+            name: Some("test_metric".to_string()),
+            matchers: Matchers::empty(),
+            offset: None,
+            at: None,
+        };
 
-        #[tokio::test]
-        async fn test_streaming_run_stops_on_timeout() {
-            let err = eval_sum_rate(provider(false), 0)
-                .await
-                .unwrap_err()
-                .to_string();
-            assert!(err.contains("timeout"), "unexpected error: {err}");
-        }
+        let values = engine.eval_vector_selector(&selector, None).await.unwrap();
+        assert_eq!(values.len(), 1);
+        assert!(values[0].samples.is_empty());
+        assert_eq!(values[0].exemplars.as_ref().unwrap().len(), 1);
+        assert!(
+            values[0]
+                .labels
+                .iter()
+                .any(|l| l.name == "env" && l.value == "prod")
+        );
     }
 }

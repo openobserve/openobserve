@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="workflow-edge-delete-hint"
       class="bg-surface-base text-text-body border-border-default rounded-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-lg dark:shadow-lg"
     >
-      <OIcon name="info" class="mr-1" size="sm" />
+      <OIcon name="info" class="me-1" size="sm" />
       {{ t("workflow.canvas.edgeDeleteHint") }}
     </div>
 
@@ -193,9 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Dashed connector + `+` between the two slots — same chip as every other
          "add a step here" affordance; here it opens the Action picker. -->
     <div class="flex flex-col items-center">
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
       <FlowAddButton data-test="workflow-flow-start-add" @click="openActionPicker($event)" />
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
     </div>
 
     <WorkflowStartCard
@@ -226,9 +226,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
   >
     <div class="flex flex-col items-center">
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
       <FlowAddButton data-test="workflow-flow-action-add" @click="openActionPicker($event)" />
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
     </div>
     <WorkflowStartCard
       :tag="t('workflow.node.kindAction')"
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Connector is ALWAYS drawn for a shown point — a leaf's straight stub, or a
          branch's short side-nudged curve. Option C: the point only renders while its
          node is hovered, so at rest there's nothing here. -->
-    <span v-if="!pt.svgW" class="border-border-strong h-5 border-l-2"></span>
+    <span v-if="!pt.svgW" class="border-border-strong h-5 border-s-2"></span>
     <svg
       v-else
       :width="pt.svgW"
@@ -695,17 +695,25 @@ const appendPointsFor = (node: any) => {
   // Half a gap past the last arm: dead centre collided with the middle arm's mid-edge
   // `+`, so that one arrow appeared to carry two buttons.
   const newPathOff = (mid + 0.5) * ARM_GAP;
+  // The real source handle sits where FlowNodeCard's own spread puts it
+  // (`FlowNodeCard.vue` handleOffset), not at the node's centre — matching that here
+  // is what keeps each arm's connector its own line instead of every arm converging
+  // on one point below the node before splitting to the buttons.
+  const nodeW = findNode(node.id)?.dimensions?.width ?? 240;
+  const handleDx = (index: number) => nodeW * ((index + 1) / (handles.length + 1) - 0.5);
   return open.map((handle: string) => {
-    const off =
-      handle === NEW_BRANCH_PATH_HANDLE ? newPathOff : (handles.indexOf(handle) - mid) * ARM_GAP;
+    const idx = handles.indexOf(handle);
+    const off = handle === NEW_BRANCH_PATH_HANDLE ? newPathOff : (idx - mid) * ARM_GAP;
+    const handleTop = handle === NEW_BRANCH_PATH_HANDLE ? 0 : handleDx(idx);
+    const cx = handleTop - off;
     return {
       id: node.id,
       handle,
       ...base,
       left: base.left + off * base.zoom,
       hoverOnly: true,
-      cx: -off,
-      svgW: 2 * Math.max(Math.abs(off), 1),
+      cx,
+      svgW: 2 * Math.max(Math.abs(off), Math.abs(cx), 1),
     };
   });
 };

@@ -208,7 +208,7 @@
                  scrollbar off the card edges. -->
             <ul
               v-else
-              class="m-0 flex max-h-100 list-none flex-col gap-2.5 overflow-y-auto p-0 pt-2.5 pr-1"
+              class="m-0 flex max-h-100 list-none flex-col gap-2.5 overflow-y-auto p-0 pe-1 pt-2.5"
             >
               <li v-for="item in resolvedScorers" :key="item.id">
                 <!-- `group` drives the card's hover affordances on the CTA /
@@ -482,7 +482,8 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import type {
   EvalJob,
   EvalTargetScope,
@@ -757,10 +758,19 @@ const selectedAgent = computed<AgentFilterSelection | null>(() => {
   return agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ?? null;
 });
 
-async function loadAgents() {
+async function loadAgents(force = false) {
   const { startUs, endUs } = dateWindow.value;
   try {
-    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
+    const options = genAiAgentsQuery(orgId.value, startUs, endUs);
+    // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const response = await queryClient.fetchQuery(options);
     agents.value = response.agents;
     if (
       agentKey.value !== ALL_AGENTS_VALUE &&
@@ -833,6 +843,8 @@ function openEvaluationRun(run: JobRunRow) {
 // (KPI strip + Runs + Failures), since one picker drives the whole view.
 async function refreshAll() {
   syncDateWindow();
+  // The window watcher's own read is not forced, and does not run at all when the window is unchanged.
+  void loadAgents(true);
   await refreshRunsData();
 }
 

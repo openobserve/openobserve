@@ -60,7 +60,7 @@ the Free Software Foundation, either version 3 of the License, or
       </div>
 
       <div
-        class="border-border-default mb-3 flex items-center justify-between gap-3 border-b pr-3 pb-2 pl-4.25"
+        class="border-border-default mb-3 flex items-center justify-between gap-3 border-b ps-4.25 pe-3 pb-2"
       >
         <label
           v-if="filteredEntries.length > 0"
@@ -95,7 +95,7 @@ the Free Software Foundation, either version 3 of the License, or
               :data-test="`scorer-library-item-${entry.name}`"
               @click="toggle(entry)"
             >
-              <div class="shrink-0 pr-2">
+              <div class="shrink-0 pe-2">
                 <OCheckbox
                   :model-value="isSelected(entry.name)"
                   @update:model-value="toggle(entry)"
@@ -123,6 +123,8 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
+import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -344,8 +346,14 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
     );
   } catch (err: any) {
     if (err?.response?.status === 409) {
-      const refreshed = await onlineEvalsService.scoreConfigs.list(props.orgId);
-      const found = refreshed.find((row) => row.name === name);
+      const options = scoreConfigsQuery(props.orgId);
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+      const refreshed = await queryClient.fetchQuery(options);
+      const found = refreshed.find((row: any) => row.name === name);
       if (found) return found;
     }
     throw err;

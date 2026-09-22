@@ -38,7 +38,7 @@
     <!-- All consumers render in FORM MODE: the three controls are name=-owned
              by the TanStack form — no v-model, no manual error refs; schema errors
              surface post-submit via the OForm* wrappers (R3). -->
-    <div class="ml-0">
+    <div class="ms-0">
       <OFormSelect
         :name="`${namePrefix}.column`"
         :options="filteredFields"
@@ -61,7 +61,7 @@
            regardless of AI-chat mode — truncation happens in every mode. -->
       <OTooltip v-if="condition.column" :content="columnDisplay" />
     </div>
-    <div class="ml-0">
+    <div class="ms-0">
       <OFormSelect
         :name="`${namePrefix}.operator`"
         :options="triggerOperators"
@@ -75,7 +75,7 @@
       />
       <OTooltip v-if="condition.operator" :content="condition.operator" />
     </div>
-    <div v-if="!isUnaryOperator(condition.operator)" class="ml-0">
+    <div v-if="!isUnaryOperator(condition.operator)" class="ms-0">
       <OFormInput
         :name="`${namePrefix}.value`"
         :placeholder="t('common.value')"

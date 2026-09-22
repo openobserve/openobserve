@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="absolute inset-y-0 left-0 z-10 w-1 bg-current" :class="severityClass" />
 
     <!-- Count + share bar -->
-    <div class="w-28 flex-shrink-0 pr-1 pl-3">
+    <div class="w-28 flex-shrink-0 ps-3 pe-1">
       <div
         class="text-text-body text-sm font-bold tabular-nums"
         :data-test="`pattern-card-${index}-frequency`"

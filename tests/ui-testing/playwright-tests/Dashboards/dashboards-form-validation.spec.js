@@ -41,6 +41,11 @@ async function createOwnedDashboard(page, pm, prefix) {
  */
 async function addBarPanel(pm, panelName) {
     await pm.dashboardCreate.addPanel();
+    await configureAndSaveBarPanel(pm, panelName);
+}
+
+/** The panel-editor half of addBarPanel, for callers already inside the editor. */
+async function configureAndSaveBarPanel(pm, panelName) {
     await pm.chartTypeSelector.selectChartType('bar');
     await pm.chartTypeSelector.selectStreamType('logs');
     await pm.chartTypeSelector.selectStream('e2e_automate');
@@ -1118,23 +1123,28 @@ test.describe("Dashboard AddPanel panel name form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-AP-001: Panel name required error on empty save');
 
-        // Clear any pre-filled name
-        await pm.dashboardsFormValidation.clearPanelName();
+        // A NEW panel names itself, and useAutoName re-arms the moment an emptied
+        // name blurs — the Save click blurs the field first, so the submit that
+        // follows carries the regenerated name and the panel saves. The required
+        // rule is only reachable on a SAVED panel, where auto-naming is off
+        // (useAutoName is passed `enabled: () => !editMode`), so validate there.
+        const panelName = uniqueName('e2e_fv_panel_required');
+        await configureAndSaveBarPanel(pm, panelName);
+        await pm.dashboardPanelActions.selectPanelAction(panelName, 'Edit');
+        await pm.dashboardsFormValidation.getPanelNameTriggerLocator()
+            .waitFor({ state: 'visible', timeout: 15000 });
 
-        // Attempt to save
+        // Clear the name and attempt to save
+        await pm.dashboardsFormValidation.clearPanelName();
         await pm.dashboardsFormValidation.getPanelSaveBtnLocator().click();
 
-        const nameError  = pm.dashboardsFormValidation.getPanelNameErrorLocator();
-        const saveBtn    = pm.dashboardsFormValidation.getPanelSaveBtnLocator();
+        const nameError = pm.dashboardsFormValidation.getPanelNameErrorLocator();
+        await expect(nameError).toBeVisible({ timeout: 10000 });
+        await expect(nameError).toContainText(/required/i);
 
-        const errorVisible = await nameError.isVisible().catch(() => false);
-        const btnDisabled  = await saveBtn.isDisabled().catch(() => false);
-
-        expect(errorVisible || btnDisabled).toBe(true);
-        if (errorVisible) {
-            await expect(nameError).toContainText(/required/i);
-        }
-        testLogger.info('Panel name required error or disabled save confirmed');
+        // The panel must not have been saved: the editor is still open.
+        await expect(pm.dashboardsFormValidation.getPanelSaveBtnLocator()).toBeVisible();
+        testLogger.info('Panel name required error confirmed, panel not saved');
     });
 
     test("should enable save when a valid panel name is entered", {

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="flex items-end gap-3">
-          <div class="claim-parser-select col-auto min-w-100">
+          <div class="claim-parser-select col-auto min-w-100 max-md:w-full max-md:min-w-0">
             <OSelect
               v-model="claimParserFunction"
               :options="functionOptions"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="rounded-default bg-surface-subtle mb-4 p-4">
               <div class="mb-2 font-medium">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
               <div class="mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
-              <div class="ml-4">
+              <div class="ms-4">
                 <div class="mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
                 <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
               </div>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Recent Errors Section -->
             <div
               v-if="claimParserFunction"
-              class="rounded-default bg-surface-subtle border-l-status-negative border-l-3 p-4"
+              class="rounded-default bg-surface-subtle border-s-status-negative border-s-3 p-4"
             >
               <div class="mb-2 flex items-center">
                 <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
@@ -129,10 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(error, index) in recentErrors.slice(0, 3)"
                   :key="index"
-                  class="rounded-default bg-status-error-bg border-l-status-negative mb-1 border-l-2 p-2"
+                  class="rounded-default bg-status-error-bg border-s-status-negative mb-1 border-s-2 p-2"
                 >
                   <div class="mb-1 flex items-start">
-                    <OIcon name="error" size="xs" class="mt-1 mr-1" />
+                    <OIcon name="error" size="xs" class="me-1 mt-1" />
                     <div class="flex-1">
                       <div class="text-xs font-medium">{{ error.error_type }}</div>
                       <div class="text-text-muted text-xs">
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-slot="{ isSubmitting }"
           class="flex items-start gap-x-2"
         >
-          <div class="w-[18.75rem] shrink-0">
+          <div class="w-[18.75rem] shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1">
             <OFormInput
               data-test="domain-management-new-domain-input"
               name="newDomain"
@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Specific allowed users section -->
-              <div v-if="domain.policy === 'allow_specific'" class="specific-users-section ml-6">
+              <div v-if="domain.policy === 'allow_specific'" class="specific-users-section ms-6">
                 <OForm
                   :ref="(el) => setEmailFormRef(domain.name, el)"
                   :schema="getEmailSchema(domain.name)"
@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Specific blocked users section (mirrors the allow-email OForm pattern) -->
-              <div v-if="domain.policy === 'block_specific'" class="specific-users-section ml-6">
+              <div v-if="domain.policy === 'block_specific'" class="specific-users-section ms-6">
                 <OForm
                   :ref="(el) => setBlockedEmailFormRef(domain.name, el)"
                   :schema="getEmailSchema(domain.name)"
@@ -497,7 +497,8 @@ import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
 import { formatDistanceToNow } from "date-fns";
 import jstransform from "@/services/jstransform";
-import organizations from "@/services/organizations";
+import { updateOrgSettingsMutation } from "@/services/organizations.queries";
+import { useMutation } from "@tanstack/vue-query";
 import searchService from "@/services/search";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -536,6 +537,11 @@ const pendingRemoveEmail = ref<{
 } | null>(null);
 const store = useStore();
 const router = useRouter();
+
+// Domain settings live on the meta org, not the selected one.
+const updateMetaOrgSettings = useMutation(() =>
+  updateOrgSettingsMutation(store.state.zoConfig.meta_org),
+);
 
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
@@ -855,10 +861,7 @@ const saveClaimParserFunction = async () => {
       claim_parser_function: claimParserFunction.value || "",
     };
 
-    await organizations.post_organization_settings(
-      store.state.zoConfig.meta_org,
-      orgSettingsPayload,
-    );
+    await updateMetaOrgSettings.mutateAsync(orgSettingsPayload);
 
     // Update store with new settings
     const updatedSettings: any = {

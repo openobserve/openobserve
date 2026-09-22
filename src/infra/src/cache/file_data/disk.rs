@@ -119,6 +119,7 @@ pub struct FileData {
     max_size: usize,
     cur_size: usize,
     root_dir: String,
+    canonical_root: OnceLock<PathBuf>,
     multi_dir: Vec<String>,
     file_type: FileType,
     data: CacheStrategy,
@@ -227,6 +228,7 @@ impl FileData {
                 cfg.common.data_cache_dir,
                 storage::format_key("", true),
             ),
+            canonical_root: OnceLock::new(),
             multi_dir: cfg
                 .disk_cache
                 .multi_dir
@@ -247,8 +249,28 @@ impl FileData {
         format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file)
     }
 
+    /// Resolve a cache key to an on-disk path, returning `None` when it would
+    /// escape `root_dir`. The cache namespace is flat, so a `..`/absolute key or
+    /// any path that canonicalizes outside the cache root is a traversal attempt.
+    fn safe_read_path(&self, file: &str) -> Option<String> {
+        if key_escapes(file) {
+            return None;
+        }
+        let path = self.get_file_path(file);
+        let canonical_root = match self.canonical_root.get() {
+            Some(root) => root,
+            None => {
+                let root = std::fs::canonicalize(&self.root_dir).ok()?;
+                let _ = self.canonical_root.set(root);
+                self.canonical_root.get()?
+            }
+        };
+        let resolved = std::fs::canonicalize(&path).ok()?;
+        resolved.starts_with(canonical_root).then_some(path)
+    }
+
     async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
-        let file_path = self.get_file_path(file);
+        let file_path = self.safe_read_path(file)?;
         tokio::task::spawn_blocking(move || match get_file_contents(&file_path, range) {
             Ok(data) => Some(Bytes::from(data)),
             Err(_) => None,
@@ -259,7 +281,7 @@ impl FileData {
     }
 
     async fn get_size(&self, file: &str) -> Option<usize> {
-        let file_path = self.get_file_path(file);
+        let file_path = self.safe_read_path(file)?;
         match get_file_size(&file_path) {
             Ok(v) => Some(v as usize),
             Err(_) => None,
@@ -619,6 +641,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn key_escapes(file: &str) -> bool {
+    use std::path::Component;
+    Path::new(file)
+        .components()
+        .any(|c| !matches!(c, Component::Normal(_) | Component::CurDir))
+}
+
 #[inline]
 fn get_file_reader(file: &str) -> Option<&FileData> {
     if !get_config().disk_cache.enabled {
@@ -644,7 +673,13 @@ pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<G
             source: Box::new(std::io::Error::other("file not found")),
         });
     };
-    let path = PathBuf::from(files.get_file_path(file));
+    let Some(safe_path) = files.safe_read_path(file) else {
+        return Err(object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(std::io::Error::other("file not found")),
+        });
+    };
+    let path = PathBuf::from(safe_path);
     let (metadata, fp) = std::fs::File::open(&path)
         .and_then(|f| Ok((f.metadata()?, f)))
         .map_err(|e| object_store::Error::NotFound {
@@ -687,18 +722,11 @@ pub async fn get_size(file: &str) -> Option<usize> {
     files.get_size(file).await
 }
 
-/// Batched range read against the disk cache: one `File::open` followed
-/// by N `pread`s, all inside one `block_in_place`. Returns one `Bytes`
-/// per input range, in input order. This is the hot path for the search
-/// side's `.bf` block fetches — without it each range turns into a
-/// separate `File::open` and async task spawn, which dominates wall
-/// clock for queries touching many buckets.
-///
-/// Returns `Err(NotFound)` when the file isn't in the disk cache; the
-/// caller falls back to remote storage.
 #[cfg(unix)]
 pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Result<Vec<Bytes>> {
-    use std::os::unix::fs::FileExt;
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
 
     let Some(files) = get_file_reader(file) else {
         return Err(object_store::Error::NotFound {
@@ -706,31 +734,43 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Resu
             source: Box::new(std::io::Error::other("file not found")),
         });
     };
-    let path = PathBuf::from(files.get_file_path(file));
+    let Some(safe_path) = files.safe_read_path(file) else {
+        return Err(object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(std::io::Error::other("file not found")),
+        });
+    };
+    let path = PathBuf::from(safe_path);
     let ranges_owned: Vec<Range<u64>> = ranges.to_vec();
     let file_label = file.to_string();
 
-    tokio::task::block_in_place(move || -> object_store::Result<Vec<Bytes>> {
+    let read = move || -> object_store::Result<Vec<Bytes>> {
         let f = std::fs::File::open(&path).map_err(|e| object_store::Error::NotFound {
             path: file_label.clone(),
             source: Box::new(e),
         })?;
-        let mut out = Vec::with_capacity(ranges_owned.len());
-        for r in &ranges_owned {
-            if r.start > r.end {
-                return Err(crate::storage::Error::BadRange(file_label.clone()).into());
+        crate::storage::read_ranges_from_file(&f, &ranges_owned).map_err(|error| {
+            object_store::Error::Generic {
+                store: "DiskCache",
+                source: Box::new(error),
             }
-            let len = (r.end - r.start) as usize;
-            let mut buf = vec![0u8; len];
-            f.read_exact_at(&mut buf, r.start)
-                .map_err(|e| object_store::Error::Generic {
-                    store: "DiskCache",
-                    source: Box::new(e),
-                })?;
-            out.push(Bytes::from(buf));
-        }
-        Ok(out)
-    })
+        })
+    };
+    if tokio::runtime::Handle::try_current().is_ok_and(|handle| {
+        matches!(
+            handle.runtime_flavor(),
+            tokio::runtime::RuntimeFlavor::MultiThread
+        )
+    }) {
+        tokio::task::block_in_place(read)
+    } else {
+        tokio::task::spawn_blocking(read)
+            .await
+            .map_err(|error| object_store::Error::Generic {
+                store: "DiskCache",
+                source: Box::new(error),
+            })?
+    }
 }
 
 #[cfg(not(unix))]
@@ -1435,6 +1475,110 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn batched_ranges_preserve_bounds_and_order() {
+        assert_batched_ranges().await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "current_thread")]
+    async fn batched_ranges_support_current_thread_runtime() {
+        assert_batched_ranges().await;
+    }
+
+    #[cfg(unix)]
+    async fn assert_batched_ranges() {
+        let key = format!(
+            "files/default/logs/ranges/2026/09/20/10/{}.parquet",
+            config::ider::uuid()
+        );
+        assert!(get_config().disk_cache.enabled);
+        set(&key, Bytes::from_static(b"0123456789abcdef"))
+            .await
+            .unwrap();
+        assert_eq!(
+            get_ranges(&key, &[10..14, 1..5, 3..7, 1..5, 14..20])
+                .await
+                .unwrap(),
+            vec![
+                Bytes::from_static(b"abcd"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"3456"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"ef")
+            ]
+        );
+        assert!(get_ranges("missing", &[]).await.unwrap().is_empty());
+        for range in [Range { start: 7, end: 3 }, 3..3, 16..17] {
+            assert!(
+                get_ranges(&key, std::slice::from_ref(&range))
+                    .await
+                    .is_err()
+            );
+        }
+        if usize::BITS == 64 {
+            assert_eq!(
+                get_ranges(&key, std::slice::from_ref(&(14..u64::MAX)))
+                    .await
+                    .unwrap(),
+                vec![Bytes::from_static(b"ef")]
+            );
+        }
+        remove(&key).await.unwrap();
+        assert!(matches!(
+            get_ranges(&key, std::slice::from_ref(&(0..1)))
+                .await
+                .unwrap_err(),
+            object_store::Error::NotFound { .. }
+        ));
+    }
+
+    #[test]
+    fn key_escapes_rejects_traversal_and_absolute() {
+        assert!(key_escapes("../etc/passwd"));
+        assert!(key_escapes("files/../../etc/passwd"));
+        assert!(key_escapes("/etc/passwd"));
+        assert!(!key_escapes(
+            "files/default/logs/disk/2022/10/03/10/1_1_1.parquet"
+        ));
+        assert!(!key_escapes(
+            "metrics_results/default/2022/10/03/10/x_1_2_3.pb"
+        ));
+    }
+
+    #[tokio::test]
+    async fn safe_read_path_blocks_traversal_allows_legit() {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            FileType::Data,
+            get_config().disk_cache.max_size,
+            "lru",
+        );
+        let file_key = "files/default/logs/disk/2022/10/03/10/traversal_guard_1.parquet";
+        let content = Bytes::from("legit-bytes");
+        let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
+        file_data
+            .set(&file_key, &tmp_file, content.len())
+            .await
+            .unwrap();
+
+        // legit cached key still reads
+        assert_eq!(file_data.get(&file_key, None).await, Some(content.clone()));
+
+        // a secret planted above the cache root must not be reachable via traversal
+        let secret = format!(
+            "{}../escape_target_{}.txt",
+            file_data.root_dir,
+            std::process::id()
+        );
+        std::fs::write(&secret, b"TOP SECRET").unwrap();
+        let evil = format!("../escape_target_{}.txt", std::process::id());
+        assert!(file_data.get(&evil, None).await.is_none());
+        assert!(file_data.get_size(&evil).await.is_none());
+        assert!(file_data.get("/etc/hosts", None).await.is_none());
+        let _ = std::fs::remove_file(&secret);
+    }
 
     #[tokio::test]
     async fn test_disk_lru_cache_set_file() {

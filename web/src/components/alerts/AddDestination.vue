@@ -55,9 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="border-card-glass-border rounded-default flex items-center border p-2"
                   data-test="destination-type-readonly"
                 >
-                  <OIcon :name="getDestinationTypeIcon(dtVal)" size="md" class="mr-2" />
+                  <OIcon :name="getDestinationTypeIcon(dtVal)" size="md" class="me-2" />
                   <span class="text-sm">{{ getDestinationTypeName(dtVal) }}</span>
-                  <OTag type="readonlyFlag" value="readonly" class="ml-2">{{
+                  <OTag type="readonlyFlag" value="readonly" class="ms-2">{{
                     t("alert_destinations.readonly")
                   }}</OTag>
                 </div>
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("alert_destinations.custom_headers") }}
                 </div>
                 <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
-                  <div class="ml-0 w-5/12">
+                  <div class="ms-0 w-5/12">
                     <OFormInput
                       :data-test="`add-destination-header-${header['key']}-key-input`"
                       :name="`apiHeaders[${index}].key`"
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="ml-0 w-5/12">
+                  <div class="ms-0 w-5/12">
                     <OFormInput
                       :data-test="`add-destination-header-${header['key']}-value-input`"
                       :name="`apiHeaders[${index}].value`"
@@ -172,10 +172,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="ml-0 w-1/6">
+                  <div class="ms-0 w-1/6">
                     <OButton
                       :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                      class="ml-1"
+                      class="ms-1"
                       variant="ghost"
                       size="icon-circle-sm"
                       :title="t('alert_templates.edit')"
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       data-test="add-destination-add-header-btn"
                       v-if="index === apiHeaders.length - 1"
-                      class="ml-1"
+                      class="ms-1"
                       variant="ghost"
                       size="icon-circle-sm"
                       :title="t('alert_templates.edit')"
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Tabs for non-alert destinations OR custom alert destinations -->
           <div v-if="!isAlerts || (isAlerts && dtVal === 'custom')" class="w-full pb-3">
-            <div class="app-tabs-container mr-2 h-9 w-fit">
+            <div class="app-tabs-container me-2 h-9 w-fit">
               <AppTabs
                 data-test="add-destination-tabs"
                 :tabs="tabs"
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="typeVal === 'email' && !getFormattedTemplates.length"
             class="mb-3 flex w-full items-center"
           >
-            <div class="mr-2 text-sm font-medium">
+            <div class="me-2 text-sm font-medium">
               {{ t("alert_destinations.noEmailTemplates") }}
             </div>
             <OButton variant="outline" size="sm" @click="createEmailTemplate">{{
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="w-full py-2">
               <div class="py-1 font-bold">{{ t("alert_destinations.headers") }}</div>
               <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
-                <div class="ml-0 w-5/12">
+                <div class="ms-0 w-5/12">
                   <OFormInput
                     :data-test="`add-destination-header-${header['key']}-key-input`"
                     :name="`apiHeaders[${index}].key`"
@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     tabindex="0"
                   />
                 </div>
-                <div class="ml-0 w-5/12">
+                <div class="ms-0 w-5/12">
                   <OFormInput
                     :data-test="`add-destination-header-${header['key']}-value-input`"
                     :name="`apiHeaders[${index}].value`"
@@ -331,10 +331,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     tabindex="0"
                   />
                 </div>
-                <div class="ml-0 w-1/6">
+                <div class="ms-0 w-1/6">
                   <OButton
                     :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                    class="ml-1"
+                    class="ms-1"
                     variant="ghost"
                     size="icon-circle-sm"
                     :title="t('alert_templates.edit')"
@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     data-test="add-destination-add-header-btn"
                     v-if="index === apiHeaders.length - 1"
-                    class="ml-1"
+                    class="ms-1"
                     variant="ghost"
                     size="icon-circle-sm"
                     :title="t('alert_templates.edit')"
@@ -472,10 +472,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OPageLayout>
 </template>
 <script lang="ts" setup>
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
 import type { PropType } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -654,6 +656,13 @@ const slackManifestReady = ref(false);
 const originalSlackWebhookUrl = ref("");
 
 const isUpdatingDestination = ref(false);
+
+const orgId = useOrgId();
+// One mutation for both branches: the caller picks create vs update, the
+// declaration owns the cache consequence.
+const saveDestinationWrite = useMutation(() =>
+  saveDestinationMutation(orgId.value, () => isUpdatingDestination.value),
+);
 const router = useRouter();
 
 // Prebuilt destinations composable
@@ -1294,6 +1303,8 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
       );
     }
 
+    // `createDestination`/`updateDestination` above come from usePrebuiltDestinations,
+    // which invalidates the scope itself.
     emit("get:destinations");
     emit("cancel:hideform");
   } catch {
@@ -1341,12 +1352,8 @@ function saveCustomDestination(value: AddDestinationForm) {
       button: "Update Destination",
       page: "Add Destination",
     });
-    return destinationService
-      .update({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: value.name,
-        data: payload,
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: value.name, data: payload })
       .then(() => {
         dismiss();
         emit("get:destinations");
@@ -1371,12 +1378,8 @@ function saveCustomDestination(value: AddDestinationForm) {
       button: "Create Destination",
       page: "Add Destination",
     });
-    return destinationService
-      .create({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: value.name,
-        data: payload,
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: value.name, data: payload })
       .then(() => {
         dismiss();
         emit("get:destinations");

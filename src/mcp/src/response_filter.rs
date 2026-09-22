@@ -18,20 +18,14 @@
 //! Reduces token usage by filtering tool responses based on the requested
 //! `DetailLevel`. Supports two mechanisms:
 //!
-//! 1. **Custom transformers** for complex tools (SearchSQL, testFunction)
+//! 1. **Custom transformers** for complex tools (SearchSQL, SearchAround)
 //! 2. **Declarative `summary_fields`** config from `x-o2-mcp` extensions
 
 use serde_json::{Map, Value, json};
 
 use super::{tools::get_summary_config, types::*};
 
-/// Maximum number of hits to include in SearchSQL summary responses
-const SEARCH_SQL_MAX_HITS: usize = 100;
-/// Maximum number of results to include in testFunction summary responses
-const TEST_FUNCTION_MAX_RESULTS: usize = 5;
-
-/// Fields to keep from SearchSQL responses (everything else is dropped)
-/// Fields to keep from SearchSQL responses (everything else is dropped)
+/// Dropping `data`/`format`/`advisory` would empty every `output_format` response.
 const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
     "took",
     "hits",
@@ -41,6 +35,9 @@ const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
     "columns",
     "scan_size",
     "function_error",
+    "data",
+    "format",
+    "advisory",
 ];
 
 /// Filter a tool's response body based on the requested detail level.
@@ -50,7 +47,7 @@ const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
 /// For tools with `summary_fields` config, the response is always normalized to
 /// `{ "total": N, "items": [...] }` regardless of detail level. The difference:
 /// - `DetailLevel::Full`: normalize only (all fields per item, standard wrapper)
-/// - `DetailLevel::Summary`: normalize + extract declared fields + cap at 50 items
+/// - `DetailLevel::Summary`: normalize + extract declared fields
 ///
 /// For tools without config, `Full` returns unchanged; `Summary` tries custom transformers.
 pub fn filter_response(tool_name: &str, response_body: &str, detail: &DetailLevel) -> String {
@@ -103,87 +100,29 @@ pub fn filter_response(tool_name: &str, response_body: &str, detail: &DetailLeve
 /// Apply a custom transformer for tools with complex response shapes.
 fn apply_custom_transformer(tool_name: &str, response_body: &str) -> Option<String> {
     match tool_name {
-        "SearchSQL" | "SearchSQLAroundKey" => Some(filter_search_sql(response_body)),
-        "testFunction" => Some(filter_test_function(response_body)),
+        "SearchSQL" | "SearchAround" => Some(filter_search_response(response_body)),
         _ => None,
     }
 }
 
-/// Filter SearchSQL responses: strip noisy metadata, cap hits at 100.
-///
-/// Keeps only: took, hits (capped), total, from, size, columns, scan_size, function_error.
-/// Drops: took_detail, cached_ratio, result_cache_ratio, scan_files, scan_records,
-/// idx_scan_size, trace_id, response_type, histogram_interval, new_start_time,
-/// new_end_time, work_group, order_by, order_by_metadata, converted_histogram_query,
-/// is_histogram_eligible, query_index, peak_memory_usage, is_partial.
-fn filter_search_sql(response_body: &str) -> String {
+/// Keep only `SEARCH_SQL_KEEP_FIELDS`: noisy metadata is dropped, result rows never are.
+fn filter_search_response(response_body: &str) -> String {
     let parsed: Value = match serde_json::from_str(response_body) {
         Ok(v) => v,
         Err(_) => return response_body.to_string(),
     };
-
-    let obj = match parsed.as_object() {
-        Some(o) => o,
-        None => return response_body.to_string(),
+    let Some(obj) = parsed.as_object() else {
+        return response_body.to_string();
     };
 
-    // Build a new object with only the fields we want
-    let mut result = serde_json::Map::new();
+    let mut result = Map::new();
     for &field in SEARCH_SQL_KEEP_FIELDS {
         if let Some(val) = obj.get(field) {
             result.insert(field.to_string(), val.clone());
         }
     }
 
-    // Cap hits at SEARCH_SQL_MAX_HITS
-    if let Some(hits) = result.get_mut("hits")
-        && let Some(arr) = hits.as_array_mut()
-        && arr.len() > SEARCH_SQL_MAX_HITS
-    {
-        let original_len = arr.len();
-        arr.truncate(SEARCH_SQL_MAX_HITS);
-        result.insert(
-            "_hits_capped".to_string(),
-            json!({
-                "original": original_len,
-                "shown": SEARCH_SQL_MAX_HITS
-            }),
-        );
-    }
-
     serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| response_body.to_string())
-}
-
-/// Filter testFunction responses: limit results count.
-fn filter_test_function(response_body: &str) -> String {
-    let mut parsed: Value = match serde_json::from_str(response_body) {
-        Ok(v) => v,
-        Err(_) => return response_body.to_string(),
-    };
-
-    let obj = match parsed.as_object_mut() {
-        Some(o) => o,
-        None => return response_body.to_string(),
-    };
-
-    // Truncate results array
-    if let Some(results) = obj.get_mut("results")
-        && let Some(arr) = results.as_array_mut()
-    {
-        let original_len = arr.len();
-        arr.truncate(TEST_FUNCTION_MAX_RESULTS);
-        if original_len > TEST_FUNCTION_MAX_RESULTS {
-            obj.insert(
-                "_truncated".to_string(),
-                json!({
-                    "original_results": original_len,
-                    "shown_results": TEST_FUNCTION_MAX_RESULTS
-                }),
-            );
-        }
-    }
-
-    serde_json::to_string(&parsed).unwrap_or_else(|_| response_body.to_string())
 }
 
 /// Normalize a list response to `{ "total": N, "items": [...] }`.
@@ -327,7 +266,7 @@ mod tests {
     // -- Custom transformer tests --
 
     #[test]
-    fn test_search_sql_caps_hits_at_100() {
+    fn test_search_sql_returns_every_hit() {
         let hits: Vec<Value> = (0..150)
             .map(|i| json!({"_timestamp": i, "log": format!("line {}", i)}))
             .collect();
@@ -345,13 +284,136 @@ mod tests {
         let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
         let parsed: Value = serde_json::from_str(&result).unwrap();
 
-        assert_eq!(
-            parsed["hits"].as_array().unwrap().len(),
-            SEARCH_SQL_MAX_HITS
-        );
+        assert_eq!(parsed["hits"].as_array().unwrap().len(), 150);
+        assert!(parsed.get("_hits_capped").is_none());
         assert_eq!(parsed["total"], 150);
         assert_eq!(parsed["took"], 42);
-        assert_eq!(parsed["_hits_capped"]["original"], 150);
+    }
+
+    #[test]
+    fn test_search_sql_keeps_agent_output_format_payload() {
+        // `agent_options.output_format` moves the rows into `data` and clears
+        // `hits`; the summary filter must not drop that payload.
+        let body = serde_json::to_string(&json!({
+            "hits": [],
+            "total": 2,
+            "took": 5,
+            "columns": ["_timestamp", "service_name"],
+            "from": 0,
+            "size": 2,
+            "scan_size": 4,
+            "format": "csv",
+            "data": "_timestamp,service_name\n1788624716442729,checkout-api\n1788624716438585,search-api",
+            "trace_id": "abc-123"
+        }))
+        .unwrap();
+
+        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(parsed["format"], "csv");
+        assert!(parsed["data"].as_str().unwrap().contains("checkout-api"));
+        assert_eq!(parsed["total"], 2);
+        // still filtered
+        assert!(parsed.get("trace_id").is_none());
+    }
+
+    #[test]
+    fn test_search_sql_keeps_ndjson_fallback_advisory() {
+        // The sparse-result fallback returns ndjson plus an `advisory`
+        // explaining why; without it the caller cannot tell the shape changed.
+        let body = serde_json::to_string(&json!({
+            "hits": [],
+            "total": 1,
+            "format": "ndjson",
+            "data": "{\"log\":\"one\"}",
+            "advisory": "result is sparse (24 columns, 80% empty cells); returned as ndjson instead"
+        }))
+        .unwrap();
+
+        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(parsed["format"], "ndjson");
+        assert!(parsed["advisory"].as_str().unwrap().contains("sparse"));
+    }
+
+    #[test]
+    fn test_data_block_passes_through_verbatim() {
+        let body = serde_json::to_string(&json!({
+            "hits": [], "total": 2, "format": "csv",
+            "data": "a,b\n1,2\n3,4",
+        }))
+        .unwrap();
+        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(parsed["data"], "a,b\n1,2\n3,4");
+        assert!(parsed.get("_data_capped").is_none());
+        assert_eq!(parsed["format"], "csv");
+    }
+
+    #[test]
+    fn test_search_around_strips_metadata_without_capping() {
+        let hits: Vec<Value> = (0..150)
+            .map(|i| json!({ "_timestamp": i, "log": "x" }))
+            .collect();
+        let body = serde_json::to_string(&json!({
+            "took": 5,
+            "hits": hits,
+            "total": 150,
+            "from": 0,
+            "size": 150,
+            "scan_size": 28943,
+            "trace_id": "abc-123",
+            "took_detail": { "total": 5 },
+        }))
+        .unwrap();
+
+        let result = filter_response("SearchAround", &body, &DetailLevel::Summary);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(parsed["hits"].as_array().unwrap().len(), 150);
+        assert!(parsed.get("_hits_capped").is_none());
+        assert_eq!(parsed["total"], 150);
+        assert!(parsed.get("trace_id").is_none());
+        assert!(parsed.get("took_detail").is_none());
+    }
+
+    #[test]
+    fn test_search_around_keeps_the_records_after_the_key() {
+        // around returns [before ... key ... after]: a tail trim answers "nothing happened after".
+        let mut hits: Vec<Value> = Vec::new();
+        for side in ["before", "after"] {
+            for i in 0..5 {
+                hits.push(json!({ "side": side, "i": i, "stacktrace": "x".repeat(9000) }));
+            }
+        }
+        let body =
+            serde_json::to_string(&json!({ "hits": hits, "total": 10, "size": 10 })).unwrap();
+
+        let result = filter_response("SearchAround", &body, &DetailLevel::Summary);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        let kept = parsed["hits"].as_array().unwrap();
+        assert_eq!(kept.len(), 10);
+        assert_eq!(kept.iter().filter(|h| h["side"] == "after").count(), 5);
+        assert!(parsed.get("_hits_capped").is_none());
+    }
+
+    #[test]
+    fn test_search_around_full_detail_is_untouched() {
+        let body = serde_json::to_string(&json!({
+            "hits": [{ "log": "x" }],
+            "total": 1,
+            "trace_id": "abc-123",
+        }))
+        .unwrap();
+
+        let result = filter_response("SearchAround", &body, &DetailLevel::Full);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(parsed["trace_id"], "abc-123");
     }
 
     #[test]
@@ -447,7 +509,7 @@ mod tests {
     }
 
     #[test]
-    fn test_test_function_truncates_results() {
+    fn test_test_function_returns_every_result() {
         let results: Vec<Value> = (0..20)
             .map(|i| json!({"output": format!("r{}", i)}))
             .collect();
@@ -456,11 +518,8 @@ mod tests {
         let result = filter_response("testFunction", &body, &DetailLevel::Summary);
         let parsed: Value = serde_json::from_str(&result).unwrap();
 
-        assert_eq!(
-            parsed["results"].as_array().unwrap().len(),
-            TEST_FUNCTION_MAX_RESULTS
-        );
-        assert_eq!(parsed["_truncated"]["original_results"], 20);
+        assert_eq!(parsed["results"].as_array().unwrap().len(), 20);
+        assert!(parsed.get("_truncated").is_none());
     }
 
     // -- Declarative summary_fields tests --

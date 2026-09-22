@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="replay-10"
               size="md"
-              class="text-icon-color hover:text-button-primary mr-2 cursor-pointer"
+              class="text-icon-color hover:text-button-primary me-2 cursor-pointer"
               @click="skipTo('backward')"
             />
             <OIcon
@@ -102,11 +102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="forward-10"
               size="md"
-              class="text-icon-color hover:text-button-primary ml-2 cursor-pointer"
+              class="text-icon-color hover:text-button-primary ms-2 cursor-pointer"
               @click="skipTo('forward')"
             />
           </div>
-          <div class="ml-4 flex items-center">
+          <div class="ms-4 flex items-center">
             <div>{{ playerState.time }}</div>
             <div class="px-1">/</div>
             <div>{{ playerState.duration }}</div>
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center">
           <OSwitch
-            class="mr-3 whitespace-nowrap"
+            class="me-3 whitespace-nowrap"
             v-model="playerState.skipInactivity"
             :label="t('rum.skipInactivity')"
             @update:model-value="toggleSkipInactive"

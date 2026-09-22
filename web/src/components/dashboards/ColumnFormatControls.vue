@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-xs"
             icon-left="close"
             :title="t('common.remove')"
-            class="ml-auto shrink-0"
+            class="ms-auto shrink-0"
             @click="colModel.conditions.splice(ruleIdx, 1)"
           />
         </div>

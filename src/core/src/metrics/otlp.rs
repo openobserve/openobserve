@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
     io::Error,
-    sync::Arc,
 };
 
 use axum::{
@@ -30,43 +30,108 @@ use config::{
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
-        promql::*,
+        promql::{METRICS_HASH_EXCLUDED_LABELS, *},
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamType},
     },
-    metrics,
     utils::{
-        flatten::{self, format_label_name},
+        flatten::{self, format_label_name, format_label_name_cow},
         json,
         schema::format_stream_name,
-        schema_ext::SchemaExt,
-        time::now_micros,
     },
 };
-use db;
-use infra::schema::{SchemaCache, get_partition_time_level};
+use db::{self, alerts::alert::cache_stream_key};
+use infra::schema::SchemaCache;
 use ingestion_common::IngestUser;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
         ExportMetricsPartialSuccess, ExportMetricsServiceRequest, ExportMetricsServiceResponse,
     },
+    common::v1::{KeyValue, any_value::Value as AnyValueKind},
     metrics::v1::{metric::Data, *},
 };
 use prost::Message;
-use schema::{check_for_schema, stream_schema_exists};
+use schema::stream_schema_exists;
 
+use super::{
+    columnar::{self, ColumnarStream},
+    ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream},
+};
 use crate::{
-    alerts::alert::AlertExt,
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     ingestion::{
-        TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
+        TriggerAlertData, check_ingestion_allowed,
         grpc::{get_exemplar_val, get_metric_val, get_val},
-        write_file,
     },
-    metrics::get_exclude_labels,
     pipeline::batch_execution::ExecutablePipeline,
 };
+
+/// A number point's labels, rebuilt per point on top of its metric's base labels.
+struct PointLabels {
+    /// Slots past `len` are spare; their strings keep their capacity for the next point.
+    labels: Vec<(String, String)>,
+    len: usize,
+    index: HashMap<String, usize>,
+    /// Set when a point's label replaced a base label, which the next point must restore.
+    base_overwritten: bool,
+}
+
+impl PointLabels {
+    fn reset(&mut self, base_labels: &[(String, String)]) {
+        if self.base_overwritten {
+            for (slot, (name, value)) in self.labels.iter_mut().zip(base_labels) {
+                fill(slot, name, value);
+            }
+            self.base_overwritten = false;
+        }
+        self.len = base_labels.len();
+        self.index.clear();
+    }
+
+    fn push(&mut self, base_len: usize, name: &str, value: &str) {
+        match columnar::find_label(&self.labels[..self.len], &mut self.index, name) {
+            Some(idx) => {
+                let slot = &mut self.labels[idx];
+                slot.1.clear();
+                slot.1.push_str(value);
+                self.base_overwritten |= idx < base_len;
+            }
+            None => {
+                if !self.index.is_empty() || self.len >= columnar::LABEL_INDEX_THRESHOLD {
+                    self.index.insert(name.to_string(), self.len);
+                }
+                match self.labels.get_mut(self.len) {
+                    Some(slot) => fill(slot, name, value),
+                    None => self.labels.push((name.to_string(), value.to_string())),
+                }
+                self.len += 1;
+            }
+        }
+    }
+
+    fn labels(&self) -> &[(String, String)] {
+        &self.labels[..self.len]
+    }
+}
+
+/// A metric's data, as JSON records or as number data points not yet turned into records.
+enum MetricRecords<'a> {
+    Json(Vec<json::Value>),
+    NumberPoints(&'a [NumberDataPoint]),
+}
+
+impl MetricRecords<'_> {
+    /// Whether the metric has nothing to write, in which case it gets no stream at all.
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::Json(records) => records.is_empty(),
+            Self::NumberPoints(points) => !points
+                .iter()
+                .any(|point| number_point_value(point).is_some()),
+        }
+    }
+}
 
 pub async fn otlp_proto(
     org_id: &str,
@@ -157,7 +222,6 @@ pub async fn handle_otlp_request(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
-    let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
 
@@ -169,7 +233,7 @@ pub async fn handle_otlp_request(
 
     // associated pipeline
     let mut stream_executable_pipelines: HashMap<String, Vec<ExecutablePipeline>> = HashMap::new();
-    let mut stream_pipeline_inputs: HashMap<String, Vec<json::Value>> = HashMap::new();
+    let mut stream_pipeline_inputs: PipelineInputs<()> = HashMap::new();
 
     // realtime alerts
     let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
@@ -178,7 +242,9 @@ pub async fn handle_otlp_request(
     let mut partial_success = ExportMetricsPartialSuccess::default();
 
     // records buffer
-    let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
+    let mut json_data_by_stream: RecordsByStream<()> = HashMap::new();
+    // gauge and sum streams nothing downstream needs as JSON go straight to arrow
+    let mut columnar_streams: HashMap<String, Option<ColumnarStream>> = HashMap::new();
 
     // check if stream is deleting from cache
     let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
@@ -214,9 +280,7 @@ pub async fn handle_otlp_request(
 
                 let mut rec = json::json!({});
                 if let Some(res) = &resource_metric.resource {
-                    for item in &res.attributes {
-                        rec[format_label_name(item.key.as_str())] = get_val(&item.value.as_ref());
-                    }
+                    insert_attributes(&mut rec, &res.attributes);
                 }
                 if let Some(lib) = &scope_metric.scope {
                     rec["instrumentation_library_name"] =
@@ -232,20 +296,34 @@ pub async fn handle_otlp_request(
 
                 let records = match &metric.data {
                     Some(data) => match data {
-                        Data::Gauge(gauge) => process_gauge(&rec, gauge, metadata, &mut prom_meta),
-                        Data::Sum(sum) => process_sum(&mut rec, sum, metadata, &mut prom_meta),
-                        Data::Histogram(hist) => {
-                            process_histogram(&mut rec, hist, metadata, &mut prom_meta)
+                        Data::Gauge(gauge) => {
+                            prepare_gauge(metadata, &mut prom_meta);
+                            MetricRecords::NumberPoints(&gauge.data_points)
                         }
-                        Data::ExponentialHistogram(exp_hist) => process_exponential_histogram(
+                        Data::Sum(sum) => {
+                            prepare_sum(&mut rec, sum, metadata, &mut prom_meta);
+                            MetricRecords::NumberPoints(&sum.data_points)
+                        }
+                        Data::Histogram(hist) => MetricRecords::Json(process_histogram(
                             &mut rec,
-                            exp_hist,
+                            hist,
                             metadata,
                             &mut prom_meta,
-                        ),
-                        Data::Summary(summary) => {
-                            process_summary(&rec, summary, metadata, &mut prom_meta)
+                        )),
+                        Data::ExponentialHistogram(exp_hist) => {
+                            MetricRecords::Json(process_exponential_histogram(
+                                &mut rec,
+                                exp_hist,
+                                metadata,
+                                &mut prom_meta,
+                            ))
                         }
+                        Data::Summary(summary) => MetricRecords::Json(process_summary(
+                            &rec,
+                            summary,
+                            metadata,
+                            &mut prom_meta,
+                        )),
                     },
                     None => {
                         // a flattened oneof that fails to deserialize turns into
@@ -256,7 +334,7 @@ pub async fn handle_otlp_request(
                         partial_success.rejected_data_points += 1;
                         partial_success.error_message =
                             format!("metric {metric_name} has no data points");
-                        vec![]
+                        MetricRecords::Json(vec![])
                     }
                 };
 
@@ -332,10 +410,41 @@ pub async fn handle_otlp_request(
                     }
                 }
 
+                let records = match records {
+                    MetricRecords::Json(records) => records,
+                    MetricRecords::NumberPoints(points) => {
+                        if !stream_executable_pipelines.contains_key(&metric_name) {
+                            let stream_param =
+                                StreamParams::new(org_id, &metric_name, StreamType::Metrics);
+                            let pipelines =
+                                crate::ingestion::get_stream_executable_pipelines(&stream_param)
+                                    .await;
+                            stream_executable_pipelines.insert(metric_name.clone(), pipelines);
+                        }
+                        let columnar =
+                            columnar_streams
+                                .entry(metric_name.clone())
+                                .or_insert_with(|| {
+                                    columnar::columnar_stream_for(
+                                        org_id,
+                                        &metric_name,
+                                        &metric_schema_map,
+                                        &stream_executable_pipelines,
+                                        &user_defined_schema_map,
+                                        &stream_alerts_map,
+                                        &stream_partitioning_map,
+                                    )
+                                });
+                        match columnar {
+                            Some(columnar) => append_number_points(columnar, &rec, points),
+                            None => number_point_records(&rec, points),
+                        }
+                    }
+                };
+
                 // process data points
-                for mut rec in records {
-                    // flattening
-                    rec = flatten::flatten(rec)?;
+                for rec in records {
+                    let mut rec = flatten_record(rec)?;
 
                     let local_metric_name = format_stream_name(
                         rec.get(NAME_LABEL).unwrap().as_str().unwrap().to_string(),
@@ -403,25 +512,21 @@ pub async fn handle_otlp_request(
                         .is_some_and(|v| !v.is_empty())
                     {
                         stream_pipeline_inputs
-                            .entry(local_metric_name.clone())
+                            .entry(local_metric_name)
                             .or_default()
-                            .push(rec);
+                            .push((rec, ()));
                     } else {
-                        // get json object
-                        let mut local_val = match rec.take() {
-                            json::Value::Object(val) => val,
-                            _ => unreachable!(),
+                        let json::Value::Object(record) = rec.take() else {
+                            unreachable!("a metric record is always an object")
                         };
-
-                        if let Some(Some(fields)) = user_defined_schema_map.get(&local_metric_name)
-                        {
-                            local_val = crate::ingestion::refactor_map(local_val, fields);
-                        }
+                        let defined_fields =
+                            ingest::defined_schema(&user_defined_schema_map, &local_metric_name);
+                        let local_val = ingest::trim_to_defined_schema(record, defined_fields);
 
                         json_data_by_stream
-                            .entry(local_metric_name.clone())
+                            .entry(local_metric_name)
                             .or_default()
-                            .push(local_val);
+                            .push((local_val, ()));
                     }
                 }
             }
@@ -433,303 +538,134 @@ pub async fn handle_otlp_request(
         log::warn!("[METRICS:OTLP] Skipped {skipped_records} records due to streams being deleted");
     }
 
-    // process records buffered for pipeline processing
-    for (stream_name, pipelines) in &stream_executable_pipelines {
-        if pipelines.is_empty() {
-            continue;
-        }
-        let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
-            let err_msg = format!(
-                "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG",
-            );
-            log::error!("{err_msg}");
-            partial_success.error_message = err_msg;
-            continue;
-        };
-        let count = pipeline_inputs.len();
-        let has_user_pipeline = pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
-
-        for exec_pl in pipelines {
-            match exec_pl
-                .process_batch(org_id, pipeline_inputs.clone(), Some(stream_name.clone()))
-                .await
-            {
-                Err(e) => {
-                    let err_msg = format!(
-                        "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}",
-                    );
-                    log::error!("{err_msg}");
-                    // update status
-                    partial_success.rejected_data_points += count as i64;
-                    partial_success.error_message = err_msg;
-                    continue;
-                }
-                Ok(pl_results) => {
-                    for (stream_params, stream_pl_results) in pl_results {
-                        if stream_params.stream_type != StreamType::Metrics {
-                            continue;
-                        }
-
-                        let destination_stream = stream_params.stream_name.to_string();
-
-                        // add partition keys
-                        if !stream_partitioning_map.contains_key(&destination_stream) {
-                            let partition_det = crate::ingestion::get_stream_partition_keys(
-                                org_id,
-                                &StreamType::Metrics,
-                                &destination_stream,
-                            )
-                            .await;
-                            stream_partitioning_map
-                                .insert(destination_stream.clone(), partition_det.clone());
-                        }
-                        for (_, mut res) in stream_pl_results {
-                            // get json object
-                            let mut local_val = match res.take() {
-                                json::Value::Object(v) => v,
-                                _ => unreachable!(),
-                            };
-
-                            if let Some(Some(fields)) =
-                                user_defined_schema_map.get(&destination_stream)
-                            {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
-                            }
-
-                            // buffer to downstream processing directly
-                            json_data_by_stream
-                                .entry(destination_stream.clone())
-                                .or_default()
-                                .push(local_val);
-                        }
-                    }
-                }
+    let (pipeline_outputs, failures) = ingest::run_pipelines(
+        org_id,
+        &stream_executable_pipelines,
+        stream_pipeline_inputs,
+        &user_defined_schema_map,
+        &mut stream_partitioning_map,
+    )
+    .await;
+    for failure in failures {
+        match failure {
+            PipelineFailure::MissingInputs { message } => {
+                partial_success.error_message = message;
             }
-        }
-
-        if !has_user_pipeline && !json_data_by_stream.contains_key(stream_name) {
-            for mut rec in pipeline_inputs {
-                let mut local_val = match rec.take() {
-                    json::Value::Object(val) => val,
-                    _ => unreachable!(),
-                };
-
-                if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
-                    local_val = crate::ingestion::refactor_map(local_val, fields);
-                }
-
-                json_data_by_stream
-                    .entry(stream_name.clone())
-                    .or_default()
-                    .push(local_val);
+            PipelineFailure::Batch {
+                records, message, ..
+            } => {
+                partial_success.rejected_data_points += records as i64;
+                partial_success.error_message = message;
             }
         }
     }
+    for (stream_name, records) in pipeline_outputs {
+        json_data_by_stream
+            .entry(stream_name)
+            .or_default()
+            .extend(records);
+    }
 
+    let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     for (local_metric_name, json_data) in json_data_by_stream {
-        // get partition keys
-        let partition_keys = stream_partitioning_map
-            .get(&local_metric_name)
-            .cloned()
-            .unwrap_or_default();
-        let partition_time_level = get_partition_time_level(StreamType::Metrics);
-
-        // check for schema evolution
-        let min_timestamp = batch_min_timestamp(&json_data, Utc::now().timestamp_micros());
-
-        let _ = check_for_schema(
+        let record_refs: Vec<&json::Map<String, json::Value>> =
+            json_data.iter().map(|(record, _)| record).collect();
+        let min_timestamp = batch_min_timestamp(&record_refs, Utc::now().timestamp_micros());
+        let has_uds = matches!(
+            user_defined_schema_map.get(&local_metric_name),
+            Some(Some(_))
+        );
+        let (schema, schema_key) = ingest::resolve_batch_schema(
             org_id,
             &local_metric_name,
-            StreamType::Metrics,
             &mut metric_schema_map,
-            json_data.iter().collect(),
+            &record_refs,
             min_timestamp,
-            false, // is_derived is false for metrics
+            has_uds,
         )
         .await?;
+        drop(record_refs);
 
-        let cur_stream_alerts = stream_alerts_map.get(&format!(
-            "{}/{}/{}",
+        let alerts = stream_alerts_map.get(&cache_stream_key(
             org_id,
             StreamType::Metrics,
-            local_metric_name
+            &local_metric_name,
         ));
-        let mut triggers: TriggerAlertData =
-            Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
-        let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
-
-        for val_map in json_data {
-            let timestamp = val_map
+        let partition_keys = stream_partitioning_map.get(&local_metric_name);
+        let rows = json_data.into_iter().map(|(record, _)| {
+            let timestamp = record
                 .get(TIMESTAMP_COL_NAME)
                 .and_then(|ts| ts.as_i64())
-                .unwrap_or(Utc::now().timestamp_micros());
-
-            let value_str = json::to_string(&val_map).unwrap();
-
-            let buf = metric_data_map
-                .entry(local_metric_name.to_owned())
-                .or_default();
-            let schema = metric_schema_map
-                .get(&local_metric_name)
-                .unwrap()
-                .schema()
-                .as_ref()
-                .clone()
-                .with_metadata(HashMap::new());
-            let schema_key = schema.hash_key();
-            // get hour key
-            let hour_key = crate::ingestion::get_write_partition_key(
-                timestamp,
-                &partition_keys,
-                partition_time_level,
-                &val_map,
-                Some(&schema_key),
-            );
-            let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                schema_key,
-                schema: Arc::new(schema),
-                records: vec![],
-                records_size: 0,
-            });
-            hour_buf
-                .records
-                .push(Arc::new(json::Value::Object(val_map.to_owned())));
-            hour_buf.records_size += value_str.len();
-
-            // start check for alert trigger
-            if let Some(alerts) = cur_stream_alerts {
-                let end_time = now_micros();
-                let dedup = super::series_signature(&val_map);
-                for alert in alerts {
-                    let key = format!(
-                        "{}/{}/{}/{}",
-                        org_id,
-                        StreamType::Metrics,
-                        alert.stream_name,
-                        alert.get_unique_key()
-                    );
-                    // One row per label set: a series repeats its labels on every sample.
-                    if !super::trigger_wants_labels(&trigger_slots, &key, dedup) {
-                        continue;
-                    }
-                    match alert.evaluate(Some(&val_map), (None, end_time), None).await {
-                        Ok(trigger_results) if trigger_results.data.is_some() => {
-                            super::merge_trigger_rows(
-                                &mut triggers,
-                                &mut trigger_slots,
-                                &key,
-                                dedup,
-                                alert,
-                                trigger_results.data.unwrap(),
-                            );
-                        }
-                        Ok(_) => {
-                            // the data doesn't satisfy the alert condition
-                        }
-                        Err(e) => {
-                            log::error!("[METRICS] Error while evaluating realtime alert: {e}");
-                        }
-                    }
-                }
-            }
-            // end check for alert triggers
-        }
-
-        if !triggers.is_empty() {
-            stream_trigger_map.insert(local_metric_name.clone(), Some(triggers));
+                .unwrap_or_else(|| Utc::now().timestamp_micros());
+            (record, timestamp)
+        });
+        let triggers = ingest::buffer_stream_records(
+            org_id,
+            rows,
+            &schema,
+            &schema_key,
+            partition_keys,
+            alerts,
+            metric_data_map
+                .entry(local_metric_name.clone())
+                .or_default(),
+        )
+        .await;
+        if triggers.is_some() {
+            stream_trigger_map.insert(local_metric_name, triggers);
         }
     }
 
-    // write data to wal
-    for (stream_name, stream_data) in metric_data_map {
-        // stream_data could be empty if metric value is nan, check it
-        if stream_data.is_empty() {
-            continue;
-        }
-
-        // check if we are allowed to ingest
-        if db::compact::retention::is_deleting_stream(
-            org_id,
-            StreamType::Metrics,
-            &stream_name,
-            None,
-        ) {
-            log::warn!("stream [{stream_name}] is being deleted");
-            continue;
-        }
-
-        // write to file
-        let writer = ingester::get_writer(
-            get_thread_id(),
-            org_id,
-            StreamType::Metrics.as_str(),
-            &stream_name,
-        )
-        .await;
-        // for performance issue, we will flush all when the app shutdown
-        let fsync = false;
-        let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
-
-        let fns_length: usize = stream_executable_pipelines
-            .get(&stream_name)
-            .map_or(0, |pipelines| {
-                pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
-            });
-        req_stats.response_time = start.elapsed().as_secs_f64();
-        let email_str = user.to_email();
-        req_stats.user_email = if email_str.is_empty() {
-            None
-        } else {
-            Some(email_str)
-        };
-        usage_reporting::report_request_usage_stats(
-            req_stats,
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            UsageType::Metrics,
-            fns_length as _,
-            started_at,
-        )
-        .await;
-    }
+    let entries_by_stream = ingest::entries_by_stream(
+        org_id,
+        metric_data_map,
+        columnar_streams
+            .into_iter()
+            .filter_map(|(stream_name, columnar)| Some((stream_name, columnar?))),
+    )?;
+    ingest::write_streams(
+        org_id,
+        entries_by_stream,
+        &stream_executable_pipelines,
+        &user,
+        UsageType::Metrics,
+        &start,
+        started_at,
+    )
+    .await?;
 
     let ep = if OtlpRequestType::Grpc == req_type {
         "/grpc/otlp/metrics"
     } else {
         "/api/otlp/v1/metrics"
     };
-
-    let time_took = start.elapsed().as_secs_f64();
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
-        .observe(time_took);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
-        .inc();
-
-    // only one trigger per request; notification/db work must not block ingestion
-    for (_, entry) in stream_trigger_map {
-        if let Some(entry) = entry {
-            tokio::spawn(evaluate_trigger(entry));
-        }
-    }
+    ingest::observe_request(ep, org_id, &start);
+    ingest::spawn_triggers(stream_trigger_map);
 
     format_response(partial_success, req_type)
 }
 
-fn batch_min_timestamp(
-    json_data: &[serde_json::Map<String, serde_json::Value>],
+/// Flattens a data-point record exactly as a full rebuild would, without always paying for one.
+fn flatten_record(mut rec: json::Value) -> Result<json::Value, anyhow::Error> {
+    // a record with no array or object skips flatten's rebuild, and the rebuild is what drops nulls
+    if let json::Value::Object(map) = &mut rec
+        && map.values().any(json::Value::is_null)
+    {
+        map.retain(|_, v| !v.is_null());
+    }
+    flatten::flatten(rec)
+}
+
+fn batch_min_timestamp<M: Borrow<json::Map<String, json::Value>>>(
+    json_data: &[M],
     default: i64,
 ) -> i64 {
     let first = json_data
         .first()
-        .and_then(|v| v.get(TIMESTAMP_COL_NAME)?.as_i64());
+        .and_then(|v| v.borrow().get(TIMESTAMP_COL_NAME)?.as_i64());
     let last = json_data
         .last()
-        .and_then(|v| v.get(TIMESTAMP_COL_NAME)?.as_i64());
+        .and_then(|v| v.borrow().get(TIMESTAMP_COL_NAME)?.as_i64());
 
     match (first, last) {
         (Some(f), Some(l)) => f.min(l),
@@ -754,22 +690,37 @@ fn build_metadata(
     }
 }
 
-fn process_gauge(
-    rec: &json::Value,
-    gauge: &Gauge,
-    mut metadata: Metadata,
-    prom_meta: &mut HashMap<String, String>,
-) -> Vec<serde_json::Value> {
-    let mut records = vec![];
-
-    // set metadata
+fn prepare_gauge(mut metadata: Metadata, prom_meta: &mut HashMap<String, String>) {
     metadata.metric_type = MetricType::Gauge;
     prom_meta.insert(
         METADATA_LABEL.to_string(),
         json::to_string(&metadata).unwrap(),
     );
+}
 
-    for data_point in &gauge.data_points {
+/// Sets a sum's family metadata and the fields every one of its records carries.
+fn prepare_sum(
+    rec: &mut json::Value,
+    sum: &Sum,
+    mut metadata: Metadata,
+    prom_meta: &mut HashMap<String, String>,
+) {
+    metadata.metric_type = MetricType::Counter;
+    prom_meta.insert(
+        METADATA_LABEL.to_string(),
+        json::to_string(&metadata).unwrap(),
+    );
+    process_aggregation_temporality(rec, sum.aggregation_temporality);
+    rec["is_monotonic"] = sum.is_monotonic.to_string().into();
+}
+
+/// One hashed record per gauge or sum data point that has a value.
+fn number_point_records<'a>(
+    rec: &json::Value,
+    data_points: impl IntoIterator<Item = &'a NumberDataPoint>,
+) -> Vec<serde_json::Value> {
+    let mut records = vec![];
+    for data_point in data_points {
         // a fresh record per data point: `process_data_point` only ever sets attribute keys,
         // so reusing one record lets a data point inherit an attribute the previous one
         // carried and it never dropped -- which then feeds the series hash.
@@ -778,40 +729,107 @@ fn process_gauge(
             continue;
         }
         let val_map = dp_rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, get_exclude_labels());
+        let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec);
     }
     records
 }
 
-fn process_sum(
-    rec: &mut json::Value,
-    sum: &Sum,
-    mut metadata: Metadata,
-    prom_meta: &mut HashMap<String, String>,
+/// Writes number data points straight to arrow, returning JSON records for those it cannot take.
+fn append_number_points(
+    columnar: &mut ColumnarStream,
+    rec: &json::Value,
+    data_points: &[NumberDataPoint],
 ) -> Vec<serde_json::Value> {
-    // set metadata
-    metadata.metric_type = MetricType::Counter;
-    prom_meta.insert(
-        METADATA_LABEL.to_string(),
-        json::to_string(&metadata).unwrap(),
-    );
+    let Some(base_labels) = columnar_base_labels(rec) else {
+        return number_point_records(rec, data_points);
+    };
+    let mut scratch = PointLabels {
+        labels: base_labels.clone(),
+        len: base_labels.len(),
+        index: HashMap::new(),
+        base_overwritten: false,
+    };
+    let rejected: Vec<&NumberDataPoint> = data_points
+        .iter()
+        .filter(|point| !append_number_point(columnar, &base_labels, point, &mut scratch))
+        .collect();
+    number_point_records(rec, rejected)
+}
 
-    let mut records = vec![];
-    process_aggregation_temporality(rec, sum.aggregation_temporality);
-    rec["is_monotonic"] = sum.is_monotonic.to_string().into();
-    for data_point in &sum.data_points {
-        let mut dp_rec = rec.clone();
-        if !process_data_point(&mut dp_rec, data_point) {
-            continue;
-        }
-        let val_map = dp_rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, get_exclude_labels());
-        val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
-        records.push(dp_rec);
+/// The labels every record of a metric starts from, `None` if one is not a plain string label.
+fn columnar_base_labels(rec: &json::Value) -> Option<Vec<(String, String)>> {
+    rec.as_object()?
+        .iter()
+        .map(|(name, value)| match value {
+            // a resource or scope attribute named `exemplars` is dropped from every record
+            json::Value::String(value) if name.is_ascii() && name != EXEMPLARS_LABEL => {
+                Some((name.clone(), value.clone()))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// Appends one data point exactly as its JSON record would be written; `false` if it cannot be.
+fn append_number_point(
+    columnar: &mut ColumnarStream,
+    base_labels: &[(String, String)],
+    data_point: &NumberDataPoint,
+    scratch: &mut PointLabels,
+) -> bool {
+    // a point without a value writes no record on either path
+    let Some(value) = number_point_value(data_point) else {
+        return true;
+    };
+    let Ok(timestamp) = i64::try_from(data_point.time_unix_nano / 1000) else {
+        return false;
+    };
+    if !data_point.exemplars.is_empty() {
+        return false;
     }
-    records
+
+    scratch.reset(base_labels);
+    for attr in &data_point.attributes {
+        let name = format_label_name_cow(&attr.key);
+        // `__name__` would move the record to another stream and `exemplars` is dropped from it
+        if !name.is_ascii() || name == NAME_LABEL || name == EXEMPLARS_LABEL {
+            return false;
+        }
+        let value = match attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+            Some(AnyValueKind::StringValue(s)) => Cow::Borrowed(s.as_str()),
+            // flattening turns a nested value into other columns, an unset one hashes as empty
+            _ => match get_val(&attr.value.as_ref()) {
+                json::Value::String(s) => Cow::Owned(s),
+                _ => return false,
+            },
+        };
+        scratch.push(base_labels.len(), &name, &value);
+    }
+    let mut start_time = itoa::Buffer::new();
+    scratch.push(
+        base_labels.len(),
+        "start_time",
+        start_time.format(data_point.start_time_unix_nano),
+    );
+    scratch.push(base_labels.len(), "flag", data_point_flag(data_point.flags));
+
+    let labels = scratch.labels();
+    let Some(label_bytes) = columnar.resolve_columns(labels) else {
+        return false;
+    };
+    let hash = super::signature_of_label_pairs(labels, METRICS_HASH_EXCLUDED_LABELS);
+    columnar.append(labels, label_bytes, value, timestamp, hash);
+    true
+}
+
+/// A gauge or sum point's value under the shared policy, `None` for one that writes no record.
+fn number_point_value(data_point: &NumberDataPoint) -> Option<f64> {
+    if no_recorded_value(data_point.flags) {
+        return None;
+    }
+    get_metric_val(&data_point.value).and_then(super::sanitize_metric_value)
 }
 
 fn process_histogram(
@@ -833,7 +851,7 @@ fn process_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -859,7 +877,7 @@ fn process_exponential_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -885,7 +903,7 @@ fn process_summary(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -901,21 +919,14 @@ fn process_summary(
 /// a stale reading as if it were fresh.
 #[must_use]
 fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) -> bool {
-    for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
-    }
-    let Some(value) = get_metric_val(&data_point.value).and_then(super::metric_value) else {
+    insert_attributes(rec, &data_point.attributes);
+    let Some(value) = number_point_value(data_point) else {
         return false;
     };
-    rec[VALUE_LABEL] = value;
+    rec[VALUE_LABEL] = value.into();
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
-    rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::NoRecordedValueMask.as_str_name()
-    } else {
-        DataPointFlags::DoNotUse.as_str_name()
-    }
-    .into();
+    rec["flag"] = data_point_flag(data_point.flags).into();
     process_exemplars(rec, &data_point.exemplars);
     true
 }
@@ -924,19 +935,15 @@ fn process_hist_data_point(
     rec: &mut json::Value,
     data_point: &HistogramDataPoint,
 ) -> Vec<serde_json::Value> {
+    if no_recorded_value(data_point.flags) {
+        return vec![];
+    }
     let mut bucket_recs = vec![];
 
-    for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
-    }
+    insert_attributes(rec, &data_point.attributes);
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
-    rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::NoRecordedValueMask.as_str_name()
-    } else {
-        DataPointFlags::DoNotUse.as_str_name()
-    }
-    .into();
+    rec["flag"] = data_point_flag(data_point.flags).into();
     process_exemplars(rec, &data_point.exemplars);
     // add count record
     let mut count_rec = rec.clone();
@@ -989,19 +996,15 @@ fn process_exp_hist_data_point(
     rec: &mut json::Value,
     data_point: &ExponentialHistogramDataPoint,
 ) -> Vec<serde_json::Value> {
+    if no_recorded_value(data_point.flags) {
+        return vec![];
+    }
     let mut bucket_recs = vec![];
 
-    for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
-    }
+    insert_attributes(rec, &data_point.attributes);
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
-    rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::NoRecordedValueMask.as_str_name()
-    } else {
-        DataPointFlags::DoNotUse.as_str_name()
-    }
-    .into();
+    rec["flag"] = data_point_flag(data_point.flags).into();
     process_exemplars(rec, &data_point.exemplars);
     // add count record
     let mut count_rec = rec.clone();
@@ -1052,19 +1055,15 @@ fn process_summary_data_point(
     rec: &mut json::Value,
     data_point: &SummaryDataPoint,
 ) -> Vec<serde_json::Value> {
+    if no_recorded_value(data_point.flags) {
+        return vec![];
+    }
     let mut bucket_recs = vec![];
 
-    for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
-    }
+    insert_attributes(rec, &data_point.attributes);
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
-    rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::NoRecordedValueMask.as_str_name()
-    } else {
-        DataPointFlags::DoNotUse.as_str_name()
-    }
-    .into();
+    rec["flag"] = data_point_flag(data_point.flags).into();
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = (data_point.count as f64).into();
@@ -1125,7 +1124,42 @@ fn process_exemplars(rec: &mut json::Value, exemplars: &Vec<Exemplar>) {
 
         exemplar_coll.push(exemplar_rec)
     }
-    rec[EXEMPLARS_LABEL] = exemplar_coll.into();
+    // an empty list is dropped by flatten, so it is only worth writing over a same-named attribute
+    if !exemplar_coll.is_empty() || rec.get(EXEMPLARS_LABEL).is_some() {
+        rec[EXEMPLARS_LABEL] = exemplar_coll.into();
+    }
+}
+
+/// Writes each attribute under its formatted name, a repeated name overwriting in place.
+fn insert_attributes(rec: &mut json::Value, attributes: &[KeyValue]) {
+    let json::Value::Object(map) = rec else {
+        unreachable!("a metric record is always an object")
+    };
+    for attr in attributes {
+        // `rec[name]` would copy the already-owned formatted name once more
+        map.insert(format_label_name(&attr.key), get_val(&attr.value.as_ref()));
+    }
+}
+
+/// Rewrites a label slot in place, keeping the strings' capacity.
+fn fill(slot: &mut (String, String), name: &str, value: &str) {
+    slot.0.clear();
+    slot.0.push_str(name);
+    slot.1.clear();
+    slot.1.push_str(value);
+}
+
+fn data_point_flag(flags: u32) -> &'static str {
+    if no_recorded_value(flags) {
+        DataPointFlags::NoRecordedValueMask.as_str_name()
+    } else {
+        DataPointFlags::DoNotUse.as_str_name()
+    }
+}
+
+/// A point carrying `NO_RECORDED_VALUE` marks a gap (a staleness marker); it writes no record.
+fn no_recorded_value(flags: u32) -> bool {
+    flags & (DataPointFlags::NoRecordedValueMask as u32) != 0
 }
 
 fn process_aggregation_temporality(rec: &mut json::Value, val: i32) {
@@ -1183,15 +1217,36 @@ fn format_response(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, sync::Arc};
 
     use config::meta::promql::{Metadata, MetricType};
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use opentelemetry_proto::tonic::metrics::v1::{
         AggregationTemporality, Exemplar, HistogramDataPoint, Metric, NumberDataPoint,
     };
     use serde_json::json;
 
     use super::*;
+
+    fn process_gauge(
+        rec: &json::Value,
+        gauge: &Gauge,
+        metadata: Metadata,
+        prom_meta: &mut HashMap<String, String>,
+    ) -> Vec<serde_json::Value> {
+        prepare_gauge(metadata, prom_meta);
+        number_point_records(rec, &gauge.data_points)
+    }
+
+    fn process_sum(
+        rec: &mut json::Value,
+        sum: &Sum,
+        metadata: Metadata,
+        prom_meta: &mut HashMap<String, String>,
+    ) -> Vec<serde_json::Value> {
+        prepare_sum(rec, sum, metadata, prom_meta);
+        number_point_records(rec, &sum.data_points)
+    }
 
     fn create_test_gauge_metric(name: &str, value: f64) -> Metric {
         Metric {
@@ -1696,6 +1751,260 @@ mod tests {
 
         // Verify exemplars were processed
         assert!(rec.get("exemplars").is_some());
+    }
+
+    fn string_attr(key: &str, value: &str) -> KeyValue {
+        use opentelemetry_proto::tonic::common::v1::{AnyValue, any_value};
+        KeyValue {
+            key: key.to_string(),
+            key_strindex: 0,
+            value: Some(AnyValue {
+                value: Some(any_value::Value::StringValue(value.to_string())),
+            }),
+        }
+    }
+
+    fn typed_attr(
+        key: &str,
+        value: Option<opentelemetry_proto::tonic::common::v1::any_value::Value>,
+    ) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            key_strindex: 0,
+            value: Some(opentelemetry_proto::tonic::common::v1::AnyValue { value }),
+        }
+    }
+
+    fn number_point(attributes: Vec<KeyValue>, value: f64, second: u64) -> NumberDataPoint {
+        NumberDataPoint {
+            attributes,
+            start_time_unix_nano: 1_000_000_000,
+            time_unix_nano: (1_788_220_800 + second) * 1_000_000_000,
+            value: Some(
+                opentelemetry_proto::tonic::metrics::v1::number_data_point::Value::AsDouble(value),
+            ),
+            exemplars: vec![],
+            flags: 0,
+        }
+    }
+
+    fn batch_rows(entries: Vec<ingester::Entry>) -> Vec<json::Map<String, json::Value>> {
+        use datafusion::arrow::array::{Array, Float64Array, Int64Array, StringArray, UInt64Array};
+        let mut rows = Vec::new();
+        for entry in entries {
+            let batch = entry.batch.unwrap();
+            for row in 0..batch.num_rows() {
+                let mut map = json::Map::new();
+                for (field, column) in batch.schema().fields().iter().zip(batch.columns()) {
+                    if column.is_null(row) {
+                        continue;
+                    }
+                    let any = column.as_any();
+                    let value = if let Some(a) = any.downcast_ref::<StringArray>() {
+                        json!(a.value(row))
+                    } else if let Some(a) = any.downcast_ref::<Float64Array>() {
+                        json!(a.value(row))
+                    } else if let Some(a) = any.downcast_ref::<Int64Array>() {
+                        json!(a.value(row))
+                    } else {
+                        json!(any.downcast_ref::<UInt64Array>().unwrap().value(row))
+                    };
+                    map.insert(field.name().clone(), value);
+                }
+                rows.push(map);
+            }
+        }
+        rows
+    }
+
+    #[test]
+    fn test_append_number_points_writes_what_the_json_path_would() {
+        use opentelemetry_proto::tonic::common::v1::{KeyValueList, any_value::Value as Any};
+
+        let mut rec = json!({});
+        insert_attributes(
+            &mut rec,
+            &[
+                string_attr("service.name", "api"),
+                string_attr("region", "eu"),
+            ],
+        );
+        rec["instrumentation_library_name"] = json!("lib");
+        rec["instrumentation_library_version"] = json!("1");
+        rec[NAME_LABEL] = json!("requests");
+        let sum = Sum {
+            data_points: vec![],
+            aggregation_temporality: 2,
+            is_monotonic: true,
+        };
+        prepare_sum(
+            &mut rec,
+            &sum,
+            Metadata::new("requests"),
+            &mut HashMap::new(),
+        );
+
+        let nested = Any::KvlistValue(KeyValueList {
+            values: vec![string_attr("inner", "x")],
+        });
+        let mut flagged = number_point(vec![string_attr("host", "b")], 2.0, 1);
+        flagged.flags = 1;
+        let mut as_int = number_point(vec![string_attr("host", "c")], 0.0, 2);
+        as_int.value =
+            Some(opentelemetry_proto::tonic::metrics::v1::number_data_point::Value::AsInt(7));
+        let mut with_exemplar = number_point(vec![string_attr("host", "d")], 3.0, 3);
+        with_exemplar.exemplars = vec![Exemplar {
+            filtered_attributes: vec![],
+            time_unix_nano: 1,
+            value: None,
+            span_id: vec![],
+            trace_id: vec![],
+        }];
+        let points = vec![
+            number_point(vec![string_attr("host", "a")], 1.5, 0),
+            number_point(
+                vec![
+                    typed_attr("port", Some(Any::IntValue(9100))),
+                    typed_attr("ok", Some(Any::BoolValue(true))),
+                    typed_attr("ratio", Some(Any::DoubleValue(0.25))),
+                ],
+                4.0,
+                4,
+            ),
+            // overrides a base label, and two names the record writes over
+            number_point(
+                vec![
+                    string_attr("region", "us"),
+                    string_attr("start_time", "x"),
+                    string_attr("Host.Name", "e"),
+                ],
+                5.0,
+                5,
+            ),
+            flagged,
+            as_int,
+            number_point(vec![string_attr("host", "nan")], f64::NAN, 6),
+            // each of these must be left to the JSON path
+            with_exemplar,
+            number_point(vec![typed_attr("kv", Some(nested))], 6.0, 7),
+            number_point(vec![typed_attr("unset", None)], 7.0, 8),
+            number_point(vec![string_attr("__name__", "elsewhere")], 8.0, 9),
+            number_point(vec![string_attr("value", "shadow")], 9.0, 10),
+            number_point(vec![string_attr("not_in_schema", "x")], 10.0, 11),
+        ];
+
+        let json_records: Vec<json::Value> = number_point_records(&rec, &points)
+            .into_iter()
+            .map(|record| flatten_record(record).unwrap())
+            .collect();
+        let columns = [
+            "service_name",
+            "region",
+            "instrumentation_library_name",
+            "instrumentation_library_version",
+            "__name__",
+            "aggregation_temporality",
+            "is_monotonic",
+            "host",
+            "port",
+            "ok",
+            "ratio",
+            "host_name",
+            "start_time",
+            "flag",
+            "kv_inner",
+            "unset",
+        ];
+        let mut fields: Vec<Field> = columns
+            .iter()
+            .map(|name| Field::new(*name, DataType::Utf8, true))
+            .collect();
+        fields.push(Field::new(VALUE_LABEL, DataType::Float64, true));
+        fields.push(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false));
+        fields.push(Field::new(HASH_LABEL, DataType::UInt64, true));
+        let mut columnar = ColumnarStream::for_schema(&Arc::new(Schema::new(fields))).unwrap();
+
+        let rejected: Vec<json::Value> = append_number_points(&mut columnar, &rec, &points)
+            .into_iter()
+            .map(|record| flatten_record(record).unwrap())
+            .collect();
+        let entries = columnar.into_entries("org", "requests").unwrap();
+        let written_size: usize = entries.iter().map(|entry| entry.data_size).sum();
+        let written = batch_rows(entries);
+
+        assert_eq!(rejected, json_records[json_records.len() - 6..]);
+        let accepted = &json_records[..json_records.len() - 6];
+        assert_eq!(written.len(), 4);
+        for (row, record) in written.iter().zip(accepted) {
+            assert_eq!(row, record.as_object().unwrap());
+        }
+        let expected_size: usize = accepted.iter().map(json::estimate_json_bytes).sum();
+        assert_eq!(written_size, expected_size);
+    }
+
+    #[test]
+    fn test_append_number_points_leaves_a_base_exemplars_attribute_to_the_json_path() {
+        let mut rec = json!({});
+        insert_attributes(
+            &mut rec,
+            &[
+                string_attr("exemplars", "attr"),
+                string_attr("region", "eu"),
+            ],
+        );
+        rec[NAME_LABEL] = json!("requests");
+        let points = vec![number_point(vec![string_attr("host", "a")], 1.5, 0)];
+
+        let fields = vec![
+            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+            Field::new("region", DataType::Utf8, true),
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+            Field::new("host", DataType::Utf8, true),
+            Field::new("start_time", DataType::Utf8, true),
+            Field::new("flag", DataType::Utf8, true),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(HASH_LABEL, DataType::UInt64, true),
+        ];
+        let mut columnar = ColumnarStream::for_schema(&Arc::new(Schema::new(fields))).unwrap();
+
+        let rejected: Vec<json::Value> = append_number_points(&mut columnar, &rec, &points)
+            .into_iter()
+            .map(|record| flatten_record(record).unwrap())
+            .collect();
+        assert!(columnar.into_entries("org", "requests").unwrap().is_empty());
+        assert_eq!(rejected.len(), 1);
+        assert!(rejected[0].get(EXEMPLARS_LABEL).is_none());
+        assert_eq!(rejected[0]["region"], json!("eu"));
+    }
+
+    #[test]
+    fn test_flatten_record_matches_flattening_with_an_empty_exemplar_list() {
+        let records = [
+            json!({"__name__": "m", "host": "a", "value": 1.0, "_timestamp": 5}),
+            json!({"__name__": "m", "host": null, "value": 1.0, "_timestamp": 5}),
+            json!({"__name__": "m", "Host.Name": "a", "value": 1.0, "_timestamp": 5}),
+            json!({"__name__": "m", "kv": {"Inner": "x", "gone": null}, "value": 1.0}),
+            json!({"__name__": "m", "list": ["x", 1], "empty": null, "value": 1.0}),
+            // an attribute of that name was always written over and then flattened away
+            json!({"__name__": "m", "exemplars": "attr", "value": 1.0}),
+        ];
+        for record in records {
+            let mut with_empty = record.clone();
+            process_exemplars(&mut with_empty, &vec![]);
+            let mut expected = record.clone();
+            expected[EXEMPLARS_LABEL] = json!([]);
+
+            assert_eq!(
+                with_empty.get(EXEMPLARS_LABEL).is_some(),
+                record.get(EXEMPLARS_LABEL).is_some()
+            );
+            assert_eq!(
+                flatten_record(with_empty).unwrap(),
+                flatten::flatten(expected).unwrap(),
+                "{record}"
+            );
+        }
     }
 
     #[test]
@@ -2393,8 +2702,17 @@ mod tests {
                 ),
             };
 
-            assert!(process_data_point(&mut rec, &data_point_flag1));
-            assert_eq!(rec["flag"], "DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK");
+            assert!(!process_data_point(&mut rec, &data_point_flag1));
+            assert!(rec.get(VALUE_LABEL).is_none());
+            assert_eq!(
+                data_point_flag(1),
+                "DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK"
+            );
+            assert_eq!(
+                data_point_flag(3),
+                "DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK"
+            );
+            assert_eq!(data_point_flag(2), "DATA_POINT_FLAGS_DO_NOT_USE");
 
             // Test with flag 0 (DoNotUse)
             let data_point_flag0 = NumberDataPoint {
@@ -2719,7 +3037,8 @@ mod tests {
 
     #[test]
     fn test_batch_min_timestamp_empty_uses_default() {
-        assert_eq!(batch_min_timestamp(&[], 42), 42);
+        let empty: &[serde_json::Map<String, serde_json::Value>] = &[];
+        assert_eq!(batch_min_timestamp(empty, 42), 42);
     }
 
     #[test]
@@ -2991,6 +3310,121 @@ mod tests {
 
             assert_eq!(records.len(), 1);
             assert!(records[0].get("zone").is_none());
+        }
+
+        // ---- OTLP per-point metadata: `start_time` and `flag` are not dimensions
+
+        /// A cumulative counter restarts and reports a new `start_time` for the same stream. That
+        /// is the collector behaving correctly, so it must not cost the series its identity.
+        #[test]
+        fn test_process_sum_start_time_does_not_fork_the_series() {
+            let restarted = NumberDataPoint {
+                start_time_unix_nano: 1_700_000_000_000_000_000,
+                ..number_dp(2.0, vec![attr("pod", "a")])
+            };
+            let records = sum_records(vec![number_dp(1.0, vec![attr("pod", "a")]), restarted]);
+
+            assert_eq!(records.len(), 2);
+            assert_ne!(
+                records[0]["start_time"], records[1]["start_time"],
+                "the two points must genuinely differ in start_time, or this proves nothing"
+            );
+            assert_eq!(
+                records[0][HASH_LABEL], records[1][HASH_LABEL],
+                "a restart must not fork one counter into two series"
+            );
+        }
+
+        /// A staleness marker carries `NO_RECORDED_VALUE`; storing its value as a sample would
+        /// make a gap look like a real reading.
+        #[test]
+        fn test_process_gauge_no_recorded_value_writes_no_record() {
+            let stale = NumberDataPoint {
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                ..number_dp(2.0, vec![attr("pod", "a")])
+            };
+            let records = gauge_records(vec![number_dp(1.0, vec![attr("pod", "a")]), stale]);
+
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0][VALUE_LABEL], json!(1.0));
+        }
+
+        /// The flag is a bit mask, so it must be honoured when other bits are set too.
+        #[test]
+        fn test_process_sum_no_recorded_value_bit_is_tested_not_compared() {
+            let stale = NumberDataPoint {
+                flags: DataPointFlags::NoRecordedValueMask as u32 | 2,
+                ..number_dp(2.0, vec![])
+            };
+
+            assert!(sum_records(vec![stale]).is_empty());
+        }
+
+        /// A flagged histogram would otherwise write zero `_count`/`_sum`/bucket rows, which
+        /// `rate()` reads as a counter reset when the series resumes.
+        #[test]
+        fn test_process_hist_data_point_no_recorded_value_writes_no_records() {
+            let stale = HistogramDataPoint {
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                ..hist_dp(Some(1.0), None, None)
+            };
+
+            assert!(hist_records(stale).is_empty());
+        }
+
+        #[test]
+        fn test_process_exp_hist_data_point_no_recorded_value_writes_no_records() {
+            let mut rec = json!({"__name__": "test_metric"});
+            let stale = ExponentialHistogramDataPoint {
+                attributes: vec![],
+                start_time_unix_nano: 0,
+                time_unix_nano: 1640995200000000000,
+                exemplars: vec![],
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                count: 100,
+                sum: Some(1.0),
+                min: None,
+                max: None,
+                scale: 0,
+                zero_count: 0,
+                zero_threshold: 0.0,
+                positive: Some(Buckets {
+                    offset: 0,
+                    bucket_counts: vec![50, 50],
+                }),
+                negative: None,
+            };
+
+            assert!(process_exp_hist_data_point(&mut rec, &stale).is_empty());
+        }
+
+        #[test]
+        fn test_process_summary_data_point_no_recorded_value_writes_no_records() {
+            let mut rec = json!({"__name__": "test_metric"});
+            let stale = SummaryDataPoint {
+                attributes: vec![],
+                start_time_unix_nano: 0,
+                time_unix_nano: 1640995200000000000,
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                count: 100,
+                sum: 1.0,
+                quantile_values: vec![ValueAtQuantile {
+                    quantile: 0.5,
+                    value: 1.0,
+                }],
+            };
+
+            assert!(process_summary_data_point(&mut rec, &stale).is_empty());
+        }
+
+        /// The columns are still written and still queryable; only their hold on series identity
+        /// is dropped.
+        #[test]
+        fn test_per_point_metadata_is_still_recorded() {
+            let records = sum_records(vec![number_dp(1.0, vec![])]);
+
+            assert_eq!(records[0]["start_time"], json!("0"));
+            assert_eq!(records[0]["flag"], json!("DATA_POINT_FLAGS_DO_NOT_USE"));
         }
 
         // ---- classic histogram

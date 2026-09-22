@@ -1119,7 +1119,8 @@ export const validateDashboardJson = (t: TranslateFn, dashboardJson: any): strin
       }
 
       // Check layout i value uniqueness within the tab
-      if (!panel?.layout || !panel?.layout?.i) {
+      // `i` is a grid index, so 0 is a valid value — only null/undefined is missing.
+      if (!panel?.layout || panel?.layout?.i == null) {
         errors.push(t("dashboard.utils.panelMissingLayoutI", { id: panel?.id }));
       } else {
         const tabLayoutValues = layoutIValues.get(tab?.tabId);

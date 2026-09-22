@@ -28,7 +28,13 @@ import {
   getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
-import { chartColor, chartNumber } from "@/utils/chartTheme";
+import { escapeHtml } from "@/utils/html";
+import {
+  chartColor,
+  chartNumber,
+  dataZoomBrushStyle,
+  CHART_SELECTION_FILL,
+} from "@/utils/chartTheme";
 import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 import { calculateMetricFontSize, buildMetricSparkline } from "./sql/charts/convertSQLMetricChart";
@@ -188,10 +194,10 @@ export const convertPromQLData = async (
   // Add warning if total number of series exceeds limit
   // Check if series limiting info is available from data loader (PromQL streaming)
   if (metadata?.seriesLimiting) {
-    const { totalMetricsReceived, metricsStored } = metadata.seriesLimiting;
-    // Only show warning if we actually hit the limit (metricsStored >= maxSeries)
-    // AND we had to drop some metrics (totalMetricsReceived > metricsStored)
-    if (totalMetricsReceived > metricsStored && metricsStored >= maxSeries) {
+    const { uniqueSeriesSeen, metricsStored } = metadata.seriesLimiting;
+    // Streaming re-delivers the same series in every chunk, so only distinct-series
+    // count proves a drop; comparing arrivals warned whenever a panel had 2+ chunks.
+    if ((uniqueSeriesSeen ?? metricsStored) > metricsStored) {
       extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
     }
   } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
@@ -281,7 +287,7 @@ export const convertPromQLData = async (
       },
       formatter: (params: any) => {
         hoveredSeriesState?.value?.setHoveredSeriesName(params?.name);
-        return params?.name;
+        return escapeHtml(params?.name);
       },
     },
     textStyle: {
@@ -318,7 +324,7 @@ export const convertPromQLData = async (
   const getSeriesMarkArea = () => {
     return {
       itemStyle: {
-        color: "rgba(0, 191, 255, 0.15)",
+        color: CHART_SELECTION_FILL,
       },
       data: markAreas,
     };
@@ -433,29 +439,21 @@ export const convertPromQLData = async (
           if (it.data[1] != null) {
             // check if the series is the current series being hovered
             // if have than bold it
-            if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
-              hoverText.push(
-                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
-                  ),
-                )} </strong>`,
-              );
-            // else normal text
-            else
-              hoverText.push(
-                `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
-                  ) ?? "",
-                )}`,
-              );
+            const row = `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+              formatUnitValue(
+                getUnitValue(
+                  it.data[1],
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals,
+                ),
+              ),
+            )}`;
+            hoverText.push(
+              it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+                ? `<strong>${row} </strong>`
+                : row,
+            );
           }
         });
 
@@ -563,6 +561,7 @@ export const convertPromQLData = async (
       bottom: "100%",
       feature: {
         dataZoom: {
+          brushStyle: dataZoomBrushStyle(),
           filterMode: "none",
           yAxisIndex: "none",
         },
@@ -966,10 +965,18 @@ export const convertPromQLData = async (
         isTimeSeriesFlag = false;
 
         switch (it?.resultType) {
+          // An INSTANT query returns "vector" (one `value` tuple per series) where a
+          // range query returns "matrix" (a `values` array). Normalising the former
+          // into the latter lets ONE branch build the painted series: the vector case
+          // below used to return a bare {name, value} with no renderItem, so a
+          // curated instant tile with a perfectly good scalar painted an empty box.
+          case "vector":
           case "matrix": {
             const metric = it?.result?.[0];
 
-            const values = (metric?.values ?? []).sort((a: any, b: any) => a[0] - b[0]);
+            const values = (metric?.values ?? (metric?.value ? [metric.value] : [])).sort(
+              (a: any, b: any) => a[0] - b[0],
+            );
             const latestValue = values[values.length - 1]?.[1] ?? 0;
 
             const metricStyle = resolveMetricValueStyle(latestValue, {
@@ -1066,17 +1073,6 @@ export const convertPromQLData = async (
             }
 
             return series;
-          }
-
-          case "vector": {
-            const traces = it?.result?.map((metric: any) => {
-              return {
-                name: JSON.stringify(metric.metric),
-                value: metric?.value?.length > 1 ? metric.value[1] : "",
-                ...getPropsByChartTypeForSeries(panelSchema.type),
-              };
-            });
-            return traces;
           }
         }
         break;

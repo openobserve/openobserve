@@ -29,7 +29,7 @@
 use config::{
     get_config,
     meta::{
-        search::{Query, Request, RequestEncoding},
+        search::{Query, Request, RequestEncoding, SearchEventContext},
         slo::{
             CountSource, QueryLanguage, SliConfig, Slo,
             alert_uptime::{EvalInterval, UptimeGrid, uptime_slices},
@@ -173,7 +173,7 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
 
     write_slices(&slo.org, &result.slices, now_secs).await?;
 
-    let outcome = commit_status(db, slo, &result, range.end, now_secs).await?;
+    let outcome = commit_status(slo, &result, range.end, now_secs).await?;
     if let slo_table::WriteOutcome::FencedByGeneration { expected, found } = outcome {
         return Ok(PassOutcome::Fenced { expected, found });
     }
@@ -248,8 +248,9 @@ async fn fetch_rows(
             ))
         }
         SliQueryPlan::PromQl { good, total } => {
-            let good_series = prom_search(&slo.org, &good).await?;
-            let total_series = prom_search(&slo.org, &total).await?;
+            let ctx = SearchEventContext::with_slo(slo);
+            let good_series = prom_search(&slo.org, &good, ctx.clone()).await?;
+            let total_series = prom_search(&slo.org, &total, ctx).await?;
             Ok((
                 promql_rows(
                     good_series,
@@ -261,7 +262,8 @@ async fn fetch_rows(
             ))
         }
         SliQueryPlan::PromQlValue(q) => {
-            let series = prom_search(&slo.org, &q).await?;
+            let ctx = SearchEventContext::with_slo(slo);
+            let series = prom_search(&slo.org, &q, ctx).await?;
             Ok(promql_value_rows(
                 series,
                 group_by,
@@ -414,7 +416,7 @@ pub fn promql_rows(
                 let slice_start = t_micros / 1_000_000 - slice_interval_secs;
                 let e = acc
                     .entry((slice_start, key.clone()))
-                    .or_insert((0.0, labels.clone()));
+                    .or_insert_with(|| (0.0, labels.clone()));
                 e.0 += value;
             }
         }
@@ -526,6 +528,7 @@ pub fn promql_value_rows(
 async fn prom_search(
     org: &str,
     q: &super::query::PromQuery,
+    ctx: SearchEventContext,
 ) -> Result<Vec<PromSeries>, anyhow::Error> {
     let req = promql_service::MetricsQueryRequest {
         query: q.expr.clone(),
@@ -537,6 +540,7 @@ async fn prom_search(
         search_type: Some(config::meta::search::SearchEventType::DerivedStream),
         regions: vec![],
         clusters: vec![],
+        search_event_context: Some(ctx),
     };
     #[cfg(not(feature = "enterprise"))]
     let is_super_cluster = false;
@@ -774,12 +778,13 @@ async fn write_slices(org: &str, slices: &[SliceRow], now_secs: i64) -> Result<(
 
 /// Fold the pass's slices into the running aggregate, CAS-fenced.
 async fn commit_status(
-    db: &sea_orm::DatabaseConnection,
     slo: &Slo,
     result: &PassResult,
     watermark_end: i64,
     now_secs: i64,
 ) -> Result<slo_table::WriteOutcome, anyhow::Error> {
+    // SQLite opens the read-only pool with read_only(true), and this path always writes.
+    let db = get_orm_client_rw().await;
     let mut by_group: std::collections::BTreeMap<String, (f64, f64, i32)> = Default::default();
     for s in &result.slices {
         let e = by_group.entry(s.group_key.clone()).or_insert((0.0, 0.0, 0));

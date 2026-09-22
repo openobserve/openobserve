@@ -17,7 +17,7 @@ env:
 jobs:
   initiate_enterprise_build:
     # A pre-merge gate: runs once auto-merge is enabled on a labelled PR, not on every push.
-    if: ${{ github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) && github.event.pull_request.auto_merge != null }}
+    if: ${{ github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) && github.event.pull_request.auto_merge != null }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -64,7 +64,7 @@ jobs:
 
       - name: Repository Dispatch
         if: ${{ steps.classify.outputs.run_enterprise == 'true' }}
-        uses: peter-evans/repository-dispatch@v4
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         env:
           TOKEN: ${{ steps.generate_token.outputs.token }}
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}

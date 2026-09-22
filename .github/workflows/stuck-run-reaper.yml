@@ -50,7 +50,7 @@ jobs:
         env:
           # Comma-separated workflow file names to police (all use eks-openobserve-* runners).
           # Release workflows are intentionally excluded — a stuck release build is left for a human.
-          WORKFLOWS: "playwright.yml,playwright_regression.yml"
+          WORKFLOWS: "playwright.yml,playwright_bugfix_regression.yml"
           DEFAULT_THRESHOLD_MINUTES: "60"
           # Separate, much longer cap for "zombie" runs stuck with no jobs ever dispatched
           # (these never held a runner, so 60m would be too aggressive — a brief GitHub

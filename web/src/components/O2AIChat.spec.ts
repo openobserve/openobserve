@@ -113,6 +113,7 @@ vi.mock("@/composables/contextProviders", () => ({
 
 // Component import must come after all vi.mock() declarations.
 import O2AIChat from "./O2AIChat.vue";
+import { getManager, resetManager } from "@/lib/vue-shortcut-manager";
 
 // ── Stub definitions ─────────────────────────────────────────────────────────
 
@@ -238,6 +239,23 @@ describe("O2AIChat", () => {
       await flushPromises();
       const welcomeSection = wrapper.find(".welcome-section");
       expect(welcomeSection.exists()).toBe(true);
+    });
+  });
+
+  describe("Ctrl+B ownership", () => {
+    beforeEach(() => resetManager());
+    afterEach(() => resetManager());
+
+    // A second ctrl+b here overwrites MainLayout's gated aiChatToggle (same key + scope).
+    it("should not register ctrl+b, leaving the gated global binding in place", () => {
+      wrapper = mountO2AIChat({ isOpen: false });
+
+      const keys = getManager()!
+        .getAll()
+        .map((s) => s.key);
+      expect(keys).not.toContain("ctrl+b");
+      expect(keys).not.toContain("meta+b");
+      expect(keys).toContain("escape");
     });
   });
 

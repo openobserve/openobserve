@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Custom URL Input Section with Folder Dropdown -->
     <template #url-input-section="{ url, updateUrl }">
-      <div class="my-[0.725rem] flex items-end gap-2">
-        <div class="w-[69%]">
+      <div class="my-[0.725rem] flex items-end gap-2 max-md:flex-wrap">
+        <div class="w-[69%] max-md:w-full">
           <OInput
             data-test="alert-import-url-input"
             :model-value="url"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="w-[30%]" data-test="alert-folder-dropdown">
+        <div class="w-[30%] max-md:w-full" data-test="alert-folder-dropdown">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom File Input Section with Folder Dropdown -->
     <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div class="mb-1 flex w-[calc(100%-0.625rem)] items-start gap-2">
-        <div class="w-[69%]">
+      <div class="mb-1 flex w-[calc(100%-0.625rem)] items-start gap-2 max-md:flex-wrap">
+        <div class="w-[69%] max-md:w-full">
           <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="md"
           />
         </div>
-        <div class="w-[30%]">
+        <div class="w-[30%] max-md:w-full">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -76,7 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
-      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
+      <div
+        class="border-border-default flex h-full w-full min-w-100 flex-col border-s max-md:min-w-0"
+      >
         <div
           v-if="alertErrorsToDisplay.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -296,7 +298,9 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "../../services/alerts";
-import anomalyDetectionService from "../../services/anomaly_detection";
+import { saveAnomalyConfigMutation } from "@/services/anomaly_detection.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import useStreams from "@/composables/useStreams";
 import BaseImport from "../common/BaseImport.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
@@ -385,6 +389,12 @@ export default defineComponent({
       },
     });
     const streamTypes = ["logs", "metrics", "traces"];
+    const anomalyOrgId = useOrgId();
+    // The anomaly import branch is a create; the mutation drops the anomaly scope.
+    const createAnomalyConfig = useMutation(() =>
+      saveAnomalyConfigMutation(anomalyOrgId.value, () => undefined),
+    );
+
     const selectedFolderId = ref<any>(
       props.folderId || router.currentRoute.value.query.folder || "default",
     );
@@ -574,11 +584,17 @@ export default defineComponent({
             alert_enabled: jsonObj.alert_enabled ?? true,
           },
         };
-        await anomalyDetectionService.create(org, payload);
+        // This branch returns before the regular path's refresh below, so it emits its own.
+        await createAnomalyConfig.mutateAsync({
+          payload,
+          folderId: selectedFolderId.value || "default",
+        });
         alertCreators.value.push({
           message: t("alerts.import.anomalyImportSuccess", { index, name: jsonObj.name }),
           success: true,
         });
+        emit("update:alerts", store, selectedFolderId.value);
+        getActiveFolderAlerts(selectedFolderId.value);
         return true;
       } catch (e: any) {
         alertCreators.value.push({

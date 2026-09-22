@@ -17,7 +17,7 @@
         {{ statusVariant(detail.experiment.status, "eval").label }}
       </OTag>
       <OButton
-        v-if="detail?.experiment.status === 'running'"
+        v-if="detail?.experiment.executionStatus === 'running'"
         size="sm"
         variant="outline"
         :disabled="acting"
@@ -27,10 +27,10 @@
         {{ t("aiObservability.experiments.cancel") }}
       </OButton>
       <OButton
-        v-else-if="detail?.experiment.status === 'failed' || failedSlotCount > 0"
+        v-else-if="detail?.experiment.executionStatus === 'failed' || failedSlotCount > 0"
         size="sm"
         variant="outline"
-        :disabled="acting"
+        :disabled="acting || slotRetryActive"
         data-test="ai-experiment-detail-retry"
         @click="retryExperiment"
       >
@@ -291,15 +291,17 @@
       @navigate="loadRowDetail"
       @retry="retryRowSlot"
       @trace="openTrace"
+      @score-trace="openScoreTrace"
     />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -318,6 +320,15 @@ import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type ScoreConfig } from "@/services/online-evals.service";
 import { healthyBooleanValue } from "@/enterprise/components/onlineEvals/utils/qualitySummary";
+import {
+  cancelExperimentMutation,
+  cloneExperimentMutation,
+  retryExperimentMutation,
+  retryExperimentSlotMutation,
+} from "@/services/llm-experiments.queries";
+import { experimentKeys } from "@/services/llm-experiments.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useMutation } from "@tanstack/vue-query";
 import llmExperimentsService, {
   type ExperimentDetail,
   type ExperimentExecution,
@@ -363,11 +374,20 @@ const sortByDispersion = ref(false);
 const highDispersionOnly = ref(false);
 const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
+const slotRetryActive = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
+const SLOT_RETRY_POLL_INTERVAL_MS = 2_000;
+let slotRetryPollTimer: ReturnType<typeof setTimeout> | null = null;
+let slotRetryPollGeneration = 0;
 
+// Real browser back when there's history to pop — returns to the Experiments
+// list with whatever filter (e.g. a dataset) the user actually arrived
+// through, not just the bare list. The fallback only fires with no history
+// to pop (direct link / reload).
+const { goBack: backToExperiments } = useSmartBack(() => aiExperimentsRoute(orgId.value));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
-  to: aiExperimentsRoute(orgId.value),
+  onClick: backToExperiments,
 }));
 const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) > 1);
 
@@ -375,13 +395,14 @@ const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) >
  *  two score columns exactly like the dataset grouping on the list page. */
 const scorerIds = computed(() => (detail.value?.preview.pinnedScorers ?? []).map((s) => s.id));
 
-// Fetched once per org, not re-fetched on every refresh() — Score Configs
-// change far less often than an Experiment's results.
+// Session-cached per org (see `scoreConfigs.listCached`) rather than a plain
+// `list()` — this page mounts fresh every time a different experiment is
+// opened, and Score Configs change far less often than that.
 const scoreConfigs = ref<ScoreConfig[]>([]);
 async function loadScoreConfigs() {
   if (!orgId.value) return;
   try {
-    scoreConfigs.value = await onlineEvalsService.scoreConfigs.list(orgId.value);
+    scoreConfigs.value = await onlineEvalsService.scoreConfigs.listCached(orgId.value);
   } catch {
     // Non-fatal: without configs, boolean cells just render unhighlighted —
     // same as before this feature existed.
@@ -436,7 +457,7 @@ const tableRows = computed(() =>
     const violations: Record<string, boolean> = {};
     for (const id of scorerIds.value) {
       const summary = row.scoreSummaries.find((candidate) => candidate.scorerId === id);
-      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null);
+      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null, row.trialCount);
       const healthy = scorerHealthyBoolean.value[id];
       const aggregate = summary?.value as Record<string, unknown> | null | undefined;
       if (healthy !== undefined && aggregate?.kind === "boolean") {
@@ -548,6 +569,8 @@ const metricCards = computed<MetricCard[]>(() => {
   const aggregate = results.aggregateSummary;
   const task = results.taskProgress;
   const scoring = results.scoringProgress;
+  const taskOutcomes = results.taskOutcomes;
+  const scoreOutcomes = results.scoreOutcomes;
   const scoreDistribution = (results.scoreSummaries ?? []).reduce(
     (distribution, summary) => ({
       success: distribution.success + summary.sampleCount,
@@ -577,6 +600,15 @@ const metricCards = computed<MetricCard[]>(() => {
     key: "cost",
     label: t("aiObservability.experiments.detail.totalCost"),
     value: aggregate?.totalCost == null ? "—" : `$${aggregate.totalCost.toFixed(4)}`,
+    footer: t(
+      aggregate?.costIncomplete
+        ? "aiObservability.experiments.detail.partialCostBreakdown"
+        : "aiObservability.experiments.detail.costBreakdown",
+      {
+        task: formatCost(aggregate?.taskCost ?? aggregate?.totalCost),
+        scoring: formatCost(aggregate?.scoringCost),
+      },
+    ),
     icon: "payments" as IconName,
     dataTest: "ai-experiment-detail-cost",
   });
@@ -591,27 +623,37 @@ const metricCards = computed<MetricCard[]>(() => {
   if (task) {
     cards.push({
       key: "progress",
-      label: t("aiObservability.experiments.detail.progress"),
+      label: t("aiObservability.experiments.detail.tasks"),
       value: `${task.completed}/${task.total}`,
-      footer: task.skipped
-        ? t("aiObservability.experiments.detail.skippedCount", { count: task.skipped })
-        : undefined,
+      footer: taskOutcomes
+        ? t("aiObservability.experiments.detail.taskDistribution", taskOutcomes)
+        : task.skipped
+          ? t("aiObservability.experiments.detail.skippedCount", { count: task.skipped })
+          : undefined,
       icon: "check-circle" as IconName,
       dataTest: "ai-experiment-detail-progress",
     });
   }
-  if (scoring && (scoring.total > 0 || results.scoreSummaries?.length)) {
+  if (scoring && (scoreOutcomes?.total || scoring.total > 0 || results.scoreSummaries?.length)) {
     cards.push({
       key: "scoring",
-      label: t("aiObservability.experiments.detail.scoring"),
-      value: `${scoring.completed}/${scoring.total}`,
-      footer: t("aiObservability.experiments.detail.scoringDistribution", scoreDistribution),
+      label: t("aiObservability.experiments.detail.scores"),
+      value: scoreOutcomes
+        ? `${scoreOutcomes.completed}/${scoreOutcomes.total}`
+        : `${scoring.completed}/${scoring.total}`,
+      footer: scoreOutcomes
+        ? t("aiObservability.experiments.detail.scoreOutcomeDistribution", scoreOutcomes)
+        : t("aiObservability.experiments.detail.scoringDistribution", scoreDistribution),
       icon: "fact-check" as IconName,
       dataTest: "ai-experiment-detail-scoring",
     });
   }
   return cards;
 });
+
+function formatCost(cost: number | null | undefined): string {
+  return cost == null ? "—" : `$${cost.toFixed(4)}`;
+}
 
 function isMetricCardActionable(card: MetricCard) {
   return card.key === "dispersion" && isMultiTrial.value;
@@ -747,6 +789,11 @@ async function refreshRows() {
     rowsLoading.value = false;
   }
 }
+// `refresh` only re-reads this page; the list's run status comes from the mutations' scope drop.
+const cancelWrite = useMutation(() => cancelExperimentMutation(orgId.value));
+const retryWrite = useMutation(() => retryExperimentMutation(orgId.value));
+const retrySlotWrite = useMutation(() => retryExperimentSlotMutation(orgId.value));
+const cloneWrite = useMutation(() => cloneExperimentMutation(orgId.value));
 
 async function refresh() {
   if (!orgId.value || !experimentId.value) return;
@@ -804,15 +851,30 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
   if (slot.taskStatus !== "error") return;
   retryingRow.value = true;
   try {
-    await llmExperimentsService.retrySlot(
-      orgId.value,
-      experimentId.value,
-      slot.rowId,
-      slot.trialIndex,
-      globalThis.crypto.randomUUID(),
-    );
-    await loadRowDetail(slot.rowId);
-    await refresh();
+    const queued = await retrySlotWrite.mutateAsync({
+      experimentId: experimentId.value,
+      rowId: slot.rowId,
+      trialIndex: slot.trialIndex,
+      idempotencyKey: globalThis.crypto.randomUUID(),
+    });
+    if (selectedRowDetail.value?.rowId === slot.rowId) {
+      selectedRowDetail.value = {
+        ...selectedRowDetail.value,
+        trials: selectedRowDetail.value.trials.map((trial) =>
+          trial.trialIndex === slot.trialIndex
+            ? {
+                ...trial,
+                status: "pending",
+                taskStatus: "queued",
+                execution: queued,
+                scores: [],
+              }
+            : trial,
+        ),
+      };
+    }
+    startSlotRetryPolling(slot.rowId);
+    slotRetryActive.value = true;
     toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
   } catch (error: any) {
     toast({
@@ -824,15 +886,84 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
   }
 }
 
+function stopSlotRetryPolling() {
+  slotRetryPollGeneration += 1;
+  slotRetryActive.value = false;
+  if (slotRetryPollTimer !== null) {
+    globalThis.clearTimeout(slotRetryPollTimer);
+    slotRetryPollTimer = null;
+  }
+}
+
+function startSlotRetryPolling(rowId: string) {
+  stopSlotRetryPolling();
+  scheduleSlotRetryPoll(rowId, slotRetryPollGeneration);
+}
+
+function scheduleSlotRetryPoll(rowId: string, generation: number) {
+  slotRetryPollTimer = globalThis.setTimeout(() => {
+    slotRetryPollTimer = null;
+    void pollSlotRetry(rowId, generation);
+  }, SLOT_RETRY_POLL_INTERVAL_MS);
+}
+
+async function pollSlotRetry(rowId: string, generation: number) {
+  const refreshSelectedRow = selectedRowDetail.value?.rowId === rowId;
+
+  try {
+    const [nextDetail, rows, nextRowDetail] = await Promise.all([
+      llmExperimentsService.get(orgId.value, experimentId.value, {
+        resultPage: 1,
+        resultPageSize: 1,
+      }),
+      fetchAllResultRows(),
+      refreshSelectedRow
+        ? llmExperimentsService.getRow(orgId.value, experimentId.value, rowId)
+        : Promise.resolve(null),
+    ]);
+
+    if (generation !== slotRetryPollGeneration) return;
+
+    detail.value = nextDetail;
+    resultRows.value = rows;
+    if (nextRowDetail && selectedRowDetail.value?.rowId === rowId) {
+      selectedRowDetail.value = nextRowDetail;
+    }
+  } catch {
+    // Keep polling durable queued work after a transient refresh failure.
+  }
+
+  if (generation !== slotRetryPollGeneration) return;
+
+  const rowStillPending =
+    selectedRowDetail.value?.rowId === rowId &&
+    selectedRowDetail.value.trials.some(
+      (trial) =>
+        ["queued", "pending", "in_progress"].includes(trial.taskStatus) ||
+        trial.scores.some((score) => ["pending", "in_progress"].includes(score.status)),
+    );
+  if (rowStillPending) {
+    scheduleSlotRetryPoll(rowId, generation);
+  } else {
+    slotRetryActive.value = false;
+    // The retry settled after the mutation expired the list, so a list read meanwhile still shows it running.
+    void queryClient.invalidateQueries({ queryKey: experimentKeys.all(orgId.value) });
+  }
+}
+
+function openScoreTrace(target: { traceId: string; timestamp: number }) {
+  openExperimentTrace(orgId.value, target, (location) => router.resolve(location), globalThis.open);
+}
+
 async function cancelExperiment() {
-  await runAction(() => llmExperimentsService.cancel(orgId.value, experimentId.value), {
+  await runAction(() => cancelWrite.mutateAsync(experimentId.value), {
     success: t("aiObservability.experiments.cancelSuccess"),
     error: t("aiObservability.experiments.cancelError"),
   });
 }
 
 async function retryExperiment() {
-  await runAction(() => llmExperimentsService.retry(orgId.value, experimentId.value), {
+  await runAction(() => retryWrite.mutateAsync(experimentId.value), {
     success: t("aiObservability.experiments.retrySuccess"),
     error: t("aiObservability.experiments.retryError"),
   });
@@ -856,7 +987,7 @@ async function cloneExperiment() {
   }
   acting.value = true;
   try {
-    const clone = await llmExperimentsService.clone(orgId.value, experimentId.value);
+    const clone = await cloneWrite.mutateAsync({ experimentId: experimentId.value });
     toast({ variant: "success", message: t("aiObservability.experiments.cloneSuccess") });
     void router.push(aiExperimentDetailRoute(orgId.value, clone.id));
   } catch (error: any) {
@@ -891,4 +1022,6 @@ async function runAction(
 watch([orgId, experimentId], refresh, { immediate: true });
 watch([sortByDispersion, highDispersionOnly], refreshRows);
 watch(orgId, loadScoreConfigs, { immediate: true });
+watch([orgId, experimentId], stopSlotRetryPolling);
+onUnmounted(stopSlotRetryPolling);
 </script>

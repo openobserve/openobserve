@@ -186,8 +186,12 @@ export class ReportsPage {
 
   async createReportReportNameInput(TEST_REPORT_NAME) {
     await this.reportNameInputField.waitFor({ state: 'visible', timeout: 10000 });
-    await this.reportNameInputField.fill(TEST_REPORT_NAME);
-    await this.page.waitForTimeout(5000);
+    // onBeforeMount seeds the form via an async form.reset() that can land after this fill and wipe name to "" — re-fill until it survives, else the submit is silently blocked by "Name is required".
+    await expect(async () => {
+      await this.reportNameInputField.fill(TEST_REPORT_NAME);
+      await this.page.waitForTimeout(1000);
+      await expect(this.reportNameInputField).toHaveValue(TEST_REPORT_NAME);
+    }).toPass({ timeout: 20000, intervals: [1000, 2000, 3000] });
   }
 
   async createReportFolderInput() {
@@ -423,6 +427,28 @@ export class ReportsPage {
     await this.deleteReportBtn(reportName).click({ force: true });
     await this.confirmPrimaryBtn.waitFor({ state: 'visible', timeout: 10000 });
     await this.confirmPrimaryBtn.click();
+  }
+
+  // Switching tabs invalidates the folder cache and reloads — the path #7280's stale list came from.
+  /**
+   * Switch between the Scheduled ("shared") and Cached report tabs.
+   * @param {'shared'|'cached'} tabValue
+   */
+  async selectReportTab(tabValue) {
+    const tab = this.page.locator(`[data-test="tab-${tabValue}"]`);
+    await tab.waitFor({ state: 'visible', timeout: 15000 });
+    await tab.click();
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  async expectReportListed(reportName) {
+    await this.reportSearchInputField.fill(reportName);
+    await expect(this.reportRow(reportName)).toBeVisible({ timeout: 20000 });
+  }
+
+  async expectReportNotListed(reportName) {
+    await this.reportSearchInputField.fill(reportName);
+    await expect(this.reportRow(reportName)).toHaveCount(0, { timeout: 20000 });
   }
 
   async setTimeToPast30Seconds() {

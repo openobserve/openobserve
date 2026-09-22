@@ -30,6 +30,7 @@
 //!   `serde(default)`, rejecting omitted zero/empty fields
 //! - `Exemplar`'s value oneof is not flattened, so a spec-form top-level `asInt`/`asDouble` key is
 //!   ignored
+//! - `arbitrary_precision` floats not in canonical spelling (`1e0`, `1.50`) drop flattened data
 
 use config::utils::json;
 
@@ -37,6 +38,7 @@ use config::utils::json;
 /// Lenient by design: unrecognized shapes are left untouched and surface as
 /// deserialization errors (HTTP 400) later.
 pub fn normalize(body: &mut json::Value) {
+    json::canonicalize_floats(body);
     let resource_metrics = match body
         .get_mut("resourceMetrics")
         .and_then(|v| v.as_array_mut())
@@ -205,6 +207,7 @@ fn normalize_summary_data_point(point: &mut json::Value) {
 mod tests {
     use opentelemetry_proto::tonic::{
         collector::metrics::v1::ExportMetricsServiceRequest,
+        common::v1::any_value,
         metrics::v1::{exemplar, metric::Data, number_data_point},
     };
 
@@ -387,6 +390,93 @@ mod tests {
         };
         assert_eq!(hist.data_points[0].count, 5);
         assert_eq!(hist.aggregation_temporality, 2);
+    }
+
+    #[test]
+    fn test_non_canonical_doubles_keep_metric_data() {
+        let data = parse(
+            r#"{"name":"g","gauge":{"dataPoints":[{
+                "timeUnixNano":"1700000005000000000","asDouble":1.50,
+                "attributes":[{"key":"weight","value":{"doubleValue":1e0}}]
+            }]}}"#,
+        );
+        let Data::Gauge(gauge) = data else {
+            panic!("expected gauge, got {data:?}");
+        };
+        let point = &gauge.data_points[0];
+        assert_eq!(point.value, Some(number_data_point::Value::AsDouble(1.5)));
+        assert_eq!(
+            point.attributes[0]
+                .value
+                .as_ref()
+                .and_then(|v| v.value.clone()),
+            Some(any_value::Value::DoubleValue(1.0))
+        );
+
+        let data = parse(
+            r#"{"name":"h","histogram":{"aggregationTemporality":2,"dataPoints":[{
+                "timeUnixNano":"1700000005000000000","count":"5","sum":2.50,"min":1E-1,"max":9.0e1,
+                "bucketCounts":["1","4"],"explicitBounds":[1.0e2]
+            }]}}"#,
+        );
+        let Data::Histogram(hist) = data else {
+            panic!("expected histogram, got {data:?}");
+        };
+        let point = &hist.data_points[0];
+        assert_eq!(point.sum, Some(2.5));
+        assert_eq!(point.min, Some(0.1));
+        assert_eq!(point.max, Some(90.0));
+        assert_eq!(point.explicit_bounds, vec![100.0]);
+
+        let data = parse(
+            r#"{"name":"s","summary":{"dataPoints":[{
+                "timeUnixNano":"1700000005000000000","count":"5","sum":1.0e1,
+                "quantileValues":[{"quantile":0.50,"value":2E0}]
+            }]}}"#,
+        );
+        let Data::Summary(summary) = data else {
+            panic!("expected summary, got {data:?}");
+        };
+        let point = &summary.data_points[0];
+        assert_eq!(point.sum, 10.0);
+        assert_eq!(point.quantile_values[0].quantile, 0.5);
+        assert_eq!(point.quantile_values[0].value, 2.0);
+
+        let data = parse(
+            r#"{"name":"e","exponentialHistogram":{"aggregationTemporality":1,"dataPoints":[{
+                "timeUnixNano":"1700000005000000000","count":"5","zeroCount":"1","scale":2,
+                "zeroThreshold":1E-3,"sum":2.50,"positive":{"bucketCounts":["1","3","1"]},
+                "exemplars":[{"timeUnixNano":"1700000005000000000","asDouble":9.50}]
+            }]}}"#,
+        );
+        let Data::ExponentialHistogram(hist) = data else {
+            panic!("expected exponential histogram, got {data:?}");
+        };
+        let point = &hist.data_points[0];
+        assert_eq!(point.zero_threshold, 0.001);
+        assert_eq!(point.sum, Some(2.5));
+        assert_eq!(
+            point.exemplars[0].value,
+            Some(exemplar::Value::AsDouble(9.5))
+        );
+    }
+
+    #[test]
+    fn test_non_canonical_resource_attribute_double() {
+        let mut body = json::from_str::<json::Value>(
+            r#"{"resourceMetrics":[{"resource":{"attributes":[{"key":"ratio","value":{"doubleValue":1e0}}]},"scopeMetrics":[]}]}"#,
+        )
+        .unwrap();
+        normalize(&mut body);
+        let request: ExportMetricsServiceRequest = json::from_value(body).unwrap();
+        let resource = request.resource_metrics[0].resource.as_ref().unwrap();
+        assert_eq!(
+            resource.attributes[0]
+                .value
+                .as_ref()
+                .and_then(|v| v.value.clone()),
+            Some(any_value::Value::DoubleValue(1.0))
+        );
     }
 
     #[test]

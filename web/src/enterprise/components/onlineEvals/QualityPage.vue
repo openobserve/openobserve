@@ -34,7 +34,7 @@
     <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
     <KpiCardRow
       v-else
-      gap="gap-2"
+      gap="gap-2 max-lg:gap-1.5"
       class="quality-page__kpis px-page-edge"
       :aria-label="t('onlineEvals.quality.kpisAriaLabel')"
     >
@@ -56,7 +56,7 @@
         :rows="configRows"
         :is-loading="isConfigsLoading || !!configsLoading || !!agentsLoading"
         @select="selectConfig"
-        @refresh="refreshAll"
+        @refresh="refreshAll(true)"
       />
     </div>
 
@@ -86,7 +86,7 @@
         />
         <span
           v-if="selectedConfig?.version"
-          class="qpd-version text-2xs text-text-secondary ml-1.5 [font-variant-numeric:tabular-nums]"
+          class="qpd-version text-2xs text-text-secondary ms-1.5 [font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
           >{{ t("onlineEvals.versionPrefix") }}{{ selectedConfig.version }}</span
         >
@@ -178,6 +178,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** Re-read the score-configs list, which this page receives as a prop. */
+  (e: "reload-configs"): void;
   (e: "update:agentKey", value: string): void;
   // Fired once after mount so the parent can run the agents-first reload. The
   // parent owns every reload trigger (mount / refresh / date / agent) — this
@@ -273,7 +275,13 @@ const numericRange = computed(() => {
   return { min: Number(r.min), max: Number(r.max) };
 });
 
-async function refreshAll() {
+async function refreshAll(reloadConfigs = false) {
+  // The score-configs list arrives as a prop, so refreshing only the derived
+  // aggregates leaves it untouched — and each of those bails out early when the
+  // list is empty, which is why the button appeared to do nothing at all. Ask
+  // the parent to re-read the list first, then recompute from it.
+  // Only a user refresh asks; mount, date and agent reloads reuse the list the parent holds.
+  if (reloadConfigs) emit("reload-configs");
   await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts(), refreshRuns()]);
 }
 

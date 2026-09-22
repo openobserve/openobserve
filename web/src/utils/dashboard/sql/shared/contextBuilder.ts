@@ -29,13 +29,14 @@ import {
   calculateChartDimensions,
   calculatePieChartRadius,
 } from "../../legendConfiguration";
-import { chartColor } from "@/utils/chartTheme";
+import { chartColor, dataZoomBrushStyle } from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
 import { processData } from "../../sqlProcessData";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
 import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
 import { createTrellisHelpers } from "./trellisConfig";
 import { type SQLContext } from "./types";
+import { escapeHtml } from "@/utils/html";
 
 /**
  * Finds the largest label in the given data array.
@@ -175,7 +176,8 @@ export function buildSQLContext(
       missingValueData?.filter((item: any) => {
         return (
           xAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
-          yAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
+          // some, not every: one null y must not erase the row, its x category and the other series
+          (!yAxisKeys.length || yAxisKeys.some((key: any) => getDataValue(item, key) != null)) &&
           breakDownKeys.every((key: any) => getDataValue(item, key) != null)
         );
       }) || [];
@@ -571,31 +573,35 @@ export function buildSQLContext(
               // if have than bold it
               if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
-                  `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-                    getUnitValue(
-                      it.value,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
+                  `<strong>${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+                    formatUnitValue(
+                      getUnitValue(
+                        it.value,
+                        panelSchema.config?.unit,
+                        panelSchema.config?.unit_custom,
+                        panelSchema.config?.decimals,
+                      ),
                     ),
                   )} </strong>`,
                 );
               // else normal text
               else
                 hoverText.push(
-                  `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                    getUnitValue(
-                      it.value,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
+                  `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+                    formatUnitValue(
+                      getUnitValue(
+                        it.value,
+                        panelSchema.config?.unit,
+                        panelSchema.config?.unit_custom,
+                        panelSchema.config?.decimals,
+                      ),
                     ),
                   )}`,
                 );
             }
           });
 
-          return `${name?.[0]?.name} <br/> ${hoverText.join("<br/>")}`;
+          return `${escapeHtml(name?.[0]?.name)} <br/> ${hoverText.join("<br/>")}`;
         } catch (error) {
           return "";
         }
@@ -747,6 +753,7 @@ export function buildSQLContext(
       bottom: "100%",
       feature: {
         dataZoom: {
+          brushStyle: dataZoomBrushStyle(),
           yAxisIndex:
             panelSchema.config?.dataZoom &&
             Object.prototype.hasOwnProperty.call(panelSchema.config.dataZoom, "yAxisIndex")

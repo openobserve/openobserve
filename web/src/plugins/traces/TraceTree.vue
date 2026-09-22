@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="vertical-segment"
               :data-left="parseInt((spans as any[])[virtualRow.index].style.left)"
               :data-depth="depth"
-              class="border-card-glass-border pointer-events-none absolute top-0 z-1 border-l"
+              class="border-card-glass-border pointer-events-none absolute top-0 z-1 border-s"
               :style="{
                 left:
                   parseInt((spans as any[])[virtualRow.index].style.left) -
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseleave="onUnhoverSpan"
           :data-test="`trace-tree-span-container-${(spans as any[])[virtualRow.index].spanId}`"
         >
-          <div :style="{ width: leftWidth + 'px' }" class="pl-1.5">
+          <div :style="{ width: leftWidth + 'px' }" class="ps-1.5">
             <div
               :style="{
                 height: '100%',
@@ -102,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }`,
               }"
               class="flex flex-col items-start justify-start truncate"
-              :title="(spans as any[])[virtualRow.index].operationName"
             >
               <div
                 class="relative-position operation-name-container bg-surface-base flex h-7.5 w-full cursor-pointer flex-nowrap items-center overflow-visible"
@@ -112,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box text-2xs border-card-glass-border! hover:bg-interactive-hover-bg relative mr-1 flex h-5 min-w-5 cursor-pointer items-center justify-center rounded-full border px-1 py-0 font-semibold transition-colors duration-200"
+                  class="span-count-box text-2xs border-card-glass-border! hover:bg-interactive-hover-bg relative me-1 flex h-5 min-w-5 cursor-pointer items-center justify-center rounded-full border px-1 py-0 font-semibold transition-colors duration-200"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -128,13 +127,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="collapseMapping[(spans as any[])[virtualRow.index].spanId]"
                     data-test="vertical-segment"
-                    class="border-card-glass-border pointer-events-none absolute -bottom-1.5 left-2 z-1 h-1.25 border-l"
+                    class="border-card-glass-border pointer-events-none absolute -bottom-1.5 left-2 z-1 h-1.25 border-s"
                   />
                 </div>
 
                 <div
                   v-else
-                  class="mr-1 h-1.5 w-1.5 shrink-0 self-center rounded-full"
+                  class="me-1 h-1.5 w-1.5 shrink-0 self-center rounded-full"
                   :style="{
                     backgroundColor: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -149,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <div
-                    class="w-[calc(100%-2rem)]! cursor-pointer truncate pl-1"
+                    class="w-[calc(100%-2rem)]! cursor-pointer truncate ps-1"
                     :class="
                       isLLMTrace((spans as any[])[virtualRow.index])
                         ? 'flex-col items-start'
@@ -157,17 +156,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :data-test="`trace-tree-span-select-btn-${(spans as any[])[virtualRow.index].spanId}`"
                   >
-                    <div class="span-name-section-content flex items-center truncate">
+                    <!-- w-full: content-sized, this box shrinks with its own text, so the service name's cap would resolve against the text it is meant to bound. -->
+                    <div
+                      class="span-name-section-content flex w-full min-w-0 items-center truncate"
+                    >
                       <OIcon
                         v-if="(spans as any[])[virtualRow.index].spanStatus === 'ERROR'"
                         name="error"
                         size="sm"
-                        class="text-status-error-text! mr-1"
+                        class="text-status-error-text! me-1"
                         :title="t('traces.traceTree.errorSpan')"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
+                      <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
                       <span
-                        class="mr-2 text-sm font-bold font-medium"
+                        class="me-2 max-w-[50%] shrink-0 truncate text-sm font-bold font-medium"
                         :class="{
                           'bg-table-highlight-bg text-table-highlight-text font-bold':
                             isHighlighted((spans as any[])[virtualRow.index].spanId),
@@ -175,27 +178,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             currentSelectedValue === (spans as any[])[virtualRow.index].spanId,
                         }"
                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
+                        :title="(spans as any[])[virtualRow.index].resolvedIdentity"
                       >
                         {{ (spans as any[])[virtualRow.index].resolvedIdentity }}
                       </span>
                       <SpanKindBadge
                         v-if="(spans as any[])[virtualRow.index]?.spanKind"
                         :kind="(spans as any[])[virtualRow.index]?.spanKind"
-                        class="mr-1"
+                        class="me-1"
                       />
 
                       <img
                         v-if="getSpanTechIcon((spans as any[])[virtualRow.index])"
                         :src="getSpanTechIcon((spans as any[])[virtualRow.index])"
                         :title="getSpanTech((spans as any[])[virtualRow.index])"
-                        class="mr-1 inline-block h-3.5 w-3.5 shrink-0 opacity-60"
+                        class="me-1 inline-block h-3.5 w-3.5 shrink-0 opacity-60"
                         aria-hidden="true"
                         alt=""
                         :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
+                      <!-- min-w-0: a flex item defaults to min-width:auto and would refuse to shrink, so the row's ellipsis never fires. -->
                       <span
-                        class="text-text-secondary text-sm"
+                        class="text-text-secondary min-w-0 truncate text-sm"
                         :data-test="`trace-tree-span-operation-name-${(spans as any[])[virtualRow.index].spanId}`"
+                        :title="(spans as any[])[virtualRow.index].operationName"
                         >{{ (spans as any[])[virtualRow.index].operationName }}</span
                       >
                     </div>
@@ -206,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span
                         v-if="(spans as any[])[virtualRow.index].genAiUsage?.total > 0"
-                        class="mr-2"
+                        class="me-2"
                       >
                         <OIcon name="functions" size="xs" />
                         {{ formatTokens((spans as any[])[virtualRow.index].genAiUsage.total) }}
@@ -250,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <span
                       v-if="getHttpStatusVars((spans as any[])[virtualRow.index])"
-                      class="rounded-default mr-1 px-1 py-[0.4rem] text-xs leading-none font-semibold whitespace-nowrap"
+                      class="rounded-default me-1 px-1 py-[0.4rem] text-xs leading-none font-semibold whitespace-nowrap"
                       :style="{
                         backgroundColor: getHttpStatusVars((spans as any[])[virtualRow.index])?.bg,
                         color: getHttpStatusVars((spans as any[])[virtualRow.index])?.text,
@@ -285,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : 'default-outline'
                       "
                       icon="event-note"
-                      class="mr-1 rounded!"
+                      class="me-1 rounded!"
                       :title="getEventCountLabel((spans as any[])[virtualRow.index])"
                       data-test="span-event-count-badge"
                       :data-test-span="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
@@ -953,6 +959,13 @@ export default defineComponent({
 
 .span-row:hover .view-span-logs {
   display: flex;
+}
+
+/* Touch has no row hover — keep the span quick-action visible. */
+@media (max-width: 47.99rem) {
+  .view-span-logs {
+    display: flex;
+  }
 }
 
 .span-row.span-row-selected::before {

@@ -16,7 +16,7 @@
     <!-- Two-column body -->
     <div class="flex h-full min-h-0 flex-1 overflow-hidden">
       <!-- ── Left: Inputs ── -->
-      <div class="flex w-85 shrink-0 flex-col gap-5 overflow-y-auto py-5 pr-5 pl-6">
+      <div class="flex w-85 shrink-0 flex-col gap-5 overflow-y-auto py-5 ps-6 pe-5">
         <!-- Model Name -->
         <OInput
           v-model="testModelName"
@@ -57,7 +57,7 @@
       <OSeparator vertical />
 
       <!-- ── Right: Live Results ── -->
-      <div class="flex-1 overflow-y-auto py-5 pr-6 pl-5">
+      <div class="flex-1 overflow-y-auto py-5 ps-5 pe-6">
         <transition name="tmm-fade" mode="out-in">
           <!-- Empty state -->
           <div
@@ -114,7 +114,7 @@
               <div class="text-2xs mb-1.5 font-semibold opacity-55">
                 {{ t("modelPricing.troubleshootingTitle") }}
               </div>
-              <ul class="m-0 pl-4 text-xs leading-[1.9] opacity-60">
+              <ul class="m-0 ps-4 text-xs leading-[1.9] opacity-60">
                 <li>{{ t("modelPricing.tip1") }}</li>
                 <li>{{ t("modelPricing.tip2") }}</li>
                 <li>{{ t("modelPricing.tip3") }}</li>

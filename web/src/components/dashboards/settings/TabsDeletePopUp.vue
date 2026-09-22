@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-tab-delete-tab-panels-move"
                 :label="t('dashboard.tabsDeletePopUp.movePanels')"
               />
-              <div v-if="action === 'move'" class="mb-2.5 ml-5 max-w-75 min-w-50">
+              <div v-if="action === 'move'" class="ms-5 mb-2.5 max-w-75 min-w-50">
                 <OSelect
                   v-model="selectedTabToMovePanels"
                   :options="moveTabOptions"
@@ -72,8 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { onMounted } from "vue";
-import { defineComponent, ref, computed } from "vue";
+import { onMounted, defineComponent, ref, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";

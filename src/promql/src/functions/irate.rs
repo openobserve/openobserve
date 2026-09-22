@@ -15,22 +15,11 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::functions::RangeFunc;
 
-pub(crate) fn irate(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, IrateFunc::new(), eval_ctx)
-}
-
 pub struct IrateFunc;
-
-impl IrateFunc {
-    pub fn new() -> Self {
-        IrateFunc {}
-    }
-}
 
 impl RangeFunc for IrateFunc {
     fn name(&self) -> &'static str {
@@ -38,11 +27,9 @@ impl RangeFunc for IrateFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.len() < 2 {
+        let [.., previous, last] = samples else {
             return None;
-        }
-        let last = samples.last().unwrap();
-        let previous = samples.get(samples.len() - 2).unwrap();
+        };
         let dt_seconds = (last.timestamp - previous.timestamp) as f64 / 1_000_000.0;
         if dt_seconds == 0.0 {
             return Some(0.0);
@@ -60,9 +47,14 @@ impl RangeFunc for IrateFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn irate(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, IrateFunc, eval_ctx)
+    }
 
     // Test helper function that creates an EvalContext for instant queries
     fn irate_test_helper(data: Value) -> Result<Value> {
@@ -119,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_irate_exec_less_than_two_samples_returns_none() {
-        let func = IrateFunc::new();
+        let func = IrateFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
         assert!(
             func.exec(&[Sample::new(1000, 5.0)], 1000, &Duration::ZERO)
@@ -129,7 +121,7 @@ mod tests {
 
     #[test]
     fn test_irate_exec_same_timestamp_returns_zero() {
-        let func = IrateFunc::new();
+        let func = IrateFunc;
         let samples = vec![Sample::new(1000, 10.0), Sample::new(1000, 20.0)];
         let result = func.exec(&samples, 1000, &Duration::ZERO);
         assert_eq!(result, Some(0.0));
@@ -137,7 +129,7 @@ mod tests {
 
     #[test]
     fn test_irate_exec_counter_reset_uses_last_value() {
-        let func = IrateFunc::new();
+        let func = IrateFunc;
         // Counter reset: last.value < previous.value
         // dt = (2000 - 1000) / 1_000_000 = 0.001s
         // expected: last.value / dt = 5.0 / 0.001 = 5000.0

@@ -81,6 +81,12 @@ use crate::{
         openobserve_api_search::traces::time_index::get_trace_time_range,
         openobserve_api_search::traces::time_index::get_org_trace_time_range,
         openobserve_api_search::traces::dag::get_trace_dag,
+        openobserve_api_search::profiles::meta::get_profiles_meta,
+        openobserve_api_search::profiles::tag_values::get_profiles_tag_values,
+        openobserve_api_search::profiles::series::profiles_series_get,
+        openobserve_api_search::profiles::series::profiles_series,
+        openobserve_api_search::profiles::merge::merge_profiles_get,
+        openobserve_api_search::profiles::merge::merge_profiles,
         metrics::ingest::json,
         openobserve_api_search::promql::remote_write,
         openobserve_api_search::promql::query_get,
@@ -284,6 +290,7 @@ use crate::{
         synthetics::get_synthetic,
         synthetics::update_synthetic,
         synthetics::delete_synthetic,
+        synthetics::move_synthetics,
         synthetics::set_synthetic_enabled,
         synthetics::run_synthetic_now,
         synthetics::list_locations,
@@ -512,6 +519,7 @@ use crate::{
         (name = "KV", description = "Key Value retrieval & management operations"),
         (name = "Metrics", description = "Metrics data ingestion operations"),
         (name = "Traces", description = "Traces data ingestion operations"),
+        (name = "Profiles", description = "Profiles query and discovery operations"),
         (name = "Clusters", description = "Super cluster operations"),
         (name = "Short Url", description = "Short Url Service"),
         (name = "Ratelimit", description = "Ratelimit operations"),
@@ -716,5 +724,50 @@ mod experiment_tests {
         );
         assert!(comparison.responses.responses.contains_key("400"));
         assert!(comparison.responses.responses.contains_key("403"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use utoipa::OpenApi;
+
+    use super::ApiDoc;
+
+    // Handlers that gained a folder-destination authorization check must
+    // advertise the 403 it returns, or clients cannot distinguish it from a bug.
+    // The /{org}/anomaly_detection pair is annotated but enterprise-gated, so it
+    // is absent from this ApiDoc and cannot be asserted from an OSS build.
+    #[test]
+    fn folder_scoped_writes_document_forbidden() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+
+        let cases: &[(&str, &str)] = &[
+            ("/api/v2/{org_id}/alerts", "post"),
+            ("/api/v2/{org_id}/alerts/{alert_id}", "put"),
+            ("/api/v2/{org_id}/alerts/{alert_id}/clone", "post"),
+            ("/api/v2/{org_id}/alerts/move", "patch"),
+            ("/api/{org_id}/slos", "post"),
+            ("/api/{org_id}/slos/{slo_id}", "put"),
+            ("/api/{org_id}/slos/move", "post"),
+            ("/api/{org_id}/synthetics/{id}", "put"),
+            ("/api/v2/{org_id}/synthetics/move", "patch"),
+            ("/api/v2/{org_id}/reports/{report_id}", "put"),
+            ("/api/v2/{org_id}/reports/move", "patch"),
+            ("/api/{org_id}/folders/dashboards/{dashboard_id}", "put"),
+            ("/api/{org_id}/dashboards/move", "patch"),
+        ];
+
+        let mut missing = Vec::new();
+        for (path, method) in cases {
+            let Some(item) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                missing.push(format!("{method} {path}: not found in spec"));
+                continue;
+            };
+            if item.get("responses").and_then(|r| r.get("403")).is_none() {
+                missing.push(format!("{method} {path}: no 403 documented"));
+            }
+        }
+        assert!(missing.is_empty(), "{missing:#?}");
     }
 }

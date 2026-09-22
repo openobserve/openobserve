@@ -13,7 +13,7 @@
       :data-test="`${dataTestPrefix}-ai-input-bar`"
       :class="[
         'border-b-card-glass-border bg-gradient-ai-faint z-10 flex h-9 shrink-0 items-center gap-2 border-b px-2',
-        props.hasExpandButton && 'pr-10',
+        props.hasExpandButton && 'pe-10',
       ]"
     >
       <!-- Show streaming status with spinner + stop button -->

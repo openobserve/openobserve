@@ -83,7 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-full justify-start"
               @click="quickSelectStream(stream.value)"
             >
-              <span class="truncate">{{ stream.label }}</span>
+              <span class="min-w-0 flex-1 truncate text-left">{{ stream.label }}</span>
+              <OTooltip :content="raw(stream.label)" side="right" align="center" />
             </OButton>
             <span
               v-if="streamList.length > quickPickStreams.length"
@@ -177,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #empty>
           <div data-test="logs-search-no-field-found-text" class="mx-0 w-5/6 pt-3 text-center">
-            <OIcon name="info" size="sm" class="mr-1 align-middle" />
+            <OIcon name="info" size="sm" class="me-1 align-middle" />
             {{ t("search.noFieldFoundInStream") }}
           </div>
         </template>
@@ -327,6 +328,7 @@ export default defineComponent({
       } else {
         this.searchObj.data.stream.selectedStream = (value as string[]) ?? [];
       }
+      this.searchObj.data.filterErrMsg = "";
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect as any;
         if (indexListSelectField?.updateInputValue) {
@@ -714,6 +716,17 @@ export default defineComponent({
       () => {
         pagination.value = { ...pagination.value, page: 1 };
       },
+    );
+
+    // Reset to page 1 whenever the selected stream(s) change. Covers the SQL
+    // Mode path too: useSearchBar's onStreamChange swaps selectedStreamFields
+    // directly and has no reference to this component's local pagination state.
+    watch(
+      () => searchObj.data.stream.selectedStream,
+      () => {
+        resetPagination();
+      },
+      { deep: true },
     );
 
     // Close the stream-select dropdown whenever the Source Details drawer opens

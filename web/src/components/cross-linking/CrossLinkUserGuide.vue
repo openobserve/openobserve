@@ -1,7 +1,7 @@
 ﻿<template>
   <ODropdown v-model:open="showUserGuide" side="left" align="start" :side-offset="8">
     <template #trigger>
-      <OButton variant="ghost" size="icon-sm" class="ml-2" data-test="cross-link-help-btn">
+      <OButton variant="ghost" size="icon-sm" class="ms-2" data-test="cross-link-help-btn">
         <OIcon name="help" size="sm" class="size-4" />
         <OTooltip :content="t('crossLinks.userGuide')" side="bottom" align="center" />
       </OButton>
@@ -14,7 +14,7 @@
 
       <div class="header mt-3 mb-1 font-semibold">{{ t("crossLinks.guideFieldHeader") }}</div>
       <p class="mt-1 mb-2">{{ t("crossLinks.guideFieldDesc") }}</p>
-      <ul class="mt-1 mb-3 ml-5 p-0">
+      <ul class="ms-5 mt-1 mb-3 p-0">
         <li class="my-1">
           <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
             raw("${field.__name}")
@@ -31,7 +31,7 @@
 
       <div class="header mt-3 mb-1 font-semibold">{{ t("crossLinks.guideTimeHeader") }}</div>
       <p class="mt-1 mb-2">{{ t("crossLinks.guideTimeDesc") }}</p>
-      <ul class="mt-1 mb-3 ml-5 p-0">
+      <ul class="ms-5 mt-1 mb-3 p-0">
         <li class="my-1">
           <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
             raw("${start_time}")
@@ -54,7 +54,7 @@
 
       <div class="header mt-3 mb-1 font-semibold">{{ t("crossLinks.guideQueryHeader") }}</div>
       <p class="mt-1 mb-2">{{ t("crossLinks.guideQueryDesc") }}</p>
-      <ul class="mt-1 mb-3 ml-5 p-0">
+      <ul class="ms-5 mt-1 mb-3 p-0">
         <li class="my-1">
           <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
             raw("${query}")

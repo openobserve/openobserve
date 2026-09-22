@@ -9,8 +9,8 @@
         :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
       >
         <div class="chat-title flex w-full items-center justify-between font-bold">
-          <div class="flex items-center gap-2">
-            <div class="inline-flex h-6 w-6 overflow-hidden rounded-full">
+          <div class="flex min-w-0 items-center gap-2">
+            <div class="inline-flex h-6 w-6 shrink-0 overflow-hidden rounded-full">
               <img :src="o2AiTitleLogo" class="h-full w-full object-cover" />
             </div>
 
@@ -19,11 +19,11 @@
                 <OButton
                   variant="ghost"
                   size="sm"
-                  class="chat-title-dropdown rounded-default hover:bg-interactive-hover-bg flex h-8 min-h-8 max-w-52.5 items-center overflow-hidden px-3 py-1.5 transition-colors duration-200"
+                  class="chat-title-dropdown rounded-default hover:bg-interactive-hover-bg flex h-8 min-h-8 max-w-40 min-w-0 items-center overflow-hidden px-3 py-1.5 transition-colors duration-200"
                 >
-                  <div class="flex max-w-55 items-center gap-2">
+                  <div class="flex min-w-0 items-center gap-2">
                     <span
-                      class="chat-title-text text-text-body block max-w-45 truncate text-sm font-medium"
+                      class="chat-title-text text-text-body block min-w-0 truncate text-sm font-medium"
                     >
                       {{ displayedTitle || t("common.newChat") }}
                       <OTooltip
@@ -38,71 +38,17 @@
                   </div>
                 </OButton>
               </template>
-              <div class="history-menu-container relative flex max-h-112.5 w-75 flex-col">
-                <OSearchInput
-                  v-model="historySearchTerm"
-                  :placeholder="t('aiAssistant.searchChatHistory')"
-                  class="sticky top-0 z-2 shrink-0 p-2"
-                />
-                <div
-                  class="history-list-container max-h-87.5 flex-1 overflow-x-hidden overflow-y-auto"
-                >
-                  <ODropdownItem
-                    v-for="chat in filteredChatHistory"
-                    :key="chat.id"
-                    class="history-item group relative"
-                    @select="loadChat(chat.id)"
-                  >
-                    <div class="flex w-full items-center justify-between">
-                      <div class="flex-1 overflow-hidden">
-                        <div class="text-compact truncate">
-                          {{ chat.title }}
-                        </div>
-                        <div class="text-2xs text-text-secondary">
-                          {{ formatTime(chat.timestamp) }}
-                        </div>
-                      </div>
-                      <OButton
-                        variant="ghost"
-                        size="icon-xs-circle"
-                        class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                        @click.stop="deleteChat(chat.id)"
-                      >
-                        <OIcon name="delete" size="sm" />
-                        <OTooltip :content="t('aiAssistant.deleteChatTooltip')" />
-                      </OButton>
-                    </div>
-                  </ODropdownItem>
-                  <div
-                    v-if="filteredChatHistory.length === 0"
-                    class="text-text-muted p-2 text-center"
-                  >
-                    {{ t("aiAssistant.noMatchingChatsFound") }}
-                  </div>
-                </div>
-
-                <!-- Clear all conversations button -->
-                <div
-                  v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container bg-surface-base shrink-0"
-                >
-                  <ODropdownSeparator />
-                  <OButton
-                    variant="ghost-destructive"
-                    class="clear-all-btn text-compact w-full justify-start px-3 py-1.5"
-                    @click.stop="clearAllConversations"
-                  >
-                    <template #icon-left>
-                      <OIcon name="delete-sweep" size="sm" />
-                    </template>
-                    {{ t("aiAssistant.clearAllConversations") }}
-                  </OButton>
-                </div>
-              </div>
+              <O2AIChatHistoryMenu
+                v-model:search-term="historySearchTerm"
+                :chats="filteredChatHistory"
+                @select="loadChat"
+                @delete="deleteChat"
+                @clear-all="clearAllConversations"
+              />
             </ODropdown>
           </div>
 
-          <div class="chat-header-actions flex items-center gap-1">
+          <div class="chat-header-actions flex shrink-0 items-center gap-1">
             <!-- Edit title button -->
             <OButton
               v-if="currentChatId"
@@ -254,911 +200,29 @@
               </div>
             </div>
           </div>
-          <div
+          <O2AIChatMessage
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message rounded-default border-border-default shadow-text-heading/10 border p-3 shadow-md"
-            :class="[
-              message.role,
-              message.role === 'user'
-                ? 'text-text-body dark:text-text-secondary ml-10 w-[calc(100%-2.5rem)] [background:var(--color-chat-bubble-ai)]'
-                : 'bg-surface-base text-text-body dark:text-text-secondary ml-0 w-full',
-              { 'error-message': message.content.startsWith('Error:') },
-            ]"
-          >
-            <div class="message-content flex w-full items-start gap-1.5">
-              <div
-                v-if="message.role === 'user'"
-                class="text-text-inverse inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full [background:var(--color-gradient-ai)]"
-              >
-                <OIcon size="sm" name="person" class="text-text-inverse" />
-              </div>
-              <div
-                class="message-blocks flex max-w-full min-w-0 flex-1 flex-col gap-0 overflow-x-auto bg-transparent wrap-break-word [word-wrap:break-word]"
-              >
-                <!-- Loading indicator inside message box for empty assistant messages -->
-                <div
-                  v-if="
-                    message.role === 'assistant' &&
-                    (!message.contentBlocks || message.contentBlocks.length === 0) &&
-                    (!message.content || message.content.trim() === '') &&
-                    isLoading
-                  "
-                  class="inline-loading text-text-secondary flex items-center gap-2.5 py-2 text-sm"
-                >
-                  <OSpinner variant="dots" size="sm" />
-                  <span>{{ currentAnalyzingMessage }}</span>
-                </div>
-                <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
-                <template
-                  v-for="(block, blockIndex) in message.contentBlocks"
-                  :key="'cb-' + blockIndex"
-                >
-                  <!-- Tool call block - expandable -->
-                  <div
-                    v-if="block.type === 'tool_call'"
-                    class="tool-call-item text-text-secondary rounded-default text-compact mb-2 flex max-w-full min-w-0 flex-col px-3 py-2"
-                    :class="[
-                      { 'has-details': hasToolCallDetails(block) },
-                      {
-                        error: block.success === false && !block.pendingConfirmation,
-                      },
-                      {
-                        'pending-confirmation':
-                          block.pendingConfirmation && block.tool !== 'navigation_action',
-                      },
-                      {
-                        'pending-navigation':
-                          block.pendingConfirmation && block.tool === 'navigation_action',
-                      },
-                    ]"
-                    @click="
-                      hasToolCallDetails(block) &&
-                      !block.pendingConfirmation &&
-                      toggleToolCallExpanded(index, blockIndex)
-                    "
-                  >
-                    <div class="tool-call-header flex items-center gap-2">
-                      <OIcon
-                        :name="
-                          block.pendingConfirmation
-                            ? block.tool === 'navigation_action'
-                              ? 'open-in-new'
-                              : 'help-outline'
-                            : block.success === false
-                              ? 'error'
-                              : 'check-circle'
-                        "
-                        size="sm"
-                        :class="
-                          block.pendingConfirmation
-                            ? block.tool === 'navigation_action'
-                              ? 'text-accent'
-                              : 'text-warning'
-                            : block.success === false
-                              ? 'text-status-negative'
-                              : 'text-status-positive'
-                        "
-                      />
-                      <span class="tool-call-name flex-1 font-medium">
-                        {{ formatToolCallMessage(block).text
-                        }}<strong v-if="formatToolCallMessage(block).highlight">{{
-                          formatToolCallMessage(block).highlight
-                        }}</strong
-                        >{{ formatToolCallMessage(block).suffix }}
-                      </span>
-                      <!-- Navigation icon -->
-                      <OIcon
-                        v-if="block.navigationAction && !block.pendingConfirmation"
-                        name="open-in-new"
-                        size="xs"
-                        class="navigation-icon ml-auto cursor-pointer opacity-70 transition-opacity duration-200 hover:opacity-100"
-                        @click.stop="handleNavigationAction(block.navigationAction)"
-                      >
-                        <OTooltip :content="block.navigationAction.label" />
-                      </OIcon>
-                      <OIcon
-                        v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
-                        :name="
-                          isToolCallExpanded(index, blockIndex) ? 'expand-less' : 'expand-more'
-                        "
-                        size="sm"
-                        class="expand-icon opacity-60 transition-transform duration-200"
-                      />
-                    </div>
-                    <!-- Expandable details -->
-                    <div
-                      v-if="isToolCallExpanded(index, blockIndex)"
-                      class="tool-call-details border-border-default mt-2.5 flex min-w-0 flex-col gap-2 border-t pt-2.5"
-                      @click.stop
-                    >
-                      <!-- Error details for failed tool calls -->
-                      <template v-if="block.success === false">
-                        <div v-if="block.resultMessage" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("common.error")
-                          }}</span>
-                          <span
-                            class="detail-value text-status-negative max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.resultMessage }}</span
-                          >
-                        </div>
-                        <div v-if="block.errorType" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("common.type")
-                          }}</span>
-                          <code
-                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.errorType }}</code
-                          >
-                        </div>
-                        <div v-if="block.suggestion" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("aiAssistant.suggestion")
-                          }}</span>
-                          <span
-                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words italic opacity-85 select-text"
-                            >{{ block.suggestion }}</span
-                          >
-                        </div>
-                      </template>
-                      <!-- Summary details for successful tool calls with summary -->
-                      <template v-if="block.success !== false && block.summary">
-                        <div
-                          v-if="block.summary.count !== undefined"
-                          class="detail-item flex flex-col gap-1"
-                        >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("aiAssistant.results")
-                          }}</span>
-                          <span
-                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.summary.count }} {{ t("aiAssistant.recordsSuffix") }}</span
-                          >
-                        </div>
-                        <div
-                          v-if="block.summary.took !== undefined"
-                          class="detail-item flex flex-col gap-1"
-                        >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("common.duration")
-                          }}</span>
-                          <span
-                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.summary.took }}{{ t("aiAssistant.ms") }}</span
-                          >
-                        </div>
-                        <!-- CLI tool summary (return_code / stdout_lines / stderr_lines / truncated) -->
-                        <div
-                          v-if="block.summary.return_code !== undefined"
-                          class="detail-item flex flex-col gap-1"
-                        >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("aiAssistant.exitCode")
-                          }}</span>
-                          <code
-                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.summary.return_code }}</code
-                          >
-                        </div>
-                        <div
-                          v-if="block.summary.stdout_lines !== undefined"
-                          class="detail-item flex flex-col gap-1"
-                        >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("aiAssistant.stdout")
-                          }}</span>
-                          <span
-                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.summary.stdout_lines }} {{ t("aiAssistant.lines") }}</span
-                          >
-                        </div>
-                        <div
-                          v-if="block.summary.stderr_lines"
-                          class="detail-item flex flex-col gap-1"
-                        >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("aiAssistant.stderr")
-                          }}</span>
-                          <span
-                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.summary.stderr_lines }} {{ t("aiAssistant.lines") }}</span
-                          >
-                        </div>
-                        <div v-if="block.summary.truncated" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("common.output")
-                          }}</span>
-                          <span
-                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ t("aiAssistant.truncatedLabel") }}</span
-                          >
-                        </div>
-                      </template>
-                      <!-- Existing context details -->
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.query"
-                        class="detail-item flex flex-col gap-1"
-                      >
-                        <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("common.query")
-                          }}</span>
-                          <OButton
-                            variant="ghost"
-                            size="icon-xs-circle"
-                            class="copy-btn opacity-60 hover:opacity-100"
-                            @click.stop="
-                              copyToClipboard(getToolCallDisplayData(block.context)?.query, t)
-                            "
-                          >
-                            <OIcon name="content-copy" size="sm" />
-                            <OTooltip :content="t('aiAssistant.copyQuery')" />
-                          </OButton>
-                        </div>
-                        <code
-                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
-                          >{{ getToolCallDisplayData(block.context)?.query }}</code
-                        >
-                      </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.stream"
-                        class="detail-item flex flex-col gap-1"
-                      >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                          t("aiAssistant.stream")
-                        }}</span>
-                        <code
-                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                          >{{ getToolCallDisplayData(block.context)?.stream }}</code
-                        >
-                      </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.type"
-                        class="detail-item flex flex-col gap-1"
-                      >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                          t("common.type")
-                        }}</span>
-                        <code
-                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                          >{{ getToolCallDisplayData(block.context)?.type }}</code
-                        >
-                      </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.start_time"
-                        class="detail-item flex flex-col gap-1"
-                      >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                          t("aiAssistant.start")
-                        }}</span>
-                        <span
-                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                          >{{
-                            formatTimestamp(getToolCallDisplayData(block.context)?.start_time)
-                          }}</span
-                        >
-                      </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.end_time"
-                        class="detail-item flex flex-col gap-1"
-                      >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                          t("aiAssistant.end")
-                        }}</span>
-                        <span
-                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                          >{{
-                            formatTimestamp(getToolCallDisplayData(block.context)?.end_time)
-                          }}</span
-                        >
-                      </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.from !== undefined"
-                        class="detail-item flex flex-col gap-1"
-                      >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                          t("aiAssistant.from")
-                        }}</span>
-                        <span
-                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                          >{{ getToolCallDisplayData(block.context)?.from }}</span
-                        >
-                      </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.size !== undefined"
-                        class="detail-item flex flex-col gap-1"
-                      >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                          t("aiAssistant.size")
-                        }}</span>
-                        <span
-                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                          >{{ getToolCallDisplayData(block.context)?.size }}</span
-                        >
-                      </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.query_type"
-                        class="detail-item flex flex-col gap-1"
-                      >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                          t("aiAssistant.queryType")
-                        }}</span>
-                        <code
-                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                          >{{ getToolCallDisplayData(block.context)?.query_type }}</code
-                        >
-                      </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.vrl"
-                        class="detail-item flex flex-col gap-1"
-                      >
-                        <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("aiAssistant.welcome.taglineVrl")
-                          }}</span>
-                          <OButton
-                            variant="ghost"
-                            size="icon-xs-circle"
-                            class="copy-btn opacity-60 hover:opacity-100"
-                            @click.stop="
-                              copyToClipboard(getToolCallDisplayData(block.context)?.vrl, t)
-                            "
-                          >
-                            <OIcon name="content-copy" size="sm" />
-                            <OTooltip :content="t('aiAssistant.copyVrl')" />
-                          </OButton>
-                        </div>
-                        <code
-                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
-                          >{{ getToolCallDisplayData(block.context)?.vrl }}</code
-                        >
-                      </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.command"
-                        class="detail-item flex flex-col gap-1"
-                      >
-                        <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("aiAssistant.command")
-                          }}</span>
-                          <OButton
-                            variant="ghost"
-                            size="icon-xs-circle"
-                            class="copy-btn opacity-60 hover:opacity-100"
-                            @click.stop="
-                              copyToClipboard(getToolCallDisplayData(block.context)?.command, t)
-                            "
-                          >
-                            <OIcon name="content-copy" size="sm" />
-                            <OTooltip :content="t('aiAssistant.copyCommand')" />
-                          </OButton>
-                        </div>
-                        <code
-                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
-                          >{{ getToolCallDisplayData(block.context)?.command }}</code
-                        >
-                      </div>
-                      <!-- Tool response: SearchSQL hits -->
-                      <template v-if="block.response && block.response.hits">
-                        <div class="detail-item flex flex-col gap-1">
-                          <div class="detail-header flex items-center justify-between">
-                            <span
-                              class="detail-label text-2xs font-semibold uppercase opacity-60"
-                              >{{ t("aiAssistant.results") }}</span
-                            >
-                            <OButton
-                              variant="ghost"
-                              size="icon-xs-circle"
-                              class="copy-btn opacity-60 hover:opacity-100"
-                              @click.stop="
-                                copyToClipboard(JSON.stringify(block.response.hits, null, 2), t)
-                              "
-                            >
-                              <OIcon name="content-copy" size="sm" />
-                              <OTooltip :content="t('aiAssistant.copyResults')" />
-                            </OButton>
-                          </div>
-                          <div
-                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
-                          >
-                            <div
-                              v-for="(hit, hIdx) in block.response.hits"
-                              :key="hIdx"
-                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
-                            >
-                              <span
-                                v-for="(val, key) in hit"
-                                :key="key"
-                                class="hit-field cursor-text break-all select-text"
-                              >
-                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
-                                {{ val }}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="tool-response-meta mt-1 flex flex-wrap gap-1.5">
-                          <span v-if="block.response.total !== undefined" class="context-tag"
-                            >{{ t("aiAssistant.total") }} {{ block.response.total }}</span
-                          >
-                          <span v-if="block.response.took !== undefined" class="context-tag"
-                            >{{ t("aiAssistant.took") }} {{ block.response.took
-                            }}{{ t("aiAssistant.ms") }}</span
-                          >
-                          <span v-if="block.response.hits_truncated" class="context-tag"
-                            >{{ t("aiAssistant.showingFirst") }}
-                            {{ block.response.hits.length }}</span
-                          >
-                        </div>
-                      </template>
-                      <!-- Tool response: testFunction input/output -->
-                      <template
-                        v-else-if="
-                          block.response && (block.response.input || block.response.output)
-                        "
-                      >
-                        <div v-if="block.response.input" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("aiAssistant.inputEvents")
-                          }}</span>
-                          <div
-                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
-                          >
-                            <div
-                              v-for="(evt, eIdx) in block.response.input"
-                              :key="eIdx"
-                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
-                            >
-                              <span
-                                v-for="(val, key) in evt"
-                                :key="key"
-                                class="hit-field cursor-text break-all select-text"
-                              >
-                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
-                                {{
-                                  typeof val === "string" && val.length > 120
-                                    ? val.substring(0, 120) + "..."
-                                    : val
-                                }}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div v-if="block.response.output" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("common.output")
-                          }}</span>
-                          <div
-                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
-                          >
-                            <div
-                              v-for="(res, rIdx) in block.response.output"
-                              :key="rIdx"
-                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
-                            >
-                              <template v-if="res.event">
-                                <span
-                                  v-for="(val, key) in res.event"
-                                  :key="key"
-                                  class="hit-field cursor-text break-all select-text"
-                                >
-                                  <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
-                                  {{
-                                    typeof val === "string" && val.length > 120
-                                      ? val.substring(0, 120) + "..."
-                                      : val
-                                  }}
-                                </span>
-                              </template>
-                              <span
-                                v-if="res.message"
-                                class="hit-field text-status-negative cursor-text break-all select-text"
-                              >
-                                <span class="hit-key font-semibold opacity-60">{{
-                                  t("aiAssistant.errorLabel")
-                                }}</span>
-                                {{ res.message }}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </template>
-                      <!-- Tool response: list items from normalized { total, items } -->
-                      <template
-                        v-else-if="
-                          block.response &&
-                          block.response.items &&
-                          Array.isArray(block.response.items)
-                        "
-                      >
-                        <div
-                          v-if="block.response.items.length > 0"
-                          class="detail-item flex flex-col gap-1"
-                        >
-                          <div class="detail-header flex items-center justify-between">
-                            <span
-                              class="detail-label text-2xs font-semibold uppercase opacity-60"
-                              >{{ t("aiAssistant.items") }}</span
-                            >
-                            <OButton
-                              variant="ghost"
-                              size="icon-xs-circle"
-                              class="copy-btn opacity-60 hover:opacity-100"
-                              @click.stop="
-                                copyToClipboard(JSON.stringify(block.response.items, null, 2), t)
-                              "
-                            >
-                              <OIcon name="content-copy" size="sm" />
-                              <OTooltip :content="t('aiAssistant.copyItems')" />
-                            </OButton>
-                          </div>
-                          <div
-                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
-                          >
-                            <div
-                              v-for="(item, iIdx) in block.response.items"
-                              :key="iIdx"
-                              class="tool-response-list-item [&:not(:last-child)]:border-border-default flex flex-col gap-0.5 py-1 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1.5"
-                            >
-                              <div
-                                v-for="(val, key) in item"
-                                :key="key"
-                                class="hit-field cursor-text break-all select-text"
-                              >
-                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
-                                {{ typeof val === "object" ? JSON.stringify(val) : val }}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </template>
-                      <!-- Tool response: generic fallback (string or other) -->
-                      <div v-else-if="block.response" class="detail-item flex flex-col gap-1">
-                        <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
-                            t("aiAssistant.response")
-                          }}</span>
-                          <OButton
-                            variant="ghost"
-                            size="icon-xs-circle"
-                            class="copy-btn opacity-60 hover:opacity-100"
-                            @click.stop="
-                              copyToClipboard(
-                                typeof block.response === 'string'
-                                  ? block.response
-                                  : JSON.stringify(block.response, null, 2),
-                                t,
-                              )
-                            "
-                          >
-                            <OIcon name="content-copy" size="sm" />
-                            <OTooltip :content="t('aiAssistant.copyResponse')" />
-                          </OButton>
-                        </div>
-                        <code
-                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
-                          >{{
-                            typeof block.response === "string"
-                              ? block.response
-                              : JSON.stringify(block.response, null, 2)
-                          }}</code
-                        >
-                      </div>
-                    </div>
-                  </div>
-                  <!-- Log Entry block - expandable -->
-                  <div
-                    v-else-if="block.type === 'log_entry'"
-                    class="log-entry-item rounded-default text-text-secondary dark:bg-surface-panel dark:border-border-default dark:hover:bg-surface-panel dark:hover:border-text-secondary mb-1 flex cursor-pointer flex-col px-2.5 py-1.5 text-xs [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] hover:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)] dark:border"
-                    @click="toggleLogEntryExpanded(index, blockIndex)"
-                  >
-                    <div class="log-entry-header flex items-center gap-1.5">
-                      <OIcon name="description" size="xs" />
-                      <span
-                        class="log-entry-info flex-1 overflow-hidden text-xs font-medium text-ellipsis whitespace-nowrap"
-                      >
-                        {{ block.preview }}
-                      </span>
-                      <OIcon
-                        :name="
-                          isLogEntryExpanded(index, blockIndex) ? 'expand-less' : 'expand-more'
-                        "
-                        size="sm"
-                        class="expand-icon opacity-60 transition-transform duration-200"
-                      />
-                    </div>
-                    <!-- Expandable details -->
-                    <div
-                      v-if="isLogEntryExpanded(index, blockIndex)"
-                      class="log-entry-details mt-2.5"
-                      @click.stop
-                    >
-                      <div
-                        class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border shadow-sm dark:shadow-sm"
-                      >
-                        <OButton
-                          variant="ghost"
-                          size="icon-xs-circle"
-                          class="copy-btn rounded-default absolute top-2 right-2 z-1 px-2 py-1 opacity-60 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:opacity-100 hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
-                          @click.stop="copyToClipboard(block.content, t)"
-                        >
-                          <OIcon name="content-copy" size="sm" />
-                          <OTooltip :content="t('aiAssistant.copyContent')" />
-                        </OButton>
-                        <code
-                          class="log-entry-code text-2xs bg-surface-base text-text-body dark:text-text-secondary block max-h-75 cursor-text overflow-y-auto p-3 pr-10 font-mono leading-relaxed whitespace-pre-wrap select-text [word-wrap:break-word] dark:[background:var(--color-syntax-bg)]"
-                          v-html="formatLogEntryContent(block.content)"
-                        ></code>
-                      </div>
-                    </div>
-                  </div>
-                  <!-- Stream-level error block -->
-                  <div
-                    v-else-if="block.type === 'error'"
-                    class="stream-error-block rounded-default border-border-default text-compact text-text-secondary mb-2 flex flex-col border-l-3 px-3 py-2.5 [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
-                  >
-                    <div class="stream-error-header flex items-center gap-2">
-                      <OIcon name="warning" size="sm" />
-                      <span class="stream-error-message text-status-negative font-medium">{{
-                        block.message
-                      }}</span>
-                    </div>
-                    <div
-                      v-if="block.suggestion"
-                      class="stream-error-suggestion mt-1.5 pl-6 text-xs italic opacity-85"
-                    >
-                      {{ block.suggestion }}
-                    </div>
-                    <div
-                      v-if="block.recoverable"
-                      class="stream-error-recoverable text-2xs mt-1 pl-6 opacity-70"
-                    >
-                      {{ t("aiAssistant.errorMayBeTemporary") }}
-                    </div>
-                  </div>
-                  <!-- Navigation block - standalone navigation button -->
-                  <div
-                    v-else-if="block.type === 'navigation' && block.navigationAction"
-                    class="navigation-block my-1 [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] dark:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)]"
-                  >
-                    <OButton
-                      variant="primary"
-                      size="xs"
-                      class="navigation-block-btn text-compact"
-                      @click="handleNavigationAction(block.navigationAction)"
-                    >
-                      <template #icon-left><OIcon :name="'open-in-new'" size="sm" /></template>
-                      {{ block.navigationAction.label }}
-                    </OButton>
-                  </div>
-                  <!-- Text block - render with markdown processing -->
-                  <template v-else-if="block.type === 'text' && block.text">
-                    <template
-                      v-for="(textBlock, tbIndex) in processTextBlock(block.text)"
-                      :key="'tb-' + blockIndex + '-' + tbIndex"
-                    >
-                      <div
-                        v-if="textBlock.type === 'code'"
-                        class="code-block rounded-default m-0 overflow-hidden"
-                      >
-                        <div
-                          class="code-block-header bg-surface-subtle flex items-center justify-between px-2 py-1"
-                        >
-                          <span
-                            v-if="textBlock.language"
-                            class="code-type-label rounded-default text-theme-accent dark:text-text-secondary px-1.5 py-0.5 text-xs font-semibold [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
-                          >
-                            {{ getLanguageDisplay(textBlock.language) }}
-                          </span>
-                          <OButton
-                            variant="ghost"
-                            size="xs"
-                            class="copy-button"
-                            @click="copyToClipboard(textBlock.content, t)"
-                          >
-                            <OIcon size="sm" name="content-copy" />
-                            <span class="ml-1">{{ t("common.copy") }}</span>
-                          </OButton>
-                        </div>
-                        <span class="generated-code-block">
-                          <code
-                            :class="['hljs', textBlock.language]"
-                            v-html="textBlock.highlightedContent"
-                          ></code>
-                        </span>
-                        <div
-                          class="code-block-footer flex w-full items-center justify-between px-2 py-1"
-                        >
-                          <OButton
-                            variant="ghost"
-                            size="xs"
-                            class="retry-button"
-                            @click="retryGeneration(message)"
-                          >
-                            <OIcon size="sm" name="refresh" />
-                            <span class="ml-1">{{ t("common.retry") }}</span>
-                          </OButton>
-                        </div>
-                      </div>
-                      <div
-                        v-else
-                        class="text-block w-full max-w-full wrap-break-word [&:not(:last-child)]:mb-1"
-                        v-html="processHtmlBlock(textBlock.content)"
-                      ></div>
-                    </template>
-                  </template>
-                </template>
-                <!-- Fallback for messages without contentBlocks (user messages or old assistant messages) -->
-                <template v-if="!message.contentBlocks || message.contentBlocks.length === 0">
-                  <!-- Display images for user messages -->
-                  <div
-                    v-if="message.role === 'user' && message.images && message.images.length > 0"
-                    class="message-images mb-2 flex flex-wrap gap-2"
-                  >
-                    <div
-                      v-for="(img, imgIndex) in message.images"
-                      :key="'img-' + imgIndex"
-                      class="message-image-item"
-                    >
-                      <img
-                        :src="'data:' + img.mimeType + ';base64,' + img.data"
-                        :alt="img.filename"
-                        class="rounded-default border-border-default max-h-37.5 max-w-50 cursor-pointer border object-contain [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-md"
-                        @click="openImagePreview(img)"
-                      />
-                      <OTooltip :content="raw(img.filename)" />
-                    </div>
-                  </div>
-                  <template v-for="(block, blockIndex) in message.blocks" :key="'fb-' + blockIndex">
-                    <div
-                      v-if="block.type === 'code'"
-                      class="code-block rounded-default m-0 overflow-hidden"
-                    >
-                      <div
-                        class="code-block-header bg-surface-subtle flex items-center justify-between px-2 py-1"
-                      >
-                        <span
-                          v-if="block.language"
-                          class="code-type-label rounded-default text-theme-accent dark:text-text-secondary px-1.5 py-0.5 text-xs font-semibold [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
-                        >
-                          {{ getLanguageDisplay(block.language) }}
-                        </span>
-                        <OButton
-                          variant="ghost"
-                          size="xs"
-                          class="copy-button"
-                          @click="copyToClipboard(block.content, t)"
-                        >
-                          <OIcon size="sm" name="content-copy" />
-                          <span class="ml-1">{{ t("common.copy") }}</span>
-                        </OButton>
-                      </div>
-                      <span class="generated-code-block">
-                        <code
-                          :class="['hljs', block.language]"
-                          v-html="block.highlightedContent"
-                        ></code>
-                      </span>
-                    </div>
-                    <div
-                      v-else
-                      class="text-block w-full max-w-full wrap-break-word [&:not(:last-child)]:mb-1"
-                      v-html="processHtmlBlock(block.content)"
-                    ></div>
-                  </template>
-                </template>
-                <!-- Feedback buttons for assistant messages -->
-                <div
-                  v-if="
-                    message.role === 'assistant' && message.content && message.content.trim() !== ''
-                  "
-                  class="feedback-buttons mt-1 flex items-center gap-0.5 *:transition-opacity *:duration-200 [&>*:hover]:opacity-100"
-                  :class="message.feedback ? '*:opacity-100' : '*:opacity-50'"
-                >
-                  <OButton
-                    variant="ghost"
-                    size="icon-xs-circle"
-                    :disabled="message.feedback === 'thumbs_up'"
-                    :class="message.feedback === 'thumbs_up' ? 'text-accent opacity-100!' : ''"
-                    data-test="o2-ai-chat-thumbs-up-btn"
-                    @click="likeCodeBlock(index)"
-                  >
-                    <OIcon name="thumb-up-off-alt" size="xs" />
-                    <OTooltip :content="t('aiAssistant.helpful')" />
-                  </OButton>
-                  <OButton
-                    variant="ghost"
-                    size="icon-xs-circle"
-                    :disabled="message.feedback === 'thumbs_down'"
-                    :class="message.feedback === 'thumbs_down' ? 'text-accent opacity-100!' : ''"
-                    data-test="o2-ai-chat-thumbs-down-btn"
-                    @click="dislikeCodeBlock(index)"
-                  >
-                    <OIcon name="thumb-down-off-alt" size="xs" />
-                    <OTooltip :content="t('aiAssistant.notHelpful')" />
-                  </OButton>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- Completed tool calls during streaming - keep progress visible
-               so each step stays on screen instead of flashing away while it
-               sits in pendingToolCalls waiting for the assistant's text. -->
-          <div
-            v-for="(block, pIdx) in pendingToolCalls"
-            v-show="block.type === 'tool_call'"
-            :key="'pending-tc-' + pIdx"
-            class="tool-call-indicator rounded-default border-border-default my-1 flex items-center border px-4 py-2 [background:var(--color-chat-bubble-user)]"
-          >
-            <div class="tool-call-content flex w-full items-center gap-3">
-              <OIcon :name="block.success === false ? 'error' : 'check-circle'" size="sm" />
-              <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
-                <span
-                  class="tool-call-message text-text-secondary text-sm font-medium opacity-85"
-                  >{{ block.message }}</span
-                >
-              </div>
-            </div>
-          </div>
+            :message="message"
+            :index="index"
+            :is-loading="isLoading"
+            :current-analyzing-message="currentAnalyzingMessage"
+            :expanded-tool-calls="expandedToolCalls"
+            :expanded-log-entries="expandedLogEntries"
+            @toggle-tool-call="(blockIndex: number) => toggleToolCallExpanded(index, blockIndex)"
+            @toggle-log-entry="(blockIndex: number) => toggleLogEntryExpanded(index, blockIndex)"
+            @navigate="handleNavigationAction"
+            @retry="retryGeneration"
+            @like="likeCodeBlock(index)"
+            @dislike="dislikeCodeBlock(index)"
+            @preview-image="openImagePreview"
+          />
           <!-- Tool call indicator - shows outside message box -->
-          <div
+          <O2AIChatToolCallIndicator
             v-if="activeToolCall"
-            class="tool-call-indicator rounded-default border-border-default my-2 flex items-center border px-4 py-3 [background:var(--color-chat-bubble-user)]"
-          >
-            <div class="tool-call-content flex w-full items-center gap-3">
-              <OSpinner variant="dots" size="xs" />
-              <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
-                <span class="tool-call-message text-text-secondary text-sm font-semibold">{{
-                  activeToolCall.message
-                }}</span>
-                <div
-                  v-if="getToolCallDisplayData(activeToolCall.context)"
-                  class="tool-call-context flex flex-wrap items-center gap-2"
-                >
-                  <div
-                    v-if="getToolCallDisplayData(activeToolCall.context)?.query"
-                    class="context-item w-full"
-                  >
-                    <code
-                      class="context-query rounded-default bg-surface-base border-border-default text-text-body dark:text-text-secondary block max-w-full overflow-hidden border px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap"
-                      >{{
-                        truncateQuery(getToolCallDisplayData(activeToolCall.context)?.query)
-                      }}</code
-                    >
-                  </div>
-                  <div
-                    v-if="
-                      getToolCallDisplayData(activeToolCall.context)?.vrl &&
-                      !getToolCallDisplayData(activeToolCall.context)?.query
-                    "
-                    class="context-item w-full"
-                  >
-                    <code
-                      class="context-query rounded-default bg-surface-base border-border-default text-text-body dark:text-text-secondary block max-w-full overflow-hidden border px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap"
-                      >{{
-                        truncateQuery(getToolCallDisplayData(activeToolCall.context)?.vrl)
-                      }}</code
-                    >
-                  </div>
-                  <span
-                    v-if="getToolCallDisplayData(activeToolCall.context)?.stream"
-                    class="context-tag text-2xs rounded-default text-ai-accent dark:text-text-secondary inline-flex items-center px-2 py-1 font-medium [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
-                  >
-                    {{ t("aiAssistant.streamPrefix") }}
-                    {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
-                  </span>
-                  <span
-                    v-if="getToolCallDisplayData(activeToolCall.context)?.query_type"
-                    class="context-tag text-2xs rounded-default text-ai-accent dark:text-text-secondary inline-flex items-center px-2 py-1 font-medium [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
-                  >
-                    {{ t("aiAssistant.typePrefix") }}
-                    {{ getToolCallDisplayData(activeToolCall.context)?.query_type }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+            :message="activeToolCall.message"
+            :context="activeToolCall.context"
+          />
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
           <div
             v-if="isLoading && !activeToolCall"
@@ -1237,277 +301,92 @@
           @change="handleImageSelect"
         />
 
-        <div
+        <O2AIChatInput
           v-if="!pendingConfirmation"
-          class="unified-input-box rounded-default bg-surface-base border-border-default focus-within:ring-accent flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:ring-2"
+          v-model="inputMessage"
+          v-model:auto-navigation="isAutoNavigationEnabled"
+          :pending-images="pendingImages"
+          :placeholder="raw(inputPlaceholder)"
+          :is-loading="isLoading"
+          :theme="store.state.theme"
+          :references="contextReferences"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
-        >
-          <!-- Image preview strip -->
-          <div
-            v-if="pendingImages.length > 0"
-            class="image-preview-strip mb-2 flex flex-wrap gap-2 py-2"
-          >
-            <div
-              v-for="(img, index) in pendingImages"
-              :key="index"
-              class="image-preview-item relative inline-block"
-            >
-              <img
-                :src="'data:' + img.mimeType + ';base64,' + img.data"
-                :alt="img.filename"
-                class="preview-image rounded-default border-border-default h-16 w-16 border object-cover [transition:transform_0.2s_ease] hover:scale-105"
-              />
-              <OButton
-                variant="ghost"
-                size="icon-xs-circle"
-                class="image-remove-btn bg-status-negative! hover:bg-status-negative! absolute! -top-1.5! -right-1.5! z-10 h-5! min-h-5! w-5! min-w-5! p-0!"
-                @click.stop="removeImage(index)"
-              >
-                <OIcon name="close" size="xs" />
-              </OButton>
-              <OTooltip
-                :content="
-                  t('common.fileWithSize', {
-                    name: img.filename,
-                    size: (img.size / 1024).toFixed(0),
-                  })
-                "
-              />
-            </div>
-          </div>
-
-          <RichTextInput
-            ref="chatInput"
-            v-model="inputMessage"
-            :placeholder="raw(inputPlaceholder)"
-            :disabled="isLoading"
-            :theme="store.state.theme"
-            :references="contextReferences"
-            :borderless="true"
-            @keydown="handleKeyDown"
-            @submit="sendMessage"
-            @update:references="handleReferencesUpdate"
-          />
-
-          <!-- Bottom bar with buttons -->
-          <div class="input-bottom-bar flex items-center justify-between pt-2">
-            <div class="flex items-center gap-2">
-              <!-- Image upload button -->
-              <OButton
-                v-if="!isLoading"
-                @click.stop="triggerImageUpload"
-                variant="ghost"
-                size="icon-sm"
-                class="image-upload-btn opacity-70 transition-opacity duration-200 hover:opacity-100"
-              >
-                <OIcon name="image" size="sm" class="text-icon-color" />
-                <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
-              </OButton>
-              <div v-else class="w-8"></div>
-
-              <!-- Auto navigation toggle button -->
-              <OButton
-                v-if="!isLoading"
-                @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
-                variant="ghost"
-                size="sm"
-                class="auto-nav-toggle-btn rounded-default hover:bg-surface-subtle flex items-center gap-1.5 px-2 py-1 transition-all duration-200"
-              >
-                <OIcon
-                  :name="isAutoNavigationEnabled ? 'check-circle' : 'radio-button-unchecked'"
-                  size="sm"
-                  :class="[
-                    'auto-nav-icon',
-                    isAutoNavigationEnabled ? 'text-theme-accent!' : 'text-icon-color',
-                  ]"
-                />
-                <span
-                  class="auto-nav-label ml-1 text-xs font-medium"
-                  :class="isAutoNavigationEnabled ? 'text-theme-accent' : 'text-text-secondary'"
-                  >{{ t("aiAssistant.autoNavigation.label") }}</span
-                >
-                <OTooltip
-                  :content="
-                    isAutoNavigationEnabled
-                      ? t('aiAssistant.autoNavigation.enabledTooltip')
-                      : t('aiAssistant.autoNavigation.disabledTooltip')
-                  "
-                />
-              </OButton>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <!-- Send button - shown when not loading -->
-              <OButton
-                v-if="!isLoading"
-                :disabled="!inputMessage.trim() && pendingImages.length === 0"
-                @click="sendMessage"
-                variant="primary"
-                size="icon-xs-circle"
-                class="send-button hover:bg-gradient-ai!"
-              >
-                <OIcon name="arrow-upward" size="sm" />
-              </OButton>
-
-              <!-- Stop button - shown when loading/streaming -->
-              <OButton
-                v-if="isLoading"
-                @click="cancelCurrentRequest"
-                variant="ghost"
-                size="icon-xs-circle"
-                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-gradient-danger! hover:bg-gradient-danger-hover! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
-              >
-                <OIcon name="stop" size="sm" />
-              </OButton>
-            </div>
-          </div>
-        </div>
+          @input-ref="(instance: any) => (chatInput = instance)"
+          @keydown="handleKeyDown"
+          @update:references="handleReferencesUpdate"
+          @send="sendMessage"
+          @cancel="cancelCurrentRequest"
+          @trigger-image-upload="triggerImageUpload"
+          @remove-image="removeImage"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  reactive,
-  onMounted,
-  nextTick,
-  watch,
-  computed,
-  onUnmounted,
-} from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { defineComponent, ref, onMounted, nextTick, watch, computed, onUnmounted } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter, useRoute } from "vue-router";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
-import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 import "highlight.js/styles/github-dark.css";
-import { marked } from "marked";
-import { MarkedOptions } from "marked";
-import DOMPurify from "dompurify";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import useAiChat from "@/composables/useAiChat";
-import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
-import { chartColor } from "@/utils/chartTheme";
-import {
-  ChatMessage,
-  ChatHistoryEntry,
-  ContentBlock,
-  NavigationAction,
-  ImageAttachment,
-  MAX_IMAGE_SIZE_BYTES,
-  ALLOWED_IMAGE_TYPES,
-} from "@/ts/interfaces/chat";
+import { getImageURL } from "@/utils/zincutils";
+import { ChatMessage } from "@/ts/interfaces/chat";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import RichTextInput, { ReferenceChip } from "@/components/RichTextInput.vue";
+import { ReferenceChip } from "@/components/RichTextInput.vue";
 import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
 import O2AIHomeWelcome from "@/components/ai-assistant/welcome/O2AIHomeWelcome.vue";
+import O2AIChatHistoryMenu from "@/components/ai-assistant/chat/O2AIChatHistoryMenu.vue";
+import O2AIChatInput from "@/components/ai-assistant/chat/O2AIChatInput.vue";
+import O2AIChatMessage from "@/components/ai-assistant/chat/O2AIChatMessage.vue";
+import O2AIChatToolCallIndicator from "@/components/ai-assistant/chat/O2AIChatToolCallIndicator.vue";
 import { useChatHistory } from "@/composables/useChatHistory";
+import { useChatImages } from "@/composables/useChatImages";
+import { useChatHistoryList } from "@/composables/useChatHistoryList";
+import { usePromptHistory } from "@/composables/usePromptHistory";
+import { useAutoNavigationPreferences } from "@/composables/useAutoNavigationPreferences";
+import { useChatScroll } from "@/composables/useChatScroll";
+import { useTypewriter } from "@/composables/useTypewriter";
+import { abortBackgroundStreams, useChatStream } from "@/composables/useChatStream";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { useAiDashboardEvents, getDashboardEventType } from "@/composables/useAiDashboardEvents";
 import OButton from "@/lib/core/Button/OButton.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
+import { computeUserOrgKey } from "@/utils/userOrgKey";
+import {
+  createPreview,
+  formatLogEntryContent,
+  getLanguageDisplay,
+  parseLogEntries,
+  processHtmlBlock,
+  processMessageContent,
+  processTextBlock,
+  renderMarkdown,
+} from "@/components/O2AIChat.content";
+import {
+  formatContextKey,
+  formatContextValue,
+  getToolCallDisplayData,
+  hasToolCallDetails,
+  truncateQuery,
+} from "@/components/O2AIChat.toolcall";
 
-const { fetchAiChat, submitFeedback } = useAiChat();
-const { emit: emitDashboardEvent } = useAiDashboardEvents();
-
-// Register VRL as a JavaScript alias (type assertion)
-hljs.registerLanguage("vrl", () => hljs.getLanguage("javascript") as any);
-
-// Configure marked options with custom language support
-const markedOptions = {
-  breaks: true,
-  gfm: true,
-  langPrefix: "hljs language-",
-  headerIds: false,
-  mangle: false,
-  sanitize: false, // Allow HTML in markdown
-  highlight: (code: string, lang: string) => {
-    if (lang === "vrl") {
-      return hljs.highlight(code, { language: "javascript" }).value;
-    }
-    if (lang && hljs.getLanguage(lang)) {
-      return hljs.highlight(code, { language: lang }).value;
-    }
-    return hljs.highlightAuto(code).value;
-  },
-} as MarkedOptions;
-
-marked.setOptions(markedOptions);
-
-// Function to render markdown content
-function renderMarkdown(content: any) {
-  return marked.parse(content);
-}
-
-// --- Shared, cross-instance streaming registry ---
-// O2AIChat is instantiated more than once (the Home page's inline AI tab and
-// the sidebar panel in MainLayout are SEPARATE component instances). When the
-// user starts a chat on Home and navigates to another page, the Home instance
-// unmounts and the sidebar instance mounts — a brand new setup() scope.
-//
-// For an in-flight stream to keep rendering after that hand-off, the detach/
-// re-attach bookkeeping MUST live outside setup() so both instances see the
-// same live array + AbortController. When these were per-instance, the sidebar
-// instance's map was empty, so loadChat() never re-attached and fell back to
-// the stale IndexedDB snapshot — the stream kept running but its text never
-// rendered in the new instance. Module scope is what makes the hand-off work.
-const backgroundStreams = new Set<AbortController>();
-const MAX_BACKGROUND_STREAMS = 3;
-
-// Map sessionId → live stream context for re-attachment when a (possibly
-// different) instance loads the same session. loadChat swaps chatMessages.value
-// back to `msgs` so processStream's isActive() becomes true again and the UI
-// updates in real-time.
-const backgroundStreamMap = new Map<
-  string,
-  {
-    msgs: ChatMessage[];
-    controller: AbortController;
-    chatId: number | null;
-  }
->();
-
-// Cross-instance streaming status, keyed by sessionId. processStream runs in the
-// closure of the instance that STARTED it, so its completion resets isLoading on
-// THAT instance's ref — not on a different instance that re-attached to the same
-// stream (e.g. the sidebar taking over from the Home tab). Each instance watches
-// this shared reactive map for its current session and clears its own streaming
-// UI when the background turn finishes, so the sidebar's loading indicator
-// doesn't hang forever after re-attaching. true = streaming, false/absent = done.
-const sessionStreamingState = reactive<Record<string, boolean>>({});
-
-// Detached streams deliberately outlive the component that started them, and
-// this registry is module scope, so nothing else will ever stop them. Call when
-// the turn is no longer authorized for what it is writing — org switch, logout
-// — never for ordinary navigation, which is the case detaching exists for.
-const abortBackgroundStreams = () => {
-  for (const controller of backgroundStreams) controller.abort();
-  backgroundStreams.clear();
-  backgroundStreamMap.clear();
-  for (const key of Object.keys(sessionStreamingState)) {
-    delete sessionStreamingState[key];
-  }
-};
+const { submitFeedback } = useAiChat();
 
 export default defineComponent({
   name: "O2AIChat",
@@ -1515,19 +394,19 @@ export default defineComponent({
     OButton,
     BetaBadge,
     ConfirmDialog,
-    RichTextInput,
     O2AIConfirmDialog,
     O2AIHomeWelcome,
+    O2AIChatHistoryMenu,
+    O2AIChatInput,
+    O2AIChatMessage,
+    O2AIChatToolCallIndicator,
     ODropdown,
-    ODropdownItem,
-    ODropdownSeparator,
     ODrawer,
     ODialog,
     OSpinner,
     OIcon,
     OTooltip,
     OInput,
-    OSearchInput,
   },
   props: {
     isOpen: {
@@ -1538,7 +417,6 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
-    //this will be used to set the input message if the user sends the data from any page by clicking on the ai chat button
     aiChatInputContext: {
       type: String,
       default: "",
@@ -1565,25 +443,16 @@ export default defineComponent({
     const route = useRoute();
     const inputMessage = ref(props.aiChatInputContext ? props.aiChatInputContext : "");
     const chatMessages = ref<ChatMessage[]>([]);
-    const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
-    const chatInput = ref<any>(null); // RichTextInput component instance
-    const currentStreamingMessage = ref("");
-    const currentTextSegment = ref(""); // Track current text segment (resets after each tool call)
-    const showHistory = ref(false);
-    // `model` is stored on persisted entries but missing from the shared interface
-    const chatHistory = ref<(ChatHistoryEntry & { model?: string })[]>([]);
+    const chatInput = ref<any>(null);
+    const currentTextSegment = ref("");
     const currentChatId = ref<number | null>(null);
-    const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
-    const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore();
     const { isDark } = useTheme();
     const { t } = useI18nTyped();
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
 
-    // Typewriter placeholder — only animates on the home tab (centeredStart) when no chat is open.
-    // On the sidepanel the placeholder stays static ("Write your prompt").
     const typewriterPrompts = computed(() => [
       t("aiAssistant.placeholderRotation.one"),
       t("aiAssistant.placeholderRotation.two"),
@@ -1605,7 +474,6 @@ export default defineComponent({
         : t("common.writeYourPrompt"),
     );
 
-    // Chat history composable
     const {
       saveToHistory: dbSaveToHistory,
       loadHistory: dbLoadHistory,
@@ -1619,291 +487,164 @@ export default defineComponent({
       t,
     );
 
+    const userEmail = () => store.state.userInfo.email ?? "";
+    const orgIdentifier = () => store.state.selectedOrganization?.identifier ?? "";
+    // Local prompt history and auto-navigation are keyed by this hash, the same scope as chat history.
+    const userOrgKey = ref<string | null>(null);
+    watch(
+      () => `${userEmail()}:${orgIdentifier()}`,
+      async (scope) => {
+        userOrgKey.value = null;
+        const key = await computeUserOrgKey(userEmail(), orgIdentifier());
+        // A slower hash from the previous user or org must not overwrite the current one.
+        if (scope === `${userEmail()}:${orgIdentifier()}`) userOrgKey.value = key;
+      },
+      { immediate: true },
+    );
+
     const currentChatTimestamp = ref<string | null>(null);
-    const saveHistoryLoading = ref(false);
-    const historySearchTerm = ref("");
-    const shouldAutoScroll = ref(true);
-    const showScrollToBottom = ref(false);
+    const {
+      shouldAutoScroll,
+      showScrollToBottom,
+      getScrollThreshold,
+      checkIfShouldAutoScroll,
+      scrollToBottom,
+      scrollToBottomSmooth,
+      scrollToLoadingIndicator,
+    } = useChatScroll(messagesContainer);
 
-    // Edit title state
-    const showEditTitleDialog = ref(false);
-    const editingTitle = ref("");
+    const {
+      autoNavigationPreferences,
+      pendingAutoNavigation,
+      isAutoNavigationEnabled,
+      saveAutoNavigationPreferences,
+    } = useAutoNavigationPreferences(currentChatId, userOrgKey);
 
-    // Clear all confirmation state
-    const showClearAllConfirmDialog = ref(false);
+    const {
+      currentAnalyzingMessage,
+      startAnalyzingRotation,
+      stopAnalyzingRotation,
+      aiGeneratedTitle,
+      displayedTitle,
+      isTypingTitle,
+      animateTitle,
+      resetTitleState,
+      clearTitleInterval,
+      displayedStreamingContent,
+      typewriterAnimationId,
+      resetTypewriterState,
+      animateStreamingText,
+    } = useTypewriter(currentTextSegment, t);
 
-    // Delete individual chat confirmation state
-    const showDeleteChatConfirmDialog = ref(false);
-    const chatToDelete = ref<number | null>(null);
-
-    // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
-    const pendingConfirmation = ref<{
-      tool: string;
-      args: Record<string, any>;
-      message: I18nText;
-      navAction?: NavigationAction;
-    } | null>(null);
-
-    // Auto navigation state - per chat ID
-    // Stores chat ID -> boolean mapping for auto navigation preference
-    const autoNavigationPreferences = ref<Map<number, boolean>>(new Map());
-
-    // Pending auto navigation preference for new chats (before chat ID is created)
-    const pendingAutoNavigation = ref(true);
-
-    // Current chat's auto navigation state (defaults to true)
-    const isAutoNavigationEnabled = computed({
-      get: () => {
-        if (!currentChatId.value) return pendingAutoNavigation.value;
-        return autoNavigationPreferences.value.get(currentChatId.value) ?? true;
-      },
-      set: (value: boolean) => {
-        if (currentChatId.value) {
-          autoNavigationPreferences.value.set(currentChatId.value, value);
-          saveAutoNavigationPreferences();
-        } else {
-          // Store temporarily for new chats
-          pendingAutoNavigation.value = value;
-        }
-      },
+    const {
+      showHistory,
+      chatHistory,
+      historySearchTerm,
+      filteredChatHistory,
+      loadHistory,
+      openHistory,
+      showEditTitleDialog,
+      editingTitle,
+      openEditTitleDialog,
+      saveEditedTitle,
+      showDeleteChatConfirmDialog,
+      chatToDelete,
+      deleteChat,
+      confirmDeleteChat,
+      showClearAllConfirmDialog,
+      clearAllConversations,
+      confirmClearAllConversations,
+    } = useChatHistoryList({
+      loadHistoryFromDb: dbLoadHistory,
+      deleteChatById: dbDeleteChatById,
+      clearAllHistory: dbClearAllHistory,
+      updateChatTitle: dbUpdateChatTitle,
+      currentChatId,
+      displayedTitle,
+      aiGeneratedTitle,
+      addNewChat: () => addNewChat(),
     });
 
-    // AI-generated chat title state
-    const aiGeneratedTitle = ref<string | null>(null);
-    const displayedTitle = ref<string>("");
-    const isTypingTitle = ref(false);
-    const titleAnimationId = ref<number>(0); // Used to cancel stale animations
-
-    // Track expanded tool calls by message index and block index
     const expandedToolCalls = ref<Set<string>>(new Set());
 
-    // Track expanded log entries by message index and block index
     const expandedLogEntries = ref<Set<string>>(new Set());
 
-    // Active tool call state - for showing tool progress outside message box
-    const activeToolCall = ref<{
-      tool: string;
-      message: I18nText;
-      context: Record<string, any>;
-      call_id?: string;
-    } | null>(null);
+    const {
+      isLoading,
+      currentSessionId,
+      lastTraceId,
+      saveHistoryLoading,
+      pendingConfirmation,
+      activeToolCall,
+      currentAbortController,
+      streamOwnerUnavailable,
+      cancelCurrentRequest,
+      saveToHistory,
+      detachCurrentStream,
+      abortAllStreams,
+      handleToolConfirm,
+      handleToolCancel,
+      handleToolAlwaysConfirm,
+      handleNavigationAction,
+      sendConfirmation,
+      isSessionOwnerUnavailable,
+      appendErrorBlock,
+      runTurn,
+      tryReattach,
+      disposeRenderFlush,
+    } = useChatStream({
+      chatMessages,
+      currentChatId,
+      currentTextSegment,
+      dbSaveToHistory,
+      store,
+      router,
+      t,
+      scrollToBottom,
+      scrollToLoadingIndicator,
+      autoNavigationPreferences,
+      pendingAutoNavigation,
+      isAutoNavigationEnabled,
+      saveAutoNavigationPreferences,
+      startAnalyzingRotation,
+      stopAnalyzingRotation,
+      aiGeneratedTitle,
+      animateTitle,
+      displayedStreamingContent,
+      typewriterAnimationId,
+      resetTypewriterState,
+      animateStreamingText,
+    });
 
-    // Pending tool calls - stores tool calls that arrive before text content to avoid empty message boxes
-    const pendingToolCalls = ref<ContentBlock[]>([]);
+    const {
+      pendingImages,
+      imageInputRef,
+      showImagePreview,
+      previewImage,
+      triggerImageUpload,
+      handleImageSelect,
+      removeImage,
+      clearPendingImages,
+      handleDragOver,
+      handleDrop,
+      handlePaste,
+      handleImageReferenceBackspace,
+      openImagePreview,
+      closeImagePreview,
+    } = useChatImages(chatInput, inputMessage, () => focusInput(), t);
 
-    // AbortController for managing request cancellation - allows users to stop ongoing AI requests
-    const currentAbortController = ref<AbortController | null>(null);
-
-    // NOTE: backgroundStreams / backgroundStreamMap / MAX_BACKGROUND_STREAMS are
-    // declared at MODULE scope (above defineComponent), not here. They must be
-    // shared across all O2AIChat instances so an in-flight stream started on the
-    // Home tab keeps rendering after navigating to a page where the sidebar
-    // instance takes over. See the comment on their declaration for why.
-
-    // Typewriter animation state for LLM responses
-    const displayedStreamingContent = ref("");
-    const typewriterAnimationId = ref<number | null>(null);
-    const TYPEWRITER_SPEED = 8; // ms per character - fast like ChatGPT (5-10ms range)
-
-    // Throttle save during streaming to prevent data loss on page reload
-    const lastStreamingSaveTime = ref<number>(0);
-    const STREAMING_SAVE_INTERVAL = 3000; // Save at most every 3 seconds during streaming
-
-    // Pending images for current message
-    const pendingImages = ref<ImageAttachment[]>([]);
-    const imageInputRef = ref<HTMLInputElement | null>(null);
-    // Image preview dialog state
-    const showImagePreview = ref(false);
-    const previewImage = ref<ImageAttachment | null>(null);
-
-    // Context references for rich text input chips
     const contextReferences = ref<ReferenceChip[]>([]);
 
-    // Component readiness tracking
     const componentReady = ref(false);
     const pendingChips = ref<ReferenceChip[]>([]);
 
-    // Set true in onUnmounted so watchers firing during teardown don't re-attach
-    // a just-detached stream back to this dying instance (see chatUpdated watch).
+    // Set in onUnmounted so the chatUpdated watch can't re-attach a just-detached stream to this dying instance.
     const isUnmounting = ref(false);
 
-    // Analyzing messages for loading indicator
-    const ANALYZING_MESSAGES = [
-      t("aiAssistant.aiChat.analyzingMessages.analyzing"),
-      t("aiAssistant.aiChat.analyzingMessages.thinking"),
-      t("aiAssistant.aiChat.analyzingMessages.processing"),
-      t("aiAssistant.aiChat.analyzingMessages.examiningData"),
-      t("aiAssistant.aiChat.analyzingMessages.reviewingContext"),
-      t("aiAssistant.aiChat.analyzingMessages.formulatingResponse"),
-      t("aiAssistant.aiChat.analyzingMessages.checkingDetails"),
-      t("aiAssistant.aiChat.analyzingMessages.gatheringInsights"),
-      t("aiAssistant.aiChat.analyzingMessages.evaluatingOptions"),
-      t("aiAssistant.aiChat.analyzingMessages.synthesizingInformation"),
-      t("aiAssistant.aiChat.analyzingMessages.workingOnIt"),
-      t("aiAssistant.aiChat.analyzingMessages.almostThere"),
-      t("aiAssistant.aiChat.analyzingMessages.divingDeeper"),
-      t("aiAssistant.aiChat.analyzingMessages.connectingTheDots"),
-      t("aiAssistant.aiChat.analyzingMessages.crunchingNumbers"),
-      t("aiAssistant.aiChat.analyzingMessages.exploringPossibilities"),
-      t("aiAssistant.aiChat.analyzingMessages.refiningAnswer"),
-      t("aiAssistant.aiChat.analyzingMessages.stillThinking"),
-      t("aiAssistant.aiChat.analyzingMessages.makingProgress"),
-      t("aiAssistant.aiChat.analyzingMessages.piecingTogether"),
-    ];
-    const currentAnalyzingMessage = ref(ANALYZING_MESSAGES[0]);
-    const analyzingRotationInterval = ref<NodeJS.Timeout | null>(null);
-
-    /**
-     * Start rotating the analyzing message every 5 seconds
-     */
-    const startAnalyzingRotation = () => {
-      currentAnalyzingMessage.value =
-        ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
-      analyzingRotationInterval.value = setInterval(() => {
-        currentAnalyzingMessage.value =
-          ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
-      }, 5000);
-    };
-
-    /**
-     * Stop rotating the analyzing message
-     */
-    const stopAnalyzingRotation = () => {
-      if (analyzingRotationInterval.value) {
-        clearInterval(analyzingRotationInterval.value);
-        analyzingRotationInterval.value = null;
-      }
-    };
-
-    // Interval ID for title animation
-    let titleIntervalId: ReturnType<typeof setInterval> | null = null;
-
-    /**
-     * Animate title with typewriter effect
-     * Characters appear one by one from left to right
-     * Uses setInterval for reliable timing with Vue reactivity
-     */
-    const animateTitle = (title: string) => {
-      // Clear any existing animation
-      if (titleIntervalId) {
-        clearInterval(titleIntervalId);
-        titleIntervalId = null;
-      }
-
-      // Increment animation ID to track this animation
-      const currentAnimationId = ++titleAnimationId.value;
-
-      isTypingTitle.value = true;
-      displayedTitle.value = "";
-      let charIndex = 0;
-
-      titleIntervalId = setInterval(() => {
-        // Check if this animation was superseded
-        if (titleAnimationId.value !== currentAnimationId) {
-          if (titleIntervalId) {
-            clearInterval(titleIntervalId);
-            titleIntervalId = null;
-          }
-          return;
-        }
-
-        if (charIndex < title.length) {
-          displayedTitle.value = title.slice(0, charIndex + 1);
-          charIndex++;
-        } else {
-          // Animation complete
-          if (titleIntervalId) {
-            clearInterval(titleIntervalId);
-            titleIntervalId = null;
-          }
-          isTypingTitle.value = false;
-        }
-      }, 30); // 30ms per character
-    };
-
-    /**
-     * Reset title state for new chat
-     */
-    const resetTitleState = () => {
-      // Cancel any ongoing animation
-      titleAnimationId.value++;
-      if (titleIntervalId) {
-        clearInterval(titleIntervalId);
-        titleIntervalId = null;
-      }
-      aiGeneratedTitle.value = null;
-      displayedTitle.value = "";
-      isTypingTitle.value = false;
-    };
-
-    /**
-     * Reset typewriter animation state
-     */
-    const resetTypewriterState = () => {
-      displayedStreamingContent.value = "";
-      if (typewriterAnimationId.value) {
-        cancelAnimationFrame(typewriterAnimationId.value);
-        typewriterAnimationId.value = null;
-      }
-    };
-
-    /**
-     * Animate text reveal with typewriter effect
-     * Skips animation for code blocks (reveals them instantly)
-     */
-    const animateStreamingText = () => {
-      const target = currentTextSegment.value;
-      const current = displayedStreamingContent.value;
-
-      if (current.length >= target.length) {
-        // Caught up, stop animation
-        if (typewriterAnimationId.value) {
-          cancelAnimationFrame(typewriterAnimationId.value);
-          typewriterAnimationId.value = null;
-        }
-        return;
-      }
-
-      // Check if we're at the start of a code block - if so, skip to end of code block
-      const remaining = target.slice(current.length);
-      const codeBlockStart = remaining.match(/^```[\w]*/);
-
-      if (codeBlockStart) {
-        // Find the closing ``` and reveal entire code block instantly
-        const codeBlockEnd = remaining.indexOf("```", codeBlockStart[0].length);
-        if (codeBlockEnd !== -1) {
-          const endPos = codeBlockEnd + 3;
-          displayedStreamingContent.value = target.slice(0, current.length + endPos);
-        } else {
-          // Code block not complete yet, reveal opening and wait
-          displayedStreamingContent.value = target.slice(
-            0,
-            current.length + codeBlockStart[0].length,
-          );
-        }
-      } else {
-        // Regular text - reveal one character per tick when caught up, but
-        // catch up faster when a backlog has built up (e.g. the backend
-        // delivered a large chunk in one burst). Without this, a fixed
-        // 1-char-per-tick reveal can lag the actual stream by many seconds
-        // on bursty responses, then "snap" to the full text once the stream
-        // ends and the remaining backlog is force-flushed.
-        const backlog = remaining.length;
-        const revealCount = backlog > 200 ? Math.ceil(backlog / 20) : 1;
-        displayedStreamingContent.value = target.slice(0, current.length + revealCount);
-      }
-
-      // Schedule next frame
-      typewriterAnimationId.value = requestAnimationFrame(() => {
-        setTimeout(animateStreamingText, TYPEWRITER_SPEED);
-      });
-    };
-
-    // Query history functionality
-    const queryHistory = ref<string[]>([]);
-    const historyIndex = ref(-1);
-    const HISTORY_KEY = "ai-chat-query-history";
-    const MAX_HISTORY_SIZE = 10;
+    const { historyIndex, isOnFirstLine, navigateHistory, addToHistory } = usePromptHistory(
+      inputMessage,
+      userOrgKey,
+    );
 
     const capabilities = [
       "1. Create a SQL query for me",
@@ -1927,154 +668,12 @@ export default defineComponent({
       }
     };
 
-    const getScrollThreshold = () => {
-      return 50; // Fixed 50px threshold for all screens
-    };
-
-    const checkIfShouldAutoScroll = () => {
-      if (!messagesContainer.value) return;
-
-      const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
-      const threshold = getScrollThreshold();
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
-
-      shouldAutoScroll.value = isAtBottom;
-
-      // Show scroll to bottom button when user scrolls up significantly
-      // Only show if there's enough content to scroll and user is not at bottom
-      const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
-      const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
-
-      showScrollToBottom.value = hasScrollableContent && isScrolledUp;
-    };
-
-    const scrollToBottom = async () => {
-      await nextTick();
-      if (messagesContainer.value && shouldAutoScroll.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-      }
-    };
-
-    const scrollToBottomSmooth = async () => {
-      await nextTick();
-      if (messagesContainer.value) {
-        messagesContainer.value.scrollTo({
-          top: messagesContainer.value.scrollHeight,
-          behavior: "smooth",
-        });
-        // Hide the button immediately when user clicks it
-        showScrollToBottom.value = false;
-        // Reset auto-scroll when user manually scrolls to bottom
-        shouldAutoScroll.value = true;
-      }
-    };
-
-    const scrollToLoadingIndicator = async () => {
-      await nextTick();
-      const loadingElement = document.getElementById("loading-indicator");
-      if (loadingElement) {
-        loadingElement.scrollIntoView({ behavior: "smooth", block: "end" });
-      }
-    };
-
-    /**
-     * Cancels the currently ongoing AI chat request if one exists
-     * This will stop the streaming response and clean up the request state
-     * Shows a user-friendly notification about the cancellation
-     *
-     * Called when user clicks the "Stop" button during message generation
-     */
-    const cancelCurrentRequest = async () => {
-      if (currentAbortController.value) {
-        currentAbortController.value.abort();
-        currentAbortController.value = null;
-
-        // Show user notification about successful cancellation
-        toast({
-          message: t("toastMessages.components.responseGenerationStopped"),
-          variant: "info",
-        });
-
-        // Update UI state to reflect cancellation
-        isLoading.value = false;
-        activeToolCall.value = null;
-        stopAnalyzingRotation();
-
-        // Immediately show all buffered text (like ChatGPT's "Stop generating")
-        displayedStreamingContent.value = currentTextSegment.value;
-        if (typewriterAnimationId.value) {
-          cancelAnimationFrame(typewriterAnimationId.value);
-          typewriterAnimationId.value = null;
-        }
-
-        // Handle partial message cleanup
-        if (chatMessages.value.length > 0) {
-          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-          if (lastMessage.role === "assistant") {
-            if (!lastMessage.content) {
-              // Remove empty assistant message that was added for streaming
-              chatMessages.value.pop();
-            } else if (currentStreamingMessage.value) {
-              // Update final text in contentBlocks to show all buffered content
-              if (lastMessage.contentBlocks) {
-                const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-                if (lastBlock && lastBlock.type === "text") {
-                  lastBlock.text = currentTextSegment.value;
-                }
-              }
-              // Keep partial content but indicate it was cancelled
-              lastMessage.content = raw(
-                lastMessage.content + "\n\n_[" + t("aiAssistant.responseStoppedByUser") + "]_",
-              );
-            }
-          }
-        }
-
-        // Persist any tool calls that completed before the user hit Stop.
-        // During the tool phase (before the assistant streams text) completed
-        // steps sit in pendingToolCalls and aren't attached to a message yet,
-        // so without this they'd vanish on cancel. Runs after the partial-
-        // message cleanup above so the empty-assistant-message pop can't drop
-        // the message we attach them to.
-        if (pendingToolCalls.value.length) {
-          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-          if (lastMessage && lastMessage.role === "assistant") {
-            if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-            // Tools ran before any text, so place them ahead of it.
-            lastMessage.contentBlocks.unshift(...pendingToolCalls.value);
-          } else {
-            const stoppedNote = `_[${t("aiAssistant.responseStoppedByUser")}]_`;
-            chatMessages.value.push({
-              role: "assistant",
-              content: raw(stoppedNote),
-              contentBlocks: [...pendingToolCalls.value, { type: "text", text: stoppedNote }],
-            });
-          }
-          pendingToolCalls.value = [];
-        }
-
-        // Reset streaming state
-        currentStreamingMessage.value = "";
-        currentTextSegment.value = "";
-        displayedStreamingContent.value = "";
-
-        // Save the current state including cancellation
-        await saveToHistory();
-
-        // Scroll to show the final state
-        await scrollToBottom();
-      }
-    };
-
-    // Process any pending chips that were queued before component was ready
     const processPendingChips = () => {
       if (pendingChips.value.length > 0) {
         nextTick(() => {
           if (chatInput.value && typeof chatInput.value.insertChip === "function") {
-            // Focus input first to ensure cursor is positioned correctly
             focusInput();
 
-            // Only clear if appendMode is false and there are no existing chips
             // Check DOM directly for existing chips instead of relying on reactive state
             const inputElement = chatInput.value.$el || chatInput.value;
             const editableDiv =
@@ -2083,10 +682,6 @@ export default defineComponent({
             const hasExistingChips = editableDiv?.querySelector(".reference-chip") !== null;
             const hasExistingText = editableDiv?.textContent?.trim().length > 0;
 
-            // Only clear if:
-            // 1. appendMode is false (user wants to replace content)
-            // 2. AND there are no existing chips
-            // 3. AND there is no existing text
             if (!props.appendMode && !hasExistingChips && !hasExistingText) {
               if (chatInput.value && typeof chatInput.value.clear === "function") {
                 chatInput.value.clear();
@@ -2094,7 +689,6 @@ export default defineComponent({
               inputMessage.value = "";
             }
 
-            // Insert all pending chips at the cursor position
             pendingChips.value.forEach((chip) => {
               chatInput.value.insertChip(chip);
             });
@@ -2104,57 +698,13 @@ export default defineComponent({
       }
     };
 
-    // Helper to create a better preview of content
-    const createPreview = (content: string, maxLength: number = 40): string => {
-      // Clean up content
-      let preview = content.trim();
-
-      // Try to detect JSON and create a meaningful preview
-      try {
-        const parsed = JSON.parse(content);
-        if (typeof parsed === "object" && parsed !== null) {
-          // For objects, show first few keys
-          const keys = Object.keys(parsed);
-          if (keys.length > 0) {
-            const firstKeys = keys
-              .slice(0, 3)
-              .map((k) => {
-                const val = parsed[k];
-                if (typeof val === "string") {
-                  const truncatedVal = val.length > 8 ? val.substring(0, 8) + "..." : val;
-                  return k + ': "' + truncatedVal + '"';
-                }
-                return k + ": " + String(val).substring(0, 8);
-              })
-              .join(", ");
-            const moreKeys = keys.length > 3 ? ", ..." : "";
-            preview = "{" + firstKeys + moreKeys + "}";
-          }
-        }
-      } catch {
-        // Not JSON, use plain text preview
-        // Replace newlines and multiple spaces with single space
-        preview = preview.replace(/\s+/g, " ");
-      }
-
-      // Truncate if still too long
-      if (preview.length > maxLength) {
-        preview = preview.substring(0, maxLength) + "...";
-      }
-
-      return preview;
-    };
-
     watch(
       () => props.aiChatInputContext,
       (newAiChatInputContext: string) => {
         if (newAiChatInputContext) {
-          // Create a reference chip from the context
           const contextChip: ReferenceChip = {
             id: `context-${Date.now()}`,
-            // Not translated: this filename is spliced verbatim into the
-            // `--- Log Entry ---` delimiter of the prompt sent to the LLM, so the
-            // delimiter must stay stable across locales.
+            // Not translated: this filename is spliced into the prompt's `--- Log Entry ---` delimiter, which must stay stable across locales.
             filename: raw("Log Entry"),
             preview: createPreview(newAiChatInputContext, 10),
             fullContent: newAiChatInputContext,
@@ -2162,10 +712,8 @@ export default defineComponent({
             type: "context",
           };
 
-          // Always queue the chip first for consistent behavior
           pendingChips.value.push(contextChip);
 
-          // If component is ready, process immediately with proper timing
           if (
             componentReady.value &&
             chatInput.value &&
@@ -2178,8 +726,7 @@ export default defineComponent({
               }, 50);
             });
           }
-          // If component not ready, chips will be processed when componentReady becomes true
-          // No fallback text needed - avoids flickering when chat opens
+          // Not ready yet: queued chips are processed when componentReady becomes true.
         }
       },
     );
@@ -2200,8 +747,6 @@ export default defineComponent({
       },
     );
 
-    //fetchInitialMessage is called when the component is mounted and the isOpen prop is true
-
     const fetchInitialMessage = async () => {
       isLoading.value = true;
       try {
@@ -2220,1302 +765,13 @@ export default defineComponent({
       scrollToBottom();
     };
 
-    /**
-     * Extract streamed assistant text from an SSE event.
-     *
-     * The o2-ai (opencode) backend emits streamed text as
-     *   {"type":"message_delta","content":"<plain string>"}
-     * and non-streamed notices as {"type":"message","content":"..."} — the text
-     * is ALWAYS the plain-string `content` field. We also defensively accept the
-     * handful of OpenAI-compatible shapes the enterprise RCA proxy can surface
-     * (`response`, `delta.content`, `choices[].delta.content`, `text`) so an
-     * agent/proxy variant doesn't silently render nothing. Returns the text, or
-     * null when the event carries no assistant text.
-     */
-    const extractStreamText = (data: any): string | null => {
-      if (data == null || typeof data !== "object") return null;
-
-      // Canonical o2-ai chat shape.
-      if (typeof data.content === "string") return data.content;
-
-      // Defensive fallbacks (OpenAI-style / RCA proxy formats).
-      if (typeof data.response === "string") return data.response;
-      if (data.delta && typeof data.delta.content === "string") {
-        return data.delta.content;
-      }
-      const firstChoice = Array.isArray(data.choices) ? data.choices[0] : null;
-      if (firstChoice && typeof firstChoice.delta?.content === "string") {
-        return firstChoice.delta.content;
-      }
-      if (typeof data.text === "string") return data.text;
-
-      return null;
-    };
-
-    const processStream = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let messageComplete = false;
-
-      // --- Stream context: captured at call time ---
-      // When the user switches sessions mid-stream, chatMessages.value gets
-      // replaced with a new array. This captured reference keeps the stream
-      // writing to the ORIGINAL array so data isn't lost.
-      const msgs = chatMessages.value;
-      let ctxSessionId = currentSessionId.value;
-      let ctxChatId = currentChatId.value;
-      let ctxTitle: string | undefined = aiGeneratedTitle.value || undefined;
-
-      // Local streaming accumulators (synced to refs only when active)
-      let streamingMsg = currentStreamingMessage.value;
-      let textSegment = currentTextSegment.value;
-
-      const isActive = () => chatMessages.value === msgs;
-
-      const syncStreamingRefs = () => {
-        if (isActive()) {
-          currentStreamingMessage.value = streamingMsg;
-          currentTextSegment.value = textSegment;
-        }
-      };
-
-      // Context-aware save: uses captured metadata when detached
-      const saveCtx = async () => {
-        if (msgs.length === 0) return;
-        if (!ctxSessionId) {
-          ctxSessionId = getUUIDv7();
-          if (isActive()) currentSessionId.value = ctxSessionId;
-        }
-        const title = isActive() ? aiGeneratedTitle.value || undefined : ctxTitle;
-        const chatId = isActive() ? currentChatId.value : ctxChatId;
-        const resultId = await dbSaveToHistory(msgs, ctxSessionId, title, chatId);
-        if (!chatId && resultId) {
-          if (isActive()) {
-            currentChatId.value = resultId;
-            // Carry the new-chat preference onto the chat id. Persist the actual
-            // value (ON by default) so an explicit user disable is honored.
-            autoNavigationPreferences.value.set(resultId, pendingAutoNavigation.value);
-            saveAutoNavigationPreferences();
-          } else {
-            ctxChatId = resultId;
-          }
-        }
-      };
-
-      let lastSaveTime = lastStreamingSaveTime.value;
-      const throttledSaveCtx = async (force = false) => {
-        const now = Date.now();
-        if (force || now - lastSaveTime >= STREAMING_SAVE_INTERVAL) {
-          lastSaveTime = now;
-          if (isActive()) lastStreamingSaveTime.value = now;
-          await saveCtx();
-        }
-      };
-
-      // Local finalizeTextBlock: operates on captured msgs, not chatMessages.value
-      const localFinalizeTextBlock = () => {
-        if (textSegment) {
-          const lm = msgs[msgs.length - 1];
-          if (lm && lm.role === "assistant" && lm.contentBlocks) {
-            const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
-            if (lb && lb.type === "text") {
-              lb.text = textSegment;
-            }
-          }
-        }
-        if (isActive()) {
-          if (typewriterAnimationId.value) {
-            cancelAnimationFrame(typewriterAnimationId.value);
-            typewriterAnimationId.value = null;
-          }
-          displayedStreamingContent.value = "";
-        }
-        textSegment = "";
-        syncStreamingRefs();
-      };
-      // --- End stream context ---
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          // Append new chunk to existing buffer
-          buffer += decoder.decode(value, { stream: true });
-
-          // Process each line that starts with 'data: '
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || ""; // Keep last potentially incomplete line
-
-          for (const line of lines) {
-            if (line.trim().startsWith("data: ")) {
-              try {
-                // Extract everything after 'data: ' and before any line break
-                const jsonStr = line.substring(line.indexOf("{"));
-
-                // Skip empty or invalid JSON strings
-                if (!jsonStr || !jsonStr.trim()) continue;
-
-                // Try to parse the JSON, handling potential errors
-                try {
-                  const data = JSON.parse(jsonStr);
-
-                  // Handle title events - AI-generated chat title from first message
-                  if (data && data.type === "title") {
-                    ctxTitle = data.title;
-                    if (isActive()) {
-                      aiGeneratedTitle.value = data.title;
-                      animateTitle(data.title);
-                    }
-                    continue;
-                  }
-
-                  // Handle confirmation_required events - add inline confirmation block in chat
-                  if (data && data.type === "confirmation_required") {
-                    localFinalizeTextBlock();
-
-                    // When detached, auto-deny confirmations to unblock the stream
-                    if (!isActive()) {
-                      try {
-                        const orgId = store.state.selectedOrganization.identifier;
-                        const res = await fetch(
-                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
-                          {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
-                            body: JSON.stringify({ approved: false }),
-                          },
-                        );
-                        // Detached stream, so there is nothing to show the user —
-                        // but a silent failure leaves the agent paused.
-                        if (!res.ok) {
-                          console.error(
-                            `Auto-deny not registered (HTTP ${res.status}) for background stream ${ctxSessionId}`,
-                          );
-                        }
-                      } catch (error) {
-                        console.error(
-                          "Error auto-denying confirmation for background stream:",
-                          error,
-                        );
-                      }
-                      continue;
-                    }
-
-                    // Check if this is a navigation action and auto navigation is enabled
-                    if (data.tool === "navigation_action" && isAutoNavigationEnabled.value) {
-                      // Auto-approve navigation without showing confirmation
-                      try {
-                        const orgId = store.state.selectedOrganization.identifier;
-                        const res = await fetch(
-                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
-                          {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
-                            body: JSON.stringify({ approved: true }),
-                          },
-                        );
-                        if (!res.ok) {
-                          console.error(
-                            `Auto-approval not registered (HTTP ${res.status}) for session ${ctxSessionId}`,
-                          );
-                        }
-                      } catch (error) {
-                        console.error("Error auto-confirming navigation:", error);
-                      }
-                      continue;
-                    }
-
-                    // data.message is always set by the backend:
-                    // - Navigation: validated label (e.g. "View in Logs")
-                    // - Other tools: "Confirm execution of {tool}?"
-                    const confirmBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: data.tool,
-                      message: activeToolCall.value?.message || data.message,
-                      context: activeToolCall.value?.context || {},
-                      call_id: data.call_id || activeToolCall.value?.call_id || undefined,
-                      pendingConfirmation: true,
-                      confirmationMessage: data.message,
-                      confirmationArgs: data.args || {},
-                    };
-                    activeToolCall.value = null;
-
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(confirmBlock);
-                    } else {
-                      msgs.push({
-                        role: "assistant",
-                        content: raw(""),
-                        contentBlocks: [...pendingToolCalls.value, confirmBlock],
-                      });
-                      pendingToolCalls.value = [];
-                    }
-                    pendingConfirmation.value = {
-                      tool: data.tool,
-                      args: data.args || {},
-                      message:
-                        data.message ||
-                        t("aiAssistant.aiChat.confirmToolExecution", { tool: data.tool }),
-                    };
-                    await scrollToBottom();
-                    continue;
-                  }
-
-                  // Handle tool_call events - show spinner indicator, don't add to chat yet
-                  if (data && data.type === "tool_call") {
-                    // If there's already an active tool call, complete it first
-                    if (activeToolCall.value) {
-                      const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
-                      };
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(completedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(completedToolBlock);
-                      }
-                    }
-
-                    // Show active indicator (blue spinner box) - don't add to chat yet
-                    if (isActive()) {
-                      activeToolCall.value = {
-                        tool: data.tool,
-                        message: data.message,
-                        context: data.context || {},
-                        call_id: data.call_id || undefined,
-                      };
-                    }
-
-                    localFinalizeTextBlock();
-                    if (isActive()) await scrollToBottom();
-                    continue;
-                  }
-
-                  // Handle error events - display error message to user
-                  if (data && data.type === "error") {
-                    // Owning replica is gone — flag and stop; sendMessage
-                    // restores the conversation once the stream ends.
-                    if (data.code === "session_owner_unavailable") {
-                      streamOwnerUnavailable.value = true;
-                      continue;
-                    }
-                    // Complete any active tool call first
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (activeToolCall.value) {
-                      const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
-                      };
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(completedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(completedToolBlock);
-                      }
-                      if (isActive()) activeToolCall.value = null;
-                    }
-
-                    // Format error message with suggestion if available
-                    // Handle case where error/message might be an object instead of string
-                    const rawError =
-                      data.error ?? data.message ?? t("aiAssistant.aiChat.unexpectedError");
-                    const errorText =
-                      typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
-
-                    // Check if this is an authorization/access error
-                    const authErr = isAuthError(errorText, data.error_type);
-                    // Widened to `string`: the branded `I18nText` from t() does not survive
-                    // the `+=` below, and `data.suggestion` is server prose appended as a
-                    // separate paragraph, not a spliced sentence fragment.
-                    let errorMessage: string = authErr
-                      ? t(UNAUTHORIZED_MESSAGE_KEY)
-                      : t("common.errorPrefix", { message: errorText });
-                    if (data.suggestion && !authErr) {
-                      errorMessage += `\n\n${data.suggestion}`;
-                    }
-
-                    // Get or create assistant message for error (reuse lastMessage)
-                    lastMessage = msgs[msgs.length - 1];
-                    if (!lastMessage || lastMessage.role !== "assistant") {
-                      msgs.push({
-                        role: "assistant",
-                        content: raw(errorMessage),
-                        contentBlocks: [
-                          ...pendingToolCalls.value,
-                          { type: "text", text: errorMessage },
-                        ],
-                      });
-                      pendingToolCalls.value = [];
-                    } else {
-                      // Append error to existing message
-                      if (lastMessage.content) {
-                        lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
-                      } else {
-                        lastMessage.content = raw(errorMessage);
-                      }
-                      if (!lastMessage.contentBlocks) {
-                        lastMessage.contentBlocks = [];
-                      }
-                      lastMessage.contentBlocks.push({
-                        type: "text",
-                        text: errorMessage,
-                      });
-                      // Clear pending tool calls to avoid leaking into later messages
-                      pendingToolCalls.value = [];
-                    }
-
-                    // Reset streaming state
-                    textSegment = "";
-                    syncStreamingRefs();
-
-                    // Save error message to history
-                    await saveCtx();
-                    if (isActive()) await scrollToBottom();
-
-                    // Stop processing further as error occurred
-                    return;
-                  }
-
-                  // Handle complete events - complete any active tool call
-                  if (data && data.type === "complete") {
-                    // Capture trace_id for feedback correlation
-                    if (data.trace_id && isActive()) {
-                      lastTraceId.value = data.trace_id;
-                    }
-                    if (activeToolCall.value) {
-                      const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
-                      };
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(completedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(completedToolBlock);
-                      }
-                      if (isActive()) activeToolCall.value = null;
-                    }
-                    // Flush any tool calls that completed before the assistant
-                    // produced text. With opencode, action-only turns (dashboard/
-                    // alert creation, navigation) finish without any `message`
-                    // event, so these blocks would otherwise stay stranded in
-                    // pendingToolCalls and never render — the user sees progress
-                    // "flash and disappear".
-                    if (pendingToolCalls.value.length) {
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(...pendingToolCalls.value);
-                      } else {
-                        msgs.push({
-                          role: "assistant",
-                          content: raw(""),
-                          contentBlocks: [...pendingToolCalls.value],
-                        });
-                      }
-                      pendingToolCalls.value = [];
-                      if (isActive()) await throttledSaveCtx(true);
-                    }
-                    continue;
-                  }
-
-                  // Handle tool_result events - enrich tool call with result data
-                  if (data && data.type === "tool_result") {
-                    const resultData = {
-                      success: data.success !== false,
-                      resultMessage: data.message || "",
-                      summary: data.summary || undefined,
-                      errorType: data.error_type || undefined,
-                      suggestion: data.suggestion || undefined,
-                      details: data.details || undefined,
-                      response: data.response || undefined,
-                    };
-
-                    // Generate navigation from tool result if applicable
-                    let navigationAction: NavigationAction | null = null;
-                    if (data.success !== false && data.call_args) {
-                      navigationAction = generateNavigationFromToolResult(
-                        data.tool,
-                        data.call_args,
-                        data,
-                      );
-                    }
-
-                    // Emit dashboard event only when stream is active (foreground)
-                    if (data.success !== false && isActive()) {
-                      const resolvedToolName =
-                        data.tool && data.tool !== "tools_call" ? data.tool : "";
-                      const callArgs = data.call_args || {};
-                      const dashboardEventType = getDashboardEventType(resolvedToolName);
-                      if (dashboardEventType) {
-                        const dashboardId =
-                          callArgs.dashboard_id ||
-                          callArgs.args?.dashboard_id ||
-                          callArgs.request_body?.dashboard_id;
-                        if (dashboardId) {
-                          const folderId =
-                            callArgs.folder ||
-                            callArgs.args?.folder ||
-                            callArgs.request_body?.folder;
-                          emitDashboardEvent({
-                            type: dashboardEventType,
-                            dashboardId,
-                            folderId,
-                          });
-                        } else {
-                          console.warn(
-                            `[O2AIChat] Could not extract dashboardId from call_args for tool "${resolvedToolName}". Skipping dashboard event.`,
-                            callArgs,
-                          );
-                        }
-                      }
-                    }
-
-                    // Match by call_id if available, fall back to tool name
-                    const matchesActiveToolCall =
-                      activeToolCall.value &&
-                      ((data.call_id && activeToolCall.value.call_id === data.call_id) ||
-                        (!data.call_id && activeToolCall.value.tool === data.tool));
-
-                    // If active tool call matches, complete it with result data
-                    if (matchesActiveToolCall) {
-                      const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value!.tool,
-                        message: activeToolCall.value!.message,
-                        context: activeToolCall.value!.context,
-                        call_id: activeToolCall.value!.call_id,
-                        ...resultData,
-                        ...(navigationAction && { navigationAction }),
-                      };
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(completedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(completedToolBlock);
-                      }
-                      if (isActive()) activeToolCall.value = null;
-                    } else {
-                      // Tool was already completed — retroactively enrich the matching block
-                      const lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.contentBlocks) {
-                        for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
-                          const block = lastMessage.contentBlocks[i];
-                          const blockMatches = data.call_id
-                            ? block.call_id === data.call_id
-                            : block.type === "tool_call" &&
-                              block.tool === data.tool &&
-                              block.success === undefined;
-                          if (blockMatches) {
-                            Object.assign(block, resultData);
-                            if (navigationAction) {
-                              block.navigationAction = navigationAction;
-                            }
-                            break;
-                          }
-                        }
-                      }
-                      // Also check pending tool calls
-                      for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
-                        const block = pendingToolCalls.value[i];
-                        const blockMatches = data.call_id
-                          ? block.call_id === data.call_id
-                          : block.type === "tool_call" &&
-                            block.tool === data.tool &&
-                            block.success === undefined;
-                        if (blockMatches) {
-                          Object.assign(block, resultData);
-                          break;
-                        }
-                      }
-                    }
-                    if (isActive()) await scrollToBottom();
-                    continue;
-                  }
-
-                  // Handle navigation_action events - check auto navigation setting
-                  // (clickable buttons on tool results are generated by frontend from tool_result data)
-                  if (data && data.type === "navigation_action") {
-                    localFinalizeTextBlock();
-
-                    // Skip navigation when stream is detached (background)
-                    if (!isActive()) continue;
-
-                    const navAction: NavigationAction = {
-                      resource_type: data.resource_type,
-                      action: data.action,
-                      label: data.label,
-                      target: data.target,
-                    };
-
-                    // Check if auto navigation is enabled
-                    if (isAutoNavigationEnabled.value) {
-                      // Auto-navigate without confirmation
-                      await handleNavigationAction(navAction);
-                    } else {
-                      // Show confirmation dialog
-                      // Store the navigation action for later use
-                      const confirmBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: "navigation_action",
-                        message: data.label || t("aiAssistant.aiChat.navigateConfirmQuestion"),
-                        context: { navAction },
-                        pendingConfirmation: true,
-                        confirmationMessage: data.label,
-                        confirmationArgs: data.target || {},
-                      };
-                      activeToolCall.value = null;
-
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(confirmBlock);
-                      } else {
-                        msgs.push({
-                          role: "assistant",
-                          content: raw(""),
-                          contentBlocks: [...pendingToolCalls.value, confirmBlock],
-                        });
-                        pendingToolCalls.value = [];
-                      }
-
-                      // Set pending confirmation with navigation action data
-                      pendingConfirmation.value = {
-                        tool: "navigation_action",
-                        args: data.target || {},
-                        message: data.label || t("aiAssistant.aiChat.navigateConfirmQuestion"),
-                      };
-
-                      // Store the navigation action for later execution
-                      pendingConfirmation.value.navAction = navAction;
-
-                      await scrollToBottom();
-                    }
-                    continue;
-                  }
-
-                  // Handle error events - stream-level errors
-                  if (data && data.type === "error") {
-                    // Owning replica is gone — flag and stop; sendMessage restores
-                    // the conversation once the stream ends. Rendering the raw
-                    // error too would dead-end above the restored conversation.
-                    if (data.code === "session_owner_unavailable") {
-                      streamOwnerUnavailable.value = true;
-                      continue;
-                    }
-                    // Complete any active tool call as failed
-                    if (activeToolCall.value) {
-                      const failedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
-                        success: false,
-                        resultMessage: data.message || t("aiAssistant.aiChat.toolExecutionFailed"),
-                        errorType: data.error_type || undefined,
-                        suggestion: data.suggestion || undefined,
-                      };
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(failedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(failedToolBlock);
-                      }
-                      if (isActive()) activeToolCall.value = null;
-                    }
-
-                    // Add inline error block
-                    const rawErrorMessage =
-                      data.message || data.error || t("aiAssistant.aiChat.errorOccurred");
-                    const authErr = isAuthError(rawErrorMessage, data.error_type);
-                    const errorBlock: ContentBlock = {
-                      type: "error",
-                      message: authErr ? t(UNAUTHORIZED_MESSAGE_KEY) : rawErrorMessage,
-                      errorType: data.error_type || undefined,
-                      suggestion: authErr ? undefined : data.suggestion || undefined,
-                      recoverable: authErr ? false : (data.recoverable ?? undefined),
-                    };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(errorBlock);
-                    } else {
-                      msgs.push({
-                        role: "assistant",
-                        content: raw(""),
-                        contentBlocks: [...pendingToolCalls.value, errorBlock],
-                      });
-                      pendingToolCalls.value = [];
-                    }
-                    messageComplete = true;
-                    if (isActive()) await scrollToBottom();
-                    continue;
-                  }
-
-                  // Handle streamed deltas and full/legacy message content.
-                  // Tolerant of multiple shapes (content/text/delta/nested/OpenAI)
-                  // so an agent schema change doesn't silently drop text.
-                  const streamText = extractStreamText(data);
-                  if (typeof streamText === "string") {
-                    // Complete any active tool call first (add green checkmark to chat)
-                    if (activeToolCall.value) {
-                      const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
-                      };
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(completedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(completedToolBlock);
-                      }
-                      if (isActive()) activeToolCall.value = null;
-                    }
-
-                    // Deltas (append verbatim) vs full/legacy messages (reformat
-                    // code fences). o2-ai streams text as type "message_delta";
-                    // any content arriving via a non-`content` fallback field is
-                    // also an incremental delta.
-                    const isMessageDelta =
-                      data.type === "message_delta" || typeof data.content !== "string";
-
-                    // Format code blocks with proper line breaks for full/legacy
-                    // messages. Deltas must be appended exactly as received.
-                    let content = streamText;
-                    if (!isMessageDelta) {
-                      content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
-                      content = content.replace(/([^`])\s*```/g, "$1\n```");
-                    }
-
-                    if (!isMessageDelta) {
-                      // Add newline separator if starting a new text segment after tool call
-                      if (streamingMsg && textSegment === "") {
-                        streamingMsg += "\n\n";
-                      }
-                      // Add newline between consecutive full/legacy message events if needed
-                      else if (
-                        streamingMsg &&
-                        !streamingMsg.endsWith("\n") &&
-                        !content.startsWith("\n")
-                      ) {
-                        streamingMsg += "\n\n";
-                        textSegment += "\n\n";
-                      }
-                    }
-
-                    // Accumulate to both total content and current segment
-                    streamingMsg += content;
-                    textSegment += content;
-                    syncStreamingRefs();
-
-                    // Start typewriter animation if not already running
-                    if (isActive() && !typewriterAnimationId.value) {
-                      animateStreamingText();
-                    }
-
-                    // Get or create assistant message
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (!lastMessage || lastMessage.role !== "assistant") {
-                      // Create new assistant message with pending tool calls + text
-                      msgs.push({
-                        role: "assistant",
-                        content: raw(streamingMsg),
-                        contentBlocks: [
-                          ...pendingToolCalls.value,
-                          { type: "text", text: textSegment },
-                        ],
-                      });
-                      pendingToolCalls.value = []; // Clear pending
-                      // Save immediately when assistant message is first created to prevent data loss on reload
-                      await throttledSaveCtx(true);
-                    } else {
-                      // Update existing assistant message's total content
-                      lastMessage.content = raw(streamingMsg);
-
-                      // Update or add text block in contentBlocks
-                      if (!lastMessage.contentBlocks) {
-                        lastMessage.contentBlocks = [];
-                      }
-
-                      // Find the last text block and update it, or create new one
-                      const lastBlock =
-                        lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-                      if (lastBlock && lastBlock.type === "text") {
-                        // Append to existing text block (same segment)
-                        lastBlock.text = textSegment;
-                      } else {
-                        // Add new text block (after tool call - new segment)
-                        lastMessage.contentBlocks.push({
-                          type: "text",
-                          text: textSegment,
-                        });
-                      }
-                      // Throttled save during streaming to preserve progress
-                      await throttledSaveCtx();
-                    }
-                    messageComplete = true;
-                    if (isActive()) await scrollToBottom();
-                  }
-                } catch (jsonError) {
-                  console.debug("JSON parse error:", jsonError, "for line:", jsonStr);
-                  continue;
-                }
-              } catch (e) {
-                console.debug("Error processing line:", e, "Line:", line);
-                continue;
-              }
-            }
-          }
-        }
-
-        // Process any remaining complete data in buffer
-        if (buffer.trim()) {
-          const lines = buffer.split("\n");
-          for (const line of lines) {
-            if (line.trim().startsWith("data: ")) {
-              try {
-                const jsonStr = line.substring(line.indexOf("{"));
-                if (!jsonStr || !jsonStr.trim()) continue;
-
-                const data = JSON.parse(jsonStr);
-
-                // Handle title events
-                if (data && data.type === "title") {
-                  ctxTitle = data.title;
-                  if (isActive()) {
-                    aiGeneratedTitle.value = data.title;
-                    animateTitle(data.title);
-                  }
-                  continue;
-                }
-
-                // Handle tool_call events
-                if (data && data.type === "tool_call") {
-                  if (activeToolCall.value) {
-                    const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
-                    };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
-                  }
-
-                  if (isActive()) {
-                    activeToolCall.value = {
-                      tool: data.tool,
-                      message: data.message,
-                      context: data.context || {},
-                      call_id: data.call_id || undefined,
-                    };
-                  }
-
-                  localFinalizeTextBlock();
-                  continue;
-                }
-
-                // Handle error events
-                if (data && data.type === "error") {
-                  // Owning replica is gone — flag and stop; sendMessage
-                  // restores the conversation once the stream ends.
-                  if (data.code === "session_owner_unavailable") {
-                    streamOwnerUnavailable.value = true;
-                    continue;
-                  }
-                  let lastMessage = msgs[msgs.length - 1];
-                  if (activeToolCall.value) {
-                    const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
-                    };
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
-                    if (isActive()) activeToolCall.value = null;
-                  }
-
-                  const rawError =
-                    data.error ?? data.message ?? t("aiAssistant.aiChat.unexpectedError");
-                  const errorText =
-                    typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
-
-                  // Check if this is an authorization/access error
-                  const authErr = isAuthError(errorText, data.error_type);
-                  // Widened to `string` — see the note on the sibling handler above.
-                  let errorMessage: string = authErr
-                    ? t(UNAUTHORIZED_MESSAGE_KEY)
-                    : t("common.errorPrefix", { message: errorText });
-                  if (data.suggestion && !authErr) {
-                    errorMessage += `\n\n${data.suggestion}`;
-                  }
-
-                  lastMessage = msgs[msgs.length - 1];
-                  if (!lastMessage || lastMessage.role !== "assistant") {
-                    msgs.push({
-                      role: "assistant",
-                      content: raw(errorMessage),
-                      contentBlocks: [
-                        ...pendingToolCalls.value,
-                        { type: "text", text: errorMessage },
-                      ],
-                    });
-                    pendingToolCalls.value = [];
-                  } else {
-                    if (lastMessage.content) {
-                      lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
-                    } else {
-                      lastMessage.content = raw(errorMessage);
-                    }
-                    if (!lastMessage.contentBlocks) {
-                      lastMessage.contentBlocks = [];
-                    }
-                    lastMessage.contentBlocks.push({
-                      type: "text",
-                      text: errorMessage,
-                    });
-                    pendingToolCalls.value = [];
-                  }
-
-                  textSegment = "";
-                  syncStreamingRefs();
-
-                  await saveCtx();
-                  if (isActive()) await scrollToBottom();
-                  return;
-                }
-
-                // Handle complete events
-                if (data && data.type === "complete") {
-                  if (data.trace_id && isActive()) {
-                    lastTraceId.value = data.trace_id;
-                  }
-                  if (activeToolCall.value) {
-                    const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
-                    };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
-                    if (isActive()) activeToolCall.value = null;
-                  }
-                  continue;
-                }
-
-                // Handle tool_result events
-                if (data && data.type === "tool_result") {
-                  const resultData = {
-                    success: data.success !== false,
-                    resultMessage: data.message || "",
-                    summary: data.summary || undefined,
-                    errorType: data.error_type || undefined,
-                    suggestion: data.suggestion || undefined,
-                    details: data.details || undefined,
-                    response: data.response || undefined,
-                  };
-
-                  const matchesActive =
-                    activeToolCall.value &&
-                    ((data.call_id && activeToolCall.value.call_id === data.call_id) ||
-                      (!data.call_id && activeToolCall.value.tool === data.tool));
-
-                  if (matchesActive) {
-                    const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value!.tool,
-                      message: activeToolCall.value!.message,
-                      context: activeToolCall.value!.context,
-                      call_id: activeToolCall.value!.call_id,
-                      ...resultData,
-                    };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
-                    if (isActive()) activeToolCall.value = null;
-                  } else {
-                    const lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.contentBlocks) {
-                      for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
-                        const block = lastMessage.contentBlocks[i];
-                        const blockMatches = data.call_id
-                          ? block.call_id === data.call_id
-                          : block.type === "tool_call" &&
-                            block.tool === data.tool &&
-                            block.success === undefined;
-                        if (blockMatches) {
-                          Object.assign(block, resultData);
-                          break;
-                        }
-                      }
-                    }
-                    for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
-                      const block = pendingToolCalls.value[i];
-                      const blockMatches = data.call_id
-                        ? block.call_id === data.call_id
-                        : block.type === "tool_call" &&
-                          block.tool === data.tool &&
-                          block.success === undefined;
-                      if (blockMatches) {
-                        Object.assign(block, resultData);
-                        break;
-                      }
-                    }
-                  }
-                  continue;
-                }
-
-                // Handle error events - stream-level errors
-                if (data && data.type === "error") {
-                  // Owning replica is gone — flag and stop; sendMessage
-                  // restores the conversation once the stream ends.
-                  if (data.code === "session_owner_unavailable") {
-                    streamOwnerUnavailable.value = true;
-                    continue;
-                  }
-                  if (activeToolCall.value) {
-                    const failedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
-                      success: false,
-                      resultMessage: data.message || t("aiAssistant.aiChat.toolExecutionFailed"),
-                      errorType: data.error_type || undefined,
-                      suggestion: data.suggestion || undefined,
-                    };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(failedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(failedToolBlock);
-                    }
-                    if (isActive()) activeToolCall.value = null;
-                  }
-
-                  const rawErrorMessage =
-                    data.message || data.error || t("aiAssistant.aiChat.errorOccurred");
-                  const authErr = isAuthError(rawErrorMessage, data.error_type);
-                  const errorBlock: ContentBlock = {
-                    type: "error",
-                    message: authErr ? t(UNAUTHORIZED_MESSAGE_KEY) : rawErrorMessage,
-                    errorType: data.error_type || undefined,
-                    suggestion: authErr ? undefined : data.suggestion || undefined,
-                    recoverable: authErr ? false : (data.recoverable ?? undefined),
-                  };
-                  let lastMessage = msgs[msgs.length - 1];
-                  if (lastMessage && lastMessage.role === "assistant") {
-                    if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                    lastMessage.contentBlocks.push(errorBlock);
-                  } else {
-                    msgs.push({
-                      role: "assistant",
-                      content: raw(""),
-                      contentBlocks: [...pendingToolCalls.value, errorBlock],
-                    });
-                    pendingToolCalls.value = [];
-                  }
-                  messageComplete = true;
-                  continue;
-                }
-
-                // Handle streamed deltas and full/legacy message content.
-                // Tolerant of multiple event shapes (see extractStreamText).
-                const streamText = extractStreamText(data);
-                if (typeof streamText === "string") {
-                  if (activeToolCall.value) {
-                    const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
-                    };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
-                    if (isActive()) activeToolCall.value = null;
-                  }
-
-                  const isMessageDelta =
-                    data.type === "message_delta" || typeof data.content !== "string";
-
-                  let content = streamText;
-                  if (!isMessageDelta) {
-                    content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
-                    content = content.replace(/([^`])\s*```/g, "$1\n```");
-                  }
-
-                  if (!isMessageDelta) {
-                    if (streamingMsg && textSegment === "") {
-                      streamingMsg += "\n\n";
-                    } else if (
-                      streamingMsg &&
-                      !streamingMsg.endsWith("\n") &&
-                      !content.startsWith("\n")
-                    ) {
-                      streamingMsg += "\n\n";
-                      textSegment += "\n\n";
-                    }
-                  }
-
-                  streamingMsg += content;
-                  textSegment += content;
-                  syncStreamingRefs();
-
-                  if (isActive() && !typewriterAnimationId.value) {
-                    animateStreamingText();
-                  }
-
-                  let lastMessage = msgs[msgs.length - 1];
-                  if (!lastMessage || lastMessage.role !== "assistant") {
-                    msgs.push({
-                      role: "assistant",
-                      content: raw(streamingMsg),
-                      contentBlocks: [
-                        ...pendingToolCalls.value,
-                        { type: "text", text: textSegment },
-                      ],
-                    });
-                    pendingToolCalls.value = [];
-                    await throttledSaveCtx(true);
-                  } else {
-                    lastMessage.content = raw(streamingMsg);
-
-                    if (!lastMessage.contentBlocks) {
-                      lastMessage.contentBlocks = [];
-                    }
-                    const lastBlock =
-                      lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-                    if (lastBlock && lastBlock.type === "text") {
-                      lastBlock.text = textSegment;
-                    } else {
-                      lastMessage.contentBlocks.push({
-                        type: "text",
-                        text: textSegment,
-                      });
-                    }
-                    await throttledSaveCtx();
-                  }
-                  messageComplete = true;
-                }
-              } catch (e) {
-                console.debug("Error processing remaining buffer:", e);
-                continue;
-              }
-            }
-          }
-        }
-
-        // If we completed a message, save to history
-        if (messageComplete) {
-          if (isActive()) {
-            // Immediately show all remaining text and stop typewriter animation
-            displayedStreamingContent.value = textSegment;
-            if (typewriterAnimationId.value) {
-              cancelAnimationFrame(typewriterAnimationId.value);
-              typewriterAnimationId.value = null;
-            }
-          }
-          // Update final text in contentBlocks
-          const lastMessage = msgs[msgs.length - 1];
-          if (lastMessage && lastMessage.role === "assistant" && lastMessage.contentBlocks) {
-            const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-            if (lastBlock && lastBlock.type === "text") {
-              lastBlock.text = textSegment;
-            }
-          }
-          await saveCtx();
-        }
-      } catch (error) {
-        // Handle different types of errors appropriately
-        if (error instanceof Error && error.name === "AbortError") {
-          // Request was cancelled by user - this is expected behavior, not an error
-          // Do a final save for background streams before exiting
-          if (!isActive() && msgs.length > 0 && ctxSessionId) {
-            await dbSaveToHistory(msgs, ctxSessionId, ctxTitle, ctxChatId);
-          }
-          return; // Exit gracefully without logging as error
-        } else {
-          // Genuine error occurred during stream processing
-          console.error("Error reading stream:", error);
-        }
-      }
-    };
-
-    const saveToHistory = async () => {
-      saveHistoryLoading.value = true;
-      if (chatMessages.value.length === 0) {
-        saveHistoryLoading.value = false;
-        return;
-      }
-
-      try {
-        // Generate session ID if not already set for this chat
-        if (!currentSessionId.value) {
-          currentSessionId.value = getUUIDv7();
-        }
-
-        // Prefer AI-generated title, fallback to default
-        const title = aiGeneratedTitle.value || undefined;
-
-        // Save using the composable
-        const chatId = await dbSaveToHistory(
-          chatMessages.value,
-          currentSessionId.value,
-          title,
-          currentChatId.value,
-        );
-
-        // Update current chat ID if this is a new chat
-        if (!currentChatId.value && chatId) {
-          currentChatId.value = chatId;
-
-          // Apply pending auto navigation preference to the new chat. Persist the
-          // actual value (ON by default) so an explicit user disable is honored.
-          autoNavigationPreferences.value.set(chatId, pendingAutoNavigation.value);
-          saveAutoNavigationPreferences();
-        }
-      } catch (error) {
-        console.error("Error saving chat history:", error);
-      } finally {
-        saveHistoryLoading.value = false;
-      }
-    };
-
-    const loadHistory = async () => {
-      try {
-        // Load history using the composable (automatically prunes to 100 items)
-        const history = await dbLoadHistory();
-        chatHistory.value = history;
-        return chatHistory.value;
-      } catch (error) {
-        console.error("Error loading chat history:", error);
-        return [];
-      }
-    };
-
-    /**
-     * Detach the current streaming request so it continues in the background.
-     * processStream's captured context (msgs) keeps writing to the old array
-     * while we clear the UI for a new session. When the stream completes,
-     * processStream saves to IndexedDB via saveCtx().
-     */
-    const detachCurrentStream = () => {
-      if (!currentAbortController.value) return;
-
-      // Move controller to background set so onUnmounted can clean it up
-      // and enforce the max background stream limit.
-      if (backgroundStreams.size >= MAX_BACKGROUND_STREAMS) {
-        // Abort the oldest background stream to stay within limits
-        const oldest = backgroundStreams.values().next().value;
-        if (oldest) {
-          oldest.abort();
-          backgroundStreams.delete(oldest);
-        }
-      }
-      const detachedController = currentAbortController.value;
-      backgroundStreams.add(detachedController);
-      currentAbortController.value = null;
-
-      // Register for re-attachment: when user navigates back to this session,
-      // loadChat swaps chatMessages.value to this live array so the UI resumes.
-      if (currentSessionId.value) {
-        backgroundStreamMap.set(currentSessionId.value, {
-          msgs: chatMessages.value,
-          controller: detachedController,
-          chatId: currentChatId.value,
-        });
-      }
-
-      // Clean up UI state — processStream continues silently in background
-      isLoading.value = false;
-      activeToolCall.value = null;
-      stopAnalyzingRotation();
-      if (typewriterAnimationId.value) {
-        cancelAnimationFrame(typewriterAnimationId.value);
-        typewriterAnimationId.value = null;
-      }
-      currentStreamingMessage.value = "";
-      currentTextSegment.value = "";
-      displayedStreamingContent.value = "";
-    };
-
-    // Logout has to kill the foreground turn too, not just the detached ones.
-    // MainLayout.signout() fires this as a window event because it lives in the
-    // Options API half of that file and can't reach setup scope directly (same
-    // pattern as o2:home-switch-tab).
-    const abortAllStreams = () => {
-      abortBackgroundStreams();
-      if (currentAbortController.value) {
-        currentAbortController.value.abort();
-        currentAbortController.value = null;
-      }
-    };
-
     const toggleExpand = () => {
       if (!store.state.isAiChatEnabled) {
-        // Closed → Open inline sidebar
         store.dispatch("setIsAiChatEnabled", true);
         store.dispatch("setIsAiChatExpanded", false);
       } else if (!store.state.isAiChatExpanded) {
-        // Inline sidebar → Expanded overlay
         store.dispatch("setIsAiChatExpanded", true);
       } else {
-        // Expanded overlay → Back to inline sidebar
         store.dispatch("setIsAiChatExpanded", false);
       }
       window.dispatchEvent(new Event("resize"));
@@ -3536,13 +792,6 @@ export default defineComponent({
           }
         },
       },
-      {
-        id: "aiChatExpand",
-        key: "ctrl+b",
-        keyForMac: "meta+b",
-        description: t("shortcuts.actions.aiChatExpand"),
-        handler: toggleExpand,
-      },
     ]);
 
     const addNewChat = () => {
@@ -3551,578 +800,16 @@ export default defineComponent({
       chatMessages.value = [];
       currentChatId.value = null;
       currentSessionId.value = null; // Will be generated on first save
-      lastTraceId.value = null; // Reset trace correlation for new chat
+      lastTraceId.value = null;
       showHistory.value = false;
       currentChatTimestamp.value = null;
-      shouldAutoScroll.value = true; // Reset auto-scroll for new chat
-      resetTitleState(); // Clear AI-generated title for new chat
-      resetTypewriterState(); // Clear typewriter animation state for new chat
-      pendingAutoNavigation.value = true; // Auto navigation is ON by default for new chats
-      showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
+      shouldAutoScroll.value = true;
+      resetTitleState();
+      resetTypewriterState();
+      pendingAutoNavigation.value = true;
+      showScrollToBottom.value = false;
       store.dispatch("setCurrentChatTimestamp", null);
       store.dispatch("setChatUpdated", true);
-    };
-
-    const openHistory = async () => {
-      showHistory.value = true;
-      await loadHistory();
-    };
-
-    const openEditTitleDialog = () => {
-      editingTitle.value = displayedTitle.value || "";
-      showEditTitleDialog.value = true;
-    };
-
-    const saveEditedTitle = async () => {
-      if (!currentChatId.value || !editingTitle.value.trim()) {
-        showEditTitleDialog.value = false;
-        return;
-      }
-
-      try {
-        // Update title using the composable
-        const success = await dbUpdateChatTitle(currentChatId.value, editingTitle.value.trim());
-
-        if (success) {
-          // Update the displayed title
-          displayedTitle.value = editingTitle.value.trim();
-          aiGeneratedTitle.value = editingTitle.value.trim();
-
-          // Reload history to reflect changes
-          loadHistory();
-        }
-      } catch (error) {
-        console.error("Error updating chat title:", error);
-      } finally {
-        showEditTitleDialog.value = false;
-      }
-    };
-
-    const deleteChat = (chatId: number) => {
-      chatToDelete.value = chatId;
-      showDeleteChatConfirmDialog.value = true;
-    };
-
-    const confirmDeleteChat = async () => {
-      if (!chatToDelete.value) return;
-
-      try {
-        // Delete chat using the composable
-        const success = await dbDeleteChatById(chatToDelete.value);
-
-        if (success) {
-          // If the deleted chat is the current one, reset to new chat
-          if (currentChatId.value === chatToDelete.value) {
-            addNewChat();
-          }
-
-          // Reload history to reflect changes
-          loadHistory();
-        }
-      } catch (error) {
-        console.error("Error deleting chat:", error);
-      } finally {
-        // Reset state
-        chatToDelete.value = null;
-        showDeleteChatConfirmDialog.value = false;
-      }
-    };
-
-    const clearAllConversations = () => {
-      showClearAllConfirmDialog.value = true;
-    };
-
-    /** Resolve the pendingConfirmation block — mark as success or failure */
-    const resolveConfirmationBlock = (approved: boolean) => {
-      for (const msg of chatMessages.value) {
-        if (msg.contentBlocks) {
-          for (const block of msg.contentBlocks) {
-            if (block.pendingConfirmation) {
-              block.pendingConfirmation = false;
-              if (!approved) {
-                block.success = false;
-                block.resultMessage = t("aiAssistant.aiChat.actionCancelledByUser");
-              }
-              return;
-            }
-          }
-        }
-      }
-    };
-
-    // Set by processStream when a session's owning replica is gone. The stream has
-    // already returned 200 by then, so sendMessage reads this once it ends.
-    const streamOwnerUnavailable = ref(false);
-
-    // Shown after a successful restore: only the dialogue came back, not the tool
-    // results, files or permission decisions from before the interruption.
-    const RESTORED_NOTICE =
-      "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.";
-
-    // Keyed on the explicit server code, never guessed from a generic failure:
-    // restoring means abandoning the current session.
-    const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
-      // `unknown`, not `any` — narrow before reading, or a non-object body throws.
-      if (typeof errorBody !== "object" || errorBody === null) return false;
-      const body = errorBody as { code?: unknown; detail?: { code?: unknown } };
-      const code = body.detail?.code ?? body.code;
-      return code === "session_owner_unavailable";
-    };
-
-    /** Surface a message inline in the transcript, as stream errors are shown. */
-    const appendErrorBlock = (message: string, recoverable = false) => {
-      const block: ContentBlock = { type: "error", message: raw(message), recoverable };
-      const msgs = chatMessages.value;
-      const last = msgs[msgs.length - 1];
-      if (last && last.role === "assistant") {
-        if (!last.contentBlocks) last.contentBlocks = [];
-        last.contentBlocks.push(block);
-      } else {
-        msgs.push({ role: "assistant", content: raw(""), contentBlocks: [block] });
-      }
-    };
-
-    /**
-     * POST a confirmation answer and report whether it landed. The response used
-     * to be discarded, so an answer reaching a replica with no record of the
-     * pending confirmation 404'd invisibly while the agent auto-denied on timeout.
-     */
-    const sendConfirmation = async (sessionId: string, approved: boolean): Promise<boolean> => {
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        const res = await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${sessionId}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved }),
-          },
-        );
-
-        if (!res.ok) {
-          console.error(
-            `Confirmation not registered (HTTP ${res.status}) for session ${sessionId}`,
-          );
-          appendErrorBlock(
-            approved
-              ? "Your approval could not be delivered — the assistant may have already cancelled this action. Please check the result before retrying."
-              : "Your response could not be delivered — the assistant may have already cancelled this action.",
-          );
-          return false;
-        }
-        return true;
-      } catch (error) {
-        console.error("Error sending confirmation:", error);
-        appendErrorBlock(
-          "Your response could not be delivered. Please check your connection and try again.",
-        );
-        return false;
-      }
-    };
-
-    const handleToolConfirm = async () => {
-      resolveConfirmationBlock(true);
-
-      // Check if this is a navigation action
-      if (pendingConfirmation.value?.tool === "navigation_action") {
-        const navAction = pendingConfirmation.value?.navAction;
-        if (navAction) {
-          await handleNavigationAction(navAction);
-        }
-        pendingConfirmation.value = null;
-        return;
-      }
-
-      if (!currentSessionId.value) return;
-
-      await sendConfirmation(currentSessionId.value, true);
-      pendingConfirmation.value = null;
-    };
-
-    const handleToolCancel = async () => {
-      resolveConfirmationBlock(false);
-
-      // Check if this is a navigation action
-      if (pendingConfirmation.value?.tool === "navigation_action") {
-        // Just clear the confirmation, don't navigate
-        pendingConfirmation.value = null;
-        return;
-      }
-
-      if (!currentSessionId.value) return;
-
-      await sendConfirmation(currentSessionId.value, false);
-      pendingConfirmation.value = null;
-    };
-
-    const handleToolAlwaysConfirm = async () => {
-      // Enable auto navigation for this chat
-      isAutoNavigationEnabled.value = true;
-
-      // Then proceed with confirmation
-      resolveConfirmationBlock(true);
-
-      // Check if this is a navigation action
-      if (pendingConfirmation.value?.tool === "navigation_action") {
-        const navAction = pendingConfirmation.value?.navAction;
-        if (navAction) {
-          await handleNavigationAction(navAction);
-        }
-        pendingConfirmation.value = null;
-        return;
-      }
-
-      if (!currentSessionId.value) return;
-
-      await sendConfirmation(currentSessionId.value, true);
-      pendingConfirmation.value = null;
-    };
-
-    // Generate navigation action from tool result data (generic, pattern-based)
-    //
-    // Expected backend response format:
-    // - Search tools: Must have SQL query in callArgs.request_body.query.sql
-    // - Create/Get/Update/Delete tools: Must return {resource}_id in response
-    //   Examples: alert_id, dashboard_id, pipeline_id, stream_id, etc.
-    //   Optional fields: name, folder (will use 'default' if not provided)
-    const generateNavigationFromToolResult = (
-      toolName: string,
-      callArgs: any,
-      responseBody: any,
-    ): NavigationAction | null => {
-      if (!callArgs) {
-        return null;
-      }
-
-      // Pattern 1: Search tools (has SQL query) → load_query navigation
-      const requestBody = callArgs.request_body || {};
-      const query = requestBody.query || {};
-      const sql = query.sql || "";
-
-      if (sql) {
-        const streamType = callArgs.stream_type || "logs";
-        let streamName = callArgs.stream_name || "";
-
-        // If stream_name is not in callArgs, try to extract it from the SQL query
-        if (!streamName) {
-          // Extract stream name from FROM clause (handles quoted and unquoted table names)
-          const fromMatch = sql.match(/FROM\s+["']?([^"'\s,()]+)["']?/i);
-          if (fromMatch) {
-            streamName = fromMatch[1];
-          }
-        }
-
-        const vrlFunction =
-          query.functionContent || requestBody.function || requestBody.functionContent;
-
-        // Don't generate navigation if time range is missing
-        if (query.start_time === undefined || query.end_time === undefined) {
-          return null;
-        }
-
-        // Don't generate navigation if stream name is still missing
-        if (!streamName) {
-          return null;
-        }
-
-        const target: any = {
-          query: sql,
-          sql_mode: true,
-          from: query.start_time,
-          to: query.end_time,
-          stream: streamName.split(","),
-        };
-
-        if (vrlFunction) {
-          target.functionContent = vrlFunction;
-        }
-
-        const streamLabel =
-          { logs: t("common.logs"), metrics: t("common.metrics"), traces: t("common.traces") }[
-            streamType as string
-          ] ?? raw(streamType.charAt(0).toUpperCase() + streamType.slice(1));
-        return {
-          resource_type: streamType,
-          action: "load_query",
-          label: t("aiAssistant.viewInTarget", { target: streamLabel }),
-          target,
-        };
-      }
-
-      // Pattern 2: Create/Get tools (has ID) → navigate_direct
-      // Extract resource type from tool name (CreateAlert → alert, GetDashboard → dashboard, createPipeline → pipeline)
-      const resourceTypeMatch = toolName.match(/^(create|get|update|delete)(.+)$/i);
-      if (!resourceTypeMatch) return null;
-
-      const resourceType = resourceTypeMatch[2].toLowerCase(); // Alert → alert, Dashboard → dashboard, Pipeline → pipeline
-
-      // Parse response data - it might be in different formats
-      let parsedResponse: any = {};
-      if (responseBody) {
-        // If responseBody has a 'response' field (from SRE agent tool_result event)
-        if (responseBody.response) {
-          let responseData = responseBody.response;
-          // If response is a JSON string, parse it
-          if (typeof responseData === "string") {
-            try {
-              responseData = JSON.parse(responseData);
-            } catch (e) {
-              console.warn("[Navigation] Failed to parse response string:", e);
-            }
-          }
-          // Extract from versioned response (v8, v7, etc.) for dashboards
-          if (typeof responseData === "object" && responseData !== null) {
-            parsedResponse =
-              responseData.v8 ||
-              responseData.v7 ||
-              responseData.v6 ||
-              responseData.v5 ||
-              responseData;
-          } else {
-            parsedResponse = responseData;
-          }
-        }
-        // If responseBody has 'content' array (MCP format)
-        else if (
-          responseBody.content &&
-          Array.isArray(responseBody.content) &&
-          responseBody.content[0]?.text
-        ) {
-          try {
-            const textContent = responseBody.content[0].text;
-            const parsed = JSON.parse(textContent);
-            // Extract from versioned response (v8, v7, etc.)
-            parsedResponse = parsed.v8 || parsed.v7 || parsed.v6 || parsed.v5 || parsed;
-          } catch (e) {
-            console.warn("[Navigation] Failed to parse content text:", e);
-          }
-        }
-        // Otherwise use responseBody as-is
-        else {
-          parsedResponse = responseBody;
-        }
-      }
-
-      // Merge data from parsed response, call args, and call args request_body for ID/field lookup
-      const requestBodyFromArgs = (callArgs || {}).request_body || {};
-      const data = {
-        ...parsedResponse,
-        ...(callArgs || {}),
-        ...requestBodyFromArgs,
-      };
-
-      // Standard pattern: {resource}_id (e.g., alert_id, dashboard_id, pipeline_id)
-      const resourceIdField = `${resourceType}_id`;
-      let resourceId = data[resourceIdField] || data.id;
-
-      // Also check camelCase variants (dashboardId, alertId)
-      if (!resourceId) {
-        const camelCaseField = resourceType + "Id";
-        resourceId = data[camelCaseField];
-      }
-
-      if (!resourceId) {
-        return null;
-      }
-
-      // Build target with consistent {resource}_id pattern
-      const target: any = {
-        [resourceIdField]: resourceId, // e.g., alert_id, dashboard_id, pipeline_id
-      };
-
-      // Add name if available (required for some resources like alerts)
-      const name = data.name;
-      if (name) {
-        target.name = name;
-      }
-
-      // Add folder if available (default to 'default' for resources that use folders)
-      const folder = data.folder;
-      if (folder || resourceType === "alert" || resourceType === "dashboard") {
-        target.folder = folder || "default";
-      }
-
-      return {
-        resource_type: resourceType,
-        action: "navigate_direct",
-        label: t("aiAssistant.viewTarget", {
-          target: resourceType.charAt(0).toUpperCase() + resourceType.slice(1),
-        }),
-        target,
-      };
-    };
-
-    const handleNavigationAction = async (action: NavigationAction) => {
-      // Detach the stream before navigating: the route change can unmount/
-      // recreate this component, and onUnmounted aborts currentAbortController
-      // to avoid leaking requests. Without detaching first, that abort races
-      // an in-flight opencode turn and kills any tool calls still queued
-      // after this navigation (e.g. create dashboard -> create alert -> nav).
-      // detachCurrentStream() moves the controller to backgroundStreams so
-      // processStream keeps running and the turn finishes in the background.
-      detachCurrentStream();
-
-      // Helper to encode strings for URL (same as search history)
-      const encodeForUrl = (str: string) => btoa(unescape(encodeURIComponent(str)));
-
-      // Extract page name for success message
-      let pageName = action.label || "";
-      if (!pageName) {
-        // Fallback: use target name or resource type
-        pageName =
-          action.target.name ||
-          action.resource_type.charAt(0).toUpperCase() + action.resource_type.slice(1);
-      }
-
-      // Perform navigation FIRST
-      if (action.action === "load_query") {
-        const targetPath = `/${action.resource_type}`;
-        const target = action.target;
-
-        // Build query object similar to SearchHistory goToLogs function
-        const queryParams: Record<string, string> = {
-          org_identifier: store.state.selectedOrganization.identifier,
-          stream_type: action.resource_type, // logs, metrics, traces
-          refresh: "0",
-          sql_mode: target.sql_mode?.toString() || "false",
-          quick_mode: "false",
-          show_histogram: "true",
-          type: "ai_chat_query",
-        };
-
-        // Add stream (comma-separated if array)
-        if (target.stream) {
-          queryParams.stream = Array.isArray(target.stream)
-            ? target.stream.join(",")
-            : target.stream;
-        }
-
-        // Add time range (prefer absolute from/to over period)
-        if (target.from !== undefined && target.to !== undefined) {
-          queryParams.from = target.from.toString();
-          queryParams.to = target.to.toString();
-        } else if (target.period) {
-          queryParams.period = target.period;
-        }
-
-        // Add base64 encoded query
-        if (target.query) {
-          queryParams.query = encodeForUrl(
-            typeof target.query === "string" ? target.query : JSON.stringify(target.query),
-          );
-        }
-
-        // Add VRL function if present
-        if (target.functionContent) {
-          queryParams.functionContent = encodeForUrl(target.functionContent);
-          queryParams.fn_editor = "true";
-        } else {
-          queryParams.fn_editor = "false";
-        }
-
-        // Navigate using same pattern as search history
-        await router.push({
-          path: targetPath,
-          query: queryParams,
-        });
-      } else if (action.action === "navigate_direct") {
-        // Direct navigation - build proper URLs based on resource type
-        let path = action.target.path || `/${action.resource_type}`;
-        // navigate_direct always carries the record form of `query`
-        const targetQuery = action.target.query as Record<string, any> | undefined;
-        const queryParams: Record<string, string> = {
-          org_identifier: store.state.selectedOrganization.identifier,
-          ...targetQuery,
-        };
-
-        // Resource-type-specific URL handling
-        if (action.resource_type === "alert") {
-          path = "/alerts";
-          const alertId = action.target.alert_id || targetQuery?.alert_id;
-          if (alertId) {
-            // Navigate to specific alert with update action
-            queryParams.action = "update";
-            queryParams.alert_id = alertId;
-            queryParams.name = action.target.name || targetQuery?.name;
-          }
-          queryParams.folder = action.target.folder || targetQuery?.folder || "default";
-        } else if (action.resource_type === "dashboard") {
-          // Dashboards use /dashboards/view path
-          path = "/dashboards/view";
-          queryParams.dashboard =
-            action.target.dashboard_id || action.target.dashboardId || targetQuery?.dashboardId;
-          queryParams.folder = action.target.folder || targetQuery?.folder || "default";
-          queryParams.tab = action.target.tab || "tab-1";
-          queryParams.refresh = "Off";
-          queryParams.period = "15m";
-          queryParams.print = "false";
-        } else if (action.resource_type === "pipeline") {
-          // Pipelines use /pipeline/pipelines/edit path
-          path = "/pipeline/pipelines/edit";
-          queryParams.id = action.target.pipeline_id || action.target.id || targetQuery?.id;
-          queryParams.name = action.target.name || targetQuery?.name;
-        }
-
-        await router.push({ path, query: queryParams });
-      }
-
-      // Use setTimeout to add message AFTER navigation fully completes and settles
-      setTimeout(async () => {
-        try {
-          // Add success message AFTER navigation completes
-          const successMessage = t("aiAssistant.navigatedTo", { page: pageName });
-          let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-
-          if (!lastMessage || lastMessage.role !== "assistant") {
-            // Create new assistant message
-            chatMessages.value.push({
-              role: "assistant",
-              content: raw(successMessage),
-              contentBlocks: [{ type: "text", text: successMessage }],
-            });
-          } else {
-            // Append to existing assistant message
-            if (lastMessage.content) {
-              lastMessage.content = raw(lastMessage.content + "\n\n" + successMessage);
-            } else {
-              lastMessage.content = raw(successMessage);
-            }
-            if (!lastMessage.contentBlocks) {
-              lastMessage.contentBlocks = [];
-            }
-            lastMessage.contentBlocks.push({
-              type: "text",
-              text: successMessage,
-            });
-          }
-
-          // Save to history after adding message
-          await saveToHistory();
-          await scrollToBottom();
-        } catch (error) {
-          console.error("Error adding navigation success message:", error);
-        }
-      }, 500);
-    };
-
-    const confirmClearAllConversations = async () => {
-      try {
-        // Clear all history using the composable
-        const success = await dbClearAllHistory();
-
-        if (success) {
-          // Reset to new chat
-          addNewChat();
-
-          // Clear the chat history array
-          chatHistory.value = [];
-        }
-      } catch (error) {
-        console.error("Error clearing all conversations:", error);
-      } finally {
-        showClearAllConfirmDialog.value = false;
-      }
     };
 
     const loadChat = async (chatId: number) => {
@@ -4132,52 +819,12 @@ export default defineComponent({
           return;
         }
 
-        // Detach any in-progress stream so it continues in the background
         detachCurrentStream();
 
-        // Load chat using the composable
         const chat = await dbLoadChat(chatId);
 
         if (chat) {
-          // Check if this session has an active background stream.
-          // If so, re-attach by using the LIVE array that processStream is writing to
-          // instead of the stale IndexedDB snapshot. Setting chatMessages.value to the
-          // same array makes processStream's isActive() true again, so UI updates resume.
-          const bgCtx = chat.sessionId ? backgroundStreamMap.get(chat.sessionId) : null;
-
-          if (bgCtx) {
-            // Re-attach: use the live streaming array
-            chatMessages.value = bgCtx.msgs;
-            currentChatId.value = bgCtx.chatId || chatId;
-            currentSessionId.value = chat.sessionId || null;
-
-            // Move controller back to foreground
-            currentAbortController.value = bgCtx.controller;
-            backgroundStreams.delete(bgCtx.controller);
-            backgroundStreamMap.delete(chat.sessionId!);
-
-            // Restore streaming UI state so loading indicator shows
-            isLoading.value = true;
-            startAnalyzingRotation();
-
-            // Prime the typewriter from whatever the stream has accumulated so
-            // far, in THIS fresh instance. processStream only syncs the segment
-            // refs and (re)starts the animation on the NEXT chunk that arrives
-            // while isActive(); text already streamed before we re-attached
-            // would otherwise sit invisible until the next delta. Reveal the
-            // existing text instantly, then let the ongoing stream continue.
-            const lastMsg = chatMessages.value[chatMessages.value.length - 1];
-            if (lastMsg?.role === "assistant" && lastMsg.contentBlocks?.length) {
-              const lastBlock = lastMsg.contentBlocks[lastMsg.contentBlocks.length - 1];
-              if (lastBlock?.type === "text" && lastBlock.text) {
-                currentStreamingMessage.value = lastMsg.content || lastBlock.text;
-                currentTextSegment.value = lastBlock.text;
-                // Instant reveal (no per-char catch-up) for the backlog.
-                displayedStreamingContent.value = lastBlock.text;
-              }
-            }
-          } else {
-            // Normal load from IndexedDB snapshot (no active stream)
+          if (!tryReattach(chat, chatId)) {
             const formattedMessages = chat.messages.map((msg: any) => ({
               role: msg.role,
               content: msg.content,
@@ -4194,7 +841,6 @@ export default defineComponent({
           showHistory.value = false;
           shouldAutoScroll.value = true;
 
-          // Load title from history (no animation for existing chats)
           displayedTitle.value = chat.title || "";
           aiGeneratedTitle.value = chat.title || null;
           isTypingTitle.value = false;
@@ -4204,7 +850,6 @@ export default defineComponent({
             store.dispatch("setChatUpdated", true);
           }
 
-          // Scroll to bottom after loading chat
           await nextTick();
           scrollToBottom();
         }
@@ -4213,24 +858,16 @@ export default defineComponent({
       }
     };
 
-    /**
-     * Sends a message to the AI chat service with streaming response handling
-     * Creates a new AbortController for each request to enable cancellation
-     * Manages the complete request lifecycle from user input to streaming response
-     */
     const sendMessage = async () => {
-      // Allow sending with text or images (or both)
       const hasText = inputMessage.value.trim().length > 0;
       const hasImages = pendingImages.value.length > 0;
       if ((!hasText && !hasImages) || isLoading.value) return;
 
-      // Get the message for backend (with unwrapped chips)
       let backendMessage = inputMessage.value;
       if (chatInput.value && typeof chatInput.value.getMessageForBackend === "function") {
         backendMessage = chatInput.value.getMessageForBackend();
       }
 
-      // Use the plain text message for display
       const userMessage = inputMessage.value;
       const messagesToSend = [...pendingImages.value]; // Capture images before clearing
 
@@ -4239,261 +876,25 @@ export default defineComponent({
         addToHistory(userMessage);
       }
 
-      // Push user message with images for display
-      // But we'll use backendMessage for the API call
       chatMessages.value.push({
         role: "user",
-        content: raw(backendMessage), // Use backend message with full context
+        content: raw(backendMessage),
         ...(hasImages && { images: messagesToSend }),
       });
       inputMessage.value = "";
-      contextReferences.value = []; // Clear reference chips
+      contextReferences.value = [];
       if (chatInput.value && typeof chatInput.value.clear === "function") {
-        chatInput.value.clear(); // Clear the rich text input
+        chatInput.value.clear();
       }
-      clearPendingImages(); // Clear pending images after capturing
-      shouldAutoScroll.value = true; // Reset auto-scroll for new message
-      await scrollToBottom(); // Scroll after user message
-      await saveToHistory(); // Save after user message
-
-      isLoading.value = true;
-      currentStreamingMessage.value = "";
-      currentTextSegment.value = "";
-      resetTypewriterState(); // Reset typewriter animation for new message
-      startAnalyzingRotation(); // Start rotating analyzing messages
-
-      // Mint the session id here rather than inside the try below. A new chat
-      // has none yet, and the cleanup on every exit path has to clear the flag
-      // for the SAME id we set it on — otherwise an instance that re-attached
-      // never sees the streaming->done transition and spins forever.
-      if (!currentSessionId.value) {
-        currentSessionId.value = getUUIDv7();
-      }
-      const streamSessionId = currentSessionId.value;
-
-      // Mark this session as actively streaming in the cross-instance registry
-      // so that if another instance re-attaches, it knows when to stop showing
-      // its own loading indicator (see sessionStreamingState declaration).
-      sessionStreamingState[streamSessionId] = true;
-
-      // Create new AbortController for this request - enables cancellation via Stop button
-      currentAbortController.value = new AbortController();
-
-      // Reseed state for this turn: at most one restore attempt, and a pending
-      // notice to show once the replacement request succeeds.
-      let hasReseeded = false;
-      let reseedNotice = false;
-
-      // Clear any flag left by a previous turn that threw or was aborted before
-      // the clear at the end of the try block — a stale `true` abandons a healthy
-      // session.
-      streamOwnerUnavailable.value = false;
-
-      try {
-        // Don't add empty assistant message here - wait for actual content
-        await scrollToLoadingIndicator(); // Scroll directly to loading indicator
-
-        let response: any;
-        try {
-          // Pass abort signal, session ID, and images to enable request cancellation and multimodal support
-          response = await fetchAiChat(
-            chatMessages.value,
-            "",
-            store.state.selectedOrganization.identifier,
-            currentAbortController.value.signal,
-            undefined, // explicitContext
-            currentSessionId.value, // sessionId for x-o2-session-id header
-            hasImages ? messagesToSend : undefined, // images for multimodal queries
-          );
-        } catch (error) {
-          console.error("Error fetching AI chat:", error);
-          return;
-        }
-
-        // Check if request was cancelled before processing response
-        if (response && response.cancelled) {
-          return;
-        }
-
-        if (!response.ok) {
-          // Read the actual error body before throwing
-          let errorBody = null;
-          try {
-            errorBody = await response.json();
-          } catch (_) {
-            // body may not be JSON
-          }
-
-          // The session is gone but the transcript is still here, so resend under
-          // a fresh session and let the server seed it from those messages.
-          // Deliberately narrow — this code only, once only.
-          if (isSessionOwnerUnavailable(errorBody) && !hasReseeded) {
-            hasReseeded = true;
-            console.warn(
-              `Session ${currentSessionId.value} is no longer available; restoring the conversation in a new session.`,
-            );
-
-            // A NEW id — reusing the old one would be refused again. streamSessionId
-            // (captured above) stays pinned to the original, and cleanup keys off it.
-            currentSessionId.value = getUUIDv7();
-            reseedNotice = true;
-
-            response = await fetchAiChat(
-              chatMessages.value,
-              "",
-              store.state.selectedOrganization.identifier,
-              currentAbortController.value?.signal,
-              undefined,
-              currentSessionId.value,
-              hasImages ? messagesToSend : undefined,
-            );
-          }
-        }
-
-        // Re-check: the reseed above may have produced a fresh response.
-        if (!response.ok) {
-          let errorBody = null;
-          try {
-            errorBody = await response.json();
-          } catch (_) {
-            // body may not be JSON
-          }
-          const err: any = new Error(
-            errorBody?.message ||
-              t("aiAssistant.aiChat.serverErrorStatus", { status: response.status }),
-          );
-          err.status = response.status;
-          err.errorBody = errorBody;
-          throw err;
-        }
-
-        // Tell the user before the content arrives — continuing silently hides
-        // that the assistant lost the earlier tool results and file state.
-        if (reseedNotice) {
-          reseedNotice = false;
-          appendErrorBlock(RESTORED_NOTICE, true);
-        }
-
-        if (!response.body) {
-          throw new Error("No response body");
-        }
-
-        const reader = response.body.getReader();
-
-        // Capture the controller, messages ref, and sessionId so we can detect
-        // detachment and clean up after processStream
-        const streamController = currentAbortController.value;
-        const streamMsgs = chatMessages.value;
-
-        await processStream(reader);
-
-        // The streaming counterpart of the pre-stream 409 above: once the stream
-        // has opened the failure arrives as an SSE event inside a 200, so
-        // response.ok can no longer be branched on. Same recovery.
-        //
-        // Only while this turn is still on screen — if the user switched chats
-        // mid-stream, restoring would clobber THAT conversation's session id and
-        // transcript instead. They can resend from the affected chat.
-        const stillOnScreen = chatMessages.value === streamMsgs;
-        if (streamOwnerUnavailable.value && !hasReseeded && stillOnScreen) {
-          streamOwnerUnavailable.value = false;
-          hasReseeded = true;
-
-          if (streamController) backgroundStreams.delete(streamController);
-          if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
-
-          // The cross-instance streaming registry has to follow the new id, or
-          // another instance re-attaching never sees this stream finish.
-          const restoredSessionId = getUUIDv7();
-          currentSessionId.value = restoredSessionId;
-          sessionStreamingState[restoredSessionId] = true;
-
-          const retry: any = await fetchAiChat(
-            chatMessages.value,
-            "",
-            store.state.selectedOrganization.identifier,
-            currentAbortController.value?.signal,
-            undefined,
-            currentSessionId.value,
-            hasImages ? messagesToSend : undefined,
-          );
-
-          if (retry && !retry.cancelled && retry.ok && retry.body) {
-            // Announced only once the replacement request is accepted, as on the
-            // pre-stream path — otherwise the claim can turn out to be false.
-            appendErrorBlock(RESTORED_NOTICE, true);
-            await processStream(retry.body.getReader());
-          } else if (!(retry && retry.cancelled)) {
-            // The retry failed — non-OK, no body, or null (a network error).
-            // hasReseeded blocks any further attempt, so staying quiet here would
-            // end the turn with no answer and no explanation. A cancel is silent.
-            appendErrorBlock(
-              "This conversation was interrupted and could not be restored. Please try sending your message again.",
-            );
-          }
-
-          // The restored turn is done either way; clear its entry, or a
-          // re-attaching instance shows a loading indicator forever.
-          sessionStreamingState[restoredSessionId] = false;
-          backgroundStreamMap.delete(restoredSessionId);
-        }
-        streamOwnerUnavailable.value = false;
-
-        // Remove controller from background set and clean up re-attachment map
-        if (streamController) backgroundStreams.delete(streamController);
-        if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
-
-        // Only update UI/store if stream was NOT detached (session is still the same)
-        const wasDetached = chatMessages.value !== streamMsgs;
-        if (!wasDetached) {
-          store.dispatch("setCurrentChatTimestamp", currentChatId.value);
-          store.dispatch("setChatUpdated", true);
-        }
-      } catch (error: any) {
-        // Remove the empty assistant message that was added before the error
-        //this will impact in the case of error showing empty message above the error message in the chat
-        if (
-          chatMessages.value.length > 0 &&
-          chatMessages.value[chatMessages.value.length - 1].role === "assistant" &&
-          !chatMessages.value[chatMessages.value.length - 1].content
-        ) {
-          chatMessages.value.pop();
-        }
-        let errorMessage: string;
-        if (error.status === 403) {
-          errorMessage = t(UNAUTHORIZED_MESSAGE_KEY);
-        } else if (error.message && error.message !== "No response body") {
-          errorMessage = error.message;
-        } else {
-          errorMessage = t("aiAssistant.aiChat.serverResponseError");
-        }
-        chatMessages.value.push({
-          role: "assistant",
-          content: raw(errorMessage),
-        });
-        await saveToHistory(); // Save after error
-      }
-
-      isLoading.value = false;
-      activeToolCall.value = null;
-      stopAnalyzingRotation();
-
-      // Mark the session's stream as finished in the cross-instance registry so
-      // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
-      // its own loading indicator. Runs on all exit paths (success/abort/error).
-      // Uses the id captured before the request, not currentSessionId — by the
-      // time an early failure lands here the user may have switched chats, and
-      // clearing the wrong session leaves the real one flagged as streaming.
-      sessionStreamingState[streamSessionId] = false;
-
-      // Clean up AbortController after request completion (success or error)
-      currentAbortController.value = null;
-
+      clearPendingImages();
+      shouldAutoScroll.value = true;
       await scrollToBottom();
+      await saveToHistory();
+
+      await runTurn(hasImages, messagesToSend);
     };
 
     const selectCapability = (capability: string) => {
-      // Remove the number prefix and set as input
       inputMessage.value = capability.replace(/^\d+\.\s/, "");
     };
 
@@ -4504,533 +905,50 @@ export default defineComponent({
       });
     };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault(); // Prevent the default enter behavior
-        sendMessage();
-      } else if (e.key === "Backspace") {
-        // Handle backspace for RichTextInput (contenteditable)
-        const target = e.target as HTMLElement;
-        const contenteditable =
-          target.closest('[contenteditable="true"]') ||
-          target.querySelector('[contenteditable="true"]');
-
-        if (contenteditable) {
-          // Check if cursor is right after an image reference span
-          const selection = window.getSelection();
-          if (!selection || selection.rangeCount === 0) return;
-
-          const range = selection.getRangeAt(0);
-          const cursorNode = range.startContainer;
-          let imageRefSpan: Element | null = null;
-
-          // Case 1: Cursor is in a text node at position 0, check previous sibling
-          if (cursorNode.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
-            const prevSibling = cursorNode.previousSibling;
-            if (prevSibling && (prevSibling as Element).classList?.contains("image-reference")) {
-              imageRefSpan = prevSibling as Element;
-            }
-          }
-          // Case 2: Cursor is in an element node, check the child before cursor
-          else if (cursorNode.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
-            const element = cursorNode as Element;
-            const prevChild = element.childNodes[range.startOffset - 1];
-            if (prevChild && (prevChild as Element).classList?.contains("image-reference")) {
-              imageRefSpan = prevChild as Element;
-            }
-          }
-
-          // If we found an image reference to delete
-          if (imageRefSpan) {
-            e.preventDefault();
-
-            // Extract filename from the span text
-            const refText = imageRefSpan.textContent || "";
-            const match = refText.match(/@\[([^\]]+)\]/);
-
-            if (match) {
-              const filename = match[1];
-
-              // Remove the associated image from pendingImages
-              const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
-              if (imageIndex !== -1) {
-                pendingImages.value.splice(imageIndex, 1);
-              }
-            }
-
-            // Remove the span element
-            imageRefSpan.remove();
-
-            // Trigger input event to update model
-            if (contenteditable) {
-              contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
-            }
-          }
-        } else {
-          // Legacy textarea handling
-          const textarea = e.target as HTMLTextAreaElement;
-          const cursorPos = textarea.selectionStart;
-          const text = inputMessage.value;
-
-          // Find if cursor is at the end of a @[filename] pattern
-          const textBeforeCursor = text.substring(0, cursorPos);
-          const match = textBeforeCursor.match(/@\[([^\]]+)\]$/);
-
-          if (match) {
-            e.preventDefault();
-            const filename = match[1];
-            const refStart = cursorPos - match[0].length;
-
-            // Remove the entire @[filename] reference from text
-            inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
-
-            // Remove the associated image from pendingImages
-            const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
-            if (imageIndex !== -1) {
-              pendingImages.value.splice(imageIndex, 1);
-            }
-
-            // Set cursor position after the deletion
-            nextTick(() => {
-              textarea.selectionStart = textarea.selectionEnd = refStart;
-            });
-          }
-        }
-      } else if (e.key === "ArrowUp") {
-        const target = e.target as HTMLElement;
-        const textarea = target.tagName === "TEXTAREA" ? (target as HTMLTextAreaElement) : null;
-        if (textarea && isOnFirstLine(textarea)) {
-          e.preventDefault();
-          navigateHistory("up");
-        }
-      } else if (e.key === "ArrowDown" && historyIndex.value > -1) {
-        e.preventDefault();
-        navigateHistory("down");
+    // RichTextInput ignores modelValue while focused, so a recalled prompt must be pushed in.
+    const recallHistory = (direction: "up" | "down") => {
+      const before = inputMessage.value;
+      navigateHistory(direction);
+      // setContent rewrites textContent, so it must not run when nothing was recalled: it would flatten the chips.
+      if (inputMessage.value === before) return;
+      // The recalled text replaced the chips in the composer, so their references must not linger.
+      contextReferences.value = [];
+      if (chatInput.value && typeof chatInput.value.setContent === "function") {
+        chatInput.value.setContent(inputMessage.value);
       }
     };
 
-    // Check if cursor is on the first line of textarea
-    const isOnFirstLine = (textarea: HTMLTextAreaElement) => {
-      if (!textarea) return false;
-
-      const cursorPosition = textarea.selectionStart;
-      const textBeforeCursor = textarea.value.substring(0, cursorPosition);
-
-      // Check if there are any newlines before cursor position
-      return !textBeforeCursor.includes("\n");
-    };
-
-    // Navigate through query history
-    const navigateHistory = (direction: "up" | "down") => {
-      if (queryHistory.value.length === 0) return;
-
-      if (direction === "up") {
-        if (historyIndex.value < queryHistory.value.length - 1) {
-          historyIndex.value++;
-          inputMessage.value = queryHistory.value[historyIndex.value];
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      } else if (e.key === "Backspace") {
+        handleImageReferenceBackspace(e);
+      } else if (e.key === "ArrowUp") {
+        if (isOnFirstLine(e.target as HTMLElement)) {
+          e.preventDefault();
+          recallHistory("up");
         }
-      } else if (direction === "down") {
-        if (historyIndex.value > 0) {
-          historyIndex.value--;
-          inputMessage.value = queryHistory.value[historyIndex.value];
-        } else if (historyIndex.value === 0) {
-          historyIndex.value = -1;
-          inputMessage.value = "";
-        }
+      } else if (e.key === "ArrowDown" && historyIndex.value > -1) {
+        e.preventDefault();
+        recallHistory("down");
       }
     };
 
     const focusInput = () => {
       if (chatInput.value) {
-        // For RichTextInput component, call its focusInput method
         if (typeof chatInput.value.focusInput === "function") {
           chatInput.value.focusInput();
         } else {
-          // Fallback for other input types
           chatInput.value.focus();
         }
       }
     };
 
-    // Handle reference chip updates from RichTextInput
     const handleReferencesUpdate = (refs: ReferenceChip[]) => {
       contextReferences.value = refs;
     };
 
-    // Image handling functions
-    const triggerImageUpload = () => {
-      imageInputRef.value?.click();
-    };
-
-    const handleImageSelect = async (event: Event) => {
-      const input = event.target as HTMLInputElement;
-      const files = input.files;
-      if (!files) return;
-
-      for (const file of Array.from(files)) {
-        await addImage(file);
-      }
-      // Reset input so the same file can be selected again
-      input.value = "";
-    };
-
-    const addImage = async (file: File): Promise<boolean> => {
-      // Validate file size first (before reading)
-      if (file.size > MAX_IMAGE_SIZE_BYTES) {
-        toast({
-          variant: "error",
-          message: t("toastMessages.components.imageExceeds2mbLimitMb", {
-            size: (file.size / 1024 / 1024).toFixed(1),
-          }),
-        });
-        return false;
-      }
-
-      // Basic file type check for immediate feedback (backend will detect actual type)
-      if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
-        toast({
-          variant: "error",
-          message: t("toastMessages.components.onlyPngAndJpegImagesAre"),
-        });
-        return false;
-      }
-
-      // Convert to base64
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const base64 = (e.target?.result as string).split(",")[1]; // Remove data:image/...;base64, prefix
-          const imageRef = `@[${file.name}]`;
-
-          // Use file.type for display - backend will detect and correct actual mime type
-          pendingImages.value.push({
-            data: base64,
-            mimeType: file.type as "image/png" | "image/jpeg",
-            filename: file.name,
-            size: file.size,
-          });
-
-          // Insert image reference at cursor position
-          // Check if we're using RichTextInput (contenteditable)
-          const contenteditable =
-            chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
-            chatInput.value?.$el?.querySelector(".rich-text-input");
-
-          if (contenteditable) {
-            // RichTextInput - insert at cursor position in contenteditable
-            const selection = window.getSelection();
-            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-
-            // Create a non-editable span for the image reference
-            const imageRefSpan = document.createElement("span");
-            imageRefSpan.contentEditable = "false";
-            imageRefSpan.className = "image-reference";
-            // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
-            imageRefSpan.style.cssText = `display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.375rem; margin: 0 0.125rem; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 0.25rem; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
-
-            // Add image icon
-            const imageIcon = document.createElement("span");
-            imageIcon.textContent = "🖼️";
-            imageIcon.style.cssText = "font-size: var(--text-xs);";
-
-            // Add filename text
-            const filenameText = document.createElement("span");
-            filenameText.textContent = file.name;
-
-            // Add remove button
-            const removeBtn = document.createElement("button");
-            removeBtn.textContent = "×";
-            removeBtn.style.cssText = `display: flex; align-items: center; justify-content: center; width: 0.875rem; height: 0.875rem; padding: 0; margin-left: 0.125rem; background: transparent; border: none; border-radius: 0.1875rem; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
-            removeBtn.onmouseover = () => {
-              removeBtn.style.background = chartColor("--color-status-negative");
-              removeBtn.style.color = chartColor("--color-white");
-            };
-            removeBtn.onmouseout = () => {
-              removeBtn.style.background = "transparent";
-              removeBtn.style.color = chartColor("--color-status-success-text");
-            };
-            removeBtn.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-
-              // Find and remove the image from pendingImages
-              const imageIndex = pendingImages.value.findIndex((img) => img.filename === file.name);
-              if (imageIndex !== -1) {
-                pendingImages.value.splice(imageIndex, 1);
-              }
-
-              // Remove the span
-              imageRefSpan.remove();
-
-              // Trigger input event
-              contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
-            };
-
-            imageRefSpan.appendChild(imageIcon);
-            imageRefSpan.appendChild(filenameText);
-            imageRefSpan.appendChild(removeBtn);
-
-            if (range && contenteditable.contains(range.startContainer)) {
-              // Insert at cursor position
-              range.deleteContents();
-
-              // Add space before if needed
-              const textBefore = range.startContainer.textContent || "";
-              if (
-                textBefore.length > 0 &&
-                !textBefore.endsWith(" ") &&
-                !textBefore.endsWith("\n")
-              ) {
-                range.insertNode(document.createTextNode(" "));
-              }
-
-              range.insertNode(imageRefSpan);
-
-              // Add space after for cursor positioning
-              const spaceAfter = document.createTextNode(" ");
-              range.setStartAfter(imageRefSpan);
-              range.insertNode(spaceAfter);
-
-              // Move cursor after the space
-              range.setStartAfter(spaceAfter);
-              range.collapse(true);
-              selection?.removeAllRanges();
-              selection?.addRange(range);
-            } else {
-              // No selection or selection outside - append to end
-              const spaceNeeded =
-                contenteditable.textContent &&
-                !contenteditable.textContent.endsWith(" ") &&
-                !contenteditable.textContent.endsWith("\n");
-              if (spaceNeeded) {
-                contenteditable.appendChild(document.createTextNode(" "));
-              }
-              contenteditable.appendChild(imageRefSpan);
-              const spaceAfter = document.createTextNode(" ");
-              contenteditable.appendChild(spaceAfter);
-
-              // Move cursor to end
-              const newRange = document.createRange();
-              newRange.setStartAfter(spaceAfter);
-              newRange.collapse(true);
-              selection?.removeAllRanges();
-              selection?.addRange(newRange);
-            }
-
-            // Trigger input event to update model
-            contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
-            focusInput();
-          } else {
-            // Legacy textarea fallback
-            const textarea = chatInput.value?.$el?.querySelector(
-              "textarea",
-            ) as HTMLTextAreaElement | null;
-            if (textarea) {
-              const start = textarea.selectionStart || 0;
-              const end = textarea.selectionEnd || 0;
-              const text = inputMessage.value;
-              const before = text.substring(0, start);
-              const after = text.substring(end);
-
-              // Add space before if needed
-              const needsSpaceBefore =
-                before.length > 0 && !before.endsWith(" ") && !before.endsWith("\n");
-              const needsSpaceAfter =
-                after.length > 0 && !after.startsWith(" ") && !after.startsWith("\n");
-
-              const insertion =
-                (needsSpaceBefore ? " " : "") + imageRef + (needsSpaceAfter ? " " : "");
-              inputMessage.value = before + insertion + after;
-
-              // Set cursor position after the inserted reference
-              nextTick(() => {
-                const newPos = start + insertion.length;
-                textarea.setSelectionRange(newPos, newPos);
-                textarea.focus();
-              });
-            } else {
-              // Final fallback: append to end
-              const currentText = inputMessage.value;
-              const separator =
-                currentText && !currentText.endsWith(" ") && !currentText.endsWith("\n") ? " " : "";
-              inputMessage.value = currentText + separator + imageRef + " ";
-            }
-          }
-
-          resolve(true);
-        };
-        reader.onerror = () => {
-          toast({
-            variant: "error",
-            message: t("toastMessages.components.failedToReadImage", { error: file.name }),
-          });
-          resolve(false);
-        };
-        reader.readAsDataURL(file);
-      });
-    };
-
-    const removeImage = (index: number) => {
-      // Get the filename before removing
-      const image = pendingImages.value[index];
-      if (image) {
-        const imageRef = `@[${image.filename}]`;
-
-        // Check if we're using RichTextInput (contenteditable)
-        const contenteditable =
-          chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
-          chatInput.value?.$el?.querySelector(".rich-text-input");
-
-        if (contenteditable) {
-          // Find and remove all image reference spans with this filename
-          const imageRefSpans = contenteditable.querySelectorAll(".image-reference");
-          imageRefSpans.forEach((span: Element) => {
-            if (span.textContent === imageRef) {
-              span.remove();
-            }
-          });
-
-          // Trigger input event to update model
-          contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
-        } else {
-          // Legacy textarea - remove from text
-          inputMessage.value = inputMessage.value
-            .replace(new RegExp(`\\s*${escapeRegExp(imageRef)}\\s*`, "g"), " ")
-            .trim();
-        }
-      }
-      pendingImages.value.splice(index, 1);
-    };
-
-    // Helper to escape special regex characters
-    const escapeRegExp = (str: string) => {
-      return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    };
-
-    const clearPendingImages = () => {
-      pendingImages.value = [];
-    };
-
-    // Handle drag and drop for images
-    const handleDragOver = (event: DragEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-    };
-
-    const handleDrop = async (event: DragEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const files = event.dataTransfer?.files;
-      if (!files) return;
-
-      for (const file of Array.from(files)) {
-        if (file.type.startsWith("image/")) {
-          await addImage(file);
-        }
-      }
-    };
-
-    // Handle paste for images
-    const handlePaste = async (event: ClipboardEvent) => {
-      const items = event.clipboardData?.items;
-      if (!items) return;
-
-      for (const item of Array.from(items)) {
-        if (item.type.startsWith("image/")) {
-          const file = item.getAsFile();
-          if (file) {
-            event.preventDefault();
-            await addImage(file);
-          }
-        }
-      }
-    };
-
-    // Open image preview dialog
-    const openImagePreview = (img: ImageAttachment) => {
-      previewImage.value = img;
-      showImagePreview.value = true;
-    };
-
-    const closeImagePreview = () => {
-      showImagePreview.value = false;
-      previewImage.value = null;
-    };
-
-    // Load query history from localStorage
-    const loadQueryHistory = () => {
-      try {
-        const stored = localStorage.getItem(HISTORY_KEY);
-        if (stored) {
-          queryHistory.value = JSON.parse(stored);
-        }
-      } catch (error) {
-        console.error("Error loading query history:", error);
-        queryHistory.value = [];
-      }
-    };
-
-    // Save query history to localStorage
-    const saveQueryHistory = () => {
-      try {
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(queryHistory.value));
-      } catch (error) {
-        console.error("Error saving query history:", error);
-      }
-    };
-
-    // Auto navigation preferences localStorage functions
-    const AUTO_NAV_KEY = "ai-chat-auto-navigation";
-
-    const loadAutoNavigationPreferences = () => {
-      try {
-        const stored = localStorage.getItem(AUTO_NAV_KEY);
-        if (stored) {
-          const data = JSON.parse(stored);
-          autoNavigationPreferences.value = new Map(
-            Object.entries(data).map(([k, v]) => [parseInt(k), v as boolean]),
-          );
-        }
-      } catch (error) {
-        console.error("Error loading auto navigation preferences:", error);
-        autoNavigationPreferences.value = new Map();
-      }
-    };
-
-    const saveAutoNavigationPreferences = () => {
-      try {
-        const data = Object.fromEntries(autoNavigationPreferences.value);
-        localStorage.setItem(AUTO_NAV_KEY, JSON.stringify(data));
-      } catch (error) {
-        console.error("Error saving auto navigation preferences:", error);
-      }
-    };
-
-    // Add query to history
-    const addToHistory = (query: string) => {
-      const trimmedQuery = query.trim();
-      if (!trimmedQuery) return;
-
-      // Remove if already exists to avoid duplicates
-      const existingIndex = queryHistory.value.indexOf(trimmedQuery);
-      if (existingIndex > -1) {
-        queryHistory.value.splice(existingIndex, 1);
-      }
-
-      // Add to beginning of array
-      queryHistory.value.unshift(trimmedQuery);
-
-      // Keep only last MAX_HISTORY_SIZE entries
-      if (queryHistory.value.length > MAX_HISTORY_SIZE) {
-        queryHistory.value = queryHistory.value.slice(0, MAX_HISTORY_SIZE);
-      }
-
-      saveQueryHistory();
-      historyIndex.value = -1; // Reset index
-    };
-
-    // Watch for isOpen changes to fetch initial message when opened
     watch(
       () => props.isOpen,
       (newValue) => {
@@ -5038,10 +956,9 @@ export default defineComponent({
           if (chatMessages.value.length === 0) {
             fetchInitialMessage();
           }
-          loadHistory(); // Load history when chat is opened
+          loadHistory();
 
-          // Mark component as ready and process any pending chips
-          // Use a slight delay to ensure RichTextInput is fully mounted
+          // Slight delay so RichTextInput is fully mounted before pending chips are processed.
           nextTick(() => {
             setTimeout(() => {
               componentReady.value = true;
@@ -5053,7 +970,6 @@ export default defineComponent({
       },
     );
 
-    // Auto-focus input when chat is expanded
     watch(
       () => store.state.isAiChatExpanded,
       (isExpanded) => {
@@ -5067,14 +983,12 @@ export default defineComponent({
       },
     );
 
-    // Watch for organization switches — reset current chat and reload history
-    // scoped to the new org so users never see cross-org chat history.
+    // Reset on org switch so users never see cross-org chat history.
     watch(
       () => store.state.selectedOrganization?.identifier,
       (newOrgId, oldOrgId) => {
         if (newOrgId && newOrgId !== oldOrgId) {
-          // A turn started under the old org must not keep streaming and
-          // writing chat history after the switch.
+          // A turn started under the old org must not keep streaming and writing history after the switch.
           abortBackgroundStreams();
           addNewChat();
           if (props.isOpen) {
@@ -5084,42 +998,13 @@ export default defineComponent({
       },
     );
 
-    // When this instance has re-attached to a stream that another instance
-    // started (its processStream completion runs in the OTHER instance's
-    // closure and can't reset our isLoading), watch the shared streaming
-    // registry and clear our own streaming UI once that session finishes.
-    watch(
-      () => (currentSessionId.value ? sessionStreamingState[currentSessionId.value] : undefined),
-      (isStreaming) => {
-        // React to the session going false, not to a true->false transition: an
-        // instance that re-attached mid-stream never observed the `true`, so it
-        // would see undefined->false and skip the cleanup, spinning forever.
-        // isLoading guards against acting when we aren't showing a stream.
-        if (isStreaming === false && isLoading.value) {
-          isLoading.value = false;
-          activeToolCall.value = null;
-          stopAnalyzingRotation();
-          // The owning instance's processStream already wrote the final text
-          // into the message blocks, so this instance only clears its own
-          // typewriter UI.
-          resetTypewriterState();
-          // Reflect the completed turn into the sync handshake + history so a
-          // later mount reads the finished chat, not a mid-stream snapshot.
-          store.dispatch("setCurrentChatTimestamp", currentChatId.value);
-          nextTick(() => scrollToBottom());
-        }
-      },
-    );
-
-    // Only fetch initial message if component starts as open
     onMounted(() => {
       if (props.isOpen) {
         fetchInitialMessage();
-        loadHistory(); // Load history on mount if chat is open
+        loadHistory();
         loadChat(store.state.currentChatTimestamp);
 
-        // Mark component as ready and process any pending chips
-        // Use a slight delay to ensure RichTextInput is fully mounted
+        // Slight delay so RichTextInput is fully mounted before pending chips are processed.
         nextTick(() => {
           setTimeout(() => {
             componentReady.value = true;
@@ -5129,39 +1014,21 @@ export default defineComponent({
         });
       }
 
-      // Load query history from localStorage
-      loadQueryHistory();
-
-      // Load auto navigation preferences from localStorage
-      loadAutoNavigationPreferences();
-
       window.addEventListener("o2:abort-ai-streams", abortAllStreams);
     });
 
     onUnmounted(() => {
       window.removeEventListener("o2:abort-ai-streams", abortAllStreams);
-      // Mark unmounting FIRST so any reactive watcher that fires during teardown
-      // (e.g. our own chatUpdated watch, triggered by the dispatch below) does
-      // not re-attach the just-detached stream back to this dying instance.
+      // Mark unmounting FIRST so the chatUpdated watch fired by the dispatch below can't re-attach the detached stream here.
       isUnmounting.value = true;
 
-      // Detach (not abort) any in-flight request: every mount site except
-      // MainLayout's sidebar is behind a v-if (Home's AI tab, the query-editor
-      // panels), so ordinary navigation tears this instance down and used to
-      // kill the answer mid-word. Unmount is the only hook that knows the
-      // component is actually going away — a route watcher can't tell the
-      // difference between "leaving" and "the page updated its query string".
+      // Detach, not abort: most mount sites sit behind a v-if, so ordinary navigation unmounts this instance mid-answer.
       const wasStreaming = !!currentAbortController.value;
       detachCurrentStream();
-      // detachCurrentStream early-returns when no controller is set, so clear the
-      // rotation interval directly rather than relying on that path.
+      // detachCurrentStream early-returns without a controller, so clear the rotation interval directly.
       stopAnalyzingRotation();
 
-      // Home runs the chat in its own inline tab with the sidebar closed. If we
-      // leave Home mid-stream, open the sidebar so its instance can re-attach
-      // and keep rendering. Skip when we're still on Home (the user only
-      // switched Home tabs) — MainLayout keeps the sidebar closed there, so
-      // opening it would show the panel and the Home AI tab at once.
+      // Leaving Home mid-stream opens the sidebar so its instance can re-attach; skip on Home, where it would show beside the AI tab.
       if (
         wasStreaming &&
         props.centeredStart &&
@@ -5171,58 +1038,24 @@ export default defineComponent({
         store.dispatch("setIsAiChatEnabled", true);
       }
 
-      // Note: background streams are intentionally NOT aborted here.
-      // detachCurrentStream() moves a turn's controller into backgroundStreams
-      // specifically so it keeps running after this component instance goes
-      // away (e.g. navigation, logout); aborting them on unmount would defeat
-      // that guarantee in exactly the scenario it exists for.
+      // Background streams are intentionally NOT aborted: surviving unmount is why they were detached.
 
-      // Clean up typewriter animation to prevent memory leaks
       if (typewriterAnimationId.value) {
         cancelAnimationFrame(typewriterAnimationId.value);
         typewriterAnimationId.value = null;
       }
 
-      // Clean up title animation interval
-      if (titleIntervalId) {
-        clearInterval(titleIntervalId);
-        titleIntervalId = null;
-      }
+      clearTitleInterval();
 
-      // Clean up the trailing-edge streaming render timer. This matters more
-      // here than a typical unmount cleanup: we intentionally let the stream
-      // keep running (see detachCurrentStream above), so displayedStreamingContent
-      // may still be ticking as this instance dies and a flush is often pending.
-      // Left alone it fires after unmount and writes into this dead instance's
-      // chatMessages, keeping the whole setup closure alive across the routine
-      // home <-> sidebar hand-off.
-      if (streamingRenderFlushTimer) {
-        clearTimeout(streamingRenderFlushTimer);
-        streamingRenderFlushTimer = null;
-      }
-      pendingStreamingRenderContent = null;
+      // The stream outlives this instance, so a pending render flush would write into dead chatMessages and pin the closure.
+      disposeRenderFlush();
 
-      // We use separate O2AIChat instances (home inline tab + sidebar) and sync
-      // them via the store: publish which chat is current + a "chatUpdated" pulse
-      // so the SURVIVING instance loads it (its chatUpdated watch calls loadChat).
-      //
-      // CRITICAL: this dying instance must NOT call loadChat()/addNewChat() on
-      // itself here. detachCurrentStream() (above) just registered the in-flight
-      // turn in backgroundStreamMap for the survivor to re-attach to; calling
-      // loadChat() on ourselves would immediately re-attach it back to THIS
-      // instance and delete the map entry, so the survivor then finds nothing
-      // and falls back to the stale IndexedDB snapshot — the exact reason the
-      // streamed text stopped rendering after navigating away mid-stream.
-      // Only publish the handoff state; let the survivor act on it.
+      // Only publish the handoff: loadChat() here would re-attach the stream to this dying instance and steal it from the survivor.
       store.dispatch("setCurrentChatTimestamp", currentChatId.value);
       store.dispatch("setChatUpdated", true);
     });
-    //this watch is added to make sure that the chat gets updated
-    // when the component is unmounted so that the main layout component can load the correct chat
     watch(chatUpdated, (newChatUpdated: boolean) => {
-      // A dying instance must not react to the handoff pulse it just published —
-      // otherwise it re-attaches its own detached stream and steals it from the
-      // surviving instance. Let the survivor handle it.
+      // A dying instance must not react to its own handoff pulse, or it steals its detached stream back from the survivor.
       if (isUnmounting.value) return;
       if (newChatUpdated && store.state.currentChatTimestamp) {
         loadChat(store.state.currentChatTimestamp);
@@ -5233,276 +1066,11 @@ export default defineComponent({
       store.dispatch("setChatUpdated", false);
     });
 
-    // Writing displayedStreamingContent into chatMessages triggers a
-    // re-render of the message list, which re-runs formatMessage() ->
-    // marked.parse() (incl. hljs.highlight for code blocks) over the WHOLE
-    // accumulated text, not just the new characters. The typewriter ticks
-    // every ~8ms; re-parsing/re-highlighting full markdown at that rate is
-    // O(n^2) over a response and eventually can't keep up with
-    // requestAnimationFrame, so the page appears to hang with data already
-    // in memory but not painted, then "snaps" to the final text once the
-    // stream ends and the last write goes through. Throttle how often the
-    // expensive reactive write happens, independent of how often the cheap
-    // per-character animation ref ticks; the animation itself stays smooth.
-    const STREAMING_RENDER_INTERVAL = 80; // ms between reactive markdown re-renders
-    let lastStreamingRenderTime = 0;
-    let pendingStreamingRenderContent: string | null = null;
-    let streamingRenderFlushTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const flushStreamingRenderNow = (content: string) => {
-      lastStreamingRenderTime = Date.now();
-      pendingStreamingRenderContent = null;
-      if (streamingRenderFlushTimer) {
-        clearTimeout(streamingRenderFlushTimer);
-        streamingRenderFlushTimer = null;
-      }
-
-      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      if (lastMessage && lastMessage.role === "assistant" && lastMessage.contentBlocks) {
-        const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-        if (lastBlock && lastBlock.type === "text") {
-          // Additive-only: the stream handler writes the FULL accumulated
-          // textSegment into this block as it arrives; the typewriter only
-          // reveals a prefix of it. Never let a lagging/stalled typewriter
-          // reveal (or an empty reset) shorten what's already rendered — that
-          // was a source of "text arrived but nothing/less showed". Only grow.
-          if ((content?.length || 0) >= (lastBlock.text?.length || 0)) {
-            lastBlock.text = content;
-          }
-        }
-      }
-    };
-
-    // Watch for typewriter animation updates to refresh the displayed text
-    watch(displayedStreamingContent, (newContent) => {
-      if (!isLoading.value) return;
-      // Don't overwrite existing text with empty string when displayedStreamingContent
-      // is reset (e.g., on tool_call). The reset signals "new segment starts" not
-      // "clear previous content".
-      if (!newContent) return;
-
-      const now = Date.now();
-      if (now - lastStreamingRenderTime >= STREAMING_RENDER_INTERVAL) {
-        flushStreamingRenderNow(newContent);
-        return;
-      }
-
-      // Trailing edge: make sure the latest content always lands even if
-      // ticks keep arriving faster than the interval.
-      pendingStreamingRenderContent = newContent;
-      if (!streamingRenderFlushTimer) {
-        const delay = STREAMING_RENDER_INTERVAL - (now - lastStreamingRenderTime);
-        streamingRenderFlushTimer = setTimeout(() => {
-          streamingRenderFlushTimer = null;
-          if (pendingStreamingRenderContent !== null) {
-            flushStreamingRenderNow(pendingStreamingRenderContent);
-          }
-        }, delay);
-      }
-    });
-
-    // Filter markdown headers - convert # and ## to smaller formatting
-    // This should only process actual markdown headers, not code block comments
-    const filterMarkdownHeaders = (content: string): string => {
-      // First, protect code blocks by temporarily replacing them
-      const codeBlocks: string[] = [];
-      let filtered = content.replace(/```[\s\S]*?```/g, (match) => {
-        codeBlocks.push(match);
-        return `___CODE_BLOCK_${codeBlocks.length - 1}___`;
-      });
-
-      // Convert ## headers to bold with colon (only outside code blocks)
-      filtered = filtered.replace(/^## (.+)$/gm, "**$1:**");
-
-      // Convert # headers to bold with colon (only outside code blocks)
-      filtered = filtered.replace(/^# (.+)$/gm, "**$1:**");
-
-      // Restore code blocks
-      filtered = filtered.replace(/___CODE_BLOCK_(\d+)___/g, (_match, index) => {
-        return codeBlocks[parseInt(index)];
-      });
-
-      return filtered;
-    };
-
-    // Process text block and return array of code/text blocks for rendering
-    const processTextBlock = (text: string) => {
-      // Filter headers before processing
-      const filteredContent = filterMarkdownHeaders(text);
-      const tokens = marked.lexer(filteredContent);
-      const blocks = [];
-
-      for (const token of tokens) {
-        if (token.type === "code") {
-          let codeText = token.text.trim();
-          while (
-            codeText.startsWith("--") ||
-            codeText.startsWith("//") ||
-            codeText.startsWith("#")
-          ) {
-            codeText = codeText.split("\n").slice(1).join("\n").trim();
-          }
-
-          const highlightedContent =
-            token.lang && hljs.getLanguage(token.lang)
-              ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
-              : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
-
-          blocks.push({
-            type: "code",
-            language: token.lang || "",
-            content: codeText,
-            highlightedContent,
-          });
-        } else {
-          blocks.push({
-            type: "text",
-            content: marked.parser([token]),
-          });
-        }
-      }
-
-      return blocks;
-    };
-
-    const processMessageContent = (content: string) => {
-      // Filter headers before processing
-      const filteredContent = filterMarkdownHeaders(content);
-      const tokens = marked.lexer(filteredContent);
-      const blocks = [];
-
-      for (const token of tokens) {
-        if (token.type === "code") {
-          // Remove comments at the beginning of code blocks
-          let codeText = token.text.trim();
-          while (
-            codeText.startsWith("--") ||
-            codeText.startsWith("//") ||
-            codeText.startsWith("#")
-          ) {
-            codeText = codeText.split("\n").slice(1).join("\n").trim();
-          }
-
-          const highlightedContent =
-            token.lang && hljs.getLanguage(token.lang)
-              ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
-              : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
-
-          blocks.push({
-            type: "code",
-            language: token.lang || "",
-            content: codeText,
-            highlightedContent,
-          });
-        } else {
-          blocks.push({
-            type: "text",
-            content: marked.parser([token]),
-          });
-        }
-      }
-
-      return blocks;
-    };
-
-    // Helper to format JSON with syntax highlighting
-    const formatLogEntryContent = (content: string): string => {
-      try {
-        const parsed = JSON.parse(content);
-        const formatted = JSON.stringify(parsed, null, 2);
-        // Apply syntax highlighting
-        const highlighted = formatted.replace(
-          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
-          (match) => {
-            let cls = "json-number";
-            if (/^"/.test(match)) {
-              if (/:$/.test(match)) {
-                cls = "json-key";
-              } else {
-                cls = "json-string";
-              }
-            } else if (/true|false/.test(match)) {
-              cls = "json-boolean";
-            } else if (/null/.test(match)) {
-              cls = "json-null";
-            }
-            return `<span class="${cls}">${match}</span>`;
-          },
-        );
-        return DOMPurify.sanitize(highlighted);
-      } catch {
-        // Not JSON, return plain text with HTML escaping
-        return DOMPurify.sanitize(
-          content
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;")
-            .replace(/\n/g, "<br>"),
-        );
-      }
-    };
-
-    // Parse log entries from message content and maintain order
-    const parseLogEntries = (content: string) => {
-      const logEntryPattern = /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
-      const orderedBlocks: any[] = [];
-      let lastIndex = 0;
-      let match;
-
-      // Reset regex state
-      logEntryPattern.lastIndex = 0;
-
-      while ((match = logEntryPattern.exec(content)) !== null) {
-        const [fullMatch, filename, lineStart, lineEnd, logContent] = match;
-        const matchIndex = match.index;
-
-        // Add text before this log entry (if any)
-        if (matchIndex > lastIndex) {
-          const textBefore = content.substring(lastIndex, matchIndex).trim();
-          if (textBefore) {
-            orderedBlocks.push({
-              type: "text",
-              text: textBefore,
-            });
-          }
-        }
-
-        // Add the log entry
-        orderedBlocks.push({
-          type: "log_entry",
-          filename,
-          lineStart: lineStart ? parseInt(lineStart) : undefined,
-          lineEnd: lineEnd ? parseInt(lineEnd) : undefined,
-          content: logContent.trim(),
-          preview: createPreview(logContent.trim(), 60),
-        });
-
-        lastIndex = matchIndex + fullMatch.length;
-      }
-
-      // Add any remaining text after the last log entry
-      if (lastIndex < content.length) {
-        const textAfter = content.substring(lastIndex).trim();
-        if (textAfter) {
-          orderedBlocks.push({
-            type: "text",
-            text: textAfter,
-          });
-        }
-      }
-
-      return orderedBlocks;
-    };
-
     const processedMessages = computed(() => {
       return chatMessages.value.map((message) => {
-        // For user messages, check for log entries
         if (message.role === "user") {
           const orderedBlocks = parseLogEntries(message.content);
 
-          // If we have ordered blocks from parsing, combine them with existing contentBlocks
           const combinedContentBlocks =
             orderedBlocks.length > 0
               ? [...orderedBlocks, ...(message.contentBlocks || [])]
@@ -5515,7 +1083,6 @@ export default defineComponent({
           };
         }
 
-        // For assistant messages, keep as is
         return {
           ...message,
           blocks: processMessageContent(message.content),
@@ -5527,15 +1094,12 @@ export default defineComponent({
     const retryGeneration = async (message: any) => {
       if (!message || message.role !== "assistant") return;
 
-      // Find the index of this assistant message
       const messageIndex = chatMessages.value.findIndex((m) => m.content === message.content);
       if (messageIndex === -1) return;
 
-      // Find the corresponding user message that came before this assistant message
       let userMessageIndex = messageIndex - 1;
       while (userMessageIndex >= 0) {
         if (chatMessages.value[userMessageIndex].role === "user") {
-          // Set the user message and trigger send without removing previous messages
           inputMessage.value = chatMessages.value[userMessageIndex].content;
           await sendMessage();
           break;
@@ -5544,71 +1108,11 @@ export default defineComponent({
       }
     };
 
-    const getLanguageDisplay = (lang: string) => {
-      const languageMap: { [key: string]: string } = {
-        js: "JavaScript",
-        javascript: "JavaScript",
-        ts: "TypeScript",
-        typescript: "TypeScript",
-        python: "Python",
-        py: "Python",
-        sql: "SQL",
-        vrl: "VRL",
-        json: "JSON",
-        css: "CSS",
-        scss: "SCSS",
-        bash: "Bash",
-        shell: "Shell",
-        yaml: "YAML",
-        yml: "YAML",
-        markdown: "Markdown",
-        md: "Markdown",
-      };
-
-      const normalizedLang = lang.toLowerCase();
-      return languageMap[normalizedLang] || lang.toUpperCase();
-    };
-
-    const processHtmlBlock = (content: string) => {
-      // Sanitize HTML to prevent XSS attacks
-      const sanitized = DOMPurify.sanitize(content);
-      // Replace pre tags with span and add our custom class
-      return sanitized
-        .replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
-        .replace(/<\/pre>/g, "</span>");
-    };
-
     const formatTime = (timestamp: string) => {
       const date = new Date(timestamp);
       return date.toLocaleString();
     };
 
-    // Tool call context formatting helpers
-    const truncateQuery = (query: string) => {
-      if (!query) return "";
-      const maxLength = 100;
-      if (query.length <= maxLength) return query;
-      return query.substring(0, maxLength) + "...";
-    };
-
-    const formatContextKey = (key: string) => {
-      // Convert snake_case to Title Case
-      return key
-        .split("_")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-    };
-
-    const formatContextValue = (value: any) => {
-      if (typeof value === "string") {
-        // Truncate long strings
-        if (value.length > 30) return value.substring(0, 30) + "...";
-        return value;
-      }
-      return String(value);
-    };
-
-    // Tool call expansion helpers
     const toggleToolCallExpanded = (messageIndex: number, blockIndex: number) => {
       const key = `${messageIndex}-${blockIndex}`;
       if (expandedToolCalls.value.has(key)) {
@@ -5622,7 +1126,6 @@ export default defineComponent({
       return expandedToolCalls.value.has(`${messageIndex}-${blockIndex}`);
     };
 
-    // Log entry expansion helpers
     const toggleLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
       const key = `${messageIndex}-${blockIndex}`;
       if (expandedLogEntries.value.has(key)) {
@@ -5634,157 +1137,6 @@ export default defineComponent({
 
     const isLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
       return expandedLogEntries.value.has(`${messageIndex}-${blockIndex}`);
-    };
-
-    // Extract display fields from tool call context (handles different tool schemas)
-    const getToolCallDisplayData = (context: any) => {
-      if (!context) return null;
-
-      const data: Record<string, any> = {};
-
-      // Handle nested request_body.query structure (SearchSQL, ExtractPatterns)
-      if (context.request_body?.query) {
-        const q = context.request_body.query;
-        if (q.sql) data.query = q.sql;
-        if (q.start_time) data.start_time = q.start_time;
-        if (q.end_time) data.end_time = q.end_time;
-        if (q.from !== undefined) data.from = q.from;
-        if (q.size !== undefined) data.size = q.size;
-        if (q.query_type) data.query_type = q.query_type;
-        if (q.vrl) data.vrl = q.vrl;
-      }
-
-      // Handle testFunction context (VRL validation)
-      if (context.vrl) data.vrl = context.vrl;
-      if (context.request_body?.function) data.vrl = context.request_body.function;
-
-      // Handle flat SQL from SearchSQL enriched context
-      if (context.sql) data.query = context.sql;
-
-      // Handle flat structure (StreamSchema, etc.)
-      if (context.stream_name) data.stream = context.stream_name;
-      if (context.type) data.type = context.type;
-
-      // CLI tools: surface the command string
-      if (context.command) data.command = context.command;
-
-      return Object.keys(data).length > 0 ? data : null;
-    };
-
-    // `response` is stamped onto blocks by the stream handler but is not part
-    // of the shared ContentBlock interface.
-    const hasToolCallDetails = (block: ContentBlock & { response?: Record<string, any> }) => {
-      // Show details for failed tools, successful tools with summary, tools with context data, or tools with response
-      if (block.success === false) return true;
-      if (block.summary) return true;
-      if (block.response) return true;
-      return getToolCallDisplayData(block.context) !== null;
-    };
-
-    // Splits an already-interpolated sentence around the value that renders bold,
-    // so the header stays ONE translatable sentence instead of two fragments.
-    const splitAroundHighlight = (full: string, highlight: string) => {
-      const at = full.indexOf(highlight);
-      if (at < 0) return { text: full, highlight: null as string | null, suffix: "" };
-      return {
-        text: full.slice(0, at),
-        highlight: highlight as string | null,
-        suffix: full.slice(at + highlight.length),
-      };
-    };
-
-    const formatToolCallMessage = (block: ContentBlock & { response?: Record<string, any> }) => {
-      // Show error message for failed tools
-      // Tool-specific messages (both success and error)
-      if (block.tool === "testFunction") {
-        if (block.success === false) {
-          return {
-            text: t("aiAssistant.aiChat.toolVrlValidationFailed"),
-            highlight: null,
-            suffix: "",
-          };
-        }
-        return { text: t("aiAssistant.aiChat.toolVrlValidated"), highlight: null, suffix: "" };
-      }
-      if (block.tool === "SearchSQL") {
-        if (block.success === false) {
-          return {
-            text: t("aiAssistant.aiChat.toolQueryFailed"),
-            highlight: null,
-            suffix: "",
-          };
-        }
-        if (block.response?.total !== undefined) {
-          const streamType = block.context?.type || "logs";
-          return {
-            text: t("aiAssistant.aiChat.toolQueriedStream", { type: streamType }),
-            highlight: t("aiAssistant.aiChat.toolResultsCount", {
-              count: block.response.total,
-            }),
-            suffix: "",
-          };
-        }
-      }
-      if (block.tool === "StreamSchema" && block.context?.stream_name) {
-        const streamName = block.context.stream_name;
-        return splitAroundHighlight(
-          t("aiAssistant.aiChat.toolStreamSchema", { name: streamName }),
-          streamName,
-        );
-      }
-      if (block.tool === "GetIncident" && block.context?.incident_id) {
-        const incidentId = block.context.incident_id;
-        return splitAroundHighlight(
-          t("aiAssistant.aiChat.toolGetIncident", { id: incidentId }),
-          incidentId,
-        );
-      }
-      if (block.tool === "GetAlert" && block.context?.alert_id) {
-        const alertId = block.context.alert_id;
-        return splitAroundHighlight(t("aiAssistant.aiChat.toolGetAlert", { id: alertId }), alertId);
-      }
-      if (block.tool === "GetDashboard" && block.context?.dashboard_id) {
-        const dashboardId = block.context.dashboard_id;
-        return splitAroundHighlight(
-          t("aiAssistant.aiChat.toolGetDashboard", { id: dashboardId }),
-          dashboardId,
-        );
-      }
-      // List tools: show count from normalized { total, items } response
-      if (block.response?.total !== undefined && block.success !== false) {
-        const base = block.message || block.tool || t("aiAssistant.aiChat.toolListedFallback");
-        return {
-          text: base + " ",
-          highlight: t("aiAssistant.aiChat.toolFoundCount", { count: block.response.total }),
-          suffix: "",
-        };
-      }
-      // Generic fallback
-      if (block.success === false && block.resultMessage) {
-        // Truncate long error messages for the header
-        const msg =
-          block.resultMessage.length > 60
-            ? block.resultMessage.substring(0, 60) + "..."
-            : block.resultMessage;
-        return { text: msg, highlight: null, suffix: "" };
-      }
-      if (block.success !== false && block.summary?.count !== undefined) {
-        const base = block.message || block.tool || t("aiAssistant.aiChat.toolFallback");
-        return {
-          text: base + " ",
-          highlight: t("aiAssistant.aiChat.toolResultsCount", { count: block.summary.count }),
-          suffix: "",
-        };
-      }
-      return { text: block.message, highlight: null, suffix: "" };
-    };
-
-    const formatTimestamp = (timestamp: number) => {
-      if (!timestamp || timestamp === 0) return t("aiAssistant.aiChat.notSpecified");
-      // Timestamp is in microseconds, convert to milliseconds
-      const ms = timestamp > 1e15 ? timestamp / 1000 : timestamp;
-      const date = new Date(ms);
-      return date.toLocaleString();
     };
 
     const likeCodeBlock = async (messageIndex: number) => {
@@ -5838,17 +1190,6 @@ export default defineComponent({
         ? getImageURL("images/common/o2_ai_logo_dark.svg")
         : getImageURL("images/common/o2_ai_logo.svg");
     });
-    const getGenerateAiIcon = computed(() => {
-      return getImageURL("images/common/ai_icon_dark.svg");
-    });
-
-    const filteredChatHistory = computed(() => {
-      if (!historySearchTerm.value) {
-        return chatHistory.value;
-      }
-      const searchTerm = historySearchTerm.value.toLowerCase();
-      return chatHistory.value.filter((chat) => chat.title.toLowerCase().includes(searchTerm));
-    });
 
     return {
       raw,
@@ -5884,22 +1225,18 @@ export default defineComponent({
       clearAllConversations,
       showClearAllConfirmDialog,
       confirmClearAllConversations,
-      // Tool confirmation
       pendingConfirmation,
       handleToolConfirm,
       handleToolCancel,
       handleToolAlwaysConfirm,
       handleNavigationAction,
       sendConfirmation,
-      // Session restore
       isSessionOwnerUnavailable,
       appendErrorBlock,
       streamOwnerUnavailable,
       currentSessionId,
-      // Auto navigation
       isAutoNavigationEnabled,
       processedMessages,
-      pendingToolCalls,
       processTextBlock,
       copyToClipboard,
       retryGeneration,
@@ -5913,7 +1250,6 @@ export default defineComponent({
       dislikeCodeBlock,
       currentChatTimestamp,
       o2AiTitleLogo,
-      getGenerateAiIcon,
       saveHistoryLoading,
       historySearchTerm,
       filteredChatHistory,
@@ -5933,18 +1269,14 @@ export default defineComponent({
       isToolCallExpanded,
       hasToolCallDetails,
       getToolCallDisplayData,
-      formatToolCallMessage,
-      formatTimestamp,
       formatContextValue,
       expandedLogEntries,
       toggleLogEntryExpanded,
       isLogEntryExpanded,
       formatLogEntryContent,
-      // AI-generated title
       aiGeneratedTitle,
       displayedTitle,
       isTypingTitle,
-      // Image handling
       pendingImages,
       imageInputRef,
       triggerImageUpload,
@@ -5953,7 +1285,6 @@ export default defineComponent({
       handleDragOver,
       handleDrop,
       handlePaste,
-      // Image preview
       showImagePreview,
       previewImage,
       openImagePreview,
@@ -5967,20 +1298,9 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* keep(generated-content): markdown/log/code markup is injected with v-html, so
-   it carries no scope attribute and cannot take utility classes — it can only be
-   reached from here through :deep().
-   keep(lib-override:hljs): highlight.js emits its own .hljs-* class names; the
-   token mapping below mirrors lib/core/Code/OCodeBlock.vue exactly (D6).
-   keep(keyframes): @keyframes and the `animation:` that consumes it must live in
-   the same block — the scoped compiler renames both together.
-   keep(complex-state): .tool-call-item's status x has-details x hover matrix and
-   .send-button's :not(.disabled):not([disabled]):not(:disabled) guard have no
-   utility equivalent (`enabled:` covers :disabled, not the .disabled class). */
+/* keep(keyframes): @keyframes and its consuming `animation:` must share a block; the scoped compiler renames both together. */
 
-/* ============================================================
-   keep(keyframes) — each consumer sits next to its @keyframes
-   ============================================================ */
+/* Deliberate copy in O2AIChatToolCallIndicator.vue: the standalone loading box here shares this class. */
 .tool-call-indicator {
   animation: fadeIn 0.3s ease;
 }
@@ -6011,8 +1331,6 @@ export default defineComponent({
   }
 }
 
-/* Scroll-to-bottom button entrance. Rises from below with a slight scale-up, so
-   it is not the same curve as fadeIn/fadeInSlide above (those drop from above). */
 .scroll-to-bottom-btn {
   animation: fadeInUp 0.3s ease;
 }
@@ -6026,343 +1344,5 @@ export default defineComponent({
     opacity: 1;
     transform: translateY(0) scale(1);
   }
-}
-
-/* ============================================================
-   keep(complex-state) — tool call status matrix.
-   Status tint x (has-details) hover x light/dark. Each status maps to its
-   semantic token; the light/dark pairs differ only in mix strength, so dark
-   overrides just the percentage.
-   ============================================================ */
-.tool-call-item {
-  background: color-mix(in srgb, var(--color-status-positive) 8%, transparent);
-}
-.dark .tool-call-item {
-  background: color-mix(in srgb, var(--color-status-positive) 12%, transparent);
-}
-.tool-call-item.has-details {
-  cursor: pointer;
-}
-.tool-call-item.has-details:hover {
-  background: color-mix(in srgb, var(--color-status-positive) 12%, transparent);
-}
-.dark .tool-call-item.has-details:hover {
-  background: color-mix(in srgb, var(--color-status-positive) 18%, transparent);
-}
-
-.tool-call-item.error {
-  background: color-mix(in srgb, var(--color-status-negative) 8%, transparent);
-}
-.dark .tool-call-item.error {
-  background: color-mix(in srgb, var(--color-status-negative) 12%, transparent);
-}
-.tool-call-item.error.has-details:hover {
-  background: color-mix(in srgb, var(--color-status-negative) 15%, transparent);
-}
-.dark .tool-call-item.error.has-details:hover {
-  background: color-mix(in srgb, var(--color-status-negative) 22%, transparent);
-}
-
-.tool-call-item.timeout {
-  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
-}
-.dark .tool-call-item.timeout {
-  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
-}
-.tool-call-item.timeout.has-details:hover {
-  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
-}
-.dark .tool-call-item.timeout.has-details:hover {
-  background: color-mix(in srgb, var(--color-warning) 22%, transparent);
-}
-
-.tool-call-item.pending-confirmation {
-  cursor: default;
-  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
-}
-.dark .tool-call-item.pending-confirmation {
-  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
-  border-color: color-mix(in srgb, var(--color-warning) 25%, transparent);
-}
-
-.tool-call-item.pending-navigation {
-  cursor: default;
-  background: color-mix(in srgb, var(--color-info) 8%, transparent);
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
-}
-.dark .tool-call-item.pending-navigation {
-  background: color-mix(in srgb, var(--color-info) 12%, transparent);
-  border-color: color-mix(in srgb, var(--color-info) 25%, transparent);
-}
-
-/* ============================================================
-   keep(complex-state) — send button.
-   The enabled guard is a .disabled CLASS plus [disabled] plus :disabled;
-   Tailwind's `enabled:` variant only covers the last two.
-   ============================================================ */
-.send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  /* The hover gradient is `hover:bg-gradient-ai!` on the button itself. It used to
-     be restated here, then dropped when the template briefly carried the gradient
-     unconditionally — and main later moved the button back to variant="primary",
-     so between the two changes the gradient stopped painting at all. */
-  box-shadow: var(--shadow-glow-xl-geom) color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
-  transform: translateY(-0.0625rem) !important;
-}
-.send-button:active:not(.disabled):not([disabled]):not(:disabled) {
-  transform: translateY(0) !important;
-  /* Pressed keeps the accent, dimmer than hover — NOT --shadow-glow, which is a
-     neutral black ring and turns the press state grey. */
-  box-shadow: var(--shadow-glow-press-geom)
-    color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
-}
-
-/* ============================================================
-   keep(generated-content) — RichTextInput is a child component, so its
-   internals carry no scope attribute of ours.
-   ============================================================ */
-.unified-input-box :deep(.rich-text-input-wrapper) {
-  width: 100%;
-  min-height: 2.5rem;
-}
-.unified-input-box :deep(.rich-text-input) {
-  padding: 0.25rem 0;
-}
-
-/* ============================================================
-   keep(generated-content) — markdown rendered from v-html inside .text-block.
-   `!important` retained: these fight the global base-elements typography layer.
-   ============================================================ */
-.text-block :deep(h1) {
-  font-size: var(--text-2xl) !important;
-  font-weight: 600 !important;
-  margin: 1rem 0 0.5rem 0 !important;
-  line-height: 1.3 !important;
-}
-.text-block :deep(h2) {
-  font-size: var(--text-xl) !important;
-  font-weight: 600 !important;
-  margin: 0.875rem 0 0.4375rem 0 !important;
-  line-height: 1.3 !important;
-}
-.text-block :deep(h3) {
-  font-size: var(--text-lg) !important;
-  font-weight: 600 !important;
-  margin: 0.75rem 0 0.375rem 0 !important;
-  line-height: 1.3 !important;
-}
-.text-block :deep(h4) {
-  font-size: var(--text-base) !important;
-  font-weight: 600 !important;
-  margin: 0.625rem 0 0.3125rem 0 !important;
-  line-height: 1.3 !important;
-}
-.text-block :deep(h5) {
-  font-size: var(--text-sm) !important;
-  font-weight: 600 !important;
-  margin: 0.5rem 0 0.25rem 0 !important;
-  line-height: 1.3 !important;
-}
-.text-block :deep(h6) {
-  font-size: var(--text-xs) !important;
-  font-weight: 600 !important;
-  margin: 0.5rem 0 0.25rem 0 !important;
-  line-height: 1.3 !important;
-}
-
-.text-block :deep(table) {
-  max-width: 100%;
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  overflow-x: auto;
-  display: block;
-  white-space: nowrap;
-}
-.text-block :deep(th),
-.text-block :deep(td) {
-  padding: 0.5rem 0.75rem;
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-border-default);
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  text-overflow: ellipsis;
-  overflow: hidden;
-}
-
-.text-block :deep(p),
-.text-block :deep(div),
-.text-block :deep(span) {
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  word-break: break-word;
-  max-width: 100%;
-}
-
-.text-block :deep(ol) {
-  list-style-type: decimal;
-  padding-left: 1.5em;
-  margin: 0.5em 0;
-}
-.text-block :deep(ul) {
-  list-style-type: disc;
-  padding-left: 1.5em;
-  margin: 0.5em 0;
-}
-.text-block :deep(li) {
-  margin: 0.25em 0;
-}
-
-/* ============================================================
-   keep(generated-content) — code blocks.
-   .generated-code-block is emitted BOTH from the template and by the markdown
-   renderer (which rewrites <pre> into <span class="generated-code-block">), so
-   it must be reachable through :deep() either way. The background/border are
-   set here rather than as utilities because they have to beat .hljs below,
-   which is unlayered and would otherwise win over @layer utilities.
-   ============================================================ */
-.message-blocks :deep(.generated-code-block),
-.text-block :deep(pre) {
-  display: block;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  margin: 0;
-  padding: 0;
-  line-height: 1.4;
-  max-width: 100%;
-  overflow-x: auto;
-}
-.message-blocks :deep(.generated-code-block code),
-.text-block :deep(pre code) {
-  display: block;
-  padding: 0.5rem;
-  margin: 0;
-  max-width: 100%;
-  background-color: var(--color-surface-base);
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-border-subtle);
-  border-top: none;
-}
-
-/* Markdown lists can nest a fenced block; hljs sets the palette, these two
-   only need the reset. */
-.text-block :deep(ul pre),
-.text-block :deep(ol pre) {
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  margin: 0;
-  padding: 0;
-}
-
-/* ============================================================
-   keep(generated-content) — formatLogEntryContent() emits these json spans.
-   ============================================================ */
-.log-entry-code :deep(.json-key) {
-  color: var(--color-json-key);
-  font-weight: 600;
-}
-.log-entry-code :deep(.json-string) {
-  color: var(--color-json-string);
-}
-.log-entry-code :deep(.json-number) {
-  color: var(--color-json-number);
-}
-.log-entry-code :deep(.json-boolean) {
-  color: var(--color-json-boolean);
-  font-weight: 600;
-}
-.log-entry-code :deep(.json-null) {
-  color: var(--color-json-null);
-  font-weight: 600;
-}
-
-/* ============================================================
-   keep(lib-override:hljs) — highlight.js output. Token mapping mirrors
-   lib/core/Code/OCodeBlock.vue (D6); tokens flip via dark.css, so one rule set
-   covers both themes.
-   ============================================================ */
-.message-blocks :deep(.hljs) {
-  display: block;
-  overflow-x: auto;
-  padding: 0.5em;
-  color: var(--color-syntax-text);
-  background: var(--color-syntax-bg);
-}
-.message-blocks :deep(.hljs-doctag),
-.message-blocks :deep(.hljs-keyword),
-.message-blocks :deep(.hljs-meta .hljs-keyword),
-.message-blocks :deep(.hljs-template-tag),
-.message-blocks :deep(.hljs-template-variable),
-.message-blocks :deep(.hljs-type),
-.message-blocks :deep(.hljs-variable.language_) {
-  color: var(--color-syntax-keyword);
-}
-.message-blocks :deep(.hljs-title),
-.message-blocks :deep(.hljs-title.class_),
-.message-blocks :deep(.hljs-title.class_.inherited__),
-.message-blocks :deep(.hljs-title.function_) {
-  color: var(--color-syntax-function);
-}
-.message-blocks :deep(.hljs-attr),
-.message-blocks :deep(.hljs-attribute),
-.message-blocks :deep(.hljs-literal),
-.message-blocks :deep(.hljs-meta),
-.message-blocks :deep(.hljs-number),
-.message-blocks :deep(.hljs-operator),
-.message-blocks :deep(.hljs-variable),
-.message-blocks :deep(.hljs-selector-attr),
-.message-blocks :deep(.hljs-selector-class),
-.message-blocks :deep(.hljs-selector-id) {
-  color: var(--color-syntax-number);
-}
-.message-blocks :deep(.hljs-regexp),
-.message-blocks :deep(.hljs-string),
-.message-blocks :deep(.hljs-meta .hljs-string) {
-  color: var(--color-syntax-string);
-}
-.message-blocks :deep(.hljs-built_in),
-.message-blocks :deep(.hljs-symbol) {
-  color: var(--color-syntax-builtin);
-}
-.message-blocks :deep(.hljs-comment),
-.message-blocks :deep(.hljs-code),
-.message-blocks :deep(.hljs-formula) {
-  color: var(--color-syntax-comment);
-}
-.message-blocks :deep(.hljs-name),
-.message-blocks :deep(.hljs-quote),
-.message-blocks :deep(.hljs-selector-tag),
-.message-blocks :deep(.hljs-selector-pseudo) {
-  color: var(--color-syntax-tag);
-}
-.message-blocks :deep(.hljs-subst) {
-  color: var(--color-syntax-text);
-}
-.message-blocks :deep(.hljs-section) {
-  color: var(--color-syntax-number);
-  font-weight: 600;
-}
-.message-blocks :deep(.hljs-bullet) {
-  color: var(--color-syntax-bullet);
-}
-.message-blocks :deep(.hljs-emphasis) {
-  color: var(--color-syntax-text);
-  font-style: italic;
-}
-.message-blocks :deep(.hljs-strong) {
-  color: var(--color-syntax-text);
-  font-weight: 600;
-}
-.message-blocks :deep(.hljs-addition) {
-  color: var(--color-syntax-addition-fg);
-  background-color: var(--color-syntax-addition-bg);
-}
-.message-blocks :deep(.hljs-deletion) {
-  color: var(--color-syntax-deletion-fg);
-  background-color: var(--color-syntax-deletion-bg);
 }
 </style>

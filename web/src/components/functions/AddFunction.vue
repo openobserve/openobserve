@@ -55,8 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="splitterModel"
           :limits="hideTestPanel ? [100, 100] : [30, 100]"
           class="w-full overflow-hidden"
-          :horizontal="false"
-          :separator-class="hideTestPanel ? 'hidden' : 'w-[0.0625rem] bg-card-glass-border'"
+          :horizontal="isMobile"
+          :separator-class="
+            hideTestPanel
+              ? 'hidden'
+              : isMobile
+                ? 'h-[0.0625rem] bg-card-glass-border'
+                : 'w-[0.0625rem] bg-card-glass-border'
+          "
         >
           <template v-slot:before>
             <!-- Workflows (hideTestPanel): drop the horizontal padding so the editor
@@ -77,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   min-header-height="2.125rem"
                   :show-expand-icon="!hideTestPanel"
-                  :label-class="hideTestPanel ? 'pl-2' : ''"
+                  :label-class="hideTestPanel ? 'ps-2' : ''"
                 />
                 <div v-show="expandState.functions" class="relative mb-1.5 min-h-0 flex-1">
                   <!-- Unified Query Editor (with built-in AI bar) -->
@@ -114,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          vrl but passes no defaultCode. -->
                   <div
                     v-if="!formData.function && functionEditorPlaceholderFlag"
-                    class="pointer-events-none absolute inset-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
+                    class="pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
                   >
                     <span
                       class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] [text-overflow:ellipsis] whitespace-nowrap text-[var(--text-sm)]"
@@ -137,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-if="expandState.functionError"
                       data-test="function-error-details"
-                      class="border-status-negative bg-surface-subtle border-l-4 px-2 pb-2"
+                      class="border-status-negative bg-surface-subtle border-s-4 px-2 pb-2"
                     >
                       <pre
                         class="text-status-error-text my-0 whitespace-pre-wrap"
@@ -193,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { saveFunctionMutation } from "@/services/jstransform.queries";
 import {
   defineComponent,
   ref,
@@ -204,7 +211,6 @@ import {
   nextTick,
 } from "vue";
 
-import jsTransformService from "../../services/jstransform";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -213,16 +219,18 @@ import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { onBeforeRouteLeave } from "vue-router";
+import { onBeforeRouteLeave, useRouter } from "vue-router";
 import O2AIChat from "@/components/O2AIChat.vue";
-import { useRouter } from "vue-router";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useVrlPlaceholder, useJsPlaceholder } from "@/composables/useVrlPlaceholder";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
 export const defaultValue: any = () => {
   return {
     name: "",
@@ -300,6 +308,7 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const store: any = useStore();
     const router = useRouter();
+    const { isMobile } = useBreakpoint();
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
@@ -367,6 +376,12 @@ export default defineComponent({
     });
 
     const beingUpdated = computed(() => props.isUpdated);
+
+    // Create vs update is the caller's decision; the cache consequence is not.
+    const orgId = useOrgId();
+    const saveFunction = useMutation(() =>
+      saveFunctionMutation(orgId.value, () => beingUpdated.value),
+    );
 
     // AddFunction OWNS the <OForm> but also reads form state (transType drives
     // the Monaco editor language + placeholder) and writes it (the editor's
@@ -482,9 +497,9 @@ export default defineComponent({
       forceSkipBeforeUnloadListener = true;
 
       try {
-        const res = beingUpdated.value
-          ? await jsTransformService.update(store.state.selectedOrganization.identifier, payload)
-          : await jsTransformService.create(store.state.selectedOrganization.identifier, payload);
+        // The write no longer knows what it invalidates — `saveFunctionMutation`
+        // declares that beside the endpoint, and the mutation cache applies it.
+        const res = await saveFunction.mutateAsync(payload);
 
         const _formData: any = { ...payload };
         formData.value = { ...defaultValue() };
@@ -665,6 +680,7 @@ export default defineComponent({
       handleFunctionError,
       vrlFunctionError,
       splitterModel,
+      isMobile,
       closeAddFunction,
       confirmDialogMeta,
       transformTypeOptions,

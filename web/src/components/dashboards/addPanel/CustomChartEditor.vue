@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:query="onEditorValueChange"
           data-test="dashboard-markdown-editor-query-editor"
           language="javascript"
-          class="javascript-query-editor bg-code-block-bg h-full flex-1 pl-5"
+          class="javascript-query-editor bg-code-block-bg h-full flex-1 ps-5"
         />
       </div>
     </div>
@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
-import { defineAsyncComponent } from "vue";
+import { defineComponent, ref, watch, defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";

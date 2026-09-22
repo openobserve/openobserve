@@ -113,16 +113,17 @@ async fn create_default_synthetics_folder(org_id: &str) -> anyhow::Result<()> {
         description: "default".to_owned(),
         icon: None,
     };
-    folders::put(org_id, None, folder, FolderType::Synthetics)
+    let (_id, _folder, created) = folders::get_or_create(org_id, folder, FolderType::Synthetics)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     // Register the folder in OpenFGA — writes owningOrg + selfParent so a
     // Type-level "Synthetic Folders" grant cascades to checks in this folder.
-    // `folders::put` is the raw table write (no FGA); the OSS folders API goes
+    // `get_or_create` is the raw table write (no FGA); the OSS folders API goes
     // through `db::folders::save_folder` which does this, but that crate isn't
     // a dep here, so call set_ownership directly (same effect). Mirrors how
     // `create_default_alerts_folder` registers afolder:default.
-    if ofga_enabled() {
+    // Only the caller that inserted registers it, so a lost race writes no duplicate tuple.
+    if created && ofga_enabled() {
         let obj = format!("{}:{}", get_ofga_type("synthetic_folder"), DEFAULT_FOLDER);
         set_ownership(org_id, &obj, "", "").await;
     }

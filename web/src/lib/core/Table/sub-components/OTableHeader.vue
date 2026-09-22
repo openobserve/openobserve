@@ -144,6 +144,12 @@ function handleSort(columnId: string, toggleHandler?: (event: Event) => void, ev
   if (event) toggleHandler?.(event);
 }
 
+// Clicks on the checkbox itself are stopped by OCheckbox, so this only sees misses on the cell padding.
+function onSelectAllCellClick() {
+  if (props.showSelectAll === false) return;
+  emit("toggle-all-rows");
+}
+
 function handleDragStart(event: any) {
   emit("drag-start", event);
 }
@@ -212,6 +218,12 @@ function sizeClamped(header: any): boolean {
 
 function isAutoWidthColumn(header: any): boolean {
   return (header.column.columnDef.meta as any)?.autoWidth === true;
+}
+
+// A fillRemaining column stretches past its content, so a growing label would
+// strand the close button at the cell's far right instead of beside the label.
+function isFillRemainingColumn(header: any): boolean {
+  return (header.column.columnDef.meta as any)?.fillRemaining === true;
 }
 
 // Mirrors the autoWidth branch of OTableBodyCell's `cellStyle`.
@@ -395,7 +407,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           {
             // Bottom divider on the cells along the header's bottom edge, since
             // the <thead> border-b doesn't paint in border-separate mode. Uses
-            // the directional border-b color so it doesn't clash with border-l.
+            // the directional border-b color so it doesn't clash with border-s.
             'border-b-table-header-border border-b': level.isLeaf || cell._isTotalHeader,
           },
           {
@@ -479,7 +491,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       <!-- Selection checkbox header -->
       <th
         v-if="selectionMultiple"
-        class="border-table-header-border border-b text-left"
+        :class="[
+          'border-table-header-border border-b text-left',
+          showSelectAll !== false ? 'cursor-pointer' : '',
+        ]"
         :style="{
           width: TABLE_CHECKBOX_COL_WIDTH + 'px',
           minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
@@ -487,6 +502,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           paddingLeft: 'var(--spacing-table-edge)',
         }"
         data-test="o2-table-th-select"
+        @click="onSelectAllCellClick"
       >
         <OTableSelectCheckbox
           v-if="showSelectAll !== false"
@@ -585,7 +601,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
             :class="[
-              'flex min-w-0 flex-1 cursor-pointer items-center gap-1',
+              'flex min-w-0 cursor-pointer items-center gap-1',
+              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerAlignClass(header),
             ]"
             data-test="o2-table-th-sort-trigger"
@@ -649,7 +666,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           <div
             v-else
             :class="[
-              'flex min-w-0 flex-1 flex-col justify-center',
+              'flex min-w-0 flex-col justify-center',
+              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerSubLabel(header)
                 ? ['gap-px', headerStackAlignClass(header)]
                 : headerAlignClass(header),
@@ -676,7 +694,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="(header.column.columnDef.meta as any)?.closable"
             type="button"
             :data-test="`o2-table-th-remove-${header.id}-btn`"
-            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
             :aria-label="t('components.table.removeColumnAria')"
             @click.stop="emit('close-column', header.column.columnDef)"
           >
@@ -700,7 +718,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :data-test="`o2-table-column-filter-btn-${header.column.id}`"
-                class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+                class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
                 @click.stop
               >
                 <OIcon
@@ -769,7 +787,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
             type="button"
             :data-test="`o2-table-column-format-btn-${header.column.id}`"
-            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
             :aria-label="t('components.table.formatColumnAria')"
             @click.stop="emit('format-column', header.column.id)"
           >
@@ -818,7 +836,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
 
       <th
         v-if="selectionMultiple"
-        class="border-table-header-border border-b text-left"
+        :class="[
+          'border-table-header-border border-b text-left',
+          showSelectAll !== false ? 'cursor-pointer' : '',
+        ]"
         :style="{
           width: TABLE_CHECKBOX_COL_WIDTH + 'px',
           minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
@@ -826,6 +847,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           paddingLeft: 'var(--spacing-table-edge)',
         }"
         data-test="o2-table-th-select"
+        @click="onSelectAllCellClick"
       >
         <OTableSelectCheckbox
           v-if="showSelectAll !== false"
@@ -914,7 +936,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
             :class="[
-              'flex flex-1 cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap',
+              'flex cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap',
+              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerAlignClass(header),
             ]"
             data-test="o2-table-th-sort-trigger"
@@ -968,7 +991,14 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               />
             </template>
           </div>
-          <div v-else :class="['min-w-0 flex-1 truncate', headerAlignClass(header)]">
+          <div
+            v-else
+            :class="[
+              'min-w-0 truncate',
+              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
+              headerAlignClass(header),
+            ]"
+          >
             <FlexRender
               v-if="!header.isPlaceholder"
               :render="header.column.columnDef.header"
@@ -981,7 +1011,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="(header.column.columnDef.meta as any)?.closable"
             type="button"
             :data-test="`o2-table-th-remove-${header.id}-btn`"
-            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
             :aria-label="t('components.table.removeColumnAria')"
             @click.stop="emit('close-column', header.column.columnDef)"
           >
@@ -1005,7 +1035,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :data-test="`o2-table-column-filter-btn-${header.column.id}`"
-                class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+                class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
                 @click.stop
               >
                 <OIcon
@@ -1074,7 +1104,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
             type="button"
             :data-test="`o2-table-column-format-btn-${header.column.id}`"
-            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
             :aria-label="t('components.table.formatColumnAria')"
             @click.stop="emit('format-column', header.column.id)"
           >

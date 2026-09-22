@@ -16,11 +16,14 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
-vi.mock("../../services/search", () => ({
-  default: {
-    delete_running_queries: vi.fn(),
-  },
-}));
+vi.mock("../../services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      delete_running_queries: vi.fn(),
+    },
+  });
+});
 
 const mockQueryService = vi.mocked(queryService);
 

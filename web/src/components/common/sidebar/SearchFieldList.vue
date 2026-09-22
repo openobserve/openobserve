@@ -21,7 +21,7 @@
         <!-- Group header (only rendered for grouped/label rows) -->
         <template #group-header="{ row, groupName }">
           <div
-            class="field-group-header -ml-page-edge px-page-edge bg-surface-subtle text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs leading-7 font-semibold"
+            class="field-group-header -ms-page-edge px-page-edge bg-surface-subtle text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs leading-7 font-semibold"
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
@@ -46,7 +46,7 @@
         <template #field-row="{ row }">
           <OFieldRow>
             <span
-              class="field-type-container relative mr-[0.3rem] ml-[0.2rem] flex h-4 w-[0.55rem] shrink-0 items-center justify-center"
+              class="field-type-container relative ms-[0.2rem] me-[0.3rem] flex h-4 w-[0.55rem] shrink-0 items-center justify-center"
             >
               <OIcon
                 class="field-expand-icon text-text-muted absolute inline-flex w-4 shrink-0 items-center justify-center"
@@ -80,7 +80,7 @@
 
         <!-- Expansion: FieldValuesPanel -->
         <template #expansion="{ row }">
-          <div class="py-1 pr-1 pl-2">
+          <div class="py-1 ps-2 pe-1">
             <FieldValuesPanel
               :field-name="row.name"
               :field-values="fieldValues[row.name]"
@@ -156,7 +156,7 @@
 
         <!-- After list: pagination -->
         <template #after-list="bottomProps">
-          <div v-if="bottomProps.totalPages > 1" class="ml-auto flex items-center gap-1">
+          <div v-if="bottomProps.totalPages > 1" class="ms-auto flex items-center gap-1">
             <OTooltip
               side="left"
               align="center"
@@ -213,6 +213,7 @@ import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -654,8 +655,8 @@ const buildExpression = (fieldName: string, v: string, action: string) =>
       ? `${fieldName} IS NULL`
       : `${fieldName} IS NOT NULL`
     : action === "include"
-      ? `${fieldName}='${v}'`
-      : `${fieldName}!='${v}'`;
+      ? `${fieldName}='${escapeSingleQuotes(v)}'`
+      : `${fieldName}!='${escapeSingleQuotes(v)}'`;
 
 const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
   addSearchTerm(buildExpression(fieldName, value, action));

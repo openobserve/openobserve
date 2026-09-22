@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-3xs text-text-muted">{{ timeLabel }}</span>
             <OBadge
               size="sm"
-              class="ml-auto"
+              class="ms-auto"
               :variant="turn.status === 'error' ? 'error-soft' : 'success-soft'"
             >
               {{

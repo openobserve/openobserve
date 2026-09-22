@@ -9,6 +9,7 @@
  *   page-title  → <span>   (use as="h1" for the single page-level title)
  *   section     → <h2>     (group labels like "Web Vitals", "Key Fields")
  *   panel-title → <h3>     (card/panel header labels)
+ *   card-title  → <h3>     (section-pane headings on a detail page)
  *   body        → <p>      (default readable text)
  *   body-strong → <strong> (emphasized inline text)
  *   label       → <span>   (form-adjacent / column sub-labels)
@@ -23,6 +24,8 @@ export type TextVariant =
   | "section"
   /** Panel or card title. 12px medium. Primary color. */
   | "panel-title"
+  /** Section-pane heading on a detail page. 14px semibold. Primary color. */
+  | "card-title"
   /** Default body paragraph. 14px normal. */
   | "body"
   /** Emphasized inline text. 14px semibold. */

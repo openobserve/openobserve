@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { calculateWidthText } from "./chartDimensionUtils";
+import { escapeHtml } from "@/utils/html";
 
 // Constants for better maintainability
 const LEGEND_CONSTANTS = {
@@ -494,9 +495,9 @@ export const createBaseLegendConfig = (
       formatter: (params: any) => {
         try {
           hoveredSeriesState?.value?.setHoveredSeriesName(params?.name);
-          return params?.name;
+          return escapeHtml(params?.name);
         } catch {
-          return params?.name ?? "";
+          return escapeHtml(params?.name ?? "");
         }
       },
     },

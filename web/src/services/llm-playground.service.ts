@@ -174,20 +174,30 @@ function normalizeScore(row: any): PlaygroundScoreResult {
  *  builder. Everything else — OpenAI, DeepSeek, Azure, gateways — takes the
  *  `chat/completions` shape. */
 const ANTHROPIC_KIND = "anthropic";
+/** Has JSON mode but rejects `json_schema`; the server degrades it for us. */
+const DEEPSEEK_KIND = "deepseek";
 
 function providerKind(request: PlaygroundRunRequest): string {
   return (request.providerType ?? "").trim().toLowerCase();
 }
 
-/**
- * True when a provider of this kind carries no response schema at all.
- *
- * Exported because the UI has to say so BEFORE a run: a schema set against such
- * a provider never leaves the client, and the only other evidence is an answer
- * that comes back as prose for no stated reason.
- */
+/** `native` is enforced, `approximated` is JSON mode with the schema restated in the prompt, `dropped` never leaves the client. */
+export type ResponseSchemaSupport = "native" | "approximated" | "dropped";
+
+export function responseSchemaSupport(providerType?: string): ResponseSchemaSupport {
+  switch ((providerType ?? "").trim().toLowerCase()) {
+    case ANTHROPIC_KIND:
+      return "dropped";
+    case DEEPSEEK_KIND:
+      return "approximated";
+    default:
+      return "native";
+  }
+}
+
+/** True when a provider of this kind carries no response schema at all. */
 export function providerDropsResponseSchema(providerType?: string): boolean {
-  return (providerType ?? "").trim().toLowerCase() === ANTHROPIC_KIND;
+  return responseSchemaSupport(providerType) === "dropped";
 }
 
 /**

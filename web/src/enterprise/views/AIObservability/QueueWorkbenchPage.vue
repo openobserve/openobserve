@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #actions>
       <template v-if="currentItem">
-        <span class="text-text-secondary mr-1 text-sm">
+        <span class="text-text-secondary me-1 text-sm">
           <i18n-t keypath="aiObservability.queues.workbench.itemCounter" tag="span">
             <template #index>
               <span class="text-text-body font-semibold">{{ currentIndex + 1 }}</span>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Item navigator (collapsible) -->
       <aside
         v-if="!navCollapsed"
-        class="border-border-default flex w-64 shrink-0 flex-col border-r"
+        class="border-border-default flex w-64 shrink-0 flex-col border-e"
       >
         <div class="border-table-row-divider flex flex-col gap-1.5 border-b px-3 py-2.5">
           <div class="flex items-center justify-between gap-2 text-xs tabular-nums">
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- scoring — on a distinct elevated surface so it reads as THE work
                  panel (the reviewer's eye should land here). -->
             <aside
-              class="border-border-default bg-surface-subtle flex w-96 shrink-0 flex-col border-l"
+              class="border-border-default bg-surface-subtle flex w-96 shrink-0 flex-col border-s"
               data-test="ai-queue-workbench-scoring"
             >
               <div class="min-h-0 flex-1 overflow-y-auto p-4">
@@ -454,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >({{ currentCase.priorAnnotations.length }})</span
                       >
                     </button>
-                    <span v-if="!priorExpanded" class="text-text-secondary text-2xs pl-5">
+                    <span v-if="!priorExpanded" class="text-text-secondary text-2xs ps-5">
                       {{ t("aiObservability.queues.workbench.priorScoresHint") }}
                     </span>
 
@@ -471,7 +471,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ a.initials }}
                         </span>
                         <span class="text-sm font-medium">{{ a.reviewer }}</span>
-                        <span class="text-text-secondary text-2xs ml-auto">{{ a.time }}</span>
+                        <span class="text-text-secondary text-2xs ms-auto">{{ a.time }}</span>
                       </div>
                       <div class="flex flex-wrap items-center gap-1.5">
                         <OTag
@@ -525,7 +525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline"
                     size="sm"
                     icon-right="arrow-forward"
-                    class="ml-auto"
+                    class="ms-auto"
                     :disabled="!canDistill"
                     data-test="ai-queue-workbench-distill-btn"
                     @click="openDistill"
@@ -662,6 +662,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -689,6 +690,11 @@ import llmQueuesService, {
   type ScoreConfigDataType,
 } from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import {
+  pushQueueItemToDatasetMutation,
+  submitQueueReviewMutation,
+} from "@/services/llm-queues.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { toggleFullscreen as domToggleFullscreen } from "@/utils/dom";
 
 defineOptions({ name: "AIQueueWorkbenchPage" });
@@ -705,6 +711,9 @@ const router = useRouter();
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const queueId = computed<string>(() => String(route.params.id ?? ""));
 
+const submitReview = useMutation(() => submitQueueReviewMutation(orgId.value));
+const pushToDataset = useMutation(() => pushQueueItemToDatasetMutation(orgId.value));
+
 const queue = ref<LlmQueue | null>(null);
 
 // Back is the queue this Workbench reviews, not the queue list — the Workbench
@@ -715,7 +724,7 @@ const queue = ref<LlmQueue | null>(null);
 // the queue detail, which is the natural parent.
 const cameFromList = computed(() => route.query.from === "queues");
 
-const backTarget = computed(() =>
+const backRoute = computed(() =>
   cameFromList.value
     ? {
         label: t("aiObservability.nav.queues"),
@@ -732,6 +741,14 @@ const backTarget = computed(() =>
         },
       },
 );
+// Real browser back when there's history to pop; the fallback above only
+// fires with no history to pop (direct link / reload).
+const { goBack: backToParent } = useSmartBack(() => backRoute.value.to);
+const backTarget = computed(() => ({
+  label: backRoute.value.label,
+  to: backRoute.value.to,
+  onClick: backToParent,
+}));
 const items = ref<LlmQueueItem[]>([]);
 const configOptions = ref<LlmScoreConfigOption[]>([]);
 const currentDetail = ref<LlmQueueItemDetail | null>(null);
@@ -1034,22 +1051,26 @@ async function submit() {
   currentSubmissionId.value = submissionId;
   submitting.value = true;
   try {
-    await llmQueuesService.submitReview(orgId.value, queueId.value, item.id, {
-      submissionId,
-      sourceStream: detail.sourceStream,
-      scores: boundConfigs.value.map((config) => {
-        const value = draft[config.scoreConfigId];
-        return {
-          scoreConfigRowId: config.rowId,
-          value:
-            config.dataType === "boolean"
-              ? value === "true"
-              : config.dataType === "numeric"
-                ? Number(value)
-                : String(value),
-        };
-      }),
-      comments: comment.value.trim() || null,
+    await submitReview.mutateAsync({
+      queueId: queueId.value,
+      itemId: item.id,
+      payload: {
+        submissionId,
+        sourceStream: detail.sourceStream,
+        scores: boundConfigs.value.map((config) => {
+          const value = draft[config.scoreConfigId];
+          return {
+            scoreConfigRowId: config.rowId,
+            value:
+              config.dataType === "boolean"
+                ? value === "true"
+                : config.dataType === "numeric"
+                  ? Number(value)
+                  : String(value),
+          };
+        }),
+        comments: comment.value.trim() || null,
+      },
     });
     item.status = "reviewed";
     item.reviewedAt = Date.now();
@@ -1127,11 +1148,15 @@ async function confirmDistill() {
   if (!item || !canConfirmDistill.value || distilling.value) return;
   distilling.value = true;
   try {
-    const result = await llmQueuesService.pushToDataset(orgId.value, queueId.value, item.id, {
-      datasetId: distillDatasetId.value,
-      reviewSubmissionId: adjudicationSubmissionId.value,
-      expectedOutput: distillExpected.value.trim(),
-      tags: distillTags.value,
+    const result = await pushToDataset.mutateAsync({
+      queueId: queueId.value,
+      itemId: item.id,
+      payload: {
+        datasetId: distillDatasetId.value,
+        reviewSubmissionId: adjudicationSubmissionId.value,
+        expectedOutput: distillExpected.value.trim(),
+        tags: distillTags.value,
+      },
     });
     const datasetId = distillDatasetId.value;
     distillOpen.value = false;

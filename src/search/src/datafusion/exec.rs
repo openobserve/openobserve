@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
-        promql::{EXEMPLARS_LABEL, HASH_LABEL, STREAMING_AGG_TABLE_SUFFIX},
+        promql::{EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, StreamType},
     },
@@ -83,12 +83,16 @@ fn create_session_config(
     let mut config = SessionConfig::from_env()?
         .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
+        .with_collect_statistics(true)
         .with_information_schema(true);
 
     config
         .options_mut()
         .execution
         .listing_table_ignore_subdirectory = false;
+
+    // DF55 migrated aggregate streams regress grouped-agg perf; revisit on the next DF bump.
+    config.options_mut().execution.enable_migration_aggregate = false;
 
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
@@ -100,14 +104,14 @@ fn create_session_config(
         };
     // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
 
-    // chain non-overlapping sorted files into ordered partitions instead of sorting
+    // any declared order: chain non-overlapping files into ordered partitions instead of sorting
     if sort_order.is_sorted() {
         config
             .options_mut()
             .execution
             .split_file_groups_by_statistics = true;
     }
-    // a round-robin exchange would trade the hash chains' ordering for a re-sort
+    // hash-sorted only: timestamp-ordered sessions still want the round-robin exchange
     if sort_order == FileSortOrder::HashTimestampAsc {
         config
             .options_mut()
@@ -299,7 +303,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         for rule in self.physical_optimizer_rules {
             builder = builder.with_physical_optimizer_rule(rule);
         }
-        if cfg.search.feature_join_match_one_enabled {
+        if cfg.search.feature_join_match_one_enabled || cfg.search.feature_shared_cte_enabled {
             builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
         }
         Ok(SessionContext::new_with_state(builder.build()))
@@ -515,9 +519,8 @@ pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
     by_name.into_values().collect()
 }
 
-/// Registers the metrics files as `table_name`; an all-hash-sorted file set
-/// additionally registers `{table_name}__hash_sorted` with the file order
-/// declared, for the streaming aggregation path.
+/// Registers the metrics files; an all-hash-sorted set also registers the
+/// `HASH_SORTED_TABLE_SUFFIX` table with its order declared.
 pub async fn register_metrics_table(
     session: &SearchSession,
     schema: Arc<Schema>,
@@ -544,7 +547,7 @@ pub async fn register_metrics_table(
             .await?;
         let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
         ctx.register_table(
-            format!("{table_name}{STREAMING_AGG_TABLE_SUFFIX}"),
+            format!("{table_name}{HASH_SORTED_TABLE_SUFFIX}"),
             union_table,
         )?;
     }
@@ -594,7 +597,7 @@ fn metrics_query_schema_with_utf8_view(
 /// Create a datafusion table from a list of files and a schema
 pub struct TableBuilder {
     sort_order: FileSortOrder,
-    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     timestamp_filter: Option<(i64, i64)>,
@@ -624,10 +627,7 @@ impl TableBuilder {
         self
     }
 
-    pub fn file_stat_cache(
-        mut self,
-        file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
-    ) -> Self {
+    pub fn file_stat_cache(mut self, file_stat_cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.file_stat_cache = file_stat_cache;
         self
     }
@@ -735,7 +735,7 @@ impl TableBuilder {
             FileFormat::Vortex => {
                 let vortex_session = VortexSession::default().with_tokio();
                 if self.sort_order.is_sorted() {
-                    // bands already parallelize; per-file spawned read-ahead only buys memory
+                    // the shards already parallelize; per-file spawned read-ahead only buys memory
                     let mut options = VortexTableOptions::default();
                     options.scan_concurrency = Some(1);
                     Arc::new(VortexFormat::new_with_options(vortex_session, options))
@@ -745,9 +745,7 @@ impl TableBuilder {
             }
         };
 
-        let mut listing_options = ListingOptions::new(file_format)
-            .with_target_partitions(target_partitions)
-            .with_collect_stat(true);
+        let mut listing_options = ListingOptions::new(file_format);
 
         if self.sort_order.is_sorted() {
             // specify sort columns for parquet file
@@ -808,6 +806,7 @@ impl TableBuilder {
             self.index_condition.clone(),
             self.fst_fields.clone(),
             self.timestamp_filter,
+            target_partitions,
         )?;
         if self.file_stat_cache.is_some() {
             table = table.with_cache(self.file_stat_cache.clone());
@@ -925,10 +924,14 @@ mod tests {
                 .cpu_num
                 .max(get_config().limit.datafusion_min_partition_num)
         );
-        assert_eq!(config.options().execution.batch_size, get_batch_size());
+        assert_eq!(
+            config.options().execution.batch_size.get(),
+            get_batch_size()
+        );
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
+        assert!(!config.options().execution.enable_migration_aggregate);
         assert_eq!(
             config.options().execution.parquet.pushdown_filters,
             get_config().search.feature_pushdown_filter_enabled

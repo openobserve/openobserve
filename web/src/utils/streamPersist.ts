@@ -8,8 +8,12 @@ const STORAGE_KEYS = {
 };
 
 export function saveLogsStream(orgId: string, streams: string[]): void {
-  if (!orgId || !streams.length) return;
-  localStorage.setItem(STORAGE_KEYS.logs(orgId), JSON.stringify(streams));
+  if (!orgId) return;
+  if (streams.length) {
+    localStorage.setItem(STORAGE_KEYS.logs(orgId), JSON.stringify(streams));
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.logs(orgId));
+  }
 }
 
 export function restoreLogsStream(orgId: string): string[] {

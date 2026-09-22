@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar bg-section-header-bg border-border-default flex h-10 flex-row items-center justify-between gap-x-3 border-t border-b"
+      class="sql-bar bg-section-header-bg border-border-default flex h-10 flex-row items-center justify-between gap-x-3 border-t border-b max-md:h-auto max-md:flex-wrap max-md:gap-y-1 max-md:px-2 max-md:py-1"
       @click.stop
     >
       <div
@@ -156,12 +156,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-if="multiQueryWarning"
           type="warningNote"
-          class="dashboard-multi-query-warning mr-2 h-8"
+          class="dashboard-multi-query-warning me-2 h-8"
         >
           {{ multiQueryWarning }}
         </OTag>
       </div>
-      <div class="flex shrink-0 items-center gap-3">
+      <div class="flex shrink-0 items-center gap-3 max-md:max-w-full max-md:flex-wrap">
         <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div
-    class="flex flex-1 flex-col overflow-hidden"
+    class="flex flex-1 flex-col overflow-hidden max-md:h-80 max-md:flex-none"
     :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0; flex: none;' : ''"
     data-test="dashboard-query"
   >
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                         .vrlFunctionQuery && functionEditorPlaceholderFlag
                     "
-                    class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
+                    class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
                   >
                     <span
                       class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
@@ -311,14 +311,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-nocheck
-import { defineComponent, ref, watch, computed, onMounted, nextTick, onUnmounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  computed,
+  onMounted,
+  nextTick,
+  onUnmounted,
+  inject,
+  type Ref,
+  onBeforeMount,
+} from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
-import { inject, type Ref } from "vue";
-import { onBeforeMount } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
@@ -393,9 +402,7 @@ export default defineComponent({
 
     const getFunctions = async () => {
       try {
-        if (store.state.organizationData.functions.length == 0) {
-          await getAllFunctions();
-        }
+        await getAllFunctions();
 
         store.state.organizationData.functions.map((data: any) => {
           functionList.value.push({

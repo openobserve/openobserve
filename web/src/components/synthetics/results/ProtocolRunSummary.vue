@@ -296,7 +296,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <!-- ── Result ── -->
         <div class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.result") }}
             </h3>
@@ -356,7 +356,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <!-- ── Timing breakdown ── -->
         <div v-if="timingBars.length" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.timings") }}
             </h3>
@@ -388,12 +388,12 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <!-- ── Assertions (http) ── -->
         <div v-if="showAssertions" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.assertions") }}
             </h3>
             <OBadge
-              class="ml-2"
+              class="ms-2"
               :variant="
                 !assertionsEvaluated
                   ? 'default'
@@ -453,7 +453,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <!-- ── TLS certificate ── -->
         <div v-if="certExpiryDate" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.tlsCert") }}
             </h3>
@@ -473,7 +473,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <!-- ── Probe ── -->
         <div class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.probe") }}
             </h3>

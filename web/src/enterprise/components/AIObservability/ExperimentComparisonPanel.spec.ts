@@ -31,6 +31,8 @@ function rowDimension(
   gating = true,
 ): ExperimentComparisonDimension {
   return {
+    id: name,
+    canAffectOutcome: gating,
     name,
     kind,
     dataType: kind === "score" ? "numeric" : null,
@@ -59,6 +61,7 @@ const comparison: ExperimentComparison = {
   candidateId: "candidate",
   datasetId: "dataset",
   threshold: 0.05,
+  outcomeDimensions: ["quality", "latency_ms"],
   assignmentRule: "Any regression wins; one-sided evidence is neutral.",
   counts: {
     baselineRows: 4,
@@ -73,6 +76,8 @@ const comparison: ExperimentComparison = {
   },
   dimensions: [
     {
+      id: "quality",
+      canAffectOutcome: true,
       name: "quality",
       kind: "score",
       scoreConfigId: "score-quality",
@@ -94,6 +99,8 @@ const comparison: ExperimentComparison = {
     // Latency rises, which is WORSE — the raw delta is positive but the oriented
     // one is negative. Guards the tint from following the wrong number.
     {
+      id: "latency_ms",
+      canAffectOutcome: true,
       name: "latency_ms",
       kind: "latency",
       scoreConfigId: null,
@@ -146,7 +153,7 @@ const stubs = {
       OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
       OTooltip: {
         props: ["content"],
-        template: '<span data-test="tooltip" :data-content="content" />',
+        template: '<span data-test="tooltip" :data-content="content"><slot /></span>',
       },
       OTag: {
         props: ["label", "variant"],
@@ -190,6 +197,26 @@ function mountPanel(override: Partial<ExperimentComparison> = {}) {
 }
 
 describe("ExperimentComparisonPanel", () => {
+  it("keeps excluded columns selectable, disables columns without policies, and allows none", () => {
+    const wrapper = mountPanel({
+      outcomeDimensions: [],
+      dimensions: [
+        ...comparison.dimensions.map((dimension) => ({ ...dimension, gating: false })),
+        { ...comparison.dimensions[0], id: "descriptive", gating: false, canAffectOutcome: false },
+      ],
+    });
+    const select = wrapper.getComponent(
+      '[data-test="ai-experiment-comparison-outcome-dimensions"]',
+    );
+    expect(select.props("options")).toEqual([
+      expect.objectContaining({ value: "quality", disabled: false }),
+      expect.objectContaining({ value: "latency_ms", disabled: false }),
+      expect.objectContaining({ value: "descriptive", disabled: true }),
+    ]);
+    select.vm.$emit("update:modelValue", ["quality"]);
+    select.vm.$emit("update:modelValue", []);
+    expect(wrapper.emitted("select-outcome-dimensions")).toEqual([[["quality"]], [[]]]);
+  });
   it("shows honest bucket counts", () => {
     const wrapper = mountPanel();
 
@@ -288,7 +315,13 @@ describe("ExperimentComparisonPanel", () => {
     const descriptive = {
       ...comparison,
       dimensions: [
-        { ...comparison.dimensions[0], name: "tone", scoreConfigName: "tone", gating: false },
+        {
+          ...comparison.dimensions[0],
+          name: "tone",
+          scoreConfigName: "tone",
+          gating: false,
+          canAffectOutcome: false,
+        },
       ],
       rows: [
         {
@@ -319,7 +352,7 @@ describe("ExperimentComparisonPanel", () => {
     const wrapper = mountPanel();
     const select = wrapper.get('[data-test="ai-experiment-comparison-threshold"]');
 
-    expect(select.findAll("option").map((o) => o.text())).toEqual(["0.02", "0.05", "0.10", "0.15"]);
+    expect(select.findAll("option").map((o) => o.text())).toEqual(["2%", "5%", "10%", "15%"]);
 
     await select.setValue("0.15");
     expect(wrapper.emitted("apply-threshold")?.[0]).toEqual([0.15]);
@@ -333,7 +366,7 @@ describe("ExperimentComparisonPanel", () => {
         .get('[data-test="ai-experiment-comparison-threshold"]')
         .findAll("option")
         .map((o) => o.text()),
-    ).toEqual(["0.02", "0.05", "0.10", "0.15", "0.50"]);
+    ).toEqual(["2%", "5%", "10%", "15%", "50%"]);
   });
 
   it("opens the row from a click anywhere on it, with no action button", async () => {

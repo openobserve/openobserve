@@ -41,7 +41,7 @@
             v-if="unseenVarNames.length"
             variant="primary-soft"
             size="xs"
-            class="ml-1"
+            class="ms-1"
             data-test="ai-playground-variables-new-tag"
           >
             {{ t("aiObservability.playground.newValueTag") }}
