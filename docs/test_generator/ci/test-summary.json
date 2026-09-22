@@ -1,6 +1,0 @@
-[
-  { "title": "should not render the Play Session Replay button for a regular trace without a RUM session", "action": "new", "verifies": "a trace with no RUM bridge span never renders the gated Play Session Replay button" },
-  { "title": "should show the Play Session Replay button for a replayable RUM session and navigate to its Session Viewer", "action": "new", "verifies": "a dangling-parent trace matched by a session_has_replay:true _rumdata row shows the Play button and clicking it lands on the correct Session Viewer URL" },
-  { "title": "should hide the Play Session Replay button when the RUM session has no recording", "action": "new", "verifies": "a trace with a non-replayable RUM bridge span (no session_has_replay) keeps the Play button hidden" },
-  { "title": "should show the no-replay empty state for a session with no recording", "action": "new", "verifies": "the Session Viewer renders the No-replay-was-recorded empty state naming the session id while retaining back navigation" }
-]
