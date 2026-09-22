@@ -31,7 +31,8 @@ test.describe("App Theme Default (Light/Dark) testcases", () => {
     testLogger.info('Layout shell mounted; asserting default light mode');
 
     await pm.themePage.expectLightMode();
-    expect(await pm.themePage.getCurrentThemeFromStorage()).toBeNull();
+    // No persisted theme resolves to light and is written back, so the key is 'light'.
+    expect(await pm.themePage.getCurrentThemeFromStorage()).toBe('light');
     testLogger.info('Default light mode verified');
   });
 

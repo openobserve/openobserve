@@ -153,21 +153,12 @@ export class ThemePage {
         return !isDark;
     }
 
-    /**
-     * Reads the raw persisted mode string from localStorage under the `theme` key.
-     * The store resolves anything that is not the literal "dark" to light, so a
-     * missing key (null) and a corrupt value ("DARK", "1", "") both mean light.
-     */
+    // Non-"dark" values (missing key, "DARK", "1", "") all resolve to light.
     async getCurrentThemeFromStorage() {
         return await this.page.evaluate(() => localStorage.getItem('theme'));
     }
 
-    /**
-     * Polls <html> for the `.dark` class until dark mode is applied. The mode flip
-     * goes through switchThemeMode (view-transition sweep); under reduced-motion or
-     * missing View Transitions it applies instantly, but the class toggle is still
-     * async to navigation — poll the class, never a fixed delay.
-     */
+    // Poll the class, never a fixed delay: the .dark toggle is async to navigation.
     async waitForDarkModeApplied(timeout = 10000) {
         await this.page.waitForFunction(
             (darkClass) => document.documentElement.classList.contains(darkClass),
