@@ -1,9 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/dateTime.spec.js",
-  "existing_tests_considered": [
-    "tests/ui-testing/playwright-tests/GeneralTests/datetime-picker-copy-paste.spec.js"
-  ],
-  "needs_registration": true,
-  "rationale": "The only existing spec in the area (datetime-picker-copy-paste.spec.js) is tightly scoped to the Copy/Paste feature (PR #13374) and never touches the shift buttons. The Forward Shift Cap is a distinct feature (PR #14683) with its own gating states (isNextShiftDisabled) and shiftTimeRange clamping. run-context.json assigns it a dedicated spec_filename/path (dateTime.spec.js), so it is a clearly-own-feature new spec. It must be registered under the GeneralTests run_files array in ci_matrix.json."
-}
