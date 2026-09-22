@@ -67,7 +67,13 @@ pub async fn list_tokens(org_id: &str) -> Result<Vec<OrgIngestionToken>, anyhow:
     Ok(tokens)
 }
 
-/// Create a new named ingestion token. Returns the full token (only time it's shown unmasked).
+/// Create a new named ingestion token. Returns the full token value.
+///
+/// Nothing here is masked — `list_tokens` returns every token in full too.
+/// These values are protected by access control, not redaction: the
+/// `/{org_id}/ingestion-tokens` routes are gated by `require_credential_access`.
+/// Callers paste the value verbatim into setup snippets and deploy URLs that do
+/// not validate token shape, so do not introduce masking.
 pub async fn create_token(
     org_id: &str,
     name: &str,
@@ -143,7 +149,10 @@ pub async fn create_token(
     })
 }
 
-/// Rotate a token's value. Returns the new full token (only time it's shown unmasked).
+/// Rotate a token's value. Returns the new full token value.
+///
+/// Unmasked, like [`create_token`] and [`list_tokens`]: the route is gated by
+/// `require_credential_access` rather than by redaction. See [`create_token`].
 pub async fn rotate_token(org_id: &str, name: &str) -> Result<OrgIngestionToken, anyhow::Error> {
     let existing = db::org_ingestion_tokens::get_by_name(org_id, name)
         .await?
