@@ -47,6 +47,7 @@ use {
 use {
     config::{DEFAULT_ORG, META_ORG_ID, meta::user::UserRole, utils::rand::generate_random_string},
     db::{org_users, organization::get_org_setting},
+    o2_enterprise::enterprise::cloud::org_invites,
     o2_openfga::authorizer::{authz::get_add_user_to_org_tuples, groups::update_group},
     std::{collections::HashSet, str::FromStr as _},
 };
@@ -884,6 +885,16 @@ pub async fn process_domain_org_mapping(user_email: &str) -> Result<bool, anyhow
                     "Failed to add user {user_email} to org in domain org mapping processing : {e}"
                 )
             })?;
+            log::info!(
+                "user {user_email} joined org {} succesfully via domain org mapping, deleting any invites",
+                mapped.org_id
+            );
+            if let Err(e) = org_invites::delete_invites_for_user(&mapped.org_id, user_email).await {
+                log::error!(
+                    "error in deleting invites for user {user_email} for org {} after joining via domain mapping : {e}",
+                    mapped.org_id
+                );
+            }
             log::info!("domain org mapping for user {user_email} successfully processed");
             return Ok(true);
         } else {

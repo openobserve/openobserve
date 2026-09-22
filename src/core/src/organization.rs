@@ -36,7 +36,8 @@ use {
     common::meta::organization::{
         OrganizationInviteResponse, OrganizationInviteUserRecord, OrganizationInvites,
     },
-    config::{SMTP_CLIENT, get_config},
+    config::{META_ORG_ID, SMTP_CLIENT, get_config},
+    db::organization::get_org_setting,
     lettre::{AsyncTransport, Message, message::SinglePart},
     o2_enterprise::enterprise::cloud::{
         InvitationRecord, OrgInviteStatus, billing_group::add_as_billing_member,
@@ -1001,12 +1002,27 @@ pub async fn generate_invitation(
             None => return Err(anyhow::anyhow!("Unauthorized access")),
         }
     }
+
+    let meta_settings = get_org_setting(META_ORG_ID).await?;
+    let mappings = meta_settings.domain_org_mappings;
+    let org_mapping = mappings.into_iter().find(|m| m.org_id == org_id);
+
     for invitee in &invites.invites {
         match get_user(Some(org_id), invitee).await {
             None => {}
             Some(_) => {
                 return Err(anyhow::anyhow!(
                     "user with email {invitee} already part of the organization"
+                ));
+            }
+        }
+
+        if let Some(mapped) = org_mapping.as_ref()
+            && let Some((_, domain)) = invitee.to_lowercase().split_once("@")
+        {
+            if mapped.domain.to_lowercase() == domain.to_lowercase().trim() {
+                return Err(anyhow::anyhow!(
+                    "domain {domain} is already mapped to this organization, cannot create invites for this domain"
                 ));
             }
         }
@@ -1142,6 +1158,19 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 
     // Check if user is already part of the org
     if get_cached_user_org(&org_id, user_email).is_some() {
+        // if already part of org, one way or other, mark as accepted
+        log::info!(
+            "user {user_email} is already part of {org_id} but tried to accept invite {invite_token}, marking it as accepted"
+        );
+        if let Err(e) = org_invites::update_invite_status(
+            invite_token,
+            &user_email.to_lowercase(),
+            OrgInviteStatus::Accepted,
+        )
+        .await
+        {
+            log::error!("Error updating the invite status in the db: {e}");
+        }
         return Ok(()); // User is already part of the org
     }
 
