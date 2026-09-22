@@ -106,36 +106,57 @@ already in `ci_matrix.json`; `build-ci-matrix.js` fails the run if it does.
 ## The alpha1 cloud matrix (`ci_matrix_cloud.json`, ENT repo)
 
 Alpha1 runs nightly against a shared, deployed cloud env, so it is **deliberately a
-subset** of the PR gate — some specs need a boot-time server flag the deployment fixes,
-and some would wreck the shared orgs their sibling shards are using.
+subset** of the PR gate. Alpha mirrors production: a feature that is off in cloud is off
+here too, and its specs do not belong in this manifest at all.
 
 Because that manifest is standalone (no OSS base, no merge), a spec added to
-`ci_matrix.json` never reaches alpha on its own. So the rule is:
+`ci_matrix.json` never reaches alpha on its own. **That is not a failure, and adding a
+spec here is nobody's obligation in a PR** — the author of an OSS spec has no way to know
+whether it works on cloud, and a guessed reason is worse than none.
 
-> **Every PR-gate spec needs a cloud verdict** — either it is in an alpha shard's
-> `run_files`, or it is in that shard's `disabled` array *with a reason*.
+Instead, review the delta on purpose now and then (monthly is plenty):
 
-`.github/scripts/check-alpha1-triage.js` (ENT) enforces this in the `alpha1 triage` job
-of `playwright_alpha1.yml`. It also fails on a manifest entry naming a spec that no
-longer exists — the failure that kept `logsQueryBuilder.spec.js` listed for ~4 months
-after it was split, silently costing that shard its coverage.
+```
+node .github/scripts/alpha1-coverage-report.js <oss-checkout> <ent-checkout>   # in the ENT repo
+```
 
-That job is **not** a dependency of the shards: drift shows up red without costing the
-night's test results.
+It prints what alpha runs, what is recorded as not-cloud-viable, and what has no verdict
+yet. It is a report — nothing in CI runs it and it never fails a build.
 
-### Recording a "no"
+The one thing CI does enforce is that this manifest cannot name a spec that no longer
+exists: the shard's test step fails on a missing file. That is the failure which kept
+`logsQueryBuilder.spec.js` listed for ~4 months after it was split, silently costing the
+shard its coverage while the job stayed green.
 
-Reasons worth stating, with the shape they take:
+### Deciding whether a spec belongs on alpha
+
+**Check whether the feature is even on in cloud first.** The infra repo is the source of
+truth, not the code defaults:
+
+```
+infra/apps/eks-o2-alpha/values.yaml        # alpha
+infra/apps/eks-eu1-o2-prod/values.yaml     # prod (also eks-ap1, aks-us2)
+```
+
+Off in alpha *and* prod means a product decision, not an alpha gap — `Workflows`
+(`O2_WORKFLOWS_ENABLED=false` everywhere) and `Reports` (hidden via
+`O2_CUSTOM_HIDE_MENUS`) are both. Watch for commented-out entries in those files; a
+careless grep reports flags that are not actually set.
+
+Other things that keep a spec off alpha:
 
 - needs a boot flag the deployment fixes — `ZO_QUICK_MODE_ENABLED`, `ingest_allowed_upto`
 - mutates shared state other shards depend on — org users, the org RUM token
-- the spec already self-skips on cloud (`test.skip(isCloudEnvironment(), …)`) — say so,
-  and quote its reason, so the manifest and the spec do not drift apart
+- the spec already self-skips on cloud (`test.skip(isCloudEnvironment(), …)`)
 - the product genuinely differs on cloud — no internal login form (Dex OIDC), tabs hidden
+
+Prove a spec passes on alpha before adding it. Adding a batch and letting the nightly
+sort them out costs the suite its credibility.
 
 ### Modules with no alpha shard
 
 When every spec in a module is ruled out, there is no shard to hang the `disabled`
 entries on. Add a **documentation-only** entry: same shape, but `"run_files": []`.
 `generate_matrix` filters those out, so they never become a job — they exist only to
-record the verdict. See the `SLO`, `RUM` and `Logs-SelectStar` entries.
+record the verdict. See the `Workflows`, `Reports`, `SLO`, `RUM` and `Logs-SelectStar`
+entries.
