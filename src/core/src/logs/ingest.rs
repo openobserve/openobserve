@@ -226,8 +226,15 @@ pub async fn ingest(
 
     let flatten_level = get_flatten_level(org_id, &stream_name, stream_type).await;
 
+    // Fail safe toward scanning: a manager we cannot consult may still hold associations.
+    #[cfg(feature = "vectorscan")]
+    let needs_pattern_scan = should_apply_sdr(&stream_name)
+        && pattern_manager.is_none_or(|m| m.has_associations(org_id, stream_type, &stream_name));
+    #[cfg(not(feature = "vectorscan"))]
+    let needs_pattern_scan = false;
+
     // pattern associations rewrite the JSON records, which the columnar path never builds
-    let needs_json_records = cfg!(feature = "vectorscan")
+    let needs_json_records = needs_pattern_scan
         || !executable_pipelines.is_empty()
         || extend_json.is_some()
         || matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)))
