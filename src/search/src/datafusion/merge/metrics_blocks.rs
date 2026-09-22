@@ -42,7 +42,7 @@ impl SourceMetadata {
     ) -> anyhow::Result<std::fs::File> {
         match self {
             Self::Parquet(metadata) => writer.finish_for_parquet(parent, metadata),
-            Self::Vortex(schema) => writer.finish_for_source(parent, schema, None),
+            Self::Vortex(schema) => writer.finish_for_vortex(parent, schema),
         }
     }
 }

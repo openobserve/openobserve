@@ -219,7 +219,7 @@ mod tests {
     use super::*;
     use crate::MetricsFileLayout;
 
-    fn fixture(format: config::FileFormat) -> (RecordBatch, FileKey, Vec<u8>) {
+    async fn fixture(format: config::FileFormat) -> (RecordBatch, FileKey, Vec<u8>) {
         let schema = Arc::new(Schema::new(vec![
             Field::new("__hash__", DataType::UInt64, false),
             Field::new("_timestamp", DataType::Int64, false),
@@ -244,7 +244,7 @@ mod tests {
         )
         .unwrap();
         let id = config::ider::uuid();
-        let file = FileKey::new(
+        let mut file = FileKey::new(
             0,
             format!("{id}:default"),
             format!(
@@ -261,16 +261,36 @@ mod tests {
         let mut writer =
             metrics_block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
         writer.write(&batch).unwrap();
-        let bytes = writer
-            .finish_for_source(
+        let bytes = match format {
+            config::FileFormat::Parquet => {
+                let mut parquet = config::utils::parquet::new_parquet_writer(
+                    Vec::new(),
+                    &schema,
+                    &[],
+                    &file.meta,
+                    false,
+                    None,
+                );
+                parquet.write(&batch).await.unwrap();
+                let metadata = parquet.finish().await.unwrap();
+                file.meta.compressed_size = i64::try_from(parquet.bytes_written()).unwrap();
+                writer.finish_for_parquet(
+                    metrics_block::ParentMetadata {
+                        rows: 6,
+                        compressed_size: file.meta.compressed_size as u64,
+                    },
+                    metadata,
+                )
+            }
+            config::FileFormat::Vortex => writer.finish_for_vortex(
                 metrics_block::ParentMetadata {
                     rows: 6,
                     compressed_size: 123,
                 },
                 schema,
-                (format == config::FileFormat::Parquet).then_some(100),
-            )
-            .unwrap();
+            ),
+        }
+        .unwrap();
         (batch, file, bytes)
     }
 
@@ -294,7 +314,7 @@ mod tests {
     #[tokio::test]
     async fn current_metadata_prunes_both_parent_formats() {
         for format in [config::FileFormat::Parquet, config::FileFormat::Vortex] {
-            let (batch, file, bytes) = fixture(format);
+            let (batch, file, bytes) = fixture(format).await;
             store(&file, Some(bytes)).await;
             for (op, value, expected) in [
                 (MatchOp::Equal, "a", vec![Range { start: 0, end: 3 }]),
@@ -327,7 +347,7 @@ mod tests {
     async fn unusable_index_preserves_source_scan() {
         for format in [config::FileFormat::Parquet, config::FileFormat::Vortex] {
             for present in [false, true] {
-                let (batch, file, _) = fixture(format);
+                let (batch, file, _) = fixture(format).await;
                 store(&file, present.then(|| vec![0; 128])).await;
                 let mut files = vec![file];
                 let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]);

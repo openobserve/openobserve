@@ -786,13 +786,11 @@ fn completion_marker_is_last_and_write_or_flush_errors_propagate() {
 }
 
 #[test]
-fn generic_source_finalizer_preserves_schema_without_row_groups() {
+fn vortex_finalizer_preserves_schema_without_row_groups() {
     let input = batch(&rows());
     let mut writer = BlockWriter::new_pending(Vec::new(), input.schema(), 2).unwrap();
     writer.write(&input).unwrap();
-    let encoded = writer
-        .finish_for_source(parent(), input.schema(), None)
-        .unwrap();
+    let encoded = writer.finish_for_vortex(parent(), input.schema()).unwrap();
     let decoded = index(&encoded, &["label_a", "label_b"]).unwrap();
     assert_eq!(decoded.parent, parent());
     assert_eq!(decoded.row_group_size, None);
@@ -854,7 +852,7 @@ fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
 }
 
 #[test]
-fn source_finalizer_still_rejects_schema_and_zero_row_group_claims() {
+fn vortex_finalizer_rejects_invalid_source_metadata() {
     let input = batch(&rows());
     let pending = || {
         let mut writer = BlockWriter::new_pending(Vec::new(), input.schema(), 2).unwrap();
@@ -871,25 +869,12 @@ fn source_finalizer_still_rejects_schema_and_zero_row_group_claims() {
                 "changed".to_owned(),
             )])),
     );
-    assert!(
-        pending()
-            .finish_for_source(parent(), changed, None)
-            .is_err()
-    );
-    assert!(
-        pending()
-            .finish_for_source(parent(), input.schema(), Some(0))
-            .is_err()
-    );
+    assert!(pending().finish_for_vortex(parent(), changed).is_err());
     let zero = ParentMetadata {
         rows: 0,
         compressed_size: 123,
     };
-    assert!(
-        pending()
-            .finish_for_source(zero, input.schema(), None)
-            .is_err()
-    );
+    assert!(pending().finish_for_vortex(zero, input.schema()).is_err());
 }
 
 #[test]

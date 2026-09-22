@@ -89,37 +89,9 @@ impl<W: Write> BlockWriter<W> {
         self.finish_for_source(parent, Arc::clone(stored.schema()), Some(row_group_size))
     }
 
-    /// The container adapter must verify the completed file before supplying its source facts.
-    pub fn finish_for_source(
-        mut self,
-        parent: ParentMetadata,
-        stored_schema: SchemaRef,
-        row_group_size: Option<u32>,
-    ) -> Result<W> {
-        validate_parent(&parent)?;
-        ensure!(
-            self.parent.as_ref().is_none_or(|known| known == &parent),
-            "parent metadata changed"
-        );
-        ensure!(self.rows == parent.rows, "source/parent row count mismatch");
-        ensure!(row_group_size != Some(0), "invalid parent row group size");
-        ensure!(
-            schema_matches(&self.schema, &stored_schema),
-            "stored source schema changed"
-        );
-        self.schema = stored_schema;
-        self.metadata_properties
-            .insert(PARENT_KEY.to_owned(), serde_json::to_string(&parent)?);
-        self.metadata_properties
-            .insert(SCHEMA_KEY.to_owned(), canonical_schema_json(&self.schema)?);
-        if let Some(size) = row_group_size {
-            self.metadata_properties
-                .insert(ROW_GROUP_SIZE_KEY.to_owned(), size.to_string());
-        } else {
-            self.metadata_properties.remove(ROW_GROUP_SIZE_KEY);
-        }
-        self.parent = Some(parent);
-        self.finish()
+    /// The caller must verify the completed Vortex file before finalizing its index.
+    pub fn finish_for_vortex(self, parent: ParentMetadata, schema: SchemaRef) -> Result<W> {
+        self.finish_for_source(parent, schema, None)
     }
 
     pub fn write(&mut self, batch: &RecordBatch) -> Result<()> {
@@ -158,6 +130,39 @@ impl<W: Write> BlockWriter<W> {
         self.output.write_all(&footer[24..])?;
         self.output.flush()?;
         Ok(self.output)
+    }
+
+    /// The container adapter must verify the completed file before supplying its source facts.
+    fn finish_for_source(
+        mut self,
+        parent: ParentMetadata,
+        stored_schema: SchemaRef,
+        row_group_size: Option<u32>,
+    ) -> Result<W> {
+        validate_parent(&parent)?;
+        ensure!(
+            self.parent.as_ref().is_none_or(|known| known == &parent),
+            "parent metadata changed"
+        );
+        ensure!(self.rows == parent.rows, "source/parent row count mismatch");
+        ensure!(row_group_size != Some(0), "invalid parent row group size");
+        ensure!(
+            schema_matches(&self.schema, &stored_schema),
+            "stored source schema changed"
+        );
+        self.schema = stored_schema;
+        self.metadata_properties
+            .insert(PARENT_KEY.to_owned(), serde_json::to_string(&parent)?);
+        self.metadata_properties
+            .insert(SCHEMA_KEY.to_owned(), canonical_schema_json(&self.schema)?);
+        if let Some(size) = row_group_size {
+            self.metadata_properties
+                .insert(ROW_GROUP_SIZE_KEY.to_owned(), size.to_string());
+        } else {
+            self.metadata_properties.remove(ROW_GROUP_SIZE_KEY);
+        }
+        self.parent = Some(parent);
+        self.finish()
     }
 
     fn new_inner(

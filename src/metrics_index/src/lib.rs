@@ -201,13 +201,12 @@ mod tests {
         .unwrap();
         writer.write(&batch).unwrap();
         let bytes = writer
-            .finish_for_source(
+            .finish_for_vortex(
                 metrics_block::ParentMetadata {
                     rows: rows as u64,
                     compressed_size: 123,
                 },
                 schema,
-                Some(100),
             )
             .unwrap();
         let id = config::ider::uuid();
@@ -226,7 +225,7 @@ mod tests {
         load_metrics_index_file(
             &account,
             &path,
-            config::FileFormat::Parquet,
+            config::FileFormat::Vortex,
             rows,
             123,
             Arc::new(requested.to_vec()),
