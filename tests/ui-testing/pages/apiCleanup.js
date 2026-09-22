@@ -369,7 +369,9 @@ class APICleanup {
             throw new Error(`createMinimalDashboard: HTTP ${response.status} — ${body}`);
         }
         const result = await response.json();
-        const dashboardId = result.dashboard_id || result.dashboardId || result.id;
+        // MetaDashboard nests the actual data under the version key (e.g. "v8").
+        const inner = result[`v${result.version}`] || result;
+        const dashboardId = inner.dashboardId || inner.dashboard_id || result.dashboard_id || result.id;
         testLogger.info('Created minimal dashboard', { dashboardId, folderId });
         return { dashboardId, folderId };
     }
