@@ -248,7 +248,8 @@
       "datetime-picker-copy-paste.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "connectDataSourcePopup.spec.js",
-      "theme.spec.js"
+      "theme.spec.js",
+      "shortcut-cheatsheet-gating.spec.js"
     ],
     "disabled": []
   },
