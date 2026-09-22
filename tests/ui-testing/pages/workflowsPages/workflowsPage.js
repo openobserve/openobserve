@@ -159,7 +159,9 @@ class WorkflowsPage {
     // Branch-arm append connectors (WorkflowCanvas appendPointsFor) — the hover-revealed
     // `+` points, each carrying an SVG path whose `d` starts at the arm's own source handle.
     this.appendAdd = '[data-test="workflow-flow-append-add"]';
-    this.appendAddPath = '[data-test="workflow-flow-append-add"] svg path';
+    // Direct-child svg only: FlowAddButton's `+` icon is another svg under the same
+    // wrapper (at `> button > svg`), and counting its path too yields 2 paths per arm.
+    this.appendAddPath = '[data-test="workflow-flow-append-add"] > svg path';
     // Node hover actions (WorkflowNode): the disable/enable toggle and the Disabled badge.
     this.nodeDisableToggle = '[data-test="workflows-node-disable-toggle"]';
     this.nodeDisabledBadgeFor = (t) => `[data-test="workflow-node-${t}-disabled-badge"]`;
