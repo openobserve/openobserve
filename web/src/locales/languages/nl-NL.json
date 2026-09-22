@@ -5910,6 +5910,9 @@
         "details": "Details",
         "json": "JSON",
         "insights": "Inzichten",
+        "back": "Terug naar resultaten",
+        "prevEvent": "Vorige gebeurtenis",
+        "nextEvent": "Volgende gebeurtenis",
         "copyLink": "Link kopiëren",
         "copy": "Kopiëren",
         "copyValue": "Waarde kopiëren",
@@ -9359,7 +9362,28 @@
     "listConjunctionAnd": "{list} en {last}",
     "runsIn": "Draait in",
     "recommendedByFieldCoverage": "Aanbevolen op basis van velddekking in uw streams.",
-    "listConjunctionAndTwo": "{first} en {last}"
+    "listConjunctionAndTwo": "{first} en {last}",
+    "domainOrgMappings": {
+      "title": "Domein naar organisatie-toewijzingen",
+      "subtitle": "Nieuwe gebruikers die inloggen met een overeenkomend e-maildomein worden automatisch aan de organisatie toegevoegd.",
+      "addMapping": "Toewijzing toevoegen",
+      "editMapping": "Toewijzing bewerken",
+      "empty": "Nog geen toewijzingen. Gebruik “{addLabel}” om er een toe te voegen.",
+      "domain": "E-maildomein",
+      "domainHelp": "Het deel na {at_sign} in het e-mailadres van de gebruiker.",
+      "organization": "Organisatie",
+      "organizationPlaceholder": "Organisatie-identificatie",
+      "organizationHelp": "De identificatie van de organisatie waaraan overeenkomende gebruikers worden toegevoegd.",
+      "organizationRequired": "Organisatie is vereist",
+      "baseRole": "Basisrol",
+      "baseRoleHelp": "De rol die overeenkomende gebruikers in die organisatie krijgen.",
+      "userGroup": "Gebruikersgroep",
+      "userGroupPlaceholder": "Groepsnaam",
+      "userGroupHelp": "Optioneel. Overeenkomende gebruikers worden ook lid van deze groep in die organisatie.",
+      "duplicateDomain": "Er bestaat al een toewijzing voor dit domein",
+      "confirmRemove": "Weet je zeker dat je de toewijzing voor {domain} wilt verwijderen?",
+      "deleteTitle": "Toewijzing verwijderen"
+    }
   },
   "reports": {
     "frequencyUnits": {

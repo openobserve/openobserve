@@ -482,7 +482,8 @@ pub async fn otlp_json(
     in_stream_name: Option<&str>,
     user: IngestUser,
 ) -> Result<HttpResponse, Error> {
-    let request = match serde_json::from_slice::<ExportTraceServiceRequest>(body.as_ref()) {
+    let request = match json::from_slice_lenient_floats::<ExportTraceServiceRequest>(body.as_ref())
+    {
         Ok(req) => req,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid json: {e}");
@@ -1842,6 +1843,38 @@ mod tests {
 
     use super::span_duration_micros;
     use crate::ingestion::grpc::get_val_for_attr;
+
+    #[test]
+    fn test_otlp_json_decodes_non_canonical_doubles() {
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            common::v1::{KeyValue, any_value::Value},
+        };
+
+        let body = br#"{"resourceSpans":[{"resource":{"attributes":[{"key":"ratio","value":{"doubleValue":0.10}}]},"scopeSpans":[{"scope":{"name":"s"},"spans":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"eee19b7ec3c1b174","name":"op","kind":2,"startTimeUnixNano":"1789000000000000001","endTimeUnixNano":"1789000000000000002","attributes":[{"key":"a","value":{"doubleValue":1e0}}],"events":[{"timeUnixNano":"1789000000000000001","name":"e","attributes":[{"key":"b","value":{"doubleValue":1.50}}]}],"links":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"eee19b7ec3c1b175","attributes":[{"key":"c","value":{"doubleValue":-2.5E-3}}]}]}]}]}]}"#;
+        assert!(config::utils::json::from_slice::<ExportTraceServiceRequest>(body).is_err());
+
+        let request: ExportTraceServiceRequest =
+            config::utils::json::from_slice_lenient_floats(body).unwrap();
+        let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
+        let resource_spans = &request.resource_spans[0];
+        let resource = resource_spans.resource.as_ref().unwrap();
+        assert_eq!(
+            value(&resource.attributes[0]),
+            Some(Value::DoubleValue(0.1))
+        );
+        let span = &resource_spans.scope_spans[0].spans[0];
+        assert_eq!(span.start_time_unix_nano, 1_789_000_000_000_000_001);
+        assert_eq!(value(&span.attributes[0]), Some(Value::DoubleValue(1.0)));
+        assert_eq!(
+            value(&span.events[0].attributes[0]),
+            Some(Value::DoubleValue(1.5))
+        );
+        assert_eq!(
+            value(&span.links[0].attributes[0]),
+            Some(Value::DoubleValue(-0.0025))
+        );
+    }
 
     #[test]
     fn test_get_val_for_attr() {

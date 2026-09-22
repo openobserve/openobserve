@@ -240,16 +240,34 @@ const handleOpenChange = (open: boolean) => {
   <ODialog
     data-test="connect-data-source-popup-dialog"
     :open="isOpen"
-    :title="t('connectDataSourcePopup.title')"
     size="sm"
+    :show-close="false"
     @update:open="handleOpenChange"
   >
     <div class="flex flex-col gap-4">
-      <div
-        class="rounded-default bg-icon-chip-primary-bg flex h-12 w-12 shrink-0 items-center justify-center"
-        aria-hidden="true"
-      >
-        <OIcon name="database" size="md" class="text-icon-chip-primary-text" />
+      <!-- Header: data-source badge, title to its right, close button on the far right -->
+      <div class="flex items-start gap-3">
+        <div
+          class="rounded-default bg-icon-chip-primary-bg flex h-12 w-12 shrink-0 items-center justify-center"
+          aria-hidden="true"
+        >
+          <OIcon name="database" size="md" class="text-icon-chip-primary-text" />
+        </div>
+
+        <h2 data-test="connect-data-source-popup-title" class="flex-1 self-center">
+          {{ t("connectDataSourcePopup.title") }}
+        </h2>
+
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          class="-me-1 shrink-0"
+          :aria-label="t('common.close')"
+          data-test="connect-data-source-popup-close-btn"
+          @click="dismiss"
+        >
+          <OIcon name="close" size="sm" />
+        </OButton>
       </div>
 
       <p data-test="connect-data-source-popup-description" class="text-text-secondary">

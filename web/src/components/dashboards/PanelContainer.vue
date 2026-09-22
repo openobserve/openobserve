@@ -335,12 +335,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
-    <div class="shrink-0">
+    <div class="drag-cancel shrink-0">
       <slot name="panel-variables"></slot>
     </div>
 
     <div
-      class="relative min-h-0 flex-1"
+      class="drag-cancel relative min-h-0 flex-1"
       :class="curatedBadge ? 'opacity-60' : undefined"
       data-test="dashboard-panel-body"
       :data-curated-stale="curatedBadge ? 'true' : 'false'"
@@ -388,6 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
         @series-data-update="onCuratedSeriesData"
+        @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
       ></PanelSchemaRenderer>
 
       <!-- A wrong label VALUE leaves the panel present, fresh and blank, and a
@@ -500,6 +501,7 @@ export default defineComponent({
     "onEditLayout",
     "update:runId",
     "contextmenu",
+    "sendToAiChat",
   ],
   props: [
     "data",

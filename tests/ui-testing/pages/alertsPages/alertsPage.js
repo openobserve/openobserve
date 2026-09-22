@@ -78,6 +78,9 @@ export class AlertsPage {
             streamTypePopover: '[data-test="add-alert-stream-type-select-dropdown-popover"]',
             streamTypeOption: '[data-test="add-alert-stream-type-select-dropdown-option"]',
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
+            queryEditorDialog: '[data-test="query-editor-dialog"]',
+            queryResultLabel: 'Query Result',
+            multiWindowBadgeText: 'results across all time windows',
             streamNamePopover: '[data-test="add-alert-stream-name-select-dropdown-popover"]',
             streamNameOption: '[data-test="add-alert-stream-name-select-dropdown-option"]',
             alertTypeSelect: '[data-test="add-alert-type-tabs"]',
@@ -3755,6 +3758,13 @@ export class AlertsPage {
         return this.creationWizard._switchToAlertRulesTab();
     }
 
+    /** The data-test VALUE inside a `[data-test="..."]` selector. */
+    _dataTestValue(selector) {
+        const m = selector.match(/\[data-test="([^"]+)"\]/);
+        if (!m) throw new Error(`Not a data-test selector: ${selector}`);
+        return m[1];
+    }
+
     /**
      * Open a new scheduled alert wizard and fill setup fields (v3 UI — no step navigation needed).
      * Shared setup for tests that verify Step 2 features without full alert creation.
@@ -3768,10 +3778,14 @@ export class AlertsPage {
         await this.fillAlertName(alertName);
         await this.selectStreamType('logs');
 
-        // Select stream via OSelect popover with deterministic waits (cloud may load streams slowly)
-        const popoverSelector = `${this.locators.streamNameDropdown}-popover`;
-        const searchSelector = `${this.locators.streamNameDropdown}-search`;
-        const optionByValue = `${this.locators.streamNameDropdown}-option[data-test-value="${streamName}"]`;
+        // Select stream via OSelect popover with deterministic waits (cloud may load streams slowly).
+        // OSelect derives its popover/search/option data-tests from the trigger's VALUE, so the
+        // suffix goes inside the attribute — appending it to the bracketed selector builds
+        // invalid CSS ('[data-test="x"]-option') that matches nothing.
+        const streamDataTest = this._dataTestValue(this.locators.streamNameDropdown);
+        const popoverSelector = `[data-test="${streamDataTest}-popover"]`;
+        const searchSelector = `[data-test="${streamDataTest}-search"]`;
+        const optionByValue = `[data-test="${streamDataTest}-option"][data-test-value="${streamName}"]`;
         let streamSelected = false;
         for (let attempt = 0; attempt < 3 && !streamSelected; attempt++) {
             await this.page.locator(this.locators.streamNameDropdown).click();
@@ -4191,6 +4205,45 @@ export class AlertsPage {
         const vrlEditor = this.page.locator('[data-test="scheduled-alert-vrl-function-editor"]');
         await expect(vrlEditor).toBeVisible({ timeout });
         testLogger.info('VRL editor is visible');
+    }
+
+    /**
+     * Record every search endpoint the query-editor dialog calls from now on.
+     *
+     * The dialog picks `_search` or `_search_multi` off `multiTimeRange`, so
+     * which one it hit is the contract — a result-shape assertion cannot tell
+     * the two apart once the response has been rendered.
+     */
+    async captureSearchRequests() {
+        this._searchRequests = [];
+        this.page.on('request', (req) => {
+            const url = req.url();
+            if (req.method() === 'POST' && url.includes('/_search')) this._searchRequests.push(url);
+        });
+        testLogger.info('Capturing search requests');
+    }
+
+    /** Exact endpoint names seen since captureSearchRequests(), most recent last. */
+    getCapturedSearchEndpoints() {
+        return (this._searchRequests || []).map(
+            (url) => new URL(url).pathname.split('/').filter(Boolean).pop(),
+        );
+    }
+
+    /**
+     * The Query Result pane shows no all-windows chip.
+     *
+     * Asserted on the rendered copy, not on a styling class — the chip carries
+     * only Tailwind utilities, so a class-based locator silently matches nothing
+     * and an absence assertion passes without ever rendering the pane. The pane
+     * header is asserted present first so the absence means something.
+     */
+    async expectNoMultiWindowBadge() {
+        const dialog = this.page.locator(this.locators.queryEditorDialog).first();
+        await expect(dialog).toBeVisible({ timeout: 10000 });
+        await expect(dialog).toContainText(this.locators.queryResultLabel);
+        await expect(dialog).not.toContainText(this.locators.multiWindowBadgeText);
+        testLogger.info('Query Result pane rendered without the all-windows chip');
     }
 
     /**
