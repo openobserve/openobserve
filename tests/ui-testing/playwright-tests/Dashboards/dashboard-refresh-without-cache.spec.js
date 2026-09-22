@@ -172,10 +172,9 @@ test.describe("Dashboard Refresh Without Cache testcases", () => {
         page,
         panelId1,
         async () => {
-          await pm.dashboardVariablesScoped.getPanelKebab("Panel1").click();
-          const item = pm.dashboardVariablesScoped.getPanelRefreshWithoutCacheItem();
-          await item.waitFor({ state: "visible", timeout: 10000 });
-          await item.click();
+          await pm.dashboardVariablesScoped.clickPanelRefreshWithoutCacheAndWaitForClearCache(
+            "Panel1"
+          );
         },
         15000
       );
@@ -186,6 +185,10 @@ test.describe("Dashboard Refresh Without Cache testcases", () => {
         result.queryCount,
         "panel-level cache refresh must re-query only the target panel"
       ).toBe(1);
+      expect(
+        result.calls[0]?.url,
+        "the re-queried panel must be Panel1 (request URL must carry panel_id=<Panel1 id>)"
+      ).toContain(`panel_id=${panelId1}`);
 
       await cleanupDashboard(page, pm, dashboardName);
       testLogger.info("Test completed");
