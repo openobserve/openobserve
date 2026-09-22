@@ -889,7 +889,10 @@ pub async fn process_domain_org_mapping(user_email: &str) -> Result<bool, anyhow
                 "user {user_email} joined org {} succesfully via domain org mapping, deleting any invites",
                 mapped.org_id
             );
-            if let Err(e) = org_invites::delete_invites_for_user(&mapped.org_id, user_email).await {
+            if let Err(e) =
+                org_invites::delete_invites_for_user(&mapped.org_id, &user_email.to_lowercase())
+                    .await
+            {
                 log::error!(
                     "error in deleting invites for user {user_email} for org {} after joining via domain mapping : {e}",
                     mapped.org_id

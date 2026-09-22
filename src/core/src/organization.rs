@@ -1160,7 +1160,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     if get_cached_user_org(&org_id, user_email).is_some() {
         // if already part of org, one way or other, mark as accepted
         log::info!(
-            "user {user_email} is already part of {org_id} but tried to accept invite {invite_token}, marking it as accepted"
+            "user {user_email} is already part of {org_id} but tried to accept invite, marking it as accepted"
         );
         if let Err(e) = org_invites::update_invite_status(
             invite_token,
