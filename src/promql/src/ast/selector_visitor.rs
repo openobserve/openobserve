@@ -36,10 +36,10 @@ impl ExprVisitor for MetricSelectorVisitor {
 
 #[cfg(test)]
 mod tests {
-
     use promql_parser::parser;
 
     use super::*;
+    use crate::ast::visitor::walk_expr;
 
     #[test]
     fn test_selector_visitor() {
@@ -57,7 +57,7 @@ mod tests {
 
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricSelectorVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
 
         let expected = [
             "container_fs_reads_bytes_total{container!=\"\",device=~\"(/dev/)?(mmcblk[0-9]p[0-9]+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)\"}[5m]",
@@ -75,7 +75,7 @@ mod tests {
 
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricSelectorVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
         let expected = [
             "http_requests_total{environment=~\"staging|testing|development\",method!=\"GET\"} offset 5m",
         ];
@@ -100,7 +100,22 @@ mod tests {
         let promql = "1 + 2";
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricSelectorVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
         assert!(visitor.exprs.is_empty());
+    }
+
+    #[test]
+    fn test_selector_visitor_collects_aggregation_param_selectors() {
+        let ast = parser::parse("topk(scalar(k{a=\"b\"}), m)").unwrap();
+        let mut visitor = MetricSelectorVisitor::default();
+        walk_expr(&mut visitor, &ast).unwrap();
+        let expected = ["m", "k{a=\"b\"}"];
+        assert_eq!(
+            visitor.exprs,
+            expected
+                .into_iter()
+                .map(|expr| parser::parse(expr).unwrap())
+                .collect::<Vec<_>>()
+        );
     }
 }

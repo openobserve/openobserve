@@ -196,7 +196,7 @@ async fn query(
             }
         };
         let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
-        if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
             log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
             return (
                 StatusCode::BAD_REQUEST,
@@ -496,7 +496,7 @@ async fn query_range(
             }
         };
         let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
-        if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
             log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
             return (
                 StatusCode::BAD_REQUEST,
@@ -1669,7 +1669,7 @@ fn get_max_lookback_window(query: &str) -> i64 {
         }
     };
     let mut visitor = MaxLookbackWindowVisitor::default();
-    if let Err(err) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+    if let Err(err) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
         log::error!("visit promql expr error: {err}");
         return 0;
     }
