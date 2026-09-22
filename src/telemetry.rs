@@ -35,10 +35,11 @@ use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataMap, MetadataValue},
 };
+use tracing::instrument::WithSubscriber;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{
     EnvFilter, Registry,
-    filter::{FilterExt, LevelFilter as TracingLevelFilter},
+    filter::{FilterExt, LevelFilter as TracingLevelFilter, Targets},
     fmt::Layer,
     prelude::*,
 };
@@ -264,6 +265,8 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
                     .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
                     .export(grpc_request)
+                    // a traced export would emit a CLIENT span that this exporter forwards again, forever
+                    .with_subscriber(tracing::subscriber::NoSubscriber::default())
                     .await
                 {
                     Ok(_) => {
@@ -568,11 +571,20 @@ pub fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, a
         tracing_subscriber::fmt::layer().with_ansi(false).boxed()
     };
 
+    // TRACE-level middleware spans carry traceparent propagation, so RUST_LOG must not drop them
+    let middleware_spans = Targets::new().with_target(
+        config::meta::logger::OTEL_MIDDLEWARE_TARGET,
+        TracingLevelFilter::TRACE,
+    );
     // search inspector needs info-level spans/events: RUST_LOG must not gate the OTel layer
     let otel_filter = if cfg.common.search_inspector_enabled {
-        FilterExt::boxed(EnvFilter::new(&cfg.log.level).or(TracingLevelFilter::INFO))
+        FilterExt::boxed(
+            EnvFilter::new(&cfg.log.level)
+                .or(TracingLevelFilter::INFO)
+                .or(middleware_spans),
+        )
     } else {
-        FilterExt::boxed(EnvFilter::new(&cfg.log.level))
+        FilterExt::boxed(EnvFilter::new(&cfg.log.level).or(middleware_spans))
     };
 
     global::set_tracer_provider(tracer.clone());
@@ -583,6 +595,7 @@ pub fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, a
                 .with_filter(otel_filter),
         )
         .init();
+    config::meta::logger::mark_otel_layer_installed();
 
     // Return the tracer provider
     Ok(tracer)

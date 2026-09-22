@@ -135,9 +135,40 @@ pub enum Error {
     },
 }
 
+impl Error {
+    /// True for a transient overload the client should retry later.
+    pub fn is_overload(&self) -> bool {
+        matches!(
+            self,
+            Error::WalError {
+                source: wal::Error::WriteQueueFull { .. }
+            } | Error::MemoryTableOverflowError {}
+                | Error::MemoryCircuitBreakerError {}
+                | Error::DiskCircuitBreakerError {}
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_overload() {
+        assert!(
+            Error::WalError {
+                source: wal::Error::WriteQueueFull { idx: 0 }
+            }
+            .is_overload()
+        );
+        assert!(Error::MemoryTableOverflowError {}.is_overload());
+        assert!(
+            !Error::ExternalError {
+                source: "disk failure".into()
+            }
+            .is_overload()
+        );
+    }
 
     #[test]
     fn test_memory_table_overflow_error_display() {

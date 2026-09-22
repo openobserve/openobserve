@@ -601,6 +601,8 @@ pub async fn ingest(
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
+        // Wholly-discarded batch skips the write path below, so count/warn its drops here.
+        warn_and_count_discards(org_id, endpoint, &stream_status);
         return Ok(IngestionResponse::new(
             http::StatusCode::OK.into(),
             vec![stream_status],
@@ -700,7 +702,7 @@ pub async fn ingest(
             .inc();
     }
 
-    warn_if_wholly_discarded(org_id, endpoint, &response_body);
+    warn_and_count_discards(org_id, endpoint, &response_body);
 
     // A write failure used to be visible only in the metric label while the
     // caller still saw 200. Signalled on `write_failed` and NOT on `code`, which
@@ -759,20 +761,44 @@ fn is_wholly_discarded(status: &RecordStatus) -> bool {
     status.failed > 0 && status.successful == 0
 }
 
-/// The 200 stays (non-2xx reads as retryable), so this warn is the only loud total-loss signal.
-fn warn_if_wholly_discarded(org_id: &str, endpoint: &str, status: &StreamStatus) {
-    if !is_wholly_discarded(&status.status) {
+/// True when a discarded batch is worth a warn at all.
+///
+/// A partial drop qualifies: a mixed batch keeps `successful > 0` forever, so a source with
+/// skewed timestamps loses records indefinitely with nothing said.
+fn warrants_discard_warn(status: &RecordStatus) -> bool {
+    status.failed > 0
+}
+
+/// Warn and count the records a success status hides.
+fn warn_and_count_discards(org_id: &str, endpoint: &str, status: &StreamStatus) {
+    if status.status.policy_dropped > 0 {
+        metrics::INGEST_RECORDS_DROPPED
+            .with_label_values(&[org_id, StreamType::Logs.as_str(), "ingestion_window"])
+            .inc_by(status.status.policy_dropped as u64);
+    }
+    if !warrants_discard_warn(&status.status) {
         return;
     }
     if !discard_warn_permitted(&format!("{org_id}/{}", status.name), Instant::now()) {
         return;
     }
-    log::warn!(
-        "[INGEST] {endpoint} {org_id}/{}: discarded all {} record(s), none stored: {}",
-        status.name,
-        status.status.failed,
-        status.status.error
-    );
+    if is_wholly_discarded(&status.status) {
+        log::warn!(
+            "[INGEST] {endpoint} {org_id}/{}: discarded all {} record(s), none stored: {}",
+            status.name,
+            status.status.failed,
+            status.status.error
+        );
+    } else {
+        log::warn!(
+            "[INGEST] {endpoint} {org_id}/{}: discarded {} of {} record(s), {} stored: {}",
+            status.name,
+            status.status.failed,
+            status.status.failed + status.status.successful,
+            status.status.successful,
+            status.status.error
+        );
+    }
 }
 
 /// At most one warn per stream per interval; a poisoned lock silences rather than panics.
@@ -1335,6 +1361,47 @@ mod tests {
             policy_dropped: 0,
             error: String::new(),
         }));
+    }
+
+    #[test]
+    fn a_partial_drop_warrants_a_warn_even_though_the_batch_stored_records() {
+        let partial = RecordStatus {
+            successful: 9,
+            failed: 1,
+            policy_dropped: 1,
+            error: "too old".to_string(),
+        };
+        // The regression: gating the warn on `is_wholly_discarded` alone skips this,
+        // so a skewed source loses records indefinitely with nothing logged.
+        assert!(!is_wholly_discarded(&partial));
+        assert!(warrants_discard_warn(&partial));
+
+        // A batch that stored everything stays silent.
+        assert!(!warrants_discard_warn(&RecordStatus {
+            successful: 10,
+            failed: 0,
+            policy_dropped: 0,
+            error: String::new(),
+        }));
+    }
+
+    #[test]
+    fn a_policy_drop_increments_the_dropped_counter() {
+        let mut status = StreamStatus::new("s");
+        status.status = RecordStatus {
+            successful: 9,
+            failed: 1,
+            policy_dropped: 1,
+            error: "too old".to_string(),
+        };
+        let counter = metrics::INGEST_RECORDS_DROPPED
+            .get_metric_with_label_values(&["org_partial_drop", "logs", "ingestion_window"])
+            .unwrap();
+        let before = counter.get();
+
+        warn_and_count_discards("org_partial_drop", "/test", &status);
+
+        assert_eq!(counter.get(), before + 1);
     }
 
     /// The interval throttles per stream, so one bad client cannot drown the log.

@@ -82,7 +82,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 83: add folder_id to workflows.
 // 84: add folder_id to workflow_drafts.
 // 85: create llm_experiment_slot_retries.
-pub const DB_SCHEMA_VERSION: u64 = 85;
+// 86: create synthetics shared variables tables; add env to synthetics_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 86;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -792,6 +793,40 @@ impl std::str::FromStr for VortexCompression {
             "compact" => Ok(Self::Compact),
             _ => Err(anyhow::anyhow!(
                 "Invalid vortex compression '{s}': expected o2, native or compact"
+            )),
+        }
+    }
+}
+
+/// Where a single-file compaction builds its merged file, see `ZO_COMPACT_MERGE_OUTPUT`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CompactMergeOutput {
+    /// A temp file under `data_tmp_dir`, read back only for the upload.
+    #[default]
+    Disk,
+    /// The whole file in a `Vec<u8>`.
+    Memory,
+}
+
+impl std::fmt::Display for CompactMergeOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disk => write!(f, "disk"),
+            Self::Memory => write!(f, "memory"),
+        }
+    }
+}
+
+impl std::str::FromStr for CompactMergeOutput {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "disk" => Ok(Self::Disk),
+            "memory" => Ok(Self::Memory),
+            _ => Err(anyhow::anyhow!(
+                "Invalid compact merge output '{s}': expected disk or memory"
             )),
         }
     }
@@ -2853,7 +2888,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_DATA_RETENTION_INTERVAL",
         default = 3600,
-        help = "Interval in seconds for the data retention job, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL"
+        help = "Interval in seconds for generating data retention jobs, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL; pending delete jobs are executed every ZO_COMPACT_INTERVAL"
     )] // seconds
     pub data_retention_interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
@@ -2867,6 +2902,13 @@ pub struct Compact {
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 2048)] // MB
     pub max_file_size: usize,
+    #[env_config(
+        name = "ZO_COMPACT_MERGE_OUTPUT",
+        parse,
+        default = "disk",
+        help = "Where a logs/traces compaction builds its merged file (Parquet or Vortex): `disk` streams it to a temp file under ZO_DATA_TMP_DIR as it is encoded and reads it back only for the upload; `memory` buffers the whole file in a Vec<u8>, which costs the file size in RAM per running merge."
+    )]
+    pub merge_output: CompactMergeOutput,
     #[env_config(name = "ZO_COMPACT_EXTENDED_DATA_RETENTION_DAYS", default = 3650)] // days
     pub extended_data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
@@ -4229,10 +4271,11 @@ fn default_mem_table_bucket_num(
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
+    std::fs::create_dir_all(&cfg.common.data_cache_dir)
+        .map_err(|e| anyhow::anyhow!("create cache dir {}: {e}", cfg.common.data_cache_dir))?;
     let cache_dir_path = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("resolve cache dir {}: {e}", cfg.common.data_cache_dir))?;
     let cache_dir_owned = deverbatim(&cache_dir_path).into_owned();
     let cache_dir = cache_dir_owned.as_str();
 
@@ -5173,6 +5216,22 @@ mod tests {
             );
         }
         assert!("true".parse::<VortexCompression>().is_err());
+    }
+
+    #[test]
+    fn test_compact_merge_output_from_str() {
+        assert_eq!(CompactMergeOutput::default(), CompactMergeOutput::Disk);
+        for (text, expected) in [
+            ("disk", CompactMergeOutput::Disk),
+            (" Memory ", CompactMergeOutput::Memory),
+        ] {
+            assert_eq!(text.parse::<CompactMergeOutput>().unwrap(), expected);
+            assert_eq!(
+                expected.to_string().parse::<CompactMergeOutput>().unwrap(),
+                expected
+            );
+        }
+        assert!("vec".parse::<CompactMergeOutput>().is_err());
     }
 
     #[test]

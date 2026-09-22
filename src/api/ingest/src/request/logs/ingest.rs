@@ -45,6 +45,18 @@ use crate::{
     },
 };
 
+/// Matches on a prefix so a parameterised media type such as `application/json; charset=utf-8` is
+/// still recognised.
+fn otlp_request_type_from_content_type(content_type: &str) -> Option<OtlpRequestType> {
+    if content_type.starts_with(CONTENT_TYPE_PROTO) {
+        Some(OtlpRequestType::HttpProtobuf)
+    } else if content_type.starts_with(CONTENT_TYPE_JSON) {
+        Some(OtlpRequestType::HttpJson)
+    } else {
+        None
+    }
+}
+
 /// _bulk ES compatible ingestion API
 #[utoipa::path(
     post,
@@ -489,8 +501,8 @@ pub async fn otlp_logs_write(
             .into_response();
     }
 
-    let (request, request_type) = match content_type {
-        CONTENT_TYPE_PROTO => match ExportLogsServiceRequest::decode(body) {
+    let (request, request_type) = match otlp_request_type_from_content_type(content_type) {
+        Some(OtlpRequestType::HttpProtobuf) => match ExportLogsServiceRequest::decode(body) {
             Ok(req) => (req, OtlpRequestType::HttpProtobuf),
             Err(e) => {
                 log::error!("[LOGS:OTLP] Invalid proto: org_id: {org_id} {e}");
@@ -504,8 +516,10 @@ pub async fn otlp_logs_write(
                     .into_response();
             }
         },
-        CONTENT_TYPE_JSON => {
-            match serde_json::from_slice::<ExportLogsServiceRequest>(body.as_ref()) {
+        Some(OtlpRequestType::HttpJson) => {
+            match config::utils::json::from_slice_lenient_floats::<ExportLogsServiceRequest>(
+                body.as_ref(),
+            ) {
                 Ok(req) => (req, OtlpRequestType::HttpJson),
                 Err(e) => {
                     log::error!("[LOGS:OTLP] Invalid json: org_id: {org_id} {e}");

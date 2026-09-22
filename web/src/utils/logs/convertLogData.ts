@@ -4,6 +4,7 @@ import {
   classicColorPaletteDarkTheme,
 } from "@/utils/dashboard/colorPalette";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { dataZoomBrushStyle } from "@/utils/chartTheme";
 
 export const convertLogData = (
   x: any,
@@ -86,6 +87,7 @@ export const convertLogData = (
       bottom: "100%",
       feature: {
         dataZoom: {
+          brushStyle: dataZoomBrushStyle(),
           show: true,
           yAxisIndex: "none",
         },
@@ -344,7 +346,13 @@ export const convertStackedLogData = (
         itemSize: 0,
         itemGap: 0,
         bottom: "100%",
-        feature: { dataZoom: { show: true, yAxisIndex: "none" } },
+        feature: {
+          dataZoom: {
+            brushStyle: dataZoomBrushStyle(),
+            show: true,
+            yAxisIndex: "none",
+          },
+        },
       },
       series,
     },

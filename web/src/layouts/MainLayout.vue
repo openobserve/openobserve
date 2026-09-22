@@ -210,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
+    <ConnectDataSourcePopup />
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
@@ -261,6 +262,7 @@ import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
+import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -304,6 +306,7 @@ export default defineComponent({
     ShortcutCheatsheet,
     GetStarted,
     CommunitySlackInvite,
+    ConnectDataSourcePopup,
     ODialog,
     ODrawer,
     OButton,
@@ -957,11 +960,6 @@ export default defineComponent({
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
           if (isEmptyDataExempt(router.currentRoute.value)) return;
-          toast({
-            variant: "warning",
-            message: t("toastMessages.layouts.ingestionNotStarted"),
-            timeout: 5000,
-          });
           router.push({ name: "ingestion" });
         } else {
           store.dispatch("setIsDataIngested", true);
@@ -1161,6 +1159,7 @@ export default defineComponent({
         dark_mode_theme_color: undefined,
         claim_parser_function: "",
         org_storage_enabled: false,
+        domain_org_mappings: [],
       };
 
       try {
@@ -1204,6 +1203,7 @@ export default defineComponent({
           cross_links: orgSettings?.data?.data?.cross_links ?? [],
           org_storage_enabled:
             orgSettings?.data?.data?.org_storage_enabled ?? defaultSettings.org_storage_enabled,
+          domain_org_mappings: orgSettings?.data?.data?.domain_org_mappings ?? [],
         });
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org

@@ -534,24 +534,10 @@
         <!-- Asked HERE and nowhere else. A cause collected later is a cause
              never collected, and it is the only input the prior-causes panel
              has. -->
-        <div class="flex flex-col gap-1">
-          <span class="text-text-secondary text-xs">{{ t("oncall.resolveCause") }}</span>
-          <span class="text-text-secondary text-xs">{{ t("oncall.resolveCauseHint") }}</span>
-          <OSelect
-            v-model="resolveCause"
-            :options="causeOptions"
-            clearable
-            :placeholder="t('oncall.resolveCausePlaceholder')"
-            data-test="oncall-resolve-cause"
-          />
-        </div>
-
-        <OTextarea
-          v-model="resolveNote"
-          :label="t('oncall.resolveCauseNote')"
-          :placeholder="t('oncall.resolveCauseNotePlaceholder')"
-          :rows="2"
-          data-test="oncall-resolve-cause-note"
+        <OnCallResolveCauseForm
+          v-model:cause="resolveCause"
+          v-model:note="resolveNote"
+          data-test-prefix="oncall-resolve"
         />
       </div>
 
@@ -606,6 +592,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallActivityTimeline from "@/components/oncall/OnCallActivityTimeline.vue";
+import OnCallResolveCauseForm from "@/components/oncall/OnCallResolveCauseForm.vue";
 import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
 import OnCallResponseDetailSkeleton from "./OnCallResponseDetailSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -658,7 +645,6 @@ import type {
   ResolvedSegment,
   TeamReachability,
 } from "@/ts/interfaces/oncall";
-import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
@@ -1008,10 +994,6 @@ const subjectStream = computed(() => {
   if (!alert?.stream_name) return null;
   return alert.stream_type ? `${alert.stream_name} (${alert.stream_type})` : alert.stream_name;
 });
-
-const causeOptions = computed(() =>
-  RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
-);
 
 const handoffTarget = computed(() =>
   handoffMode.value === "person" ? handoffPerson.value : handoffTeam.value,

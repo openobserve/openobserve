@@ -543,6 +543,15 @@ pub fn schema_records_to_entries(
         .collect()
 }
 
+/// Only a server fault is 500: a batch the client must fix is 400 and an overload is 503.
+pub fn write_error_status(e: &Error) -> http::StatusCode {
+    match e {
+        Error::ResourceError(_) => http::StatusCode::SERVICE_UNAVAILABLE,
+        e if e.is_columns_limit_exceeded() => http::StatusCode::BAD_REQUEST,
+        _ => http::StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
 /// An entry carrying a `batch` counts its rows from the batch, not from `data`.
 pub async fn write_entries(
     writer: &Arc<ingester::Writer>,
@@ -570,7 +579,11 @@ pub async fn write_entries(
             stream_name,
             e
         );
-        return Err(Error::IngestionError(e.to_string()));
+        return Err(if e.is_overload() {
+            Error::ResourceError(e.to_string())
+        } else {
+            Error::IngestionError(e.to_string())
+        });
     }
 
     req_stats.size += entries_size as f64 / SIZE_IN_MB;
@@ -1442,5 +1455,22 @@ mod tests {
                 .err()
                 .expect("over the limit");
         assert!(err.to_string().contains("columns"), "{err}");
+    }
+
+    #[test]
+    fn test_write_error_status() {
+        let columns = schema::get_request_columns_limit_error("o/logs/s", 243);
+        assert_eq!(
+            write_error_status(&Error::OtherError(columns)),
+            http::StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            write_error_status(&Error::ResourceError("write queue full".to_string())),
+            http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            write_error_status(&Error::IngestionError("disk failure".to_string())),
+            http::StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }

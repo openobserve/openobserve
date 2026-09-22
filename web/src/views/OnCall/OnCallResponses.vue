@@ -738,13 +738,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
 
-    <ConfirmDialog
-      v-model="confirmBulkResolve"
+    <ODialog
+      :open="confirmBulkResolve"
+      @update:open="(v: boolean) => (v ? (confirmBulkResolve = v) : closeBulkResolveDialog())"
       :title="t('oncall.bulkResolveTitle')"
-      :message="t('oncall.bulkResolveConfirm', { count: selectedIds.length })"
-      @update:ok="bulkResolve"
-      @update:cancel="confirmBulkResolve = false"
-    />
+      data-test="oncall-bulk-resolve-dialog"
+    >
+      <div class="flex flex-col gap-3">
+        <p class="text-text-secondary text-sm">
+          {{ t("oncall.bulkResolveConfirm", { count: selectedIds.length }) }}
+        </p>
+
+        <OnCallResolveCauseForm
+          v-model:cause="bulkResolveCause"
+          v-model:note="bulkResolveNote"
+          data-test-prefix="oncall-bulk-resolve"
+        />
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <OButton variant="outline" size="sm-action" @click="closeBulkResolveDialog">
+            {{ t("oncall.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="bulkBusy"
+            data-test="oncall-bulk-resolve-confirm"
+            @click="bulkResolve"
+          >
+            {{ t("oncall.resolve") }}
+          </OButton>
+        </div>
+      </template>
+    </ODialog>
   </OPageLayout>
 </template>
 
@@ -753,9 +781,9 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallActivityTimeline from "@/components/oncall/OnCallActivityTimeline.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
+import OnCallResolveCauseForm from "@/components/oncall/OnCallResolveCauseForm.vue";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
@@ -764,6 +792,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -939,6 +968,8 @@ const causeFilter = ref<ResolutionCause | "">("");
 const busyId = ref("");
 const bulkBusy = ref(false);
 const confirmBulkResolve = ref(false);
+const bulkResolveCause = ref<ResolutionCause | "">("");
+const bulkResolveNote = ref("");
 
 // Only after the first fetch, so the checklist never flashes while loading.
 const loaded = ref(false);
@@ -1526,11 +1557,19 @@ async function bulkSnooze(minutes: number) {
   );
 }
 
-async function bulkResolve() {
+function closeBulkResolveDialog() {
   confirmBulkResolve.value = false;
+  bulkResolveCause.value = "";
+  bulkResolveNote.value = "";
+}
+
+async function bulkResolve() {
+  const cause = bulkResolveCause.value || undefined;
+  const cause_note = bulkResolveNote.value.trim() || undefined;
+  closeBulkResolveDialog();
   await runBulk(
     selectedRecords((r) => r.firings.filter((f) => f.state !== "resolved")),
-    (id) => resolveWrite.mutateAsync({ responseId: id }),
+    (id) => resolveWrite.mutateAsync({ responseId: id, cause, causeNote: cause_note }),
     "bulkResolveDone",
     "bulkResolvePartial",
   );

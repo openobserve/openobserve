@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "cloud")]
-use config::DEFAULT_ORG;
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 use openobserve_core::{organization, users};
 #[cfg(feature = "cloud")]
@@ -44,6 +42,13 @@ use {
     serde_json::Value,
     std::collections::HashMap,
     std::sync::LazyLock as Lazy,
+};
+#[cfg(feature = "cloud")]
+use {
+    config::{DEFAULT_ORG, META_ORG_ID, meta::user::UserRole, utils::rand::generate_random_string},
+    db::{org_users, organization::get_org_setting},
+    o2_openfga::authorizer::{authz::get_add_user_to_org_tuples, groups::update_group},
+    std::{collections::HashSet, str::FromStr as _},
 };
 
 #[cfg(feature = "cloud")]
@@ -830,6 +835,70 @@ async fn publish_org_not_found_error(org_id: &str, user_email: &str) {
 }
 
 #[cfg(feature = "cloud")]
+pub async fn process_domain_org_mapping(user_email: &str) -> Result<bool, anyhow::Error> {
+    let meta_settings = get_org_setting(META_ORG_ID).await?;
+    let mappings = meta_settings.domain_org_mappings;
+    // split email to get the domain
+    if let Some((_, domain)) = user_email.to_lowercase().split_once("@") {
+        if let Some(mapped) = mappings
+            .into_iter()
+            .find(|m| m.domain.to_lowercase() == domain)
+        {
+            log::info!("found domain org mapping for user {user_email}, processing");
+            let base_role = UserRole::from_str(&mapped.base_role).map_err(|e| {
+                anyhow::anyhow!(
+                    "error parsing domain org role {} to user role : {e:?}",
+                    mapped.base_role
+                )
+            })?;
+            // first add the user entry itself to the ofga, as a member of the mapped org with
+            // mapped base role
+            let mut new_tuples = Vec::new();
+            get_add_user_to_org_tuples(
+                &mapped.org_id,
+                user_email,
+                &mapped.base_role,
+                &mut new_tuples,
+            );
+            update_tuples(new_tuples, vec![]).await?;
+            // then if there is some user group to be added, add user to that group
+            if let Some(group) = mapped.user_group {
+                let mut user_set = HashSet::new();
+                user_set.insert(user_email.to_string());
+                update_group(&mapped.org_id, &group, Some(user_set), None, None, None).await?;
+            }
+            // finally add the org user entry, this is last
+            // because ofga is in a way idempotent, so if if it gets retried again, it will work
+            // but having org user entry but not ofga mapping can cause a lot of issues with 401s
+            // which would be difficult to resolve, so try it the last
+            org_users::add(
+                &mapped.org_id,
+                user_email,
+                base_role,
+                &generate_random_string(16),
+                Some(format!("rum{}", generate_random_string(16))),
+            )
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to add user {user_email} to org in domain org mapping processing : {e}"
+                )
+            })?;
+            log::info!("domain org mapping for user {user_email} successfully processed");
+            return Ok(true);
+        } else {
+            log::info!("no domain org mapping found for user {user_email}, continuing normally");
+            return Ok(false);
+        }
+    } else {
+        log::warn!(
+            "user email {user_email} could not be split correctly at @, skipping org domain mapping"
+        );
+        return Ok(false);
+    }
+}
+
+#[cfg(feature = "cloud")]
 pub async fn check_and_add_to_org(
     user_email: &str,
     name: &str,
@@ -883,6 +952,21 @@ pub async fn check_and_add_to_org(
                 log::error!("Error adding user to the database: {}", e);
                 return Ok((is_new_user, pending_invites));
             }
+        }
+    }
+
+    // if user is a new user, process org mappings for them
+    if is_new_user {
+        match process_domain_org_mapping(user_email).await {
+            Ok(processed) => {
+                if processed {
+                    // domain based adding is done, so do not treat as a new user
+                    return Ok((false, pending_invites));
+                }
+            }
+            Err(e) => log::error!(
+                "error processing domain org mapping for user {user_email}, continuing normally : {e}"
+            ),
         }
     }
 
@@ -959,7 +1043,7 @@ pub async fn check_and_add_to_org(
                     log::info!("User updated to the openfga");
                 }
                 Err(e) => {
-                    log::error!("Error updating user to the openfga: {}", e);
+                    log::error!("Error updating user {user_email} to the openfga: {}", e);
                 }
             }
         }

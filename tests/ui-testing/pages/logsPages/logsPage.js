@@ -147,6 +147,8 @@ export class LogsPage {
         this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.errorMessage = '[data-test="logs-search-error-state"]';
+        // Stream-not-found (filter) error branch: pre-run detection of a missing stream name in a SQL query — distinct from the post-run logs-search-error-state (code 20002).
+        this.filterErrorMessage = '[data-test="logs-search-filter-error-message"]';
         // Generic error indicator (class/role based) used when no data-test error hook exists.
         this.genericErrorSelector = '[class*="error"], [class*="negative"], [role="alert"]';
         this.warningElement = 'text=warning Query execution';
@@ -3485,6 +3487,48 @@ export class LogsPage {
             return expectedSubstring ? last.includes(expectedSubstring) : last.trim().length > 0;
         }, { timeout, intervals: [300, 500, 800, 1200] }).toBe(true);
         return last;
+    }
+
+    async getSelectedStreamTriggerLabel() {
+        const trigger = this.page.locator(this.indexDropDownTrigger);
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        return await trigger.getAttribute('data-test-selected-label');
+    }
+
+    async getRenderedStreamNameStyles() {
+        // Assert computed text-transform, not textContent — o2-enterprise#1745 regresses via CSS capitalize, not the stored name.
+        const triggerSel = this.indexDropDownTrigger;
+        return await this.page.evaluate((sel) => {
+            const out = [];
+            const record = (el) => {
+                const text = (el.textContent || '').trim();
+                if (text) out.push({ text, textTransform: getComputedStyle(el).textTransform });
+            };
+            const trigger = document.querySelector(sel);
+            if (trigger) trigger.querySelectorAll('span').forEach(record);
+            document.querySelectorAll('.text-field-list-group-text').forEach(record);
+            return out;
+        }, triggerSel);
+    }
+
+    async clearPersistedStreamSelection() {
+        const orgId = getOrgIdentifier();
+        await this.page.evaluate((id) => {
+            try {
+                localStorage.removeItem(`oo_selected_stream_logs_${id}`);
+                localStorage.removeItem(`oo_logs_stream_type_${id}`);
+            } catch (e) { /* storage unavailable in this context */ }
+        }, orgId);
+    }
+
+    async expectSelectStreamPrompt() {
+        await expect(this.page.locator(this.noStreamHero)).toBeVisible({ timeout: 20000 });
+        await expect(this.page.locator(this.selectStreamCard)).toBeVisible();
+        await expect(this.page.locator(this.queryGuideCard)).toBeVisible();
+    }
+
+    async isRunQueryButtonVisible(timeout = 3000) {
+        return await this.page.locator(this.searchBarRefreshButton).first().isVisible({ timeout }).catch(() => false);
     }
 
     async clickLogTableColumnSource() {
@@ -12214,6 +12258,71 @@ export class LogsPage {
         const hero = this.page.locator(this.noStreamHero);
         await hero.waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('No-stream hero is visible');
+    }
+
+    /**
+     * Asserts the generic "no stream selected" hero is NOT visible — the regression
+     * this feature fixes: the filter-error branch must win over the empty state.
+     */
+    async expectNoStreamHeroNotVisible() {
+        await expect(
+            this.page.locator(this.noStreamHero),
+            'No-stream-selected hero should NOT be visible when the filter error is shown',
+        ).not.toBeVisible();
+        testLogger.info('No-stream hero is not visible');
+    }
+
+    /**
+     * Waits for the stream-not-found (filter) error branch to become visible.
+     */
+    async waitForStreamNotFoundError(timeout = 15000) {
+        await expect(
+            this.page.locator(this.filterErrorMessage),
+            'Stream-not-found error should be visible',
+        ).toBeVisible({ timeout });
+        testLogger.info('Stream-not-found error is visible');
+    }
+
+    /**
+     * Asserts the stream-not-found (filter) error branch is NOT visible.
+     */
+    async expectStreamNotFoundErrorNotVisible() {
+        await expect(
+            this.page.locator(this.filterErrorMessage),
+            'Stream-not-found error should NOT be visible',
+        ).not.toBeVisible();
+        testLogger.info('Stream-not-found error is not visible');
+    }
+
+    /**
+     * Waits for the stream-not-found (filter) error branch to disappear (query
+     * cleared or a stream selected).
+     */
+    async waitForStreamNotFoundErrorHidden(timeout = 15000) {
+        await expect(
+            this.page.locator(this.filterErrorMessage),
+            'Stream-not-found error should be hidden',
+        ).toBeHidden({ timeout });
+        testLogger.info('Stream-not-found error is hidden');
+    }
+
+    /**
+     * Reads the stream-not-found error summary text (the exact `Stream "<name>"
+     * does not exist` message), polling until the summary is populated.
+     */
+    async getStreamNotFoundErrorText(timeout = 15000) {
+        const summary = this.page.locator(this.searchErrorSummary).first();
+        let text = '';
+        await expect
+            .poll(
+                async () => {
+                    text = ((await summary.textContent().catch(() => null)) || '').trim();
+                    return text;
+                },
+                { timeout, message: 'Stream-not-found error summary never populated' },
+            )
+            .not.toBe('');
+        return text;
     }
 
     /**

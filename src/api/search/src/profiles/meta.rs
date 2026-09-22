@@ -97,8 +97,8 @@ pub async fn get_profiles_meta(
     let request_trace_id = get_or_create_trace_id(&headers, &http_span);
     let started = std::time::Instant::now();
     let stream = quote_identifier(&stream_name);
-    // Flattened tags are columns: label_names come from the stream schema.
-    let label_names = discover_label_names(&org_id, &stream_name).await;
+    let schema_fields = load_schema_field_names(&org_id, &stream_name).await;
+    let label_names = label_names_from_schema_fields(schema_fields.iter().map(|s| s.as_str()));
     let sql_params = ProfilesSqlParams {
         request_trace_id: &request_trace_id,
         org_id: &org_id,
@@ -108,16 +108,23 @@ pub async fn get_profiles_meta(
         timeout,
     };
 
-    let (data_sources_res, services_res, profile_types_res) = tokio::join!(
-        distinct_values(&sql_params, &stream, "otel_scope_name", http_span.clone()),
-        distinct_values(&sql_params, &stream, "service_name", http_span.clone()),
-        load_profile_types(&sql_params, &stream, http_span),
-    );
-
-    let data_sources = match data_sources_res {
-        Ok(v) => v,
-        Err(response) => return response,
+    // Only DISTINCT columns present in schema — async-profiler data often has no service_name.
+    let services_fut = async {
+        if schema_fields.iter().any(|f| f == "service_name") {
+            distinct_values(&sql_params, &stream, "service_name", http_span.clone()).await
+        } else {
+            Ok(Vec::new())
+        }
     };
+    let profile_types_fut = async {
+        if schema_fields.iter().any(|f| f == "profile_type") {
+            load_profile_types(&sql_params, &stream, http_span.clone()).await
+        } else {
+            Ok(Vec::new())
+        }
+    };
+    let (services_res, profile_types_res) = tokio::join!(services_fut, profile_types_fut);
+
     let services = match services_res {
         Ok(v) => v,
         Err(response) => return response,
@@ -128,7 +135,7 @@ pub async fn get_profiles_meta(
     };
 
     Json(ProfilesMetaResponse {
-        data_sources,
+        data_sources: Vec::new(),
         services,
         profile_types,
         label_names,
@@ -159,13 +166,15 @@ async fn distinct_values(
     Ok(values)
 }
 
-async fn discover_label_names(org_id: &str, stream_name: &str) -> Vec<String> {
+async fn load_schema_field_names(org_id: &str, stream_name: &str) -> Vec<String> {
     match infra::schema::get(org_id, stream_name, StreamType::Profiles).await {
-        Ok(schema) => {
-            label_names_from_schema_fields(schema.fields().iter().map(|f| f.name().as_str()))
-        }
+        Ok(schema) => schema
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect(),
         Err(e) => {
-            warn!("profiles meta schema lookup failed, returning empty label_names: {e}");
+            warn!("profiles meta schema lookup failed: {e}");
             Vec::new()
         }
     }
