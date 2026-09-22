@@ -322,7 +322,10 @@ const emailRecipientOptions = computed<SelectOption[]>(() => {
   }));
   const options: SelectOption[] = [];
   if (users.length) {
-    options.push({ label: t("alerts.prebuiltDestinations.emailRecipientsGroupUsers"), header: true });
+    options.push({
+      label: t("alerts.prebuiltDestinations.emailRecipientsGroupUsers"),
+      header: true,
+    });
     options.push(...users);
   }
   if (serviceAccounts.length) {

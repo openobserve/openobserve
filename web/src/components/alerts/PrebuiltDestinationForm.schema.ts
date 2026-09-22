@@ -74,7 +74,14 @@ export const makePrebuiltDestinationSchema = (
       // destination saved before the picker existed) is split into its addresses.
       shape[field.key] = z
         .union([z.array(z.string()), z.string()])
-        .transform((v) => (Array.isArray(v) ? v : v.split(",").map((s) => s.trim()).filter(Boolean)))
+        .transform((v) =>
+          Array.isArray(v)
+            ? v
+            : v
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+        )
         .optional();
     } else {
       shape[field.key] = z.string().optional();
@@ -88,9 +95,7 @@ export const makePrebuiltDestinationSchema = (
       const isEmpty =
         value === undefined ||
         value === null ||
-        (Array.isArray(value)
-          ? value.length === 0
-          : value.toString().trim() === "");
+        (Array.isArray(value) ? value.length === 0 : value.toString().trim() === "");
 
       // Required + empty → "<label> is required" (do NOT run the validator).
       if (field.required && isEmpty) {
