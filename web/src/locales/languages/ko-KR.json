@@ -19096,7 +19096,7 @@
     "routingSaysPlace": "{value} {noun}에서 발생한 모든 알림 및 인시던트",
     "routingSaysPlaces": "{scope}에서 발생한 모든 알림 및 인시던트",
     "routingSaysAnything": "모든 알림 및 인시던트",
-    "routingNoLadder": "아직 에스컬레이션 정책이 없습니다",
+    "routingNoLadder": "아직 에스컬레이션 단계가 없습니다",
     "routingPagesTeam": "{team}에 페이지를 보냅니다",
     "routingCaughtLast": "페이지 {count}건 · 마지막: {when} | 페이지 {count}건 · 마지막: {when}",
     "routingEmptyBodyNamed": "규칙이 수신 알림과 일치하기 전에는 {team}에 페이지가 전송되지 않습니다.",

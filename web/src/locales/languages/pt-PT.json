@@ -19096,7 +19096,7 @@
     "routingSaysPlace": "Todos os alertas e incidentes de {noun} {value}",
     "routingSaysPlaces": "Todos os alertas e incidentes de {scope}",
     "routingSaysAnything": "Todos os alertas e incidentes",
-    "routingNoLadder": "ainda sem escada de escalonamento",
+    "routingNoLadder": "Ainda não há escada de escalonamento",
     "routingPagesTeam": "notifica {team}",
     "routingCaughtLast": "{count} notificação · nos últimos {when} | {count} notificações · nos últimos {when}",
     "routingEmptyBodyNamed": "{team} não será notificado até que uma regra corresponda a um alerta de entrada.",

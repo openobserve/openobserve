@@ -19096,7 +19096,7 @@
     "routingSaysPlace": "Tất cả cảnh báo và sự cố từ {value} {noun}",
     "routingSaysPlaces": "Tất cả cảnh báo và sự cố từ {scope}",
     "routingSaysAnything": "Tất cả cảnh báo và sự cố",
-    "routingNoLadder": "chưa có thang leo thang",
+    "routingNoLadder": "Chưa có thang leo thang",
     "routingPagesTeam": "gọi {team}",
     "routingCaughtLast": "{count} lần gọi · lần cuối {when} | {count} lần gọi · lần cuối {when}",
     "routingEmptyBodyNamed": "{team} sẽ không được gọi cho đến khi một quy tắc khớp với cảnh báo đến.",

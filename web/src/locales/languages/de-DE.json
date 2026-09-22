@@ -19096,7 +19096,7 @@
     "routingSaysPlace": "Alle Warnmeldungen und Vorfälle aus {value} {noun}",
     "routingSaysPlaces": "Alle Warnmeldungen und Vorfälle aus {scope}",
     "routingSaysAnything": "Alle Warnmeldungen und Vorfälle",
-    "routingNoLadder": "noch keine Eskalationsleiter",
+    "routingNoLadder": "Noch keine Eskalationskette",
     "routingPagesTeam": "benachrichtigt {team}",
     "routingCaughtLast": "{count} Benachrichtigung · letzte {when} | {count} Benachrichtigungen · letzte {when}",
     "routingEmptyBodyNamed": "{team} wird nicht benachrichtigt, bis eine Regel eine eingehende Warnmeldung abfängt.",

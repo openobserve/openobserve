@@ -326,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-button-outline-border h-auto! rounded-s-none! border-s!"
         icon-left="chevron-right"
         :aria-label="t('common.next')"
-        :disabled="disable"
+        :disabled="disable || isNextShiftDisabled()"
         @click.prevent.stop="shiftTimeRange('next')"
       />
     </OTooltip>
@@ -366,6 +366,8 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
+
+const MICROS_PER_SECOND = 1_000_000;
 
 interface ConsumableDateTime {
   startTime: number;
@@ -1247,7 +1249,12 @@ export default defineComponent({
       const duration = endTime - startTime;
       if (!(duration > 0)) return;
 
-      const delta = (direction === "prev" ? -1 : 1) * duration;
+      let delta = (direction === "prev" ? -1 : 1) * duration;
+      if (direction === "next") {
+        // The calendar rejects future dates, so a forward shift stops at now.
+        delta = Math.min(delta, Date.now() * 1000 - endTime);
+        if (delta < MICROS_PER_SECOND) return;
+      }
       const startDateTime = convertUnixTime(startTime + delta);
       const endDateTime = convertUnixTime(endTime + delta);
 
@@ -1259,6 +1266,12 @@ export default defineComponent({
 
       menuOpen.value = false;
       if (!props.autoApply) saveDate("absolute");
+    };
+
+    const isNextShiftDisabled = () => {
+      if (selectedType.value === "relative") return true;
+      const { endUTC } = getUTCTimeStamp();
+      return !(endUTC + MICROS_PER_SECOND <= Date.now() * 1000);
     };
 
     // Arrow-key navigation for the picker panel: Left/Right switch the
@@ -1490,6 +1503,7 @@ export default defineComponent({
       optionsFn,
       setDateType,
       shiftTimeRange,
+      isNextShiftDisabled,
       onPickerKeydown,
       getConsumableDateTime,
       relativeDatesInHour,

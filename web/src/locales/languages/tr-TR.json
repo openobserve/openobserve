@@ -19096,7 +19096,7 @@
     "routingSaysPlace": "{value} {noun} kaynağından tüm uyarılar ve olaylar",
     "routingSaysPlaces": "{scope} kaynağından tüm uyarılar ve olaylar",
     "routingSaysAnything": "Tüm uyarılar ve olaylar",
-    "routingNoLadder": "henüz yükseltme merdiveni yok",
+    "routingNoLadder": "Henüz eskalasyon zinciri yok",
     "routingPagesTeam": "{team} ekibine çağrı gönderir",
     "routingCaughtLast": "{count} çağrı · son {when} | {count} çağrı · son {when}",
     "routingEmptyBodyNamed": "Bir kural gelen bir uyarıyla eşleşene kadar {team} ekibine çağrı gönderilmez.",
