@@ -144,7 +144,6 @@ pub async fn get_trace_details(
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
-            bypass_index_optimizer: false,
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],

@@ -2985,8 +2985,6 @@ pub async fn execute_anomaly_query(
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
-            // Origin-blind binning diverges from date_bin at 7m/11m/5h, all validator-legal.
-            bypass_index_optimizer: true,
             ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,

@@ -1381,7 +1381,6 @@ mod tests {
                 timezone: None,
                 sampling_ratio: None,
                 sampling_config: None,
-                bypass_index_optimizer: false,
             },
             encoding: RequestEncoding::Empty,
             regions: vec![],
