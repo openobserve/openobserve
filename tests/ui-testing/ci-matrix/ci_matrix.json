@@ -165,7 +165,8 @@
       "dashboard-table-column-filtering.spec.js",
       "dashboard-table-pagination.spec.js",
       "dashboard-pivot-table.spec.js",
-      "interactive-dashboard-table.spec.js"
+      "interactive-dashboard-table.spec.js",
+      "dashboard-cell-explorer-detail.spec.js"
     ],
     "disabled": []
   },
