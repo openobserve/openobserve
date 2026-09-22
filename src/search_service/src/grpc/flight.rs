@@ -640,7 +640,7 @@ fn optimizer_physical_plan(
     let original_plan = Arc::clone(&plan);
     let plan = index_rule.optimize(plan, ctx.state().config_options())?;
 
-    // bypass: the fast path bins on the epoch grid, but date_bin bins on the 2001 origin
+    // Guard here: an installed fast path also drops indexed files, silently losing buckets.
     if bypass_index_optimizer || !index_rule.can_optimize() {
         index_optimizer_rule_ref.lock().take();
     }
