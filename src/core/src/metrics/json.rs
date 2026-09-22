@@ -67,8 +67,7 @@ struct StreamLookups {
     need_all_values: HashMap<String, bool>,
     partitions: HashMap<String, Vec<StreamPartition>>,
     alerts: HashMap<String, Vec<Alert>>,
-    deleting: HashMap<String, bool>,
-    bounds: ingest::BoundsCache,
+    policies: ingest::StreamPolicies,
 }
 
 impl StreamLookups {
@@ -81,8 +80,7 @@ impl StreamLookups {
             need_all_values: HashMap::new(),
             partitions: HashMap::new(),
             alerts: HashMap::new(),
-            deleting: HashMap::new(),
-            bounds: ingest::BoundsCache::new(org_id, now),
+            policies: ingest::StreamPolicies::new(org_id, now),
         }
     }
 }
@@ -146,21 +144,8 @@ async fn buffer_record(
         *v = json::Value::String(stream_name.clone());
     }
 
-    // check stream if it is deleting
-    let is_deleting = match lookups.deleting.get(&stream_name) {
-        Some(v) => *v,
-        None => {
-            let flag = db::compact::retention::is_deleting_stream(
-                org_id,
-                StreamType::Metrics,
-                &stream_name,
-                None,
-            );
-            lookups.deleting.insert(stream_name.clone(), flag);
-            flag
-        }
-    };
-    if is_deleting {
+    let policy = lookups.policies.get(&stream_name).await;
+    if policy.deleting {
         return Ok(false);
     }
 
@@ -211,7 +196,7 @@ async fn buffer_record(
         }
     };
     // checked before the stream is created, so a rejected record leaves nothing behind
-    if let Err(reason) = lookups.bounds.get(&stream_name).await.check(timestamp) {
+    if let Err(reason) = policy.bounds.check(timestamp) {
         let status = stream_status_map
             .entry(stream_name.clone())
             .or_insert_with(|| StreamStatus::new(&stream_name));

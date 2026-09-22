@@ -222,7 +222,7 @@ pub async fn handle_otlp_request(
 
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let mut bounds = ingest::BoundsCache::new(org_id, started_at);
+    let mut policies = ingest::StreamPolicies::new(org_id, started_at);
 
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
@@ -248,8 +248,6 @@ pub async fn handle_otlp_request(
     // gauge and sum streams nothing downstream needs as JSON go straight to arrow
     let mut columnar_streams: HashMap<String, Option<ColumnarStream>> = HashMap::new();
 
-    // check if stream is deleting from cache
-    let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
 
     for resource_metric in &request.resource_metrics {
@@ -260,22 +258,8 @@ pub async fn handle_otlp_request(
             for metric in &scope_metric.metrics {
                 let metric_name = format_stream_name(metric.name.to_string());
 
-                // check stream if it is deleting
-                let is_deleting = match stream_delete_status.get(&metric_name) {
-                    Some(v) => *v,
-                    None => {
-                        let flag = db::compact::retention::is_deleting_stream(
-                            org_id,
-                            StreamType::Metrics,
-                            &metric_name,
-                            None,
-                        );
-                        stream_delete_status.insert(metric_name.clone(), flag);
-                        flag
-                    }
-                };
-
-                if is_deleting {
+                let policy = policies.get(&metric_name).await;
+                if policy.deleting {
                     skipped_records += 1;
                     continue;
                 }
@@ -437,9 +421,8 @@ pub async fn handle_otlp_request(
                                         &stream_partitioning_map,
                                     )
                                 });
-                        let stream_bounds = bounds.get(&metric_name).await;
                         let admitted = points.iter().filter(|point| {
-                            match stream_bounds.check(point_timestamp(point.time_unix_nano)) {
+                            match policy.bounds.check(point_timestamp(point.time_unix_nano)) {
                                 Ok(()) => true,
                                 Err(reason) => {
                                     reject_point(
@@ -472,7 +455,7 @@ pub async fn handle_otlp_request(
                         .get(TIMESTAMP_COL_NAME)
                         .and_then(json::Value::as_i64)
                         .unwrap_or(i64::MAX);
-                    let stream_bounds = bounds.get(&local_metric_name).await;
+                    let stream_bounds = policies.get(&local_metric_name).await.bounds;
                     if let Err(reason) = stream_bounds.check(timestamp) {
                         reject_point(&mut partial_success, org_id, &local_metric_name, reason);
                         continue;

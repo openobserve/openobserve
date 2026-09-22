@@ -150,14 +150,21 @@ impl OutOfBounds {
     }
 }
 
-/// Per-request cache of each stream's bounds, all measured from the same `now`.
-pub(super) struct BoundsCache {
-    pub(super) org_id: String,
-    now: i64,
-    by_stream: HashMap<String, TimestampBounds>,
+/// Whether a stream takes records at all, and which timestamps it takes.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct StreamPolicy {
+    pub deleting: bool,
+    pub bounds: TimestampBounds,
 }
 
-impl BoundsCache {
+/// Per-request cache of each stream's policy, all measured from the same `now`.
+pub(super) struct StreamPolicies {
+    pub(super) org_id: String,
+    now: i64,
+    by_stream: HashMap<String, StreamPolicy>,
+}
+
+impl StreamPolicies {
     pub(super) fn new(org_id: &str, now: i64) -> Self {
         Self {
             org_id: org_id.to_string(),
@@ -166,19 +173,29 @@ impl BoundsCache {
         }
     }
 
-    pub(super) async fn get(&mut self, stream_name: &str) -> TimestampBounds {
-        if let Some(bounds) = self.by_stream.get(stream_name) {
-            return *bounds;
+    /// One map lookup per call on the hot path; the stream's settings are read only once.
+    pub(super) async fn get(&mut self, stream_name: &str) -> StreamPolicy {
+        if let Some(policy) = self.by_stream.get(stream_name) {
+            return *policy;
         }
+        let deleting = db::compact::retention::is_deleting_stream(
+            &self.org_id,
+            StreamType::Metrics,
+            stream_name,
+            None,
+        );
         let retention_days =
             infra::schema::get_settings(&self.org_id, stream_name, StreamType::Metrics)
                 .await
                 .map(|s| s.data_retention)
                 .filter(|days| *days > 0)
                 .unwrap_or_else(|| get_config().compact.data_retention_days);
-        let bounds = TimestampBounds::new(self.now, retention_days);
-        self.by_stream.insert(stream_name.to_string(), bounds);
-        bounds
+        let policy = StreamPolicy {
+            deleting,
+            bounds: TimestampBounds::new(self.now, retention_days),
+        };
+        self.by_stream.insert(stream_name.to_string(), policy);
+        policy
     }
 }
 

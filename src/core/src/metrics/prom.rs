@@ -97,9 +97,9 @@ impl HaGate<'_> {
     }
 }
 
-/// The timestamp policy plus the samples it refused; remote-write can only log those.
+/// The per-stream policies plus the samples they refused; remote-write can only log those.
 struct Admission {
-    bounds: ingest::BoundsCache,
+    policies: ingest::StreamPolicies,
     rejected: usize,
     last_rejection: Option<ingest::OutOfBounds>,
 }
@@ -107,7 +107,7 @@ struct Admission {
 impl Admission {
     fn new(org_id: &str, now: i64) -> Self {
         Self {
-            bounds: ingest::BoundsCache::new(org_id, now),
+            policies: ingest::StreamPolicies::new(org_id, now),
             rejected: 0,
             last_rejection: None,
         }
@@ -125,7 +125,7 @@ impl Admission {
             Err(reason) => {
                 self.rejected += 1;
                 self.last_rejection = Some(reason);
-                reason.count(&self.bounds.org_id, stream_name);
+                reason.count(&self.policies.org_id, stream_name);
                 false
             }
         }
@@ -175,8 +175,6 @@ pub async fn remote_write(
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
 
-    // check if stream is deleting from cache
-    let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
 
     // parse metadata
@@ -322,7 +320,7 @@ pub async fn remote_write(
         preload_alerts_time = t.elapsed().as_micros();
 
         for stream in &streams {
-            admission.bounds.get(&stream.stream_name).await;
+            admission.policies.get(&stream.stream_name).await;
         }
     }
     let total_preload_time = preload_start.elapsed().as_micros();
@@ -389,22 +387,8 @@ pub async fn remote_write(
             None => continue,
         };
 
-        // check stream if it is deleting
-        let is_deleting = match stream_delete_status.get(&metric_name) {
-            Some(v) => *v,
-            None => {
-                let flag = db::compact::retention::is_deleting_stream(
-                    org_id,
-                    StreamType::Metrics,
-                    &metric_name,
-                    None,
-                );
-                stream_delete_status.insert(metric_name.clone(), flag);
-                flag
-            }
-        };
-
-        if is_deleting {
+        let policy = admission.policies.get(&metric_name).await;
+        if policy.deleting {
             skipped_records += 1;
             continue;
         }
@@ -422,7 +406,7 @@ pub async fn remote_write(
 
         // every sample of a series shares its labels, so the identity is loop-invariant
         let series_hash = super::signature_of_series_labels(&label_pairs);
-        let stream_bounds = admission.bounds.get(&metric_name).await;
+        let stream_bounds = policy.bounds;
 
         // a label the schema has not seen goes down the JSON path, which evolves the schema
         if event.histograms.is_empty()
@@ -1201,7 +1185,7 @@ async fn buffer_native_histograms(
                 .position(|s| *s == suffix)
                 .unwrap();
             let (stream_name, hist_labels) = &mut derived_streams[idx];
-            let bounds = admission.bounds.get(stream_name).await;
+            let bounds = admission.policies.get(stream_name).await.bounds;
             if !admission.admit(stream_name, bounds, timestamp) {
                 continue;
             }
