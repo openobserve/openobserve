@@ -32,7 +32,7 @@ pub enum PatternPolicy {
 }
 
 impl PatternPolicy {
-    /// Strict parse for write paths; the lossy `From` stays for reads of existing rows.
+    /// Strict parse for write paths; `From` stays lenient for reads of existing rows.
     pub fn parse_strict(value: &str) -> Result<Self, UnknownPolicy> {
         Self::parse_strict_with(value, config::get_config().common.sdr_detect_policy_enabled)
     }
@@ -107,6 +107,8 @@ where
             "DropField" => Self::DropField,
             "Redact" => Self::Redact,
             "Hash" => Self::Hash,
+            // Config-free by design: coercing a stored Detect here would rewrite untouched data.
+            "Detect" => Self::Detect,
             _ => Self::Redact,
         }
     }
@@ -360,6 +362,7 @@ mod tests {
         assert_eq!(PatternPolicy::from("DropField"), PatternPolicy::DropField);
         assert_eq!(PatternPolicy::from("Redact"), PatternPolicy::Redact);
         assert_eq!(PatternPolicy::from("Hash"), PatternPolicy::Hash);
+        assert_eq!(PatternPolicy::from("Detect"), PatternPolicy::Detect);
     }
 
     #[test]
@@ -400,6 +403,7 @@ mod tests {
             PatternPolicy::DropField,
             PatternPolicy::Redact,
             PatternPolicy::Hash,
+            PatternPolicy::Detect,
         ] {
             let s = policy.to_string();
             assert_eq!(PatternPolicy::from(s.as_str()), policy);
@@ -489,8 +493,50 @@ mod tests {
     }
 
     #[test]
-    fn test_pattern_policy_from_detect_is_lossy_and_config_independent() {
-        assert_eq!(PatternPolicy::from("Detect"), PatternPolicy::Redact);
+    fn test_pattern_policy_from_detect_survives_the_read_path() {
+        assert_eq!(PatternPolicy::from("Detect"), PatternPolicy::Detect);
+        assert_eq!(
+            PatternPolicy::from(PatternPolicy::Detect.to_string()),
+            PatternPolicy::Detect
+        );
+    }
+
+    #[test]
+    fn test_pattern_policy_from_agrees_with_strict_parse_under_either_flag() {
+        // The flag gates writes only; a read that consulted it would decode rows two ways.
+        for detect_enabled in [true, false] {
+            for value in ["DropField", "Redact", "Hash"] {
+                assert_eq!(
+                    PatternPolicy::from(value),
+                    PatternPolicy::parse_strict_with(value, detect_enabled).unwrap(),
+                    "{value}/{detect_enabled}"
+                );
+            }
+        }
+        assert_eq!(
+            PatternPolicy::from("Detect"),
+            PatternPolicy::parse_strict_with("Detect", true).unwrap()
+        );
+        assert!(PatternPolicy::parse_strict_with("Detect", false).is_err());
+        assert_eq!(PatternPolicy::from("Detect"), PatternPolicy::Detect);
+    }
+
+    #[test]
+    fn test_pattern_association_entry_from_model_preserves_detect() {
+        let model = Model {
+            id: 7,
+            org: "org".to_string(),
+            stream: "logs".to_string(),
+            stream_type: "logs".to_string(),
+            field: "message".to_string(),
+            pattern_id: "p-detect".to_string(),
+            policy: "Detect".to_string(),
+            apply_at: "AtIngestion".to_string(),
+        };
+        assert_eq!(
+            PatternAssociationEntry::from(model).policy,
+            PatternPolicy::Detect
+        );
     }
 
     #[test]

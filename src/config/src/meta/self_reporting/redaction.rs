@@ -136,6 +136,8 @@ impl EvidenceScope {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FieldOutcome {
     pub redacted_regions: u64,
+    /// Matched under `Detect` and deliberately left intact; never added to `redacted_regions`.
+    pub detected_regions: u64,
     pub dropped_fields: u64,
     pub dropfield_shadowed: bool,
     pub records_scanned: u64,
@@ -177,6 +179,8 @@ pub struct RedactionEvidence {
     pub policy: Option<String>,
     pub apply_time: String,
     pub redacted_regions: u64,
+    /// Content observed and left intact; a separate audit question from `redacted_regions`.
+    pub detected_regions: u64,
     pub dropped_fields: u64,
     pub dropfield_shadowed: bool,
     pub records_scanned: u64,
@@ -216,6 +220,7 @@ impl RedactionEvidence {
         row.field = Some(field.to_string());
         row.policy = Some(policy.to_string());
         row.redacted_regions = outcome.redacted_regions;
+        row.detected_regions = outcome.detected_regions;
         row.dropped_fields = outcome.dropped_fields;
         row.dropfield_shadowed = outcome.dropfield_shadowed;
         row.records_scanned = outcome.records_scanned;
@@ -236,6 +241,7 @@ impl RedactionEvidence {
     ) -> Self {
         let mut row = Self::base(EvidenceKind::IntervalMarker, scope);
         row.redacted_regions = outcome.redacted_regions;
+        row.detected_regions = outcome.detected_regions;
         row.dropped_fields = outcome.dropped_fields;
         row.records_scanned = outcome.records_scanned;
         row.records_affected = outcome.records_affected;
@@ -292,6 +298,7 @@ impl RedactionEvidence {
             policy: None,
             apply_time: INGESTION_APPLY_TIME.to_string(),
             redacted_regions: 0,
+            detected_regions: 0,
             dropped_fields: 0,
             dropfield_shadowed: false,
             records_scanned: 0,
@@ -326,6 +333,7 @@ impl RedactionEvidence {
             policy: Some(String::new()),
             apply_time: INGESTION_APPLY_TIME.to_string(),
             redacted_regions: 0,
+            detected_regions: 0,
             dropped_fields: 0,
             dropfield_shadowed: false,
             records_scanned: 0,
@@ -539,6 +547,69 @@ mod tests {
     }
 
     #[test]
+    fn a_detect_row_counts_without_reporting_a_redaction() {
+        let scope = EvidenceScope::new("org", "logs", StreamType::Logs);
+        let outcome = FieldOutcome {
+            detected_regions: 4,
+            records_scanned: 10,
+            records_affected: 3,
+            fields_scanned: 10,
+            ..Default::default()
+        };
+        let row = RedactionEvidence::redaction(
+            &scope,
+            "message",
+            "Detect",
+            outcome,
+            DataWindow::default(),
+        );
+        assert_eq!(row.detected_regions, 4);
+        // Detect never mutates, so a row that detected 4 regions must still redact zero.
+        assert_eq!(row.redacted_regions, 0);
+        assert_eq!(row.policy.as_deref(), Some("Detect"));
+    }
+
+    #[test]
+    fn detected_and_redacted_regions_are_carried_as_independent_counts() {
+        let scope = EvidenceScope::new("org", "logs", StreamType::Logs);
+        let outcome = FieldOutcome {
+            redacted_regions: 2,
+            detected_regions: 5,
+            ..Default::default()
+        };
+        let row = RedactionEvidence::redaction(
+            &scope,
+            "message",
+            "Redact",
+            outcome,
+            DataWindow::default(),
+        );
+        assert_eq!(row.redacted_regions, 2);
+        assert_eq!(row.detected_regions, 5);
+        // Neither field may be a total of the other; 7 would mean the two were summed.
+        assert_ne!(row.redacted_regions, 7);
+        assert_ne!(row.detected_regions, 7);
+
+        let marker =
+            RedactionEvidence::interval_marker(&scope, outcome, DataWindow::default(), 100, 400);
+        assert_eq!((marker.redacted_regions, marker.detected_regions), (2, 5));
+    }
+
+    #[test]
+    fn rows_that_carry_no_counts_carry_no_detection_either() {
+        let scope = EvidenceScope::new("org", "logs", StreamType::Logs);
+        let gap = RedactionEvidence::gap(&scope, GapReason::QueueFull, 7, 10, 20);
+        assert_eq!(gap.detected_regions, 0);
+        let unavailable = RedactionEvidence::scan_unavailable(
+            &scope,
+            FailPosture::Open,
+            12,
+            DataWindow::default(),
+        );
+        assert_eq!(unavailable.detected_regions, 0);
+    }
+
+    #[test]
     fn an_interval_marker_reports_a_scanned_zero() {
         let scope = EvidenceScope::new("org", "logs", StreamType::Logs).with_patterns(
             vec!["card".to_string()],
@@ -689,6 +760,7 @@ mod tests {
             "policy",
             "apply_time",
             "redacted_regions",
+            "detected_regions",
             "dropped_fields",
             "dropfield_shadowed",
             "records_scanned",
@@ -720,6 +792,7 @@ mod tests {
         for field in [
             "field",
             "policy",
+            "detected_regions",
             "pattern_hash",
             "data_min_ts",
             "data_max_ts",
