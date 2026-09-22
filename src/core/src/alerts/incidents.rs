@@ -2298,7 +2298,7 @@ pub async fn trigger_rca_for_incident(
     build_on_previous: bool,
     // A caller that emits Begin before spawning must authorize synchronously and
     // pass this one-shot proof so the spawned task cannot meter twice.
-    usage_permit: Option<crate::trial_quota::AiUsagePermit>,
+    usage_permit: Option<crate::AiUsagePermit>,
 ) -> Result<(), anyhow::Error> {
     use o2_enterprise::enterprise::{
         ai::client::get_agent_client, common::config::get_config as get_o2_config,
