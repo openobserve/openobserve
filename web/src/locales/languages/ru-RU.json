@@ -18926,7 +18926,7 @@
     "routingSaysPlace": "Все оповещения и инциденты — {noun} {value}",
     "routingSaysPlaces": "Все оповещения и инциденты — {scope}",
     "routingSaysAnything": "Все оповещения и инциденты",
-    "routingNoLadder": "лестницы эскалации пока нет",
+    "routingNoLadder": "Лестницы эскалации пока нет",
     "routingPagesTeam": "вызывает {team}",
     "routingCaughtLast": "{count} вызов · последний: {when} | {count} вызовов · последний: {when}",
     "routingEmptyBodyNamed": "{team} не будет получать вызовы, пока правило не совпадёт с входящим оповещением.",
