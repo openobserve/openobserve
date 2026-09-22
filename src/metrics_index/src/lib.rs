@@ -13,16 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Metrics sidecar index support.
-//!
-//! This crate owns the indexed metrics file layout, `.midx` encoding and
-//! decoding, PromQL matcher pruning, and the process-wide row-selection cache.
+//! Metrics index layout, label pruning, and row-selection caching.
 
 mod cache;
 pub mod layout;
-#[cfg(test)]
-#[path = "tests/legacy_fixture.rs"]
-mod legacy_fixture;
 mod pruner;
 mod reader;
 
@@ -38,20 +32,17 @@ mod tests {
     use arrow::{
         array::{Array, RecordBatch, StringViewArray, UInt32Array},
         datatypes::{DataType, Field, Schema},
-        ipc::writer::FileWriter as ArrowFileWriter,
     };
-    use bytes::Bytes;
     use config::{TIMESTAMP_COL_NAME, meta::promql::VALUE_LABEL};
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 
     use super::{
-        METRICS_INDEX_ROW_COUNT, layout,
-        legacy_fixture::MetricsIndexWriter,
+        METRICS_INDEX_ROW_COUNT,
         pruner::{
             create_physical_filter, metrics_index_labels, residual_matchers_covered,
             selection_cache_key, sidecar_covers_labels,
         },
-        reader::{MetricsIndexData, decode_metrics_index, evaluate_metrics_index},
+        reader::{MetricsIndexData, evaluate_metrics_index, load_metrics_index_file},
     };
 
     #[test]
@@ -123,7 +114,7 @@ mod tests {
         let data = MetricsIndexData {
             schema: Arc::clone(&schema),
             batches: vec![batch],
-            parent_records: None,
+            parent_records: 8,
             row_group_size: None,
         };
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]);
@@ -154,102 +145,98 @@ mod tests {
         );
     }
 
-    #[test]
-    fn reader_enforces_the_recorded_parent_and_version() {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("__hash__", DataType::UInt64, false),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new("path", DataType::Utf8View, true),
-        ]));
-        let batch = RecordBatch::try_new(
-            Arc::clone(&schema),
-            vec![
-                Arc::new(arrow::array::UInt64Array::from(vec![1, 1, 2])),
-                Arc::new(arrow::array::Int64Array::from(vec![10, 20, 10])),
-                Arc::new(StringViewArray::from(vec!["a", "a", "b"])),
-            ],
-        )
-        .unwrap();
-        let mut writer = MetricsIndexWriter::try_new(&schema).unwrap();
-        writer.write(&batch).unwrap();
-        let bytes = writer.finish(3, Some(2)).unwrap();
-
-        let data =
-            decode_metrics_index("parent", Bytes::from(bytes), &["path".to_string()]).unwrap();
-        assert_eq!(data.parent_records, Some(3));
-        assert_eq!(data.row_group_size, Some(2));
-        assert_eq!(
-            evaluate_metrics_index(&data, None, 3).unwrap(),
-            vec![Range { start: 0, end: 3 }]
-        );
-        // file_list says 4 rows: the index was written for another file
-        let mismatch = evaluate_metrics_index(&data, None, 4).unwrap_err();
-        assert!(mismatch.to_string().contains("written for 3 rows"));
-
-        // a newer format version is refused before anything is decoded
-        let newer_schema = Arc::new(Schema::new_with_metadata(
-            vec![Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false)],
-            std::collections::HashMap::from([(
-                layout::METRICS_INDEX_VERSION_KEY.to_string(),
-                (layout::METRICS_INDEX_VERSION + 1).to_string(),
-            )]),
-        ));
-        let newer = RecordBatch::try_new(
-            Arc::clone(&newer_schema),
-            vec![Arc::new(UInt32Array::from(vec![3]))],
-        )
-        .unwrap();
-        let mut ipc = ArrowFileWriter::try_new(Vec::new(), &newer_schema).unwrap();
-        ipc.write(&newer).unwrap();
-        let newer_bytes = Bytes::from(ipc.into_inner().unwrap());
-        let Err(error) = decode_metrics_index("newer", newer_bytes, &[]) else {
-            panic!("a newer metrics index version was decoded");
-        };
-        assert!(error.to_string().contains("this build reads up to 1"));
-
-        // a zero row group size would make the parquet access plan divide by zero
-        let mut writer = MetricsIndexWriter::try_new(&schema).unwrap();
-        writer.write(&batch).unwrap();
-        let zero_bytes = Bytes::from(writer.finish(3, Some(0)).unwrap());
-        let Err(error) = decode_metrics_index("zero", zero_bytes, &[]) else {
-            panic!("a zero row group size was decoded");
-        };
-        assert!(error.to_string().contains("row group size of 0"));
-    }
-
-    #[test]
-    fn rejects_sidecars_that_do_not_tile_the_parent_file() {
-        let bytes = sidecar_bytes(&[], vec![2, 3]);
-        let data = decode_metrics_index("mismatch", bytes, &[]).unwrap();
-
+    #[tokio::test]
+    async fn rejects_sidecars_that_do_not_tile_the_parent_file() {
+        let mut data = sidecar_data(&[], vec![2, 3], &[]).await;
+        data.parent_records = 4;
         let too_long = evaluate_metrics_index(&data, None, 4).unwrap_err();
         assert!(
             too_long
                 .to_string()
                 .contains("beyond the parent file's 4 records")
         );
-
+        data.parent_records = 6;
         let too_short = evaluate_metrics_index(&data, None, 6).unwrap_err();
         assert!(too_short.to_string().contains("covers 5 rows"));
     }
 
-    /// Serialize a metrics index with the given label columns (in this order).
-    fn sidecar_bytes(labels: &[(&str, Vec<&str>)], counts: Vec<u32>) -> Bytes {
-        let mut fields = vec![Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false)];
-        let mut columns: Vec<Arc<dyn Array>> = vec![Arc::new(UInt32Array::from(counts))];
+    async fn sidecar_data(
+        labels: &[(&str, Vec<&str>)],
+        counts: Vec<u32>,
+        requested: &[String],
+    ) -> MetricsIndexData {
+        use arrow::array::{Float64Array, Int64Array, UInt64Array};
+        use object_store::{ObjectStore, PutOptions};
+        let rows = counts.iter().map(|n| *n as usize).sum::<usize>();
+        let mut fields = vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+        ];
+        let hashes = counts
+            .iter()
+            .enumerate()
+            .flat_map(|(i, n)| std::iter::repeat_n(i as u64, *n as usize));
+        let times = counts.iter().flat_map(|n| 0..i64::from(*n));
+        let mut columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(UInt64Array::from_iter_values(hashes)),
+            Arc::new(Int64Array::from_iter_values(times)),
+            Arc::new(Float64Array::from(vec![1.; rows])),
+        ];
         for (name, values) in labels {
             fields.push(Field::new(*name, DataType::Utf8View, true));
-            columns.push(Arc::new(StringViewArray::from(values.clone())));
+            let values = counts
+                .iter()
+                .zip(values)
+                .flat_map(|(count, value)| std::iter::repeat_n(*value, *count as usize));
+            columns.push(Arc::new(StringViewArray::from_iter_values(values)));
         }
         let schema = Arc::new(Schema::new(fields));
-        let batch = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
-        let mut writer = ArrowFileWriter::try_new(Vec::new(), &schema).unwrap();
+        let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
+        let mut writer = metrics_block::BlockWriter::new_pending(
+            Vec::new(),
+            schema.clone(),
+            metrics_block::MAX_BLOCK_ROWS,
+        )
+        .unwrap();
         writer.write(&batch).unwrap();
-        Bytes::from(writer.into_inner().unwrap())
+        let bytes = writer
+            .finish_for_source(
+                metrics_block::ParentMetadata {
+                    rows: rows as u64,
+                    compressed_size: 123,
+                },
+                schema,
+                Some(100),
+            )
+            .unwrap();
+        let id = config::ider::uuid();
+        let account = format!("{id}:default");
+        let path = format!("files/test/midx/m/2026/09/22/00/indexed-v1-{id}.midx");
+        let store = object_store::memory::InMemory::new();
+        store
+            .put_opts(
+                &path.clone().into(),
+                bytes::Bytes::from(bytes).into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        infra::storage::add_account(&id, Box::new(store)).await;
+        load_metrics_index_file(
+            &account,
+            &path,
+            config::FileFormat::Parquet,
+            rows,
+            123,
+            Arc::new(requested.to_vec()),
+        )
+        .await
+        .unwrap()
     }
 
-    #[test]
-    fn projects_by_name_across_sidecars_with_different_layouts() {
+    #[tokio::test]
+    async fn projects_by_name_across_sidecars_with_different_layouts() {
         let labels = vec!["path".to_string(), "instance".to_string()];
         let matchers = Matchers::new(vec![
             Matcher::new(MatchOp::Equal, "path", "a"),
@@ -258,23 +245,26 @@ mod tests {
 
         // file 1: [.., instance, job, path]; file 2: [.., path, instance] —
         // same labels, different positions
-        let file1 = sidecar_bytes(
+        let file1 = sidecar_data(
             &[
                 ("instance", vec!["i1", "i2", "i1"]),
                 ("job", vec!["j", "j", "j"]),
                 ("path", vec!["a", "a", "b"]),
             ],
             vec![3, 2, 4],
-        );
-        let file2 = sidecar_bytes(
+            &labels,
+        )
+        .await;
+        let file2 = sidecar_data(
             &[("path", vec!["b", "a"]), ("instance", vec!["i1", "i1"])],
             vec![7, 1],
-        );
-        for (name, bytes, expected_rows, expected) in [
+            &labels,
+        )
+        .await;
+        for (name, data, expected_rows, expected) in [
             ("f1", file1, 9, vec![Range { start: 0, end: 3 }]),
             ("f2", file2, 8, vec![Range { start: 7, end: 8 }]),
         ] {
-            let data = decode_metrics_index(name, bytes, &labels).unwrap();
             assert_eq!(data.schema.fields().len(), 3, "{name}");
             let filter = create_physical_filter(&data.schema, &matchers).unwrap();
             assert_eq!(
@@ -285,8 +275,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn exactness_requires_sidecar_coverage_of_every_residual_matcher() {
+    #[tokio::test]
+    async fn exactness_requires_sidecar_coverage_of_every_residual_matcher() {
         let table_schema = Schema::new(vec![
             Field::new("__hash__", DataType::UInt64, false),
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
@@ -322,17 +312,19 @@ mod tests {
             &matcher_labels
         ));
 
-        let full = sidecar_bytes(&[("path", vec!["a"]), ("instance", vec!["i1"])], vec![3]);
-        let data = decode_metrics_index("full", full, &matcher_labels).unwrap();
+        let data = sidecar_data(
+            &[("path", vec!["a"]), ("instance", vec!["i1"])],
+            vec![3],
+            &matcher_labels,
+        )
+        .await;
         assert!(sidecar_covers_labels(&data.schema, &matcher_labels));
-
-        let partial = sidecar_bytes(&[("path", vec!["a"])], vec![3]);
-        let data = decode_metrics_index("partial", partial, &matcher_labels).unwrap();
+        let data = sidecar_data(&[("path", vec!["a"])], vec![3], &matcher_labels).await;
         assert!(!sidecar_covers_labels(&data.schema, &matcher_labels));
     }
 
-    #[test]
-    fn missing_label_over_selects_instead_of_dropping() {
+    #[tokio::test]
+    async fn missing_label_over_selects_instead_of_dropping() {
         let labels = vec!["path".to_string(), "instance".to_string()];
         let matchers = Matchers::new(vec![
             Matcher::new(MatchOp::Equal, "path", "a"),
@@ -340,8 +332,7 @@ mod tests {
         ]);
 
         // sidecar without `instance`: only the `path` matcher is evaluated
-        let partial = sidecar_bytes(&[("path", vec!["a", "b", "a"])], vec![2, 4, 1]);
-        let data = decode_metrics_index("partial", partial, &labels).unwrap();
+        let data = sidecar_data(&[("path", vec!["a", "b", "a"])], vec![2, 4, 1], &labels).await;
         assert_eq!(data.schema.fields().len(), 2);
         let filter = create_physical_filter(&data.schema, &matchers).unwrap();
         assert!(filter.is_some());
@@ -351,8 +342,7 @@ mod tests {
         );
 
         // sidecar with none of the matched labels: the whole file is selected
-        let none = sidecar_bytes(&[("job", vec!["j", "j"])], vec![4, 2]);
-        let data = decode_metrics_index("none", none, &labels).unwrap();
+        let data = sidecar_data(&[("job", vec!["j", "j"])], vec![4, 2], &labels).await;
         assert_eq!(data.schema.fields().len(), 1);
         let filter = create_physical_filter(&data.schema, &matchers).unwrap();
         assert!(filter.is_none());

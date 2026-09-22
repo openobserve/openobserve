@@ -13,29 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Cursor, ops::Range, sync::Arc};
+use std::{ops::Range, sync::Arc};
 
 use arrow::{
     array::{Array, BooleanArray, RecordBatch, UInt32Array},
     datatypes::SchemaRef,
-    ipc::reader::FileReaderBuilder as ArrowFileReaderBuilder,
 };
 use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::PhysicalExpr,
 };
 
-use crate::layout::{
-    METRICS_INDEX_PARENT_RECORDS_KEY, METRICS_INDEX_ROW_COUNT, METRICS_INDEX_ROW_GROUP_SIZE_KEY,
-    METRICS_INDEX_VERSION, METRICS_INDEX_VERSION_KEY,
-};
+use crate::layout::METRICS_INDEX_ROW_COUNT;
 
 pub(super) struct MetricsIndexData {
     pub(super) schema: SchemaRef,
     pub(super) batches: Vec<RecordBatch>,
-    /// Rows of the data file this index was written for, absent in v1 files without metadata.
-    pub(super) parent_records: Option<usize>,
-    /// Parquet row-group size of the data file, absent for Vortex and older indexes.
+    pub(super) parent_records: usize,
+    /// Vortex does not use Parquet row groups.
     pub(super) row_group_size: Option<u32>,
 }
 
@@ -47,82 +42,13 @@ pub(super) async fn load_metrics_index_file(
     parent_size: i64,
     labels: Arc<Vec<String>>,
 ) -> Result<MetricsIndexData> {
-    let location = path.into();
-    let header = infra::cache::storage::get_range(account, &location, 0..6)
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?;
-    if header.as_ref() != b"ARROW1" {
-        let parent = metrics_block::ParentMetadata {
-            rows: parent_rows as u64,
-            compressed_size: u64::try_from(parent_size)
-                .map_err(|error| DataFusionError::External(Box::new(error)))?,
-        };
-        return load_block_metadata(account, path, parent, format, labels).await;
-    }
-    let bytes = infra::cache::file_data::get(account, path, None)
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?;
-    let path = path.to_string();
-    tokio::task::spawn_blocking(move || decode_metrics_index(&path, bytes, &labels))
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?
-}
-
-/// Read the row-range columns plus the requested labels from a sidecar.
-///
-/// The projection is resolved by name against the sidecar's own schema: the
-/// label set and column order of a sidecar depend on the schema at compaction
-/// time and differ between files. A requested label that the sidecar does not
-/// have is skipped, which over-selects that file; the final PromQL filter keeps
-/// the query result exact.
-pub(super) fn decode_metrics_index(
-    path: &str,
-    bytes: bytes::Bytes,
-    labels: &[String],
-) -> Result<MetricsIndexData> {
-    let file_schema = ArrowFileReaderBuilder::new()
-        .build(Cursor::new(bytes.clone()))?
-        .schema();
-    let metadata = file_schema.metadata();
-    if let Some(version) = parse_metadata::<u32>(metadata, METRICS_INDEX_VERSION_KEY, path)?
-        && version > METRICS_INDEX_VERSION
-    {
-        return Err(DataFusionError::Execution(format!(
-            "metrics index {path} has version {version}, this build reads up to {METRICS_INDEX_VERSION}"
-        )));
-    }
-    let parent_records = parse_metadata(metadata, METRICS_INDEX_PARENT_RECORDS_KEY, path)?;
-    let row_group_size = parse_metadata(metadata, METRICS_INDEX_ROW_GROUP_SIZE_KEY, path)?;
-    // the access plan divides by it; a corrupt 0 must fail here, not panic there
-    if row_group_size == Some(0) {
-        return Err(DataFusionError::Execution(format!(
-            "metrics index {path} has a row group size of 0"
-        )));
-    }
-    let mut projection = vec![file_schema.index_of(METRICS_INDEX_ROW_COUNT)?];
-    for label in labels {
-        match file_schema.index_of(label) {
-            Ok(index) => projection.push(index),
-            Err(_) => log::debug!(
-                "metrics index {path} has no label {label}, evaluating the remaining matchers only"
-            ),
-        }
-    }
-    let reader = ArrowFileReaderBuilder::new()
-        .with_projection(projection)
-        .build(Cursor::new(bytes))?;
-    let reader_schema = reader.schema();
-    let batches = reader.collect::<std::result::Result<Vec<_>, _>>()?;
-    let schema = batches
-        .first()
-        .map(RecordBatch::schema)
-        .unwrap_or(reader_schema);
-    Ok(MetricsIndexData {
-        schema,
-        batches,
-        parent_records,
-        row_group_size,
-    })
+    let parent = metrics_block::ParentMetadata {
+        rows: u64::try_from(parent_rows)
+            .map_err(|error| DataFusionError::External(error.into()))?,
+        compressed_size: u64::try_from(parent_size)
+            .map_err(|error| DataFusionError::External(error.into()))?,
+    };
+    load_block_metadata(account, path, parent, format, labels).await
 }
 
 /// Evaluate `filter` over the run rows and collect the selected physical row
@@ -133,9 +59,8 @@ pub(super) fn evaluate_metrics_index(
     filter: Option<&dyn PhysicalExpr>,
     expected_rows: usize,
 ) -> Result<Vec<Range<usize>>> {
-    if let Some(parent_records) = data.parent_records
-        && parent_records != expected_rows
-    {
+    let parent_records = data.parent_records;
+    if parent_records != expected_rows {
         return Err(DataFusionError::Execution(format!(
             "metrics-index was written for {parent_records} rows, but the parent file contains {expected_rows} records"
         )));
@@ -275,28 +200,10 @@ fn metrics_block_index_data(
     Ok(MetricsIndexData {
         schema,
         batches: vec![batch],
-        parent_records: Some(
-            usize::try_from(index.parent.rows).map_err(|e| DataFusionError::External(e.into()))?,
-        ),
+        parent_records: usize::try_from(index.parent.rows)
+            .map_err(|e| DataFusionError::External(e.into()))?,
         row_group_size,
     })
-}
-
-fn parse_metadata<T: std::str::FromStr>(
-    metadata: &HashMap<String, String>,
-    key: &str,
-    path: &str,
-) -> Result<Option<T>> {
-    metadata
-        .get(key)
-        .map(|value| {
-            value.parse::<T>().map_err(|_| {
-                DataFusionError::Execution(format!(
-                    "metrics index {path} has an invalid {key}: {value}"
-                ))
-            })
-        })
-        .transpose()
 }
 
 #[cfg(test)]
@@ -310,17 +217,11 @@ mod tests {
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 
     use super::*;
-    use crate::{MetricsFileLayout, legacy_fixture::MetricsIndexWriter};
+    use crate::MetricsFileLayout;
 
     fn fixture(
         format: config::FileFormat,
-    ) -> (
-        RecordBatch,
-        String,
-        metrics_block::ParentMetadata,
-        Vec<u8>,
-        Vec<u8>,
-    ) {
+    ) -> (RecordBatch, String, metrics_block::ParentMetadata, Vec<u8>) {
         let schema = Arc::new(Schema::new(vec![
             Field::new("__hash__", DataType::UInt64, false),
             Field::new("_timestamp", DataType::Int64, false),
@@ -354,30 +255,19 @@ mod tests {
             compressed_size: 123,
         };
         let row_group_size = (format == config::FileFormat::Parquet).then_some(100);
-        let mut legacy = MetricsIndexWriter::try_new(&schema).unwrap();
-        legacy.write(&batch).unwrap();
-        let legacy = legacy.finish(6, row_group_size).unwrap();
         let mut writer =
             metrics_block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
         writer.write(&batch).unwrap();
         let blocks = writer
             .finish_for_source(parent.clone(), schema, row_group_size.map(|v| v as u32))
             .unwrap();
-        (batch, key, parent, legacy, blocks)
+        (batch, key, parent, blocks)
     }
 
     #[tokio::test]
-    async fn block_metadata_matches_legacy_pruning_for_both_parent_formats() {
+    async fn current_metadata_filters_and_relocates_for_both_parent_formats() {
         for format in [config::FileFormat::Parquet, config::FileFormat::Vortex] {
-            let (batch, key, _parent, legacy, blocks) = fixture(format);
-            assert!(
-                decode_metrics_index(
-                    "legacy-only-parser",
-                    bytes::Bytes::from(blocks.clone()),
-                    &["path".into()]
-                )
-                .is_err()
-            );
+            let (batch, key, _parent, blocks) = fixture(format);
             let id = config::ider::uuid();
             let account = format!("{id}:default");
             let store = object_store::memory::InMemory::new();
@@ -406,7 +296,6 @@ mod tests {
                 .unwrap();
             infra::storage::add_account(&id, Box::new(store)).await;
             let labels = Arc::new(vec!["path".into()]);
-            let old = decode_metrics_index("legacy", legacy.into(), &labels).unwrap();
             let new = load_metrics_index_file(&account, &path, format, 6, 123, labels.clone())
                 .await
                 .unwrap();
@@ -416,31 +305,24 @@ mod tests {
                     .unwrap();
             assert_eq!(moved.schema, new.schema);
             assert_eq!(moved.batches, new.batches);
+            assert_eq!(new.parent_records, 6);
             assert_eq!(
-                new.schema
-                    .fields()
-                    .iter()
-                    .map(|f| f.name())
-                    .collect::<Vec<_>>(),
-                old.schema
-                    .fields()
-                    .iter()
-                    .map(|f| f.name())
-                    .collect::<Vec<_>>()
+                new.row_group_size,
+                (format == config::FileFormat::Parquet).then_some(100)
             );
-            assert_eq!(new.parent_records, old.parent_records);
-            assert_eq!(new.row_group_size, old.row_group_size);
-            for (op, value) in [
-                (MatchOp::Equal, "a"),
-                (MatchOp::Equal, ""),
-                (MatchOp::NotEqual, "a"),
-                (MatchOp::Re(".*".parse().unwrap()), ".*"),
+            for (op, value, expected) in [
+                (MatchOp::Equal, "a", vec![Range { start: 0, end: 3 }]),
+                (MatchOp::Equal, "", vec![Range { start: 5, end: 6 }]),
+                (MatchOp::NotEqual, "a", vec![Range { start: 5, end: 6 }]),
+                (
+                    MatchOp::Re(".*".parse().unwrap()),
+                    ".*",
+                    vec![Range { start: 0, end: 3 }, Range { start: 5, end: 6 }],
+                ),
+                (MatchOp::Equal, "unmatched", vec![]),
             ] {
                 let matchers = Matchers::new(vec![Matcher::new(op, "path", value)]);
                 let filter = crate::pruner::create_physical_filter(&new.schema, &matchers).unwrap();
-                let legacy_filter =
-                    crate::pruner::create_physical_filter(&old.schema, &matchers).unwrap();
-                let expected = evaluate_metrics_index(&old, legacy_filter.as_deref(), 6).unwrap();
                 assert_eq!(
                     evaluate_metrics_index(&new, filter.as_deref(), 6).unwrap(),
                     expected
@@ -458,7 +340,7 @@ mod tests {
                 )];
                 assert!(
                     crate::search(
-                        "compatibility",
+                        "current-format",
                         &mut files,
                         batch.schema().as_ref(),
                         &matchers,
@@ -479,7 +361,22 @@ mod tests {
                 }
             }
             assert!(
-                load_metrics_index_file(&account, &path, format, 6, 124, labels)
+                load_metrics_index_file(&account, &path, format, 6, 124, labels.clone())
+                    .await
+                    .is_err()
+            );
+            assert!(
+                load_metrics_index_file(&account, &path, format, 7, 123, labels.clone())
+                    .await
+                    .is_err()
+            );
+            let other_format = if format == config::FileFormat::Parquet {
+                config::FileFormat::Vortex
+            } else {
+                config::FileFormat::Parquet
+            };
+            assert!(
+                load_metrics_index_file(&account, &path, other_format, 6, 123, labels)
                     .await
                     .is_err()
             );
@@ -492,10 +389,10 @@ mod tests {
             "missing",
             "truncated",
             "missing_marker",
-            "previous_format",
-            "legacy",
+            "unknown_version",
+            "invalid_format",
         ] {
-            let (batch, key, _parent, legacy, mut blocks) = fixture(config::FileFormat::Parquet);
+            let (batch, key, _parent, mut blocks) = fixture(config::FileFormat::Parquet);
             let id = config::ider::uuid();
             let account = format!("{id}:default");
             let store = object_store::memory::InMemory::new();
@@ -508,14 +405,13 @@ mod tests {
                         blocks[len - 1] ^= 1;
                         blocks
                     }
-                    "previous_format" => {
-                        let mut old = vec![0u8; 128];
-                        old[64..72].copy_from_slice(b"O2MIDX01");
-                        old[72..76].copy_from_slice(&1u32.to_le_bytes());
-                        old[88..96].copy_from_slice(&64u64.to_le_bytes());
-                        old
+                    "unknown_version" => {
+                        let start = blocks.len() - metrics_block::FOOTER_LEN;
+                        blocks[start..start + 4]
+                            .copy_from_slice(&(metrics_block::VERSION + 1).to_le_bytes());
+                        blocks
                     }
-                    _ => legacy,
+                    _ => vec![0; 128],
                 };
                 store
                     .put_opts(
@@ -550,9 +446,9 @@ mod tests {
             .unwrap()
             .unwrap()
             .1;
-            assert_eq!(exact, kind == "legacy");
+            assert!(!exact);
             assert_eq!(files.len(), 1);
-            assert_eq!(files[0].selection.is_some(), kind == "legacy");
+            assert!(files[0].selection.is_none());
         }
     }
 }
