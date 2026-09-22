@@ -173,6 +173,11 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
     if enabled {
         let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     } else {
+        // Evict locally before notifying the cluster: watch() consumes the
+        // coordinator delete event on a detached task, so without this the node
+        // that just disabled the token would keep authenticating it from the
+        // stale cache entry until that task gets scheduled.
+        ORG_INGESTION_TOKENS.remove(&cache_key(org_id, &committed.token));
         let _ = delete_from_db_coordinator(&key, false, true, None).await;
     }
     // Always replicate the token with its new `enabled` state; the receiving
