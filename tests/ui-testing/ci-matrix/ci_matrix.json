@@ -251,7 +251,8 @@
       "datetime-picker-copy-paste.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "connectDataSourcePopup.spec.js",
-      "theme.spec.js"
+      "theme.spec.js",
+      "annotationQueueInputPreview.spec.js"
     ],
     "disabled": []
   },
