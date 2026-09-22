@@ -25,8 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <template #subtitle>
-      <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+    <template v-if="!sessionNotFound" #subtitle>
+      <div
+        class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+        data-test="session-viewer-subtitle"
+      >
         <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="language" size="sm" />
           {{ sessionDetails.ip }}
@@ -69,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-    <template #actions>
+    <template v-if="!sessionNotFound" #actions>
       <ShareButton
         data-test="session-viewer-share-link-btn"
         :url="shareUrl"

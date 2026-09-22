@@ -738,6 +738,15 @@ describe("SessionViewer.vue — no replay recorded", () => {
     wrapper.unmount();
   });
 
+  it("renders neither the session subtitle nor the share button", async () => {
+    const wrapper = await mountUnrecorded();
+
+    expect(wrapper.find('[data-test="session-viewer-subtitle"]').exists()).toBe(false);
+    expect(wrapper.findComponent(ShareButton).exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Unknown User");
+    wrapper.unmount();
+  });
+
   it("keeps the Go Back navigation", async () => {
     const wrapper = await mountUnrecorded();
 
