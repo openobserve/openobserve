@@ -170,6 +170,20 @@ def _tracked_create(
     return alert_id
 
 
+def _clone(
+    client: OpenObserveClient,
+    prereqs: dict[str, Any],
+    source: str,
+    body: dict[str, Any],
+    query: str = "",
+) -> dict[str, Any]:
+    response = client.post(f"alerts/{source}/clone{query}", prefix="api/v2/", json=body)
+    assert response.status_code == 200, response.text
+    created = response.json()
+    prereqs["created_composites"].append(created["id"])
+    return created
+
+
 def test_composite_crud_get_and_live_scheduler_diagnostic(
     client: OpenObserveClient, composite_prereqs: dict[str, Any]
 ):
@@ -638,6 +652,277 @@ def test_clone_move_enable_trigger_and_delete_use_generic_alert_endpoints(
         client.delete(f"folders/alerts/{second_folder}", prefix="api/v2/")
 
 
+def test_clone_copies_the_definition_but_forces_the_copy_disabled(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    source_name = unique_name("cmp_clone_full")
+    source = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(
+            name=source_name,
+            child_ids=composite_prereqs["child_ids"][:2],
+            destination=composite_prereqs["destination"],
+            template=composite_prereqs["template"],
+            enabled=True,
+            priority=1,
+            tags=["env:clone", "kind:composite"],
+            description="clone source definition",
+            stale_child_policy="treat_as_false",
+            warning_counts_as_firing=False,
+        ),
+    )
+    source_detail = client.get(f"alerts/{source}", prefix="api/v2/").json()
+    assert source_detail["enabled"] is True
+    assert source_detail["scheduler_job_present"] is True
+
+    clone_name = unique_name("cmp_clone_full_copy")
+    clone = _clone(
+        client,
+        composite_prereqs,
+        source,
+        {"name": clone_name, "folder_id": composite_prereqs["folder_id"]},
+    )["id"]
+    detail = client.get(f"alerts/{clone}", prefix="api/v2/").json()
+
+    # A clone is never armed. The copy lands disabled and unscheduled even
+    # though the source was running, so duplicating an alert to edit it cannot
+    # start a second stream of notifications behind the user's back.
+    assert detail["enabled"] is False
+    assert detail["scheduler_job_present"] is False
+
+    # Everything else is a faithful copy, not just the expression: the fields
+    # below are what a clone silently losing them would cost the user.
+    for field in (
+        "alert_type",
+        "description",
+        "destinations",
+        "template",
+        "context_attributes",
+        "trigger_condition",
+        "creates_incident",
+        "workflows",
+        "priority",
+        "tags",
+        "composite_condition",
+        "pending_period_sec",
+    ):
+        assert detail[field] == source_detail[field], field
+    assert [child["alert_id"] for child in detail["children"]] == [
+        child["alert_id"] for child in source_detail["children"]
+    ]
+    assert detail["name"] == clone_name
+    assert detail["folderId"] == composite_prereqs["folder_id"]
+
+    # Cloning is a copy, not a move: the source keeps its name and its job.
+    after = client.get(f"alerts/{source}", prefix="api/v2/").json()
+    assert after["name"] == source_name
+    assert after["enabled"] is True
+    assert after["scheduler_job_present"] is True
+
+
+def test_clone_defaults_its_name_and_folder_from_the_source(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    source_name = unique_name("cmp_clone_defaults")
+    source = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(
+            name=source_name, child_ids=composite_prereqs["child_ids"][:2]
+        ),
+    )
+
+    # An empty body is the whole contract: the name falls back to "<name>_copy"
+    # and the folder to the SOURCE's folder — not the default one, which is
+    # what a caller who never passes `folder_id` would otherwise silently get.
+    created = _clone(client, composite_prereqs, source, {})
+    assert created["name"] == f"{source_name}_copy"
+    assert created["alert_type"] == "composite"
+    detail = client.get(f"alerts/{created['id']}", prefix="api/v2/").json()
+    assert detail["folderId"] == composite_prereqs["folder_id"]
+
+    destination_folder = client.post(
+        "folders/alerts",
+        prefix="api/v2/",
+        json={"name": unique_name("cmp_clone_dst"), "description": "clone target"},
+    )
+    assert destination_folder.status_code == 200, destination_folder.text
+    destination_folder_id = destination_folder.json()["folderId"]
+    routed: str | None = None
+    try:
+        # `folder_id` in the body outranks `?folder=`, which only names where
+        # the SOURCE is read from.
+        routed_name = unique_name("cmp_clone_routed")
+        routed = _clone(
+            client,
+            composite_prereqs,
+            source,
+            {"name": routed_name, "folder_id": destination_folder_id},
+            query=f"?folder={composite_prereqs['folder_id']}",
+        )["id"]
+        assert (
+            client.get(f"alerts/{routed}", prefix="api/v2/").json()["folderId"]
+            == destination_folder_id
+        )
+    finally:
+        # The folder cannot be dropped while the clone still lives in it.
+        if routed is not None:
+            assert client.delete(f"alerts/{routed}", prefix="api/v2/").status_code == 200
+            composite_prereqs["created_composites"].remove(routed)
+        client.delete(f"folders/alerts/{destination_folder_id}", prefix="api/v2/")
+
+
+def test_clone_rejects_unknown_sources_and_missing_destination_folders(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    source = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(
+            name=unique_name("cmp_clone_errors"),
+            child_ids=composite_prereqs["child_ids"][:2],
+        ),
+    )
+
+    response = client.post(
+        f"alerts/{source}/clone",
+        prefix="api/v2/",
+        json={"name": unique_name("cmp_clone_nowhere"), "folder_id": "no_such_folder"},
+    )
+    assert response.status_code == 404, response.text
+    assert response.json()["code"] == "composite_folder_not_found"
+
+    # A well-formed id that resolves to nothing, and a string that is not a
+    # ksuid at all, must both 404 rather than 500 on the parse.
+    for unknown in ("2abcdefghijklmnopqrstuvwxyz", "not-a-ksuid"):
+        response = client.post(
+            f"alerts/{unknown}/clone",
+            prefix="api/v2/",
+            json={"name": unique_name("cmp_clone_ghost")},
+        )
+        assert response.status_code == 404, (unknown, response.text)
+
+
+def test_cloning_a_parent_extends_the_child_delete_guard_to_the_copy(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    child, other = composite_prereqs["child_ids"][:2]
+    parent = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(name=unique_name("cmp_clone_ref"), child_ids=[child, other]),
+    )
+    clone = _clone(
+        client, composite_prereqs, parent, {"name": unique_name("cmp_clone_ref_copy")}
+    )["id"]
+
+    # The clone references the same children by id, so the child is now held by
+    # two parents and the reference guard must name both.
+    response = client.get(f"alerts/{child}/composite-references", prefix="api/v2/")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert {reference["alert_id"] for reference in body["references"]} == {parent, clone}
+    assert body["hidden_reference_count"] == 0
+
+    response = client.delete(f"alerts/{child}", prefix="api/v2/")
+    assert response.status_code == 409, response.text
+    body = response.json()
+    assert body["code"] == "child_referenced"
+    assert {reference["alert_id"] for reference in body["references"]} == {parent, clone}
+    assert client.get(f"alerts/{child}", prefix="api/v2/").status_code == 200
+
+
+def test_clone_preserves_a_composite_child_of_a_nested_composite(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    first, second, third = composite_prereqs["child_ids"][:3]
+    inner = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(
+            name=unique_name("cmp_clone_inner"), child_ids=[first, second]
+        ),
+    )
+    outer = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(name=unique_name("cmp_clone_outer"), child_ids=[inner, third]),
+    )
+    outer_detail = client.get(f"alerts/{outer}", prefix="api/v2/").json()
+
+    clone = _clone(
+        client, composite_prereqs, outer, {"name": unique_name("cmp_clone_outer_copy")}
+    )["id"]
+    detail = client.get(f"alerts/{clone}", prefix="api/v2/").json()
+
+    assert (
+        detail["composite_condition"]["expression"]
+        == outer_detail["composite_condition"]["expression"]
+    )
+    assert [(child["alert_id"], child["alert_type"]) for child in detail["children"]] == [
+        (inner, "composite"),
+        (third, "scheduled"),
+    ]
+    assert all(child["accessible"] for child in detail["children"])
+
+
+def test_clone_of_a_simple_alert_keeps_the_source_enabled_state(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    # The generic endpoint serves both families, and they deliberately differ:
+    # a composite clone is forced disabled, while a simple alert clone copies
+    # `enabled` verbatim and therefore starts scheduled. Pinned here so the
+    # divergence is a decision, not a surprise found in production.
+    source_name = unique_name("cmp_clone_simple")
+    response = client.post(
+        f"alerts?folder={composite_prereqs['folder_id']}",
+        prefix="api/v2/",
+        json=_alert_payload(
+            name=source_name,
+            folder_id=composite_prereqs["folder_id"],
+            template=composite_prereqs["template"],
+            destination=composite_prereqs["destination"],
+            enabled=True,
+        ),
+    )
+    assert response.status_code == 200, response.text
+    source = _find_by_name(client, source_name)["alert_id"]
+    clone: str | None = None
+    try:
+        assert client.get(f"alerts/{source}", prefix="api/v2/").json()["enabled"] is True
+        clone_name = unique_name("cmp_clone_simple_copy")
+        response = client.post(
+            f"alerts/{source}/clone",
+            prefix="api/v2/",
+            json={"name": clone_name, "folder_id": composite_prereqs["folder_id"]},
+        )
+        assert response.status_code == 200, response.text
+        clone = _find_by_name(client, clone_name)["alert_id"]
+        assert client.get(f"alerts/{clone}", prefix="api/v2/").json()["enabled"] is True
+    finally:
+        for alert_id in (clone, source):
+            if alert_id is not None:
+                _delete_best_effort(client, alert_id)
+
+
+@pytest.mark.skip(
+    reason="Backend gap: POST /alerts with alert_type=composite and name='' returns 200 "
+    "and stores an unnamed alert, while the same empty name on a simple alert is "
+    "rejected 400 'Alert name is required'. clone inherits it (name='' clones to ''). "
+    "The clone dialog now blocks it in the UI (#14627); this is the API half."
+)
+def test_composite_rejects_a_blank_name_like_a_simple_alert_does(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    response = client.post(
+        f"alerts?folder={composite_prereqs['folder_id']}",
+        prefix="api/v2/",
+        json=_composite_payload(name="", child_ids=composite_prereqs["child_ids"][:2]),
+    )
+    assert response.status_code == 400, response.text
+
+
 def test_child_rename_and_move_do_not_rewrite_stored_id_expression(
     client: OpenObserveClient, composite_prereqs: dict[str, Any]
 ):
@@ -897,3 +1182,46 @@ def test_composite_timeline_returns_child_lanes_plus_a_result_lane(
     # lane deliberately has none, which is how it is told apart from a child.
     assert sorted(lane["slot"] for lane in body["children"]) == [0, 1], body
     assert "slot" not in body["result"], body
+
+
+def test_list_exposes_the_name_resolved_expression_for_composite_rows(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    """A composite row has no stream or query, so the expression is the only
+    thing on it that says what it evaluates.
+
+    Resolved server-side because the list row carries no children: the UI has
+    nothing to turn `{id}` operands into names with.
+    """
+    child_a, child_b, _ = composite_prereqs["child_ids"]
+    names = {
+        child_a: composite_prereqs["child_payloads"][child_a]["name"],
+        child_b: composite_prereqs["child_payloads"][child_b]["name"],
+    }
+    composite = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(
+            name=unique_name("cmp_summary"),
+            child_ids=[child_a, child_b],
+            expression=f"{{{child_a}}} && !{{{child_b}}}",
+        ),
+    )
+
+    rows = _list(client)
+    row = next(item for item in rows if item["alert_id"] == composite)
+    summary = row["expression_summary"]
+
+    assert names[child_a] in summary, summary
+    assert names[child_b] in summary, summary
+    assert "AND" in summary and "NOT" in summary, summary
+    # The operand IDs must not survive into the summary — it is a display
+    # string, and a KSUID in it is both unreadable and a disclosure.
+    assert child_a not in summary, summary
+    assert child_b not in summary, summary
+
+    # Only composites carry one — a scheduled alert has a query instead, and
+    # the field must not appear on rows it means nothing for.
+    for item in rows:
+        if item.get("alert_type") != "composite":
+            assert item.get("expression_summary") is None, item

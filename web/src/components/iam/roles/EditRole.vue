@@ -251,6 +251,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { updateRoleMutation } from "@/services/iam.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { resourcesQuery } from "@/services/iam.queries";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import { cloneDeep } from "lodash-es";
 import { computed, defineAsyncComponent, nextTick, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -267,12 +274,10 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { updateRole, getResources, getAllRolePermissions, getRoleUsers } from "@/services/iam";
+import { getAllRolePermissions, getRoleUsers } from "@/services/iam";
 import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
-import templateService from "@/services/alert_templates";
-import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
 import savedviewsService from "@/services/saved_views";
@@ -288,9 +293,11 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
+import workflowService from "@/services/workflows";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
+
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
 import {
@@ -481,6 +488,9 @@ const filteredResources: Ref<any[]> = ref([]);
 
 const resourceOptions: Ref<any[]> = ref([]);
 
+const orgId = useOrgId();
+const updateRoleOne = useMutation(() => updateRoleMutation(orgId.value));
+
 const updateActiveTab = (tab: string) => {
   if (!tab) return;
   activeTab.value = tab;
@@ -489,22 +499,25 @@ const updateActiveTab = (tab: string) => {
 const getRoleDetails = () => {
   isFetchingInitialRoles.value = true;
 
-  getResources(store.state.selectedOrganization.identifier)
-    .then(async (res) => {
-      permissionsState.resources = res.data
+  queryClient
+    .fetchQuery(resourcesQuery(store.state.selectedOrganization.identifier))
+    .then(async (res: any) => {
+      permissionsState.resources = res
         .sort((a: any, b: any) => a.order - b.order)
         .filter((resource: any) => resource.visible);
 
       setDefaultPermissions();
 
       filteredResources.value = permissionsState.resources
+        // A nested type is reached by expanding its parent, not as a row of its
+        // own, so offering it here selects something the table never renders.
+        .filter((r) => !r.parent)
         .map((r) => {
           return {
             label: r.display_name,
             value: r.key,
           };
-        })
-        .filter((r) => r.value !== "dashboard");
+        });
 
       resourceOptions.value = cloneDeep(filteredResources.value);
 
@@ -848,6 +861,24 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         }
       }
 
+      if (!resourceMapper[resource] && resource === "workflows") {
+        if (!resourceMapper["workflow_folder"]) {
+          resourceMapper["workflow_folder"] = getResourceByName(
+            permissionsState.permissions,
+            "workflow_folder",
+          ) as Resource;
+        }
+
+        await getResourceEntities(resourceMapper["workflow_folder"]);
+
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource,
+          ) as Resource;
+        }
+      }
+
       if (!resourceMapper[resource]) continue;
 
       if (resourceMapper[resource].parent && !resourceMapper[resourceMapper[resource].parent]) {
@@ -893,6 +924,11 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         // owning folder can't be derived from the entity — load every folder's
         // monitors so the permission can be matched to its row.
         for (const folderEntity of resourceMapper["synthetic_folder"]?.entities ?? []) {
+          await getResourceEntities(folderEntity as Entity);
+        }
+      } else if (resource === "workflows") {
+        // Plain workflow ids too, so the same sweep applies.
+        for (const folderEntity of resourceMapper["workflow_folder"]?.entities ?? []) {
           await getResourceEntities(folderEntity as Entity);
         }
       } else if (
@@ -1223,6 +1259,10 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
           (f.entities ?? []).some((e: Entity) => e.name === entity),
         ) as Entity;
+      } else if (resource === "workflows") {
+        resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
+          (f.entities ?? []).some((e: Entity) => e.name === entity),
+        ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
@@ -1273,6 +1313,10 @@ const updateJsonInTable = () => {
       } else if (resource === "synthetics") {
         // Plain-id entity — locate the folder whose loaded monitors contain it.
         resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
+          (f.entities ?? []).some((e: Entity) => e.name === entity),
+        ) as Entity;
+      } else if (resource === "workflows") {
+        resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
           (f.entities ?? []).some((e: Entity) => e.name === entity),
         ) as Entity;
       } else if (resource === "report") {
@@ -1550,6 +1594,8 @@ const getResourceEntities = (resource: Resource | Entity) => {
     rfolder: getReportFolders,
     synthetic_folder: getSyntheticsFolders,
     synthetics: getSynthetics,
+    workflow_folder: getWorkflowFolders,
+    workflows: getWorkflows,
     re_patterns: getRePatterns,
     provider: getProviders,
     score_config: getScoreConfigs,
@@ -1731,6 +1777,45 @@ const getSynthetics = async (resource: Entity | Resource) => {
     resolve(true);
   });
 };
+const getWorkflowFolders = async () => {
+  const folders: any = await commonService.list_Folders(
+    store.state.selectedOrganization.identifier,
+    "workflows",
+  );
+
+  let isDefaultPresent = folders.data.list.find((folder: any) => folder.folderId === "default");
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
+  updateResourceEntities(
+    "workflow_folder",
+    ["folderId"],
+    [...folders.data.list],
+    true,
+    "name",
+    "workflows",
+  );
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getWorkflows = async (resource: Entity | Resource) => {
+  // Plain workflow ids, no folder prefix — matches the objects set_ownership
+  // writes, same as synthetics.
+  const res: any = await workflowService.listWorkflows(
+    store.state.selectedOrganization.identifier,
+    resource.name,
+  );
+
+  const workflowRows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+  updateEntityEntities(resource, ["id"], [...workflowRows], false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
 const _getGroups = async () => {
   const groups = await getGroups(store.state.selectedOrganization.identifier);
   updateResourceEntities("group", [], [...groups.data]);
@@ -1767,12 +1852,11 @@ const getFunctions = async () => {
 };
 
 const getDestinations = async () => {
-  const destinations = await destinationService.list({
-    sort_by: "name",
-    org_identifier: store.state.selectedOrganization.identifier,
-  });
+  const destinations = await queryClient.fetchQuery(
+    destinationsQuery(store.state.selectedOrganization.identifier),
+  );
 
-  updateResourceEntities("destination", ["name"], [...destinations.data]);
+  updateResourceEntities("destination", ["name"], [...destinations]);
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1780,11 +1864,11 @@ const getDestinations = async () => {
 };
 
 const getTemplates = async () => {
-  const templates = await templateService.list({
-    org_identifier: store.state.selectedOrganization.identifier,
-  });
+  const templates = await queryClient.fetchQuery(
+    templatesQuery(store.state.selectedOrganization.identifier),
+  );
 
-  updateResourceEntities("template", ["name"], [...templates.data]);
+  updateResourceEntities("template", ["name"], [...templates]);
 
   return new Promise((resolve) => {
     resolve(true);
@@ -2385,11 +2469,9 @@ const saveRole = () => {
     return;
   }
 
-  updateRole({
-    role_id: editingRole.value,
-    org_identifier: store.state.selectedOrganization.identifier,
-    payload,
-  })
+  // Was: invalidate, then update — the refetch raced the write.
+  updateRoleOne
+    .mutateAsync({ role_id: editingRole.value, payload })
     .then(async () => {
       // combine permissionsHash and selectedPermissionsHash
 

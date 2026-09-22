@@ -128,11 +128,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       leftover errorMsg after resetSearchObj), which would
                       otherwise fall through to the results branch and leave the
                       center blank.
+
+                      filterErrMsg IS checked here though: a non-empty query
+                      naming a stream that doesn't exist also leaves
+                      selectedStream empty, and that has a specific cause to show
+                      (see updateQueryValue's streamFound handling) rather than
+                      the generic "pick a stream" prompt.
                     -->
                     <div
                       v-else-if="
                         searchObj.data.stream.streamLists.length > 0 &&
-                        searchObj.data.stream.selectedStream.length == 0
+                        searchObj.data.stream.selectedStream.length == 0 &&
+                        searchObj.data.filterErrMsg === ''
                       "
                       class="h-full max-lg:overflow-y-auto"
                     >

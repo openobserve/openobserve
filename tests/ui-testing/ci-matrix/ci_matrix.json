@@ -19,6 +19,7 @@
       "alerts-add-alert-org-identifier.spec.js",
       "alerts-composite-builder.spec.js",
       "alerts-composite-list.spec.js",
+      "alerts-clone-dialog.spec.js",
       "alerts-composite-preview.spec.js",
       "alerts-composite-detail.spec.js"
     ],
@@ -243,7 +244,9 @@
       "onboarding-form-validation.spec.js",
       "rum-form-validation.spec.js",
       "login-form-validation.spec.js",
-      "datetime-picker-copy-paste.spec.js"
+      "datetime-picker-copy-paste.spec.js",
+      "splunk-hec-ingestion-window.spec.js",
+      "connectDataSourcePopup.spec.js"
     ],
     "disabled": []
   },
@@ -309,7 +312,8 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js"
+      "timezoneDisplay.spec.js",
+      "logsRefreshCacheDropdown.spec.js"
     ],
     "disabled": [
       {
@@ -450,7 +454,8 @@
       "traceAdvancedFiltering.spec.js",
       "tracesAnalyzeDimensions.spec.js",
       "traces-autocomplete-suggestions.spec.js",
-      "traceGenAiParts.spec.js"
+      "traceGenAiParts.spec.js",
+      "tracesCharts.spec.js"
     ],
     "disabled": []
   },

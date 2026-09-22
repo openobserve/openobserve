@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div icon="info" class="date-time-container justify-between">
+  <div
+    icon="info"
+    class="date-time-container inline-flex items-stretch"
+    :class="{
+      'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
+    }"
+  >
+    <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
+      <OButton
+        data-test="date-time-prev-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        class="border-button-outline-border h-auto! rounded-e-none! border-e!"
+        icon-left="chevron-left"
+        :aria-label="t('common.previous')"
+        :disabled="disable"
+        @click.prevent.stop="shiftTimeRange('prev')"
+      />
+    </OTooltip>
     <OPopover
       v-model:open="menuOpen"
       side="bottom"
@@ -37,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             hideRelative: disableRelative,
             'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
+            'h-auto! rounded-none! border-0!': !hideRangeShift,
           }"
           class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
@@ -299,6 +318,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OPopover>
+    <OTooltip v-if="!hideRangeShift" :content="t('common.next')">
+      <OButton
+        data-test="date-time-next-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        class="border-button-outline-border h-auto! rounded-s-none! border-s!"
+        icon-left="chevron-right"
+        :aria-label="t('common.next')"
+        :disabled="disable"
+        @click.prevent.stop="shiftTimeRange('next')"
+      />
+    </OTooltip>
   </div>
 </template>
 
@@ -408,6 +439,10 @@ export default defineComponent({
       default: false,
     },
     hideRelativeTimezone: {
+      type: Boolean,
+      default: false,
+    },
+    hideRangeShift: {
       type: Boolean,
       default: false,
     },
@@ -1193,6 +1228,39 @@ export default defineComponent({
       if (props.autoApply) saveDate(type === "absolute" ? "absolute" : "relative-custom");
     };
 
+    /**
+     * Shift the applied time window backward (`prev`) or forward (`next`) by its
+     * own duration, then promote the picker to an absolute range and emit the
+     * change so the page re-runs its query. Works from both relative and
+     * absolute modes: `getConsumableDateTime` resolves the current window to
+     * concrete microsecond timestamps first, so shifting across midnight/day
+     * boundaries stays exact and a relative picker is switched to absolute.
+     *
+     * Deliberately does NOT call `markProgrammaticDateChange()`: the change is
+     * user-driven, so `userChangedValue` stays `true` and consumers (e.g.
+     * traces live-mode) re-run their query just like a manual Apply. With
+     * `autoApply` the deep `selectedDate`/`selectedTime` watcher saves the new
+     * range; otherwise we save and emit directly.
+     */
+    const shiftTimeRange = (direction: "prev" | "next") => {
+      const { startTime, endTime } = getConsumableDateTime();
+      const duration = endTime - startTime;
+      if (!(duration > 0)) return;
+
+      const delta = (direction === "prev" ? -1 : 1) * duration;
+      const startDateTime = convertUnixTime(startTime + delta);
+      const endDateTime = convertUnixTime(endTime + delta);
+
+      selectedDate.value.from = startDateTime.date;
+      selectedDate.value.to = endDateTime.date;
+      selectedTime.value.startTime = startDateTime.time;
+      selectedTime.value.endTime = endDateTime.time;
+      selectedType.value = "absolute";
+
+      menuOpen.value = false;
+      if (!props.autoApply) saveDate("absolute");
+    };
+
     // Arrow-key navigation for the picker panel: Left/Right switch the
     // Relative/Absolute tabs, and arrows roam the relative preset grid.
     // stopPropagation keeps reka's dropdown-menu keydown from swallowing them.
@@ -1421,6 +1489,7 @@ export default defineComponent({
       setSavedDate,
       optionsFn,
       setDateType,
+      shiftTimeRange,
       onPickerKeydown,
       getConsumableDateTime,
       relativeDatesInHour,

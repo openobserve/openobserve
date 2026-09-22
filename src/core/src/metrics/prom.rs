@@ -148,7 +148,7 @@ pub async fn remote_write(
         let metric_name = format_stream_name(item.metric_family_name.to_string());
         let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
             .await
-            .unwrap_or(Schema::empty());
+            .unwrap_or_else(|_| Schema::empty());
         if schema.metadata().contains_key(METADATA_LABEL) {
             // already has metadata, skip
             continue;

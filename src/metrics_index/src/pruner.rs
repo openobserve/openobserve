@@ -75,7 +75,9 @@ pub async fn search(
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
         // only indexed metrics files own a sidecar; other layouts stay as they are
-        if MetricsFileLayout::of(&file.key) != Some(MetricsFileLayout::Indexed) {
+        if index_files.contains_key(&file.key)
+            || MetricsFileLayout::of(&file.key) != Some(MetricsFileLayout::Indexed)
+        {
             continue;
         }
         let Some(sidecar_path) = MetricsFileLayout::metrics_index_path(&file.key) else {
@@ -104,12 +106,10 @@ pub async fn search(
         } else {
             String::new()
         };
-        index_files.entry(file.key.clone()).or_insert((
-            file.account.clone(),
-            sidecar_path,
-            cache_key,
-            expected_rows,
-        ));
+        index_files.insert(
+            file.key.clone(),
+            (file.account.clone(), sidecar_path, cache_key, expected_rows),
+        );
     }
     if index_files.is_empty() {
         return Ok(None);

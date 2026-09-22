@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-organizations-list"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('organization.search')"
@@ -515,8 +515,8 @@ export default defineComponent({
         query: {
           action: "update",
           org_identifier: store.state.selectedOrganization.identifier,
-          to_be_updated_org_id: props.row.identifier,
-          to_be_updated_org_name: props.row.name,
+          to_be_updated_org_id: row.identifier,
+          to_be_updated_org_name: row.name,
         },
       });
     };

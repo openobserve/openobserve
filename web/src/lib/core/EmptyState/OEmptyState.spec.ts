@@ -111,38 +111,44 @@ describe("OEmptyState", () => {
       expect(flexNowrapEl.exists()).toBe(false);
     });
 
-    it("should keep a single row on lg+ but wrap below lg when columns is false", () => {
+    it("wraps the stretched cards only once they run out of room when columns is false", () => {
       // Arrange & Act
       wrapper = buildWrapper({ columns: false });
 
-      // Assert — nowrap is lg+ only; below lg the row wraps instead of overflowing.
-      const flexWrapEl = wrapper.find(".flex-wrap");
-      const flexNowrapEl = wrapper.find(".lg\\:flex-nowrap");
+      // Assert — no viewport-pinned nowrap: a narrow container must wrap at any viewport.
+      const row = wrapper.find(".flex-wrap");
 
-      expect(flexWrapEl.exists()).toBe(false);
-      expect(flexNowrapEl.exists()).toBe(true);
-      expect(flexNowrapEl.classes()).toContain("max-lg:flex-wrap");
+      expect(row.exists()).toBe(true);
+      expect(row.classes()).toContain("items-stretch");
+      expect(wrapper.find(".lg\\:flex-nowrap").exists()).toBe(false);
     });
 
-    it("should keep a single row on lg+ but wrap below lg when columns is omitted (default)", () => {
+    it("wraps the stretched cards only once they run out of room when columns is omitted (default)", () => {
       // Arrange & Act — no columns prop at all
       wrapper = buildWrapper();
 
-      // Assert — default is false, so the lg+ nowrap variant should be present
-      // and unconditional flex-wrap should not.
-      const flexWrapEl = wrapper.find(".flex-wrap");
-      const flexNowrapEl = wrapper.find(".lg\\:flex-nowrap");
+      // Assert — default is false, so the row stretches its cards and has no nowrap pin
+      const row = wrapper.find(".flex-wrap");
 
-      expect(flexWrapEl.exists()).toBe(false);
-      expect(flexNowrapEl.exists()).toBe(true);
+      expect(row.exists()).toBe(true);
+      expect(row.classes()).toContain("items-stretch");
+      expect(wrapper.find(".lg\\:flex-nowrap").exists()).toBe(false);
     });
 
-    it("does not apply flex-wrap to any element when columns is false", () => {
+    it("renders exactly one wrapping row when columns is false", () => {
       // Arrange & Act
       wrapper = buildWrapper({ columns: false });
 
-      // Assert — no element in the entire rendered tree should carry flex-wrap
-      expect(wrapper.findAll(".flex-wrap")).toHaveLength(0);
+      // Assert
+      expect(wrapper.findAll(".flex-wrap")).toHaveLength(1);
+    });
+
+    it("does not stretch the cards when columns is true", () => {
+      // Arrange & Act
+      wrapper = buildWrapper({ columns: true });
+
+      // Assert
+      expect(wrapper.find(".flex-wrap").classes()).not.toContain("items-stretch");
     });
 
     it("does not apply flex-nowrap to any element when columns is true", () => {

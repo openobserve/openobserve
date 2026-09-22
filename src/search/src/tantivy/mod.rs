@@ -470,7 +470,7 @@ async fn search_tantivy_index(
 
     // generate the tantivy query
     let condition: IndexCondition =
-        index_condition.ok_or(anyhow::anyhow!("IndexCondition not found"))?;
+        index_condition.ok_or_else(|| anyhow::anyhow!("IndexCondition not found"))?;
     let (mut query, has_skipped_conditions) =
         condition.to_tantivy_query(trace_id, tantivy_schema.clone(), fts_field)?;
 

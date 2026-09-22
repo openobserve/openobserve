@@ -167,6 +167,12 @@ import { generateCloudFormationURL } from "@/utils/awsIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import dashboardsService from "@/services/dashboards";
+import { createDashboardMutation } from "@/services/dashboards.queries";
+import { folderKeys } from "@/services/common.querykeys";
+import { dashboardKeys } from "@/services/dashboards.querykeys";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
+import { queryClient } from "@/composables/query/queryClient";
 import WindowsConfig from "./WindowsConfig.vue";
 import LinuxConfig from "./LinuxConfig.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -186,6 +192,8 @@ export default defineComponent({
     const store = useStore();
     const { confirm } = useConfirmDialog();
     const router = useRouter();
+    const dashboardOrgId = useOrgId();
+    const createDashboard = useMutation(() => createDashboardMutation(dashboardOrgId.value));
     const showTemplateDialog = ref(false);
     const showComponentContent = ref(false);
     const selectedComponent = shallowRef<any>(null);
@@ -375,6 +383,8 @@ export default defineComponent({
             description: "AWS service dashboards",
           });
           awsFolder = createResponse.data;
+          // The dashboard mutation's scope does not cover folders, so the new folder would never reach the rail's cache.
+          await queryClient.invalidateQueries({ queryKey: folderKeys.all(orgId) });
         }
 
         return awsFolder.folderId;
@@ -394,6 +404,8 @@ export default defineComponent({
       if (existingDashboardId) {
         try {
           await dashboardsService.delete(orgId, existingDashboardId, folderId);
+          // Dropped here as well as by the create's mutation: if the create fails, the list must not keep the deleted row.
+          void queryClient.invalidateQueries({ queryKey: dashboardKeys.all(orgId) });
           // Wait a moment to ensure deletion completes
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (deleteError) {
@@ -406,8 +418,7 @@ export default defineComponent({
         }
       }
 
-      // Import dashboard
-      await dashboardsService.create(orgId, dashboardJson, folderId);
+      await createDashboard.mutateAsync({ json: dashboardJson, folderId });
     };
 
     const handleAddDashboard = async () => {

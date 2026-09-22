@@ -6,6 +6,11 @@ const pipelines = {
     return http().get(url);
   },
 
+  getPipelineHistory: (org_identifier: string, params: Record<string, string>) => {
+    const url = `/api/${org_identifier}/pipelines/history`;
+    return http().get(url, { params });
+  },
+
   getPipeline: ({ name, org_identifier }: { name: string; org_identifier: string }) => {
     const url = `/api/${org_identifier}/pipelines/${name}`;
     return http().get(url);

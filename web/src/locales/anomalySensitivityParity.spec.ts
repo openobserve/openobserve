@@ -185,112 +185,112 @@ const PINNED_COPY: Record<string, { tooltip: string; budgetTooltip: string; hint
       "يحدد حد الدرجات من درجات تدريب النموذج عند هذا المئين — القيمة 97 تضع الحد عند أعلى 3٪ من درجات التدريب. قد تختلف الدرجات الفعلية عن درجات التدريب، لذا فهذه ليست نسبة من الفترات القادمة وليست معدل تنبيهات. القيمة الأقل تخفض الحد وترسل عادة تنبيهات أكثر؛ وتباعد فترة التهدئة التنبيهات المتكررة.",
     budgetTooltip:
       "الحد الأقصى لعدد التنبيهات التي يمكن لهذا الإعداد إرسالها، ويُفرض عند الإرسال. يستمر الكشف في تقييم كل فترة؛ وعند استنفاد الميزانية تُمنع التنبيهات الإضافية حتى تتجدد.",
-    hint: "تُقيَّم الفترات مقابل علامة المئين {percentile} من درجات تدريب النموذج — وعدد التنبيهات الناتج يعتمد على بياناتك.",
+    hint: "تُطلق النافذة تنبيهًا عندما تبدو أكثر غرابة من {percentile}% مما رآه النموذج أثناء التدريب. ويعتمد عدد التنبيهات الناتجة على بياناتك.",
   },
   "de-DE": {
     tooltip:
       "Legt die Score-Schwelle aus den Trainingswerten des Modells bei diesem Perzentil fest — 97 setzt die Schwelle bei den obersten 3 % der Trainingswerte. Live-Werte können vom Training abweichen; dies ist also kein Anteil künftiger Buckets und keine Alarmrate. Ein niedrigerer Wert senkt die Schwelle und sendet in der Regel mehr Warnmeldungen; eine Abklingzeit begrenzt Wiederholungen.",
     budgetTooltip:
       "Die maximale Zahl von Warnmeldungen, die diese Konfiguration zustellen darf — bei der Zustellung erzwungen. Die Erkennung bewertet weiterhin jeden Bucket; ist das Budget aufgebraucht, werden weitere Warnmeldungen unterdrückt, bis es sich auffüllt.",
-    hint: "Buckets werden am p{percentile}-Wert der Trainingswerte des Modells gemessen — wie viele Warnmeldungen das ergibt, hängt von Ihren Daten ab.",
+    hint: "Ein Bucket löst eine Warnmeldung aus, wenn er ungewöhnlicher erscheint als {percentile} % dessen, was das Modell im Training gesehen hat. Wie viele Warnmeldungen das bedeutet, hängt von Ihren Daten ab.",
   },
   "en-US": {
     tooltip:
       "Sets the score bar from the model's training scores at this percentile — 97 puts the bar at the top 3% of training scores. Live scores can differ from training, so this is not a share of future buckets and not an alert rate. A lower value lowers the bar and generally sends more alerts; a cooldown spaces out repeats.",
     budgetTooltip:
       "The maximum number of alerts this configuration may deliver, enforced at delivery. Detection still scores every bucket; once the budget is spent, further alerts are suppressed until it refills.",
-    hint: "Buckets are judged against the p{percentile} mark of the model's training scores — how many alerts that yields depends on your data.",
+    hint: "A bucket alerts when it looks more unusual than {percentile}% of what the model saw in training. How many alerts that means depends on your data.",
   },
   "es-ES": {
     tooltip:
       "Fija el listón de puntuación a partir de las puntuaciones de entrenamiento del modelo en este percentil: 97 sitúa el listón en el 3 % superior de las puntuaciones de entrenamiento. Las puntuaciones reales pueden diferir del entrenamiento, así que esto no es una proporción de buckets futuros ni una tasa de alertas. Un valor más bajo baja el listón y suele enviar más alertas; un periodo de enfriamiento espacia las repeticiones.",
     budgetTooltip:
       "El número máximo de alertas que esta configuración puede entregar, aplicado en la entrega. La detección sigue puntuando cada bucket; agotado el presupuesto, las alertas adicionales se suprimen hasta que se repone.",
-    hint: "Los buckets se comparan con la marca p{percentile} de las puntuaciones de entrenamiento del modelo; cuántas alertas produce depende de tus datos.",
+    hint: "Un intervalo genera una alerta cuando parece más inusual que el {percentile}% de lo que el modelo vio durante el entrenamiento. Cuántas alertas supone eso depende de tus datos.",
   },
   "fr-FR": {
     tooltip:
       "Définit la barre de score à partir des scores d'entraînement du modèle à ce percentile — 97 place la barre au niveau des 3 % les plus élevés des scores d'entraînement. Les scores réels peuvent différer de l'entraînement : ce n'est donc ni une part des compartiments futurs ni un taux d'alertes. Une valeur plus basse abaisse la barre et envoie en général davantage d'alertes ; un délai de refroidissement espace les répétitions.",
     budgetTooltip:
       "Le nombre maximal d'alertes que cette configuration peut délivrer, appliqué à la livraison. La détection continue de noter chaque compartiment ; une fois le budget épuisé, les alertes supplémentaires sont supprimées jusqu'à ce qu'il se reconstitue.",
-    hint: "Les compartiments sont évalués par rapport au repère p{percentile} des scores d'entraînement du modèle — le nombre d'alertes qui en résulte dépend de vos données.",
+    hint: "Un intervalle déclenche une alerte lorsqu'il paraît plus inhabituel que {percentile}% de ce que le modèle a vu à l'entraînement. Le nombre d'alertes que cela représente dépend de vos données.",
   },
   "it-IT": {
     tooltip:
       "Imposta l'asticella del punteggio dai punteggi di addestramento del modello a questo percentile: 97 colloca l'asticella nel 3 % più alto dei punteggi di addestramento. I punteggi reali possono differire dall'addestramento, quindi questa non è una quota dei bucket futuri né un tasso di avvisi. Un valore più basso abbassa l'asticella e in genere invia più avvisi; un periodo di attesa distanzia le ripetizioni.",
     budgetTooltip:
       "Il numero massimo di avvisi che questa configurazione può recapitare, applicato al recapito. Il rilevamento continua a valutare ogni bucket; esaurito il budget, gli avvisi ulteriori vengono soppressi finché non si ricarica.",
-    hint: "I bucket sono valutati rispetto al riferimento p{percentile} dei punteggi di addestramento del modello: quanti avvisi ne derivino dipende dai tuoi dati.",
+    hint: "Un intervallo genera un avviso quando appare più insolito del {percentile}% di ciò che il modello ha visto durante l'addestramento. Quanti avvisi comporti dipende dai tuoi dati.",
   },
   "ja-JP": {
     tooltip:
       "モデルのトレーニングスコアのこのパーセンタイルからスコアの基準線を設定します。97 はトレーニングスコアの上位 3% に基準線を置きます。実際のスコアはトレーニングと異なることがあるため、これは将来のバケットの割合でもアラート率でもありません。値を下げると基準線が下がり、通常はアラートが増えます。クールダウンにより連続するアラートは間隔が空きます。",
     budgetTooltip:
       "この設定が配信できるアラートの上限で、配信時に強制されます。検出はすべてのバケットをスコアリングし続けます。予算を使い切ると、回復するまで追加のアラートは抑制されます。",
-    hint: "バケットはモデルのトレーニングスコアの p{percentile} 基準で判定されます。アラート件数はデータ次第です。",
+    hint: "バケットは、モデルがトレーニングで見たものの {percentile}% よりも異常に見える場合にアラートを発します。それが何件のアラートになるかはデータ次第です。",
   },
   "ko-KR": {
     tooltip:
       "모델 훈련 점수의 이 백분위수에서 점수 기준선을 설정합니다. 97은 훈련 점수 상위 3%에 기준선을 둡니다. 실제 점수는 훈련과 다를 수 있으므로 이는 미래 버킷의 비율도, 알림 비율도 아닙니다. 값을 낮추면 기준선이 낮아져 보통 더 많은 알림이 전송되며, 쿨다운이 반복 알림의 간격을 벌립니다.",
     budgetTooltip:
       "이 구성이 전달할 수 있는 알림의 최대 개수로, 전달 시점에 강제됩니다. 감지는 모든 버킷을 계속 채점하며, 예산이 소진되면 회복될 때까지 추가 알림이 억제됩니다.",
-    hint: "버킷은 모델 훈련 점수의 p{percentile} 기준에 따라 판정됩니다. 알림 수는 데이터에 따라 달라집니다.",
+    hint: "버킷이 학습 중 모델이 확인한 데이터의 {percentile}%보다 더 이례적으로 보이면 알림이 발생합니다. 알림이 몇 건 발생하는지는 데이터에 따라 다릅니다.",
   },
   "nl-NL": {
     tooltip:
       "Stelt de scorelat in op basis van de trainingsscores van het model bij dit percentiel — 97 legt de lat bij de hoogste 3% van de trainingsscores. Live scores kunnen afwijken van de training, dus dit is geen aandeel van toekomstige buckets en geen meldingsfrequentie. Een lagere waarde verlaagt de lat en verstuurt doorgaans meer meldingen; een afkoelperiode spreidt herhalingen.",
     budgetTooltip:
       "Het maximale aantal meldingen dat deze configuratie mag bezorgen, afgedwongen bij bezorging. Detectie blijft elke bucket scoren; is het budget op, dan worden verdere meldingen onderdrukt tot het zich aanvult.",
-    hint: "Buckets worden beoordeeld tegen het p{percentile}-punt van de trainingsscores van het model — hoeveel meldingen dat oplevert, hangt af van je gegevens.",
+    hint: "Een bucket geeft een alarm wanneer deze ongewoner lijkt dan {percentile}% van wat het model tijdens de training zag. Hoeveel alarmen dat oplevert, hangt af van uw gegevens.",
   },
   "pl-PL": {
     tooltip:
       "Ustawia próg punktowy na podstawie wyników treningowych modelu przy tym percentylu — 97 umieszcza próg przy górnych 3% wyników treningowych. Wyniki na żywo mogą różnić się od treningowych, więc nie jest to udział przyszłych przedziałów ani częstość alertów. Niższa wartość obniża próg i zwykle wysyła więcej alertów; okres wyciszenia rozdziela powtórzenia.",
     budgetTooltip:
       "Maksymalna liczba alertów, jaką ta konfiguracja może dostarczyć, egzekwowana przy dostarczaniu. Wykrywanie nadal ocenia każdy przedział; po wyczerpaniu budżetu kolejne alerty są wstrzymywane, aż budżet się odnowi.",
-    hint: "Przedziały są oceniane względem punktu p{percentile} wyników treningowych modelu — liczba alertów zależy od Twoich danych.",
+    hint: "Przedział generuje alert, gdy wygląda na bardziej nietypowy niż {percentile}% tego, co model widział podczas uczenia. To, ile to oznacza alertów, zależy od Twoich danych.",
   },
   "pt-PT": {
     tooltip:
       "Define a fasquia de pontuação a partir das pontuações de treino do modelo neste percentil — 97 coloca a fasquia nos 3 % superiores das pontuações de treino. As pontuações reais podem diferir do treino, pelo que isto não é uma fração dos buckets futuros nem uma taxa de alertas. Um valor mais baixo desce a fasquia e normalmente envia mais alertas; um período de espera espaça as repetições.",
     budgetTooltip:
       "O número máximo de alertas que esta configuração pode entregar, aplicado na entrega. A deteção continua a pontuar todos os buckets; esgotado o orçamento, os alertas adicionais são suprimidos até ele se repor.",
-    hint: "Os buckets são avaliados face à marca p{percentile} das pontuações de treino do modelo — quantos alertas isso gera depende dos seus dados.",
+    hint: "Um bucket gera alerta quando parece mais incomum do que {percentile}% do que o modelo viu no treinamento. Quantos alertas isso significa depende dos seus dados.",
   },
   "ru-RU": {
     tooltip:
       "Задаёт планку оценки по обучающим оценкам модели на этом процентиле — 97 ставит планку на верхних 3% обучающих оценок. Реальные оценки могут отличаться от обучающих, поэтому это не доля будущих бакетов и не частота оповещений. Меньшее значение опускает планку и обычно отправляет больше оповещений; период охлаждения разрежает повторы.",
     budgetTooltip:
       "Максимальное число оповещений, которое эта конфигурация может доставить; ограничение применяется при доставке. Обнаружение продолжает оценивать каждый бакет; когда бюджет исчерпан, дальнейшие оповещения подавляются, пока он не восстановится.",
-    hint: "Бакеты оцениваются относительно отметки p{percentile} обучающих оценок модели — сколько оповещений это даст, зависит от ваших данных.",
+    hint: "Интервал срабатывает, когда выглядит необычнее, чем {percentile}% увиденного моделью при обучении. Сколько это даст оповещений, зависит от ваших данных.",
   },
   "tr-TR": {
     tooltip:
       "Puan çıtasını, modelin eğitim puanlarının bu yüzdelik dilimine göre belirler — 97, çıtayı eğitim puanlarının en üst %3'üne yerleştirir. Canlı puanlar eğitimden farklı olabilir; bu nedenle bu, gelecekteki aralıkların bir payı ya da bir uyarı oranı değildir. Daha düşük bir değer çıtayı düşürür ve genellikle daha fazla uyarı gönderir; bekleme süresi tekrarları seyrekleştirir.",
     budgetTooltip:
       "Bu yapılandırmanın teslim edebileceği en fazla uyarı sayısı; teslimde uygulanır. Algılama her aralığı puanlamaya devam eder; bütçe tükenince, yenilenene kadar ek uyarılar bastırılır.",
-    hint: "Aralıklar, modelin eğitim puanlarının p{percentile} işaretine göre değerlendirilir — kaç uyarı çıkacağı verilerinize bağlıdır.",
+    hint: "Bir zaman aralığı, modelin eğitimde gördüklerinin %{percentile}'inden daha sıra dışı göründüğünde uyarı verir. Bunun kaç uyarıya karşılık geldiği verinize bağlıdır.",
   },
   "vi-VN": {
     tooltip:
       "Đặt mức chuẩn điểm từ điểm huấn luyện của mô hình tại phân vị này — 97 đặt mức chuẩn ở 3% điểm huấn luyện cao nhất. Điểm thực tế có thể khác với huấn luyện, nên đây không phải tỷ lệ các bucket tương lai và không phải tần suất cảnh báo. Giá trị thấp hơn hạ mức chuẩn và thường gửi nhiều cảnh báo hơn; thời gian chờ giãn cách các cảnh báo lặp lại.",
     budgetTooltip:
       "Số cảnh báo tối đa mà cấu hình này được phép gửi, được áp đặt khi gửi. Việc phát hiện vẫn chấm điểm mọi bucket; khi ngân sách cạn, các cảnh báo tiếp theo bị chặn cho đến khi ngân sách hồi phục.",
-    hint: "Các bucket được so với mốc p{percentile} của điểm huấn luyện mô hình — số cảnh báo tạo ra tùy thuộc vào dữ liệu của bạn.",
+    hint: "Một khung thời gian sẽ phát cảnh báo khi nó trông bất thường hơn {percentile}% những gì mô hình đã thấy trong quá trình huấn luyện. Số lượng cảnh báo cụ thể phụ thuộc vào dữ liệu của bạn.",
   },
   "zh-CN": {
     tooltip:
       "根据模型训练分数在该百分位处设定分数门槛——97 将门槛设在训练分数最高的 3% 处。实际分数可能与训练不同，因此这既不是未来数据桶的占比，也不是告警频率。取值越低门槛越低，通常发送的告警越多；冷却时间会拉开重复告警的间隔。",
     budgetTooltip:
       "此配置可投递告警的上限，在投递时强制执行。检测仍会为每个数据桶评分；预算用尽后，多余的告警将被抑制，直到预算恢复。",
-    hint: "数据桶按模型训练分数的 p{percentile} 标记来判定——产生多少告警取决于你的数据。",
+    hint: "当某个时间桶看起来比模型在训练中见到的 {percentile}% 更异常时，就会触发告警。具体会产生多少条告警取决于你的数据。",
   },
   "zh-TW": {
     tooltip:
       "依模型訓練分數在此百分位處設定分數門檻——97 將門檻設在訓練分數最高的 3% 處。實際分數可能與訓練不同，因此這既不是未來區間的占比，也不是警示頻率。數值越低門檻越低，通常發送的警示越多；冷卻時間會拉開重複警示的間隔。",
     budgetTooltip:
       "此設定可傳送警示的上限，於傳送時強制執行。偵測仍會為每個區間評分；預算用盡後，多餘的警示會被抑制，直到預算回復。",
-    hint: "區間依模型訓練分數的 p{percentile} 標記判定——產生多少警示取決於你的資料。",
+    hint: "當某個時間桶看起來比模型在訓練中見過的 {percentile}% 更不尋常時，就會觸發警示。這代表多少個警示取決於你的資料。",
   },
 };
 
@@ -448,5 +448,50 @@ describe("anomaly sensitivity locale parity", () => {
         expect(text, `${key} must not contain "${claim}"`).not.toContain(claim);
       }
     }
+  });
+
+  // "Percentile" named two unrelated things: the Sensitivity number and the
+  // Detection Function's p50/p95/p99. The label is what a reader sees first, so
+  // it must not reach for the Detection Function's vocabulary to name itself.
+  it("en-US labels the sensitivity number without detection-function vocabulary", () => {
+    const label = String(at(en, "alerts.anomaly.percentile")).toLowerCase();
+    expect(label).not.toContain("percentile");
+    expect(label).not.toMatch(/\bp\d{2}\b/);
+    // Still a label, not a sentence — it sits in a 21.75rem-wide field column.
+    expect(label.split(/\s+/).length).toBeLessThanOrEqual(3);
+  });
+
+  // The collision is only resolved if the tooltip on the number says, in words,
+  // that it is not the Detection Function's percentile.
+  it("en-US disowns the detection-function meaning beside the sensitivity number", () => {
+    const tooltip = String(at(en, "alerts.anomaly.sensitivityNotDataPercentile")).toLowerCase();
+    expect(tooltip).toContain("detection function");
+    expect(tooltip).toContain("unrelated");
+    // It has to name what it ranks instead, or "unrelated" tells the reader nothing.
+    expect(tooltip).toMatch(/model's confidence|model's scores/);
+  });
+
+  // The other half of the same collision: the Detection Function's p-levels rank
+  // the FIELD's values, and must never read as an alerting/sensitivity control.
+  it("en-US keeps the detection-function tooltip in data space, not alert space", () => {
+    const tooltip = String(at(en, "alerts.anomaly.detectionFunctionTooltip")).toLowerCase();
+    expect(tooltip).toMatch(/\bp50\b/);
+    expect(tooltip).toMatch(/\bp95\b/);
+    // Names the thing being measured, so p95 reads as "of a field", not "of scores".
+    expect(tooltip).toMatch(/field/);
+    for (const claim of ["sensitivity", "how unusual", "training score", "alerts when"]) {
+      expect(tooltip, `detectionFunctionTooltip must not contain "${claim}"`).not.toContain(claim);
+    }
+  });
+
+  // Anomalies are marked in score space by a trained model, so they cannot appear
+  // on the config-time value preview. The caption has to send the reader somewhere
+  // REAL — pinned against the rendered label, not a phrase no screen shows.
+  it("en-US points the preview reader at a destination the app actually renders", () => {
+    const caption = String(at(en, "alerts.anomaly.previewCaption")).toLowerCase();
+    expect(caption).toContain("training");
+    const destination = String(at(en, "alerts.anomaly.detectionCharts")).toLowerCase();
+    expect(destination.length).toBeGreaterThan(0);
+    expect(caption).toContain(destination);
   });
 });

@@ -1048,7 +1048,7 @@ describe("OnCallResponseDetail", () => {
     const ack = stats.find((s: any) => s.key === "ack");
     const resolve = stats.find((s: any) => s.key === "resolve");
 
-    expect(ack.label).toBe("Unacked for");
+    expect(ack.label).toBe("Unacknowledged for");
     expect(ack.value).not.toBe("—");
 
     expect(resolve.label).toBe("Open for");
@@ -1166,8 +1166,8 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
           escalated_to: "rung",
           rung_micros: 300_000_000,
           recipients: ["ana@o2.ai"],
-          chased: ["bo@o2.ai"],
-          deduplicated: [],
+          chased: true,
+          deduplicated: false,
           response: {},
         },
       } as any);
@@ -1177,8 +1177,6 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
 
       const message = String(toastSpy.mock.calls.at(-1)![0].message);
       expect(message).toContain("ana@o2.ai");
-      // Chased counts as reached: a second page landed on them.
-      expect(message).toContain("bo@o2.ai");
     });
 
     /// A rung that resolved to nobody is a real outcome, and the one worth
@@ -1190,8 +1188,8 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
           escalated_to: "rung",
           rung_micros: 0,
           recipients: [],
-          chased: [],
-          deduplicated: ["ana@o2.ai"],
+          chased: false,
+          deduplicated: true,
           response: {},
         },
       } as any);

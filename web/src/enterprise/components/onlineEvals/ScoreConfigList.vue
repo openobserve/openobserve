@@ -35,20 +35,15 @@
         </template>
 
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
+            :last-run-at="lastRunAt"
+            :loading="refreshing || loading"
+            shortcut-id="scoreConfigsRefresh"
             data-test="score-config-list-refresh-btn"
             @click="emit('refresh')"
-          >
-            <OTooltip
-              side="bottom"
-              :content="t('common.refresh')"
-              shortcut-id="scoreConfigsRefresh"
-            />
-          </OButton>
+          />
         </template>
 
         <!-- Data-type breakdown (catalog signal) — doubles as a filter synced to
@@ -215,7 +210,7 @@
 import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -242,6 +237,10 @@ const props = defineProps<{
   search: string;
   loading?: boolean;
   forbidden?: boolean;
+  /** Epoch-ms of the last list read, for the refresh button's age label. */
+  lastRunAt?: number | null;
+  /** A reload is in flight — spins the refresh button and blocks a second click. */
+  refreshing?: boolean;
 }>();
 
 const emit = defineEmits<{
