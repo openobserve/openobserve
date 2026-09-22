@@ -21,6 +21,8 @@ import {
   ACTION_LABEL_KEYS,
   CLICK_TYPE_VALUES,
   RETIRED_ACTIONS,
+  SUBSTITUTED_VALUE_ACTIONS,
+  VALUE_ACTIONS,
   actionOptions,
   clickTypeOf,
   clickTypeOptions,
@@ -139,5 +141,19 @@ describe("synthetics click types", () => {
     expect(stepActionLabelKey("click", "left", 2)).toBe("synthetics.journey.clickTypes.double");
     // The two fields belong to a click; on any other action they say nothing.
     expect(stepActionLabelKey("hover", "right", 2)).toBe(ACTION_LABEL_KEYS.hover);
+  });
+});
+
+describe("substituted value actions", () => {
+  it("offers exactly the actions whose value the probe substitutes", () => {
+    expect(SUBSTITUTED_VALUE_ACTIONS).toEqual(["navigate", "type", "select", "press"]);
+  });
+
+  // The exclusion is the source of truth: a new value action is substituted unless named there.
+  it("derives itself from the value actions, so a new one is not silently dropped", () => {
+    for (const action of VALUE_ACTIONS) {
+      const excluded = (["upload", "scroll", "wait"] as StepAction[]).includes(action);
+      expect(SUBSTITUTED_VALUE_ACTIONS.includes(action)).toBe(!excluded);
+    }
   });
 });

@@ -65,11 +65,18 @@ describe("VariableSuggestionRow", () => {
     expect(wrapper.find('[data-test="synthetics-variable-suggestion-envs"]').exists()).toBe(false);
   });
 
-  it("uses the layers icon labelled with every source for an environment variable", () => {
+  it("labels a global overridden in an environment with the environment names alone", () => {
     wrapper = mountRow({ suggestion: suggestion({ envs: ["staging"], global: true }) });
     const icon = wrapper.find(scopeSel);
     expect(icon.attributes("data-icon")).toBe("layers");
-    expect(icon.attributes("aria-label")).toBe("staging, Global");
+    expect(icon.attributes("aria-label")).toBe("staging");
+  });
+
+  it("labels an environment-only variable with its environment names", () => {
+    wrapper = mountRow({ suggestion: suggestion({ envs: ["staging", "prod"] }) });
+    const icon = wrapper.find(scopeSel);
+    expect(icon.attributes("data-icon")).toBe("layers");
+    expect(icon.attributes("aria-label")).toBe("staging, prod");
   });
 
   it("gives a check-tier row the layers icon and no source label", () => {

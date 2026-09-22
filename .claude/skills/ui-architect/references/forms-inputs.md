@@ -265,7 +265,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 </OTemplateInput>
 ```
 
-**Family:** Sibling `OTemplateTextarea` (multi-line). Shared sub-component `OTemplateSuggestList` and composable `useTemplateSuggest` (exports `CLOSED_TOKEN_RE`, `OPEN_TOKEN_RE`, `tokenAtCaret`) are internal to the family. Headless.
+**Family:** Sibling `OTemplateTextarea` (multi-line). Shared sub-components `OTemplateOverlay` (peek box + list) and `OTemplateSuggestList`, plus the composable `useTemplateSuggest` (exports `CLOSED_TOKEN_RE`, `OPEN_TOKEN_RE`, `tokenAtCaret`, `tokenFor`), are internal to the family. Headless.
 
 ### OTemplateTextarea
 

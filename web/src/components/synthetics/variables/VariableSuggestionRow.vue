@@ -81,10 +81,11 @@ const { t } = useI18nTyped();
 
 const envsText = computed<I18nText>(() => raw(props.suggestion.envs.join(", ")));
 
+// The icon rule, in words: a purely global variable reads as global, anything else as its envs.
 const sourceLabel = computed<I18nText | undefined>(() => {
-  const sources = [...props.suggestion.envs];
-  if (props.suggestion.global) sources.push(t("synthetics.variables.global"));
-  return sources.length ? raw(sources.join(", ")) : undefined;
+  const { global, envs } = props.suggestion;
+  if (global && !envs.length) return t("synthetics.variables.global");
+  return envs.length ? raw(envs.join(", ")) : undefined;
 });
 
 const gapText = computed<I18nText | undefined>(() => {

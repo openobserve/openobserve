@@ -25,7 +25,8 @@ import {
 } from "reka-ui";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { tokenFor } from "./useTemplateSuggest";
+import { useI18nTyped } from "@/types/i18n";
 import type { TemplateSuggestion } from "./OTemplateInput.types";
 import type {
   TemplateSuggestListEmits,
@@ -60,10 +61,6 @@ watch(
   },
 );
 
-function tokenFor(name: string) {
-  return raw(`{{${name}}}`);
-}
-
 function onUpdateOpen(open: boolean) {
   if (!open) emit("close");
 }
@@ -84,6 +81,7 @@ function onSelect(event: Event, name: string) {
   <PopoverRoot :open="open" @update:open="onUpdateOpen">
     <PopoverAnchor :reference="reference ?? undefined" />
     <PopoverPortal>
+      <!-- The raw var() is reka's measured popover space, not a design token. -->
       <PopoverContent
         align="start"
         :side-offset="4"
@@ -105,7 +103,7 @@ function onSelect(event: Event, name: string) {
           :aria-label="t('components.templateInput.suggestions')"
           class="flex min-h-0 flex-1 flex-col"
         >
-          <div ref="scrollEl" class="max-h-72 overflow-y-auto p-1">
+          <div ref="scrollEl" class="overflow-y-auto p-1">
             <div :style="{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }">
               <!-- Reactive bindings on ListboxItem go stale: reka memoises the item and its Slot lets the memoised props win. -->
               <div
@@ -114,14 +112,8 @@ function onSelect(event: Event, name: string) {
                 :ref="(node) => virtualizer.measureElement(node as HTMLElement | null)"
                 :data-index="row.index"
                 :data-active="row.index === highlightedIndex ? '' : undefined"
-                :style="{
-                  position: 'absolute',
-                  top: 0,
-                  insetInlineStart: 0,
-                  width: '100%',
-                  transform: `translateY(${row.start}px)`,
-                }"
-                class="rounded-default data-active:bg-select-item-hover-bg"
+                :style="{ transform: `translateY(${row.start}px)` }"
+                class="rounded-default data-active:bg-select-item-hover-bg absolute start-0 top-0 w-full"
                 @mousedown.prevent
                 @pointermove="emit('highlight', row.index)"
               >

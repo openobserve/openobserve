@@ -50,6 +50,11 @@ export function openTokenAt(text: string, caret: number): OpenToken | null {
   return { query: found[1], start: caret - found[0].length };
 }
 
+/** The `{{name}}` text the list and the peek both render. */
+export function tokenFor(name: string) {
+  return raw(`{{${name}}}`);
+}
+
 function isNativeField(target: EventTarget | null): target is NativeField {
   return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 }
@@ -82,6 +87,10 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
   function close() {
     open.value = null;
     highlightedIndex.value = 0;
+  }
+
+  function highlight(index: number) {
+    highlightedIndex.value = index;
   }
 
   function clearPeekTimer() {
@@ -209,5 +218,6 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
     onBlur,
     accept,
     close,
+    highlight,
   };
 }

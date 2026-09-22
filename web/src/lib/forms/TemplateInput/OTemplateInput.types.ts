@@ -24,7 +24,6 @@ export interface TemplateSuggestion {
 
 /** The `{{` list props both wrappers share, on top of the wrapped field's own props. */
 export interface TemplateSuggestProps<T extends TemplateSuggestion> {
-  /** Bound value */
   modelValue?: string;
   /** Names offered on `{{`, in display order; absent or empty means a plain field. */
   suggestions?: T[];
@@ -32,12 +31,11 @@ export interface TemplateSuggestProps<T extends TemplateSuggestion> {
   values?: Record<string, string>;
 }
 
-/** Keys the list cannot support: each one makes the caret and the emitted text disagree. */
-export type TemplateInputUnsupportedKeys =
-  "modelValue" | "type" | "debounce" | "mask" | "modelModifiers" | "revealable";
-
+// Each omitted key makes the caret and the emitted text disagree, so the list cannot support it.
 export interface TemplateInputProps<T extends TemplateSuggestion>
-  extends Omit<InputProps, TemplateInputUnsupportedKeys>, TemplateSuggestProps<T> {
+  extends
+    Omit<InputProps, "modelValue" | "type" | "debounce" | "mask" | "modelModifiers" | "revealable">,
+    TemplateSuggestProps<T> {
   /** `selectionStart` is `null` on every other input type. */
   type?: "text" | "url";
 }
@@ -49,8 +47,6 @@ export interface TemplateSuggestEmits {
   (_e: "blur", _event: FocusEvent): void;
   (_e: "keydown", _event: KeyboardEvent): void;
 }
-
-export type TemplateInputEmits = TemplateSuggestEmits;
 
 export interface TemplateSuggestionSlotProps<T extends TemplateSuggestion> {
   suggestion: T;
@@ -65,15 +61,10 @@ export interface TemplateSuggestSlots<T extends TemplateSuggestion> {
 export interface TemplateInputSlots<T extends TemplateSuggestion>
   extends InputSlots, TemplateSuggestSlots<T> {}
 
-export type TemplateSuggestEmit = {
-  (_e: "update:modelValue", _value: string): void;
-  (_e: "select", _name: string): void;
-};
-
 export interface UseTemplateSuggestOptions<T extends TemplateSuggestion> {
   suggestions: () => T[] | undefined;
   values: () => Record<string, string> | undefined;
-  emit: TemplateSuggestEmit;
+  emit: TemplateSuggestEmits;
 }
 
 export interface OpenToken {
@@ -99,6 +90,7 @@ export interface UseTemplateSuggestReturn<T extends TemplateSuggestion> {
   onBlur: () => void;
   accept: (_name: string) => void;
   close: () => void;
+  highlight: (_index: number) => void;
 }
 
 export type {
