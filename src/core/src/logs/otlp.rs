@@ -785,11 +785,16 @@ pub async fn handle_request(
     )
     .await;
 
+    let status = match &write_result {
+        Ok(_) => StatusCode::OK,
+        Err(e) => crate::ingestion::write_error_status(e),
+    };
+
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     let label_values = [
         endpoint,
-        if write_result.is_ok() { "200" } else { "500" },
+        status.as_str(),
         org_id,
         StreamType::Logs.as_str(),
         "",
@@ -805,7 +810,7 @@ pub async fn handle_request(
     if let Err(e) = write_result {
         log::error!("Error while writing logs: {e}");
         return Ok(MetaHttpResponse::error_with_header(
-            StatusCode::INTERNAL_SERVER_ERROR,
+            status,
             format!("error while writing log data: {e}"),
         ));
     }
