@@ -405,19 +405,17 @@ fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
     let method = http_method.to_string();
-    let path = request
-        .uri()
-        .path()
-        .strip_prefix("/")
-        .unwrap_or("")
-        .to_string();
+    let path = request.uri().path();
+    let path = path.strip_prefix("/").unwrap_or(path).to_string();
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
-    // Org-relative view of the path so the ingestion-route classifier sees
-    // segment 0 as `{org_id}`. `audit_middleware` runs before prefix stripping,
-    // so `path` here is e.g. `[base_uri/]api/{org}/_bulk`; take everything after
-    // the `api/` segment.
-    let ingestion_path = path.split_once("api/").map(|(_, rest)| rest).unwrap_or("");
+    let ingestion_path = if path.starts_with("api/") {
+        path.split_once("api/")
+            .map(|(_, rest)| rest)
+            .unwrap_or(&path)
+    } else {
+        &path
+    };
 
     if get_o2_config().common.audit_enabled
         && !(path_columns
