@@ -818,6 +818,26 @@ describe("Dashboards.vue", () => {
       expect(router.currentRoute.value.query.page).toBe("3");
     });
 
+    it("resets to page 1 and drops page from the URL on a folder switch after landing", async () => {
+      await router.push({ path: "/dashboards", query: { folder: "default", page: "3" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+      await flushPromises();
+      await settle();
+      expect(wrapper.vm.currentPage).toBe(3);
+
+      wrapper.vm.updateActiveFolderId("folder1");
+      await settle();
+      await flushPromises();
+      await settle();
+
+      expect(wrapper.vm.currentPage).toBe(1);
+      expect(router.currentRoute.value.query.folder).toBe("folder1");
+      expect(router.currentRoute.value.query.page).toBeUndefined();
+    });
+
     it("toggleFavorite persists the per-user setting resolved to the active folder", async () => {
       const testStore = storeWithTwo();
       (testStore.state.userInfo as any).email = "me@example.com";

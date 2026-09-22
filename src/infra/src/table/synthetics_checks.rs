@@ -76,7 +76,7 @@ pub fn invalidate_all_cache() {
 /// A failed emit is logged, not propagated: the database write has already
 /// committed, and the cache TTL is the backstop for a dropped event. Failing
 /// the user's save because a cache hint did not send would be the worse trade.
-async fn invalidate_and_publish(org_id: &str, id: &str) {
+pub async fn invalidate_and_publish(org_id: &str, id: &str) {
     invalidate_cache(org_id, id);
     if let Err(e) = crate::coordinator::synthetics::emit_check_put(org_id, id).await {
         log::error!("[synthetics] emit check cache event failed for {org_id}/{id}: {e}");
@@ -153,6 +153,7 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             alert_if_fails: settings.alert_if_fails,
             collect_rum_data: settings.collect_rum_data,
             session_replay: settings.session_replay,
+            environments: settings.environments,
             auth,
             cookies,
             variables,
@@ -326,6 +327,28 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     Ok(out)
 }
 
+/// How many checks in an org are pinned to each environment, keyed by environment id.
+pub async fn count_by_environment<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<std::collections::HashMap<String, u64>, errors::Error> {
+    let rows: Vec<serde_json::Value> = Entity::find()
+        .select_only()
+        .column(Column::Settings)
+        .filter(Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    let mut counts = std::collections::HashMap::new();
+    for settings in rows {
+        let parsed: SyntheticSettings = serde_json::from_value(settings).unwrap_or_default();
+        for env in parsed.environments {
+            *counts.entry(env).or_insert(0) += 1;
+        }
+    }
+    Ok(counts)
+}
+
 /// Picks the primary key for a new row. Split out of [`create`] so the
 /// super-cluster branch is testable without a database. An empty id cannot be
 /// honoured, so it falls back rather than inserting `""`.
@@ -351,11 +374,23 @@ pub async fn create<C: TransactionTrait>(
     use_given_id: bool,
 ) -> Result<Synthetic, errors::Error> {
     let txn = conn.begin().await?;
-    let now = config::utils::time::now_micros();
     let id = new_check_id(&check, use_given_id);
+    let result = insert_row(&txn, org_id, &id, &check).await?;
+    txn.commit().await?;
+    invalidate_and_publish(&result.org_id, &result.id).await;
+    Ok(result)
+}
 
-    let mut am = build_active_model(&check)?;
-    am.id = Set(id);
+/// Inserts a check under `id` without touching the cache; the caller announces it.
+pub async fn insert_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    check: &Synthetic,
+) -> Result<Synthetic, errors::Error> {
+    let now = config::utils::time::now_micros();
+    let mut am = build_active_model(check)?;
+    am.id = Set(id.to_owned());
     am.org_id = Set(org_id.to_owned());
     am.folder_id = Set(check.folder_id.clone());
     am.synthetics_type = Set(check_type_to_str(&check.check_type).to_owned());
@@ -364,11 +399,8 @@ pub async fn create<C: TransactionTrait>(
     am.next_run_at = Set(check.start.unwrap_or(0));
     am.owner = Set(check.owner.clone());
 
-    let model = am.insert(&txn).await?.try_into_model()?;
-    let result = Synthetic::try_from(model)?;
-    txn.commit().await?;
-    invalidate_and_publish(&result.org_id, &result.id).await;
-    Ok(result)
+    let model = am.insert(conn).await?.try_into_model()?;
+    Synthetic::try_from(model)
 }
 
 pub async fn update<C: TransactionTrait>(
@@ -378,20 +410,29 @@ pub async fn update<C: TransactionTrait>(
     check: Synthetic,
 ) -> Result<Synthetic, errors::Error> {
     let txn = conn.begin().await?;
+    let result = update_row(&txn, org_id, id, &check).await?;
+    txn.commit().await?;
+    invalidate_and_publish(&result.org_id, &result.id).await;
+    Ok(result)
+}
 
-    let Some(m) = get_model(&txn, org_id, id).await? else {
+/// Updates a check's editable fields without touching the cache; the caller announces it.
+pub async fn update_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    check: &Synthetic,
+) -> Result<Synthetic, errors::Error> {
+    let Some(m) = get_model(conn, org_id, id).await? else {
         return Err(errors::Error::Message(format!("check not found: {id}")));
     };
 
     let mut am: ActiveModel = m.into();
-    update_mutable_fields(&mut am, &check)?;
+    update_mutable_fields(&mut am, check)?;
     am.updated_at = Set(config::utils::time::now_micros());
 
-    let model = am.update(&txn).await?.try_into_model()?;
-    let result = Synthetic::try_from(model)?;
-    txn.commit().await?;
-    invalidate_and_publish(&result.org_id, &result.id).await;
-    Ok(result)
+    let model = am.update(conn).await?.try_into_model()?;
+    Synthetic::try_from(model)
 }
 
 pub async fn put<C: TransactionTrait>(
@@ -498,6 +539,7 @@ pub struct DueCheck {
     pub org_id: String,
     pub check_type: SyntheticType,
     pub locations: Vec<String>,
+    pub environments: Vec<String>,
     pub frequency: SyntheticFrequency,
     /// Minutes from UTC — used for cron scheduling. 0 = UTC.
     pub tz_offset: i32,
@@ -554,12 +596,15 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
 
         let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
 
+        let settings: SyntheticSettings = serde_json::from_value(m.settings).unwrap_or_default();
+
         Ok(DueCheck {
             id: m.id,
             name: m.name,
             org_id: m.org_id,
             check_type,
             locations,
+            environments: settings.environments,
             frequency,
             tz_offset: m.tz_offset,
             next_run_at: m.next_run_at,
@@ -949,6 +994,7 @@ fn pack_settings(check: &Synthetic) -> Result<serde_json::Value, errors::Error> 
         collect_rum_data: check.collect_rum_data,
         session_replay: check.session_replay,
         start: check.start,
+        environments: check.environments.clone(),
     })?)
 }
 

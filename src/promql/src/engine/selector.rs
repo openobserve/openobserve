@@ -112,6 +112,8 @@ impl Engine {
         let eval_timestamps = self.eval_ctx.timestamps();
 
         let lookback_delta = self.ctx.lookback_delta;
+        // exemplar series carry no samples, so they must survive an empty selection
+        let keep_sampleless = self.ctx.query_ctx.query_exemplars;
         // every series selects independently, so fan the selection out
         let result = metrics_cache.into_par_iter().filter_map(|metric| {
             let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
@@ -147,8 +149,7 @@ impl Engine {
                 }
             }
 
-            // Only include metrics that have at least one sample
-            (!selected_samples.is_empty()).then_some(RangeValue {
+            (keep_sampleless || !selected_samples.is_empty()).then_some(RangeValue {
                 labels: metric.labels,
                 samples: selected_samples,
                 exemplars: metric.exemplars,
@@ -598,6 +599,7 @@ fn merge_loaded_metrics(results: Vec<LoadedMetrics>) -> HashMap<u64, RangeValue>
 mod tests {
     use std::{sync::Arc, time::Duration};
 
+    use config::meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL};
     use promql_parser::{
         label::{MatchOp, Matchers},
         parser::{Offset, VectorSelector},
@@ -956,5 +958,84 @@ mod tests {
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
+    }
+
+    /// Serves one series that carries only an exemplar, as the exemplar loader produces.
+    struct ExemplarProvider;
+
+    #[async_trait::async_trait]
+    impl crate::TableProvider for ExemplarProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            stream_name: &str,
+            _time_range: (i64, i64),
+            _matchers: Matchers,
+            _label_selector: hashbrown::HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+            use datafusion::arrow::{
+                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+                datatypes::{DataType, Field},
+            };
+            let schema = Arc::new(Schema::new(vec![
+                Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(VALUE_LABEL, DataType::Float64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+                Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+                Field::new("env", DataType::Utf8, false),
+            ]));
+            let ts = 1640995200000000i64 - 60_000_000;
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(vec![ts])),
+                    Arc::new(Float64Array::from(vec![1.0])),
+                    Arc::new(UInt64Array::from(vec![7])),
+                    Arc::new(StringArray::from(vec![Some(format!(
+                        r#"[{{"_timestamp":{ts},"value":1.5,"trace_id":"abc"}}]"#
+                    ))])),
+                    Arc::new(StringArray::from(vec!["prod"])),
+                ],
+            )
+            .unwrap();
+            let ctx = SessionContext::new();
+            ctx.register_batch(stream_name, batch).unwrap();
+            Ok(vec![(ctx, schema, ScanStats::default(), true)])
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_vector_selector_keeps_sampleless_series_for_exemplars() {
+        let trace_id = "test_trace_exemplars";
+        let mut query_ctx = (*create_test_query_ctx(trace_id, "test_org_exemplars", 30)).clone();
+        query_ctx.query_exemplars = true;
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                Arc::new(query_ctx),
+                ExemplarProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+
+        let selector = VectorSelector {
+            name: Some("test_metric".to_string()),
+            matchers: Matchers::empty(),
+            offset: None,
+            at: None,
+        };
+
+        let values = engine.eval_vector_selector(&selector, None).await.unwrap();
+        assert_eq!(values.len(), 1);
+        assert!(values[0].samples.is_empty());
+        assert_eq!(values[0].exemplars.as_ref().unwrap().len(), 1);
+        assert!(
+            values[0]
+                .labels
+                .iter()
+                .any(|l| l.name == "env" && l.value == "prod")
+        );
     }
 }

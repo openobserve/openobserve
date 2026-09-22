@@ -653,6 +653,7 @@ pub async fn delete_location(org_id: &str, is_root: bool, id: &str) -> anyhow::R
 /// Errors are prefixed with "validation: " so handlers can map them to 400.
 pub(crate) async fn validate_against_capabilities(
     org_id: &str,
+    check_id: &str,
     body: &Synthetic,
     is_create: bool,
 ) -> anyhow::Result<()> {
@@ -673,7 +674,29 @@ pub(crate) async fn validate_against_capabilities(
         &allowed_devices,
         is_create,
     )
-    .map_err(|e| anyhow::anyhow!("validation: {e}"))
+    .map_err(|e| anyhow::anyhow!("validation: {e}"))?;
+    super::variables::validate_environments(org_id, &body.environments).await?;
+    validate_variable_cap(org_id, check_id, body).await
+}
+
+/// Refuses a check whose environments would push its resolved set past the cap.
+async fn validate_variable_cap(
+    org_id: &str,
+    check_id: &str,
+    body: &Synthetic,
+) -> anyhow::Result<()> {
+    let before = super::variables::org_variable_state(org_id).await?;
+    let mut after = before.clone();
+    // Empty on create: `body.id` is client-controlled and would borrow another check's slack.
+    let footprint = super::variables::check_footprint(check_id, body);
+    match after.checks.iter_mut().find(|c| c.id == footprint.id) {
+        Some(existing) => *existing = footprint,
+        None => after.checks.push(footprint),
+    }
+    match config::meta::synthetics_variables::variable_cap_error(&before, &after) {
+        Some(err) => anyhow::bail!("validation: {err}"),
+        None => Ok(()),
+    }
 }
 
 /// The org token and install command a private location hands back, or

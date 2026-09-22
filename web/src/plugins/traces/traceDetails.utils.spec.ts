@@ -4,7 +4,7 @@
 // session ID to display in the trace-details header.
 
 import { describe, it, expect } from "vitest";
-import { resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
+import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 
 describe("resolveSessionId", () => {
   // Empty / null / undefined inputs → "" so the header template hides
@@ -117,5 +117,52 @@ describe("resolveUrlTimeRange", () => {
       from: 1752490492843,
       to: 1752490493164,
     });
+  });
+});
+
+describe("resolveReplaySpan", () => {
+  it.each([[null], [undefined], [[]]])("returns null for %j", (input) => {
+    expect(resolveReplaySpan(input as any)).toBeNull();
+  });
+
+  it("returns null when spans carry a RUM session id but no replay flag", () => {
+    const spans = [{ span_id: "rum_view_v1", rum_session_id: "sess-1" }];
+    expect(resolveReplaySpan(spans)).toBeNull();
+  });
+
+  it("returns null when the replay flag is explicitly false", () => {
+    const spans = [
+      { span_id: "rum_view_v1", rum_session_id: "sess-1", rum_session_has_replay: false },
+    ];
+    expect(resolveReplaySpan(spans)).toBeNull();
+  });
+
+  it("returns null when a span has the replay flag but no RUM session id", () => {
+    const spans = [{ span_id: "rum_view_v1", rum_session_has_replay: true }];
+    expect(resolveReplaySpan(spans)).toBeNull();
+  });
+
+  // Backend spans carry the AI conversation id as session_id; it is not a RUM session.
+  it("ignores backend spans that carry session_id or gen_ai_conversation_id", () => {
+    const spans = [
+      { span_id: "s-1", session_id: "conv-1", gen_ai_conversation_id: "conv-1" },
+      { span_id: "s-2", session_id: "conv-1" },
+    ];
+    expect(resolveReplaySpan(spans)).toBeNull();
+  });
+
+  it("returns the first span that has both a RUM session id and the replay flag", () => {
+    const first = {
+      span_id: "rum_view_v1",
+      rum_session_id: "sess-1",
+      rum_session_has_replay: true,
+    };
+    const spans = [
+      { span_id: "s-0", session_id: "conv-1" },
+      { span_id: "rum_view_v0", rum_session_id: "sess-0", rum_session_has_replay: false },
+      first,
+      { span_id: "rum_action_a1", rum_session_id: "sess-1", rum_session_has_replay: true },
+    ];
+    expect(resolveReplaySpan(spans)).toBe(first);
   });
 });

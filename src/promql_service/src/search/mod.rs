@@ -307,7 +307,8 @@ async fn search_in_cluster(
 
     // cache enabled if result cache is enabled and use_cache is true and start != end
     // the cache keys on the output range, but a pinned value follows the data at `T` (#14688)
-    let cacheable = cfg.common.result_cache_enabled && window.pinned.is_none();
+    // the cache key ignores the query type, so exemplar results never share it with samples
+    let cacheable = cfg.common.result_cache_enabled && window.pinned.is_none() && !query_exemplars;
     let use_cache = cacheable && req.use_cache && start != end;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step);
@@ -678,6 +679,9 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
+        let Some(exemplars) = ser.exemplars.as_ref() else {
+            continue;
+        };
         let labels: Labels = ser
             .metric
             .iter()
@@ -686,14 +690,9 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
         let entry = merged_data
             .entry(signature(&labels))
             .or_insert_with(HashMap::new);
-        ser.exemplars
-            .as_ref()
-            .unwrap()
-            .exemplars
-            .iter()
-            .for_each(|v| {
-                entry.insert(v.time, v);
-            });
+        exemplars.exemplars.iter().for_each(|v| {
+            entry.insert(v.time, v);
+        });
         merged_metrics.insert(signature(&labels), labels);
     }
     let mut merged_data = merged_data
@@ -822,6 +821,40 @@ mod tests {
                 vec![(1_000_000, 1.0), (2_000_000, 2.0), (3_000_000, 3.0)]
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_merge_exemplars_skips_series_without_exemplars() {
+        let labels = vec![Arc::new(Label::new("job", "test"))];
+        let mut response = cluster_rpc::MetricsQueryResponse::default();
+        grpc::add_value(
+            &mut response,
+            Value::Matrix(vec![RangeValue::new(
+                labels.clone(),
+                vec![Sample::new(1_000_000, 1.0)],
+            )]),
+        );
+        grpc::add_value(
+            &mut response,
+            Value::Matrix(vec![RangeValue::new_with_exemplars(
+                labels.clone(),
+                vec![Arc::new(Exemplar {
+                    timestamp: 2_000_000,
+                    value: 2.0,
+                    labels: vec![],
+                })],
+            )]),
+        );
+
+        let value = merge_exemplars_query(&response.series, "test_exemplars_merge")
+            .await
+            .unwrap();
+        let Value::Matrix(matrix) = value else {
+            panic!("expected matrix result");
+        };
+        assert_eq!(matrix.len(), 1);
+        assert_eq!(matrix[0].labels, labels);
+        assert_eq!(matrix[0].exemplars.as_ref().unwrap().len(), 1);
     }
 
     #[test]

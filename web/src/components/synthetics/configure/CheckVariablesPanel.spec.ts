@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 // Real i18n plugin — the panel's hint line uses <i18n-t>, which the mocked
 // useI18n() of sibling specs cannot resolve.
@@ -24,7 +24,19 @@ import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
 
 vi.mock("@/utils/uuid", () => ({ getUUID: vi.fn(() => "uuid-123") }));
 
+const { listEnvironmentsMock, listGlobalVariablesMock } = vi.hoisted(() => ({
+  listEnvironmentsMock: vi.fn(() => Promise.reject(new Error("no backend in specs"))),
+  listGlobalVariablesMock: vi.fn(() => Promise.reject(new Error("no backend in specs"))),
+}));
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    listEnvironments: listEnvironmentsMock,
+    listGlobalVariables: listGlobalVariablesMock,
+  },
+}));
+
 import CheckVariablesPanel from "./CheckVariablesPanel.vue";
+import PromoteCheckVariableDialog from "@/components/synthetics/variables/PromoteCheckVariableDialog.vue";
 
 // ── Stubs ───────────────────────────────────────────────────────────────────
 
@@ -63,7 +75,7 @@ const OIconStub = {
 
 const OTooltipStub = {
   props: ["content", "side"],
-  template: "<span />",
+  template: "<span><slot /></span>",
 };
 
 const OEmptyStateStub = {
@@ -92,6 +104,14 @@ const ODialogStub = {
   </div>`,
 };
 
+const OSelectStub = {
+  props: ["modelValue", "options", "label", "size"],
+  emits: ["update:modelValue"],
+  template: `<select v-bind="$attrs" :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
+    <option v-for="o in options" :key="o.value" :value="o.value">{{ o.label }}</option>
+  </select>`,
+};
+
 const STUBS = {
   ODialog: ODialogStub,
   OInput: OInputStub,
@@ -99,6 +119,7 @@ const STUBS = {
   OButton: OButtonStub,
   OBadge: OBadgeStub,
   OIcon: OIconStub,
+  OSelect: OSelectStub,
   OTooltip: OTooltipStub,
   OEmptyState: OEmptyStateStub,
 };
@@ -119,14 +140,20 @@ const varToken = { id: "var-b", name: "TOKEN", value: "supersecret", secure: tru
 function checkWith(
   variables: NonNullable<BrowserCheck["variables"]>,
   journey: BrowserStep[] = [],
+  environments: string[] = [],
 ): BrowserCheck {
-  return { ...mockMonitorHttp, variables, journey };
+  return { ...mockMonitorHttp, variables, journey, environments };
 }
 
 function mountPanel(props: Record<string, unknown> = {}) {
   return mount(CheckVariablesPanel, {
     props: { check: mockMonitorHttp, ...props },
-    global: { plugins: [i18n], stubs: STUBS },
+    global: {
+      plugins: [i18n],
+      stubs: STUBS,
+      // Vuex 4's useStore() injects by the string key "store".
+      provide: { store: { state: { selectedOrganization: { identifier: "default" } } } },
+    },
   }) as VueWrapper;
 }
 
@@ -400,18 +427,17 @@ describe("CheckVariablesPanel", () => {
 
   // ── Secure variables ──────────────────────────────────────────────────────
   describe("secure variables", () => {
-    it("should mask a secure variable's value and never show the raw value", () => {
+    it("should show no value on any row, and never the raw secret", () => {
       wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
 
-      const masked = wrapper.find(sel("-value-1"));
-      expect(masked.text()).toBe("••••••••");
+      expect(wrapper.find(sel("-value-1")).exists()).toBe(false);
       expect(wrapper.text()).not.toContain("supersecret");
     });
 
-    it("should show a non-secure variable's value in the clear", () => {
+    it("should keep a plain variable's value off the row too", () => {
       wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
 
-      expect(wrapper.find(sel("-value-0")).text()).toBe("https://example.com");
+      expect(wrapper.text()).not.toContain("https://example.com");
     });
   });
 
@@ -427,19 +453,20 @@ describe("CheckVariablesPanel", () => {
       },
     ];
 
-    it("should count steps referencing the exact {{name}} token", () => {
+    it("should count steps referencing the exact {{name}} token in the remove warning", async () => {
       wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], journey) });
 
-      expect(wrapper.find(sel("-usage-0-badge")).text()).toBe("2");
-      expect(wrapper.find(sel("-usage-1-badge")).text()).toBe("1");
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      expect(wrapper.find(sel("-remove-dialog")).text()).toContain("referenced by 2 steps");
     });
 
-    it("should show 0 for a variable that is not referenced, even by a superstring token", () => {
+    it("should not warn for a variable referenced only by a superstring token", async () => {
       // "BASE" is a prefix of "BASE_URL" — {{BASE_URL}} must not count for it.
       const varBase = { id: "var-c", name: "BASE", value: "x", secure: false, example: "" };
       wrapper = mountPanel({ check: checkWith([varBase], journey) });
 
-      expect(wrapper.find(sel("-usage-0-badge")).text()).toBe("0");
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      expect(wrapper.find(sel("-remove-dialog")).text()).not.toContain("referenced by");
     });
   });
 
@@ -516,5 +543,204 @@ describe("CheckVariablesPanel", () => {
       await nextTick();
       expect(wrapper.find(sel("-undo-row")).exists()).toBe(false);
     });
+  });
+
+  // ── Environment resolution ────────────────────────────────────────────────
+  describe("environment resolution", () => {
+    function sharedVar(over: Record<string, unknown> = {}) {
+      return {
+        id: "var-1",
+        name: "ORG",
+        kind: "plain",
+        description: "",
+        example: "",
+        tags: [],
+        value: "acme",
+        has_value: true,
+        used_by_checks: 0,
+        created_at: 0,
+        updated_at: 0,
+        ...over,
+      };
+    }
+
+    function env(name: string, variables: Record<string, unknown>[] = []) {
+      return {
+        id: `env-${name}`,
+        name,
+        description: "",
+        is_global: false,
+        checks_count: 0,
+        created_at: 0,
+        updated_at: 0,
+        variables,
+      };
+    }
+
+    /** Both list calls, which is every request the panel makes. */
+    function mockShared(
+      environments: Record<string, unknown>[],
+      globals: Record<string, unknown>[],
+    ) {
+      listEnvironmentsMock.mockResolvedValueOnce({ data: environments } as never);
+      listGlobalVariablesMock.mockResolvedValueOnce({ data: globals } as never);
+    }
+
+    const environments = () => [
+      env("staging", [sharedVar({ id: "var-2", name: "BASE_URL", value: "https://stage" })]),
+      env("qa"),
+    ];
+    const selected = ["env-staging", "env-qa"];
+
+    it("fetches both tiers once and offers the source filter over the check's environments", async () => {
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], [], selected) });
+      await flushPromises();
+
+      const options = wrapper.find('[data-test="synthetics-inherited-filter"]').findAll("option");
+      expect(options.map((o) => o.text())).toEqual(["All", "Global", "staging", "qa"]);
+      expect(listEnvironmentsMock).toHaveBeenCalledTimes(1);
+      expect(listGlobalVariablesMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-resolves when an environment is ticked, with no further request", async () => {
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varToken], [], []) });
+      await flushPromises();
+
+      // Unscoped: the globals apply, and no environment is named.
+      expect(wrapper.find('[data-test="synthetics-inherited-filter"]').exists()).toBe(false);
+
+      await wrapper.setProps({ check: checkWith([varToken], [], ["env-staging"]) });
+      await nextTick();
+
+      expect(wrapper.text()).toContain("BASE_URL");
+      expect(listEnvironmentsMock).toHaveBeenCalledTimes(1);
+      expect(listGlobalVariablesMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("filters the union client-side, without a second fetch", async () => {
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], [], selected) });
+      await flushPromises();
+
+      // The shadowed BASE_URL is staging-sourced, so the qa filter hides it.
+      expect(wrapper.find("span.line-through").exists()).toBe(true);
+      await wrapper.find('[data-test="synthetics-inherited-filter"]').setValue("qa");
+      expect(wrapper.find("span.line-through").exists()).toBe(false);
+      expect(listEnvironmentsMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("counts distinct resolved names across local and inherited", async () => {
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], [], selected) });
+      await flushPromises();
+
+      // ORG, BASE_URL (shadowed name counts once), TOKEN.
+      expect(wrapper.find(sel("-count")).text()).toBe("3");
+    });
+
+    it("warns on the local row that shadows an inherited name", async () => {
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], [], selected) });
+      await flushPromises();
+
+      expect(wrapper.find(sel("-overrides-0-badge")).exists()).toBe(true);
+      // TOKEN shadows nothing inherited.
+      expect(wrapper.find(sel("-overrides-1-badge")).exists()).toBe(false);
+    });
+
+    it("shows the cap once the resolved count approaches it", async () => {
+      const many = Array.from({ length: 41 }, (_, i) =>
+        sharedVar({ id: `var-${i}`, name: `VAR_${i}` }),
+      );
+      mockShared([env("staging")], many);
+      wrapper = mountPanel({ check: checkWith([], [], ["env-staging"]) });
+      await flushPromises();
+
+      expect(wrapper.find(sel("-count")).text()).toBe("41 of 50");
+    });
+
+    it("falls back to the declaration count while nothing is resolved", async () => {
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      await flushPromises();
+
+      expect(wrapper.find(sel("-count")).text()).toBe("2");
+    });
+
+    it("notes the fallback value when removing an override", async () => {
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], [], selected) });
+      await flushPromises();
+
+      // varBaseUrl shadows staging's BASE_URL — removing it falls back there.
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      expect(wrapper.find(sel("-remove-dialog")).text()).toContain(
+        "Steps using BASE_URL will now get the staging value.",
+      );
+    });
+  });
+});
+
+describe("CheckVariablesPanel — promote", () => {
+  let wrapper: VueWrapper;
+  const saved = checkWith([varBaseUrl, varToken]);
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  it("offers no promote for an unsaved check", () => {
+    wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
+
+    expect(wrapper.find(sel("-promote-0-btn")).exists()).toBe(false);
+  });
+
+  it("offers promote only for rows unchanged since the last save", () => {
+    const edited = { ...varBaseUrl, value: "https://edited.test" };
+    const added = { id: "var-c", name: "NEW", value: "x", secure: false, example: "" };
+    wrapper = mountPanel({
+      check: checkWith([edited, varToken, added]),
+      checkId: "check-1",
+      saved,
+    });
+
+    expect(wrapper.find(sel("-promote-0-btn")).exists()).toBe(false);
+    expect(wrapper.find(sel("-promote-1-btn")).exists()).toBe(true);
+    expect(wrapper.find(sel("-promote-2-btn")).exists()).toBe(false);
+  });
+
+  it("opens the promote dialog for the chosen variable", async () => {
+    wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]), checkId: "check-1", saved });
+
+    await wrapper.find(sel("-promote-1-btn")).trigger("click");
+
+    const dialog = wrapper.findComponent(PromoteCheckVariableDialog);
+    expect(dialog.props("open")).toBe(true);
+    expect(dialog.props("name")).toBe("TOKEN");
+    expect(dialog.props("secure")).toBe(true);
+    expect(dialog.props("checkId")).toBe("check-1");
+  });
+
+  it("drops the promoted variable from the check and reports it", async () => {
+    wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]), checkId: "check-1", saved });
+
+    wrapper.findComponent(PromoteCheckVariableDialog).vm.$emit("done", "BASE_URL");
+    await nextTick();
+
+    expect(lastEmitted(wrapper).variables?.map((v) => v.name)).toEqual(["TOKEN"]);
+    expect(wrapper.emitted("promoted")?.[0]).toEqual(["BASE_URL"]);
+  });
+
+  it("keeps a row edited while the dialog was open", async () => {
+    const edited = { ...varBaseUrl, value: "https://edited.test" };
+    wrapper = mountPanel({ check: checkWith([edited, varToken]), checkId: "check-1", saved });
+
+    wrapper.findComponent(PromoteCheckVariableDialog).vm.$emit("done", "BASE_URL");
+    await nextTick();
+
+    expect(wrapper.emitted("update:check")).toBeUndefined();
+    expect(wrapper.emitted("promoted")?.[0]).toEqual(["BASE_URL"]);
   });
 });
