@@ -1250,7 +1250,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   /* -------------------------------------------------- persistent card cache */
 
-  const cacheFor = (card: MetricCard) => usePanelCache(EXPLORER_CACHE_FOLDER, org.value, card.name);
+  const cacheFor = (card: MetricCard) =>
+    usePanelCache(EXPLORER_CACHE_FOLDER, org.value, card.name, org.value);
 
   /**
    * What the cached result is a result OF. A mismatch means re-query.
@@ -1296,14 +1297,17 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     /** The caller's `previewsEpoch`; see `requestPreview`. */
     epoch: number,
   ): Promise<"painted" | "miss" | "recheck"> => {
+    const identity = cacheIdentity(resolved.queries, step);
     let cached: any = null;
     try {
-      cached = await cacheFor(card).getPanelCache();
+      // The identity is part of the storage key, so it must be the same value
+      // `savePanelCache` wrote under; the isEqual below still verifies it.
+      cached = await cacheFor(card).getPanelCache(identity);
     } catch {
       return "miss";
     }
     if (!cached?.value) return "miss";
-    if (!isEqual(cached.key, cacheIdentity(resolved.queries, step))) return "miss";
+    if (!isEqual(cached.key, identity)) return "miss";
     // IndexedDB answered after the grid moved on. Painting now would restore the
     // previous org's — or the previous window's — chart into a map that was
     // deliberately emptied.

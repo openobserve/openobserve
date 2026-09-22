@@ -3568,6 +3568,12 @@
     "joinSlack": "Unisciti a Slack",
     "maybeLater": "Forse più tardi"
   },
+  "connectDataSourcePopup": {
+    "title": "Per iniziare, colleghiamo la tua prima fonte di dati.",
+    "description": "Abbiamo molto da mostrarti, ma dobbiamo prima collegare i tuoi dati. La maggior parte dei team vede i primi log in circa un minuto.",
+    "connectButton": "Collega una fonte di dati",
+    "slackLink": "Unisciti anche alla nostra community Slack"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Continua da dove si era fermato",
     "startFromNow": "Inizia da ora.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "Payload dell'evento",
       "payloadIndex": "Il campo {field} seleziona lo stream. Gli eventi senza di esso vanno nello stream {stream}.",
       "payloadTime": "Il campo {field} è in secondi epoch e accetta un valore frazionario. Quando manca o non è positivo, viene usato l'orario di ricezione.",
+      "windowTitle": "I timestamp fuori dalla finestra di ingestione vengono scartati",
+      "windowBody": "Gli eventi più vecchi di {past} (5 ore per impostazione predefinita) o più avanti di {future} (24 ore per impostazione predefinita) vengono scartati e la richiesta risponde comunque con codice 0, perché un client Splunk non ritenta dopo un errore. Un timestamp fisso o obsoleto sembra quindi un invio riuscito che non memorizza nulla.",
       "payloadMetadata": "I campi {fields} vengono memorizzati come colonne sull'evento.",
       "healthTitle": "Controllo di integrità",
       "healthBody": "Una richiesta GET non richiede autenticazione e risponde {response}.",
@@ -5380,6 +5388,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Aggiorna per applicare le ultime modifiche alle variabili",
       "refresh": "Aggiorna",
+      "refreshCacheReload": "Aggiorna cache e ricarica",
+      "moreRefreshOptions": "Altre opzioni di aggiornamento",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard non trovato o è stato eliminato. Reindirizzamento all'elenco dei dashboard.",
       "failedToLoadDashboard": "Impossibile caricare il dashboard. Reindirizzamento all'elenco dei dashboard.",
@@ -5902,6 +5912,9 @@
         "details": "Dettagli",
         "json": "JSON",
         "insights": "Approfondimenti",
+        "back": "Torna ai risultati",
+        "prevEvent": "Evento precedente",
+        "nextEvent": "Evento successivo",
         "copyLink": "Copia link",
         "copy": "Copia",
         "copyValue": "Copia valore",
@@ -9351,7 +9364,28 @@
     "listConjunctionAnd": "{list} e {last}",
     "runsIn": "Esecuzione in",
     "recommendedByFieldCoverage": "Consigliato in base alla copertura dei campi nei tuoi stream.",
-    "listConjunctionAndTwo": "{first} e {last}"
+    "listConjunctionAndTwo": "{first} e {last}",
+    "domainOrgMappings": {
+      "title": "Mappature da dominio a organizzazione",
+      "subtitle": "I nuovi utenti che accedono con un dominio email corrispondente vengono aggiunti automaticamente all'organizzazione.",
+      "addMapping": "Aggiungi mappatura",
+      "editMapping": "Modifica mappatura",
+      "empty": "Nessuna mappatura. Usa “{addLabel}” per aggiungerne una.",
+      "domain": "Dominio email",
+      "domainHelp": "La parte dopo {at_sign} nell'indirizzo email dell'utente.",
+      "organization": "Organizzazione",
+      "organizationPlaceholder": "Identificatore dell'organizzazione",
+      "organizationHelp": "L'identificatore dell'organizzazione a cui vengono aggiunti gli utenti corrispondenti.",
+      "organizationRequired": "L'organizzazione è obbligatoria",
+      "baseRole": "Ruolo di base",
+      "baseRoleHelp": "Il ruolo assegnato agli utenti corrispondenti in tale organizzazione.",
+      "userGroup": "Gruppo di utenti",
+      "userGroupPlaceholder": "Nome del gruppo",
+      "userGroupHelp": "Facoltativo. Gli utenti corrispondenti vengono aggiunti anche a questo gruppo in tale organizzazione.",
+      "duplicateDomain": "Esiste già una mappatura per questo dominio",
+      "confirmRemove": "Sei sicuro di voler eliminare la mappatura per {domain}?",
+      "deleteTitle": "Elimina mappatura"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -16465,13 +16499,10 @@
       "columnMemory": "Memoria (corrente)",
       "columnDisk": "Disco % (corrente)",
       "columnLoad": "Carico 15m (corrente)",
+      "columnCores": "Core",
       "columnLastSeen": "Ultima rilevazione",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Dashboard Host Metrics",
-      "importConfirmTitle": "Aggiungere la dashboard Host Metrics?",
-      "importConfirmMessage": "Non hai ancora questa dashboard. Aggiungendola viene creata una dashboard denominata 'Host Metrics' nella tua cartella Default, che poi viene aperta per questo host.",
-      "importConfirmOk": "Aggiungi e apri",
-      "importConfirmCancel": "Annulla",
+      "loadPerCore": "({value}/core)",
       "windowsLivenessNote": "Gli host Windows compaiono in questo elenco solo quando l'agente riporta la metrica di carico (system_cpu_load_average_15m) — se i tuoi agenti Windows sono in esecuzione ma mancano qui, abilita lo scraper del carico nella configurazione del collector o aggiorna l'agente.",
       "panel": {
         "cpuBusy": "CPU occupata",
@@ -17881,6 +17912,7 @@
     "target_rotation_all": "Tutti in {rotation}",
     "target_rotation_deleted": "Una rotazione che il team non ha più",
     "target_rotation_legacy": "Chi è di turno",
+    "target_unrecognized": "Un target che questa schermata non riconosce",
     "ladderPoolEveryone": "tutti in {rotation}",
     "target_user": "Una persona specifica",
     "target_whole_team": "Tutto il team",

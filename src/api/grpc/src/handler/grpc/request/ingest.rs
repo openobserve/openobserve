@@ -111,24 +111,19 @@ impl Ingest for Ingester {
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
                     // internal ingestion does not require email id
-                    openobserve_core::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, internal_user)
-                        .await
-                        .map(|_| ()) // we don't care about success response
-                        .map_err(|e| Error::IngestionError(format!("error in ingesting traces {e}")))
+                    match openobserve_core::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, internal_user).await {
+                        Err(e) => Err(Error::IngestionError(format!("error in ingesting traces {e}"))),
+                        // overload and write failures come back as an error status, not as Err
+                        Ok(res) if !res.status().is_success() => Err(Error::IngestionError(format!(
+                            "error in ingesting traces: http code {}",
+                            res.status()
+                        ))),
+                        Ok(_) => Ok(()),
+                    }
                 }
             }
             StreamType::EnrichmentTables => {
-                let json_records: Vec<json::Map<String, json::Value>> =
-                    json::from_slice(&in_data.data).unwrap_or({
-                        let vec_value: Vec<json::Value> = json::from_slice(&in_data.data).unwrap();
-                        vec_value
-                            .into_iter()
-                            .filter_map(|v| match v {
-                                json::Value::Object(map) => Some(map),
-                                _ => None,
-                            })
-                            .collect()
-                    });
+                let json_records = parse_enrichment_records(&in_data.data);
                 let append_data = match req.metadata {
                     Some(metadata) => metadata
                         .data
@@ -217,6 +212,19 @@ fn ok_reply() -> IngestionResponse {
     }
 }
 
+fn parse_enrichment_records(data: &[u8]) -> Vec<json::Map<String, json::Value>> {
+    json::from_slice(data).unwrap_or_else(|_| {
+        let vec_value: Vec<json::Value> = json::from_slice(data).unwrap();
+        vec_value
+            .into_iter()
+            .filter_map(|v| match v {
+                json::Value::Object(map) => Some(map),
+                _ => None,
+            })
+            .collect()
+    })
+}
+
 /// The proto has only `status_code` + `message`, so `207` carries the partial-failure JSON.
 fn encode_metrics_reply(resp: &ingestion_common::IngestionResponse) -> IngestionResponse {
     if resp.code != 200 {
@@ -262,6 +270,36 @@ mod tests {
         );
         resp.error = error.map(str::to_string);
         resp
+    }
+
+    #[test]
+    fn test_parse_enrichment_records_object_array() {
+        let records =
+            parse_enrichment_records(br#"[{"id": 1}, {"id": 2, "nested": {"ok": true}}]"#);
+        assert_eq!(
+            json::to_value(records).unwrap(),
+            json::json!([
+                {"id": 1}, {"id": 2, "nested": {"ok": true}}
+            ])
+        );
+        assert!(parse_enrichment_records(b"[]").is_empty());
+    }
+
+    #[test]
+    fn test_parse_enrichment_records_mixed_array() {
+        let records =
+            parse_enrichment_records(br#"[null, {"id": 1}, 2, "text", false, [], {"id": 2}]"#);
+        assert_eq!(
+            json::to_value(records).unwrap(),
+            json::json!([{"id": 1}, {"id": 2}])
+        );
+        assert!(parse_enrichment_records(b"[null, 1, false]").is_empty());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_parse_enrichment_records_rejects_non_array() {
+        parse_enrichment_records(br#"{"id": 1}"#);
     }
 
     #[test]

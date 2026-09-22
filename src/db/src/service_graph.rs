@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::dist_lock;
+use bytes::Bytes;
+use infra::{
+    dist_lock,
+    errors::{DbError, Error},
+};
 
 use crate as db;
 
 const V4_STARTED_AT_KEY: &str = "/service_graph/v4/started_at";
 const V1_STOPPED_KEY: &str = "/service_graph/v1/stopped";
 
-fn mk_key() -> String {
+pub(crate) fn mk_key() -> String {
     "/service_graph/node/offsets".to_string()
 }
 
@@ -122,20 +126,31 @@ async fn is_flag(key: &str) -> bool {
 }
 
 /// Write-once: re-read under the lock because two schedulers may reach the same switch together.
-async fn put_once(key: &str, value: String) -> Result<(), anyhow::Error> {
-    if db::get(key).await.is_ok() {
+pub(crate) async fn put_once(key: &str, value: String) -> Result<(), anyhow::Error> {
+    if missing_as_none(db::get(key).await)?.is_some() {
         return Ok(());
     }
     let locker = dist_lock::lock(key, 0).await?;
-    let ret = if db::get(key).await.is_ok() {
-        Ok(())
-    } else {
-        db::put(key, value.into(), db::NO_NEED_WATCH, None)
+    let ret = match missing_as_none(db::get(key).await) {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => db::put(key, value.into(), db::NO_NEED_WATCH, None)
             .await
-            .map_err(anyhow::Error::from)
+            .map_err(anyhow::Error::from),
+        Err(e) => Err(e.into()),
     };
     dist_lock::unlock(&locker).await?;
     ret
+}
+
+/// Only a missing key is absent; any other meta-db error must not be mistaken for one.
+pub(crate) fn missing_as_none(
+    ret: infra::errors::Result<Bytes>,
+) -> infra::errors::Result<Option<Bytes>> {
+    match ret {
+        Ok(value) => Ok(Some(value)),
+        Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(None),
+        Err(e) => Err(e),
+    }
 }
 
 #[cfg(test)]
@@ -165,6 +180,19 @@ mod tests {
         );
         assert_eq!(parse_v4_offset("42;"), (42, String::new()));
         assert_eq!(parse_v4_offset("42"), (42, String::new()));
+    }
+
+    #[test]
+    fn test_missing_as_none_keeps_read_errors() {
+        let value = missing_as_none(Ok(Bytes::from("42;node"))).unwrap();
+        assert_eq!(value, Some(Bytes::from("42;node")));
+        let missing = Err(Error::DbError(DbError::KeyNotExists("/k".to_string())));
+        assert_eq!(missing_as_none(missing).unwrap(), None);
+        let failed = Err(Error::DbError(DbError::DBOperError(
+            "database is locked".to_string(),
+            "/k".to_string(),
+        )));
+        assert!(missing_as_none(failed).is_err());
     }
 
     #[test]

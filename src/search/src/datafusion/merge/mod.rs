@@ -146,13 +146,10 @@ async fn run_merge_query(
 
     // print the physical plan
     if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
-            .indent(false)
-            .to_string();
-        println!("+---------------------------+--------------------------+");
-        println!("merge_parquet_files");
-        println!("+---------------------------+--------------------------+");
-        println!("{plan}");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string("merge_parquet_files", physical_plan.as_ref())
+        );
     }
 
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
@@ -178,6 +175,15 @@ async fn run_merge_query(
         Ok(())
     });
     Ok((schema, rx, read_task))
+}
+
+/// A temp file under `data_tmp_dir`, never the OS temp dir (often a RAM-backed tmpfs).
+pub(super) fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
+    // data_tmp_dir is wiped at startup, reclaiming files a crash orphaned
+    let tmp_dir = &get_config().common.data_tmp_dir;
+    std::fs::create_dir_all(tmp_dir)?;
+    let (file, path) = tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts();
+    Ok((tokio::fs::File::from_std(file), path))
 }
 
 pub fn append_metadata<W: AsyncFileWriter>(

@@ -329,6 +329,7 @@ mod tests {
             "last_over_time",
             "max_over_time",
             "min_over_time",
+            "present_over_time",
             "rate",
             "resets",
             "stddev_over_time",

@@ -178,9 +178,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Detection Function + Detection Resolution (filters mode) -->
-        <div v-if="queryMode === 'filters'" class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
+        <div
+          v-if="queryMode === 'filters'"
+          class="mb-4! grid grid-cols-2 items-start gap-3 pb-0! @max-2xl/page:grid-cols-1"
+        >
           <!-- Detection Function -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -233,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Detection Resolution -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -332,9 +335,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Check Every + Look Back Window -->
-        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
+        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0! @max-2xl/page:grid-cols-1">
           <!-- Check Every -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -383,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Look Back Window -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -435,9 +438,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Training Window + Retrain Every -->
-        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
+        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0! @max-2xl/page:grid-cols-1">
           <!-- Training Window -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -477,7 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Retrain Every -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -504,7 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Sensitivity -->
-        <div class="mb-4! flex flex-row items-start gap-2 pb-0!">
+        <div class="mb-4! flex flex-row flex-wrap items-start gap-2 pb-0!">
           <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.sensitivity") }}
             <span class="text-status-error-text ms-1">*</span>
@@ -519,7 +522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex flex-1 flex-col gap-1">
             <!-- In budget mode the budget IS the contract, so the control is the delivered-alert cap. -->
-            <div v-if="budgetMode" class="flex items-start gap-3">
+            <div v-if="budgetMode" class="flex flex-wrap items-start gap-3">
               <OToggleGroup
                 :model-value="budgetTier"
                 :aria-label="t('alerts.sensitivity')"
@@ -558,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div v-else class="flex items-center gap-3">
+            <div v-else class="flex flex-wrap items-center gap-3">
               <OFormToggleGroup
                 name="threshold"
                 :aria-label="t('alerts.sensitivity')"
@@ -628,7 +631,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- SQL preview — in custom_sql mode the user's own editor is already on this form -->
-        <div v-if="queryMode !== 'custom_sql'" class="mb-4! flex flex-row items-start gap-2 pb-0!">
+        <div
+          v-if="queryMode !== 'custom_sql'"
+          class="mb-4! flex flex-row flex-wrap items-start gap-2 pb-0!"
+        >
           <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.sqlPreview") }}
           </div>
@@ -654,7 +660,8 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   ANOMALY_FILTER_OPERATORS,
   operatorNeedsValue,
@@ -993,12 +1000,9 @@ export default defineComponent({
       }
       loadingFields.value = true;
       try {
-        const res = await streamService.schema(
-          store.state.selectedOrganization.identifier,
-          streamName,
-          streamType,
+        const schema = await queryClient.fetchQuery(
+          streamSchemaQuery(store.state.selectedOrganization.identifier, streamName, streamType),
         );
-        const schema = res.data;
         const fieldsArray =
           schema.uds_schema && schema.uds_schema.length > 0
             ? schema.uds_schema

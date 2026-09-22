@@ -895,7 +895,7 @@ async fn execute_workflow(
 ) -> Result<WorkflowExecutionStatus, anyhow::Error> {
     let workflow = get_workflow_by_id(org_id, id)
         .await?
-        .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+        .ok_or_else(|| anyhow::anyhow!("workflow with given id not found"))?;
 
     if !workflow.enabled {
         return Ok(WorkflowExecutionStatus::Success);
@@ -942,7 +942,7 @@ pub async fn retry_run(
 ) -> Result<WorkflowResult, anyhow::Error> {
     let workflow = workflows::get_by_org_wid(org_id, wid)
         .await?
-        .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+        .ok_or_else(|| anyhow::anyhow!("workflow with given id not found"))?;
 
     let mut start_id = None;
     for node in &workflow.nodes {
@@ -992,9 +992,11 @@ pub async fn retry_run(
 
     let node_id = from_node.as_ref().unwrap_or(&start_id);
 
-    let inputs = ip_map.input_map.remove(node_id).ok_or(anyhow::anyhow!(
-        "node id {node_id} does not have any associated input data in the stored inputs"
-    ))?;
+    let inputs = ip_map.input_map.remove(node_id).ok_or_else(|| {
+        anyhow::anyhow!(
+            "node id {node_id} does not have any associated input data in the stored inputs"
+        )
+    })?;
 
     let start_time = chrono::Utc::now().timestamp_micros();
     let res = executable

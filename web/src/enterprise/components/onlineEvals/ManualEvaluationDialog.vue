@@ -57,6 +57,8 @@
 </template>
 
 <script setup lang="ts">
+import { evalJobsQuery } from "@/services/online-evals.service.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import onlineEvalsService, {
@@ -137,7 +139,7 @@ async function loadJobs(): Promise<void> {
   loadedJobs.value = [];
   form.reset({ jobId: "" });
   try {
-    loadedJobs.value = await onlineEvalsService.jobs.list(props.orgId);
+    loadedJobs.value = await queryClient.fetchQuery(evalJobsQuery(props.orgId));
     if (compatibleJobs.value.length === 1) {
       form.setFieldValue("jobId", compatibleJobs.value[0].id);
     }

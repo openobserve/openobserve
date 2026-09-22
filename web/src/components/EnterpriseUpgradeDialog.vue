@@ -378,13 +378,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { licenseQuery } from "@/services/license_server.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
-import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -477,8 +478,7 @@ export default defineComponent({
       if (isEnterprise && hasLicense && !isCloud) {
         isLoadingLicense.value = true;
         try {
-          const response = await licenseServer.get_license();
-          licenseData.value = response.data;
+          licenseData.value = await queryClient.fetchQuery(licenseQuery());
           // Generate dashboard after license data is fetched
           generateUsageDashboard();
         } catch (error) {

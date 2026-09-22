@@ -3568,6 +3568,12 @@
     "joinSlack": "Sluit je aan bij de Slack",
     "maybeLater": "Misschien later"
   },
+  "connectDataSourcePopup": {
+    "title": "Laten we om te beginnen je eerste gegevensbron verbinden.",
+    "description": "We hebben veel te laten zien, maar eerst moeten we je gegevens verbinden. De meeste teams zien hun eerste logs binnen ongeveer een minuut.",
+    "connectButton": "Een gegevensbron verbinden",
+    "slackLink": "Sluit je ook aan bij onze Slack-community"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Doorgaan vanaf waar het pauzeerde",
     "startFromNow": "Vanaf nu starten.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "Gebeurtenis-payload",
       "payloadIndex": "Het veld {field} selecteert de stream. Gebeurtenissen zonder dit veld gaan naar de stream {stream}.",
       "payloadTime": "Het veld {field} is epochseconden, en een fractionele waarde wordt geaccepteerd. Als het ontbreekt of niet positief is, wordt de ontvangsttijd gebruikt.",
+      "windowTitle": "Tijdstempels buiten het inname-venster worden verwijderd",
+      "windowBody": "Gebeurtenissen ouder dan {past} (standaard 5 uur) of verder vooruit dan {future} (standaard 24 uur) worden verwijderd, en het verzoek antwoordt toch met code 0 omdat een Splunk-client een fout niet opnieuw probeert. Een hardcoded of verouderd tijdstempel lijkt daardoor op een geslaagde verzending die niets opslaat.",
       "payloadMetadata": "De velden {fields} worden als kolommen op de gebeurtenis opgeslagen.",
       "healthTitle": "Healthcheck",
       "healthBody": "Een GET-verzoek vereist geen authenticatie en antwoordt met {response}.",
@@ -5380,6 +5388,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Vernieuwen om de laatste variabelewijzigingen toe te passen",
       "refresh": "Vernieuwen",
+      "refreshCacheReload": "Cache vernieuwen en herladen",
+      "moreRefreshOptions": "Meer vernieuwingsopties",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard niet gevonden of is verwijderd. Doorverwijzen naar dashboardlijst.",
       "failedToLoadDashboard": "Kan dashboard niet laden. Doorverwijzen naar dashboardlijst.",
@@ -5902,6 +5912,9 @@
         "details": "Details",
         "json": "JSON",
         "insights": "Inzichten",
+        "back": "Terug naar resultaten",
+        "prevEvent": "Vorige gebeurtenis",
+        "nextEvent": "Volgende gebeurtenis",
         "copyLink": "Link kopiëren",
         "copy": "Kopiëren",
         "copyValue": "Waarde kopiëren",
@@ -9351,7 +9364,28 @@
     "listConjunctionAnd": "{list} en {last}",
     "runsIn": "Draait in",
     "recommendedByFieldCoverage": "Aanbevolen op basis van velddekking in uw streams.",
-    "listConjunctionAndTwo": "{first} en {last}"
+    "listConjunctionAndTwo": "{first} en {last}",
+    "domainOrgMappings": {
+      "title": "Domein naar organisatie-toewijzingen",
+      "subtitle": "Nieuwe gebruikers die inloggen met een overeenkomend e-maildomein worden automatisch aan de organisatie toegevoegd.",
+      "addMapping": "Toewijzing toevoegen",
+      "editMapping": "Toewijzing bewerken",
+      "empty": "Nog geen toewijzingen. Gebruik “{addLabel}” om er een toe te voegen.",
+      "domain": "E-maildomein",
+      "domainHelp": "Het deel na {at_sign} in het e-mailadres van de gebruiker.",
+      "organization": "Organisatie",
+      "organizationPlaceholder": "Organisatie-identificatie",
+      "organizationHelp": "De identificatie van de organisatie waaraan overeenkomende gebruikers worden toegevoegd.",
+      "organizationRequired": "Organisatie is vereist",
+      "baseRole": "Basisrol",
+      "baseRoleHelp": "De rol die overeenkomende gebruikers in die organisatie krijgen.",
+      "userGroup": "Gebruikersgroep",
+      "userGroupPlaceholder": "Groepsnaam",
+      "userGroupHelp": "Optioneel. Overeenkomende gebruikers worden ook lid van deze groep in die organisatie.",
+      "duplicateDomain": "Er bestaat al een toewijzing voor dit domein",
+      "confirmRemove": "Weet je zeker dat je de toewijzing voor {domain} wilt verwijderen?",
+      "deleteTitle": "Toewijzing verwijderen"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -16465,13 +16499,10 @@
       "columnMemory": "Geheugen (huidig)",
       "columnDisk": "Schijf % (huidig)",
       "columnLoad": "Load 15m (huidig)",
+      "columnCores": "Kernen",
       "columnLastSeen": "Laatst gezien",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Dashboard Hostmetrieken",
-      "importConfirmTitle": "Het dashboard Hostmetrieken toevoegen?",
-      "importConfirmMessage": "Je hebt dit dashboard nog niet. Als je het toevoegt, wordt een dashboard met de naam 'Host Metrics' aangemaakt in je map Default en daarna voor deze host geopend.",
-      "importConfirmOk": "Toevoegen en openen",
-      "importConfirmCancel": "Annuleren",
+      "loadPerCore": "({value}/kern)",
       "windowsLivenessNote": "Windows-hosts verschijnen alleen in deze lijst wanneer de agent de loadmetriek (system_cpu_load_average_15m) rapporteert — als je Windows-agents draaien maar hier ontbreken, schakel dan de load-scraper in de collectorconfiguratie in of werk de agent bij.",
       "panel": {
         "cpuBusy": "CPU bezet",
@@ -17881,6 +17912,7 @@
     "target_rotation_all": "Iedereen in {rotation}",
     "target_rotation_deleted": "Een rotatie die dit team niet meer heeft",
     "target_rotation_legacy": "Wie er dienst heeft",
+    "target_unrecognized": "Een doel dat dit scherm niet herkent",
     "ladderPoolEveryone": "iedereen in {rotation}",
     "target_user": "Een specifieke persoon",
     "target_whole_team": "Het hele team",

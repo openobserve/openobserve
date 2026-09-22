@@ -35,19 +35,27 @@ vi.mock("vue-router", async (importOriginal) => {
   };
 });
 
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    getPipelines: vi.fn().mockResolvedValue({
-      data: {
-        list: [
-          { name: "Alpha Pipeline", pipeline_id: "pid-alpha" },
-          { name: "Beta Pipeline", pipeline_id: "pid-beta" },
-          { name: "Gamma Pipeline", pipeline_id: "pid-gamma" },
-        ],
-      },
-    }),
-  },
-}));
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPipelines: vi.fn().mockResolvedValue({
+        data: {
+          list: [
+            { name: "Alpha Pipeline", pipeline_id: "pid-alpha" },
+            { name: "Beta Pipeline", pipeline_id: "pid-beta" },
+            { name: "Gamma Pipeline", pipeline_id: "pid-gamma" },
+          ],
+        },
+      }),
+      // Delegates to the http mock so the existing (url, {params}) assertions
+      // keep working now that the component reads through the query layer.
+      getPipelineHistory: vi.fn((org: string, params: any) =>
+        mockHttpGet(`/api/${org}/pipelines/history`, { params }),
+      ),
+    },
+  });
+});
 
 const mockHttpGet = vi.fn().mockResolvedValue({
   data: {
@@ -373,23 +381,23 @@ describe("PipelineHistory", () => {
       expect(vm.pagination.page).toBe(1);
     });
 
-    it("clears searchQuery and still fetches (no filter) when null is selected", async () => {
+    it("clears searchQuery and serves the unfiltered view from cache when null is selected", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       vi.clearAllMocks();
       mockHttpGet.mockResolvedValue({ data: { hits: [], total: 0 } });
 
       const vm = wrapper.vm as any;
-      // Selecting null (clearing the select) always triggers a fetch without a pipeline_id filter.
+      // Selecting null (clearing the select) returns to the unfiltered view,
+      // which the mount fetch already cached — no second request.
       vm.onPipelineSelected(null);
       await flushPromises();
 
       // searchQuery is cleared to empty string
       expect(vm.searchQuery).toBe("");
-      // A fetch is still issued (without pipeline_id param) to show unfiltered history
-      expect(mockHttpGet).toHaveBeenCalledTimes(1);
-      const callParams = mockHttpGet.mock.calls[0][1]?.params ?? {};
-      expect(callParams.pipeline_id).toBeUndefined();
+      expect(mockHttpGet).not.toHaveBeenCalled();
+      // The cached unfiltered rows repaint.
+      expect(vm.rows.length).toBe(1);
     });
   });
 
@@ -477,9 +485,10 @@ describe("PipelineHistory", () => {
       mockHttpGet.mockResolvedValue({ data: { hits: [], total: 0 } });
 
       const vm = wrapper.vm as any;
+      // A different window — the same one would (correctly) serve from cache.
       vm.updateDateTime({
-        startTime: 1700000000000000,
-        endTime: 1700003600000000,
+        startTime: 1700010000000000,
+        endTime: 1700013600000000,
         relativeTimePeriod: "",
       });
       await flushPromises();

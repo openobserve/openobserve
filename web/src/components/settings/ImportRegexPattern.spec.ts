@@ -31,11 +31,14 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock services
-vi.mock("@/services/regex_pattern", () => ({
-  default: {
-    create: vi.fn(),
-  },
-}));
+vi.mock("@/services/regex_pattern", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+    },
+  });
+});
 
 vi.mock("axios", () => ({
   default: {

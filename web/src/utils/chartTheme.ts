@@ -181,3 +181,12 @@ export const chartTextColor = (): string => chartColor("--color-text-secondary")
 export const chartAxisLine = (): string => chartColor("--color-border-default");
 export const chartBg = (): string => chartColor("--color-surface-base");
 export const chartGridLine = (): string => chartColor("--color-border-subtle");
+
+// Shared fill for chart selections so the zoom brush and annotation markAreas read identically.
+export const CHART_SELECTION_FILL = "rgba(0, 191, 255, 0.15)";
+
+// echarts v6 defaults the toolbox dataZoom brush to a 50%-opaque tint that hides the chart while dragging.
+export const dataZoomBrushStyle = () => ({
+  borderWidth: 0,
+  color: CHART_SELECTION_FILL,
+});

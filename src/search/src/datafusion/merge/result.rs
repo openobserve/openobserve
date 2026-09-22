@@ -43,6 +43,11 @@ impl MergeResult {
 pub enum MergedFile {
     /// Ordinary output, including logs, traces and downsampled metrics.
     Standard { data: Vec<u8>, meta: FileMeta },
+    /// Ordinary output spooled to local disk by the compactor.
+    StandardFile {
+        data_path: tempfile::TempPath,
+        meta: FileMeta,
+    },
     /// Metrics output ordered by `(__hash__, _timestamp)` and retained in memory.
     MetricsHashSorted { data: Vec<u8>, meta: FileMeta },
     /// Open-hour round output spooled to local disk, no `.midx`.
@@ -61,7 +66,7 @@ pub enum MergedFile {
 impl MergedFile {
     fn metrics_layout(&self) -> Option<MetricsFileLayout> {
         match self {
-            Self::Standard { .. } => None,
+            Self::Standard { .. } | Self::StandardFile { .. } => None,
             Self::MetricsHashSorted { .. } => Some(MetricsFileLayout::HashSorted),
             Self::MetricsHashMerged { .. } => Some(MetricsFileLayout::HashMerged),
             Self::MetricsIndexed { .. } => Some(MetricsFileLayout::Indexed),
@@ -90,11 +95,11 @@ impl MergedFile {
             Self::Standard { data, meta } | Self::MetricsHashSorted { data, meta } => {
                 Ok((data, meta))
             }
-            Self::MetricsHashMerged { .. } | Self::MetricsIndexed { .. } => {
-                Err(DataFusionError::Execution(
-                    "ingester cannot consume compactor metrics output".to_string(),
-                ))
-            }
+            Self::StandardFile { .. }
+            | Self::MetricsHashMerged { .. }
+            | Self::MetricsIndexed { .. } => Err(DataFusionError::Execution(
+                "ingester cannot consume compactor spooled output".to_string(),
+            )),
         }
     }
 
@@ -106,7 +111,8 @@ impl MergedFile {
             Self::Standard { data, meta } | Self::MetricsHashSorted { data, meta } => {
                 Ok((data, meta, None))
             }
-            Self::MetricsHashMerged { data_path, meta } => {
+            Self::StandardFile { data_path, meta }
+            | Self::MetricsHashMerged { data_path, meta } => {
                 Ok((tokio::fs::read(&data_path).await?, meta, None))
             }
             Self::MetricsIndexed {

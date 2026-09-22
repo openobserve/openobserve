@@ -3568,6 +3568,12 @@
     "joinSlack": "Tritt dem Slack bei",
     "maybeLater": "Vielleicht später"
   },
+  "connectDataSourcePopup": {
+    "title": "Verbinden wir zunächst Ihre erste Datenquelle.",
+    "description": "Wir haben Ihnen viel zu zeigen, aber zuerst müssen wir Ihre Daten verbinden. Die meisten Teams sehen ihre ersten Logs in etwa einer Minute.",
+    "connectButton": "Datenquelle verbinden",
+    "slackLink": "Auch unserer Slack-Community beitreten"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Fortsetzen, wo es angehalten wurde",
     "startFromNow": "Ab jetzt starten.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "Ereignis-Nutzlast",
       "payloadIndex": "Das Feld {field} wählt den Stream aus. Ereignisse ohne dieses Feld gehen an den Stream {stream}.",
       "payloadTime": "Das Feld {field} enthält Epochensekunden, wobei auch ein Bruchwert akzeptiert wird. Wenn es fehlt oder nicht positiv ist, wird die Empfangszeit verwendet.",
+      "windowTitle": "Zeitstempel außerhalb des Aufnahmefensters werden verworfen",
+      "windowBody": "Ereignisse, die älter als {past} (standardmäßig 5 Stunden) oder weiter in der Zukunft als {future} (standardmäßig 24 Stunden) sind, werden verworfen, und die Anfrage antwortet dennoch mit Code 0, da ein Splunk-Client einen Fehler nicht erneut sendet. Ein fest codierter oder veralteter Zeitstempel sieht daher wie ein erfolgreicher Versand aus, der nichts speichert.",
       "payloadMetadata": "Die Felder {fields} werden als Spalten am Ereignis gespeichert.",
       "healthTitle": "Integritätsprüfung",
       "healthBody": "Eine GET-Anfrage erfordert keine Authentifizierung und antwortet mit {response}.",
@@ -5380,6 +5388,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Aktualisieren, um die neuesten Variablenänderungen zu übernehmen",
       "refresh": "Aktualisieren",
+      "refreshCacheReload": "Cache aktualisieren & neu laden",
+      "moreRefreshOptions": "Weitere Aktualisierungsoptionen",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard nicht gefunden oder wurde gelöscht. Weiterleitung zur Dashboard-Liste.",
       "failedToLoadDashboard": "Dashboard konnte nicht geladen werden. Weiterleitung zur Dashboard-Liste.",
@@ -5902,6 +5912,9 @@
         "details": "Details",
         "json": "JSON",
         "insights": "Einblicke",
+        "back": "Zurück zu den Ergebnissen",
+        "prevEvent": "Vorheriges Ereignis",
+        "nextEvent": "Nächstes Ereignis",
         "copyLink": "Link kopieren",
         "copy": "Kopieren",
         "copyValue": "Wert kopieren",
@@ -9351,7 +9364,28 @@
     "listConjunctionAnd": "{list} und {last}",
     "runsIn": "Läuft in",
     "recommendedByFieldCoverage": "Empfohlen basierend auf der Feldabdeckung in Ihren Streams.",
-    "listConjunctionAndTwo": "{first} und {last}"
+    "listConjunctionAndTwo": "{first} und {last}",
+    "domainOrgMappings": {
+      "title": "Zuordnungen von Domänen zu Organisationen",
+      "subtitle": "Neue Benutzer, die sich mit einer passenden E-Mail-Domain anmelden, werden automatisch zur Organisation hinzugefügt.",
+      "addMapping": "Zuordnung hinzufügen",
+      "editMapping": "Zuordnung bearbeiten",
+      "empty": "Noch keine Zuordnungen. Verwenden Sie „{addLabel}“, um eine hinzuzufügen.",
+      "domain": "E-Mail-Domain",
+      "domainHelp": "Der Teil nach {at_sign} in der E-Mail-Adresse des Benutzers.",
+      "organization": "Organisation",
+      "organizationPlaceholder": "Organisationskennung",
+      "organizationHelp": "Die Kennung der Organisation, zu der passende Benutzer hinzugefügt werden.",
+      "organizationRequired": "Organisation ist erforderlich",
+      "baseRole": "Basisrolle",
+      "baseRoleHelp": "Die Rolle, die passende Benutzer in dieser Organisation erhalten.",
+      "userGroup": "Benutzergruppe",
+      "userGroupPlaceholder": "Gruppenname",
+      "userGroupHelp": "Optional. Passende Benutzer treten in dieser Organisation auch dieser Gruppe bei.",
+      "duplicateDomain": "Für diese Domain existiert bereits eine Zuordnung",
+      "confirmRemove": "Sind Sie sicher, dass Sie die Zuordnung für {domain} löschen möchten?",
+      "deleteTitle": "Zuordnung löschen"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -16465,13 +16499,10 @@
       "columnMemory": "Speicher (aktuell)",
       "columnDisk": "Festplatte % (aktuell)",
       "columnLoad": "Last 15m (aktuell)",
+      "columnCores": "Kerne",
       "columnLastSeen": "Zuletzt gesehen",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Dashboard „Host Metrics“",
-      "importConfirmTitle": "Dashboard „Host Metrics“ hinzufügen?",
-      "importConfirmMessage": "Sie haben dieses Dashboard noch nicht. Beim Hinzufügen wird ein Dashboard namens 'Host Metrics' in Ihrem Default-Ordner erstellt und dann für diesen Host geöffnet.",
-      "importConfirmOk": "Hinzufügen und öffnen",
-      "importConfirmCancel": "Abbrechen",
+      "loadPerCore": "({value}/Kern)",
       "windowsLivenessNote": "Windows-Hosts erscheinen in dieser Liste nur, wenn der Agent die Lastmetrik (system_cpu_load_average_15m) meldet – wenn Ihre Windows-Agenten laufen, hier aber fehlen, aktivieren Sie den Load-Scraper in der Collector-Konfiguration oder aktualisieren Sie den Agent.",
       "panel": {
         "cpuBusy": "CPU-Auslastung",
@@ -17881,6 +17912,7 @@
     "target_rotation_all": "Alle in {rotation}",
     "target_rotation_deleted": "Eine Rotation, die dieses Team nicht mehr hat",
     "target_rotation_legacy": "Wer Bereitschaft hat",
+    "target_unrecognized": "Ein Ziel, das dieser Bildschirm nicht erkennt",
     "ladderPoolEveryone": "alle in {rotation}",
     "target_user": "Eine bestimmte Person",
     "target_whole_team": "Das gesamte Team",

@@ -1,4 +1,5 @@
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
 import { nextTick, ref } from "vue";
 import { PROMQL_CATALOG } from "@/utils/query/promqlCompletion";
@@ -9,14 +10,6 @@ import { SORT_LANE } from "@/utils/query/sqlCompletion";
 // user has already typed — none of them belong inside `{`.
 const NON_LABEL_COLUMNS = new Set(["value", "_timestamp", "__hash__", "__name__"]);
 
-// One schema per metric per page, shared by every editor. A metrics stream is
-// named for its metric, so this is also the label list.
-//
-// Keyed by ORGANISATION and metric, because organisations are switched in place
-// in this SPA and metric names are not unique across them — the field-value
-// cache is scoped the same way, for the same reason.
-const metricLabelCache = new Map<string, string[]>();
-const metricLabelCacheKey = (org: string, metric: string) => `${org}|${metric}`;
 import { useStore } from "vuex";
 
 const usePromqlSuggestions = () => {
@@ -242,22 +235,20 @@ const usePromqlSuggestions = () => {
         // with all of its labels for the client to dedupe — 5903 bytes where
         // the schema answers in 1699, and it is metadata, so no scan at all.
         try {
-          const cacheKey = metricLabelCacheKey(org, metricName);
-          let labels = metricLabelCache.get(cacheKey);
-          if (!labels) {
-            const response: any = await streamService.schema(org, metricName, "metrics");
-            const columns = response?.data?.schema ?? response?.data?.uds_schema ?? [];
-            labels = columns
-              .map((column: any) => column?.name)
-              .filter((name: string) => name && !NON_LABEL_COLUMNS.has(name));
-            metricLabelCache.set(cacheKey, labels as string[]);
-          }
+          // The query is the cache: keyed per org and metric, and it expires.
+          const response: any = await queryClient.fetchQuery(
+            streamSchemaQuery(org, metricName, "metrics"),
+          );
+          const columns = response?.schema ?? response?.uds_schema ?? [];
+          const labels: string[] = columns
+            .map((column: any) => column?.name)
+            .filter((name: string) => name && !NON_LABEL_COLUMNS.has(name));
 
           if (!isCurrent()) return;
 
           const alreadyFiltered = formattedLabels.join(",");
           updatePromqlKeywords(
-            (labels as string[])
+            labels
               .filter((name) => alreadyFiltered.indexOf(`${name}=`) === -1)
               .map((name) => ({
                 label: name,

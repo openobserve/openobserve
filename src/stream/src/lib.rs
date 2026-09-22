@@ -176,7 +176,7 @@ pub fn stream_res(
     stats.created_at = unwrap_stream_created_at(&schema).unwrap_or_default();
 
     let metrics_meta = if stream_type == StreamType::Metrics {
-        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(promql::Metadata {
+        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or_else(|| promql::Metadata {
             metric_type: promql::MetricType::Empty,
             metric_family_name: stream_name.to_string(),
             help: stream_name.to_string(),

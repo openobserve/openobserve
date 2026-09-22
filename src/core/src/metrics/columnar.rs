@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
 use config::{
     TIMESTAMP_COL_NAME, get_config,
@@ -25,29 +22,16 @@ use config::{
         promql::{HASH_LABEL, VALUE_LABEL},
         stream::{StreamPartition, StreamType},
     },
-    utils::{
-        json::{self, JsonBytesExt, estimate_json_entry_bytes, is_size_excluded_column},
-        schema_ext::SchemaExt,
-        time::HOUR_MICRO_SECS,
-    },
+    utils::json::{JsonBytesExt, estimate_json_entry_bytes, is_size_excluded_column},
 };
-use datafusion::arrow::{
-    array::{
-        Array, ArrayBuilder, ArrayRef, Float64Builder, Int64Builder, StringBuilder, UInt64Builder,
-        make_builder,
-    },
-    datatypes::{DataType, Schema},
-    record_batch::RecordBatch,
-};
-use infra::{
-    errors::{Error, Result},
-    schema::{SchemaCache, get_partition_time_level},
-};
+use datafusion::arrow::datatypes::{DataType, Schema};
+use infra::{errors::Result, schema::SchemaCache};
 
 use super::LabelPair;
-use crate::pipeline::batch_execution::ExecutablePipeline;
-
-const BUILDER_START_ROWS: usize = 16;
+use crate::{
+    ingestion::columnar::{ColumnKind, ColumnarBuckets},
+    pipeline::batch_execution::ExecutablePipeline,
+};
 
 /// Past this many labels the scan in `push_label` costs more than hashing every name.
 pub(super) const LABEL_INDEX_THRESHOLD: usize = 64;
@@ -55,50 +39,15 @@ pub(super) const LABEL_INDEX_THRESHOLD: usize = 64;
 /// `value`, `_timestamp` and `__hash__`, the columns a record carries beyond its labels.
 const IDENTITY_COLUMNS: usize = 3;
 
-#[derive(Clone, Copy)]
-enum MetricColumn {
-    Label,
-    Value,
-    Timestamp,
-    Hash,
-}
-
-struct ColumnarBucket {
-    partition_key: String,
-    builders: Vec<Box<dyn ArrayBuilder>>,
-    rows: usize,
-    json_size: usize,
-}
-
-impl ColumnarBucket {
-    fn for_hour(schema: &Arc<Schema>, schema_key: &str, timestamp: i64) -> Self {
-        Self {
-            partition_key: crate::ingestion::get_write_partition_key(
-                timestamp,
-                &Vec::new(),
-                get_partition_time_level(StreamType::Metrics),
-                &json::Map::new(),
-                Some(schema_key),
-            ),
-            builders: schema
-                .fields()
-                .iter()
-                .map(|f| make_builder(f.data_type(), BUILDER_START_ROWS))
-                .collect(),
-            rows: 0,
-            json_size: 0,
-        }
-    }
-}
-
 pub(super) struct ColumnarStream {
-    schema: Arc<Schema>,
-    schema_key: String,
-    columns: Vec<MetricColumn>,
+    buckets: ColumnarBuckets,
+    /// Whether each schema column holds a label rather than an identity column.
+    label_columns: Vec<bool>,
+    value_col: usize,
+    timestamp_col: usize,
+    hash_col: usize,
     /// Probed once per label of every sample, so it takes foldhash rather than SipHash.
     col_index: hashbrown::HashMap<String, usize>,
-    /// A backfill can span any number of hours, and foldhash keeps an i64 lookup cheap.
-    buckets: hashbrown::HashMap<i64, ColumnarBucket>,
     /// The widest record this stream's schema can hold, which bounds a series' label count.
     max_labels: usize,
     /// Scratch reused across the samples of a request, not state.
@@ -108,52 +57,38 @@ pub(super) struct ColumnarStream {
 
 impl ColumnarStream {
     /// `None` unless every field is exactly the type the JSON path would infer for it.
-    pub(super) fn for_schema(schema: &Arc<Schema>) -> Option<Self> {
+    pub(super) fn for_schema(schema: &Schema) -> Option<Self> {
         if schema.fields().is_empty() {
             return None;
         }
-        let mut columns = Vec::with_capacity(schema.fields().len());
+        let mut label_columns = Vec::with_capacity(schema.fields().len());
         let mut col_index = hashbrown::HashMap::with_capacity(schema.fields().len());
-        let (mut has_value, mut has_timestamp, mut has_hash) = (false, false, false);
+        let (mut value_col, mut timestamp_col, mut hash_col) = (None, None, None);
         for (idx, field) in schema.fields().iter().enumerate() {
-            let column = match (field.name().as_str(), field.data_type()) {
-                (VALUE_LABEL, DataType::Float64) => {
-                    has_value = true;
-                    MetricColumn::Value
-                }
-                (TIMESTAMP_COL_NAME, DataType::Int64) => {
-                    has_timestamp = true;
-                    MetricColumn::Timestamp
-                }
-                (HASH_LABEL, DataType::UInt64) => {
-                    has_hash = true;
-                    MetricColumn::Hash
-                }
-                (_, DataType::Utf8) => MetricColumn::Label,
+            match (field.name().as_str(), field.data_type()) {
+                (VALUE_LABEL, DataType::Float64) => value_col = Some(idx),
+                (TIMESTAMP_COL_NAME, DataType::Int64) => timestamp_col = Some(idx),
+                (HASH_LABEL, DataType::UInt64) => hash_col = Some(idx),
+                (_, DataType::Utf8) => {}
                 _ => return None,
-            };
-            columns.push(column);
+            }
+            label_columns.push(field.data_type() == &DataType::Utf8);
             col_index.insert(field.name().clone(), idx);
         }
-        if !(has_value && has_timestamp && has_hash) {
-            return None;
-        }
-        let present = vec![false; columns.len()];
-        let schema = Arc::new(schema.as_ref().clone().with_metadata(HashMap::new()));
-        let schema_key = schema.hash_key();
         Some(Self {
-            schema,
-            schema_key,
-            columns,
+            buckets: ColumnarBuckets::new(StreamType::Metrics, schema),
+            present: vec![false; label_columns.len()],
+            label_columns,
+            value_col: value_col?,
+            timestamp_col: timestamp_col?,
+            hash_col: hash_col?,
             col_index,
-            buckets: hashbrown::HashMap::with_capacity(1),
             // a record adds `value`, `_timestamp` and `__hash__` to the series' labels
             max_labels: get_config()
                 .limit
                 .req_cols_per_record_limit
                 .saturating_sub(IDENTITY_COLUMNS),
             label_cols: Vec::new(),
-            present,
         })
     }
 
@@ -168,7 +103,7 @@ impl ColumnarStream {
         self.present.fill(false);
         for label in labels {
             let &idx = self.col_index.get(label.name())?;
-            if !matches!(self.columns[idx], MetricColumn::Label) || self.present[idx] {
+            if !self.label_columns[idx] || self.present[idx] {
                 return None;
             }
             self.present[idx] = true;
@@ -186,52 +121,22 @@ impl ColumnarStream {
         timestamp: i64,
         hash: u64,
     ) {
-        // metrics partition hourly, so a record's hour is also its partition
-        let hour = timestamp.div_euclid(HOUR_MICRO_SECS);
-        let size = estimated_record_bytes(label_bytes, value, timestamp, hash);
-        let Self {
-            schema,
-            schema_key,
-            buckets,
-            columns,
-            label_cols,
-            present,
-            ..
-        } = self;
-        let bucket = buckets
-            .entry(hour)
-            .or_insert_with(|| ColumnarBucket::for_hour(schema, schema_key, timestamp));
-        present.fill(false);
-        for (col, label) in label_cols.iter().zip(labels) {
-            string_builder(&mut bucket.builders[*col]).append_value(label.value());
-            present[*col] = true;
+        let bucket = self.buckets.bucket(timestamp);
+        for (col, label) in self.label_cols.iter().zip(labels) {
+            bucket
+                .column(*col, ColumnKind::Utf8)
+                .append_str(label.value());
         }
-        for (col, column) in columns.iter().enumerate() {
-            match column {
-                MetricColumn::Label => {
-                    if !present[col] {
-                        string_builder(&mut bucket.builders[col]).append_null();
-                    }
-                }
-                MetricColumn::Value => bucket.builders[col]
-                    .as_any_mut()
-                    .downcast_mut::<Float64Builder>()
-                    .unwrap()
-                    .append_value(value),
-                MetricColumn::Timestamp => bucket.builders[col]
-                    .as_any_mut()
-                    .downcast_mut::<Int64Builder>()
-                    .unwrap()
-                    .append_value(timestamp),
-                MetricColumn::Hash => bucket.builders[col]
-                    .as_any_mut()
-                    .downcast_mut::<UInt64Builder>()
-                    .unwrap()
-                    .append_value(hash),
-            }
-        }
-        bucket.rows += 1;
-        bucket.json_size += size;
+        bucket
+            .column(self.value_col, ColumnKind::Float64)
+            .append_f64(value);
+        bucket
+            .column(self.timestamp_col, ColumnKind::Int64)
+            .append_i64(timestamp);
+        bucket
+            .column(self.hash_col, ColumnKind::UInt64)
+            .append_u64(hash);
+        bucket.finish_row(estimated_record_bytes(label_bytes, value, timestamp, hash));
     }
 
     pub(super) fn into_entries(
@@ -239,35 +144,7 @@ impl ColumnarStream {
         org_id: &str,
         stream_name: &str,
     ) -> Result<Vec<ingester::Entry>> {
-        let mut entries = Vec::with_capacity(self.buckets.len());
-        for mut bucket in self.buckets.into_values() {
-            if bucket.rows == 0 {
-                continue;
-            }
-            // `finish` hands over the whole capacity, which the memtable then holds until flush
-            let cols: Vec<ArrayRef> = bucket
-                .builders
-                .iter_mut()
-                .map(|b| {
-                    let mut col = b.finish();
-                    col.shrink_to_fit();
-                    col
-                })
-                .collect();
-            let batch = RecordBatch::try_new(self.schema.clone(), cols)
-                .map_err(|e| Error::IngestionError(e.to_string()))?;
-            entries.push(ingester::Entry {
-                org_id: Arc::from(org_id),
-                stream: Arc::from(stream_name),
-                schema: Some(self.schema.clone()),
-                schema_key: Arc::from(self.schema_key.as_str()),
-                partition_key: Arc::from(bucket.partition_key.as_str()),
-                data: Vec::new(),
-                data_size: bucket.json_size,
-                batch: Some(batch),
-            });
-        }
-        Ok(entries)
+        self.buckets.into_entries(org_id, stream_name, None)
     }
 }
 
@@ -384,17 +261,13 @@ fn estimated_record_bytes(label_bytes: usize, value: f64, timestamp: i64, hash: 
     2 + entries - 1
 }
 
-fn string_builder(builder: &mut Box<dyn ArrayBuilder>) -> &mut StringBuilder {
-    builder
-        .as_any_mut()
-        .downcast_mut::<StringBuilder>()
-        .unwrap()
-}
-
 #[cfg(test)]
 mod tests {
-    use config::meta::promql::NAME_LABEL;
+    use std::sync::Arc;
+
+    use config::{meta::promql::NAME_LABEL, utils::json};
     use datafusion::arrow::datatypes::Field;
+    use infra::schema::get_partition_time_level;
 
     use super::*;
 
@@ -544,7 +417,7 @@ mod tests {
     fn test_columnar_buckets_follow_the_partition_key_across_the_epoch() {
         let schema = columnar_schema(&[NAME_LABEL]);
         let mut columnar = ColumnarStream::for_schema(&schema).unwrap();
-        let schema_key = columnar.schema_key.clone();
+        let schema_key = columnar.buckets.schema_key().to_string();
         let labels = vec![(NAME_LABEL.to_string(), "http_requests".to_string())];
         let timestamps = [-3_601_000_000_i64, -1_000_000, 1_000_000];
         let label_bytes = columnar.resolve_columns(&labels).unwrap();

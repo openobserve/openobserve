@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
               <!-- min-w-0: otherwise the wrapper can't shrink below the search's min-content and pushes controls off-edge. -->
-              <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
+              <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
                 <div class="min-w-0 flex-1 max-md:min-w-40">
                   <OInput
                     v-model="dynamicQueryModel"
@@ -199,20 +199,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="loading"
+                :last-run-at="lastUpdatedAt"
+                :loading="refreshing"
+                shortcut-id="dashboardsListRefresh"
                 data-test="dashboard-list-refresh"
-                @click="getDashboards"
-              >
-                <OTooltip
-                  side="bottom"
-                  :content="t('dashboard.reloadDashboards')"
-                  shortcut-id="dashboardsListRefresh"
-                />
-              </OButton>
+                @click="refreshDashboards"
+              />
             </template>
             <template #cell-name="{ row, value }">
               <span class="inline-flex items-center gap-1">
@@ -401,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :filter-query="filterQuery"
                   @open-drawer="showAddDashboardFromGitHub = true"
-                  @imported="getDashboards"
+                  @imported="refreshDashboards"
                 />
               </div>
             </template>
@@ -535,6 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -554,6 +550,7 @@ import {
   onUnmounted,
   ref,
   watch,
+  toRaw,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
@@ -567,7 +564,6 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
-import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import {
@@ -576,9 +572,12 @@ import {
   evictDashboardsFromCache,
   getAllDashboards,
   getAllDashboardsByFolderId,
+  loadDashboardsByFolderId,
   getDashboard,
   getFoldersList,
 } from "../../utils/commons";
+import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import TemplateSuggestionCards from "@/components/dashboards/TemplateSuggestionCards.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
@@ -645,6 +644,7 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ORefreshButton,
     OIcon,
     ODropdown,
     ODropdownItem,
@@ -810,11 +810,9 @@ export default defineComponent({
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
       const folderId = event.folderId || activeFolderId.value;
       if (folderId) {
-        // Clear cached data so getAllDashboardsByFolderId re-fetches from API
-        store.dispatch("setAllDashboardList", {
-          ...store.state.organizationData.allDashboardList,
-          [folderId]: undefined,
-        });
+        // The AI agent just changed this folder, so refetch rather than serving
+        // the cached list.
+        await getAllDashboards(store, folderId, true);
         const response = await getAllDashboardsByFolderId(store, folderId);
         dashboardList.value = response || [];
       }
@@ -960,7 +958,10 @@ export default defineComponent({
           const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
           Promise.all(
             favFolders.map((fid) => getAllDashboardsByFolderId(store, fid).catch(() => null)),
-          );
+          ).then(() => {
+            // A folder switched away from mid-flight must not stamp over the one now active.
+            if (activeFolderId.value === FAVORITES_FOLDER_ID) stampFolders(favFolders);
+          });
           searchAcrossFolders.value = false;
           router.push({
             path: "/dashboards",
@@ -972,15 +973,17 @@ export default defineComponent({
           });
           return;
         }
-        // skip the skeleton for already-cached folders so we don't flash it
-        // String() matches JS's own null→"null" key coercion (behavior-neutral).
-        loading.value =
-          !store.state.organizationData.allDashboardList[String(activeFolderId.value)];
+        // Paints whatever is already in hand, then swaps in the server's copy.
+        // Only a folder never opened this session spins.
         forbidden.value = false;
+        const folderId = activeFolderId.value;
         try {
-          const response = await getAllDashboardsByFolderId(store, activeFolderId.value);
-
-          dashboardList.value = response || [];
+          await loadDashboardsByFolderId(store, folderId, {
+            apply: (rows) => (dashboardList.value = rows || []),
+            loading,
+          });
+          // A folder switched away from mid-flight must not stamp over the one now active.
+          if (activeFolderId.value === folderId) stampFolders([folderId ?? "default"]);
         } catch (error) {
           console.error("Error loading dashboards:", error);
           forbidden.value = asCaughtError(error).response?.status === 403;
@@ -1184,7 +1187,8 @@ export default defineComponent({
           folderId || "default",
         );
 
-        await getDashboards();
+        // Post-write reload: the duplicate will not appear from a cache hit.
+        await getDashboards(true);
 
         showPositiveNotification(t("dashboard.dashboards.duplicatedSuccessfully"));
       } catch (err) {
@@ -1210,6 +1214,21 @@ export default defineComponent({
     const dashboardList = ref<Record<string, any>[]>([]);
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
+    // A refresh with rows already on screen: the button spins, the table keeps
+    // its rows instead of dropping back to a skeleton.
+    const refreshing = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
+    // Favorites span several folders, so the age shown is the oldest list on screen.
+    const stampFolders = (folderIds: any[]) => {
+      const org = store.state.selectedOrganization.identifier;
+      const times = folderIds
+        .map(
+          (fid) =>
+            queryClient.getQueryState(dashboardsByFolderQuery(org, fid).queryKey)?.dataUpdatedAt,
+        )
+        .filter((t): t is number => !!t);
+      lastUpdatedAt.value = times.length ? Math.min(...times) : Date.now();
+    };
     const loading = ref(true);
     // Only the dashboards fetch is authoritative on access; the folder list is not.
     const forbidden = ref(false);
@@ -1224,24 +1243,32 @@ export default defineComponent({
       },
       { once: true },
     );
-    const getDashboards = async () => {
+    // Bound to the refresh button and post-write reloads: both must reach the
+    // server. Without `force` this read was a cache hit, so the Refresh button
+    // issued no request at all inside the tier's staleTime.
+    const refreshDashboards = () => getDashboards(true);
+
+    const getDashboards = async (force = false) => {
       const dismiss = toast({
         variant: "loading",
         message: t("dashboard.dashboards.loadingDashboards"),
         timeout: 0,
       });
-      loading.value = true;
+      // Only spin the table when there is nothing to show — a refresh with rows
+      // on screen keeps them and spins the button instead.
+      refreshing.value = true;
+      loading.value = dashboardList.value.length === 0;
       try {
         if (showFavoritesOnly.value) {
           // Refresh in the favorites view: re-read the favorites setting and
           // force-refetch each involved folder so titles/owners are current.
           const org = store.state.selectedOrganization?.identifier;
           const userId = store.state.userInfo?.email;
-          if (org && userId) await loadFavorites(org, userId);
+          if (org && userId) await loadFavorites(org, userId, force);
           const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
           const fetched = await Promise.all(
             favFolders.map((fid) =>
-              getAllDashboards(store, fid)
+              getAllDashboards(store, fid, true)
                 .then(() => fid)
                 .catch(() => null),
             ),
@@ -1261,11 +1288,14 @@ export default defineComponent({
             )
             .map((f: any) => f.dashboardId);
           await pruneFavorites(stale);
+          stampFolders(favFolders);
         } else {
-          const response = await getAllDashboards(store, activeFolderId.value ?? "default");
+          const folderId = activeFolderId.value ?? "default";
+          const response = await getAllDashboards(store, folderId, force);
           // folderId is always truthy here, so getAllDashboards never returns
           // undefined; `?? []` only satisfies the type (fallback unreachable).
           dashboardList.value = response ?? [];
+          stampFolders([folderId]);
         }
       } catch (err) {
         showErrorNotification(
@@ -1274,6 +1304,7 @@ export default defineComponent({
       } finally {
         dismiss();
         loading.value = false;
+        refreshing.value = false;
       }
     };
 
@@ -1387,7 +1418,8 @@ export default defineComponent({
           // of lingering until the next navigation.
           if (deletedWasHome) {
             const org = store.state.selectedOrganization?.identifier;
-            if (org) useHomeDashboard(t).load(org);
+            // Forced: a plain load would answer from the cache and keep the pin for up to staleTime.
+            if (org) useHomeDashboard(t).load(org, true);
           }
         } catch (err) {
           showErrorNotification(
@@ -1712,15 +1744,14 @@ export default defineComponent({
         await pruneFavorites(deletedIds);
 
         selectedIds.value = [];
-        // Refresh dashboards. The local getDashboards() takes no arguments; the
-        // previous (store, folderId) args were silently ignored at runtime, so
-        // dropping them is behavior-neutral.
-        await getDashboards();
+        // Post-write reload: must reach the server, or the just-pruned cache
+        // entry is simply re-read.
+        await getDashboards(true);
         // If the pinned dashboard was in the batch, re-read the (now cleared)
         // home_dashboard setting so the Home shortcut/pin updates immediately.
         if (bulkIncludedHome) {
           const org = store.state.selectedOrganization?.identifier;
-          if (org) await useHomeDashboard(t).load(org);
+          if (org) await useHomeDashboard(t).load(org, true);
         }
       } catch (error) {
         dismiss();
@@ -1762,7 +1793,7 @@ export default defineComponent({
       {
         id: "dashboardsListRefresh",
         handler: () => {
-          if (!isInputFocused()) getDashboards();
+          if (!isInputFocused()) refreshDashboards();
         },
       },
       {
@@ -1783,6 +1814,8 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      refreshing,
+      lastUpdatedAt,
       forbidden,
       showAddDashboardDialog,
       showAddDashboardFromGitHub,
@@ -1799,6 +1832,7 @@ export default defineComponent({
       deleteDashboard,
       duplicateDashboard,
       getDashboards,
+      refreshDashboards,
       getImageURL,
       verifyOrganizationStatus,
       activeFolderId,
