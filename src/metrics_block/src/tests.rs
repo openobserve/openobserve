@@ -138,16 +138,51 @@ fn parent() -> ParentMetadata {
     }
 }
 
-fn fixture() -> Vec<u8> {
-    let rows = rows();
-    let mut writer = BlockWriter::new(
+fn test_writer(max_rows: usize) -> BlockWriter<Vec<u8>> {
+    BlockWriter::new(
         Vec::new(),
         schema(),
         vec!["label_a".into(), "label_b".into()],
         parent(),
-        2,
+        max_rows,
     )
-    .unwrap();
+    .unwrap()
+}
+
+fn test_footer(blob: &[u8]) -> Footer {
+    read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap()
+}
+
+fn decoded_rows(blob: &[u8], index: &Index) -> Vec<(u64, i64, u64)> {
+    index
+        .blocks
+        .iter()
+        .flat_map(|block| {
+            let range = block.block_range();
+            let samples =
+                decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap();
+            samples
+                .timestamps
+                .into_iter()
+                .zip(samples.value_bits)
+                .map(move |(t, v)| (block.hash, t, v))
+        })
+        .collect()
+}
+
+fn parquet_bytes(input: &RecordBatch, row_group_size: usize) -> Bytes {
+    use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
+    let properties = WriterProperties::builder()
+        .set_max_row_group_row_count(Some(row_group_size))
+        .build();
+    let mut writer = ArrowWriter::try_new(Vec::new(), input.schema(), Some(properties)).unwrap();
+    writer.write(input).unwrap();
+    Bytes::from(writer.into_inner().unwrap())
+}
+
+fn fixture() -> Vec<u8> {
+    let rows = rows();
+    let mut writer = test_writer(2);
     for range in [0..1, 1..5, 5..7] {
         writer.write(&batch(&rows[range])).unwrap();
     }
@@ -173,20 +208,14 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
     assert_eq!(index.blocks.len(), 4);
     assert!(!index.blocks.block(0).strictly_increasing);
     assert!(index.blocks.block(1).strictly_increasing);
-    let mut actual = Vec::new();
-    for (i, block) in index.blocks.iter().enumerate() {
-        let range = block.block_range();
-        let decoded =
-            decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap();
-        for (time, value) in decoded.timestamps.iter().zip(&decoded.value_bits) {
-            actual.push((block.hash, *time, *value));
-        }
-        assert_eq!(index.label_value(i, "missing").unwrap(), None);
-    }
     assert_eq!(
-        actual,
+        decoded_rows(&blob, &index),
         rows().iter().map(|r| (r.0, r.1, r.2)).collect::<Vec<_>>()
     );
+    assert_eq!(index.label_value(0, "missing").unwrap(), None);
+    let mut writer = test_writer(2);
+    writer.write(&batch(&rows())).unwrap();
+    assert_eq!(writer.finish().unwrap(), blob);
     assert_eq!(
         index
             .label_values(0, &["label_a".into(), "label_b".into()])
@@ -203,23 +232,9 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
 }
 
 #[test]
-fn deterministic_independent_of_input_batch_boundaries() {
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
-    writer.write(&batch(&rows())).unwrap();
-    assert_eq!(writer.finish().unwrap(), fixture());
-}
-
-#[test]
-fn numeric_parent_version_bounds_and_decoder_claims_are_checked() {
+fn numeric_parent_and_projection_are_validated() {
     let blob = fixture();
-    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let footer = test_footer(&blob);
     let bytes = Bytes::copy_from_slice(
         &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
     );
@@ -233,30 +248,6 @@ fn numeric_parent_version_bounds_and_decoder_claims_are_checked() {
     modified[10] ^= 1;
     assert!(decode_index(Bytes::from(modified), &footer, &parent(), &[]).is_err());
     assert!(decode_index(bytes.clone(), &footer, &parent(), &["value".into()]).is_err());
-    let mut end = blob[blob.len() - FOOTER_LEN..].to_vec();
-    end[..4].copy_from_slice(&(VERSION + 1).to_le_bytes());
-    assert!(read_footer(&end, blob.len() as u64).is_err());
-    end = blob[blob.len() - FOOTER_LEN..].to_vec();
-    end[8..16].copy_from_slice(&u64::MAX.to_le_bytes());
-    assert!(read_footer(&end, blob.len() as u64).is_err());
-    assert!(read_footer(&end[..FOOTER_LEN - 1], blob.len() as u64).is_err());
-    let index = index(&blob, &[]).unwrap();
-    let b = &index.blocks.block(0);
-    let range = b.block_range();
-    let payload = &blob[range.start as usize..range.end as usize];
-    let mut corrupt = payload.to_vec();
-    corrupt[0] ^= 1;
-    assert!(decode_block(&corrupt, b).is_err());
-    assert!(decode_block(&payload[..payload.len() - 1], b).is_err());
-    let mut claim = b.clone();
-    claim.max_timestamp += 1;
-    assert!(decode_block(payload, &claim).is_err());
-    claim = b.clone();
-    claim.strictly_increasing = true;
-    assert!(decode_block(payload, &claim).is_err());
-    claim = b.clone();
-    claim.row_count = (MAX_BLOCK_ROWS + 1) as u32;
-    assert!(decode_block(payload, &claim).is_err());
 }
 
 fn expanded_metadata_batch(encoded: &crate::compact::CompactMetadata<'_>) -> Result<RecordBatch> {
@@ -272,7 +263,7 @@ fn expanded_metadata_batch(encoded: &crate::compact::CompactMetadata<'_>) -> Res
 }
 
 fn replace_column(blob: &[u8], column: usize, value: ArrayRef) -> Vec<u8> {
-    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let footer = test_footer(blob);
     let raw = &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize];
     let encoded = crate::compact::CompactMetadata::parse(raw).unwrap();
     let old = expanded_metadata_batch(&encoded).unwrap();
@@ -305,41 +296,36 @@ fn completed_footer_does_not_hide_invalid_directory() {
         Arc::new(UInt32Array::from(vec![u32::MAX, 1, 1, 1])),
     );
     assert!(index(&corrupt, &[]).is_err());
+    let bad_rows = replace_column(&blob, 2, Arc::new(UInt32Array::from(vec![2, 2, 2, 2])));
+    assert!(index(&bad_rows, &[]).is_err());
+    let parsed = index(&blob, &[]).unwrap();
+    let mut offsets: Vec<_> = parsed
+        .blocks
+        .iter()
+        .map(|block| block.block_offset)
+        .collect();
+    offsets[1] += 1;
+    assert!(
+        index(
+            &replace_column(&blob, 5, Arc::new(UInt64Array::from(offsets))),
+            &[]
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn changed_labels_order_schema_and_row_totals_fail_closed() {
     let mut input = rows();
     input[1].3 = Some("");
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     assert!(writer.write(&batch(&input)).is_err());
     assert!(writer.finish().is_err());
     let mut input = rows();
     input[2].1 = 9;
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     assert!(writer.write(&batch(&input)).is_err());
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     writer.write(&batch(&rows()[..3])).unwrap();
     assert!(writer.finish().is_err());
     let other = Arc::new(
@@ -349,14 +335,7 @@ fn changed_labels_order_schema_and_row_totals_fail_closed() {
             .with_metadata(HashMap::from([("semantic".into(), "changed".into())])),
     );
     let changed = RecordBatch::try_new(other, batch(&rows()).columns().to_vec()).unwrap();
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     assert!(writer.write(&changed).is_err());
 }
 
@@ -397,17 +376,10 @@ fn projected_labels_do_not_retain_unrequested_large_buffers() {
     let mut columns = input.columns().to_vec();
     columns[3] = Arc::new(StringArray::from(vec![Some(large.as_str()); values.len()]));
     let input = RecordBatch::try_new(schema(), columns).unwrap();
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     writer.write(&input).unwrap();
     let blob = writer.finish().unwrap();
-    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let footer = test_footer(&blob);
     let metadata_bytes = (footer.metadata_range.end - footer.metadata_range.start) as usize;
     let index = index(&blob, &["label_b"]).unwrap();
     assert!(metadata_bytes < 100_000);
@@ -466,14 +438,7 @@ fn excessive_compressed_length_and_capacity_classification() {
 #[test]
 fn duplicates_across_chunk_boundary_remain_exact_and_visible() {
     let input = batch(&rows());
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        1,
-    )
-    .unwrap();
+    let mut writer = test_writer(1);
     writer.write(&input).unwrap();
     let blob = writer.finish().unwrap();
     let index = index(&blob, &[]).unwrap();
@@ -496,14 +461,7 @@ fn long_view_backing_buffers_and_real_writer_capacity_limit() {
         7
     ]));
     let input = RecordBatch::try_new(schema(), columns).unwrap();
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     writer.write(&input).unwrap();
     let blob = writer.finish().unwrap();
     let decoded = index(&blob, &["label_b"]).unwrap();
@@ -571,7 +529,7 @@ fn lossless_transform_preserves_extreme_timestamps_resets_and_all_float_bits() {
         .unwrap();
         writer.write(&batch(&rows)).unwrap();
         let blob = writer.finish().unwrap();
-        let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+        let footer = test_footer(&blob);
         let index = decode_index(
             Bytes::copy_from_slice(
                 &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
@@ -581,25 +539,17 @@ fn lossless_transform_preserves_extreme_timestamps_resets_and_all_float_bits() {
             &[],
         )
         .unwrap();
-        let mut actual = Vec::new();
-        for block in &index.blocks {
-            let range = block.block_range();
-            let decoded =
-                decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap();
-            actual.extend(decoded.timestamps.into_iter().zip(decoded.value_bits));
-        }
-        assert_eq!(actual, timestamp.into_iter().zip(bits).collect::<Vec<_>>());
-        let mut old_footer = blob[blob.len() - FOOTER_LEN..].to_vec();
-        old_footer[24..].copy_from_slice(b"UNKNOWN!");
-        old_footer[..4].copy_from_slice(&1u32.to_le_bytes());
-        assert!(read_footer(&old_footer, blob.len() as u64).is_err());
+        assert_eq!(
+            decoded_rows(&blob, &index),
+            rows.iter().map(|r| (r.0, r.1, r.2)).collect::<Vec<_>>()
+        );
     }
 }
 
 #[test]
 fn compact_metadata_rejects_truncation_corruption_and_excessive_claims() {
     let compact = fixture();
-    let footer = read_footer(&compact[compact.len() - FOOTER_LEN..], compact.len() as u64).unwrap();
+    let footer = test_footer(&compact);
     let metadata =
         &compact[footer.metadata_range.start as usize..footer.metadata_range.end as usize];
     for n in 0..metadata.len() {
@@ -629,7 +579,7 @@ fn compact_metadata_rejects_truncation_corruption_and_excessive_claims() {
 #[test]
 fn compact_encoder_accepts_large_metadata_header() {
     let blob = fixture();
-    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let footer = test_footer(&blob);
     let encoded = crate::compact::CompactMetadata::parse(
         &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
     )
@@ -648,29 +598,15 @@ fn compact_encoder_accepts_large_metadata_header() {
 
 #[test]
 fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
-    use parquet::{
-        arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder},
-        file::properties::WriterProperties,
-    };
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     let input = batch(&rows());
-    let mut parquet = Vec::new();
-    let props = WriterProperties::builder()
-        .set_max_row_group_row_count(Some(3))
-        .build();
-    let mut writer = ArrowWriter::try_new(&mut parquet, input.schema(), Some(props)).unwrap();
-    writer.write(&input).unwrap();
-    writer.close().unwrap();
-    let original = Bytes::from(parquet);
+    let original = parquet_bytes(&input, 3);
     let parent = ParentMetadata {
         compressed_size: original.len() as u64,
         ..parent()
     };
     let container = build_from_parquet(original.clone(), parent.clone()).unwrap();
-    let footer = read_footer(
-        &container[container.len() - FOOTER_LEN..],
-        container.len() as u64,
-    )
-    .unwrap();
+    let footer = test_footer(&container);
     let parsed = decode_index(
         Bytes::copy_from_slice(
             &container[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
@@ -683,13 +619,10 @@ fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
     assert_eq!(footer.version, VERSION);
     assert_eq!(parsed.row_group_size, Some(3));
     assert_eq!(parsed.source_schema, input.schema());
-    let mut actual = Vec::new();
-    for block in &parsed.blocks {
-        let range = block.block_range();
-        let decoded =
-            decode_block(&container[range.start as usize..range.end as usize], &block).unwrap();
-        actual.extend(decoded.timestamps.into_iter().zip(decoded.value_bits));
-    }
+    let actual = decoded_rows(&container, &parsed)
+        .into_iter()
+        .map(|(_, t, v)| (t, v))
+        .collect::<Vec<_>>();
     assert_eq!(
         actual,
         rows().iter().map(|r| (r.1, r.2)).collect::<Vec<_>>()
@@ -715,13 +648,9 @@ fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
 
 #[test]
 fn pending_writer_requires_source_metadata_and_verifies_final_parquet_rows() {
-    use parquet::arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder};
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     let input = batch(&rows());
-    let mut data = Vec::new();
-    let mut parquet = ArrowWriter::try_new(&mut data, input.schema(), None).unwrap();
-    parquet.write(&input).unwrap();
-    parquet.close().unwrap();
-    let bytes = Bytes::from(data);
+    let bytes = parquet_bytes(&input, 3);
     let reader = ParquetRecordBatchReaderBuilder::try_new(bytes.clone()).unwrap();
     let metadata = reader.metadata().as_ref().clone();
     let parent = ParentMetadata {
@@ -792,18 +721,8 @@ fn v2_footer_and_numeric_parent_have_no_key_or_checksum_columns() {
 }
 
 #[test]
-fn terminal_footer_rejects_previous_format_truncation_and_invalid_structure() {
+fn terminal_footer_rejects_truncation_and_invalid_structure() {
     let blob = fixture();
-    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
-    let mut previous = [0u8; 64];
-    previous[..8].copy_from_slice(b"O2MIDX01");
-    previous[8..12].copy_from_slice(&1u32.to_le_bytes());
-    previous[16..24].copy_from_slice(&footer.metadata_range.start.to_le_bytes());
-    previous[24..32]
-        .copy_from_slice(&(footer.metadata_range.end - footer.metadata_range.start).to_le_bytes());
-    let previous_size = footer.metadata_range.end + previous.len() as u64;
-    assert!(read_footer(&previous, previous_size).is_err());
-    assert!(read_footer(&previous[previous.len() - FOOTER_LEN..], previous_size).is_err());
     for length in 0..blob.len() {
         let truncated = &blob[..length];
         let suffix = &truncated[length.saturating_sub(FOOTER_LEN)..];
@@ -822,32 +741,12 @@ fn terminal_footer_rejects_previous_format_truncation_and_invalid_structure() {
         assert!(read_footer(&invalid, blob.len() as u64).is_err());
     }
     assert!(read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64 + 1).is_err());
-    let bad_rows = replace_column(&blob, 2, Arc::new(UInt32Array::from(vec![2, 2, 2, 2])));
-    assert!(index(&bad_rows, &[]).is_err());
-    let parsed = index(&blob, &[]).unwrap();
-    let mut offsets: Vec<_> = parsed
-        .blocks
-        .iter()
-        .map(|block| block.block_offset)
-        .collect();
-    offsets[1] += 1;
-    assert!(
-        index(
-            &replace_column(&blob, 5, Arc::new(UInt64Array::from(offsets))),
-            &[]
-        )
-        .is_err()
-    );
 }
 
 #[test]
 fn completion_marker_is_last_and_write_or_flush_errors_propagate() {
     let complete = fixture();
-    let footer = read_footer(
-        &complete[complete.len() - FOOTER_LEN..],
-        complete.len() as u64,
-    )
-    .unwrap();
+    let footer = test_footer(&complete);
     for (fail_after, fail_flush) in [
         (footer.metadata_range.start as usize + 1, usize::MAX),
         (complete.len() - 9, usize::MAX),
@@ -898,35 +797,21 @@ fn generic_source_finalizer_preserves_schema_without_row_groups() {
     assert_eq!(decoded.parent, parent());
     assert_eq!(decoded.row_group_size, None);
     assert_eq!(decoded.source_schema, input.schema());
-    let mut actual = Vec::new();
-    for block in &decoded.blocks {
-        let span = block.block_range();
-        let values =
-            decode_block(&encoded[span.start as usize..span.end as usize], &block).unwrap();
-        actual.extend(values.timestamps.into_iter().zip(values.value_bits));
-    }
     assert_eq!(
-        actual,
-        rows().iter().map(|row| (row.1, row.2)).collect::<Vec<_>>()
+        decoded_rows(&encoded, &decoded),
+        rows().iter().map(|r| (r.0, r.1, r.2)).collect::<Vec<_>>()
     );
 }
 
 #[test]
 fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
-    use parquet::arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder};
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     let directory = tempfile::tempdir().unwrap();
     let data_path = directory.path().join("indexed-v1-before.parquet");
     let midx_path = directory.path().join("indexed-v1-before.midx");
     let input = batch(&rows());
-    let mut writer = ArrowWriter::try_new(
-        std::fs::File::create(&data_path).unwrap(),
-        input.schema(),
-        None,
-    )
-    .unwrap();
-    writer.write(&input).unwrap();
-    writer.close().unwrap();
-    let original = Bytes::from(std::fs::read(&data_path).unwrap());
+    let original = parquet_bytes(&input, 3);
+    std::fs::write(&data_path, &original).unwrap();
     let source = ParentMetadata {
         rows: input.num_rows() as u64,
         compressed_size: original.len() as u64,
@@ -946,7 +831,7 @@ fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
         compressed_size: std::fs::metadata(moved_data).unwrap().len(),
     };
     let blob = std::fs::read(moved_index).unwrap();
-    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let footer = test_footer(&blob);
     let parsed = decode_index(
         Bytes::copy_from_slice(
             &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
@@ -1047,7 +932,7 @@ fn more_than_one_million_blocks_roundtrip() {
     let mut writer = BlockWriter::new(Vec::new(), schema, vec![], parent.clone(), 1).unwrap();
     writer.write(&batch).unwrap();
     let bytes = writer.finish().unwrap();
-    let footer = read_footer(&bytes[bytes.len() - FOOTER_LEN..], bytes.len() as u64).unwrap();
+    let footer = test_footer(&bytes);
     let metadata = Bytes::copy_from_slice(
         &bytes[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
     );

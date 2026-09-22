@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 use anyhow::Context;
 use arrow::array::RecordBatch;
@@ -22,15 +22,12 @@ use config::{get_config, meta::stream::FileMeta};
 use datafusion::error::{DataFusionError, Result};
 use metrics_block::{BlockWriter, ParentMetadata};
 use parquet::file::metadata::ParquetMetaData;
-use tokio::{sync::Semaphore, task::JoinHandle};
+use tokio::task::JoinHandle;
 use vortex::{arrow::ArrowSessionExt, file::OpenOptionsSessionExt, session::VortexSession};
 
 use super::MergedFile;
 
 pub(super) const VORTEX_SOURCE_SCHEMA_KEY: &str = "o2_metrics_source_schema";
-
-static BLOCK_ENCODING_JOBS: LazyLock<Arc<Semaphore>> =
-    LazyLock::new(|| Arc::new(Semaphore::new(get_config().limit.cpu_num.clamp(1, 32))));
 
 pub(super) enum SourceMetadata {
     Parquet(ParquetMetaData),
@@ -130,15 +127,8 @@ impl<T: Send + 'static> EncodingJob<T> {
     async fn run(
         work: impl FnOnce() -> anyhow::Result<T> + Send + 'static,
     ) -> Result<anyhow::Result<T>> {
-        let permit = Arc::clone(&BLOCK_ENCODING_JOBS)
-            .acquire_owned()
-            .await
-            .map_err(|error| DataFusionError::External(Box::new(error)))?;
         let mut job = Self {
-            handle: tokio::task::spawn_blocking(move || {
-                let _permit = permit;
-                work()
-            }),
+            handle: tokio::task::spawn_blocking(work),
         };
         (&mut job.handle)
             .await

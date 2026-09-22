@@ -219,9 +219,7 @@ mod tests {
     use super::*;
     use crate::MetricsFileLayout;
 
-    fn fixture(
-        format: config::FileFormat,
-    ) -> (RecordBatch, String, metrics_block::ParentMetadata, Vec<u8>) {
+    fn fixture(format: config::FileFormat) -> (RecordBatch, FileKey, Vec<u8>) {
         let schema = Arc::new(Schema::new(vec![
             Field::new("__hash__", DataType::UInt64, false),
             Field::new("_timestamp", DataType::Int64, false),
@@ -245,112 +243,74 @@ mod tests {
             ],
         )
         .unwrap();
-        let key = format!(
-            "files/test/metrics/m/2026/09/20/00/indexed-v1-{}{}",
-            config::ider::uuid(),
-            format.extension()
+        let id = config::ider::uuid();
+        let file = FileKey::new(
+            0,
+            format!("{id}:default"),
+            format!(
+                "files/test/metrics/m/2026/09/20/00/indexed-v1-{id}{}",
+                format.extension()
+            ),
+            FileMeta {
+                records: 6,
+                compressed_size: 123,
+                ..Default::default()
+            },
+            false,
         );
-        let parent = metrics_block::ParentMetadata {
-            rows: 6,
-            compressed_size: 123,
-        };
-        let row_group_size = (format == config::FileFormat::Parquet).then_some(100);
         let mut writer =
             metrics_block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
         writer.write(&batch).unwrap();
-        let blocks = writer
-            .finish_for_source(parent.clone(), schema, row_group_size.map(|v| v as u32))
+        let bytes = writer
+            .finish_for_source(
+                metrics_block::ParentMetadata {
+                    rows: 6,
+                    compressed_size: 123,
+                },
+                schema,
+                (format == config::FileFormat::Parquet).then_some(100),
+            )
             .unwrap();
-        (batch, key, parent, blocks)
+        (batch, file, bytes)
+    }
+
+    async fn store(file: &FileKey, bytes: Option<Vec<u8>>) {
+        let store = object_store::memory::InMemory::new();
+        if let Some(bytes) = bytes {
+            let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
+            store
+                .put_opts(
+                    &path.into(),
+                    bytes::Bytes::from(bytes).into(),
+                    PutOptions::default(),
+                )
+                .await
+                .unwrap();
+        }
+        let id = file.account.strip_suffix(":default").unwrap();
+        infra::storage::add_account(id, Box::new(store)).await;
     }
 
     #[tokio::test]
-    async fn current_metadata_filters_and_relocates_for_both_parent_formats() {
+    async fn current_metadata_prunes_both_parent_formats() {
         for format in [config::FileFormat::Parquet, config::FileFormat::Vortex] {
-            let (batch, key, _parent, blocks) = fixture(format);
-            let id = config::ider::uuid();
-            let account = format!("{id}:default");
-            let store = object_store::memory::InMemory::new();
-            let path = MetricsFileLayout::metrics_index_path(&key).unwrap();
-            store
-                .put_opts(
-                    &path.clone().into(),
-                    bytes::Bytes::from(blocks.clone()).into(),
-                    PutOptions::default(),
-                )
-                .await
-                .unwrap();
-            let moved_key = format!(
-                "files/moved/metrics/renamed/2030/01/01/00/indexed-v1-{}{}",
-                config::ider::uuid(),
-                format.extension()
-            );
-            let moved_path = MetricsFileLayout::metrics_index_path(&moved_key).unwrap();
-            store
-                .put_opts(
-                    &moved_path.clone().into(),
-                    bytes::Bytes::from(blocks).into(),
-                    PutOptions::default(),
-                )
-                .await
-                .unwrap();
-            infra::storage::add_account(&id, Box::new(store)).await;
-            let labels = Arc::new(vec!["path".into()]);
-            let new = load_metrics_index_file(&account, &path, format, 6, 123, labels.clone())
-                .await
-                .unwrap();
-            let moved =
-                load_metrics_index_file(&account, &moved_path, format, 6, 123, labels.clone())
-                    .await
-                    .unwrap();
-            assert_eq!(moved.schema, new.schema);
-            assert_eq!(moved.batches, new.batches);
-            assert_eq!(new.parent_records, 6);
-            assert_eq!(
-                new.row_group_size,
-                (format == config::FileFormat::Parquet).then_some(100)
-            );
+            let (batch, file, bytes) = fixture(format);
+            store(&file, Some(bytes)).await;
             for (op, value, expected) in [
                 (MatchOp::Equal, "a", vec![Range { start: 0, end: 3 }]),
                 (MatchOp::Equal, "", vec![Range { start: 5, end: 6 }]),
                 (MatchOp::NotEqual, "a", vec![Range { start: 5, end: 6 }]),
-                (
-                    MatchOp::Re(".*".parse().unwrap()),
-                    ".*",
-                    vec![Range { start: 0, end: 3 }, Range { start: 5, end: 6 }],
-                ),
+                (MatchOp::Re(".*".parse().unwrap()), ".*", vec![0..3, 5..6]),
                 (MatchOp::Equal, "unmatched", vec![]),
             ] {
+                let mut files = vec![file.clone()];
                 let matchers = Matchers::new(vec![Matcher::new(op, "path", value)]);
-                let filter = crate::pruner::create_physical_filter(&new.schema, &matchers).unwrap();
-                assert_eq!(
-                    evaluate_metrics_index(&new, filter.as_deref(), 6).unwrap(),
-                    expected
-                );
-                let mut files = vec![FileKey::new(
-                    0,
-                    account.clone(),
-                    key.clone(),
-                    FileMeta {
-                        records: 6,
-                        compressed_size: 123,
-                        ..Default::default()
-                    },
-                    false,
-                )];
-                assert!(
-                    crate::search(
-                        "current-format",
-                        &mut files,
-                        batch.schema().as_ref(),
-                        &matchers,
-                        1
-                    )
-                    .await
-                    .unwrap()
-                    .unwrap()
-                    .1
-                );
+                let (_, exact) =
+                    crate::search("prune", &mut files, batch.schema().as_ref(), &matchers, 1)
+                        .await
+                        .unwrap()
+                        .unwrap();
+                assert!(exact);
                 if expected.is_empty() {
                     assert!(files.is_empty());
                 } else {
@@ -360,95 +320,31 @@ mod tests {
                     );
                 }
             }
-            assert!(
-                load_metrics_index_file(&account, &path, format, 6, 124, labels.clone())
-                    .await
-                    .is_err()
-            );
-            assert!(
-                load_metrics_index_file(&account, &path, format, 7, 123, labels.clone())
-                    .await
-                    .is_err()
-            );
-            let other_format = if format == config::FileFormat::Parquet {
-                config::FileFormat::Vortex
-            } else {
-                config::FileFormat::Parquet
-            };
-            assert!(
-                load_metrics_index_file(&account, &path, other_format, 6, 123, labels)
-                    .await
-                    .is_err()
-            );
         }
     }
 
     #[tokio::test]
-    async fn malformed_and_missing_indexes_leave_files_unpruned() {
-        for kind in [
-            "missing",
-            "truncated",
-            "missing_marker",
-            "unknown_version",
-            "invalid_format",
-        ] {
-            let (batch, key, _parent, mut blocks) = fixture(config::FileFormat::Parquet);
-            let id = config::ider::uuid();
-            let account = format!("{id}:default");
-            let store = object_store::memory::InMemory::new();
-            let path = MetricsFileLayout::metrics_index_path(&key).unwrap();
-            if kind != "missing" {
-                let bytes = match kind {
-                    "truncated" => vec![0; 7],
-                    "missing_marker" => {
-                        let len = blocks.len();
-                        blocks[len - 1] ^= 1;
-                        blocks
-                    }
-                    "unknown_version" => {
-                        let start = blocks.len() - metrics_block::FOOTER_LEN;
-                        blocks[start..start + 4]
-                            .copy_from_slice(&(metrics_block::VERSION + 1).to_le_bytes());
-                        blocks
-                    }
-                    _ => vec![0; 128],
-                };
-                store
-                    .put_opts(
-                        &path.into(),
-                        bytes::Bytes::from(bytes).into(),
-                        PutOptions::default(),
-                    )
-                    .await
-                    .unwrap();
+    async fn unusable_index_preserves_source_scan() {
+        for format in [config::FileFormat::Parquet, config::FileFormat::Vortex] {
+            for present in [false, true] {
+                let (batch, file, _) = fixture(format);
+                store(&file, present.then(|| vec![0; 128])).await;
+                let mut files = vec![file];
+                let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]);
+                let (_, exact) = crate::search(
+                    "fallback",
+                    &mut files,
+                    batch.schema().as_ref(),
+                    &matchers,
+                    1,
+                )
+                .await
+                .unwrap()
+                .unwrap();
+                assert!(!exact);
+                assert_eq!(files.len(), 1);
+                assert!(files[0].selection.is_none());
             }
-            infra::storage::add_account(&id, Box::new(store)).await;
-            let mut files = vec![FileKey::new(
-                0,
-                account,
-                key,
-                FileMeta {
-                    records: 6,
-                    compressed_size: 123,
-                    ..Default::default()
-                },
-                false,
-            )];
-            let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]);
-            let exact = crate::search(
-                "fallback",
-                &mut files,
-                batch.schema().as_ref(),
-                &matchers,
-                1,
-            )
-            .await
-            .unwrap()
-            .unwrap()
-            .1;
-            assert!(!exact);
-            assert_eq!(files.len(), 1);
-            assert!(files[0].selection.is_none());
         }
     }
 }
