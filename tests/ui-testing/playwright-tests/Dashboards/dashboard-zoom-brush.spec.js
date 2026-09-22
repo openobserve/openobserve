@@ -10,13 +10,23 @@ import { generateDashboardName } from "./utils/configPanelHelpers.js";
 import { createDashboardWithMultiplePanels } from "./utils/panelTimeSetup.js";
 const testLogger = require("../utils/test-logger.js");
 
+// The selection fill rgba(0,191,255,0.15) lifts (blue - red) by ~38 over the
+// chart; echarts' own rgba(234,237,245,0.5) default lifts it by ~5 while washing
+// the series out, so anything under this floor means the brush style was lost.
+const MIN_SELECTION_TINT = 20;
+
+// A brush controller left bound to the same zrender repaints the cover, roughly
+// doubling that lift — a reading past this ceiling is a stacked overlay.
+const MAX_SELECTION_TINT = 60;
+
 test.describe("Dashboard Chart Zoom Brush & Panel Drag testcases", () => {
   test.describe.configure({ mode: "parallel" });
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    // Fresh e2e_automate data every test so the chart has a non-empty time window.
+    // Deduped per worker inside the helper — the repeat posts add nothing and
+    // cost ~90 s of each test's budget on cloud.
     await ingestion(page);
     testLogger.info("Test setup completed");
   });
@@ -168,6 +178,123 @@ test.describe("Dashboard Chart Zoom Brush & Panel Drag testcases", () => {
         { intervals: [100, 200, 500, 1000, 1000], timeout: 5000 }
       )
       .toBe(true);
+
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("TC-ZOOM-003: Selecting a range on an expanded panel paints the translucent tint, not an opaque grey", {
+    tag: ["@dashboard-chart-zoom-brush", "@all", "@functional", "@P0"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await buildSavedPanel(page, pm, dashboardName, "Zoom Tint", "line");
+
+    // Expanded view: the chart is outside the GridStack tile, so the press can
+    // only reach ECharts and this measures the selection fill, nothing else.
+    await pm.dashboardZoomDrag.openExpandedPanel();
+    await pm.dashboardZoomDrag.waitForChartMounted();
+    await pm.dashboardPanelActions.verifyChartHasData(expect);
+
+    // Baseline read with the cursor already parked on the canvas, so the axis
+    // pointer is in both samples and only the selection cover differs.
+    await pm.dashboardZoomDrag.moveToBrushStart();
+    const baseline = await pm.dashboardZoomDrag.measureBandBlueShift();
+    expect(baseline).not.toBeNull();
+
+    await pm.dashboardZoomDrag.holdBrushAcrossCanvas();
+    const brushed = await pm.dashboardZoomDrag.measureBandBlueShift();
+    await pm.dashboardZoomDrag.releaseBrush();
+    expect(brushed).not.toBeNull();
+
+    const tint = brushed - baseline;
+    testLogger.info("Selection cover tint", { baseline, brushed, tint });
+    expect(tint).toBeGreaterThan(MIN_SELECTION_TINT);
+    expect(tint).toBeLessThan(MAX_SELECTION_TINT);
+
+    await pm.dashboardZoomDrag.closeExpandedPanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("TC-ZOOM-004: Repeated re-renders do not stack the selection cover", {
+    tag: ["@dashboard-chart-zoom-brush", "@all", "@functional", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await buildSavedPanel(page, pm, dashboardName, "Zoom Restack", "line");
+
+    await pm.dashboardZoomDrag.openExpandedPanel();
+    await pm.dashboardZoomDrag.waitForChartMounted();
+    await pm.dashboardPanelActions.verifyChartHasData(expect);
+
+    // Every re-apply of the chart options dispatches takeGlobalCursor, the path
+    // that used to bind a fresh brush controller to the same zrender without
+    // unbinding the previous one, so each repaint darkened the cover further.
+    for (let i = 0; i < 3; i++) {
+      await pm.dashboardZoomDrag.refreshExpandedPanel();
+      await pm.dashboardZoomDrag.waitForChartMounted();
+    }
+
+    await pm.dashboardZoomDrag.moveToBrushStart();
+    const baseline = await pm.dashboardZoomDrag.measureBandBlueShift();
+    expect(baseline).not.toBeNull();
+
+    await pm.dashboardZoomDrag.holdBrushAcrossCanvas();
+    const brushed = await pm.dashboardZoomDrag.measureBandBlueShift();
+    await pm.dashboardZoomDrag.releaseBrush();
+    expect(brushed).not.toBeNull();
+
+    const tint = brushed - baseline;
+    testLogger.info("Selection cover tint after repeated re-renders", {
+      baseline,
+      brushed,
+      tint,
+    });
+    expect(tint).toBeGreaterThan(MIN_SELECTION_TINT);
+    expect(tint).toBeLessThan(MAX_SELECTION_TINT);
+
+    await pm.dashboardZoomDrag.closeExpandedPanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("TC-DRAG-002: Pressing the panel body never starts a grid drag, while the header still does", {
+    tag: ["@dashboard-chart-zoom-brush", "@all", "@functional", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
+      dashboardName,
+      panels: [
+        { panelName: "Cancel Panel A", panelTimeEnabled: false },
+        { panelName: "Cancel Panel B", panelTimeEnabled: false },
+      ],
+    });
+    const panelBId = panelIds[1];
+    await pm.dashboardZoomDrag.waitForPanelTile(panelBId);
+
+    // Vertical only: a horizontal press on the body would also brush the chart,
+    // and what is under test here is the grid, not the zoom.
+    const gesture = { deltaX: 0, deltaY: -200 };
+
+    await pm.dashboardZoomDrag.holdDragFrom(
+      pm.dashboardZoomDrag.getPanelBody(panelBId),
+      gesture
+    );
+    const bodyStartedDrag = await pm.dashboardZoomDrag.isGridDragActive();
+    await pm.dashboardZoomDrag.releaseDrag();
+    testLogger.info("Grid drag from panel body", { bodyStartedDrag });
+    expect(bodyStartedDrag).toBe(false);
+
+    await pm.dashboardZoomDrag.holdDragFrom(
+      pm.dashboardZoomDrag.getPanelHeader(panelBId),
+      gesture
+    );
+    const headerStartedDrag = await pm.dashboardZoomDrag.isGridDragActive();
+    await pm.dashboardZoomDrag.releaseDrag();
+    testLogger.info("Grid drag from panel header", { headerStartedDrag });
+    expect(headerStartedDrag).toBe(true);
 
     await cleanupTestDashboard(page, pm, dashboardName);
   });
