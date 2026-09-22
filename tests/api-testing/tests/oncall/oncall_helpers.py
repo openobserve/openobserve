@@ -706,6 +706,28 @@ class OnCallClient:
         return wait_until(_ledger, timeout=timeout, interval=LADDER_POLL,
                           msg=f"{count} delivery row(s) on {response_id}")
 
+    def wait_for_delivered(self, response_id: str, *, count: int = 1,
+                           timeout: float = LADDER_TIMEOUT) -> dict[str, Any]:
+        """Poll until `count` rows on this page are `delivered: true`.
+
+        NOT the same wait as `wait_for_deliveries`, which stops at the first
+        ledger ROW. A row is written when the engine tries a recipient, and the
+        `delivered` flag is set when the transport comes back — so a caller that
+        waits on rows and then reads the LANDED set races the transport, and
+        loses that race exactly where the runner is slow. Asserting an empty
+        landed set then reads as "the delivery pipeline is broken" when the
+        delivery had simply not finished.
+        """
+        def _ledger() -> dict[str, Any] | None:
+            resp = self.deliveries(response_id)
+            if resp.status_code != 200:
+                return None
+            body = resp.json() or {}
+            return body if len(delivered_recipients(body)) >= count else None
+
+        return wait_until(_ledger, timeout=timeout, interval=LADDER_POLL,
+                          msg=f"{count} DELIVERED row(s) on {response_id}")
+
     def wait_for_exhausted(self, response_id: str,
                            timeout: float = LADDER_TIMEOUT) -> dict[str, Any]:
         """Poll until the ladder reports itself finished."""

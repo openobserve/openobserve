@@ -145,7 +145,9 @@ def test_reached_equals_the_delivered_rows_in_the_ledger(
     have caught it.
     """
     page_id = ladders["delivers"]["page"]["id"]
-    oncall.wait_for_deliveries(page_id)
+    # Wait for a LANDED row, not merely a row: the flag is set when the
+    # transport answers, so waiting on rows and reading the landed set races it.
+    oncall.wait_for_delivered(page_id)
     ledger = ledger_of(oncall, page_id)
     progress = progress_of(oncall, page_id)
 
@@ -190,7 +192,9 @@ def test_a_rung_that_landed_is_not_reported_as_reaching_nobody(
     there rather than smuggled in as a pass here.
     """
     page_id = ladders["delivers"]["page"]["id"]
-    oncall.wait_for_deliveries(page_id)
+    # Wait for a LANDED row, not merely a row: the flag is set when the
+    # transport answers, so waiting on rows and reading the landed set races it.
+    oncall.wait_for_delivered(page_id)
     ledger = ledger_of(oncall, page_id)
     landed = delivered_recipients(ledger)
     # NOT a skip: `ladders["delivers"]` posts to the instance's own ingest endpoint,
