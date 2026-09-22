@@ -788,6 +788,9 @@ pub async fn update_config(
     if let Some(Some(half_width)) = req.level_half_width_seconds {
         validate_level_half_width(half_width).map_err(validation_error)?;
     }
+    if let Some(days) = req.retrain_interval_days {
+        validate_retrain_interval_days(days).map_err(validation_error)?;
+    }
 
     let mut active_model = existing.into_active_model();
 
@@ -1721,6 +1724,9 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     if let Some(half_width) = req.level_half_width_seconds {
         validate_level_half_width(half_width)?;
     }
+    if let Some(days) = req.retrain_interval_days {
+        validate_retrain_interval_days(days)?;
+    }
 
     // Delegated so create and update cannot drift to two differently-worded rules.
     validate_interval_pair(&req.schedule_interval, &req.histogram_interval)?;
@@ -1774,6 +1780,27 @@ fn validate_level_half_width(half_width_seconds: i64) -> Result<()> {
     if half_width_seconds > ONE_YEAR_SECONDS {
         anyhow::bail!(
             "level_half_width_seconds must be at most {ONE_YEAR_SECONDS} (one year); the level              window must fit inside the training window"
+        );
+    }
+    Ok(())
+}
+
+/// A retrain cadence the scheduler's arithmetic can carry. `0` is the operator's "Never".
+///
+/// A negative value puts `now - days*86_400e6` in the FUTURE, so every stored
+/// `training_completed_at` is already older than it and the config retrains on every 60-second
+/// scheduler tick forever. The upper bound keeps `days * 86_400 * 1_000_000` inside i64; the
+/// scheduler also saturates that multiply, because validation and arithmetic safety are separate
+/// defences and only one of them covers rows that predate this rule.
+fn validate_retrain_interval_days(days: i32) -> Result<()> {
+    const MAX_RETRAIN_INTERVAL_DAYS: i32 = 36_500;
+    if days < 0 {
+        anyhow::bail!("retrain_interval_days must be 0 (never) or greater");
+    }
+    if days > MAX_RETRAIN_INTERVAL_DAYS {
+        anyhow::bail!(
+            "retrain_interval_days must be at most {MAX_RETRAIN_INTERVAL_DAYS} (100 years); \
+             use 0 to never auto-retrain"
         );
     }
     Ok(())
@@ -3758,6 +3785,36 @@ mod tests {
         req.query_mode = "custom_sql".to_string();
         req.filters = None;
         req.custom_sql = Some("SELECT count(*) FROM logs".to_string());
+        assert!(validate_config_request(&req).is_ok());
+    }
+
+    /// C2: the cadence column was unvalidated, and a negative value is a self-inflicted DoS —
+    /// `now - days * 86_400e6` lands in the FUTURE, so every stored `training_completed_at` is
+    /// already older than it and the config retrains on every 60-second tick forever.
+    #[test]
+    fn a_negative_or_absurd_retrain_cadence_is_rejected_at_validation() {
+        assert!(validate_retrain_interval_days(0).is_ok(), "0 is Never");
+        for days in [1, 7, 14, 30, 365, 36_500] {
+            assert!(validate_retrain_interval_days(days).is_ok(), "{days}d");
+        }
+        for days in [-1, -7, -36_500, i32::MIN] {
+            assert!(
+                validate_retrain_interval_days(days).is_err(),
+                "{days}d must be rejected"
+            );
+        }
+        for days in [36_501, i32::MAX] {
+            assert!(
+                validate_retrain_interval_days(days).is_err(),
+                "{days}d must be rejected"
+            );
+        }
+
+        // And it is actually wired into the create path, not merely defined.
+        let mut req = make_valid_filters_req();
+        req.retrain_interval_days = Some(-5);
+        assert!(validate_config_request(&req).is_err());
+        req.retrain_interval_days = Some(0);
         assert!(validate_config_request(&req).is_ok());
     }
 
