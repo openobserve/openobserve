@@ -333,19 +333,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OTabPanels v-model="tokenTab" animated>
             <OTabPanel name="curl">
-              <pre
-                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenCurlSnippet }}</pre>
+              <OCodeBlock
+                data-test="service-accounts-token-curl-code"
+                :code="tokenCurlSnippet"
+                lang="bash"
+                wrap
+                :copy-message="t('serviceAccounts.toast.tokenCopied')"
+              />
             </OTabPanel>
             <OTabPanel name="header">
-              <pre
-                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenHeaderSnippet }}</pre>
+              <OCodeBlock
+                data-test="service-accounts-token-header-code"
+                :code="tokenHeaderSnippet"
+                lang="http"
+                wrap
+                :copy-message="t('serviceAccounts.toast.tokenCopied')"
+              />
             </OTabPanel>
             <OTabPanel name="env">
-              <pre
-                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenEnvSnippet }}</pre>
+              <OCodeBlock
+                data-test="service-accounts-token-env-code"
+                :code="tokenEnvSnippet"
+                lang="bash"
+                wrap
+                :copy-message="t('serviceAccounts.toast.tokenCopied')"
+              />
             </OTabPanel>
           </OTabPanels>
 
@@ -357,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="content-copy"
               :title="t('serviceAccounts.copyToken')"
               @click.stop="
-                copyToClipboard(activeTokenSnippet, t, {
+                copyToClipboard(serviceToken, t, {
                   successMessage: t('serviceAccounts.toast.tokenCopied'),
                   timeout: 5000,
                 })
@@ -401,11 +413,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-accounts-token-access-summary"
             class="mt-4"
           >
-            <div v-if="grantedRolesText" class="mb-1 flex items-start">
-              <OBadge variant="success" icon="check" size="sm">{{ grantedRolesText }}</OBadge>
+            <div v-if="tokenAccess?.assigned.roles.length" class="mb-2">
+              <div class="text-text-secondary mb-1 text-xs font-medium">
+                {{ t("serviceAccounts.tokenReveal.rolesAssignedLabel") }}
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <OBadge
+                  v-for="role in tokenAccess.assigned.roles"
+                  :key="role"
+                  variant="success"
+                  icon="check"
+                  size="sm"
+                  >{{ role }}</OBadge
+                >
+              </div>
             </div>
-            <div v-if="grantedGroupsText" class="mb-1 flex items-start">
-              <OBadge variant="success" icon="check" size="sm">{{ grantedGroupsText }}</OBadge>
+            <div v-if="tokenAccess?.assigned.groups.length" class="mb-2">
+              <div class="text-text-secondary mb-1 text-xs font-medium">
+                {{ t("serviceAccounts.tokenReveal.groupsAssignedLabel") }}
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <OBadge
+                  v-for="group in tokenAccess.assigned.groups"
+                  :key="group"
+                  variant="success"
+                  icon="check"
+                  size="sm"
+                  >{{ group }}</OBadge
+                >
+              </div>
             </div>
 
             <div
@@ -502,6 +538,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -555,6 +592,7 @@ export default defineComponent({
     OTag,
     OBadge,
     OBanner,
+    OCodeBlock,
     OCodeCell,
     OUserCell,
     OTimeCell,
@@ -610,20 +648,6 @@ export default defineComponent({
         !!tokenAccess.value &&
         tokenAccess.value.failed.roles.length + tokenAccess.value.failed.groups.length > 0,
     );
-    const grantedRolesText = computed(() =>
-      tokenAccess.value?.assigned.roles.length
-        ? t("serviceAccounts.tokenReveal.grantedRoles", {
-            roles: tokenAccess.value.assigned.roles.join(", "),
-          })
-        : "",
-    );
-    const grantedGroupsText = computed(() =>
-      tokenAccess.value?.assigned.groups.length
-        ? t("serviceAccounts.tokenReveal.grantedGroups", {
-            groups: tokenAccess.value.assigned.groups.join(", "),
-          })
-        : "",
-    );
     const failedRolesText = computed(() =>
       tokenAccess.value?.failed.roles.length
         ? t("serviceAccounts.tokenReveal.failedRoles", {
@@ -666,15 +690,6 @@ export default defineComponent({
     const tokenEnvSnippet = computed(() => {
       const orgId = store.state.selectedOrganization.identifier;
       return `OPENOBSERVE_AUTH="Basic ${tokenBasicCredential.value}"\nOPENOBSERVE_ORG_ID=${orgId}`;
-    });
-
-    // "Copy Token" copies whatever the active tab is showing (curl / header /
-    // env), not always the raw token — otherwise switching to the Header or
-    // Env tab and hitting Copy silently copies the wrong thing.
-    const activeTokenSnippet = computed(() => {
-      if (tokenTab.value === "header") return tokenHeaderSnippet.value;
-      if (tokenTab.value === "env") return tokenEnvSnippet.value;
-      return tokenCurlSnippet.value;
     });
 
     // Enterprise/Cloud builds have a Groups UI, so a freshly created account
@@ -1278,8 +1293,6 @@ export default defineComponent({
       tokenAccessPending,
       hasAccessGrants,
       hasAccessFailures,
-      grantedRolesText,
-      grantedGroupsText,
       failedRolesText,
       failedGroupsText,
       isSyntheticSA,
@@ -1288,7 +1301,6 @@ export default defineComponent({
       tokenCurlSnippet,
       tokenHeaderSnippet,
       tokenEnvSnippet,
-      activeTokenSnippet,
       tokenNextStepHint,
       showGroupLink,
       groupLinkTarget,

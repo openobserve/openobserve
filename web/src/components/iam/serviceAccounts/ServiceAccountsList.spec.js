@@ -1183,6 +1183,49 @@ describe("ServiceAccountsList Component", () => {
       // Copy button should still be present (data-test attribute)
       expect(tokenDialog.html()).toContain("service-accounts-list-token-copy-btn");
     });
+
+    it("the copy hint does not use an em dash", () => {
+      const hint = wrapper.find('[data-test="service-accounts-token-copy-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).not.toContain("—");
+    });
+
+    it("the main Copy Token button always copies the raw token, even on the Header/Env tab", async () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      wrapper.vm.tokenTab = "header";
+      await nextTick();
+
+      await wrapper
+        .find('[data-test="service-accounts-list-token-copy-btn"]')
+        .trigger("click");
+      await flushPromises();
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("the-token");
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalledWith(
+        wrapper.vm.tokenHeaderSnippet,
+      );
+    });
+
+    it("renders the active tab's snippet in a dedicated OCodeBlock with its own copy action", async () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      const tokenDialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("title") === "Copy your token");
+
+      for (const [tab, expectedCode] of [
+        ["curl", wrapper.vm.tokenCurlSnippet],
+        ["header", wrapper.vm.tokenHeaderSnippet],
+        ["env", wrapper.vm.tokenEnvSnippet],
+      ]) {
+        wrapper.vm.tokenTab = tab;
+        await nextTick();
+        const codeBlock = tokenDialog.findComponent({ name: "OCodeBlock" });
+        expect(codeBlock.exists()).toBe(true);
+        expect(codeBlock.props("code")).toBe(expectedCode);
+        // copyable defaults to true — the box owns its own copy button.
+        expect(codeBlock.props("copyable")).not.toBe(false);
+      }
+    });
   });
 
   describe("Token dialog — access summary (single screen, edition-gated)", () => {
@@ -1257,7 +1300,9 @@ describe("ServiceAccountsList Component", () => {
       );
       const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
       expect(summary.exists()).toBe(true);
-      expect(summary.text()).toContain("Roles assigned: editor");
+      // Label shown once, followed by a badge per role — not one sentence.
+      expect(summary.text()).toContain("Roles assigned");
+      expect(summary.text()).toContain("editor");
     });
 
     it("creation with grants lists the assigned roles/groups and hides the fallback links", async () => {
@@ -1269,14 +1314,31 @@ describe("ServiceAccountsList Component", () => {
 
       const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
       expect(summary.exists()).toBe(true);
-      expect(summary.text()).toContain("Roles assigned: editor");
-      expect(summary.text()).toContain("Added to user groups: pipelines");
+      expect(summary.text()).toContain("Roles assigned");
+      expect(summary.text()).toContain("editor");
+      expect(summary.text()).toContain("Added to user groups");
+      expect(summary.text()).toContain("pipelines");
       expect(wrapper.find('[data-test="service-accounts-list-token-add-to-role"]').exists()).toBe(
         false,
       );
       expect(wrapper.find('[data-test="service-accounts-token-access-failed"]').exists()).toBe(
         false,
       );
+    });
+
+    it("shows the 'Roles assigned' label once even when multiple roles were granted", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com", {
+        assigned: { roles: ["editor", "viewer", "admin"], groups: [] },
+        failed: { roles: [], groups: [] },
+      });
+      await nextTick();
+
+      const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
+      const labelOccurrences = summary.text().split("Roles assigned").length - 1;
+      expect(labelOccurrences).toBe(1);
+      ["editor", "viewer", "admin"].forEach((role) => {
+        expect(summary.text()).toContain(role);
+      });
     });
 
     it("creation with failed grants surfaces the failures and the retry hint", async () => {
