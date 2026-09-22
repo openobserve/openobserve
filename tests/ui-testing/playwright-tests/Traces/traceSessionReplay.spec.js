@@ -1,9 +1,8 @@
 // traceSessionReplay.spec.js
 // RUM Session Replay — gated Play button (Trace Details) + no-replay empty
-// state (Session Viewer). Data setup follows docs/test_generator/ci/setup-contract.md:
-// a dangling-parent OTLP trace in `default` matched by `_rumdata` rows (with/without
-// `session_has_replay`) drives the gate, and a present `_sessionreplay` stream
-// makes the empty state reachable.
+// state (Session Viewer). Data setup: a dangling-parent OTLP trace in `default`
+// matched by `_rumdata` rows (with/without `session_has_replay`) drives the
+// gate, and a present `_sessionreplay` stream makes the empty state reachable.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
