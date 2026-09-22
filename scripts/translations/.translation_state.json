@@ -12397,10 +12397,12 @@
           "title": "5a6743f87ca1085c",
           "variables": {
             "input": {
-              "trace": "b6bec50de2750e82"
+              "session": "4a9571b392344252",
+              "trace": "1989045c93127363"
             },
             "output": {
-              "trace": "078f80923419eb8e"
+              "session": "b3b25c889e3814e2",
+              "trace": "c4ae6bff9a4cc3d1"
             },
             "spans": {
               "trace": "c3d361441ab0db75"
@@ -12412,6 +12414,10 @@
             "steps": {
               "session": "6d11de0abbce4788",
               "trace": "d59a422557bbb94c"
+            },
+            "tool_calls": {
+              "session": "cd0eae8459084422",
+              "trace": "88b26a078466ba1e"
             }
           }
         },

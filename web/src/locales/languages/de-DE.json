@@ -13041,10 +13041,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Eingabe vom Root-Span des Traces."
+              "trace": "Eingabe aus dem Root-Chat-Span des Traces.",
+              "session": "Die Einstiegsfrage: Eingabe aus dem Root-Chat-Span des ersten Traces."
             },
             "output": {
-              "trace": "Ausgabe vom Root-Span des Traces."
+              "trace": "Ausgabe aus dem Root-Chat-Span des Traces.",
+              "session": "Die abschließende Antwort: Ausgabe aus dem Root-Chat-Span des letzten Traces."
             },
             "statistics": {
               "trace": "Trace-Metriken: Span-Anzahl, Dauer, LLM- und Tool-Aufrufe, Fehler, Token und Kosten.",
@@ -13056,6 +13058,10 @@
             "steps": {
               "trace": "Spans in zeitlicher Reihenfolge; die Mitte wird eingeklappt, wenn der Trace sehr lang ist.",
               "session": "Traces in zeitlicher Reihenfolge, dargestellt als Gesprächsrunden."
+            },
+            "tool_calls": {
+              "trace": "Jeder Tool-Aufruf im Trace, in zeitlicher Reihenfolge, mit Name, Eingabe, Ausgabe und Status.",
+              "session": "Jeder Tool-Aufruf über die Traces der Sitzung hinweg, in zeitlicher Reihenfolge, mit Name, Eingabe, Ausgabe und Status."
             }
           }
         }

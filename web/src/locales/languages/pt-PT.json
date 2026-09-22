@@ -13041,10 +13041,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Entrada do span raiz do trace."
+              "trace": "Entrada do span de chat raiz do rastro.",
+              "session": "A pergunta inicial: entrada do span de chat raiz do primeiro rastro."
             },
             "output": {
-              "trace": "Saída do span raiz do trace."
+              "trace": "Saída do span de chat raiz do rastro.",
+              "session": "A resposta final: saída do span de chat raiz do último rastro."
             },
             "statistics": {
               "trace": "Métricas do trace: contagem de spans, duração, chamadas de LLM e ferramentas, erros, tokens e custo.",
@@ -13056,6 +13058,10 @@
             "steps": {
               "trace": "Spans em ordem de tempo; o meio é recolhido quando o trace é muito longo.",
               "session": "Traces em ordem de tempo, representados como turnos de conversa."
+            },
+            "tool_calls": {
+              "trace": "Todas as chamadas de ferramenta no rastro, em ordem cronológica, com seu nome, entrada, saída e status.",
+              "session": "Todas as chamadas de ferramenta nos rastros da sessão, em ordem cronológica, com seu nome, entrada, saída e status."
             }
           }
         }
