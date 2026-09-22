@@ -2587,12 +2587,7 @@ impl AlertExt for Alert {
             Err(AlertError::SendNotificationError {
                 error_message: outcome.error_message,
             })
-        // Non-empty: with no workflows either, "every workflow failed" is vacuously true, and an
-        // alert that pages an on-call team and nothing else answered a blank 500.
-        } else if self.destinations.is_empty()
-            && !self.workflows.is_empty()
-            && workflow_error == self.workflows.len()
-        {
+        } else if all_workflows_failed(attempted, self.workflows.len(), workflow_error) {
             Err(AlertError::SendNotificationError {
                 error_message: workflow_err_msg,
             })
@@ -2600,6 +2595,14 @@ impl AlertExt for Alert {
             Ok(outcome)
         }
     }
+}
+
+fn all_workflows_failed(
+    attempted_destinations: usize,
+    workflow_count: usize,
+    workflow_errors: usize,
+) -> bool {
+    attempted_destinations == 0 && workflow_count > 0 && workflow_errors == workflow_count
 }
 
 /// Build the notification context for a send, resolving the row template
@@ -4198,7 +4201,14 @@ mod send_path_tests {
 
     #[cfg(feature = "enterprise")]
     use super::incident_path_notified;
-    use super::{NotificationOutcome, choose_template};
+    use super::{NotificationOutcome, all_workflows_failed, choose_template};
+
+    #[test]
+    fn skipped_incident_destinations_do_not_hide_total_workflow_failure() {
+        assert!(all_workflows_failed(0, 1, 1));
+        assert!(!all_workflows_failed(0, 1, 0));
+        assert!(!all_workflows_failed(1, 1, 1));
+    }
 
     fn tpl(name: &str) -> Template {
         Template {
