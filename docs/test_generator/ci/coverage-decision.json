@@ -1,0 +1,16 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/traceSessionReplay.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-page-dataflow.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-cdn-dataflow.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-npm-dataflow.spec.js"
+  ],
+  "needs_registration": true,
+  "registration": {
+    "ci_matrix_group": "Traces",
+    "add_to_run_files": "traceSessionReplay.spec.js"
+  },
+  "rationale": "No existing spec exercises the RUM Session Replay feature. traceDetails.spec.js opens generic trace details but never asserts the gated Play Session Replay button; the RUM dataflow specs prove _rumdata/_sessionreplay ingestion through the real SDK but never open a trace-detail Play button nor the no-replay empty state. This feature is a single cohesive area (RUM Session Replay) whose dominant UI entry point is the Traces TraceDetails view, so a dedicated spec in Traces/ (per run-context spec_path) is the right home. The no-replay empty state is a RUM-surface assertion that belongs to this same feature (reachable only through session replay), so it lives in this spec rather than a separate RUM shard; see the plan's Notes for the area nuance."
+}

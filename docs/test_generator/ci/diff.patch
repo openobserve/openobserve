@@ -1,0 +1,924 @@
+===== COMPLETE LIST OF CHANGED FILES (26 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+web/src/composables/rum/useRumSpanBuilder.spec.ts
+web/src/composables/rum/useRumSpanBuilder.ts
+web/src/locales/languages/ar-SA.json
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/plugins/traces/TraceDetails.rum-bridge.spec.ts
+web/src/plugins/traces/TraceDetails.spec.ts
+web/src/plugins/traces/TraceDetails.vue
+web/src/plugins/traces/traceDetails.utils.spec.ts
+web/src/plugins/traces/traceDetails.utils.ts
+web/src/views/RUM/SessionViewer.spec.ts
+web/src/views/RUM/SessionViewer.vue
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index 2d77bd20510..a6564222ef2 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -14366,6 +14366,8 @@
+     "noCorrelatedTraces": "e4e73d4f296f896b",
+     "noErrorsInWindow": "38acc7913f59dc7e",
+     "noMatchingSessions": "0a351a7cccc1397c",
++    "noReplayRecordedMessage": "87d6635ebe531ad0",
++    "noReplayRecordedTitle": "f89a778ebefa2ed3",
+     "noSessionReplay": "a9378d6297019298",
+     "ofActiveUsers": "11eca08aa22daa55",
+     "ofTotal": "de344ba2ec6092cb",
+diff --git a/web/src/composables/rum/useRumSpanBuilder.spec.ts b/web/src/composables/rum/useRumSpanBuilder.spec.ts
+index 688e871ad5e..332146e0a81 100644
+--- a/web/src/composables/rum/useRumSpanBuilder.spec.ts
++++ b/web/src/composables/rum/useRumSpanBuilder.spec.ts
+@@ -1497,6 +1497,71 @@ describe("useRumSpanBuilder", () => {
+     });
+   });
+ 
++  describe("formatRumEventsAsSpans — replay flag", () => {
++    const withReplay = { session_has_replay: true };
++
++    const buildAllKinds = (flag: Record<string, any>) => {
++      const traced = makeTracedResource({ date: 1_000_000, ...flag });
++      const view = makeViewEvent(flag);
++      const nearAction = makeActionEvent({ date: 1_000_000, ...flag });
++      const farAction = makeActionEvent({ action_id: "action-far", date: 5_000_000, ...flag });
++      const resource = makeResourceEvent({ resource_type: "fetch", ...flag });
++      const errors = [1, 2, 3, 4].map((i) =>
++        makeErrorEvent({ error_id: `err-${i}`, date: 1_200_000 + i, ...flag }),
++      );
++      const { formatRumEventsAsSpans } = buildComposable();
++      return formatRumEventsAsSpans(
++        [traced],
++        [view],
++        [nearAction, farAction],
++        [resource, ...errors],
++      );
++    };
++
++    // The gate needs both fields, so the flag is asserted wherever a session id is.
++    const sessionSpans = (spans: any[]) => spans.filter((s) => s.rum_session_id);
++
++    it("should mark every session-bearing span as replayable when the rows carry session_has_replay", () => {
++      const spans = sessionSpans(buildAllKinds(withReplay));
++
++      expect(spans.map((s) => s.rum_event_type)).toEqual(
++        expect.arrayContaining(["view", "action", "collapsed_actions", "resource", "error"]),
++      );
++      for (const span of spans) {
++        expect(span.rum_session_has_replay, span.span_id).toBe(true);
++      }
++    });
++
++    it("should mark every session-bearing span as not replayable when the rows lack session_has_replay", () => {
++      const spans = sessionSpans(buildAllKinds({}));
++
++      expect(spans.length).toBeGreaterThan(4);
++      for (const span of spans) {
++        expect(span.rum_session_has_replay, span.span_id).toBe(false);
++      }
++    });
++
++    it("should treat an explicit false session_has_replay as not replayable", () => {
++      const spans = sessionSpans(buildAllKinds({ session_has_replay: false }));
++
++      expect(spans.length).toBeGreaterThan(4);
++      for (const span of spans) {
++        expect(span.rum_session_has_replay, span.span_id).toBe(false);
++      }
++    });
++
++    it("should take a collapsed group's replay flag from the browser request", () => {
++      const traced = makeTracedResource({ date: 1_000_000, session_has_replay: true });
++      const farAction = makeActionEvent({ action_id: "action-far", date: 5_000_000 });
++      const { formatRumEventsAsSpans } = buildComposable();
++
++      const spans = formatRumEventsAsSpans([traced], [], [farAction], [makeResourceEvent()]);
++
++      const collapsed = spans.find((s) => s.rum_event_type === "collapsed_actions");
++      expect(collapsed!.rum_session_has_replay).toBe(true);
++    });
++  });
++
+   // =========================================================================
+   // formatRumEventsAsSpans — registerServiceColors
+   // =========================================================================
+diff --git a/web/src/composables/rum/useRumSpanBuilder.ts b/web/src/composables/rum/useRumSpanBuilder.ts
+index e41f3d37619..ea2ee2a6170 100644
+--- a/web/src/composables/rum/useRumSpanBuilder.ts
++++ b/web/src/composables/rum/useRumSpanBuilder.ts
+@@ -174,6 +174,9 @@ export default function useRumSpanBuilder(
+     }
+   };
+ 
++  // The RUM Session Replay page only lists sessions whose events carry this flag.
++  const hasReplay = (event: any): boolean => event?.session_has_replay === true;
++
+   /** Fetches the browser request and its page view for a trace with a dangling parent, searching only around the window its spans span. */
+   const fetchRumEventsForTrace = async (traceId: string, spans: any[]) => {
+     const empty = {
+@@ -316,6 +319,7 @@ export default function useRumSpanBuilder(
+       span_kind: event.type === "resource" ? SPAN_KIND_CLIENT : SPAN_KIND_UNSPECIFIED,
+       rum_event_type: event.type,
+       rum_session_id: event.session_id,
++      rum_session_has_replay: hasReplay(event),
+       _is_trace_bridge: isTraced,
+     };
+   };
+@@ -374,6 +378,7 @@ export default function useRumSpanBuilder(
+         span_kind: SPAN_KIND_UNSPECIFIED,
+         rum_event_type: "view",
+         rum_session_id: view.session_id,
++        rum_session_has_replay: hasReplay(view),
+       };
+     });
+   };
+@@ -424,6 +429,7 @@ export default function useRumSpanBuilder(
+         span_kind: SPAN_KIND_UNSPECIFIED,
+         rum_event_type: "action",
+         rum_session_id: action.session_id,
++        rum_session_has_replay: hasReplay(action),
+       });
+     }
+ 
+@@ -438,6 +444,7 @@ export default function useRumSpanBuilder(
+           {
+             rum_event_type: "collapsed_actions",
+             rum_session_id: firstTracedResource?.session_id,
++            rum_session_has_replay: hasReplay(firstTracedResource),
+           },
+         ),
+       );
+diff --git a/web/src/locales/languages/ar-SA.json b/web/src/locales/languages/ar-SA.json
+index d0ad8dc1d79..166a2da6e39 100644
+--- a/web/src/locales/languages/ar-SA.json
++++ b/web/src/locales/languages/ar-SA.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "إعادة تشغيل الجلسة",
+     "viewSessionReplay": "عرض إعادة تشغيل الجلسة",
+     "playSessionReplay": "إعادة تشغيل جلسة اللعب",
++    "noReplayRecordedTitle": "لم يتم تسجيل إعادة تشغيل لهذه الجلسة",
++    "noReplayRecordedMessage": "لا تحتوي الجلسة {id} على مقاطع إعادة تشغيل لتشغيلها.",
+     "discoverSessionTitle": "اكتشف إعادة تشغيل الجلسة لفهم تفاعلات المستخدمين بالتفصيل",
+     "discoverSessionMessage": "يقوم Session Replay بالتقاط وإعادة تشغيل تفاعلات المستخدمين على موقعك الإلكتروني أو تطبيقك. يتيح لك ذلك مراجعة بصرية لكيفية التنقل بين المستخدمين، وأين ينقرون، وما يكتبون، وكيف يتفاعلون مع محتواك",
+     "loadingErrorDetails": "تمسك جيدا، نحن نحصل على تفاصيل خطأ.",
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index 95364b43f1b..7d89ac888bb 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Sitzungswiederholung",
+     "viewSessionReplay": "Sitzungswiederholung anzeigen",
+     "playSessionReplay": "Sitzungswiederholung abspielen",
++    "noReplayRecordedTitle": "Für diese Sitzung wurde keine Wiedergabe aufgezeichnet",
++    "noReplayRecordedMessage": "Sitzung {id} hat keine Wiedergabesegmente zum Abspielen.",
+     "discoverSessionTitle": "Entdecken Sie Session Replay, um Benutzerinteraktionen im Detail zu verstehen",
+     "discoverSessionMessage": "Session Replay erfasst Benutzerinteraktionen auf Ihrer Website oder Anwendung und spielt sie erneut ab. Auf diese Weise können Sie visuell überprüfen, wie Benutzer navigieren, wohin sie klicken, was sie eingeben und wie sie mit Ihren Inhalten interagieren",
+     "loadingErrorDetails": "Halten Sie sich fest, wir rufen Fehlerdetails ab.",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 317f9f8deda..9cd9d0a8c42 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Session Replay",
+     "viewSessionReplay": "View Session Replay",
+     "playSessionReplay": "Play Session Replay",
++    "noReplayRecordedTitle": "No replay was recorded for this session",
++    "noReplayRecordedMessage": "Session {id} has no replay segments to play.",
+     "discoverSessionTitle": "Discover Session Replay to Understand User Interactions in Detail",
+     "discoverSessionMessage": "Session Replay captures and replays user interactions on your website or application. This allows you to visually review how users navigate, where they click, what they type, and how they engage with your content",
+     "loadingErrorDetails": "Hold on tight, we're fetching error details.",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index ce1146ed2f8..6f571adfa2f 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Reproducción de sesión",
+     "viewSessionReplay": "Ver reproducción de sesión",
+     "playSessionReplay": "Reproducir la reproducción de la sesión",
++    "noReplayRecordedTitle": "No se grabó ninguna repetición para esta sesión",
++    "noReplayRecordedMessage": "La sesión {id} no tiene segmentos de repetición para reproducir.",
+     "discoverSessionTitle": "Descubra la reproducción de sesiones para comprender en detalle las interacciones de los usuarios",
+     "discoverSessionMessage": "La reproducción de sesiones captura y reproduce las interacciones de los usuarios en su sitio web o aplicación. Esto te permite revisar visualmente cómo navegan los usuarios, dónde hacen clic, qué escriben y cómo interactúan con tu contenido",
+     "loadingErrorDetails": "Agárrate fuerte, estamos buscando los detalles del error.",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index 54b0f26887a..9c2414d36e9 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Rediffusion de la session",
+     "viewSessionReplay": "Afficher la rediffusion de la session",
+     "playSessionReplay": "Replay de la session",
++    "noReplayRecordedTitle": "Aucun replay n'a été enregistré pour cette session",
++    "noReplayRecordedMessage": "La session {id} n'a aucun segment de replay à lire.",
+     "discoverSessionTitle": "Découvrez Session Replay pour comprendre en détail les interactions des utilisateurs",
+     "discoverSessionMessage": "Session Replay capture et rejoue les interactions des utilisateurs sur votre site Web ou votre application. Cela vous permet d'examiner visuellement la façon dont les utilisateurs naviguent, où ils cliquent, ce qu'ils saisissent et comment ils interagissent avec votre contenu",
+     "loadingErrorDetails": "Attendez, nous sommes en train de récupérer les détails de l'erreur.",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index e3616ae2312..7178dfd171c 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Replay della sessione",
+     "viewSessionReplay": "Visualizza il replay della sessione",
+     "playSessionReplay": "Riproduci sessione",
++    "noReplayRecordedTitle": "Nessun replay registrato per questa sessione",
++    "noReplayRecordedMessage": "La sessione {id} non ha segmenti di replay da riprodurre.",
+     "discoverSessionTitle": "Scopri Session Replay per comprendere in dettaglio le interazioni degli utenti",
+     "discoverSessionMessage": "Session Replay acquisisce e riproduce le interazioni degli utenti sul tuo sito web o sulla tua applicazione. Ciò ti consente di esaminare visivamente il modo in cui gli utenti navigano, dove fanno clic, cosa digitano e come interagiscono con i tuoi contenuti",
+     "loadingErrorDetails": "Tieni duro, stiamo recuperando i dettagli dell'errore.",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index ba9e2837173..5fb131a0f5d 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "セッションリプレイ",
+     "viewSessionReplay": "セッションリプレイを表示",
+     "playSessionReplay": "セッションリプレイを再生",
++    "noReplayRecordedTitle": "このセッションのリプレイは記録されていません",
++    "noReplayRecordedMessage": "セッション {id} には再生できるリプレイセグメントがありません。",
+     "discoverSessionTitle": "ユーザーインタラクションを詳細に理解するためのセッションリプレイをご覧ください",
+     "discoverSessionMessage": "セッションリプレイは、ウェブサイトまたはアプリケーションでのユーザーインタラクションをキャプチャして再生します。これにより、ユーザーがどのようにナビゲートしたか、どこをクリックしたか、何を入力したか、コンテンツにどのように反応したかを視覚的に確認できます。",
+     "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index d98c54d6559..e7007bd7e33 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "세션 리플레이",
+     "viewSessionReplay": "세션 리플레이 보기",
+     "playSessionReplay": "플레이 세션 리플레이",
++    "noReplayRecordedTitle": "이 세션에 대한 리플레이가 기록되지 않았습니다",
++    "noReplayRecordedMessage": "세션 {id}에 재생할 리플레이 세그먼트가 없습니다.",
+     "discoverSessionTitle": "세션 리플레이를 통해 사용자 상호작용에 대해 자세히 알아보세요",
+     "discoverSessionMessage": "Session Replay는 웹 사이트 또는 애플리케이션에서의 사용자 상호 작용을 캡처하고 재생합니다.이를 통해 사용자가 탐색하는 방식, 클릭한 위치, 입력하는 내용, 콘텐츠에 참여하는 방식을 시각적으로 검토할 수 있습니다.",
+     "loadingErrorDetails": "잠시만요. 오류 세부 정보를 가져오는 중입니다.",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index 882d7380e88..246d11bdbe7 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Sessie opnieuw afspelen",
+     "viewSessionReplay": "Bekijk de herhaling van de sessie",
+     "playSessionReplay": "Sessie opnieuw afspelen",
++    "noReplayRecordedTitle": "Geen replay opgenomen voor deze sessie",
++    "noReplayRecordedMessage": "Sessie {id} heeft geen replay-segmenten om af te spelen.",
+     "discoverSessionTitle": "Ontdek Session Replay om gebruikersinteracties in detail te begrijpen",
+     "discoverSessionMessage": "Session Replay legt gebruikersinteracties op uw website of applicatie vast en herhaalt deze. Zo kun je visueel bekijken hoe gebruikers navigeren, waar ze klikken, wat ze typen en hoe ze met je inhoud omgaan.",
+     "loadingErrorDetails": "Wacht even, we halen foutgegevens op.",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index 237a3ec7431..af23f280496 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Odtwarzanie sesji",
+     "viewSessionReplay": "Wyświetl odtwarzanie sesji",
+     "playSessionReplay": "Odtwórz sesję",
++    "noReplayRecordedTitle": "Nie nagrano powtórki dla tej sesji",
++    "noReplayRecordedMessage": "Sesja {id} nie ma segmentów powtórki do odtworzenia.",
+     "discoverSessionTitle": "Odkryj odtwarzanie sesji, aby szczegółowo zrozumieć interakcje użytkowników",
+     "discoverSessionMessage": "Odtwarzanie sesji rejestruje i odtwarza interakcje użytkowników na Twojej stronie internetowej lub w aplikacji. Pozwala to wizualnie przejrzeć, jak użytkownicy nawigują, gdzie klikają, co wpisują i w jaki sposób angażują się w treści.",
+     "loadingErrorDetails": "Trzymaj się, pobieramy szczegóły błędu.",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index 19f40ed9aa9..ced73f30574 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Repetição da sessão",
+     "viewSessionReplay": "Exibir repetição da sessão",
+     "playSessionReplay": "Reproduzir repetição da sessão",
++    "noReplayRecordedTitle": "Nenhuma reprodução foi gravada para esta sessão",
++    "noReplayRecordedMessage": "A sessão {id} não tem segmentos de reprodução para exibir.",
+     "discoverSessionTitle": "Descubra o Session Replay para entender detalhadamente as interações do usuário",
+     "discoverSessionMessage": "O Session Replay captura e reproduz as interações do usuário em seu site ou aplicativo. Isso permite que você analise visualmente como os usuários navegam, onde clicam, o que digitam e como interagem com seu conteúdo.",
+     "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index b78f3fddce2..de61580dbfa 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Воспроизведение сессии",
+     "viewSessionReplay": "Просмотр воспроизведения сессии",
+     "playSessionReplay": "Воспроизвести сессию",
++    "noReplayRecordedTitle": "Для этой сессии отсутствует запись воспроизведения",
++    "noReplayRecordedMessage": "У сессии {id} нет сегментов воспроизведения для проигрывания.",
+     "discoverSessionTitle": "Откройте для себя воспроизведение сессии, чтобы подробно понять взаимодействия пользователей",
+     "discoverSessionMessage": "Воспроизведение сессии захватывает и воспроизводит взаимодействия пользователей на вашем веб-сайте или приложении. Это позволяет визуально просмотреть, как пользователи перемещаются, куда они нажимают, что вводят и как взаимодействуют с вашим контентом",
+     "loadingErrorDetails": "Держитесь, мы загружаем детали ошибки.",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index 7f24096bbd8..28a32cc98fd 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Oturum Tekrar Oynatma",
+     "viewSessionReplay": "Oturum Tekrarını Görüntüle",
+     "playSessionReplay": "Oturum Oynatma Oynatma",
++    "noReplayRecordedTitle": "Bu oturum için kayıt oynatımı yapılmadı",
++    "noReplayRecordedMessage": "{id} oturumunun oynatılacak kayıt oynatım bölümü yok.",
+     "discoverSessionTitle": "Kullanıcı Etkileşimlerini Ayrıntılı Anlamak için Oturum Tekrarını Keşfedin",
+     "discoverSessionMessage": "Session Replay, web sitenizdeki veya uygulamanızdaki kullanıcı etkileşimlerini yakalar ve tekrarlar. Bu, kullanıcıların nasıl gezindiklerini, nereye tıkladıklarını, ne yazdıklarını ve içeriğinizle nasıl etkileşim kurduklarını görsel olarak incelemenizi sağlar.",
+     "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index b806d859267..1aff89d1018 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "Phát lại phiên",
+     "viewSessionReplay": "Xem phát lại phiên",
+     "playSessionReplay": "Phát lại phiên",
++    "noReplayRecordedTitle": "Không có phát lại nào được ghi cho phiên này",
++    "noReplayRecordedMessage": "Phiên {id} không có phân đoạn phát lại nào để phát.",
+     "discoverSessionTitle": "Khám phá Phát lại phiên để hiểu chi tiết tương tác người dùng",
+     "discoverSessionMessage": "Phát lại phiên ghi lại và phát lại các tương tác của người dùng trên trang web hoặc ứng dụng của bạn. Điều này cho phép bạn xem xét trực quan cách người dùng điều hướng, nơi họ nhấp, nội dung họ gõ và cách họ tương tác với nội dung của bạn",
+     "loadingErrorDetails": "Hãy chờ một chút, chúng tôi đang lấy chi tiết lỗi.",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index 005b01a21cc..38d5fb00c2b 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "会话重放",
+     "viewSessionReplay": "查看会话重放",
+     "playSessionReplay": "播放会话重放",
++    "noReplayRecordedTitle": "此会话未录制回放",
++    "noReplayRecordedMessage": "会话 {id} 没有可播放的回放片段。",
+     "discoverSessionTitle": "探索会话回放以详细了解用户互动",
+     "discoverSessionMessage": "Session Replay 捕获并重放您的网站或应用程序上的用户互动。这使您可以直观地查看用户的导航方式、点击的位置、键入的内容以及他们如何与您的内容互动",
+     "loadingErrorDetails": "等一下，我们正在获取错误细节。",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index 89acc007c7f..41dea5b08d4 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -1474,6 +1474,8 @@
+     "sessionReplay": "工作階段重播",
+     "viewSessionReplay": "檢視工作階段重播",
+     "playSessionReplay": "播放工作階段重播",
++    "noReplayRecordedTitle": "此工作階段未錄製重播",
++    "noReplayRecordedMessage": "工作階段 {id} 沒有可播放的重播區段。",
+     "discoverSessionTitle": "探索工作階段重播以深入了解使用者互動",
+     "discoverSessionMessage": "工作階段重播會擷取並重播使用者在網站或應用程式上的互動行為，讓您以視覺化方式檢閱使用者如何瀏覽、在哪裡按下、輸入了什麼，以及如何與內容互動",
+     "loadingErrorDetails": "正在擷取錯誤詳細資訊，請稍候。",
+diff --git a/web/src/plugins/traces/TraceDetails.rum-bridge.spec.ts b/web/src/plugins/traces/TraceDetails.rum-bridge.spec.ts
+index 179b1771936..282e10d1e41 100644
+--- a/web/src/plugins/traces/TraceDetails.rum-bridge.spec.ts
++++ b/web/src/plugins/traces/TraceDetails.rum-bridge.spec.ts
+@@ -114,7 +114,14 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
+   let wrapper: any;
+   let rumRequests: any[];
+ 
+-  function mountWithDetails(details: any) {
++  function answerRumSearch(sql: string, rumRows: any[]) {
++    if (sql.includes("type = 'view'")) return rumRows.filter((r) => r.type === "view");
++    if (sql.includes("type='action'")) return rumRows.filter((r) => r.type === "action");
++    if (sql.includes("type = 'error'")) return rumRows.filter((r) => r.type !== "view");
++    return rumRows.filter((r) => r._oo_trace_id);
++  }
++
++  function mountWithDetails(details: any, rumRows: any[] = []) {
+     rumRequests = [];
+     globalThis.server.use(
+       http.get(
+@@ -131,7 +138,8 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
+           const body: any = await request.json();
+           if (body.query?.sql?.includes("_rumdata")) {
+             rumRequests.push(body.query);
+-            return HttpResponse.json({ took: 0, hits: [], total: 0, from: 0, size: 0 });
++            const hits = answerRumSearch(body.query.sql, rumRows);
++            return HttpResponse.json({ took: 0, hits, total: hits.length, from: 0, size: 0 });
+           }
+           return HttpResponse.json(details);
+         },
+@@ -141,6 +149,41 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
+     return mountTraceDetails({ traceId: "test-trace-id" });
+   }
+ 
++  const RUM_SESSION_ID = "bf9f9e4f-34e8-4c4f-b43f-f27c17769d93";
++  const AI_CONVERSATION_ID = "01a0bb13-c247-707a-9b90-26610d52030b";
++  const REPLAY_BUTTON = '[data-test="trace-details-view-session-replay-btn"]';
++
++  function makeRumRows(sessionFlags: Record<string, unknown>) {
++    const base = {
++      session_id: RUM_SESSION_ID,
++      view_id: "view-1",
++      date: 1_755_853_746_000,
++      ...sessionFlags,
++    };
++    return [
++      {
++        ...base,
++        type: "resource",
++        _oo_trace_id: "test-trace-id",
++        _oo_span_id: "d4b07e603e2fa32f",
++        resource_url: "https://app.example/api/ai/chat_stream",
++        resource_method: "POST",
++        resource_type: "fetch",
++        resource_duration: 1_000_000,
++      },
++      { ...base, type: "view", view_url: "/web/ai", view_time_spent: 5_000_000 },
++    ];
++  }
++
++  async function mountBridge(rumRows: any[], details = makeDetailsResponse("d4b07e603e2fa32f")) {
++    wrapper = mountWithDetails(details, rumRows);
++    await flushPromises();
++    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBeGreaterThan(3), {
++      timeout: 5000,
++    });
++    await flushPromises();
++  }
++
+   function mountTraceDetails(props: Record<string, unknown>) {
+     return mount(TraceDetails, {
+       attachTo: "#app",
+@@ -241,4 +284,34 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
+     expect(selected.trace_start_time).toBe(TRACE_START_US);
+     expect(selected.trace_end_time).toBe(TRACE_END_US + 1);
+   });
++
++  it("hides Play Session Replay when the browser session has no recording", async () => {
++    await mountBridge(makeRumRows({}));
++
++    expect(wrapper.vm.spanList.some((s: any) => s.rum_session_id === RUM_SESSION_ID)).toBe(true);
++    expect(wrapper.find(REPLAY_BUTTON).exists()).toBe(false);
++  });
++
++  it("shows Play Session Replay when the browser session has a recording", async () => {
++    await mountBridge(makeRumRows({ session_has_replay: true }));
++
++    expect(wrapper.find(REPLAY_BUTTON).exists()).toBe(true);
++  });
++
++  it("opens the RUM session, not the AI conversation, from Play Session Replay", async () => {
++    const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
++    const details = makeDetailsResponse("d4b07e603e2fa32f");
++    details.hits[0].session_id = AI_CONVERSATION_ID;
++    details.hits[0].gen_ai_conversation_id = AI_CONVERSATION_ID;
++    await mountBridge(makeRumRows({ session_has_replay: true }), details);
++
++    await wrapper.find(REPLAY_BUTTON).trigger("click");
++
++    expect(push).toHaveBeenCalledTimes(1);
++    expect(push.mock.calls[0][0]).toMatchObject({
++      name: "SessionViewer",
++      params: { id: RUM_SESSION_ID },
++    });
++    expect(push.mock.calls[0][0].params.id).not.toBe(AI_CONVERSATION_ID);
++  });
+ });
+diff --git a/web/src/plugins/traces/TraceDetails.spec.ts b/web/src/plugins/traces/TraceDetails.spec.ts
+index 32397fb096c..3deefe0fc11 100644
+--- a/web/src/plugins/traces/TraceDetails.spec.ts
++++ b/web/src/plugins/traces/TraceDetails.spec.ts
+@@ -1615,29 +1615,23 @@ describe("TraceDetails", () => {
+   });
+ 
+   describe("Coverage: redirectToSessionReplay edge cases", () => {
+-    it("should handle case when firstRumSessionData is null (lines 1851-1853)", () => {
++    it("should not navigate when no span has a replayable RUM session", () => {
+       const routerPushSpy = vi.spyOn(router, "push");
+-      // Set spanList without RUM session data - firstRumSessionData will be null
+       wrapper.vm.searchObj.data.traceDetails.spanList =
+         tracesMockData.tracesDetails.traceSpans.hits;
+ 
+-      // Verify firstRumSessionData is null
+-      expect(wrapper.vm.firstRumSessionData).toBeNull();
+-
+-      // This should not throw an error now that the bug is fixed
+-      // Previously would throw: Cannot read properties of null (reading 'rum_session_id')
+       expect(() => wrapper.vm.redirectToSessionReplay()).not.toThrow();
+       expect(routerPushSpy).not.toHaveBeenCalled();
+       routerPushSpy.mockRestore();
+     });
+ 
+-    it("should navigate to session viewer when rum_session_id exists", () => {
++    it("should navigate to session viewer when a RUM session with a replay exists", () => {
+       const routerPushSpy = vi.spyOn(router, "push");
+-      // Add RUM session data to spanList
+       wrapper.vm.searchObj.data.traceDetails.spanList = [
+         {
+           ...tracesMockData.tracesDetails.traceSpans.hits[0],
+           rum_session_id: "session-123",
++          rum_session_has_replay: true,
+           start_time: 1000000000,
+           end_time: 2000000000,
+           rum_date: 1500000000,
+@@ -1846,16 +1840,17 @@ describe("TraceDetails", () => {
+   });
+ 
+   describe("Coverage: RUM session integration", () => {
+-    it("should show session replay button when RUM session exists", async () => {
++    it("should show session replay button when a RUM session with a replay exists", async () => {
+       wrapper.vm.searchObj.data.traceDetails.spanList = [
+         {
+           ...tracesMockData.tracesDetails.traceSpans.hits[0],
+           rum_session_id: "session-123",
++          rum_session_has_replay: true,
+         },
+       ];
+       await wrapper.vm.$nextTick();
+ 
+-      expect(wrapper.vm.hasRumSessionId).toBe(true);
++      expect(wrapper.vm.hasReplaySession).toBe(true);
+       const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
+       expect(replayBtn.exists()).toBe(true);
+     });
+@@ -1865,13 +1860,13 @@ describe("TraceDetails", () => {
+         tracesMockData.tracesDetails.traceSpans.hits;
+       await wrapper.vm.$nextTick();
+ 
+-      expect(wrapper.vm.hasRumSessionId).toBe(false);
++      expect(wrapper.vm.hasReplaySession).toBe(false);
+       const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
+       expect(replayBtn.exists()).toBe(false);
+     });
+ 
+     it("should hide session replay button when hideSessionReplayButton prop is true", async () => {
+-      // The button v-if checks hasRumSessionId && !hideSessionReplayButton
++      // The button v-if checks hasReplaySession && !hideSessionReplayButton
+       const hiddenWrapper = mount(TraceDetails, {
+         attachTo: "#app",
+         props: {
+@@ -1880,6 +1875,7 @@ describe("TraceDetails", () => {
+             {
+               ...tracesMockData.tracesDetails.traceSpans.hits[0],
+               rum_session_id: "session-hidden",
++              rum_session_has_replay: true,
+             },
+           ],
+           mode: "embedded",
+diff --git a/web/src/plugins/traces/TraceDetails.vue b/web/src/plugins/traces/TraceDetails.vue
+index d799fbd166f..1fcbd466f68 100644
+--- a/web/src/plugins/traces/TraceDetails.vue
++++ b/web/src/plugins/traces/TraceDetails.vue
+@@ -537,7 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               </span>
+             </div>
+             <OButton
+-              v-if="hasRumSessionId && !hideSessionReplayButton"
++              v-if="hasReplaySession && !hideSessionReplayButton"
+               data-test="trace-details-view-session-replay-btn"
+               variant="outline"
+               size="sm"
+@@ -928,7 +928,7 @@ import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
+ import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
+ import { convertTimelineData, convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
+ import { getAllSpanColors } from "@/utils/traces/traceColors";
+-import { resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
++import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
+ import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
+ import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
+ import { useTracePatternTree } from "@/composables/useTracePatternTree";
+@@ -1457,16 +1457,9 @@ export default defineComponent({
+       return store.state.zoConfig.service_streams_enabled !== false;
+     });
+ 
+-    // Check if any RUM span has a session_id
+-    const hasRumSessionId = computed(() => {
+-      return spanList.value.some((span: any) => span.rum_session_id);
+-    });
+-
+-    // Get the first RUM event with session_id for navigation
+-    const firstRumSessionData = computed(() => {
+-      const rumSpan = spanList.value.find((span: any) => span.rum_session_id);
+-      return rumSpan || null;
+-    });
++    // Gate and target share one span so the button never links to a session with nothing to play.
++    const replaySpan = computed(() => resolveReplaySpan(spanList.value));
++    const hasReplaySession = computed(() => replaySpan.value !== null);
+ 
+     // Computed properties for mode-based priority logic
+     const effectiveTraceId = computed(() => {
+@@ -2821,19 +2814,18 @@ export default defineComponent({
+     };
+ 
+     const redirectToSessionReplay = () => {
+-      if (!firstRumSessionData.value || !firstRumSessionData.value.rum_session_id) {
+-        return;
+-      }
++      const span = replaySpan.value;
++      if (!span) return;
+ 
+       router.push({
+         name: "SessionViewer",
+         params: {
+-          id: firstRumSessionData.value.rum_session_id,
++          id: span.rum_session_id,
+         },
+         query: {
+-          start_time: Math.floor(firstRumSessionData.value.start_time / 1000) - 1000000,
+-          end_time: Math.ceil(firstRumSessionData.value.end_time / 1000) + 1000000,
+-          event_time: firstRumSessionData.value.rum_date,
++          start_time: Math.floor(span.start_time / 1000) - 1000000,
++          end_time: Math.ceil(span.end_time / 1000) + 1000000,
++          event_time: span.rum_date,
+         },
+       });
+     };
+@@ -3075,8 +3067,7 @@ export default defineComponent({
+       redirectToLogs,
+       handleTreeViewCorrelatedLogs,
+       redirectToSessionReplay,
+-      hasRumSessionId,
+-      firstRumSessionData,
++      hasReplaySession,
+       filteredStreamOptions,
+       filterStreamFn,
+       streamSearchValue,
+diff --git a/web/src/plugins/traces/traceDetails.utils.spec.ts b/web/src/plugins/traces/traceDetails.utils.spec.ts
+index 2b4e850866d..94d201f2111 100644
+--- a/web/src/plugins/traces/traceDetails.utils.spec.ts
++++ b/web/src/plugins/traces/traceDetails.utils.spec.ts
+@@ -4,7 +4,7 @@
+ // session ID to display in the trace-details header.
+ 
+ import { describe, it, expect } from "vitest";
+-import { resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
++import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
+ 
+ describe("resolveSessionId", () => {
+   // Empty / null / undefined inputs → "" so the header template hides
+@@ -119,3 +119,50 @@ describe("resolveUrlTimeRange", () => {
+     });
+   });
+ });
++
++describe("resolveReplaySpan", () => {
++  it.each([[null], [undefined], [[]]])("returns null for %j", (input) => {
++    expect(resolveReplaySpan(input as any)).toBeNull();
++  });
++
++  it("returns null when spans carry a RUM session id but no replay flag", () => {
++    const spans = [{ span_id: "rum_view_v1", rum_session_id: "sess-1" }];
++    expect(resolveReplaySpan(spans)).toBeNull();
++  });
++
++  it("returns null when the replay flag is explicitly false", () => {
++    const spans = [
++      { span_id: "rum_view_v1", rum_session_id: "sess-1", rum_session_has_replay: false },
++    ];
++    expect(resolveReplaySpan(spans)).toBeNull();
++  });
++
++  it("returns null when a span has the replay flag but no RUM session id", () => {
++    const spans = [{ span_id: "rum_view_v1", rum_session_has_replay: true }];
++    expect(resolveReplaySpan(spans)).toBeNull();
++  });
++
++  // Backend spans carry the AI conversation id as session_id; it is not a RUM session.
++  it("ignores backend spans that carry session_id or gen_ai_conversation_id", () => {
++    const spans = [
++      { span_id: "s-1", session_id: "conv-1", gen_ai_conversation_id: "conv-1" },
++      { span_id: "s-2", session_id: "conv-1" },
++    ];
++    expect(resolveReplaySpan(spans)).toBeNull();
++  });
++
++  it("returns the first span that has both a RUM session id and the replay flag", () => {
++    const first = {
++      span_id: "rum_view_v1",
++      rum_session_id: "sess-1",
++      rum_session_has_replay: true,
++    };
++    const spans = [
++      { span_id: "s-0", session_id: "conv-1" },
++      { span_id: "rum_view_v0", rum_session_id: "sess-0", rum_session_has_replay: false },
++      first,
++      { span_id: "rum_action_a1", rum_session_id: "sess-1", rum_session_has_replay: true },
++    ];
++    expect(resolveReplaySpan(spans)).toBe(first);
++  });
++});
+diff --git a/web/src/plugins/traces/traceDetails.utils.ts b/web/src/plugins/traces/traceDetails.utils.ts
+index 4aa02c7e10c..46ac780a584 100644
+--- a/web/src/plugins/traces/traceDetails.utils.ts
++++ b/web/src/plugins/traces/traceDetails.utils.ts
+@@ -50,6 +50,12 @@ export function resolveSessionId(spans: any[] | null | undefined): string {
+   return s ? String(s.gen_ai_conversation_id || s.session_id || "") : "";
+ }
+ 
++/** First RUM bridge span whose browser session has a replay to play; null when the trace has none. */
++export function resolveReplaySpan(spans: any[] | null | undefined): any | null {
++  if (!spans?.length) return null;
++  return spans.find((sp: any) => sp?.rum_session_id && sp?.rum_session_has_replay === true) ?? null;
++}
++
+ /**
+  * Resolve the trace-details window from the route query. Unusable bounds
+  * collapse to `0/0` — the API's "no caller range" — and always together,
+diff --git a/web/src/views/RUM/SessionViewer.spec.ts b/web/src/views/RUM/SessionViewer.spec.ts
+index a2bc012c947..8876d7ca1d6 100644
+--- a/web/src/views/RUM/SessionViewer.spec.ts
++++ b/web/src/views/RUM/SessionViewer.spec.ts
+@@ -69,10 +69,24 @@ vi.mock("@/composables/rum/usePerformance", () => ({
+ 
+ vi.mock("@/services/search", async (importOriginal) => {
+   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
++  // Existing tests need the lookup to find a row; the no-replay tests override the first call.
++  const sessionRow = {
++    zo_sql_timestamp: 1692884313968000,
++    start_time: 1692884313968,
++    end_time: 1692884769270,
++    browser: "Chrome",
++    os: "macOS",
++    ip: "1.2.3.4",
++    source: "browser",
++    city: "San Francisco",
++    country: "US",
++    session_id: "session-abc",
++  };
+   return overlayServiceMock(await importOriginal(), {
+     default: {
+-      search: vi.fn().mockResolvedValue({
+-        data: { hits: [] },
++      search: vi.fn().mockImplementation(async (params: any) => {
++        const sql: string = params?.query?.query?.sql ?? "";
++        return { data: { hits: sql.includes("min(start)") ? [sessionRow] : [] } };
+       }),
+     },
+   });
+@@ -178,7 +192,10 @@ describe("SessionViewer.vue", () => {
+ 
+     it("should show Unknown User when session has no user email initially", () => {
+       // Default sessionDetails.user_email starts as "" before session load
+-      expect(wrapper.text()).toContain("Unknown User");
++      vi.mocked(searchService.search).mockReturnValueOnce(new Promise(() => {}));
++      const pending = mountSessionViewer(router);
++      expect(pending.text()).toContain("Unknown User");
++      pending.unmount();
+     });
+   });
+ 
+@@ -669,3 +686,79 @@ describe("SessionViewer.vue — session id with an embedded single quote", () =>
+     wrapper.unmount();
+   });
+ });
++
++describe("SessionViewer.vue — no replay recorded", () => {
++  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
++
++  async function mountAt(id: string) {
++    vi.clearAllMocks();
++    const router = createTestRouter();
++    await router.push({
++      path: `/rum/sessions/${id}`,
++      query: { start_time: "1692884313968000", end_time: "1692884769270000" },
++    });
++    const wrapper = mountSessionViewer(router);
++    await flush();
++    await flush();
++    return wrapper;
++  }
++
++  function mountUnrecorded() {
++    // Only the first call is the lookup; a persistent override would leak into later tests.
++    vi.mocked(searchService.search).mockResolvedValueOnce({ data: { hits: [] } } as any);
++    return mountAt("session-unrecorded");
++  }
++
++  it("shows the no-replay state naming the session id", async () => {
++    const wrapper = await mountUnrecorded();
++
++    const empty = wrapper.find('[data-test="session-viewer-no-replay"]');
++    expect(empty.exists()).toBe(true);
++    expect(empty.text()).toContain("No replay was recorded for this session");
++    expect(empty.text()).toContain("session-unrecorded");
++    wrapper.unmount();
++  });
++
++  it("does not mount the player or the events sidebar", async () => {
++    const wrapper = await mountUnrecorded();
++
++    expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(false);
++    expect(wrapper.find('[data-test="stub-player-events-sidebar"]').exists()).toBe(false);
++    wrapper.unmount();
++  });
++
++  it("issues only the session lookup, not the segment or event fetches", async () => {
++    const wrapper = await mountUnrecorded();
++
++    const sqlCalls = vi
++      .mocked(searchService.search)
++      .mock.calls.map((call) => (call[0] as any).query.query.sql as string);
++    expect(sqlCalls).toHaveLength(1);
++    expect(sqlCalls[0]).toContain("min(start)");
++    wrapper.unmount();
++  });
++
++  it("renders neither the session subtitle nor the share button", async () => {
++    const wrapper = await mountUnrecorded();
++
++    expect(wrapper.find('[data-test="session-viewer-subtitle"]').exists()).toBe(false);
++    expect(wrapper.findComponent(ShareButton).exists()).toBe(false);
++    expect(wrapper.text()).not.toContain("Unknown User");
++    wrapper.unmount();
++  });
++
++  it("keeps the Go Back navigation", async () => {
++    const wrapper = await mountUnrecorded();
++
++    expect(wrapper.find('[data-test="session-viewer-back-btn"]').exists()).toBe(true);
++    wrapper.unmount();
++  });
++
++  it("mounts the player when the session lookup finds a row", async () => {
++    const wrapper = await mountAt("session-abc");
++
++    expect(wrapper.find('[data-test="session-viewer-no-replay"]').exists()).toBe(false);
++    expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(true);
++    wrapper.unmount();
++  });
++});
+diff --git a/web/src/views/RUM/SessionViewer.vue b/web/src/views/RUM/SessionViewer.vue
+index ce88c114781..a3ebbc8c6e2 100644
+--- a/web/src/views/RUM/SessionViewer.vue
++++ b/web/src/views/RUM/SessionViewer.vue
+@@ -25,8 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     }"
+     bleed
+   >
+-    <template #subtitle>
+-      <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
++    <template v-if="!sessionNotFound" #subtitle>
++      <div
++        class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
++        data-test="session-viewer-subtitle"
++      >
+         <div class="flex items-center gap-1.5 truncate text-xs">
+           <OIcon name="language" size="sm" />
+           {{ sessionDetails.ip }}
+@@ -69,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         </div>
+       </div>
+     </template>
+-    <template #actions>
++    <template v-if="!sessionNotFound" #actions>
+       <ShareButton
+         data-test="session-viewer-share-link-btn"
+         :url="shareUrl"
+@@ -77,7 +80,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         size="icon-toolbar"
+       />
+     </template>
+-    <div class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden">
++    <OEmptyState
++      v-if="sessionNotFound"
++      size="hero"
++      illustration="no-results"
++      :title="t('rum.noReplayRecordedTitle')"
++      :description="t('rum.noReplayRecordedMessage', { id: sessionId })"
++      data-test="session-viewer-no-replay"
++    />
++    <div
++      v-else
++      class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden"
++    >
+       <OSplitter
+         v-model="splitterSize"
+         :limits="[200, 1400]"
+@@ -148,6 +162,7 @@ import usePerformance from "@/composables/rum/usePerformance";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
++import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+ import ShareButton from "@/components/common/ShareButton.vue";
+ import useRum from "@/composables/rum/useRum";
+ 
+@@ -186,6 +201,7 @@ const segmentEvents = ref<any[]>([]);
+ // starting, which is exactly the moment the mobile player mounts — that dip is what let
+ // the "No session replay available" empty state flash before the segments arrived.
+ const segmentsLoading = ref(true);
++const sessionNotFound = ref(false);
+ 
+ // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
+ // wireframe player; browser sessions use the rrweb VideoPlayer.
+@@ -247,6 +263,7 @@ const rawEventsMap = ref<Map<string, any>>(new Map());
+ onBeforeMount(async () => {
+   sessionId.value = router.currentRoute.value.params.id as string;
+   await getSession();
++  if (sessionNotFound.value) return;
+   getSessionSegments();
+   getSessionEvents();
+ });
+@@ -345,6 +362,8 @@ const getSession = () => {
+       )
+       .then((res) => {
+         if (res.data.hits.length === 0) {
++          sessionNotFound.value = true;
++          segmentsLoading.value = false;
+           return;
+         }
+ 

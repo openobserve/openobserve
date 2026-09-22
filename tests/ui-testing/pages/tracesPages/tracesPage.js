@@ -83,6 +83,9 @@ export class TracesPage {
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+    // RUM Session Replay — gated Play button on the trace-details toolbar.
+    this.traceDetailsOperationName = '[data-test="trace-details-operation-name"]';
+    this.traceDetailsViewSessionReplayButton = '[data-test="trace-details-view-session-replay-btn"]';
 
     // ===== LLM PREVIEW PANE (GenAI v5 parts) SELECTORS =====
     // Source: web/src/plugins/traces/TraceDetailsSidebar.vue + LLMContentRenderer.vue
@@ -383,6 +386,39 @@ export class TracesPage {
 
   async expectTraceDetailsVisible() {
     await expect(this.page.locator(this.traceDetailsTree)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Navigate directly to the trace-details route for a known trace id. `from`
+   * / `to` are microsecond epoch bounds (traceDetails.utils.ts resolveUrlTimeRange).
+   */
+  async navigateToTraceDetailsUrl({ traceId, fromUs, toUs, stream = 'default' }) {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    const url = `${baseUrl}/web/traces/trace-details?trace_id=${traceId}&stream=${stream}&from=${fromUs}&to=${toUs}&org_identifier=${org}`;
+    await this.page.goto(url);
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  /**
+   * Assert the gated "Play Session Replay" button is rendered. Callers must
+   * first wait for the trace-details tree to signal the trace has loaded.
+   */
+  async expectSessionReplayButtonVisible() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assert the "Play Session Replay" button is absent — the negative half of
+   * the replay gate (no span carries rum_session_id && rum_session_has_replay).
+   */
+  async expectSessionReplayButtonHidden() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toHaveCount(0);
+  }
+
+  async clickSessionReplayButton() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+    await this.page.locator(this.traceDetailsViewSessionReplayButton).click();
   }
 
   async navigateBackFromTraceDetails() {
