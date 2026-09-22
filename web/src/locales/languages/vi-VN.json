@@ -1474,6 +1474,8 @@
     "sessionReplay": "Phát lại phiên",
     "viewSessionReplay": "Xem phát lại phiên",
     "playSessionReplay": "Phát lại phiên",
+    "noReplayRecordedTitle": "Không có phát lại nào được ghi cho phiên này",
+    "noReplayRecordedMessage": "Phiên {id} không có phân đoạn phát lại nào để phát.",
     "discoverSessionTitle": "Khám phá Phát lại phiên để hiểu chi tiết tương tác người dùng",
     "discoverSessionMessage": "Phát lại phiên ghi lại và phát lại các tương tác của người dùng trên trang web hoặc ứng dụng của bạn. Điều này cho phép bạn xem xét trực quan cách người dùng điều hướng, nơi họ nhấp, nội dung họ gõ và cách họ tương tác với nội dung của bạn",
     "loadingErrorDetails": "Hãy chờ một chút, chúng tôi đang lấy chi tiết lỗi.",

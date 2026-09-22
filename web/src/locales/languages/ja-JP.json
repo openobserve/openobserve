@@ -1474,6 +1474,8 @@
     "sessionReplay": "セッションリプレイ",
     "viewSessionReplay": "セッションリプレイを表示",
     "playSessionReplay": "セッションリプレイを再生",
+    "noReplayRecordedTitle": "このセッションのリプレイは記録されていません",
+    "noReplayRecordedMessage": "セッション {id} には再生できるリプレイセグメントがありません。",
     "discoverSessionTitle": "ユーザーインタラクションを詳細に理解するためのセッションリプレイをご覧ください",
     "discoverSessionMessage": "セッションリプレイは、ウェブサイトまたはアプリケーションでのユーザーインタラクションをキャプチャして再生します。これにより、ユーザーがどのようにナビゲートしたか、どこをクリックしたか、何を入力したか、コンテンツにどのように反応したかを視覚的に確認できます。",
     "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。",

@@ -1474,6 +1474,8 @@
     "sessionReplay": "Sessie opnieuw afspelen",
     "viewSessionReplay": "Bekijk de herhaling van de sessie",
     "playSessionReplay": "Sessie opnieuw afspelen",
+    "noReplayRecordedTitle": "Geen replay opgenomen voor deze sessie",
+    "noReplayRecordedMessage": "Sessie {id} heeft geen replay-segmenten om af te spelen.",
     "discoverSessionTitle": "Ontdek Session Replay om gebruikersinteracties in detail te begrijpen",
     "discoverSessionMessage": "Session Replay legt gebruikersinteracties op uw website of applicatie vast en herhaalt deze. Zo kun je visueel bekijken hoe gebruikers navigeren, waar ze klikken, wat ze typen en hoe ze met je inhoud omgaan.",
     "loadingErrorDetails": "Wacht even, we halen foutgegevens op.",
