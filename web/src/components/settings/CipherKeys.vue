@@ -170,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { cipherKeysQuery } from "@/services/cipher_keys.queries";
@@ -320,6 +321,17 @@ export default defineComponent({
       const map = new Map(tabledata.value.map((r: any) => [r.name, r]));
       selectedKeys.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
+
+    const { selectedIds: persistedSelectedKeyIds } = usePersistedSelection<any>({
+      tableId: "settings-cipher-keys",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: tabledata,
+      getRowId: (row) => row.name,
+      onRestore: handleSelectedIdsUpdate,
+    });
+    watch(selectedKeyIds, (ids) => {
+      persistedSelectedKeyIds.value = ids;
+    });
 
     const addCipherKey = () => {
       router.push({

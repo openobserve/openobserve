@@ -276,7 +276,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, onMounted, defineComponent, computed } from "vue";
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
+import { ref, onMounted, defineComponent, computed, watch } from "vue";
 import type { Ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -398,6 +399,17 @@ export default defineComponent({
         .map((id) => map.get(id))
         .filter(Boolean) as SyntheticsLocationRecord[];
     };
+
+    const { selectedIds: persistedSelectedLocationIds } = usePersistedSelection<any>({
+      tableId: "settings-synthetics-locations",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: locations,
+      getRowId: (row) => row.id,
+      onRestore: handleSelectedIdsUpdate,
+    });
+    watch(selectedLocationIds, (ids) => {
+      persistedSelectedLocationIds.value = ids;
+    });
 
     onMounted(() => {
       fetchLocations();

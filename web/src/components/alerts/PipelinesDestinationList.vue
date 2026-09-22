@@ -199,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { bulkDeleteDestinationsMutation } from "@/services/alert_destination.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
@@ -350,6 +351,17 @@ export default defineComponent({
       const map = new Map(destinations.value.map((r: any) => [r.name, r]));
       selectedDestinations.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
+
+    const { selectedIds: persistedSelectedDestinationIds } = usePersistedSelection<any>({
+      tableId: "settings-pipeline-destinations",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: destinations,
+      getRowId: (row) => row.name,
+      onRestore: handleSelectedIdsUpdate,
+    });
+    watch(selectedDestinationIds, (ids) => {
+      persistedSelectedDestinationIds.value = ids;
+    });
 
     onActivated(() => {
       getTemplates();

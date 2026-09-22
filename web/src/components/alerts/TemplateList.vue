@@ -331,6 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts" setup>
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import {
   bulkDeleteTemplatesMutation,
   deleteTemplateMutation,
@@ -455,6 +456,17 @@ const handleSelectedIdsUpdate = (ids: string[]) => {
     .map((id: any) => map.get(id))
     .filter((r: any) => r && !r.isPrebuilt);
 };
+
+const { selectedIds: persistedSelectedTemplateIds } = usePersistedSelection<any>({
+  tableId: "settings-alert-templates",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: templates,
+  getRowId: (row) => row.name,
+  onRestore: handleSelectedIdsUpdate,
+});
+watch(selectedTemplateIds, (ids) => {
+  persistedSelectedTemplateIds.value = ids;
+});
 
 // Disables the individual row checkbox for prebuilt templates. The select-all
 // filtering happens in `handleSelectedIdsUpdate` above, since that's the only

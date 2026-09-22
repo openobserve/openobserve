@@ -328,6 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { orgUsersQuery, assignableRolesQuery, allUserRolesQuery } from "@/services/users.queries";
 import { rolesQuery } from "@/services/iam.queries";
 import { userKeys } from "@/services/users.querykeys";
@@ -1467,6 +1468,18 @@ export default defineComponent({
       );
       selectedUsers.value = ids.map((id) => usersMap.get(id)).filter(Boolean);
     };
+
+    const userRows = computed<any[]>(() => usersState.users);
+    const { selectedIds: persistedSelectedUserIds } = usePersistedSelection<any>({
+      tableId: "iam-users-list",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: userRows,
+      getRowId: (row) => row.email,
+      onRestore: handleSelectedIdsUpdate,
+    });
+    watch(selectedUserIds, (ids) => {
+      persistedSelectedUserIds.value = ids;
+    });
 
     // Watch selectedUsers to filter out disabled rows
     watch(selectedUsers, (newSelectedUsers) => {

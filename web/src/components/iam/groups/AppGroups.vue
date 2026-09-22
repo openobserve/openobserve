@@ -180,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { useQuery } from "@tanstack/vue-query";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
@@ -238,6 +239,17 @@ const handleSelectedIdsUpdate = (ids: string[]) => {
   const groupsMap = new Map(rows.value.map((g: any) => [g.group_name, g]));
   selectedGroups.value = ids.map((id) => groupsMap.get(id)).filter(Boolean);
 };
+
+const { selectedIds: persistedSelectedGroupNames } = usePersistedSelection<any>({
+  tableId: "iam-groups-list",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: rows,
+  getRowId: (row) => row.group_name,
+  onRestore: handleSelectedIdsUpdate,
+});
+watch(selectedGroupNames, (ids) => {
+  persistedSelectedGroupNames.value = ids;
+});
 
 const confirmBulkDelete = ref(false);
 const bulkDeleteLoading = ref(false);

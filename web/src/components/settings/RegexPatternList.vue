@@ -233,6 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { regexPatternsQuery } from "@/services/regex_pattern.queries";
@@ -391,6 +392,17 @@ export default defineComponent({
       const map = new Map(regexPatterns.value.map((r: any) => [r.id, r]));
       selectedPatterns.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
+
+    const { selectedIds: persistedSelectedPatternIds } = usePersistedSelection<any>({
+      tableId: "settings-regex-patterns",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: regexPatterns,
+      getRowId: (row) => row.id,
+      onRestore: handleSelectedIdsUpdate,
+    });
+    watch(selectedPatternIds, (ids) => {
+      persistedSelectedPatternIds.value = ids;
+    });
 
     onMounted(async () => {
       // Unconditional: the cache paints what it has straight away and only

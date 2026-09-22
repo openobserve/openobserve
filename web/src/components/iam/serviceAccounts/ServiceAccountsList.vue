@@ -475,6 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { serviceAccountsQuery } from "@/services/service_accounts.queries";
@@ -788,6 +789,18 @@ export default defineComponent({
       );
       selectedAccounts.value = ids.map((id) => accountsMap.get(id)).filter(Boolean);
     };
+
+    const accountRows = computed<any[]>(() => serviceAccountsState.service_accounts_users);
+    const { selectedIds: persistedSelectedAccountEmails } = usePersistedSelection<any>({
+      tableId: "iam-service-accounts-list",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: accountRows,
+      getRowId: (row) => row.email,
+      onRestore: handleSelectedIdsUpdate,
+    });
+    watch(selectedAccountEmails, (ids) => {
+      persistedSelectedAccountEmails.value = ids;
+    });
 
     const confirmDeleteAction = (row: any) => {
       confirmDelete.value = true;

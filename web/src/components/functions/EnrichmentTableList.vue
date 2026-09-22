@@ -478,6 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { enrichmentTableStatusesQuery } from "@/services/jstransform.queries";
@@ -651,6 +652,17 @@ export default defineComponent({
         .map((id) => visibleRows.value.find((r: any) => r.name === id))
         .filter(Boolean);
     };
+
+    const { selectedIds: persistedSelectedEnrichmentTableIds } = usePersistedSelection<any>({
+      tableId: "pipelines-enrichment-tables",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: jsTransforms,
+      getRowId: (row) => row.name,
+      onRestore: handleSelectedIdsUpdate,
+    });
+    watch(selectedEnrichmentTableIds, (ids) => {
+      persistedSelectedEnrichmentTableIds.value = ids;
+    });
 
     const perPageOptionsList = [20, 50, 100, 250, 500];
     const { getStreams, getStreamsFetchedAt, resetStreamType, getStream } = useStreams(t);
