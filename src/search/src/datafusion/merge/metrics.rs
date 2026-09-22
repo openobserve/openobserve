@@ -48,6 +48,8 @@ use super::{
 };
 use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
 
+const MAX_SERIES_PER_FILE: usize = 1_000_000;
+
 struct ReadTask {
     handle: tokio::task::JoinHandle<Result<()>>,
 }
@@ -75,7 +77,6 @@ impl<T> Drop for VortexTask<T> {
 pub(super) struct MetricsOutput {
     pub file_format: FileFormat,
     pub max_file_size: usize,
-    pub max_series_per_file: usize,
     pub layout: MetricsFileLayout,
     pub sink: CompactMergeOutput,
 }
@@ -150,15 +151,13 @@ impl MetricsFileState {
 }
 
 struct SeriesSplit {
-    limit: usize,
     count: usize,
     last_hash: Option<u64>,
 }
 
 impl SeriesSplit {
-    fn new(limit: usize) -> Self {
+    fn new() -> Self {
         Self {
-            limit: limit.max(1),
             count: 0,
             last_hash: None,
         }
@@ -174,7 +173,7 @@ impl SeriesSplit {
         while end < hashes.len() {
             let hash = hashes.value(end);
             if self.last_hash != Some(hash) {
-                if self.count == self.limit {
+                if self.count == MAX_SERIES_PER_FILE {
                     break;
                 }
                 self.count += 1;
@@ -480,7 +479,7 @@ async fn write_parquet(
     } = split;
     let mut active: Option<ActiveMetricsParquetWriter> = None;
     let mut files = Vec::new();
-    let mut series = SeriesSplit::new(output.max_series_per_file);
+    let mut series = SeriesSplit::new();
 
     while let Some(batch) = rx.recv().await {
         if batch.num_rows() == 0 {
@@ -552,7 +551,7 @@ async fn write_vortex(
             let strategy = vortex_write_strategy(&session);
             let mut active: Option<ActiveMetricsVortexWriter> = None;
             let mut files = Vec::new();
-            let mut series = SeriesSplit::new(output.max_series_per_file);
+            let mut series = SeriesSplit::new();
 
             while let Some(batch) = rx.recv().await {
                 if batch.num_rows() == 0 {
@@ -716,7 +715,6 @@ mod tests {
         MetricsOutput {
             file_format: FileFormat::Parquet,
             max_file_size: 1024 * 1024 * 1024,
-            max_series_per_file: 1_000_000,
             layout: MetricsFileLayout::Indexed,
             sink,
         }
@@ -1135,86 +1133,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn series_limit_splits_inside_batches_and_preserves_indexes() {
-        for format in [FileFormat::Parquet, FileFormat::Vortex] {
-            for sink in [CompactMergeOutput::Memory, CompactMergeOutput::Disk] {
-                let schema = block_schema(None, false);
-                let rows = vec![
-                    (1, 10, Some(1f64.to_bits())),
-                    (2, 10, Some(2f64.to_bits())),
-                    (2, 20, Some(3f64.to_bits())),
-                    (3, 10, Some(4f64.to_bits())),
-                    (4, 10, Some(5f64.to_bits())),
-                    (5, 10, Some(6f64.to_bits())),
-                ];
-                let mut output = block_output(sink);
-                output.file_format = format;
-                output.max_series_per_file = 2;
-                let files = produce(
-                    &schema,
-                    vec![
-                        block_batch(&schema, &rows[..2]),
-                        RecordBatch::new_empty(schema.clone()),
-                        block_batch(&schema, &rows[2..]),
-                    ],
-                    output,
-                )
-                .await
-                .unwrap();
-                assert_eq!(files.len(), 3);
-                let mut actual = Vec::new();
-                for file in files {
-                    let (data, meta, path) = file.into_upload_parts().await.unwrap();
-                    let samples = sample_rows_for(format, bytes::Bytes::from(data)).await;
-                    let unique = samples
-                        .iter()
-                        .map(|r| r.0)
-                        .collect::<std::collections::HashSet<_>>();
-                    assert!(unique.len() <= 2);
-                    let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
-                    let footer = metrics_block::read_footer(
-                        &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
-                        encoded.len() as u64,
-                    )
-                    .unwrap();
-                    let index = metrics_block::decode_index(
-                        bytes::Bytes::copy_from_slice(
-                            &encoded[footer.metadata_range.start as usize
-                                ..footer.metadata_range.end as usize],
-                        ),
-                        &footer,
-                        &metrics_block::ParentMetadata {
-                            rows: meta.records as u64,
-                            compressed_size: meta.compressed_size as u64,
-                        },
-                        &[],
-                    )
-                    .unwrap();
-                    let mut native = Vec::new();
-                    for block in &index.blocks {
-                        let range = block.block_range();
-                        let decoded = metrics_block::decode_block(
-                            &encoded[range.start as usize..range.end as usize],
-                            &block,
-                        )
-                        .unwrap();
-                        native.extend(
-                            decoded
-                                .timestamps
-                                .into_iter()
-                                .zip(decoded.value_bits)
-                                .map(|(t, v)| (block.hash, t, Some(v))),
-                        );
-                    }
-                    assert_eq!(native, samples);
-                    actual.extend(samples);
-                }
-                assert_eq!(actual, rows);
-            }
-        }
-    }
-
-    #[tokio::test]
     #[ignore = "Writes over one million series for both storage formats"]
     async fn million_series_compaction_keeps_every_index() {
         let schema = block_schema(None, false);
@@ -1224,9 +1142,17 @@ mod tests {
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let mut output = block_output(CompactMergeOutput::Disk);
             output.file_format = format;
-            let files = produce(&schema, vec![block_batch(&schema, &rows)], output)
-                .await
-                .unwrap();
+            let files = produce(
+                &schema,
+                vec![
+                    block_batch(&schema, &rows[..MAX_SERIES_PER_FILE - 1]),
+                    RecordBatch::new_empty(schema.clone()),
+                    block_batch(&schema, &rows[MAX_SERIES_PER_FILE - 1..]),
+                ],
+                output,
+            )
+            .await
+            .unwrap();
             assert_eq!(files.len(), 2);
             let mut seen = 0;
             for (part, file) in files.into_iter().enumerate() {
@@ -1281,7 +1207,7 @@ mod tests {
 
     #[test]
     fn million_series_boundary_counts_series_not_samples() {
-        let mut split = SeriesSplit::new(1_000_000);
+        let mut split = SeriesSplit::new();
         let hashes = UInt64Array::from_iter_values(0..1_000_000);
         assert_eq!(split.take(&hashes, 0), 1_000_000);
         let next = UInt64Array::from(vec![999_999, 999_999, 1_000_000]);
@@ -1499,7 +1425,6 @@ mod tests {
             MetricsOutput {
                 file_format: FileFormat::Parquet,
                 max_file_size: 200,
-                max_series_per_file: 1_000_000,
                 layout: MetricsFileLayout::HashMerged,
                 sink: CompactMergeOutput::Disk,
             },
@@ -1595,7 +1520,6 @@ mod tests {
             MetricsOutput {
                 file_format,
                 max_file_size,
-                max_series_per_file: 1_000_000,
                 layout: MetricsFileLayout::Indexed,
                 sink: CompactMergeOutput::Disk,
             },

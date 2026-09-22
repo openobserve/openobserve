@@ -2882,12 +2882,6 @@ pub struct Compact {
         help = "Enable experimental metrics indexing and sample blocks for newly written metrics data."
     )]
     pub metrics_index_enabled: bool,
-    #[env_config(
-        name = "ZO_COMPACT_METRICS_MAX_SERIES_PER_FILE",
-        default = 1000000,
-        help = "Maximum series per hash-ordered metrics compaction output file."
-    )]
-    pub metrics_max_series_per_file: usize,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(
