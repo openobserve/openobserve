@@ -31,18 +31,17 @@ use arrow::{
 pub use directory::{BlockDirectory, BlockIter};
 pub use reader::{BlockDecoder, decode_block, decode_index, read_footer};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 pub use writer::{BlockWriter, build_from_parquet};
 
-pub const VERSION: u32 = 1;
-pub const FOOTER_LEN: usize = 64;
+pub const VERSION: u32 = 2;
+pub const FOOTER_LEN: usize = 32;
 pub const MAX_BLOCK_ROWS: usize = 8192;
 pub const MAX_METADATA_BYTES: usize = 128 * 1024 * 1024;
 pub const MAX_WRITER_METADATA_BYTES: usize = 256 * 1024 * 1024;
 pub const MAX_BLOCKS: usize = 1_000_000;
 pub const MAX_LABEL_COLUMNS: usize = 128;
-const MAGIC: &[u8; 8] = b"O2MIDX01";
-const DIRECTORY_FIELDS: usize = 9;
+const MAGIC: &[u8; 8] = b"O2MIDX02";
+const DIRECTORY_FIELDS: usize = 8;
 const PARENT_KEY: &str = "o2:midx_parent";
 const SCHEMA_KEY: &str = "o2:midx_source_schema";
 const LABELS_KEY: &str = "o2:midx_labels";
@@ -71,8 +70,7 @@ impl std::fmt::Display for FormatLimit {
 impl std::error::Error for FormatLimit {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ParentIdentity {
-    pub object_key: String,
+pub struct ParentMetadata {
     pub rows: u64,
     pub compressed_size: u64,
 }
@@ -81,7 +79,6 @@ pub struct ParentIdentity {
 pub struct Footer {
     pub version: u32,
     pub metadata_range: Range<u64>,
-    metadata_checksum: [u8; 32],
     pub payload_end: u64,
 }
 
@@ -95,7 +92,6 @@ pub struct BlockMeta {
     pub payload_offset: u64,
     pub payload_len: u32,
     pub strictly_increasing: bool,
-    pub checksum: [u8; 32],
 }
 
 impl BlockMeta {
@@ -123,7 +119,7 @@ pub struct DecodedBlockRef<'a> {
 #[derive(Debug)]
 pub struct Index {
     pub row_group_size: Option<u32>,
-    pub parent: ParentIdentity,
+    pub parent: ParentMetadata,
     pub source_schema: SchemaRef,
     pub blocks: BlockDirectory,
     pub labels: RecordBatch,
@@ -159,7 +155,7 @@ pub fn is_format_limit_error(error: &anyhow::Error) -> bool {
     error.is::<FormatLimit>()
 }
 
-/// Upper bound for a single v1 independently compressed sample payload.
+/// Bounds scratch space before allocating or decoding one sample block.
 pub fn max_compressed_block_len(row_count: u32) -> Result<usize> {
     ensure!(
         row_count > 0 && row_count as usize <= MAX_BLOCK_ROWS,
@@ -295,10 +291,6 @@ fn label_value(array: &dyn Array, row: usize) -> Result<Option<&str>> {
         return label_value(array.values().as_ref(), array.keys().value(row) as usize);
     }
     Err(anyhow!("unsupported identity label array"))
-}
-
-fn checksum(bytes: &[u8]) -> [u8; 32] {
-    Sha256::digest(bytes).into()
 }
 
 fn semantic_metadata(schema: &Schema) -> HashMap<String, String> {

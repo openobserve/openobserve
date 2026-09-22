@@ -178,7 +178,9 @@ pub async fn search(
                     let data = load_metrics_index_file(
                         &account,
                         &sidecar_path,
-                        &data_path,
+                        config::FileFormat::from_extension(&data_path).ok_or_else(|| {
+                            DataFusionError::Execution("Unsupported metrics source format".into())
+                        })?,
                         expected_rows,
                         compressed_size,
                         Arc::clone(&labels),

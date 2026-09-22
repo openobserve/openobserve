@@ -22,9 +22,8 @@ use std::{
 use anyhow::{Context, Result, anyhow, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, FixedSizeBinaryArray, Float64Array, Int64Array,
-        LargeStringArray, RecordBatch, RecordBatchOptions, StringArray, StringViewArray,
-        UInt32Array, UInt64Array,
+        Array, ArrayRef, BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch,
+        RecordBatchOptions, StringArray, StringViewArray, UInt32Array, UInt64Array,
     },
     datatypes::{DataType, Field, Schema, SchemaRef},
 };
@@ -40,7 +39,7 @@ use crate::*;
 pub struct BlockWriter<W: Write> {
     output: W,
     schema: SchemaRef,
-    parent: Option<ParentIdentity>,
+    parent: Option<ParentMetadata>,
     label_indices: Vec<usize>,
     hash_index: usize,
     time_index: usize,
@@ -69,7 +68,7 @@ impl<W: Write> BlockWriter<W> {
         output: W,
         schema: SchemaRef,
         label_columns: Vec<String>,
-        parent: ParentIdentity,
+        parent: ParentMetadata,
         max_block_rows: usize,
     ) -> Result<Self> {
         Self::new_with_metadata_limits(
@@ -83,7 +82,7 @@ impl<W: Write> BlockWriter<W> {
         )
     }
 
-    /// Parent identity is required before metadata or a footer can be emitted.
+    /// Parent metadata is required before metadata or a footer can be emitted.
     pub fn new_pending(output: W, schema: SchemaRef, max_block_rows: usize) -> Result<Self> {
         let labels = identity_label_columns(&schema)?;
         Self::new_inner(
@@ -99,13 +98,9 @@ impl<W: Write> BlockWriter<W> {
 
     pub fn finish_for_parquet(
         self,
-        parent: ParentIdentity,
+        parent: ParentMetadata,
         metadata: ParquetMetaData,
     ) -> Result<W> {
-        ensure!(
-            parent.object_key.ends_with(".parquet"),
-            "Parquet finalization requires a Parquet parent"
-        );
         ensure!(
             u64::try_from(metadata.file_metadata().num_rows())? == parent.rows,
             "Parquet parent row count mismatch"
@@ -120,21 +115,17 @@ impl<W: Write> BlockWriter<W> {
     /// The container adapter must verify the completed file before supplying its source facts.
     pub fn finish_for_source(
         mut self,
-        parent: ParentIdentity,
+        parent: ParentMetadata,
         stored_schema: SchemaRef,
         row_group_size: Option<u32>,
     ) -> Result<W> {
         validate_parent(&parent)?;
         ensure!(
             self.parent.as_ref().is_none_or(|known| known == &parent),
-            "parent identity changed"
+            "parent metadata changed"
         );
         ensure!(self.rows == parent.rows, "source/parent row count mismatch");
         ensure!(row_group_size != Some(0), "invalid parent row group size");
-        ensure!(
-            !parent.object_key.ends_with(".vortex") || row_group_size.is_none(),
-            "Vortex has no Parquet row groups"
-        );
         ensure!(
             schema_matches(&self.schema, &stored_schema),
             "stored source schema changed"
@@ -188,7 +179,7 @@ impl<W: Write> BlockWriter<W> {
                 == self
                     .parent
                     .as_ref()
-                    .context("parent identity is not bound")?
+                    .context("parent metadata is not bound")?
                     .rows,
             "source/parent row count mismatch"
         );
@@ -199,14 +190,15 @@ impl<W: Write> BlockWriter<W> {
         capacity(metadata.len() <= self.metadata_limit, "MAX_METADATA_BYTES")?;
         let metadata_len = u64::try_from(metadata.len())?;
         let mut footer = [0u8; FOOTER_LEN];
-        footer[..8].copy_from_slice(MAGIC);
-        footer[8..12].copy_from_slice(&VERSION.to_le_bytes());
-        footer[12..16].copy_from_slice(&0u32.to_le_bytes());
-        footer[16..24].copy_from_slice(&self.offset.to_le_bytes());
-        footer[24..32].copy_from_slice(&metadata_len.to_le_bytes());
-        footer[32..].copy_from_slice(&checksum(&metadata));
+        footer[..4].copy_from_slice(&VERSION.to_le_bytes());
+        footer[8..16].copy_from_slice(&self.offset.to_le_bytes());
+        footer[16..24].copy_from_slice(&metadata_len.to_le_bytes());
+        footer[24..].copy_from_slice(MAGIC);
         self.output.write_all(&metadata)?;
-        self.output.write_all(&footer)?;
+        self.output.write_all(&footer[..24])?;
+        self.output.flush()?;
+        self.output.write_all(&footer[24..])?;
+        self.output.flush()?;
         Ok(self.output)
     }
 
@@ -214,7 +206,7 @@ impl<W: Write> BlockWriter<W> {
         output: W,
         schema: SchemaRef,
         label_columns: Vec<String>,
-        parent: ParentIdentity,
+        parent: ParentMetadata,
         max_block_rows: usize,
         metadata_limit: usize,
         writer_metadata_limit: usize,
@@ -234,7 +226,7 @@ impl<W: Write> BlockWriter<W> {
         output: W,
         schema: SchemaRef,
         label_columns: Vec<String>,
-        parent: Option<ParentIdentity>,
+        parent: Option<ParentMetadata>,
         max_block_rows: usize,
         metadata_limit: usize,
         writer_metadata_limit: usize,
@@ -454,7 +446,7 @@ impl<W: Write> BlockWriter<W> {
         let payload_len = u32::try_from(payload.len())?;
         ensure!(
             payload.len() <= max_compressed_block_len(u32::try_from(count)?)?,
-            "compressed block exceeds v1 bound"
+            "compressed block exceeds format bound"
         );
         let meta = BlockMeta {
             hash: self.current_hash.context("missing series hash")?,
@@ -468,7 +460,6 @@ impl<W: Write> BlockWriter<W> {
             payload_offset: self.offset,
             payload_len,
             strictly_increasing: self.timestamps.windows(2).all(|w| w[0] < w[1]),
-            checksum: checksum(&payload),
         };
         self.offset = self
             .offset
@@ -492,7 +483,6 @@ impl<W: Write> BlockWriter<W> {
             Field::new("__oo_midx_offset", DataType::UInt64, false),
             Field::new("__oo_midx_length", DataType::UInt32, false),
             Field::new("__oo_midx_strict", DataType::Boolean, false),
-            Field::new("__oo_midx_checksum", DataType::FixedSizeBinary(32), false),
         ];
         let mut fields: Vec<_> = fields.into_iter().map(Arc::new).collect();
         let mut columns: Vec<ArrayRef> = vec![
@@ -523,9 +513,6 @@ impl<W: Write> BlockWriter<W> {
                     .map(|b| b.strictly_increasing)
                     .collect::<Vec<_>>(),
             )),
-            Arc::new(FixedSizeBinaryArray::try_from_iter(
-                self.blocks.iter().map(|b| b.checksum.as_slice()),
-            )?),
         ];
         for (j, index) in self.label_indices.iter().enumerate() {
             let field = self.schema.field(*index);
@@ -572,12 +559,8 @@ impl Write for CountingMetadata {
 }
 pub fn build_from_parquet<T: ChunkReader + 'static>(
     reader: T,
-    parent: ParentIdentity,
+    parent: ParentMetadata,
 ) -> Result<Vec<u8>> {
-    ensure!(
-        parent.object_key.ends_with(".parquet"),
-        "Parquet rebuild requires a Parquet parent"
-    );
     ensure!(
         reader.len() == parent.compressed_size,
         "Parquet parent size mismatch"
@@ -601,7 +584,7 @@ pub(super) fn encoded_size(value: &impl serde::Serialize, limit: usize) -> Resul
 
 fn build_from_builder<T: ChunkReader + 'static>(
     builder: ParquetRecordBatchReaderBuilder<T>,
-    parent: ParentIdentity,
+    parent: ParentMetadata,
     labels: Vec<String>,
 ) -> Result<Vec<u8>> {
     ensure!(
@@ -645,11 +628,7 @@ fn build_from_builder<T: ChunkReader + 'static>(
     writer.finish()
 }
 
-fn validate_parent(parent: &ParentIdentity) -> Result<()> {
-    ensure!(
-        sidecar_path(&parent.object_key).is_some(),
-        "unsupported parent object key"
-    );
+fn validate_parent(parent: &ParentMetadata) -> Result<()> {
     ensure!(
         parent.rows > 0 && parent.compressed_size > 0,
         "empty parent unsupported"
@@ -708,7 +687,7 @@ fn block_metadata_charge<'a>(labels: impl Iterator<Item = Option<&'a str>>) -> R
 
 fn static_metadata_charge(
     schema: &Schema,
-    parent: Option<&ParentIdentity>,
+    parent: Option<&ParentMetadata>,
     labels: &[String],
     limit: usize,
 ) -> Result<usize> {
@@ -731,7 +710,7 @@ mod bounds_tests {
         labels: usize,
         rows: usize,
         text: Option<&str>,
-    ) -> (SchemaRef, Vec<String>, RecordBatch, ParentIdentity) {
+    ) -> (SchemaRef, Vec<String>, RecordBatch, ParentMetadata) {
         let mut fields = vec![
             Field::new("__hash__", DataType::UInt64, false),
             Field::new("_timestamp", DataType::Int64, false),
@@ -748,8 +727,7 @@ mod bounds_tests {
         columns
             .extend((0..labels).map(|_| Arc::new(StringArray::from(vec![text; rows])) as ArrayRef));
         let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
-        let parent = ParentIdentity {
-            object_key: "files/o/metrics/m/2026/09/18/07/indexed-v1-a.parquet".into(),
+        let parent = ParentMetadata {
             rows: rows as u64,
             compressed_size: 10,
         };

@@ -228,7 +228,7 @@ pub async fn merge_files(
 
     let merge_result = {
         let mode = mode.clone();
-        let output = MergeOutput::for_compactor(stream_type).with_file_key_prefix(prefix);
+        let output = MergeOutput::for_compactor(stream_type);
         DATAFUSION_RUNTIME
             .spawn(async move {
                 merge::merge_parquet_files(
@@ -288,7 +288,7 @@ pub async fn merge_files(
     let mut new_files = Vec::with_capacity(outputs.len());
     for file in outputs {
         let id = ider::generate_file_name();
-        let new_file_key = file.file_key(prefix, &id, file_format)?;
+        let new_file_key = format!("{prefix}/{}", file.file_name(&id, file_format));
         let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
         let cache_locally = cfg.cache_latest_files.enabled
             && cfg.cache_latest_files.cache_parquet
@@ -544,8 +544,7 @@ mod tests {
         )
         .unwrap();
         let table = Arc::new(MemTable::try_new(Arc::clone(&schema), vec![vec![batch]]).unwrap());
-        let mut output = MergeOutput::for_compactor(StreamType::Metrics)
-            .with_file_key_prefix("files/publish/metrics/m/2026/09/20/00");
+        let mut output = MergeOutput::for_compactor(StreamType::Metrics);
         output.file_format = format;
         merge::merge_parquet_files(
             schema,
@@ -581,9 +580,10 @@ mod tests {
                 };
                 meta.index_size = 79;
                 meta.mindex_size = 999_999;
-                let key = file
-                    .file_key("files/publish/metrics/m/2026/09/20/00", "unused", format)
-                    .unwrap();
+                let key = format!(
+                    "files/publish/metrics/m/2026/09/20/00/{}",
+                    file.file_name("unused", format)
+                );
                 let uploads = Arc::new(std::sync::Mutex::new(Vec::new()));
                 let sink = Arc::clone(&uploads);
                 let (data, meta) = publish_merged_output(file, &key, false, move |key, bytes| {
@@ -618,9 +618,10 @@ mod tests {
             .flat_map(|format| [None, Some(0usize), Some(1)].map(|failure| (format, failure)))
         {
             let file = produced_indexed_output(format).await;
-            let key = file
-                .file_key("files/publish/metrics/m/2026/09/20/00", "unused", format)
-                .unwrap();
+            let key = format!(
+                "files/publish/metrics/m/2026/09/20/00/{}",
+                file.file_name("unused", format)
+            );
             let paths = match &file {
                 MergedFile::MetricsIndexed {
                     data_path,
@@ -658,9 +659,10 @@ mod tests {
     async fn single_pass_materialization_failure_precedes_all_publication() {
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let file = produced_indexed_output(format).await;
-            let key = file
-                .file_key("files/publish/metrics/m/2026/09/20/00", "unused", format)
-                .unwrap();
+            let key = format!(
+                "files/publish/metrics/m/2026/09/20/00/{}",
+                file.file_name("unused", format)
+            );
             if let MergedFile::MetricsIndexed {
                 metrics_index_path, ..
             } = &file

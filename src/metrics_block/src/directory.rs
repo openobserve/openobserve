@@ -55,7 +55,6 @@ impl BlockDirectory {
             payload_len: u32::try_from(next_offset - entry.payload_offset)
                 .expect("validated block payload span"),
             strictly_increasing: self.strict[index / 8] & (1 << (index % 8)) != 0,
-            checksum: entry.checksum,
         }
     }
 
@@ -121,7 +120,6 @@ struct PackedBlock {
     min_timestamp: i64,
     max_timestamp: i64,
     payload_offset: u64,
-    checksum: [u8; 32],
 }
 
 pub(crate) struct DirectoryBuilder {
@@ -152,7 +150,6 @@ impl DirectoryBuilder {
             min_timestamp: block.min_timestamp,
             max_timestamp: block.max_timestamp,
             payload_offset: block.payload_offset,
-            checksum: block.checksum,
         });
     }
 
@@ -172,7 +169,7 @@ mod tests {
 
     #[test]
     fn packed_directory_preserves_full_width_fields_and_derived_spans() {
-        assert_eq!(std::mem::size_of::<PackedBlock>(), 72);
+        assert_eq!(std::mem::size_of::<PackedBlock>(), 40);
         let input = [
             BlockMeta {
                 hash: u64::MAX - 1,
@@ -183,7 +180,6 @@ mod tests {
                 payload_offset: 0,
                 payload_len: u32::MAX,
                 strictly_increasing: false,
-                checksum: [0xa5; 32],
             },
             BlockMeta {
                 hash: u64::MAX,
@@ -194,7 +190,6 @@ mod tests {
                 payload_offset: u64::from(u32::MAX),
                 payload_len: u32::MAX,
                 strictly_increasing: true,
-                checksum: [0x5a; 32],
             },
         ];
         let mut builder =

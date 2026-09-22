@@ -24,7 +24,7 @@ use arrow_schema::Schema;
 use config::{FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, get_config, meta::stream::FileMeta};
 use datafusion::error::{DataFusionError, Result};
 use futures::TryStreamExt;
-use metrics_block::{BlockWriter, ParentIdentity};
+use metrics_block::{BlockWriter, ParentMetadata};
 use metrics_index::MetricsIndexWriter;
 use parquet::{
     arrow::arrow_reader::ParquetRecordBatchReaderBuilder, file::metadata::ParquetMetaData,
@@ -128,7 +128,7 @@ impl SourceMetadata {
     fn finish(
         self,
         writer: BlockWriter<std::fs::File>,
-        parent: ParentIdentity,
+        parent: ParentMetadata,
     ) -> anyhow::Result<std::fs::File> {
         match self {
             Self::Parquet(metadata) => writer.finish_for_parquet(parent, metadata),
@@ -178,7 +178,6 @@ impl Blocks {
     pub async fn finish(
         self,
         data_path: tempfile::TempPath,
-        object_key: String,
         meta: FileMeta,
         source_metadata: SourceMetadata,
         stats: GenerationStats,
@@ -187,7 +186,7 @@ impl Blocks {
             let format = source_metadata.format();
             let block_path = match self {
                 Self::Active(active) => {
-                    let parent = ParentIdentity { object_key: object_key.clone(), rows: u64::try_from(meta.records)?, compressed_size: u64::try_from(meta.compressed_size)? };
+                    let parent = ParentMetadata { rows: u64::try_from(meta.records)?, compressed_size: u64::try_from(meta.compressed_size)? };
                     let BlockFile { writer, path } = *active;
                     match source_metadata.finish(writer, parent) {
                         Ok(file) => { drop(file); Some(path) }
@@ -206,7 +205,7 @@ impl Blocks {
                 Some(path) => path,
                 None => replay_legacy(&data_path, &meta, format, &stats)?,
             };
-            Ok(MergedFile::MetricsIndexed { data_path, metrics_index_path, object_key: Some(object_key), meta })
+            Ok(MergedFile::MetricsIndexed { data_path, metrics_index_path, meta })
         }).await?.map_err(|error| DataFusionError::External(error.into()))
     }
 }

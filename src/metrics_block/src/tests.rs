@@ -28,6 +28,40 @@ use crate::*;
 
 type Row = (u64, i64, u64, Option<&'static str>, Option<&'static str>);
 
+#[derive(Default)]
+struct WriteState {
+    bytes: Vec<u8>,
+    flush_has_marker: Vec<bool>,
+}
+
+struct FailureWriter {
+    state: Arc<std::sync::Mutex<WriteState>>,
+    fail_after: usize,
+    fail_flush: usize,
+}
+
+impl std::io::Write for FailureWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let mut state = self.state.lock().unwrap();
+        if state.bytes.len() >= self.fail_after {
+            return Err(std::io::Error::other("injected write failure"));
+        }
+        let size = bytes.len().min(self.fail_after - state.bytes.len());
+        state.bytes.extend_from_slice(&bytes[..size]);
+        Ok(size)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        let mut state = self.state.lock().unwrap();
+        let has_marker = state.bytes.ends_with(MAGIC);
+        state.flush_has_marker.push(has_marker);
+        if state.flush_has_marker.len() == self.fail_flush {
+            return Err(std::io::Error::other("injected flush failure"));
+        }
+        Ok(())
+    }
+}
+
 fn schema() -> SchemaRef {
     Arc::new(Schema::new_with_metadata(
         vec![
@@ -75,9 +109,8 @@ fn batch(rows: &[Row]) -> RecordBatch {
     .unwrap()
 }
 
-fn parent() -> ParentIdentity {
-    ParentIdentity {
-        object_key: "files/o/metrics/m/2026/09/18/07/indexed-v1-a.parquet".into(),
+fn parent() -> ParentMetadata {
+    ParentMetadata {
         rows: 7,
         compressed_size: 123,
     }
@@ -162,7 +195,7 @@ fn deterministic_independent_of_input_batch_boundaries() {
 }
 
 #[test]
-fn parent_version_checksums_bounds_and_decoder_claims_are_checked() {
+fn numeric_parent_version_bounds_and_decoder_claims_are_checked() {
     let blob = fixture();
     let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
     let bytes = Bytes::copy_from_slice(
@@ -179,12 +212,12 @@ fn parent_version_checksums_bounds_and_decoder_claims_are_checked() {
     assert!(decode_index(Bytes::from(modified), &footer, &parent(), &[]).is_err());
     assert!(decode_index(bytes.clone(), &footer, &parent(), &["value".into()]).is_err());
     let mut end = blob[blob.len() - FOOTER_LEN..].to_vec();
-    end[8..12].copy_from_slice(&(VERSION + 1).to_le_bytes());
+    end[..4].copy_from_slice(&(VERSION + 1).to_le_bytes());
     assert!(read_footer(&end, blob.len() as u64).is_err());
     end = blob[blob.len() - FOOTER_LEN..].to_vec();
-    end[16..24].copy_from_slice(&u64::MAX.to_le_bytes());
+    end[8..16].copy_from_slice(&u64::MAX.to_le_bytes());
     assert!(read_footer(&end, blob.len() as u64).is_err());
-    assert!(read_footer(&end[..63], blob.len() as u64).is_err());
+    assert!(read_footer(&end[..FOOTER_LEN - 1], blob.len() as u64).is_err());
     let index = index(&blob, &[]).unwrap();
     let b = &index.blocks.block(0);
     let range = b.payload_range();
@@ -218,14 +251,13 @@ fn replace_column(blob: &[u8], column: usize, value: ArrayRef) -> Vec<u8> {
     let mut result = blob[..footer.metadata_range.start as usize].to_vec();
     result.extend_from_slice(&meta);
     let mut end = blob[blob.len() - FOOTER_LEN..].to_vec();
-    end[24..32].copy_from_slice(&(meta.len() as u64).to_le_bytes());
-    end[32..].copy_from_slice(&checksum(&meta));
+    end[16..24].copy_from_slice(&(meta.len() as u64).to_le_bytes());
     result.extend_from_slice(&end);
     result
 }
 
 #[test]
-fn valid_checksum_does_not_hide_invalid_directory() {
+fn completed_footer_does_not_hide_invalid_directory() {
     let blob = fixture();
     let corrupt = replace_column(&blob, 2, Arc::new(UInt32Array::from(vec![0, 2, 2, 1])));
     assert!(index(&corrupt, &[]).is_err());
@@ -383,8 +415,8 @@ fn excessive_compressed_length_and_capacity_classification() {
     padded.extend(std::iter::repeat_n(0, delta as usize));
     padded.extend_from_slice(&changed[range.end as usize..old_end]);
     let mut footer = changed[old_end..].to_vec();
-    let start = u64::from_le_bytes(footer[16..24].try_into().unwrap()) + u64::from(delta);
-    footer[16..24].copy_from_slice(&start.to_le_bytes());
+    let start = u64::from_le_bytes(footer[8..16].try_into().unwrap()) + u64::from(delta);
+    footer[8..16].copy_from_slice(&start.to_le_bytes());
     padded.extend_from_slice(&footer);
     let error = crate::tests::index(&padded, &[]).unwrap_err();
     assert!(
@@ -395,7 +427,7 @@ fn excessive_compressed_length_and_capacity_classification() {
     let limit = capacity(false, "MAX_BLOCKS").unwrap_err();
     assert!(is_format_limit_error(&limit));
     assert!(is_format_limit_error(&limit.context("builder")));
-    let ordinary = anyhow!("checksum mismatch");
+    let ordinary = anyhow!("invalid sample frame");
     assert!(!is_format_limit_error(&ordinary));
 }
 
@@ -526,8 +558,8 @@ fn lossless_transform_preserves_extreme_timestamps_resets_and_all_float_bits() {
         }
         assert_eq!(actual, timestamp.into_iter().zip(bits).collect::<Vec<_>>());
         let mut old_footer = blob[blob.len() - FOOTER_LEN..].to_vec();
-        old_footer[..8].copy_from_slice(b"UNKNOWN!");
-        old_footer[8..12].copy_from_slice(&1u32.to_le_bytes());
+        old_footer[24..].copy_from_slice(b"UNKNOWN!");
+        old_footer[..4].copy_from_slice(&1u32.to_le_bytes());
         assert!(read_footer(&old_footer, blob.len() as u64).is_err());
     }
 }
@@ -599,7 +631,7 @@ fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
     writer.write(&input).unwrap();
     writer.close().unwrap();
     let original = Bytes::from(parquet);
-    let parent = ParentIdentity {
+    let parent = ParentMetadata {
         compressed_size: original.len() as u64,
         ..parent()
     };
@@ -652,7 +684,7 @@ fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
 }
 
 #[test]
-fn pending_writer_requires_real_parent_and_verifies_final_parquet_identity() {
+fn pending_writer_requires_source_metadata_and_verifies_final_parquet_rows() {
     use parquet::arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder};
     let input = batch(&rows());
     let mut data = Vec::new();
@@ -662,7 +694,7 @@ fn pending_writer_requires_real_parent_and_verifies_final_parquet_identity() {
     let bytes = Bytes::from(data);
     let reader = ParquetRecordBatchReaderBuilder::try_new(bytes.clone()).unwrap();
     let metadata = reader.metadata().as_ref().clone();
-    let parent = ParentIdentity {
+    let parent = ParentMetadata {
         compressed_size: bytes.len() as u64,
         ..parent()
     };
@@ -681,7 +713,7 @@ fn pending_writer_requires_real_parent_and_verifies_final_parquet_identity() {
             .is_err()
     );
     let mut wrong = parent.clone();
-    wrong.object_key = "not-a-metrics-parent".into();
+    wrong.compressed_size = 0;
     assert!(
         pending()
             .finish_for_parquet(wrong, metadata.clone())
@@ -691,4 +723,274 @@ fn pending_writer_requires_real_parent_and_verifies_final_parquet_identity() {
         .finish_for_parquet(parent.clone(), metadata)
         .unwrap();
     assert_eq!(encoded, build_from_parquet(bytes, parent).unwrap());
+}
+
+#[test]
+fn v2_footer_and_numeric_parent_have_no_key_or_checksum_columns() {
+    let blob = fixture();
+    let end = &blob[blob.len() - FOOTER_LEN..];
+    assert_eq!(FOOTER_LEN, 32);
+    assert_eq!(&end[..4], &2u32.to_le_bytes());
+    assert_eq!(&end[4..8], &[0; 4]);
+    assert_eq!(&end[24..], b"O2MIDX02");
+    let footer = read_footer(end, blob.len() as u64).unwrap();
+    assert_eq!(
+        u64::from_le_bytes(end[8..16].try_into().unwrap()),
+        footer.payload_end
+    );
+    assert_eq!(
+        u64::from_le_bytes(end[16..24].try_into().unwrap()),
+        footer.metadata_range.end - footer.metadata_range.start
+    );
+    let metadata = crate::compact::CompactMetadata::parse(
+        &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+    )
+    .unwrap();
+    let schema = metadata.schema();
+    assert_eq!(schema.fields().len(), 8 + 2);
+    assert!(
+        schema
+            .fields()
+            .iter()
+            .all(|field| !field.name().contains("checksum"))
+    );
+    let parent: serde_json::Value = serde_json::from_str(&schema.metadata()[PARENT_KEY]).unwrap();
+    assert_eq!(
+        parent,
+        serde_json::json!({"rows": 7, "compressed_size": 123})
+    );
+}
+
+#[test]
+fn terminal_footer_rejects_previous_format_truncation_and_invalid_structure() {
+    let blob = fixture();
+    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let mut previous = [0u8; 64];
+    previous[..8].copy_from_slice(b"O2MIDX01");
+    previous[8..12].copy_from_slice(&1u32.to_le_bytes());
+    previous[16..24].copy_from_slice(&footer.metadata_range.start.to_le_bytes());
+    previous[24..32]
+        .copy_from_slice(&(footer.metadata_range.end - footer.metadata_range.start).to_le_bytes());
+    let previous_size = footer.metadata_range.end + previous.len() as u64;
+    assert!(read_footer(&previous, previous_size).is_err());
+    assert!(read_footer(&previous[previous.len() - FOOTER_LEN..], previous_size).is_err());
+    for length in 0..blob.len() {
+        let truncated = &blob[..length];
+        let suffix = &truncated[length.saturating_sub(FOOTER_LEN)..];
+        assert!(read_footer(suffix, length as u64).is_err());
+    }
+    for (range, bytes) in [
+        (0..4, 1u32.to_le_bytes().to_vec()),
+        (4..8, 1u32.to_le_bytes().to_vec()),
+        (8..16, u64::MAX.to_le_bytes().to_vec()),
+        (16..24, 0u64.to_le_bytes().to_vec()),
+        (
+            16..24,
+            (MAX_METADATA_BYTES as u64 + 1).to_le_bytes().to_vec(),
+        ),
+        (24..32, b"INCOMPLT".to_vec()),
+    ] {
+        let mut invalid = blob[blob.len() - FOOTER_LEN..].to_vec();
+        invalid[range].copy_from_slice(&bytes);
+        assert!(read_footer(&invalid, blob.len() as u64).is_err());
+    }
+    assert!(read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64 + 1).is_err());
+    let bad_rows = replace_column(&blob, 2, Arc::new(UInt32Array::from(vec![2, 2, 2, 2])));
+    assert!(index(&bad_rows, &[]).is_err());
+    let parsed = index(&blob, &[]).unwrap();
+    let mut offsets: Vec<_> = parsed
+        .blocks
+        .iter()
+        .map(|block| block.payload_offset)
+        .collect();
+    offsets[1] += 1;
+    assert!(
+        index(
+            &replace_column(&blob, 5, Arc::new(UInt64Array::from(offsets))),
+            &[]
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn completion_marker_is_last_and_write_or_flush_errors_propagate() {
+    let complete = fixture();
+    let footer = read_footer(
+        &complete[complete.len() - FOOTER_LEN..],
+        complete.len() as u64,
+    )
+    .unwrap();
+    for (fail_after, fail_flush) in [
+        (footer.metadata_range.start as usize + 1, usize::MAX),
+        (complete.len() - 9, usize::MAX),
+        (complete.len() - 4, usize::MAX),
+        (usize::MAX, 1),
+        (usize::MAX, 2),
+        (usize::MAX, usize::MAX),
+    ] {
+        let state = Arc::new(std::sync::Mutex::new(WriteState::default()));
+        let output = FailureWriter {
+            state: Arc::clone(&state),
+            fail_after,
+            fail_flush,
+        };
+        let mut writer = BlockWriter::new(
+            output,
+            schema(),
+            vec!["label_a".into(), "label_b".into()],
+            parent(),
+            2,
+        )
+        .unwrap();
+        writer.write(&batch(&rows())).unwrap();
+        let result = writer.finish();
+        let observed = state.lock().unwrap();
+        if fail_after == usize::MAX && fail_flush == usize::MAX {
+            assert!(result.is_ok());
+            assert_eq!(observed.bytes, complete);
+            assert_eq!(observed.flush_has_marker, [false, true]);
+        } else {
+            assert!(result.is_err());
+            if fail_flush != 2 {
+                assert!(!observed.bytes.ends_with(MAGIC));
+            }
+        }
+    }
+}
+
+#[test]
+fn generic_source_finalizer_preserves_schema_without_row_groups() {
+    let input = batch(&rows());
+    let mut writer = BlockWriter::new_pending(Vec::new(), input.schema(), 2).unwrap();
+    writer.write(&input).unwrap();
+    let encoded = writer
+        .finish_for_source(parent(), input.schema(), None)
+        .unwrap();
+    let decoded = index(&encoded, &["label_a", "label_b"]).unwrap();
+    assert_eq!(decoded.parent, parent());
+    assert_eq!(decoded.row_group_size, None);
+    assert_eq!(decoded.source_schema, input.schema());
+    let mut actual = Vec::new();
+    for block in &decoded.blocks {
+        let span = block.payload_range();
+        let values =
+            decode_block(&encoded[span.start as usize..span.end as usize], &block).unwrap();
+        actual.extend(values.timestamps.into_iter().zip(values.value_bits));
+    }
+    assert_eq!(
+        actual,
+        rows().iter().map(|row| (row.1, row.2)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
+    use parquet::arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder};
+    let directory = tempfile::tempdir().unwrap();
+    let data_path = directory.path().join("indexed-v1-before.parquet");
+    let midx_path = directory.path().join("indexed-v1-before.midx");
+    let input = batch(&rows());
+    let mut writer = ArrowWriter::try_new(
+        std::fs::File::create(&data_path).unwrap(),
+        input.schema(),
+        None,
+    )
+    .unwrap();
+    writer.write(&input).unwrap();
+    writer.close().unwrap();
+    let original = Bytes::from(std::fs::read(&data_path).unwrap());
+    let source = ParentMetadata {
+        rows: input.num_rows() as u64,
+        compressed_size: original.len() as u64,
+    };
+    std::fs::write(&midx_path, build_from_parquet(original, source).unwrap()).unwrap();
+    let moved = directory.path().join("moved");
+    std::fs::create_dir(&moved).unwrap();
+    let moved_data = moved.join("indexed-v1-after.parquet");
+    let moved_index = moved.join("indexed-v1-after.midx");
+    std::fs::rename(data_path, &moved_data).unwrap();
+    std::fs::rename(midx_path, &moved_index).unwrap();
+    let source =
+        ParquetRecordBatchReaderBuilder::try_new(Bytes::from(std::fs::read(&moved_data).unwrap()))
+            .unwrap();
+    let expected = ParentMetadata {
+        rows: source.metadata().file_metadata().num_rows() as u64,
+        compressed_size: std::fs::metadata(moved_data).unwrap().len(),
+    };
+    let blob = std::fs::read(moved_index).unwrap();
+    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let parsed = decode_index(
+        Bytes::copy_from_slice(
+            &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+        ),
+        &footer,
+        &expected,
+        &["label_a".into()],
+    )
+    .unwrap();
+    assert_eq!(parsed.parent, expected);
+    assert_eq!(parsed.source_schema, input.schema());
+    assert_eq!(
+        parsed
+            .blocks
+            .iter()
+            .map(|block| u64::from(block.row_count))
+            .sum::<u64>(),
+        input.num_rows() as u64
+    );
+}
+
+#[test]
+fn source_finalizer_still_rejects_schema_and_zero_row_group_claims() {
+    let input = batch(&rows());
+    let pending = || {
+        let mut writer = BlockWriter::new_pending(Vec::new(), input.schema(), 2).unwrap();
+        writer.write(&input).unwrap();
+        writer
+    };
+    let changed = Arc::new(
+        input
+            .schema()
+            .as_ref()
+            .clone()
+            .with_metadata(HashMap::from([(
+                "semantic".to_owned(),
+                "changed".to_owned(),
+            )])),
+    );
+    assert!(
+        pending()
+            .finish_for_source(parent(), changed, None)
+            .is_err()
+    );
+    assert!(
+        pending()
+            .finish_for_source(parent(), input.schema(), Some(0))
+            .is_err()
+    );
+    let zero = ParentMetadata {
+        rows: 0,
+        compressed_size: 123,
+    };
+    assert!(
+        pending()
+            .finish_for_source(zero, input.schema(), None)
+            .is_err()
+    );
+}
+
+#[test]
+fn sample_payload_requires_one_complete_frame() {
+    let blob = fixture();
+    let parsed = index(&blob, &[]).unwrap();
+    let mut block = parsed.blocks.block(0);
+    let range = block.payload_range();
+    let original = &blob[range.start as usize..range.end as usize];
+    let mut trailing = original.to_vec();
+    trailing.push(0);
+    block.payload_len = trailing.len() as u32;
+    assert!(decode_block(&trailing, &block).is_err());
+    block.payload_len = (original.len() - 1) as u32;
+    assert!(decode_block(&original[..original.len() - 1], &block).is_err());
 }

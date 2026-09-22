@@ -79,49 +79,21 @@ pub(super) struct MetricsOutput {
     pub max_file_size: usize,
     pub layout: MetricsFileLayout,
     pub sink: CompactMergeOutput,
-    pub file_key_prefix: Option<Arc<str>>,
     pub stats: GenerationStats,
 }
 
 impl MetricsOutput {
-    fn prepare_blocks(
-        &self,
-        schema: &Arc<Schema>,
-        with_index: bool,
-    ) -> Result<(Blocks, Option<String>)> {
-        let eligible = with_index
-            && self.file_key_prefix.is_some()
-            && metrics_block::is_supported_schema(schema);
-        let object_key = eligible.then(|| {
-            format!(
-                "{}/{}",
-                self.file_key_prefix.as_deref().unwrap(),
-                MetricsFileLayout::Indexed
-                    .file_name(&config::ider::generate_file_name(), self.file_format)
-            )
-        });
-        if object_key
-            .as_ref()
-            .is_some_and(|key| metrics_block::sidecar_path(key).is_none())
-        {
-            return Err(DataFusionError::Execution(
-                "invalid metrics block destination key".into(),
-            ));
+    fn prepare_blocks(&self, schema: &Arc<Schema>, with_index: bool) -> Blocks {
+        if !with_index || !metrics_block::is_supported_schema(schema) {
+            return Blocks::Disabled;
         }
-        let blocks = if eligible {
-            match Blocks::try_new(schema, &self.stats) {
-                Ok(blocks) => blocks,
-                Err(error) => {
-                    log::warn!(
-                        "metrics block initialization unavailable; using legacy index: {error}"
-                    );
-                    Blocks::Disabled
-                }
+        match Blocks::try_new(schema, &self.stats) {
+            Ok(blocks) => blocks,
+            Err(error) => {
+                log::warn!("metrics block initialization unavailable; using legacy index: {error}");
+                Blocks::Disabled
             }
-        } else {
-            Blocks::Disabled
-        };
-        Ok((blocks, object_key))
+        }
     }
 }
 
@@ -287,7 +259,6 @@ struct ActiveMetricsParquetWriter {
     writer: AsyncArrowWriter<ParquetSink>,
     state: MetricsFileState,
     blocks: Blocks,
-    object_key: Option<String>,
 }
 
 impl ActiveMetricsParquetWriter {
@@ -299,7 +270,7 @@ impl ActiveMetricsParquetWriter {
         with_index: bool,
         output: &MetricsOutput,
     ) -> Result<Self> {
-        let (blocks, object_key) = output.prepare_blocks(schema, with_index)?;
+        let blocks = output.prepare_blocks(schema, with_index);
         let sink = if with_index {
             output.sink
         } else {
@@ -318,7 +289,6 @@ impl ActiveMetricsParquetWriter {
                 output.stats.clone(),
             )?,
             blocks,
-            object_key,
         })
     }
 
@@ -350,12 +320,9 @@ impl ActiveMetricsParquetWriter {
         if matches!(self.blocks, Blocks::Disabled) {
             let mut output = merged_file(data_path, metrics_index, file_meta).await?;
             if let MergedFile::MetricsIndexed {
-                object_key,
-                metrics_index_path,
-                ..
+                metrics_index_path, ..
             } = &mut output
             {
-                *object_key = self.object_key;
                 stats.temp(metrics_index_path);
             }
             Ok(output)
@@ -363,7 +330,6 @@ impl ActiveMetricsParquetWriter {
             self.blocks
                 .finish(
                     data_path,
-                    self.object_key.expect("block attempt has an immutable key"),
                     file_meta,
                     SourceMetadata::Parquet(parquet_metadata),
                     stats,
@@ -378,7 +344,6 @@ struct ActiveMetricsVortexWriter {
     data_path: tempfile::TempPath,
     state: MetricsFileState,
     blocks: Blocks,
-    object_key: Option<String>,
     schema: Arc<Schema>,
 }
 
@@ -391,7 +356,7 @@ impl ActiveMetricsVortexWriter {
         dtype: DType,
         output: &MetricsOutput,
     ) -> Result<Self> {
-        let (blocks, object_key) = output.prepare_blocks(schema, with_index)?;
+        let blocks = output.prepare_blocks(schema, with_index);
         let with_legacy = with_index && matches!(blocks, Blocks::Disabled);
         let (file, data_path) = new_temp_file()?;
         output.stats.temp(&data_path);
@@ -423,7 +388,6 @@ impl ActiveMetricsVortexWriter {
                 output.stats.clone(),
             )?,
             blocks,
-            object_key,
             schema: Arc::clone(schema),
         })
     }
@@ -463,12 +427,9 @@ impl ActiveMetricsVortexWriter {
         if matches!(self.blocks, Blocks::Disabled) {
             let mut result = merged_file(self.data_path, metrics_index, file_meta).await?;
             if let MergedFile::MetricsIndexed {
-                object_key,
-                metrics_index_path,
-                ..
+                metrics_index_path, ..
             } = &mut result
             {
-                *object_key = self.object_key;
                 stats.temp(metrics_index_path);
             }
             Ok(result)
@@ -477,7 +438,6 @@ impl ActiveMetricsVortexWriter {
                 .blocks
                 .finish(
                     self.data_path,
-                    self.object_key.expect("block attempt has an immutable key"),
                     file_meta,
                     SourceMetadata::Vortex(schema),
                     stats,
@@ -677,7 +637,6 @@ async fn merged_file(
         Some(metrics_index) => MergedFile::MetricsIndexed {
             data_path,
             metrics_index_path: write_temp_file(metrics_index).await?,
-            object_key: None,
             meta,
         },
         None => MergedFile::MetricsHashMerged { data_path, meta },
@@ -756,7 +715,6 @@ mod tests {
             max_file_size: 1024 * 1024 * 1024,
             layout: MetricsFileLayout::Indexed,
             sink,
-            file_key_prefix: Some(Arc::from("files/single-pass/metrics/m/2026/09/20/00")),
             stats,
         }
     }
@@ -868,26 +826,10 @@ mod tests {
         let count = files.len();
         let mut actual = Vec::new();
         for (position, file) in files.into_iter().enumerate() {
-            let key = file
-                .file_key(
-                    "files/single-pass/metrics/m/2026/09/20/00",
-                    "ignored",
-                    FileFormat::Parquet,
-                )
-                .unwrap();
-            assert!(
-                file.file_key(
-                    "files/wrong/metrics/m/2026/09/20/00",
-                    "ignored",
-                    FileFormat::Parquet
-                )
-                .is_err()
-            );
             let (data, meta, path) = file.into_upload_parts().await.unwrap();
             let data = bytes::Bytes::from(data);
             let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
-            let parent = metrics_block::ParentIdentity {
-                object_key: key,
+            let parent = metrics_block::ParentMetadata {
                 rows: meta.records as u64,
                 compressed_size: data.len() as u64,
             };
@@ -1160,8 +1102,7 @@ mod tests {
                         MergeOutput::for_ingester(StreamType::Metrics),
                     )
                 } else {
-                    let mut output = MergeOutput::for_compactor(StreamType::Metrics)
-                        .with_file_key_prefix("files/dispatch/metrics/m/2026/09/20/00");
+                    let mut output = MergeOutput::for_compactor(StreamType::Metrics);
                     output.file_format = configured_format;
                     (
                         MergeMode::for_compactor(
@@ -1195,9 +1136,6 @@ mod tests {
                 .unwrap()
                 .files
                 .remove(0);
-                let key = file
-                    .file_key("files/dispatch/metrics/m/2026/09/20/00", "plain", format)
-                    .unwrap();
                 let (data, meta, path) = file.into_upload_parts().await.unwrap();
                 let mut actual = sample_rows_for(format, bytes::Bytes::from(data.clone())).await;
                 actual.sort_unstable();
@@ -1211,8 +1149,7 @@ mod tests {
                         encoded.len() as u64,
                     )
                     .unwrap();
-                    let parent = metrics_block::ParentIdentity {
-                        object_key: key,
+                    let parent = metrics_block::ParentMetadata {
                         rows: meta.records as u64,
                         compressed_size: data.len() as u64,
                     };
@@ -1423,14 +1360,6 @@ mod tests {
             .await
             .unwrap()
             .remove(0);
-            let key = match &file {
-                MergedFile::MetricsIndexed {
-                    object_key: Some(key),
-                    ..
-                } => key.clone(),
-                _ => panic!("expected native indexed Vortex output"),
-            };
-            assert!(key.ends_with(".vortex"));
             let (data, _meta, path) = file.into_upload_parts().await.unwrap();
             let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
             let footer = metrics_block::read_footer(
@@ -1438,8 +1367,7 @@ mod tests {
                 encoded.len() as u64,
             )
             .unwrap();
-            let parent = metrics_block::ParentIdentity {
-                object_key: key.clone(),
+            let parent = metrics_block::ParentMetadata {
                 rows: rows.len() as u64,
                 compressed_size: data.len() as u64,
             };
@@ -1566,13 +1494,6 @@ mod tests {
             assert_eq!(files.len(), 3);
             let mut actual = Vec::new();
             for file in files {
-                let key = file
-                    .file_key(
-                        "files/single-pass/metrics/m/2026/09/20/00",
-                        "unused",
-                        FileFormat::Vortex,
-                    )
-                    .unwrap();
                 let (data, meta, path) = file.into_upload_parts().await.unwrap();
                 let stored =
                     sample_rows_for(FileFormat::Vortex, bytes::Bytes::from(data.clone())).await;
@@ -1582,8 +1503,7 @@ mod tests {
                     encoded.len() as u64,
                 )
                 .unwrap();
-                let parent = metrics_block::ParentIdentity {
-                    object_key: key,
+                let parent = metrics_block::ParentMetadata {
                     rows: meta.records as u64,
                     compressed_size: data.len() as u64,
                 };
@@ -1765,7 +1685,6 @@ mod tests {
                 max_file_size: 200,
                 layout: MetricsFileLayout::HashMerged,
                 sink: CompactMergeOutput::Disk,
-                file_key_prefix: None,
                 stats: GenerationStats::default(),
             },
             rx,
@@ -1862,7 +1781,6 @@ mod tests {
                 max_file_size,
                 layout: MetricsFileLayout::Indexed,
                 sink: CompactMergeOutput::Disk,
-                file_key_prefix: None,
                 stats: GenerationStats::default(),
             },
             rx,
@@ -1951,7 +1869,29 @@ mod tests {
 
             let metrics_index = tokio::fs::read(&metrics_index_path).await.unwrap();
             drop(metrics_index_path);
-            assert!(!metrics_index.is_empty());
+            let footer = metrics_block::read_footer(
+                &metrics_index[metrics_index.len() - metrics_block::FOOTER_LEN..],
+                metrics_index.len() as u64,
+            )
+            .unwrap();
+            let parent = metrics_block::ParentMetadata {
+                rows: meta.records as u64,
+                compressed_size: bytes.len() as u64,
+            };
+            let index = metrics_block::decode_index(
+                bytes::Bytes::copy_from_slice(
+                    &metrics_index
+                        [footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+                ),
+                &footer,
+                &parent,
+                &["path".into()],
+            )
+            .unwrap();
+            assert_eq!(
+                index.blocks.row_counts().map(u64::from).sum::<u64>(),
+                meta.records as u64
+            );
             assert!(!persisted_metrics_index_path.exists());
 
             let (_, reader) =

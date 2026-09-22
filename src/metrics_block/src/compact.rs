@@ -18,9 +18,9 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{Context, Result, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, DictionaryArray, FixedSizeBinaryArray, Int64Array,
-        LargeStringArray, RecordBatch, RecordBatchOptions, StringArray, StringViewArray,
-        UInt8Array, UInt16Array, UInt32Array, UInt64Array,
+        Array, ArrayRef, BooleanArray, DictionaryArray, Int64Array, LargeStringArray, RecordBatch,
+        RecordBatchOptions, StringArray, StringViewArray, UInt8Array, UInt16Array, UInt32Array,
+        UInt64Array,
     },
     datatypes::{DataType, Schema, SchemaRef, UInt8Type, UInt16Type, UInt32Type},
 };
@@ -267,16 +267,6 @@ fn encode_column(col: &dyn Array) -> Result<Vec<u8>> {
                 out.push(u8::from(col.value(i)));
             }
         }
-        DataType::FixedSizeBinary(32) => {
-            ensure!(col.null_count() == 0, "null compact checksum");
-            let col = col
-                .as_any()
-                .downcast_ref::<FixedSizeBinaryArray>()
-                .context("checksum")?;
-            for i in 0..col.len() {
-                out.extend_from_slice(col.value(i));
-            }
-        }
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => return encode_labels(col),
         _ => anyhow::bail!("unsupported compact field"),
     }
@@ -367,16 +357,6 @@ fn decode_column(
             Ok(Arc::new(BooleanArray::from(
                 raw.iter().map(|v| *v != 0).collect::<Vec<_>>(),
             )))
-        }
-        DataType::FixedSizeBinary(32) => {
-            ensure!(
-                raw.len() == rows.checked_mul(32).context("column size overflow")?,
-                "compact checksum length"
-            );
-            charge(expanded, raw.len())?;
-            Ok(Arc::new(FixedSizeBinaryArray::try_from_iter(
-                raw.chunks_exact(32),
-            )?))
         }
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
             decode_labels(raw, kind, rows, expanded)
