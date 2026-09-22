@@ -227,4 +227,26 @@ describe("buildCountChartQuery", () => {
 
     expect(chartQuery).toContain("WHERE (note = '-- not a comment')");
   });
+
+  // #14514: a projected string literal containing "from" must not be taken for
+  // the statement's real FROM (regression lock for the maskStringLiterals fix).
+  it("does not mistake a projected literal's 'from' for the statement's real FROM (#14514)", () => {
+    const chartQuery = buildCountChartQuery(
+      "SELECT 'copied from prod' AS note, _timestamp FROM \"bugtest\"",
+    );
+
+    expect(chartQuery).toBe(
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY 1',
+    );
+  });
+
+  it("does not truncate at a WHERE-clause literal that contains 'group by' (#14514)", () => {
+    const chartQuery = buildCountChartQuery(
+      "SELECT * FROM \"bugtest\" WHERE (msg = 'items group by owner')",
+    );
+
+    expect(chartQuery).toBe(
+      "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"bugtest\" WHERE (msg = 'items group by owner') GROUP BY 1",
+    );
+  });
 });

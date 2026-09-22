@@ -57,6 +57,7 @@ use schema::stream_schema_exists;
 use super::{
     columnar::{self, ColumnarStream},
     ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream},
+    native_histogram,
 };
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
@@ -873,9 +874,10 @@ fn process_exponential_histogram(
     );
     let mut records = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
+    let limits = native_histogram::ExpansionLimits::from_config(&config::get_config());
     for data_point in &hist.data_points {
         let mut dp_rec = rec.clone();
-        for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
+        for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point, limits) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
@@ -995,6 +997,7 @@ fn process_hist_data_point(
 fn process_exp_hist_data_point(
     rec: &mut json::Value,
     data_point: &ExponentialHistogramDataPoint,
+    limits: native_histogram::ExpansionLimits,
 ) -> Vec<serde_json::Value> {
     if no_recorded_value(data_point.flags) {
         return vec![];
@@ -1006,46 +1009,53 @@ fn process_exp_hist_data_point(
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = data_point_flag(data_point.flags).into();
     process_exemplars(rec, &data_point.exemplars);
-    // add count record
-    let mut count_rec = rec.clone();
-    count_rec[VALUE_LABEL] = (data_point.count as f64).into();
-    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(count_rec);
 
-    // add sum record -- OTLP marks `sum` optional, so an absent (or NaN) sum emits no record
-    if let Some(sum) = data_point.sum.and_then(super::metric_value) {
-        let mut sum_rec = rec.clone();
-        sum_rec[VALUE_LABEL] = sum;
-        sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
-        bucket_recs.push(sum_rec);
+    // OTLP bucket `i` covers `(base^i, base^(i+1)]`, the native layout's bucket `i+1`
+    let otlp_buckets = |b: &Option<exponential_histogram_data_point::Buckets>| -> Vec<(i64, f64)> {
+        let Some(b) = b else { return vec![] };
+        // explicitly reported empty buckets are kept so their `le` series exists before they fill
+        b.bucket_counts
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (b.offset as i64 + i as i64 + 1, *c as f64))
+            .collect()
+    };
+    let expanded = native_histogram::ExponentialHistogram {
+        schema: data_point.scale,
+        count: data_point.count as f64,
+        // OTLP marks `sum` optional, so an absent sum emits no record
+        sum: data_point.sum,
+        zero_count: data_point.zero_count as f64,
+        zero_threshold: data_point.zero_threshold,
+        positive: otlp_buckets(&data_point.positive),
+        negative: otlp_buckets(&data_point.negative),
+    }
+    .expand(limits);
+    for (suffix, le, value) in expanded {
+        let Some(value) = super::metric_value(value) else {
+            continue;
+        };
+        let mut hist_rec = rec.clone();
+        hist_rec[VALUE_LABEL] = value;
+        hist_rec[NAME_LABEL] = format!("{}{suffix}", rec[NAME_LABEL].as_str().unwrap()).into();
+        if let Some(le) = le {
+            hist_rec["le"] = le.into();
+        }
+        bucket_recs.push(hist_rec);
     }
 
-    // OTLP exponential histogram bucket boundaries are powers of `base`, where
-    // `base = 2^(2^-scale)`. Bucket index `idx` (offset + array position) covers the
-    // range (base^idx, base^(idx+1)], so its upper bound is `base^(idx+1)`.
-    // NOTE: `^` is bitwise XOR in Rust, not exponentiation -- use `powf`/`powi`.
-    let base = 2f64.powf(2f64.powi(-data_point.scale));
-    // add negative bucket records (negative values, so the boundary is negated)
-    if let Some(buckets) = &data_point.negative {
-        let offset = buckets.offset;
-        for (i, val) in buckets.bucket_counts.iter().enumerate() {
-            let mut bucket_rec = rec.clone();
-            bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
-            bucket_rec[VALUE_LABEL] = (*val as f64).into();
-            bucket_rec["le"] = (-base.powi(offset + (i as i32) + 1)).to_string().into();
-            bucket_recs.push(bucket_rec);
-        }
+    if let Some(min) = data_point.min.and_then(super::metric_value) {
+        let mut min_rec = rec.clone();
+        min_rec[VALUE_LABEL] = min;
+        min_rec[NAME_LABEL] = format!("{}_min", min_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(min_rec);
     }
-    // add positive bucket records
-    if let Some(buckets) = &data_point.positive {
-        let offset = buckets.offset;
-        for (i, val) in buckets.bucket_counts.iter().enumerate() {
-            let mut bucket_rec = rec.clone();
-            bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
-            bucket_rec[VALUE_LABEL] = (*val as f64).into();
-            bucket_rec["le"] = base.powi(offset + (i as i32) + 1).to_string().into();
-            bucket_recs.push(bucket_rec);
-        }
+
+    if let Some(max) = data_point.max.and_then(super::metric_value) {
+        let mut max_rec = rec.clone();
+        max_rec[VALUE_LABEL] = max;
+        max_rec[NAME_LABEL] = format!("{}_max", max_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(max_rec);
     }
 
     bucket_recs
@@ -1227,6 +1237,14 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    /// No target downscaling: the producer's scale is emitted as is, capped only by the valve.
+    fn lim(max_buckets: usize) -> native_histogram::ExpansionLimits {
+        native_histogram::ExpansionLimits {
+            target_schema: 8,
+            max_buckets,
+        }
+    }
 
     fn process_gauge(
         rec: &json::Value,
@@ -1677,17 +1695,31 @@ mod tests {
             }),
         };
 
-        let result = process_exp_hist_data_point(&mut rec, &data_point);
+        let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
 
-        // Verify the processed data
-        assert!(!result.is_empty());
-        // Should have count, sum, and bucket records
-        assert!(result.len() >= 2);
-
-        // Check count record
         let count_rec = &result[0];
         assert!(count_rec["__name__"].as_str().unwrap().ends_with("_count"));
         assert_eq!(count_rec["value"], json!(100.0));
+
+        // the explicitly empty negative bucket (-2, -1] keeps its `le` series
+        let buckets: Vec<(&str, f64)> = result
+            .iter()
+            .filter(|r| r["__name__"].as_str().unwrap().ends_with("_bucket"))
+            .map(|r| (r["le"].as_str().unwrap(), r["value"].as_f64().unwrap()))
+            .collect();
+        assert_eq!(
+            buckets,
+            vec![
+                ("-2", 0.0),
+                ("-1", 0.0),
+                ("0", 10.0),
+                ("1", 10.0),
+                ("2", 60.0),
+                ("4", 90.0),
+                ("8", 110.0),
+                ("inf", 110.0),
+            ]
+        );
     }
 
     #[test]
@@ -2608,6 +2640,19 @@ mod tests {
             assert!(le_values.contains(&"10".to_string()));
         }
 
+        fn exp_hist_buckets(result: &[serde_json::Value]) -> Vec<(String, f64)> {
+            result
+                .iter()
+                .filter(|r| r["__name__"].as_str().unwrap_or("").ends_with("_bucket"))
+                .map(|r| {
+                    (
+                        r["le"].as_str().unwrap().to_string(),
+                        r["value"].as_f64().unwrap(),
+                    )
+                })
+                .collect()
+        }
+
         #[test]
         fn test_exponential_histogram_buckets() {
             let mut rec = json!({"__name__": "test_exp_histogram"});
@@ -2634,50 +2679,344 @@ mod tests {
                 }),
             };
 
-            let result = process_exp_hist_data_point(&mut rec, &data_point);
+            let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
 
-            // Should have count, sum, positive buckets, and negative buckets
-            assert!(result.len() >= 2); // At least count and sum
+            assert_eq!(result[0]["__name__"], "test_exp_histogram_count");
+            assert_eq!(result[0]["value"], 200.0);
+            assert_eq!(result[1]["__name__"], "test_exp_histogram_sum");
+            assert_eq!(result[1]["value"], 500.0);
 
-            // Check count record
-            let count_record = result
+            let expected = [
+                ("-1", 0.0),
+                ("-0.7071", 10.0),
+                ("-0.5", 15.0),
+                ("-0.001", 15.0),
+                ("0.001", 20.0),
+                ("1", 20.0),
+                ("1.414", 30.0),
+                ("2", 50.0),
+                ("2.828", 80.0),
+                // `count` wins over a short bucket total so `le="inf"` equals `_count`
+                ("inf", 200.0),
+            ];
+            let expected: Vec<(String, f64)> = expected
                 .iter()
-                .find(|r| r["__name__"].as_str().unwrap_or("").ends_with("_count"));
-            assert!(count_record.is_some());
-            assert_eq!(count_record.unwrap()["value"], 200.0);
-
-            // Check sum record
-            let sum_record = result
-                .iter()
-                .find(|r| r["__name__"].as_str().unwrap_or("").ends_with("_sum"));
-            assert!(sum_record.is_some());
-            assert_eq!(sum_record.unwrap()["value"], 500.0);
-
-            // Bucket boundaries: base = 2^(2^-scale). scale=1 => base = 2^0.5 = sqrt(2).
-            let base = 2f64.powf(2f64.powi(-1));
-
-            // Positive buckets (offset 0): le = base^(idx+1) for idx = 0,1,2.
-            let positive_les: Vec<f64> = result
-                .iter()
-                .filter(|r| r["__name__"].as_str().unwrap_or("").ends_with("_bucket"))
-                .filter_map(|r| r["le"].as_str().and_then(|s| s.parse::<f64>().ok()))
-                .filter(|le| *le > 0.0)
+                .map(|(le, v)| (le.to_string(), *v))
                 .collect();
-            assert_eq!(positive_les.len(), 3);
-            for (i, le) in positive_les.iter().enumerate() {
-                assert!((le - base.powi(i as i32 + 1)).abs() < 1e-9);
+            assert_eq!(exp_hist_buckets(&result), expected);
+        }
+
+        #[test]
+        fn test_exponential_histogram_buckets_issue_14634() {
+            let mut rec = json!({"__name__": "h"});
+            let data_point = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                attributes: vec![],
+                start_time_unix_nano: 0,
+                time_unix_nano: 1640995200000000000,
+                exemplars: vec![],
+                flags: 0,
+                count: 7,
+                sum: Some(21.0),
+                min: None,
+                max: None,
+                scale: 2,
+                zero_count: 1,
+                zero_threshold: 0.0,
+                positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                    offset: 0,
+                    bucket_counts: vec![2, 3],
+                }),
+                negative: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                    offset: 0,
+                    bucket_counts: vec![1],
+                }),
+            };
+
+            let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
+
+            let expected = [
+                ("-1.189", 0.0),
+                ("-1", 1.0),
+                ("0", 2.0),
+                ("1", 2.0),
+                ("1.189", 4.0),
+                ("1.414", 7.0),
+                ("inf", 7.0),
+            ];
+            let expected: Vec<(String, f64)> = expected
+                .iter()
+                .map(|(le, v)| (le.to_string(), *v))
+                .collect();
+            assert_eq!(exp_hist_buckets(&result), expected);
+        }
+
+        #[test]
+        fn test_exponential_histogram_extreme_scales_still_expand() {
+            for scale in [i32::MAX, 21, -11, i32::MIN] {
+                let mut rec = json!({"__name__": "h"});
+                let data_point = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    exemplars: vec![],
+                    flags: 0,
+                    count: 1,
+                    sum: Some(1.0),
+                    min: None,
+                    max: None,
+                    scale,
+                    zero_count: 0,
+                    zero_threshold: 0.0,
+                    positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                        offset: 0,
+                        bucket_counts: vec![1],
+                    }),
+                    negative: None,
+                };
+                let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
+                assert_eq!(result[0]["__name__"], "h_count", "scale {scale}");
+                assert_eq!(result[1]["__name__"], "h_sum", "scale {scale}");
+                let buckets = exp_hist_buckets(&result);
+                assert_eq!(
+                    buckets.last().unwrap(),
+                    &("inf".to_string(), 1.0),
+                    "scale {scale}"
+                );
+                for w in buckets.windows(2) {
+                    let (a, b) = (
+                        w[0].0.parse::<f64>().unwrap(),
+                        w[1].0.parse::<f64>().unwrap(),
+                    );
+                    assert!(a < b && w[0].1 <= w[1].1, "scale {scale}: {buckets:?}");
+                }
             }
+        }
 
-            // Negative buckets (offset -2): le = -base^(idx+1) for idx = -2,-1.
-            let negative_les: Vec<f64> = result
+        #[test]
+        fn test_exponential_histogram_clips_bucket_to_zero_threshold() {
+            let mut rec = json!({"__name__": "h"});
+            let data_point = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                attributes: vec![],
+                start_time_unix_nano: 0,
+                time_unix_nano: 1640995200000000000,
+                exemplars: vec![],
+                flags: 0,
+                count: 10,
+                sum: Some(17.5),
+                min: None,
+                max: None,
+                scale: 0,
+                zero_count: 0,
+                zero_threshold: 1.5,
+                positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                    offset: 0,
+                    bucket_counts: vec![10],
+                }),
+                negative: None,
+            };
+
+            let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
+
+            let expected = [("-1.5", 0.0), ("1.5", 0.0), ("2", 10.0), ("inf", 10.0)];
+            let expected: Vec<(String, f64)> = expected
                 .iter()
-                .filter(|r| r["__name__"].as_str().unwrap_or("").ends_with("_bucket"))
-                .filter_map(|r| r["le"].as_str().and_then(|s| s.parse::<f64>().ok()))
-                .filter(|le| *le < 0.0)
+                .map(|(le, v)| (le.to_string(), *v))
                 .collect();
-            assert_eq!(negative_les.len(), 2);
-            assert!((negative_les[0] - (-base.powi(-1))).abs() < 1e-9);
-            assert!((negative_les[1] - (-base.powi(0))).abs() < 1e-9);
+            assert_eq!(exp_hist_buckets(&result), expected);
+        }
+
+        #[test]
+        fn test_exponential_histogram_layout_stable_as_buckets_grow() {
+            // scale 0, 13 then 14 buckets: the old 16-label default downscaled the second sample
+            let sample = |counts: Vec<u64>| {
+                let mut rec = json!({"__name__": "h"});
+                let dp = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    exemplars: vec![],
+                    flags: 0,
+                    count: counts.iter().sum(),
+                    sum: None,
+                    min: None,
+                    max: None,
+                    scale: 0,
+                    zero_count: 0,
+                    zero_threshold: 0.0,
+                    positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                        offset: 0,
+                        bucket_counts: counts,
+                    }),
+                    negative: None,
+                };
+                let limits = native_histogram::ExpansionLimits {
+                    target_schema: 2,
+                    max_buckets: 512,
+                };
+                exp_hist_buckets(&process_exp_hist_data_point(&mut rec, &dp, limits))
+                    .into_iter()
+                    .map(|(le, _)| le)
+                    .collect::<Vec<_>>()
+            };
+            let a = sample(vec![1; 13]);
+            let b = sample(vec![1; 14]);
+            assert_eq!(a.len(), 13 + 1 + 1 + 1);
+            assert_eq!(b.len(), 14 + 1 + 1 + 1);
+            assert!(a.iter().all(|le| b.contains(le)), "{a:?} vs {b:?}");
+        }
+
+        #[test]
+        fn test_exponential_histogram_downscales_fine_scale() {
+            let mut rec = json!({"__name__": "h"});
+            let data_point = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                attributes: vec![],
+                start_time_unix_nano: 0,
+                time_unix_nano: 1640995200000000000,
+                exemplars: vec![],
+                flags: 0,
+                count: 3,
+                sum: Some(3.0),
+                min: None,
+                max: None,
+                scale: 10,
+                zero_count: 0,
+                zero_threshold: 0.0,
+                positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                    offset: 0,
+                    bucket_counts: vec![1, 1, 1],
+                }),
+                negative: None,
+            };
+
+            let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
+
+            // scale 10 buckets 1..=3 merge into schema-8 bucket 1: (1, 2^(1/256)]
+            let expected = [("0", 0.0), ("1", 0.0), ("1.003", 3.0), ("inf", 3.0)];
+            let expected: Vec<(String, f64)> = expected
+                .iter()
+                .map(|(le, v)| (le.to_string(), *v))
+                .collect();
+            assert_eq!(exp_hist_buckets(&result), expected);
+        }
+
+        /// Explicitly reported empty buckets keep their `le` series before they fill.
+        #[test]
+        fn test_exponential_histogram_keeps_explicit_empty_buckets() {
+            let sample = |counts: Vec<u64>| {
+                let mut rec = json!({"__name__": "h"});
+                let data_point = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    exemplars: vec![],
+                    flags: 0,
+                    count: counts.iter().sum(),
+                    sum: None,
+                    min: None,
+                    max: None,
+                    scale: 0,
+                    zero_count: 0,
+                    zero_threshold: 0.0,
+                    positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                        offset: 0,
+                        bucket_counts: counts,
+                    }),
+                    negative: None,
+                };
+                exp_hist_buckets(&process_exp_hist_data_point(&mut rec, &data_point, lim(16)))
+            };
+            let expect = |pairs: &[(&str, f64)]| -> Vec<(String, f64)> {
+                pairs.iter().map(|(le, v)| (le.to_string(), *v)).collect()
+            };
+
+            // (2,4] and (4,8] are empty but reported: no gap marker, cumulative unchanged
+            assert_eq!(
+                sample(vec![10, 0, 0, 10]),
+                expect(&[
+                    ("0", 0.0),
+                    ("1", 0.0),
+                    ("2", 10.0),
+                    ("4", 10.0),
+                    ("8", 10.0),
+                    ("16", 20.0),
+                    ("inf", 20.0),
+                ])
+            );
+            assert_eq!(
+                sample(vec![10, 1, 0, 10]),
+                expect(&[
+                    ("0", 0.0),
+                    ("1", 0.0),
+                    ("2", 10.0),
+                    ("4", 11.0),
+                    ("8", 11.0),
+                    ("16", 21.0),
+                    ("inf", 21.0),
+                ])
+            );
+            // leading and trailing zeros are kept as well
+            assert_eq!(
+                sample(vec![0, 5, 0]),
+                expect(&[
+                    ("0", 0.0),
+                    ("1", 0.0),
+                    ("2", 0.0),
+                    ("4", 5.0),
+                    ("8", 5.0),
+                    ("inf", 5.0),
+                ])
+            );
+        }
+
+        /// The zero bucket's `le` series exists before its first observation.
+        #[test]
+        fn test_exponential_histogram_zero_bucket_series_stable_across_samples() {
+            let sample = |zero_count: u64| {
+                let mut rec = json!({"__name__": "h"});
+                let data_point = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    exemplars: vec![],
+                    flags: 0,
+                    count: 10 + zero_count,
+                    sum: None,
+                    min: None,
+                    max: None,
+                    scale: 0,
+                    zero_count,
+                    zero_threshold: 0.001,
+                    positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                        offset: 0,
+                        bucket_counts: vec![10],
+                    }),
+                    negative: None,
+                };
+                exp_hist_buckets(&process_exp_hist_data_point(&mut rec, &data_point, lim(16)))
+            };
+            let expect = |pairs: &[(&str, f64)]| -> Vec<(String, f64)> {
+                pairs.iter().map(|(le, v)| (le.to_string(), *v)).collect()
+            };
+            assert_eq!(
+                sample(0),
+                expect(&[
+                    ("-0.001", 0.0),
+                    ("0.001", 0.0),
+                    ("1", 0.0),
+                    ("2", 10.0),
+                    ("inf", 10.0),
+                ])
+            );
+            assert_eq!(
+                sample(1),
+                expect(&[
+                    ("-0.001", 0.0),
+                    ("0.001", 1.0),
+                    ("1", 1.0),
+                    ("2", 11.0),
+                    ("inf", 11.0),
+                ])
+            );
         }
     }
 
@@ -3022,7 +3361,7 @@ mod tests {
                     negative: None,
                 };
 
-            let result = process_exp_hist_data_point(&mut rec, &data_point);
+            let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
 
             // Should have at least count and sum records
             let metric_names: Vec<&str> = result
@@ -3181,6 +3520,7 @@ mod tests {
                     }),
                     negative: None,
                 },
+                lim(16),
             )
         }
 
@@ -3395,7 +3735,7 @@ mod tests {
                 negative: None,
             };
 
-            assert!(process_exp_hist_data_point(&mut rec, &stale).is_empty());
+            assert!(process_exp_hist_data_point(&mut rec, &stale, lim(16)).is_empty());
         }
 
         #[test]
