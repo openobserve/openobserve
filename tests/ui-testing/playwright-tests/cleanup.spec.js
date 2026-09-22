@@ -341,6 +341,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^severity_test_\d+$/,                         // Severity test streams (severity_test_<timestamp>)
         /^alert_e2e_/,                                 // Alert e2e test streams (alert_e2e_*)
         /^alert_import_/,                              // Alert import test streams (alert_import_*)
+        /^alert_chart_missing_/,                       // Alert chart error-state test streams (alerts-chart-error-state.spec.js #14519)
         /^dedup_test_/,                                // Dedup test streams (dedup_test_*)
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream

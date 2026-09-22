@@ -483,7 +483,11 @@ use std::collections::HashMap;
 
 use config::meta::{
     self_reporting::usage::UsageData,
-    synthetics::{Synthetic, SyntheticAuth, for_each_string_at_path},
+    synthetics::{
+        MAX_VARIABLES, Synthetic, SyntheticAuth, SyntheticType, SyntheticVariable,
+        validate_http_url_quietly, with_default_scheme,
+    },
+    synthetics_variables::substitute_placeholders,
 };
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -1030,6 +1034,8 @@ pub struct AckResponse {
     /// probe agent. Pinned by a test.
     #[serde(skip)]
     pub usage_events: Vec<UsageData>,
+    /// Environments of this run that did not pass, worst first, by name.
+    pub failing_environments: Vec<String>,
 }
 
 /// The notification a completed run should send, resolved against the check's
@@ -1088,40 +1094,40 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         .ok_or_else(|| anyhow::anyhow!("check not found: {}", check.synthetics_id))?;
 
     // Decrypt credentials and variables; build env_inject for the probe.
-    // Extracted config secrets live in config_secrets; legacy rows may still
-    // carry AESenc: values in-place inside config.
-    let mut has_encrypted_config = !synthetic.config_secrets.is_empty();
-    for path in synthetic.check_type.secret_config_paths() {
-        let _ = for_each_string_at_path(&mut synthetic.config, path, &mut |s: &mut String| {
-            if s.starts_with("AESenc:") {
-                has_encrypted_config = true;
-            }
-            Ok::<(), ()>(())
-        });
-    }
-    let needs_dek = synthetic.auth.is_some()
-        || !synthetic.variables.is_empty()
-        || !synthetic.cookies.is_empty()
-        || has_encrypted_config;
+    let has_encrypted_config = crate::service::has_encrypted_config(&mut synthetic);
+    let env_id = check.env.clone();
+    let has_shared_variables = crate::service::org_has_shared_variables(&check.org_id).await;
     let mut env_inject = HashMap::new();
 
-    if needs_dek {
+    if needs_dek(&synthetic, has_encrypted_config, has_shared_variables) {
         let dek = crate::service::synthetics_dek(&check.org_id).await?;
+
+        // Before the shared tier: a `{{NAME}}` in a header only exists once its slot is restored.
+        if has_encrypted_config {
+            crate::service::rehydrate_config_secrets(&mut synthetic, &dek)?;
+        }
 
         if let Some(ref auth) = synthetic.auth {
             env_inject.extend(build_env_map(auth, &dek)?);
         }
 
-        // Inject decrypted variable values so the probe can substitute {{ VAR }}.
-        // All values are AESenc: at rest regardless of the secure flag.
-        for var in &synthetic.variables {
-            let value = if var.value.starts_with("AESenc:") {
-                crate::service::decrypt_secret(&dek, &var.value)?
-            } else {
-                var.value.clone()
-            };
-            env_inject.insert(var.name.clone(), value);
-        }
+        let shared = if has_shared_variables {
+            crate::service::resolve_shared_variables(
+                &check.org_id,
+                env_id.as_deref(),
+                &synthetic,
+                &dek,
+            )
+            .await?
+        } else {
+            Vec::new()
+        };
+        env_inject.extend(merge_variable_tiers(
+            shared,
+            &synthetic.variables,
+            &dek,
+            &check.synthetics_id,
+        )?);
 
         // Decrypt top-level cookies and serialize as _AUTH_COOKIES JSON for the probe.
         // Probe calls context.addCookies(JSON.parse(envVars._AUTH_COOKIES)) regardless of auth
@@ -1152,28 +1158,12 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
                     .map_err(|e| anyhow::anyhow!("cookies serialize failed: {e}"))?,
             );
         }
-
-        // Rehydrate config-embedded secrets (SSH password, headers, browser
-        // recorded secrets) — the probe reads them from `config` verbatim.
-        if has_encrypted_config {
-            for (pointer, encrypted) in std::mem::take(&mut synthetic.config_secrets) {
-                if let Some(slot) = synthetic.config.pointer_mut(&pointer) {
-                    *slot = serde_json::Value::String(crate::service::decrypt_secret(
-                        &dek, &encrypted,
-                    )?);
-                }
-            }
-            // Legacy rows: AESenc: values still stored in-place inside config.
-            for path in synthetic.check_type.secret_config_paths() {
-                for_each_string_at_path(&mut synthetic.config, path, &mut |s: &mut String| {
-                    if s.starts_with("AESenc:") {
-                        *s = crate::service::decrypt_secret(&dek, s)?;
-                    }
-                    Ok::<(), anyhow::Error>(())
-                })?;
-            }
-        }
     }
+
+    synthetic.target = resolved_target(
+        &synthetic.check_type,
+        &substitute_placeholders(&synthetic.target, &env_inject),
+    )?;
 
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);
@@ -1218,8 +1208,12 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         .map(|r| r.trigger_type)
         .unwrap_or_else(|| "schedule".to_string());
 
-    let metadata: serde_json::Value =
+    let mut metadata: serde_json::Value =
         serde_json::from_str(&check.metadata).unwrap_or(serde_json::json!({}));
+    if let Some(env_id) = check.env.as_deref() {
+        metadata["environment"] =
+            serde_json::json!(environment_display_name(&check.org_id, env_id).await);
+    }
 
     // SSRF policy from the location registry: private locations run relaxed
     // (probing the customer's own network is the point), everything else strict.
@@ -1265,6 +1259,55 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         ssrf_policy,
         ingest,
     })
+}
+
+fn needs_dek(
+    synthetic: &Synthetic,
+    has_encrypted_config: bool,
+    has_shared_variables: bool,
+) -> bool {
+    synthetic.auth.is_some()
+        || !synthetic.variables.is_empty()
+        || !synthetic.cookies.is_empty()
+        || has_encrypted_config
+        || has_shared_variables
+}
+
+/// The two variable tiers merged into what the probe receives.
+fn merge_variable_tiers(
+    shared: Vec<(String, String)>,
+    check_variables: &[SyntheticVariable],
+    dek: &[u8],
+    synthetics_id: &str,
+) -> anyhow::Result<HashMap<String, String>> {
+    let mut merged: HashMap<String, String> = shared.into_iter().collect();
+    for var in check_variables {
+        let value = if var.value.starts_with("AESenc:") {
+            crate::service::decrypt_secret(dek, &var.value)?
+        } else {
+            var.value.clone()
+        };
+        merged.insert(var.name.clone(), value);
+    }
+    if merged.len() > MAX_VARIABLES {
+        anyhow::bail!(
+            "check {synthetics_id} resolves {} variables, more than the {MAX_VARIABLES} allowed",
+            merged.len()
+        );
+    }
+    Ok(merged)
+}
+
+/// The target the probe gets, normalised and re-checked: a variable can still supply `file://`.
+fn resolved_target(check_type: &SyntheticType, substituted: &str) -> anyhow::Result<String> {
+    match check_type {
+        SyntheticType::Http | SyntheticType::Browser => {
+            let target = with_default_scheme(substituted);
+            validate_http_url_quietly("target", &target).map_err(|e| anyhow::anyhow!(e))?;
+            Ok(target)
+        }
+        _ => Ok(substituted.to_string()),
+    }
 }
 
 /// AES-decrypt credentials from `auth` and return as env var map.
@@ -1337,6 +1380,7 @@ fn stale_lease_response(
         consecutive_failures: 0,
         failing_locations: Vec::new(),
         passing_locations: Vec::new(),
+        failing_environments: Vec::new(),
         usage_events: Vec::new(),
     }
 }
@@ -1552,6 +1596,12 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
     };
     let (failing_locations, passing_locations) = (outcomes.failing, outcomes.passing);
 
+    let failing_environments = if run_complete && !matches!(alert, AlertDecision::Silent) {
+        environment_names(&check.org_id, &check.run_id).await
+    } else {
+        Vec::new()
+    };
+
     Ok(AckResponse {
         run_complete,
         run_status,
@@ -1574,7 +1624,44 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         failing_locations,
         passing_locations,
         usage_events,
+        failing_environments,
     })
+}
+
+pub(crate) async fn environment_display_name(org_id: &str, env_id: &str) -> String {
+    let conn = get_orm_client_rw().await;
+    match infra::table::synthetics_environments::get_by_id(conn, org_id, env_id).await {
+        Ok(Some(env)) => env.name,
+        _ => env_id.to_string(),
+    }
+}
+
+/// Failing environment IDs for a run, mapped to the names a reader recognises.
+async fn environment_names(org_id: &str, run_id: &str) -> Vec<String> {
+    let conn = get_orm_client_rw().await;
+    let ids = match synthetics_jobs::failing_environments(conn, run_id).await {
+        Ok(ids) if !ids.is_empty() => ids,
+        Ok(_) => return Vec::new(),
+        Err(e) => {
+            tracing::warn!(run_id = %run_id, "[synthetics] failing_environments: {e}");
+            return Vec::new();
+        }
+    };
+    let known = match infra::table::synthetics_environments::list(conn, org_id).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!(org_id = %org_id, "[synthetics] environment lookup: {e}");
+            return ids;
+        }
+    };
+    ids.into_iter()
+        .map(|id| {
+            known
+                .iter()
+                .find(|e| e.id == id)
+                .map_or(id, |e| e.name.clone())
+        })
+        .collect()
 }
 
 /// Resolves the alert decision for a completed run and persists the new state.
@@ -1701,7 +1788,10 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
 
 #[cfg(test)]
 mod tests {
+    use config::meta::synthetics::{SyntheticCookie, SyntheticVariable};
+
     use super::*;
+    use crate::service::encrypt_secret;
 
     /// The minimum an ack has ever had to carry. Everything else on
     /// `AckRequest` is `#[serde(default)]`, which is what makes rollback safe.
@@ -2666,5 +2756,155 @@ mod tests {
                 metadata: "{}".to_string(),
             }
         }
+    }
+
+    fn dek() -> Vec<u8> {
+        vec![7u8; 64]
+    }
+
+    fn variable(name: &str, value: &str) -> SyntheticVariable {
+        SyntheticVariable {
+            name: name.to_string(),
+            value: encrypt_secret(&dek(), value).unwrap(),
+            secure: false,
+            example: String::new(),
+        }
+    }
+
+    #[test]
+    fn a_check_with_only_shared_variables_still_needs_the_dek() {
+        let synthetic = Synthetic::default();
+        assert!(!needs_dek(&synthetic, false, false));
+        assert!(needs_dek(&synthetic, false, true));
+    }
+
+    #[test]
+    fn the_original_four_inputs_still_decide_on_their_own() {
+        let with_variables = Synthetic {
+            variables: vec![variable("A", "1")],
+            ..Default::default()
+        };
+        assert!(needs_dek(&with_variables, false, false));
+
+        let with_cookies = Synthetic {
+            cookies: vec![SyntheticCookie::default()],
+            ..Default::default()
+        };
+        assert!(needs_dek(&with_cookies, false, false));
+
+        assert!(needs_dek(&Synthetic::default(), true, false));
+    }
+
+    #[test]
+    fn a_check_tier_name_overrides_a_shared_one_and_the_rest_inherit() {
+        let shared = vec![
+            ("BASE_URL".to_string(), "https://shared".to_string()),
+            ("API_TOKEN".to_string(), "shared-token".to_string()),
+        ];
+        let merged = merge_variable_tiers(
+            shared,
+            &[variable("BASE_URL", "https://check")],
+            &dek(),
+            "check-1",
+        )
+        .unwrap();
+
+        assert_eq!(merged.get("BASE_URL").unwrap(), "https://check");
+        assert_eq!(merged.get("API_TOKEN").unwrap(), "shared-token");
+    }
+
+    #[test]
+    fn the_shared_tier_resolves_on_its_own_when_the_check_has_none() {
+        let shared = vec![("PASSWORD".to_string(), "hunter2".to_string())];
+        let merged = merge_variable_tiers(shared, &[], &dek(), "check-1").unwrap();
+
+        assert_eq!(merged.get("PASSWORD").unwrap(), "hunter2");
+    }
+
+    #[test]
+    fn the_cap_counts_the_resolved_set_not_either_tier() {
+        let shared: Vec<(String, String)> = (0..MAX_VARIABLES)
+            .map(|i| (format!("SHARED_{i}"), "x".to_string()))
+            .collect();
+        assert!(merge_variable_tiers(shared.clone(), &[], &dek(), "check-1").is_ok());
+        // One inline variable that does not collide pushes the merged set over.
+        assert!(
+            merge_variable_tiers(shared, &[variable("EXTRA", "1")], &dek(), "check-1").is_err()
+        );
+    }
+
+    #[test]
+    fn an_overriding_name_does_not_count_twice_toward_the_cap() {
+        let shared: Vec<(String, String)> = (0..MAX_VARIABLES)
+            .map(|i| (format!("SHARED_{i}"), "x".to_string()))
+            .collect();
+        let merged = merge_variable_tiers(
+            shared,
+            &[variable("SHARED_0", "override")],
+            &dek(),
+            "check-1",
+        )
+        .unwrap();
+        assert_eq!(merged.len(), MAX_VARIABLES);
+        assert_eq!(merged.get("SHARED_0").unwrap(), "override");
+    }
+
+    #[test]
+    fn a_resolved_target_must_still_be_an_http_url() {
+        assert!(resolved_target(&SyntheticType::Http, "file:///etc/passwd").is_err());
+        assert!(resolved_target(&SyntheticType::Browser, "javascript:alert(1)").is_err());
+        assert_eq!(
+            resolved_target(&SyntheticType::Http, "https://shop.test/login").unwrap(),
+            "https://shop.test/login"
+        );
+        assert_eq!(
+            resolved_target(&SyntheticType::Tcp, "db.internal:5432").unwrap(),
+            "db.internal:5432"
+        );
+    }
+
+    #[test]
+    fn a_resolved_target_without_a_scheme_gets_https_as_at_save_time() {
+        assert_eq!(
+            resolved_target(&SyntheticType::Http, "shop.test/login").unwrap(),
+            "https://shop.test/login"
+        );
+    }
+
+    #[test]
+    fn a_bad_resolved_target_never_echoes_the_substituted_secret() {
+        let err = resolved_target(&SyntheticType::Http, "ftp://x/?key=hunter2")
+            .unwrap_err()
+            .to_string();
+        assert!(err.starts_with("target: "), "{err}");
+        assert!(!err.contains("hunter2"), "{err}");
+    }
+
+    #[test]
+    fn a_secret_referenced_only_from_a_header_is_visible_once_rehydrated() {
+        let mut synthetic = Synthetic {
+            check_type: SyntheticType::Http,
+            target: "https://shop.test".to_string(),
+            config: serde_json::json!({
+                "method": "GET",
+                "headers": [{ "key": "Authorization", "value": "" }]
+            }),
+            ..Default::default()
+        };
+        synthetic.config_secrets.insert(
+            "/headers/0/value".to_string(),
+            encrypt_secret(&dek(), "Bearer {{API_TOKEN}}").unwrap(),
+        );
+        let referenced = |s: &Synthetic| {
+            config::meta::synthetics_variables::placeholder_names(
+                &crate::service::check_placeholder_text(s),
+            )
+        };
+        assert!(!referenced(&synthetic).contains("API_TOKEN"));
+
+        crate::service::rehydrate_config_secrets(&mut synthetic, &dek()).unwrap();
+
+        assert!(referenced(&synthetic).contains("API_TOKEN"));
+        assert!(synthetic.config_secrets.is_empty());
     }
 }

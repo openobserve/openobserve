@@ -21,8 +21,8 @@
 //! placeholder translation ($N → ?) automatically per backend.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    Statement, Value, sea_query::Expr,
+    ColumnTrait, ConnectionTrait, DatabaseBackend, DbErr, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Statement, Value, sea_query::Expr,
 };
 use serde::Serialize;
 use svix_ksuid::KsuidLike as _;
@@ -37,6 +37,8 @@ pub struct EnqueueParams<'a> {
     pub synthetics_name: &'a str,
     pub org_id: &'a str,
     pub location: &'a str,
+    /// Environment this job runs against, or None for an unscoped check.
+    pub env: Option<&'a str>,
     pub pool: &'a str,
     pub scheduled_ts: i64,
     pub valid_until: i64,
@@ -73,6 +75,7 @@ pub struct LeasedRow {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
+    pub env: Option<String>,
     pub pool: String,
     pub scheduled_ts: i64,
     pub valid_until: i64,
@@ -150,6 +153,23 @@ pub fn dead_letter_reason(
 
 // ── Scheduler: enqueue ────────────────────────────────────────────────────────
 
+/// The unique index that makes `enqueue`'s `ON CONFLICT` target resolve.
+pub(crate) const DEDUP_UQ: &str = "synthetics_jobs_dedup_env_uq";
+
+/// The dedup key, with `env` COALESCEd.
+pub(crate) fn dedup_index_sql(backend: DatabaseBackend) -> String {
+    match backend {
+        DatabaseBackend::Postgres | DatabaseBackend::Sqlite => format!(
+            "CREATE UNIQUE INDEX IF NOT EXISTS {DEDUP_UQ} ON synthetics_jobs \
+             (synthetics_id, location, scheduled_ts, (COALESCE(env, '')))"
+        ),
+        DatabaseBackend::MySql => format!(
+            "CREATE UNIQUE INDEX {DEDUP_UQ} ON synthetics_jobs (synthetics_id, location, \
+             scheduled_ts, env)"
+        ),
+    }
+}
+
 /// Inserts one pending check row. ON CONFLICT DO NOTHING prevents double-scheduling.
 /// Returns the KSUID assigned to the new job (or empty string on conflict-skip).
 pub async fn enqueue<C: ConnectionTrait>(
@@ -159,11 +179,11 @@ pub async fn enqueue<C: ConnectionTrait>(
     let id = svix_ksuid::Ksuid::new(None, None).to_string();
     let sql = r#"
         INSERT INTO synthetics_jobs
-            (id, synthetics_id, synthetics_name, org_id, location, pool,
+            (id, synthetics_id, synthetics_name, org_id, location, env, pool,
              scheduled_ts, valid_until, status, dispatch_attempts, run_id, browser_devices,
              steps_configured, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10, $11, $12)
-        ON CONFLICT (synthetics_id, location, scheduled_ts) DO NOTHING
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0, $10, $11, $12, $13)
+        ON CONFLICT (synthetics_id, location, scheduled_ts, COALESCE(env, '')) DO NOTHING
     "#;
 
     conn.execute(Statement::from_sql_and_values(
@@ -175,6 +195,9 @@ pub async fn enqueue<C: ConnectionTrait>(
             Value::from(p.synthetics_name),
             Value::from(p.org_id),
             Value::from(p.location),
+            p.env
+                .map(Value::from)
+                .unwrap_or(Value::from(None::<String>)),
             Value::from(p.pool),
             Value::from(p.scheduled_ts),
             Value::from(p.valid_until),
@@ -197,7 +220,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
     id: &str,
 ) -> Result<Option<LeasedRow>, errors::Error> {
     let sql = r#"
-        SELECT id, synthetics_id, synthetics_name, org_id, location, pool,
+        SELECT id, synthetics_id, synthetics_name, org_id, location, env, pool,
                scheduled_ts, valid_until, dispatch_attempts, run_id, browser_devices,
                steps_configured, metadata
         FROM synthetics_jobs
@@ -220,6 +243,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
                 synthetics_name: row.try_get("", "synthetics_name")?,
                 org_id: row.try_get("", "org_id")?,
                 location: row.try_get("", "location")?,
+                env: row.try_get("", "env").unwrap_or_default(),
                 pool: row.try_get("", "pool")?,
                 scheduled_ts: row.try_get("", "scheduled_ts")?,
                 valid_until: row.try_get("", "valid_until")?,
@@ -368,6 +392,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
             synthetics_name: m.synthetics_name,
             org_id: m.org_id,
             location: m.location,
+            env: m.env,
             pool: m.pool,
             scheduled_ts: m.scheduled_ts,
             valid_until: m.valid_until,
@@ -759,9 +784,7 @@ pub async fn run_location_outcomes<C: ConnectionTrait>(
     conn: &C,
     run_id: &str,
 ) -> Result<RunLocationOutcomes, errors::Error> {
-    const STATUS_PASSED: i32 = 3;
-
-    let mut rows = Entity::find()
+    let rows = Entity::find()
         .select_only()
         .column(Column::Location)
         .column(Column::Status)
@@ -769,30 +792,27 @@ pub async fn run_location_outcomes<C: ConnectionTrait>(
         .into_tuple::<(String, i32)>()
         .all(conn)
         .await?;
+    Ok(split_by_outcome(rows))
+}
 
-    // Worst first: Error(6) > Warning(5) > Failed(4). A reader scanning the first
-    // line of a message should see the most severe location, not the
-    // alphabetically first. Passing rows sort last and are split out below.
-    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-
-    let mut out = RunLocationOutcomes::default();
-    for (loc, status) in rows {
-        // A location runs once per run, but dedupe anyway: a requeued job can
-        // leave two rows for one location, and naming it twice in a message
-        // reads as two separate outages.
-        let bucket = if status == STATUS_PASSED {
-            &mut out.passing
-        } else {
-            &mut out.failing
-        };
-        if !bucket.contains(&loc) {
-            bucket.push(loc);
-        }
-    }
-    // Failing is severity-ordered; passing has no severity, so alphabetical is
-    // the only stable order a reader can predict.
-    out.passing.sort();
-    Ok(out)
+/// Environments of a run that did not pass, worst first.
+pub async fn failing_environments<C: ConnectionTrait>(
+    conn: &C,
+    run_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    let rows = Entity::find()
+        .select_only()
+        .column(Column::Env)
+        .column(Column::Status)
+        .filter(Column::RunId.eq(run_id))
+        .into_tuple::<(Option<String>, i32)>()
+        .all(conn)
+        .await?;
+    let named = rows
+        .into_iter()
+        .filter_map(|(env, status)| env.map(|env| (env, status)))
+        .collect();
+    Ok(split_by_outcome(named).failing)
 }
 
 /// One location+pool's share of the pending queue.
@@ -882,9 +902,45 @@ pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u6
     Ok(res.rows_affected())
 }
 
+/// Splits `(key, status)` rows into failing, worst first, and passing, each key once.
+fn split_by_outcome(mut rows: Vec<(String, i32)>) -> RunLocationOutcomes {
+    const STATUS_PASSED: i32 = 3;
+
+    // Error(6) > Warning(5) > Failed(4): a message's first line names the most severe.
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+    let mut out = RunLocationOutcomes::default();
+    for (key, status) in rows {
+        // A requeued job can leave two rows for one key, and naming it twice reads as two outages.
+        let bucket = if status == STATUS_PASSED {
+            &mut out.passing
+        } else {
+            &mut out.failing
+        };
+        if !bucket.contains(&key) {
+            bucket.push(key);
+        }
+    }
+    out.passing.sort();
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_dedup_key_coalesces_a_null_environment() {
+        for backend in [DatabaseBackend::Postgres, DatabaseBackend::Sqlite] {
+            let sql = dedup_index_sql(backend);
+            assert!(sql.contains("COALESCE(env, '')"), "{backend:?}: {sql}");
+            assert!(sql.contains("UNIQUE INDEX"), "{backend:?}: {sql}");
+            // The three original columns still have to be part of the key.
+            for col in ["synthetics_id", "location", "scheduled_ts"] {
+                assert!(sql.contains(col), "{backend:?} lost {col}: {sql}");
+            }
+        }
+    }
 
     #[test]
     fn test_enqueue_params_fields() {
@@ -893,6 +949,7 @@ mod tests {
             synthetics_name: "Login Flow",
             org_id: "org1",
             location: "aws-us-east-1",
+            env: Some("env-prod"),
             pool: "aws-browser",
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,
@@ -908,6 +965,7 @@ mod tests {
         assert_eq!(p.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
         assert!(p.browser_devices.is_some());
         assert_eq!(p.steps_configured, 14);
+        assert_eq!(p.env, Some("env-prod"));
     }
 
     #[test]
@@ -918,6 +976,7 @@ mod tests {
             synthetics_name: "Login Flow".to_string(),
             org_id: "org1".to_string(),
             location: "aws-us-east-1".to_string(),
+            env: None,
             pool: "aws-browser".to_string(),
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,
@@ -950,15 +1009,10 @@ mod tests {
         db.execute(backend.build(&schema.create_table_from_entity(Entity)))
             .await
             .unwrap();
-        // sqlite rejects `enqueue`'s ON CONFLICT target without a matching
-        // unique index. The FK to `synthetics_runs` is deliberately absent:
-        // sqlite ignores FKs without `PRAGMA foreign_keys=ON`.
-        db.execute_unprepared(
-            "CREATE UNIQUE INDEX synthetics_jobs_dedup_uq \
-             ON synthetics_jobs (synthetics_id, location, scheduled_ts)",
-        )
-        .await
-        .unwrap();
+        // The FK to `synthetics_runs` is absent on purpose: sqlite ignores FKs without the pragma.
+        db.execute_unprepared(&dedup_index_sql(backend))
+            .await
+            .unwrap();
         db
     }
 
@@ -968,6 +1022,7 @@ mod tests {
             synthetics_name: "Login Flow",
             org_id: "org1",
             location: "aws-us-east-1",
+            env: None,
             pool: "aws-browser",
             scheduled_ts: SCHEDULED_TS,
             valid_until: i64::MAX,
@@ -978,6 +1033,33 @@ mod tests {
             steps_configured,
             metadata: r#"{"tags":["prod"],"synthetic_type":"browser"}"#,
         }
+    }
+
+    #[tokio::test]
+    async fn one_tick_against_two_environments_enqueues_two_jobs() {
+        let db = jobs_db().await;
+
+        for env in [Some("prod"), Some("staging"), None] {
+            let params = EnqueueParams {
+                env,
+                ..browser_params(1)
+            };
+            enqueue(&db, params).await.unwrap();
+        }
+
+        // Same environment, same tick: still one job.
+        let repeat = EnqueueParams {
+            env: Some("prod"),
+            ..browser_params(1)
+        };
+        enqueue(&db, repeat).await.unwrap();
+
+        let rows = Entity::find().all(&db).await.unwrap();
+        assert_eq!(
+            rows.len(),
+            3,
+            "prod, staging and unscoped — no more, no less"
+        );
     }
 
     /// The missed-SELECT-column catcher: adding a field to `LeasedRow` without
@@ -1261,5 +1343,18 @@ mod tests {
             dead_letter_reason(1, MAX - 1, MAX),
             DeadLetterReason::Expired
         );
+    }
+
+    #[test]
+    fn outcomes_put_the_worst_failure_first_and_name_each_key_once() {
+        let out = split_by_outcome(vec![
+            ("eu".to_string(), 4),
+            ("us".to_string(), 6),
+            ("eu".to_string(), 4),
+            ("ap".to_string(), 3),
+            ("ca".to_string(), 3),
+        ]);
+        assert_eq!(out.failing, ["us", "eu"]);
+        assert_eq!(out.passing, ["ap", "ca"]);
     }
 }

@@ -1030,9 +1030,17 @@ async fn handle_composite_alert_trigger(
                 composite_incident_handled = incident_handled;
             }
 
-            let delivery_result = if incident_handled {
+            let delivery_result = if !should_dispatch_after_incident(
+                incident_handled,
+                !notification_alert.workflows.is_empty(),
+            ) {
                 Ok(crate::alerts::alert::NotificationOutcome::default())
             } else {
+                let skip_destinations = if incident_handled {
+                    &notification_alert.destinations
+                } else {
+                    &scheduled_data.notified_destinations
+                };
                 notification_alert
                     .send_notification(
                         trace_id,
@@ -1043,7 +1051,7 @@ async fn handle_composite_alert_trigger(
                         Some(evaluated.level),
                         Some(i32::from(evaluated.result) as f64),
                         None,
-                        &scheduled_data.notified_destinations,
+                        skip_destinations,
                     )
                     .await
             };
@@ -1180,6 +1188,13 @@ async fn handle_composite_alert_trigger(
     trigger.data = config::utils::json::to_string(&scheduled_data)?;
     let _ = infra::scheduler::complete_claim(trigger).await?;
     Ok(())
+}
+
+fn should_dispatch_after_incident(
+    incident_destinations_handled: bool,
+    has_workflows: bool,
+) -> bool {
+    !incident_destinations_handled || has_workflows
 }
 
 fn composite_notification_alert(
@@ -2972,7 +2987,6 @@ async fn handle_alert_triggers(
         //     );
         // }
 
-        // True when correlation sent or suppressed the notification itself; false sends below.
         #[cfg(feature = "enterprise")]
         let incident_handled_notification = if alert.creates_incident
             && o2_enterprise::enterprise::common::config::get_config()
@@ -3056,7 +3070,10 @@ async fn handle_alert_triggers(
             trigger_data_stream.dedup_suppressed = Some(false);
         }
 
-        if incident_handled_notification {
+        if !should_dispatch_after_incident(
+            incident_handled_notification,
+            !alert.workflows.is_empty(),
+        ) {
             // Notification was handled (sent or suppressed) inside correlate_alert_to_incident.
             // Still advance the trigger state so the scheduler moves forward normally.
             record_delivery(&mut trigger_data);
@@ -3067,17 +3084,18 @@ async fn handle_alert_triggers(
             };
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-        } else if let Some(dispatch) = dispatch_per_group(
-            &alert,
-            &scheduler_trace_id,
-            trigger_results.group_classification.as_ref(),
-            &data,
-            trigger_results.end_time,
-            eval_level,
-            Some(start_time),
-            triggered_at,
-        )
-        .await
+        } else if !incident_handled_notification
+            && let Some(dispatch) = dispatch_per_group(
+                &alert,
+                &scheduler_trace_id,
+                trigger_results.group_classification.as_ref(),
+                &data,
+                trigger_results.end_time,
+                eval_level,
+                Some(start_time),
+                triggered_at,
+            )
+            .await
         {
             // Per-group dispatch REPLACES the alert-level send (§5.5 MN-1):
             // sending both would page the worst group twice per incident.
@@ -3174,7 +3192,14 @@ async fn handle_alert_triggers(
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         } else {
-            // Direct notification — creates_incident=false, or incident correlation errored.
+            // Incident correlation owns destination delivery, but workflows are
+            // dispatched only here. Skip destinations already handled by the
+            // incident path so the same firing cannot page them twice.
+            let skip_destinations: &[String] = if incident_handled_notification {
+                &alert.destinations
+            } else {
+                &trigger_data.notified_destinations
+            };
             match alert
                 .send_notification(
                     &scheduler_trace_id,
@@ -3185,11 +3210,7 @@ async fn handle_alert_triggers(
                     eval_level,
                     trigger_results.actual_value,
                     None,
-                    // Retry ledger (§6.1): destinations that already landed on
-                    // a prior attempt of THIS notification cycle are skipped,
-                    // so a retry driven by one flaky destination cannot
-                    // double-page the ones that succeeded.
-                    &trigger_data.notified_destinations,
+                    skip_destinations,
                 )
                 .await
             {
@@ -6089,9 +6110,13 @@ mod tests {
 
     use super::*;
 
-    // ── On-call: one page per firing ────────────────────────────────────────
+    #[test]
+    fn incident_destination_delivery_does_not_suppress_attached_workflows() {
+        assert!(should_dispatch_after_incident(true, true));
+        assert!(!should_dispatch_after_incident(true, false));
+        assert!(should_dispatch_after_incident(false, false));
+    }
 
-    /// The record this evaluation's paging decision is taken against.
     #[cfg(feature = "enterprise")]
     fn oncall_record(
         state: config::meta::oncall::ResponseState,
@@ -6123,7 +6148,6 @@ mod tests {
         }
     }
 
-    /// While a record is open its ladder escalates, so `silence = 0` must not page every cycle.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_still_open_firing_does_not_page_again_on_the_next_cycle() {
@@ -6146,7 +6170,6 @@ mod tests {
         }
     }
 
-    /// A resolved firing that fires again later gets its own record, so its cause is history.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_resolved_firing_that_fires_again_gets_its_own_record() {
@@ -6168,7 +6191,6 @@ mod tests {
         );
     }
 
-    /// Both paths must agree, or ticking `creates_incident` changes how loudly an alert pages.
     #[test]
     fn test_both_entry_points_default_an_unset_priority_the_same_way() {
         assert_eq!(

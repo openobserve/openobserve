@@ -1251,6 +1251,11 @@ fn validate_metadata_params(
     } else {
         now_micros()
     };
+    if start > end {
+        let err = "start must not be later than end";
+        log::error!("{err}");
+        return Err(err.to_owned());
+    }
     Ok((selector, start, end))
 }
 
@@ -1900,5 +1905,25 @@ mod tests {
         // A matcher without a metric name should error
         let result = validate_metadata_params(Some("{job=\"prometheus\"}".to_string()), None, None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_start_after_end() {
+        let result = validate_metadata_params(
+            None,
+            Some("1700000200".to_string()),
+            Some("1700000100".to_string()),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_start_equals_end() {
+        let result = validate_metadata_params(
+            None,
+            Some("1700000100".to_string()),
+            Some("1700000100".to_string()),
+        );
+        assert!(result.is_ok());
     }
 }

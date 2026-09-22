@@ -82,7 +82,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 83: add folder_id to workflows.
 // 84: add folder_id to workflow_drafts.
 // 85: create llm_experiment_slot_retries.
-pub const DB_SCHEMA_VERSION: u64 = 86;
+// 86: create synthetics shared variables tables; add env to synthetics_jobs.
+// 87: create oncall_response_reports.
+pub const DB_SCHEMA_VERSION: u64 = 87;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -3245,9 +3247,11 @@ pub struct Prometheus {
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
-    /// Max `le` labels (buckets + gap markers + inf) a native histogram sample may
-    /// expand to; over-limit samples are downscaled (adjacent buckets merged).
-    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 16)]
+    /// Exponential histograms are stored at `min(producer schema, this)`, never count-driven.
+    #[env_config(name = "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA", default = 1)]
+    pub exp_histogram_target_schema: i32,
+    /// Safety valve, not a layout knob: past this many `le` labels a sample is downscaled.
+    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 512)]
     pub native_histogram_max_buckets: usize,
 }
 
@@ -3795,6 +3799,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check for metrics limit
     if cfg.limit.metrics_max_points_per_series == 0 {
         cfg.limit.metrics_max_points_per_series = 30_000;
+    }
+    if !(-4..=8).contains(&cfg.prom.exp_histogram_target_schema) {
+        return Err(anyhow::anyhow!(
+            "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA must be within -4..=8, got {}",
+            cfg.prom.exp_histogram_target_schema
+        ));
     }
 
     // check search job retention
@@ -5915,6 +5925,30 @@ mod tests {
         cfg.common.feature_bloom_filter_extra_fields = "trace_id".to_string();
         check_common_config(&mut cfg).unwrap();
         assert_eq!(cfg.common.feature_bloom_filter_extra_fields, "trace_id");
+    }
+
+    #[test]
+    fn test_check_common_config_exp_histogram_target_schema_range() {
+        let cfg = Config::init().unwrap();
+        assert_eq!(cfg.prom.exp_histogram_target_schema, 1);
+        assert_eq!(cfg.prom.native_histogram_max_buckets, 512);
+        // check_common_config scales sizes in place, so each call gets a fresh config
+        for schema in [-4, 8] {
+            let mut cfg = Config::init().unwrap();
+            cfg.prom.exp_histogram_target_schema = schema;
+            check_common_config(&mut cfg).unwrap();
+        }
+        for schema in [-5, 9] {
+            let mut cfg = Config::init().unwrap();
+            cfg.prom.exp_histogram_target_schema = schema;
+            let err = check_common_config(&mut cfg).unwrap_err().to_string();
+            assert_eq!(
+                err,
+                format!(
+                    "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA must be within -4..=8, got {schema}"
+                )
+            );
+        }
     }
 
     #[test]

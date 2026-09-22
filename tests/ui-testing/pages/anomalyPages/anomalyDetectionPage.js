@@ -56,6 +56,12 @@ class AnomalyDetectionPage {
             customSqlRequiredError: '[data-test="anomaly-custom-sql-required-error"]',
             customSqlTimestampError: '[data-test="anomaly-custom-sql-timestamp-alias-error"]',
             detectionFunction: '[data-test="anomaly-detection-function"]',
+            // The Detection Function info icon renders as a bare OIcon (no data-test,
+            // unlike the sensitivity info icon), so anchor on the label and take the
+            // cursor-pointer icon span — the OTooltip's hidden anchor span (also
+            // aria-hidden) has no cursor-pointer class and is excluded.
+            detectionFunctionInfo:
+              'div.font-semibold:has-text("Detection Function") span[aria-hidden="true"].cursor-pointer',
             detectionFunctionField: '[data-test="anomaly-detection-function-field"]',
             histogramIntervalValue: '[data-test="anomaly-histogram-interval-value"]',
             histogramIntervalUnit: '[data-test="anomaly-histogram-interval-unit"]',
@@ -70,6 +76,7 @@ class AnomalyDetectionPage {
             retrainInterval: '[data-test="anomaly-retrain-interval"]',
             sensitivityTier: '[data-test="anomaly-sensitivity-tier"]',
             sensitivityPercentile: '[data-test="anomaly-sensitivity-percentile"]',
+            sensitivityPercentileInfo: '[data-test="anomaly-sensitivity-percentile-info"]',
             sensitivityError: '[data-test="anomaly-sensitivity-error"]',
             sensitivityHint: '[data-test="anomaly-sensitivity-hint"]',
             // Budget mode (edit-only sensitivity): renders when the config
@@ -90,7 +97,11 @@ class AnomalyDetectionPage {
             // Right rail
             dataPreviewChart: '[data-test="anomaly-data-preview-chart"]',
             dataPreviewEmpty: '[data-test="anomaly-data-preview-empty"]',
+            dataPreviewCaption: '[data-test="anomaly-data-preview-caption"]',
             summaryScrollBtn: '[data-test="anomaly-summary-scroll-btn"]',
+
+            // Portalled OTooltip bubble (child mode mounts it lazily on hover).
+            tooltipContent: '[data-test="o-tooltip-content"]',
 
             // Detection charts (AlertDetail)
             detectionCharts: '[data-test="alerts-anomalydetectionchart"]',
@@ -355,6 +366,11 @@ class AnomalyDetectionPage {
         await this.selectOptionByValue(this.selectors.detectionFunctionField, field);
     }
 
+    /** The info icon beside the "Detection Function" label (its explainer tooltip). */
+    getDetectionFunctionInfoLocator() {
+        return this.page.locator(this.selectors.detectionFunctionInfo);
+    }
+
     /** @param {'m'|'h'} unit */
     async setHistogramInterval(value, unit = 'm') {
         await this.fillFormInput(this.selectors.histogramIntervalValue, value);
@@ -468,6 +484,20 @@ class AnomalyDetectionPage {
 
     getSensitivityErrorLocator() {
         return this.page.locator(this.selectors.sensitivityError);
+    }
+
+    /** The info icon beside the percentile label ("Level" disambiguation). */
+    getSensitivityPercentileInfoLocator() {
+        return this.page.locator(this.selectors.sensitivityPercentileInfo);
+    }
+
+    /**
+     * The inline percentile label span ("Level"). It carries no data-test, so
+     * anchor it as the info icon's parent — the icon is a child of the label,
+     * not a sibling.
+     */
+    getSensitivityPercentileLabelLocator() {
+        return this.page.locator(this.selectors.sensitivityPercentileInfo).locator('xpath=..');
     }
 
     // Budget mode (edit-only sensitivity)
@@ -710,6 +740,16 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.dataPreviewEmpty);
     }
 
+    /** The caption under the preview chart (rendered only once the preview is active). */
+    getDataPreviewCaptionLocator() {
+        return this.page.locator(this.selectors.dataPreviewCaption);
+    }
+
+    /** The portalled OTooltip bubble (mounted lazily on the trigger's hover). */
+    getTooltipContentLocator() {
+        return this.page.locator(this.selectors.tooltipContent);
+    }
+
     /** The preview debounces edits by 600ms, so allow for that plus the query. */
     async waitForDataPreview(timeout = 30000) {
         await this.getDataPreviewChartLocator().waitFor({ state: 'visible', timeout });
@@ -719,6 +759,18 @@ class AnomalyDetectionPage {
 
     getRow(name) {
         return this.page.locator(this.selectors.rowName(name));
+    }
+
+    /**
+     * The row's two-state pause/start control.
+     *
+     * Its data-row-action reflects the row's enabled state — 'pause' while
+     * enabled (the action on offer is to pause it), 'resume' while paused. That
+     * attribute, not the row's own visibility (which is invariant across both
+     * states), is the only UI proof a toggle actually took effect.
+     */
+    getPauseButtonLocator(name) {
+        return this.page.locator(this.selectors.rowPause(name));
     }
 
     /** OInput puts the real <input> behind a -field suffix; the wrapper is a div. */

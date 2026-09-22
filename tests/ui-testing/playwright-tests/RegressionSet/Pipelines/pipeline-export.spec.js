@@ -3,8 +3,6 @@ const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const { ingestTestData } = require('../../utils/data-ingestion.js');
 
-const SOURCE_STREAM = 'e2e_automate';
-
 const condition = () => ({
   filterType: 'group',
   logicalOperator: 'AND',
@@ -31,16 +29,17 @@ test.describe("Pipeline bulk export", () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await ingestTestData(page);
     await page.waitForLoadState('domcontentloaded');
     testLogger.info('Pipeline export setup completed');
   });
 
   test.afterEach(async () => {
-    while (created.length) {
-      const name = created.pop();
-      await pm.apiCleanup.deletePipeline(name).catch((e) =>
-        testLogger.warn(`Cleanup failed for ${name}: ${e.message}`)
+    if (created.length) {
+      // deletePipeline() takes the server-assigned pipeline_id, not the name we chose —
+      // cleanupPipelines() looks pipelines up by their source stream and deletes by id.
+      const streamNames = created.splice(0).map((name) => `${name}_src`);
+      await pm.apiCleanup.cleanupPipelines(streamNames).catch((e) =>
+        testLogger.warn(`Pipeline cleanup failed: ${e.message}`)
       );
     }
   });
@@ -52,7 +51,12 @@ test.describe("Pipeline bulk export", () => {
     const prefix = `e2e7030${Math.random().toString(36).substring(2, 7)}`;
     const names = [`${prefix}-alpha`, `${prefix}-beta`];
     for (const name of names) {
-      await pm.pipelinesPage.createPipeline(name, SOURCE_STREAM, `${name}_dest`, condition());
+      // A realtime pipeline is the only one OpenObserve allows per source stream, so
+      // each pipeline needs its own stream — they can't share one, even with each other.
+      const sourceStream = `${name}_src`;
+      await ingestTestData(page, sourceStream);
+      const result = await pm.pipelinesPage.createPipeline(name, sourceStream, `${name}_dest`, condition());
+      expect(result.status, `Pipeline creation must succeed for ${name}: ${JSON.stringify(result.data)}`).toBe(200);
       created.push(name);
     }
     testLogger.info(`Created ${names.length} pipelines under prefix ${prefix}`);

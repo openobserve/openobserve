@@ -3,8 +3,6 @@ const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const { ingestTestData } = require('../../utils/data-ingestion.js');
 
-const SOURCE_STREAM = 'e2e_automate';
-
 // Smallest payload createPipeline accepts; the pipeline's logic is irrelevant to this test.
 const minimalCondition = () => ({
   filterType: 'group',
@@ -27,21 +25,24 @@ test.describe("Pipeline list preview bounds", () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
   let pipelineName;
+  let sourceStream;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await ingestTestData(page);
     await page.waitForLoadState('domcontentloaded');
     testLogger.info('Pipeline preview bounds setup completed');
   });
 
   test.afterEach(async () => {
-    if (pipelineName) {
-      await pm.apiCleanup.deletePipeline(pipelineName).catch((e) =>
+    if (sourceStream) {
+      // deletePipeline() takes the server-assigned pipeline_id, not the name we chose —
+      // cleanupPipelines() looks the pipeline up by its source stream and deletes by id.
+      await pm.apiCleanup.cleanupPipelines([sourceStream]).catch((e) =>
         testLogger.warn(`Pipeline cleanup failed: ${e.message}`)
       );
+      sourceStream = undefined;
       pipelineName = undefined;
     }
   });
@@ -50,9 +51,15 @@ test.describe("Pipeline list preview bounds", () => {
     tag: ['@bug-12647', '@bug-9498', '@P2', '@regression', '@pipelinesRegression', '@pipelinesRegressionPreview']
   }, async ({ page }) => {
     // Created via API: the canvas editor's node-wiring pass is pure flake surface for a hover test.
-    const destName = `e2e_12647_dest_${Math.random().toString(36).substring(7)}`;
-    pipelineName = `e2e-12647-${Math.random().toString(36).substring(7)}`;
-    await pm.pipelinesPage.createPipeline(pipelineName, SOURCE_STREAM, destName, minimalCondition());
+    const suffix = Math.random().toString(36).substring(7);
+    // A realtime pipeline is the only one OpenObserve allows per source stream, so a
+    // dedicated stream keeps this test from colliding with any other pipeline test.
+    sourceStream = `e2e_12647_src_${suffix}`;
+    const destName = `e2e_12647_dest_${suffix}`;
+    pipelineName = `e2e-12647-${suffix}`;
+    await ingestTestData(page, sourceStream);
+    const result = await pm.pipelinesPage.createPipeline(pipelineName, sourceStream, destName, minimalCondition());
+    expect(result.status, `Pipeline creation must succeed: ${JSON.stringify(result.data)}`).toBe(200);
     testLogger.info(`Created pipeline ${pipelineName}`);
 
     await pm.pipelinesPage.openPipelineMenu();
