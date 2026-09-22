@@ -170,6 +170,24 @@ describe("SyntheticsInheritedVariables", () => {
     expect(wrapper.find(`${rowSel} .tip-slot`).text()).toBe("API_KEY — staging: ••••••");
   });
 
+  it("says Not set for a secret source that has no value, instead of masking nothing", () => {
+    wrapper = mountInherited({
+      rows: [
+        row({
+          name: "API_KEY",
+          secret: true,
+          hints: [
+            { source: "staging", example: "", has_value: true },
+            { source: "qa", example: "", has_value: false },
+          ],
+        }),
+      ],
+    });
+    expect(wrapper.find(`${rowSel} .tip-slot`).text()).toBe(
+      "API_KEY — staging: •••••• · qa: Not set",
+    );
+  });
+
   it("names the environments a variable is missing from, on the triangle's label", () => {
     wrapper = mountInherited({
       rows: [row({ name: "API_KEY" })],

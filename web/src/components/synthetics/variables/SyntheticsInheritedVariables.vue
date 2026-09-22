@@ -165,12 +165,12 @@ function sourceLabel(row: InheritedUnionRow): I18nText {
 function hintsLine(row: InheritedUnionRow): I18nText {
   const hints = row.hints.map((hint) => {
     const label = hint.source === "global" ? t("synthetics.variables.global") : hint.source;
+    const notSet = t("synthetics.inherited.valueNotSet");
     const value = row.secret
-      ? "••••••"
-      : hint.example ||
-        (hint.has_value
-          ? t("synthetics.inherited.valueSet")
-          : t("synthetics.inherited.valueNotSet"));
+      ? hint.has_value
+        ? "••••••"
+        : notSet
+      : hint.example || (hint.has_value ? t("synthetics.inherited.valueSet") : notSet);
     // An env source beside a global source is a shadow — say who it beats.
     const relation =
       hint.source !== "global" && row.global

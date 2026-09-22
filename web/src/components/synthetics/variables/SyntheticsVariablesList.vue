@@ -88,14 +88,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-value="{ row }">
+        <OBadge
+          v-if="row.kind === 'secret' && !row.has_value"
+          variant="warning"
+          data-test="synthetics-variable-value-empty"
+          >{{ t("synthetics.variables.notSet") }}</OBadge
+        >
         <span
-          v-if="row.kind === 'secret'"
+          v-else-if="row.kind === 'secret'"
           class="text-muted-foreground font-mono"
           data-test="synthetics-variable-secret-value"
+          >••••••</span
         >
-          ••••••
-          <span v-if="!row.has_value">{{ t("synthetics.variables.notSet") }}</span>
-        </span>
         <OBadge
           v-else-if="row.value === ''"
           variant="warning"

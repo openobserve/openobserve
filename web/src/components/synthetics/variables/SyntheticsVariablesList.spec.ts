@@ -117,16 +117,23 @@ describe("SyntheticsVariablesList — value cell", () => {
     expect(wrapper.find(emptyBadge).exists()).toBe(false);
   });
 
-  it("leaves a secret row on its mask, never the Empty badge", () => {
+  it("masks a stored secret with no Empty badge", () => {
     wrapper = mountList([
       variable({ id: "s1", name: "TOKEN", kind: "secret", value: undefined, has_value: true }),
+    ]);
+    expect(wrapper.find(secretValue).text()).toBe("••••••");
+    expect(wrapper.find(emptyBadge).exists()).toBe(false);
+  });
+
+  it("flags a secret with no stored value with a Not set badge instead of a mask", () => {
+    wrapper = mountList([
       variable({ id: "s2", name: "UNSET", kind: "secret", value: undefined, has_value: false }),
     ]);
-    const masks = wrapper.findAll(secretValue);
-    expect(masks).toHaveLength(2);
-    expect(masks[0].text()).toBe("••••••");
-    expect(masks[1].text()).toContain("Not set");
-    expect(wrapper.find(emptyBadge).exists()).toBe(false);
+    const badge = wrapper.find(emptyBadge);
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe("Not set");
+    expect(badge.attributes("data-variant")).toBe("warning");
+    expect(wrapper.find(secretValue).exists()).toBe(false);
   });
 });
 
