@@ -106,8 +106,6 @@ message SearchInfo {
 message IndexInfo {
     repeated KvItem                equal_keys = 3;
     IdxOptimizeMode       index_optimize_mode = 5;
-    // anomaly queries bin via date_bin; the tantivy fast path bins on the epoch grid
-    bool               bypass_index_optimizer = 6;
 }
 
 message SuperClusterInfo {

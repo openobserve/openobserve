@@ -407,7 +407,6 @@ pub(crate) async fn run_profiles_sql(
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
-            bypass_index_optimizer: false,
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],
