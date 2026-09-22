@@ -124,6 +124,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else>{{ row.first_name }}</template>
           </template>
 
+          <template v-if="showRolesColumn" #cell-roles="{ row }">
+            <span
+              :data-test="`service-accounts-roles-${row.email}`"
+              class="text-text-secondary truncate text-xs"
+              :title="serviceAccountRolesText(row.email)"
+              >{{ serviceAccountRolesText(row.email) }}</span
+            >
+          </template>
+
           <template #cell-token="{ row }">
             <OCodeCell
               :data-test="`service-accounts-token-${row.email}`"
@@ -479,6 +488,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { serviceAccountsQuery } from "@/services/service_accounts.queries";
+import { allUserRolesQuery } from "@/services/users.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -717,10 +728,41 @@ export default defineComponent({
     const confirmBulkDelete = ref(false);
     const bulkDeleteLoading = ref(false);
 
+    // Map of account email -> role names, for the Roles column. A single
+    // batched org-wide request (same endpoint AppRoles.vue uses for its member
+    // counts), not one lookup per row. Enterprise/cloud only; on OSS the
+    // column itself is never rendered so this is simply never called.
+    const serviceAccountRoles = ref<Record<string, string[]> | null>(null);
+
+    const loadServiceAccountRoles = async (force = false) => {
+      if (!showRolesColumn) return;
+      try {
+        const options = allUserRolesQuery(store.state.selectedOrganization.identifier);
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        serviceAccountRoles.value = (await queryClient.fetchQuery(options)) ?? {};
+      } catch {
+        // Silent: roles are context for this column, not load-bearing — the
+        // list stays fully usable without them.
+        serviceAccountRoles.value = null;
+      }
+    };
+
+    const serviceAccountRolesText = (email: string): string => {
+      const roles = serviceAccountRoles.value?.[email];
+      return roles?.length ? roles.join(", ") : "—";
+    };
+
     onBeforeMount(async () => {
       // Not forced: a route-change read stays cached. Only the refresh button
       // and the post-write reloads below pass `true`.
       await getServiceAccountsUsers();
+      loadServiceAccountRoles();
 
       // Only `action=update&email=…` auto-opens the edit dialog so a shared
       // edit link still lands directly on the user's form. `action=add` is
@@ -735,6 +777,10 @@ export default defineComponent({
         if (match) addUser({ row: match }, true);
       }
     });
+
+    // Roles/Groups are an enterprise/cloud-only concept (OSS has no RBAC UI),
+    // so the column — and the lookup backing it — is skipped entirely there.
+    const showRolesColumn = config.isEnterprise === "true" || config.isCloud === "true";
 
     const columns: OTableColumnDef[] = [
       {
@@ -758,6 +804,21 @@ export default defineComponent({
         minSize: 160,
         meta: { align: "left", flex: true },
       },
+      ...(showRolesColumn
+        ? [
+            {
+              id: "roles",
+              header: t("serviceAccounts.list.col.roles"),
+              accessorKey: "roles",
+              sortable: false,
+              resizable: true,
+              hideable: true,
+              size: 160,
+              minSize: 120,
+              meta: { align: "left" },
+            } satisfies OTableColumnDef,
+          ]
+        : []),
       {
         id: "token",
         header: t("serviceAccounts.list.col.token"),
@@ -825,7 +886,10 @@ export default defineComponent({
       return e?.status === 403 || e?.response?.status === 403;
     });
     // Bound to refresh / post-write reloads: always hits the server.
-    const refreshServiceAccounts = () => getServiceAccountsUsers(true);
+    const refreshServiceAccounts = () => {
+      loadServiceAccountRoles(true);
+      return getServiceAccountsUsers(true);
+    };
 
     const applyServiceAccounts = (accounts: any[]) => {
       resultTotal.value = accounts.length;
@@ -1255,6 +1319,9 @@ export default defineComponent({
       isSystemAccount,
       isRowSelectable,
       deleteUserEmailIdentifier,
+      showRolesColumn,
+      serviceAccountRoles,
+      serviceAccountRolesText,
     };
   },
 });

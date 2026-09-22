@@ -2062,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Identifier",
+        "roles": "Roles",
         "token": "Token",
         "created": "Created"
       }

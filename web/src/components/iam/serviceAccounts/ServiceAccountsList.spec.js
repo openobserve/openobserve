@@ -707,13 +707,15 @@ describe("ServiceAccountsList Component", () => {
     it("has correct column configuration", () => {
       // columns uses OTableColumnDef with 'id' (not 'name'). The row-index "#"
       // column is now auto-injected by OTable's show-index, so it is not part
-      // of the component's own column defs.
-      expect(wrapper.vm.columns).toHaveLength(5);
+      // of the component's own column defs. aws-exports is mocked with
+      // isEnterprise: "true", so the Roles column is included.
+      expect(wrapper.vm.columns).toHaveLength(6);
       expect(wrapper.vm.columns[0].id).toBe("email");
       expect(wrapper.vm.columns[1].id).toBe("first_name");
-      expect(wrapper.vm.columns[2].id).toBe("token");
-      expect(wrapper.vm.columns[3].id).toBe("created_at");
-      expect(wrapper.vm.columns[4].id).toBe("actions");
+      expect(wrapper.vm.columns[2].id).toBe("roles");
+      expect(wrapper.vm.columns[3].id).toBe("token");
+      expect(wrapper.vm.columns[4].id).toBe("created_at");
+      expect(wrapper.vm.columns[5].id).toBe("actions");
     });
 
     it("has correct per page options", () => {
@@ -1360,6 +1362,18 @@ describe("ServiceAccountsList Component", () => {
     it("formatCreatedAt returns an em dash for missing timestamps", () => {
       expect(wrapper.vm.formatCreatedAt(0)).toBe("—");
       expect(wrapper.vm.formatCreatedAt(undefined)).toBe("—");
+    });
+
+    it("includes a 'roles' column on enterprise/cloud (aws-exports mocked isEnterprise: true)", () => {
+      const rolesCol = wrapper.vm.columns.find((c) => c.id === "roles");
+      expect(rolesCol).toBeDefined();
+      expect(rolesCol.header).toBe("Roles");
+    });
+
+    it("serviceAccountRolesText joins assigned role names, else renders an em dash", () => {
+      wrapper.vm.serviceAccountRoles = { "svc@example.com": ["editor", "viewer"] };
+      expect(wrapper.vm.serviceAccountRolesText("svc@example.com")).toBe("editor, viewer");
+      expect(wrapper.vm.serviceAccountRolesText("unknown@example.com")).toBe("—");
     });
   });
 
