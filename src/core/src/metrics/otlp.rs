@@ -3735,7 +3735,7 @@ mod tests {
                 negative: None,
             };
 
-            assert!(process_exp_hist_data_point(&mut rec, &stale).is_empty());
+            assert!(process_exp_hist_data_point(&mut rec, &stale, lim(16)).is_empty());
         }
 
         #[test]
