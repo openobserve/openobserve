@@ -192,6 +192,7 @@ mod m20260912_000001_add_anomaly_alert_budget;
 mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
 mod m20260916_000001_add_folder_id_to_workflow_drafts;
+mod m20260917_000001_create_llm_experiment_slot_retries;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -469,6 +470,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260912_000002_add_anomaly_last_recovery_notified_at::Migration),
             Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
             Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
+            Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
         ]
     }
 }
@@ -509,6 +511,7 @@ mod tests {
         ),
         (83, "m20260910_000001_add_folder_id_to_workflows"),
         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
+        (85, "m20260917_000001_create_llm_experiment_slot_retries"),
     ];
 
     #[test]

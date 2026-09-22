@@ -446,7 +446,7 @@ describe("OnCallRuleEditor", () => {
     await flushPromises();
     expect(
       wrapper.findComponent('[data-test="oncall-rule-editor-team"]').props("helpText"),
-    ).toContain("no escalation ladder yet");
+    ).toContain("No escalation ladder yet");
   });
 
   /// A host serving more than one team (the org-level dialog) cannot ship a

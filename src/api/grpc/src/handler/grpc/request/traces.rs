@@ -13,14 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::otlp::OtlpRequestType, metrics};
+use config::meta::otlp::OtlpRequestType;
 use ingestion_common::IngestUser;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
 };
 use tonic::{Response, Status};
 
-use crate::service::traces::handle_otlp_request;
+use crate::{
+    handler::grpc::request::otlp::{export_reply, observe_ok},
+    service::traces::handle_otlp_request,
+};
 
 #[derive(Default)]
 pub struct TraceServer;
@@ -72,24 +75,14 @@ impl TraceService for TraceServer {
             in_stream_name,
             user,
         )
-        .await;
-        if resp.is_ok() {
-            // metrics
-            let time = start.elapsed().as_secs_f64();
-            metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/otlp/v1/traces", "200", "", "", "", ""])
-                .observe(time);
-            metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/otlp/v1/traces", "200", "", "", "", ""])
-                .inc();
-            return Ok(Response::new(ExportTraceServiceResponse {
-                partial_success: None,
-            }));
-        } else {
-            let err = resp.err().unwrap().to_string();
-            log::error!("handle_trace_request err {err}");
-            Err(Status::internal(err))
-        }
+        .await
+        .map_err(|e| {
+            log::error!("handle_trace_request err {e}");
+            Status::internal(e.to_string())
+        })?;
+        let reply = export_reply(resp).await?;
+        observe_ok("/otlp/v1/traces", start);
+        Ok(Response::new(reply))
     }
 }
 

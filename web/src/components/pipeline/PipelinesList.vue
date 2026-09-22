@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #toolbar>
-            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OToggleGroup
                 mobile-dropdown
                 :model-value="activeTab"
@@ -108,20 +108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="pipelinesRefresh"
               data-test="pipeline-list-refresh-btn"
-              @click="getPipelines"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="pipelinesRefresh"
-              />
-            </OButton>
+              @click="refreshPipelines"
+            />
           </template>
 
           <template #cell-type="{ row }">
@@ -513,7 +508,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 </template>
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { pipelinesQuery } from "@/services/pipelines.queries";
+import { pipelineKeys } from "@/services/pipelines.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
 import { useI18nTyped } from "@/types/i18n";
@@ -547,6 +547,7 @@ import ResumePipelineDialog from "../ResumePipelineDialog.vue";
 import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -566,7 +567,76 @@ const filterQuery = ref("");
 
 const showCreatePipeline = ref(false);
 
-const pipelines = ref([]);
+/**
+ * Pure: builds a new row per pipeline rather than writing onto the argument, so
+ * this can be derived straight from the cached query data without rewriting the
+ * cache entry in place.
+ */
+const shapePipelines = (list: any[]) =>
+  list.map((pipeline: any) => {
+    const updatedEdges = pipeline.edges.map((edge: any) => ({
+      ...edge,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20, // Increase arrow width
+        height: 20, // Increase arrow height
+      },
+      type: "custom",
+
+      style: {
+        strokeWidth: 2,
+      },
+      animated: true,
+      updatable: true,
+    }));
+
+    const derived =
+      pipeline.source.source_type === "realtime"
+        ? {
+            stream_name: pipeline.source.stream_name,
+            stream_type: pipeline.source.stream_type,
+            frequency: "--",
+            period: "--",
+            cron: "--",
+            sql_query: "--",
+          }
+        : {
+            stream_type: pipeline.source.stream_type,
+            // These three feed accessor-only table columns (no #cell-* slot), so
+            // whatever is written here renders verbatim — hence t() rather than
+            // bare literals.
+            frequency:
+              pipeline.source.trigger_condition.frequency_type == "minutes"
+                ? t("pipeline.frequencyMins", {
+                    count: pipeline.source.trigger_condition.frequency,
+                  })
+                : pipeline.source.trigger_condition.cron,
+            period: t("pipeline.frequencyMins", {
+              count: pipeline.source.trigger_condition.period,
+            }),
+            cron:
+              pipeline.source.trigger_condition.frequency_type == "minutes"
+                ? t("common.boolFalse")
+                : t("common.boolTrue"),
+            sql_query: pipeline.source.query_condition.sql,
+          };
+
+    return {
+      ...pipeline,
+      type: pipeline.source.source_type,
+      ...derived,
+      edges: updatedEdges,
+    };
+  });
+
+const orgIdForList = useOrgId();
+const pipelinesList = useQuery(() =>
+  Object.assign(pipelinesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+
+// The list is the query, not a copy of it: anything invalidating the pipelines
+// scope repaints these rows with no wiring here.
+const pipelines = computed(() => shapePipelines(pipelinesList.data.value ?? []));
 
 const store = useStore();
 
@@ -614,7 +684,12 @@ const confirmDialogMeta: any = ref({
   onConfirm: () => {},
 });
 const activeTab = ref("all");
-const filteredPipelines: any = ref([]);
+// Derived, not assigned: a copy written only by updateActiveTab() is empty on a cold mount.
+const filteredPipelines = computed<any[]>(() =>
+  activeTab.value === "all"
+    ? pipelines.value
+    : pipelines.value.filter((pipeline: any) => pipeline.source.source_type === activeTab.value),
+);
 const columns: any = ref([]);
 
 const selectedPipelineIds = ref<string[]>([]);
@@ -783,16 +858,6 @@ const summaryStats = computed<StatItem[]>(() => {
 
 const updateActiveTab = () => {
   expandedId.value = [];
-  if (activeTab.value === "all") {
-    columns.value = getColumnsForActiveTab(activeTab.value);
-    filteredPipelines.value = pipelines.value;
-    return;
-  }
-
-  filteredPipelines.value = pipelines.value.filter(
-    (pipeline: any) => pipeline.source.source_type === activeTab.value,
-  );
-
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
 
@@ -830,7 +895,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
         message,
         variant: "success",
       });
-      await getPipelines();
+      await getPipelines(true);
     })
     .catch((error) => {
       if (error.response.status != 403) {
@@ -996,74 +1061,32 @@ const goToImportPipeline = () => {
   });
 };
 
-const loading = ref(true);
-const forbidden = ref(false);
-const getPipelines = async () => {
-  loading.value = true;
-  forbidden.value = false;
-  try {
-    const response = await pipelineService.getPipelines(
-      store.state.selectedOrganization.identifier,
-    );
-    pipelines.value = [];
-    // resultTotal.value = response.data.list.length;
-    pipelines.value = response.data.list.map((pipeline: any) => {
-      const updatedEdges = pipeline.edges.map((edge: any) => ({
-        ...edge,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 20, // Increase arrow width
-          height: 20, // Increase arrow height
-        },
-        type: "custom",
+const loading = pipelinesList.isPending;
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = pipelinesList.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = pipelinesList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = pipelinesList.dataUpdatedAt;
+// Bound to the refresh button: always hits the server.
+const refreshPipelines = () => getPipelines(true);
 
-        style: {
-          strokeWidth: 2,
-        },
-        animated: true,
-        updatable: true,
-      }));
-      pipeline.type = pipeline.source.source_type;
-      if (pipeline.source.source_type === "realtime") {
-        pipeline.stream_name = pipeline.source.stream_name;
-        pipeline.stream_type = pipeline.source.stream_type;
-        pipeline.frequency = "--";
-        pipeline.period = "--";
-        pipeline.cron = "--";
-        pipeline.sql_query = "--";
-      } else {
-        pipeline.stream_type = pipeline.source.stream_type;
-        // These three feed accessor-only table columns (no #cell-* slot), so whatever
-        // is written here renders verbatim — hence t() rather than bare literals.
-        // Keys deliberately preserve the existing English ("15 Mins", "True"/"False")
-        // so this change is i18n-only with no visible diff. Switching the Cron column
-        // to Yes/No would read better, but that is a copy decision, not a migration one.
-        pipeline.frequency =
-          pipeline.source.trigger_condition.frequency_type == "minutes"
-            ? t("pipeline.frequencyMins", { count: pipeline.source.trigger_condition.frequency })
-            : pipeline.source.trigger_condition.cron;
-        pipeline.period = t("pipeline.frequencyMins", {
-          count: pipeline.source.trigger_condition.period,
-        });
-        pipeline.cron =
-          pipeline.source.trigger_condition.frequency_type == "minutes"
-            ? t("common.boolFalse")
-            : t("common.boolTrue");
-        pipeline.sql_query = pipeline.source.query_condition.sql;
-      }
-
-      pipeline.edges = updatedEdges;
-      return {
-        ...pipeline,
-      };
-    });
-  } catch (error: any) {
-    console.error(error);
-    forbidden.value = error?.response?.status === 403;
-  } finally {
-    loading.value = false;
-  }
+// Only an explicit call reads: refresh, post-write reload, search. Mount and
+// invalidation-driven repaints come from the query itself.
+const getPipelines = async (force = false) => {
+  if (force) await pipelinesList.refetch();
+  // `refetch` resolves before vue-query has propagated the new value into its
+  // reactive refs, so callers reading `pipelines` straight after need a tick.
+  await nextTick();
 };
+
+watch(pipelinesList.error, (error: any) => {
+  if (error) console.error(error);
+});
 const editPipeline = (pipeline: any) => {
   pipeline.nodes.forEach((node: any) => {
     node.type = node.io_type;
@@ -1102,7 +1125,7 @@ const savePipeline = (data: any) => {
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then(() => {
-      getPipelines();
+      getPipelines(true);
       dismiss();
       showCreatePipeline.value = false;
       toast({
@@ -1139,6 +1162,11 @@ const deletePipeline = async () => {
         message: t("toastMessages.pipeline.pipelineDeletedSuccessfully"),
         variant: "success",
       });
+      // Drop the row from the cache first so it disappears now, not when the
+      // reload in `finally` lands.
+      queryClient.setQueriesData({ queryKey: pipelineKeys.all(org_id) }, (list: any) =>
+        Array.isArray(list) ? list.filter((p: any) => p.pipeline_id !== pipeline_id) : list,
+      );
     })
     .catch((error) => {
       if (error.response.status != 403) {
@@ -1150,7 +1178,7 @@ const deletePipeline = async () => {
     })
     .finally(async () => {
       selectedPipelineIds.value = [];
-      await getPipelines();
+      await getPipelines(true);
       updateActiveTab();
       dismiss();
     });
@@ -1297,7 +1325,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     }
 
     selectedPipelineIds.value = [];
-    await getPipelines();
+    await getPipelines(true);
     updateActiveTab();
   } catch (error) {
     dismiss();
@@ -1394,7 +1422,7 @@ const bulkDeletePipelines = async () => {
     }
 
     selectedPipelineIds.value = [];
-    await getPipelines();
+    await getPipelines(true);
     updateActiveTab();
   } catch (error: any) {
     dismiss();
@@ -1449,7 +1477,7 @@ useShortcuts([
   {
     id: "pipelinesRefresh",
     handler: () => {
-      if (!isInputFocused()) getPipelines();
+      if (!isInputFocused()) getPipelines(true);
     },
   },
   {

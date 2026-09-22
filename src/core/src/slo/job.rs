@@ -416,7 +416,7 @@ pub fn promql_rows(
                 let slice_start = t_micros / 1_000_000 - slice_interval_secs;
                 let e = acc
                     .entry((slice_start, key.clone()))
-                    .or_insert((0.0, labels.clone()));
+                    .or_insert_with(|| (0.0, labels.clone()));
                 e.0 += value;
             }
         }

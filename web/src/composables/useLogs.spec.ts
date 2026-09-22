@@ -79,11 +79,14 @@ vi.mock("../../services/search", () => {
   };
 });
 
-vi.mock("../../services/saved_views", () => ({
-  default: {
-    get: vi.fn().mockImplementation(() => Promise.resolve()),
-  },
-}));
+vi.mock("../../services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn().mockImplementation(() => Promise.resolve()),
+    },
+  });
+});
 
 // Mock getStreams and getStream functions
 const mockGetStreams = vi.fn();

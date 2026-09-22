@@ -18,7 +18,7 @@ use std::borrow::Cow;
 use serde_json::value::{Map, Value};
 
 const KEY_SEPARATOR: &str = "_";
-const TOKEN_NUMBER: &str = "$serde_json::private::Number";
+pub const TOKEN_NUMBER: &str = "$serde_json::private::Number";
 
 #[inline]
 pub fn flatten(to_flatten: Value) -> Result<Value, anyhow::Error> {
@@ -172,21 +172,19 @@ pub fn format_key(key: &mut String) {
                 bytes[i] = b'_';
             }
         } else {
-            *key = key
-                .chars()
-                .map(|c| {
-                    if c.is_lowercase() || c.is_numeric() {
-                        c
-                    } else if c.is_uppercase() {
-                        c.to_lowercase().next().unwrap()
-                    } else {
-                        '_'
-                    }
-                })
-                .collect();
+            *key = key.chars().map(format_key_char).collect();
             return;
         }
         i += 1;
+    }
+}
+
+/// Appends `key` to `out` as `format_key` would rewrite it, without an intermediate `String`.
+pub fn push_formatted_key(out: &mut String, key: &str) {
+    if check_key(key) {
+        out.push_str(key);
+    } else {
+        out.extend(key.chars().map(format_key_char));
     }
 }
 
@@ -209,6 +207,16 @@ pub fn format_label_name_cow(label_name: &str) -> Cow<'_, str> {
     }
 }
 
+fn format_key_char(c: char) -> char {
+    if c.is_lowercase() || c.is_numeric() {
+        c
+    } else if c.is_uppercase() {
+        c.to_lowercase().next().unwrap()
+    } else {
+        '_'
+    }
+}
+
 fn check_key(key: &str) -> bool {
     if key
         .bytes()
@@ -227,6 +235,24 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn test_push_formatted_key_matches_format_key() {
+        for key in [
+            "plain_key",
+            "Mixed.Case-Key",
+            "kubectl.kubernetes.io/restartedAt",
+            "NAÏVE",
+            "a b",
+            "",
+        ] {
+            let mut expected = key.to_string();
+            format_key(&mut expected);
+            let mut out = "prefix_".to_string();
+            push_formatted_key(&mut out, key);
+            assert_eq!(out, format!("prefix_{expected}"), "{key}");
+        }
+    }
 
     #[test]
     fn test_check_key_lowercase() {

@@ -49,9 +49,12 @@ vi.mock("@/composables/fieldValueDB", () => ({
   trimToMaxFields: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("@/services/stream", () => ({
-  default: { fieldValues: vi.fn() },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { fieldValues: vi.fn() },
+  });
+});
 
 import streamService from "@/services/stream";
 

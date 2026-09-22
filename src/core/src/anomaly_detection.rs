@@ -63,7 +63,7 @@ const VALUE_COLUMN_TTL: Duration = Duration::from_secs(60);
 
 /// Keyed `(org_id, anomaly_id)` so per-tick detection stops PK-reading the meta primary.
 #[cfg(feature = "enterprise")]
-static VALUE_COLUMN_CACHE: LazyLock<RwLock<HashMap<(String, String), (Option<String>, Instant)>>> =
+static VALUE_COLUMN_CACHE: LazyLock<RwLock<ValueColumnCache>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Lowercased operators the enterprise query builder can express, mirroring its
@@ -101,6 +101,9 @@ const SUPPORTED_FILTER_OPERATORS: [&str; 30] = [
     "re_match",
     "re_not_match",
 ];
+
+#[cfg(feature = "enterprise")]
+type ValueColumnCache = HashMap<(String, String), (Option<String>, Instant)>;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
@@ -3539,8 +3542,10 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_partial_search_result_is_an_error_not_evidence() {
-        let mut resp = config::meta::search::Response::default();
-        resp.is_partial = true;
+        let resp = config::meta::search::Response {
+            is_partial: true,
+            ..Default::default()
+        };
         let err = parse_search_results_to_timeseries(&resp, "a1", None).unwrap_err();
         assert!(err.to_string().contains("partial"), "{err}");
     }

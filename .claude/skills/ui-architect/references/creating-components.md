@@ -63,12 +63,12 @@ Rules:
 
 A compound family is one folder with multiple members that share a `provide`/`inject` context. **Build and ship the whole family — never half of one.** Existing families:
 
-| Family | Members (co-located) |
-| --- | --- |
-| Button | `OButton`, `OButtonGroup` |
-| Tabs | `OTabs`, `OTab`, `ORouteTab`, `OTabPanels`, `OTabPanel` |
-| Select | `OSelect`, `OSelectItem`, `OSelectGroup` (+ `OFormSelect`) |
-| Dropdown | `ODropdown` + item/group/separator members |
+| Family   | Members (co-located)                                       |
+| -------- | ---------------------------------------------------------- |
+| Button   | `OButton`, `OButtonGroup`                                  |
+| Tabs     | `OTabs`, `OTab`, `ORouteTab`, `OTabPanels`, `OTabPanel`    |
+| Select   | `OSelect`, `OSelectItem`, `OSelectGroup` (+ `OFormSelect`) |
+| Dropdown | `ODropdown` + item/group/separator members                 |
 
 The shared context (its `InjectionKey`) is defined in the root member's `.types.ts` and provided by the root, injected by children.
 
@@ -89,11 +89,11 @@ For ARIA-complex behavior (Dialog, Drawer, Tabs, Select, Popover, Combobox, Drop
 
 A component bakes its design in. It exposes **intent**, never **appearance**. Only three prop categories are allowed:
 
-| Category | Examples | Why |
-| --- | --- | --- |
-| Semantic **variant** | `variant="primary" \| "ghost" \| "outline"` | communicates intent |
-| Semantic **size** | `size="sm" \| "md" \| "lg"` | adapts without exposing pixels |
-| **State** | `disabled`, `loading`, `readonly` | behavioral flags |
+| Category             | Examples                                    | Why                            |
+| -------------------- | ------------------------------------------- | ------------------------------ |
+| Semantic **variant** | `variant="primary" \| "ghost" \| "outline"` | communicates intent            |
+| Semantic **size**    | `size="sm" \| "md" \| "lg"`                 | adapts without exposing pixels |
+| **State**            | `disabled`, `loading`, `readonly`           | behavioral flags               |
 
 **Banned props** — anything whose only job is to change a CSS value:
 
@@ -109,8 +109,9 @@ Implement variants as a computed class map keyed by the variant/size value (no C
 
 ```ts
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  primary: "bg-button-primary text-button-primary-foreground hover:bg-button-primary-hover",
-  ghost:   "bg-transparent text-button-ghost-text hover:bg-button-ghost-hover-bg",
+  primary:
+    "bg-button-primary text-button-primary-foreground hover:bg-button-primary-hover",
+  ghost: "bg-transparent text-button-ghost-text hover:bg-button-ghost-hover-bg",
 };
 ```
 
@@ -127,7 +128,8 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 
 ```ts
 // OButton.types.ts
-export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "destructive";
+export type ButtonVariant =
+  "primary" | "secondary" | "outline" | "ghost" | "destructive";
 export type ButtonSize = "sm" | "md" | "lg" | "icon";
 
 export interface ButtonProps {
@@ -160,12 +162,12 @@ Two-way binding uses the standard `modelValue` prop + `update:modelValue` emit (
 
 Token files live in `web/src/lib/styles/tokens/`:
 
-| File | Layer |
-| --- | --- |
-| `base.css` | raw palette (`:root`) — the only place literal hex lives; never referenced in components |
-| `semantic.css` | `@theme inline` — shared meaning (`--color-text-primary`, `--color-surface-panel`, `--color-border-default`) |
-| `component.css` | `@theme inline` — per-component tokens (`--color-button-primary`) |
-| `dark.css` | dark overrides under `.dark` |
+| File            | Layer                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------ |
+| `base.css`      | raw palette (`:root`) — the only place literal hex lives; never referenced in components                     |
+| `semantic.css`  | `@theme inline` — shared meaning (`--color-text-primary`, `--color-surface-panel`, `--color-border-default`) |
+| `component.css` | `@theme inline` — per-component tokens (`--color-button-primary`)                                            |
+| `dark.css`      | dark overrides under `.dark`                                                                                 |
 
 **Adding a new component token:** define it in `component.css` inside `@theme inline`, referencing a semantic/base token (never a raw value):
 

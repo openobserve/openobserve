@@ -123,6 +123,9 @@ pub struct TopologyMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub processed_up_to: Option<i64>,
     pub unresolved: UnresolvedCounts,
+    /// Non-essential queries that failed and were read as empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub degraded: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -547,10 +550,12 @@ mod tests {
                     ambiguous: 3,
                     cardinality: 4,
                 },
+                degraded: vec![],
             }),
         };
         let val = serde_json::to_value(&graph).unwrap();
         assert_eq!(val["meta"]["source"], "v4");
+        assert!(val["meta"].get("degraded").is_none());
         assert_eq!(val["meta"]["processed_up_to"], 1_700_000_000_i64);
         assert_eq!(val["meta"]["unresolved"]["ip_only"], 2_u64);
         let v1 = TopologyMeta {
