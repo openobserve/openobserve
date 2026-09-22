@@ -60,6 +60,7 @@ const INTEGRAL_ARRAY_KEYS: &[&str] = &[
 ];
 
 pub fn normalize(body: &mut json::Value) {
+    json::canonicalize_floats(body);
     normalize_value(body);
     // opentelemetry-proto's AnyValue JSON serde does not understand
     // stringValueStrindex; expand it to stringValue via the dictionary.
@@ -854,5 +855,37 @@ mod tests {
             .attributes[0];
         assert!(attr.key.is_empty());
         assert_eq!(attr.key_strindex, 1);
+    }
+
+    #[test]
+    fn accepts_non_canonical_double_attributes() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+
+        let mut payload = json::from_str::<json::Value>(
+            r#"{"dictionary":{"stringTable":["","cpu.ratio"],"attributeTable":[{"keyStrindex":1,"value":{"doubleValue":2.50}}]},
+                "resourceProfiles":[{"resource":{"attributes":[{"key":"ratio","value":{"doubleValue":1.50}},{"key":"scale","value":{"doubleValue":1e0}}]},"scopeProfiles":[]}]}"#,
+        )
+        .unwrap();
+        normalize(&mut payload);
+        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
+            .expect("non-canonical doubles should deserialize");
+        let attributes = &req.resource_profiles[0]
+            .resource
+            .as_ref()
+            .unwrap()
+            .attributes;
+        let doubles: Vec<_> = attributes
+            .iter()
+            .map(|attr| attr.value.as_ref().and_then(|v| v.value.clone()))
+            .collect();
+        assert_eq!(
+            doubles,
+            vec![Some(Value::DoubleValue(1.5)), Some(Value::DoubleValue(1.0))]
+        );
+        let table_entry = &req.dictionary.as_ref().unwrap().attribute_table[0];
+        assert_eq!(
+            table_entry.value.as_ref().and_then(|v| v.value.clone()),
+            Some(Value::DoubleValue(2.5))
+        );
     }
 }
