@@ -92,15 +92,23 @@ pub async fn run() -> Result<(), anyhow::Error> {
     });
 
     spawn_pausable_job!(
-        "run_retention",
+        "run_generate_retention_job",
         get_config().compact.data_retention_interval + 3,
         {
-            log::debug!("[COMPACTOR::JOB] Running data retention");
-            if let Err(e) = compaction::run_retention().await {
-                log::error!("[COMPACTOR::JOB] run data retention error: {e}");
+            log::debug!("[COMPACTOR::JOB] Running generate retention job");
+            if let Err(e) = compaction::run_generate_retention_job().await {
+                log::error!("[COMPACTOR::JOB] run generate retention job error: {e}");
             }
         }
     );
+
+    // Deleted streams block re-creation until their job runs, so execute on the short cycle.
+    spawn_pausable_job!("run_retention", get_config().compact.interval + 3, {
+        log::debug!("[COMPACTOR::JOB] Running data retention");
+        if let Err(e) = compaction::run_retention().await {
+            log::error!("[COMPACTOR::JOB] run data retention error: {e}");
+        }
+    });
 
     spawn_pausable_job!("run_delay_deletion", get_config().compact.interval + 4, {
         log::debug!("[COMPACTOR::JOB] Running data delay deletion");

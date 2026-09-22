@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden max-lg:flex-wrap max-lg:overflow-visible"
+    class="flex min-w-0 flex-1 flex-wrap items-center gap-2 overflow-hidden max-lg:overflow-visible"
   >
     <div class="w-64 shrink-0 max-lg:order-last max-lg:w-full max-lg:basis-full">
       <OSearchInput

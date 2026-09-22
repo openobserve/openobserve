@@ -13,8 +13,14 @@ const i18n = createI18n({
   messages: { en: {} },
 });
 
-vi.mock("@/services/stream");
-vi.mock("@/services/search");
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/search", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({

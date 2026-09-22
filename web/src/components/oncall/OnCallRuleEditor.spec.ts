@@ -446,7 +446,7 @@ describe("OnCallRuleEditor", () => {
     await flushPromises();
     expect(
       wrapper.findComponent('[data-test="oncall-rule-editor-team"]').props("helpText"),
-    ).toContain("no escalation ladder yet");
+    ).toContain("No escalation ladder yet");
   });
 
   /// A host serving more than one team (the org-level dialog) cannot ship a
@@ -502,6 +502,15 @@ describe("OnCallRuleEditor", () => {
       dialog(wrapper).vm.$emit("click:neutral");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("remove")).toHaveLength(1);
+    });
+
+    it("offers no removal when the host's row already has one", async () => {
+      const wrapper = render({
+        rule: { rule_id: "r1", team_id: "team_1", dimensions: { "k8s-cluster": "introspection" } },
+        allowRemove: false,
+      });
+      await flushPromises();
+      expect(dialog(wrapper).props("neutralButtonLabel")).toBeUndefined();
     });
   });
 });

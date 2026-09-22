@@ -282,14 +282,15 @@ describe("OnCallRoutingList", () => {
       );
     });
 
-    /// The picker's empty string is a UI vocabulary; the wire takes null.
+    /// The picker's "None" option carries the value null (OSelect's sentinel
+    /// for "nothing selected"); the wire takes that same null straight through.
     it("clears the nomination by emitting null", async () => {
       const wrapper = render({ defaultTeamId: "team_2" });
       await flushPromises();
       await wrapper.find('[data-test="oncall-routing-catch-all-set"]').trigger("click");
       wrapper
         .findComponent('[data-test="oncall-routing-catch-all-select"]')
-        .vm.$emit("update:modelValue", "");
+        .vm.$emit("update:modelValue", null);
       await wrapper.vm.$nextTick();
       await wrapper.find('[data-test="oncall-routing-catch-all-save"]').trigger("click");
 

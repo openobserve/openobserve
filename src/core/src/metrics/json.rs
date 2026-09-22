@@ -112,7 +112,10 @@ async fn buffer_record(
     };
     let stream_name = match stream_name {
         Some(name) => name.to_string(),
-        None => match record.get(NAME_LABEL).ok_or(anyhow!("missing __name__"))? {
+        None => match record
+            .get(NAME_LABEL)
+            .ok_or_else(|| anyhow!("missing __name__"))?
+        {
             json::Value::String(s) => format_stream_name(s.to_string()),
             _ => {
                 return Err(anyhow::anyhow!("invalid __name__, need to be string"));
@@ -241,7 +244,11 @@ fn finish_rows(
     let first_type = records.first().map(|(_, metric_type)| *metric_type);
     let mut rows = Vec::with_capacity(records.len());
     for (mut record, _) in records {
-        let value = parse_metric_value(record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))?)?;
+        let value = parse_metric_value(
+            record
+                .get(VALUE_LABEL)
+                .ok_or_else(|| anyhow!("missing value"))?,
+        )?;
         if let Some(existing) = record.get_mut(VALUE_LABEL) {
             *existing = value;
         }

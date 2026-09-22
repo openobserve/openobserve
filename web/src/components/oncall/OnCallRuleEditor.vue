@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondary-button-label="t('oncall.cancel')"
     :primary-button-disabled="!!saveProblem"
     :primary-button-loading="saving"
-    :neutral-button-label="rule ? t('oncall.removeRule') : undefined"
+    :neutral-button-label="rule && allowRemove ? t('oncall.removeRule') : undefined"
     neutral-button-variant="ghost-destructive"
     data-test="oncall-rule-editor"
     @update:open="(v: boolean) => emit('update:open', v)"
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('oncall.ruleTeamPlaceholder')"
           :help-text="ladderNote"
           size="sm"
-          width="sm"
+          width="md"
           searchable
           data-test="oncall-rule-editor-team"
           @update:model-value="(v: unknown) => (team = String(v))"
@@ -473,6 +473,9 @@ const props = withDefaults(
     /** The target team's ladder, so "page" says what paging means. */
     ladder?: TeamRungSummary[];
     saving?: boolean;
+    /** Whether the dialog offers its own removal button. Off where the host's
+     *  row already carries one, so a rule isn't removable two ways. */
+    allowRemove?: boolean;
   }>(),
   {
     open: false,
@@ -488,6 +491,7 @@ const props = withDefaults(
     signals: () => [],
     ladder: () => [],
     saving: false,
+    allowRemove: true,
   },
 );
 

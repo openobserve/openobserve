@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="teamId"
       :loading="loading"
       pagination="client"
+      show-index
       table-id="oncall-policies"
       :persist-columns="true"
       :show-global-filter="false"

@@ -45,6 +45,9 @@ pub use remote::test_config as test_remote_config;
 
 pub const CONCURRENT_REQUESTS: usize = 1000;
 
+// Preserve object_store's existing coalesced-read concurrency bound.
+const COALESCED_RANGE_CONCURRENCY: usize = 10;
+
 static MULTI_ACCOUNTS: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(accounts::default);
 
 /// Storage tier applied consistently to every object that belongs to one
@@ -179,6 +182,98 @@ pub async fn get_ranges(
     MULTI_ACCOUNTS
         .get_ranges(account, &file.into(), ranges)
         .await
+}
+
+/// Clipped fetches must still contain the start of every requested nonempty subrange.
+pub async fn coalesce_ranges_checked<F, Fut>(
+    ranges: &[Range<u64>],
+    fetch: F,
+    coalesce: u64,
+) -> Result<Vec<Bytes>>
+where
+    F: FnMut(Range<u64>) -> Fut + Send,
+    Fut: std::future::Future<Output = Result<Bytes>> + Send,
+{
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
+    for range in ranges {
+        if range.start > range.end || usize::try_from(range.end - range.start).is_err() {
+            return Err(Error::BadRange(format!("{range:?}")).into());
+        }
+    }
+    let mut sorted = ranges.to_vec();
+    sorted.sort_unstable_by_key(|range| range.start);
+    let mut merged: Vec<Range<u64>> = Vec::with_capacity(sorted.len());
+    for range in sorted {
+        if let Some(previous) = merged.last_mut()
+            && range.start.saturating_sub(previous.end) <= coalesce
+        {
+            previous.end = previous.end.max(range.end);
+        } else {
+            merged.push(range);
+        }
+    }
+    for range in &merged {
+        if usize::try_from(range.end - range.start).is_err() {
+            return Err(Error::BadRange(format!("{range:?}")).into());
+        }
+    }
+    let fetched: Vec<Bytes> = futures::stream::iter(merged.iter().cloned())
+        .map(fetch)
+        .buffered(COALESCED_RANGE_CONCURRENCY)
+        .try_collect()
+        .await?;
+    ranges
+        .iter()
+        .map(|range| {
+            let index = merged
+                .partition_point(|fetch| fetch.start <= range.start)
+                .checked_sub(1)
+                .ok_or_else(|| Error::OutOfRange(format!("{range:?}")))?;
+            let fetch = &merged[index];
+            let bytes = &fetched[index];
+            let start = usize::try_from(range.start - fetch.start)
+                .map_err(|_| Error::OutOfRange(format!("{range:?}")))?;
+            let end = usize::try_from(range.end - fetch.start)
+                .map_err(|_| Error::OutOfRange(format!("{range:?}")))?
+                .min(bytes.len());
+            if start > end || (range.start < range.end && start == end) {
+                return Err(Error::OutOfRange(format!("{range:?}")).into());
+            }
+            Ok(bytes.slice(start..end))
+        })
+        .collect()
+}
+
+#[cfg(unix)]
+pub(crate) fn read_ranges_from_file(
+    file: &std::fs::File,
+    ranges: &[Range<u64>],
+) -> std::io::Result<Vec<Bytes>> {
+    use std::os::unix::fs::FileExt;
+
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
+    let size = file.metadata()?.len();
+    let ranges = ranges
+        .iter()
+        .map(|range| {
+            object_store::GetRange::Bounded(range.clone())
+                .as_range(size)
+                .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
+        })
+        .collect::<std::io::Result<Vec<_>>>()?;
+    let mut output = Vec::with_capacity(ranges.len());
+    for range in ranges {
+        let len = usize::try_from(range.end - range.start)
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
+        let mut bytes = vec![0; len];
+        file.read_exact_at(&mut bytes, range.start)?;
+        output.push(Bytes::from(bytes));
+    }
+    Ok(output)
 }
 
 pub async fn head(account: &str, file: &str) -> Result<ObjectMeta> {
@@ -511,6 +606,139 @@ impl From<Error> for object_store::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_coalesce_ranges_checked_order_clipping_and_zero_width() {
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        let fetch = |range: Range<u64>| {
+            calls.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            std::future::ready(
+                object_store::GetRange::Bounded(range)
+                    .as_range(16)
+                    .map(|range| {
+                        Bytes::from_static(b"0123456789abcdef")
+                            .slice(range.start as usize..range.end as usize)
+                    })
+                    .map_err(|error| object_store::Error::Generic {
+                        store: "fixture",
+                        source: Box::new(error),
+                    }),
+            )
+        };
+        let ranges = [14..20, 1..5, 3..7, 1..5, 16..16, 3..3];
+        assert_eq!(
+            coalesce_ranges_checked(&ranges, fetch, 1).await.unwrap(),
+            vec![
+                Bytes::from_static(b"ef"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"3456"),
+                Bytes::from_static(b"1234"),
+                Bytes::new(),
+                Bytes::new()
+            ]
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed), 2);
+    }
+
+    #[tokio::test]
+    async fn test_coalesce_ranges_checked_rejects_clipped_subrange_starts() {
+        for ranges in [
+            vec![1..3, 20..21, 3..3],
+            vec![14..20, 16..17],
+            vec![1..3, 20..20],
+        ] {
+            let result = coalesce_ranges_checked(
+                &ranges,
+                |range| async move {
+                    let range = object_store::GetRange::Bounded(range)
+                        .as_range(16)
+                        .map_err(|error| object_store::Error::Generic {
+                            store: "fixture",
+                            source: Box::new(error),
+                        })?;
+                    Ok(Bytes::from_static(b"0123456789abcdef")
+                        .slice(range.start as usize..range.end as usize))
+                },
+                object_store::OBJECT_STORE_COALESCE_DEFAULT,
+            )
+            .await;
+            assert!(result.is_err(), "{ranges:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_coalesce_ranges_checked_empty_invalid_and_backend_errors() {
+        let no_read = |_: Range<u64>| -> std::future::Ready<Result<Bytes>> {
+            panic!("invalid/empty request reached storage")
+        };
+        assert!(
+            coalesce_ranges_checked(&[], no_read, 1)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            coalesce_ranges_checked(&[Range { start: 7, end: 3 }], no_read, 1)
+                .await
+                .is_err()
+        );
+        let error = coalesce_ranges_checked(
+            std::slice::from_ref(&(0..1)),
+            |_| async {
+                Err(object_store::Error::NotFound {
+                    path: "missing".into(),
+                    source: Box::new(std::io::Error::from(std::io::ErrorKind::NotFound)),
+                })
+            },
+            1,
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(error, object_store::Error::NotFound { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_ranges_from_file_order_overlap_and_eof() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), b"0123456789abcdef").unwrap();
+        let ranges = [10..14, 1..5, 3..7, 1..5, 14..20];
+        assert_eq!(
+            read_ranges_from_file(file.as_file(), &ranges).unwrap(),
+            vec![
+                Bytes::from_static(b"abcd"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"3456"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"ef"),
+            ]
+        );
+        assert!(
+            read_ranges_from_file(file.as_file(), &[])
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_ranges_from_file_rejects_invalid_and_bounds_huge_end() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), b"0123456789abcdef").unwrap();
+        for range in [Range { start: 7, end: 3 }, 3..3, 16..17, u64::MAX..u64::MAX] {
+            let error = read_ranges_from_file(file.as_file(), &[range]).unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        }
+        let result = read_ranges_from_file(file.as_file(), std::slice::from_ref(&(14..u64::MAX)));
+        if usize::BITS == 64 {
+            assert_eq!(result.unwrap(), vec![Bytes::from_static(b"ef")]);
+        } else {
+            // Match GetRange::is_valid on 32-bit targets: reject before clipping.
+            assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
+        }
+        std::fs::write(file.path(), b"").unwrap();
+        assert!(read_ranges_from_file(file.as_file(), std::slice::from_ref(&(0..1))).is_err());
+    }
 
     #[test]
     fn test_error_display_out_of_range() {

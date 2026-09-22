@@ -22,18 +22,21 @@ import ModelPricingList from "./ModelPricingList.vue";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock("@/services/model_pricing", () => ({
-  default: {
-    list: vi.fn(),
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    getBuiltIn: vi.fn(),
-    refreshBuiltIn: vi.fn(),
-    test: vi.fn(),
-  },
-}));
+vi.mock("@/services/model_pricing", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      getBuiltIn: vi.fn(),
+      refreshBuiltIn: vi.fn(),
+      test: vi.fn(),
+    },
+  });
+});
 
 const mockToastFn = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({

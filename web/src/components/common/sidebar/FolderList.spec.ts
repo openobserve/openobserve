@@ -68,10 +68,14 @@ const ConfirmDialogStub = {
 
 // Mock the external dependencies
 vi.mock("vue-router");
-vi.mock("@/services/dashboards");
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/utils/commons", () => ({
-  getFoldersListByType: vi.fn(),
-  deleteFolderByIdByType: vi.fn(),
+  // Both are `async` in the real module, so the doubles must be thenable too.
+  getFoldersListByType: vi.fn(() => Promise.resolve([])),
+  deleteFolderByIdByType: vi.fn(() => Promise.resolve()),
 }));
 // Create persistent mocks that can be accessed across tests
 const showPositiveNotificationMock = vi.fn();
@@ -755,7 +759,8 @@ describe("FolderList.vue", () => {
           props: { type: "alerts" },
         });
 
-        await nextTick();
+        // The folder fetch on mount is awaited, so the selection lands a microtask later.
+        await flushPromises();
         expect(newWrapper.vm.activeFolderId).toBe("folder1");
 
         newWrapper.unmount();
@@ -788,7 +793,8 @@ describe("FolderList.vue", () => {
           props: { type: "alerts" },
         });
 
-        await nextTick();
+        // The folder fetch on mount is awaited, so the selection lands a microtask later.
+        await flushPromises();
         expect(newWrapper.vm.activeFolderId).toBe("default");
 
         newWrapper.unmount();

@@ -19,11 +19,14 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 // vi.mock() calls at the TOP — hoisted by Vitest
-vi.mock("@/services/stream", () => ({
-  default: {
-    nameList: vi.fn(),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      nameList: vi.fn(),
+    },
+  });
+});
 
 // OSelect is a heavy reka-ui component — stub it so tests can control its
 // behaviour and assert on the props it receives without mounting a full

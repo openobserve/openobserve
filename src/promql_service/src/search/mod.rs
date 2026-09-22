@@ -23,7 +23,7 @@ use config::{
     meta::{
         cluster::{Node, RoleGroup},
         promql::value::*,
-        search::ScanStats,
+        search::{ScanStats, SearchEventType},
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
@@ -35,11 +35,19 @@ use config::{
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
-    client::grpc::make_grpc_metrics_client,
+    client::grpc::{ResponseCompression, make_grpc_metrics_client_with_policy},
     errors::{Error, ErrorCodes, Result},
     runtime::DATAFUSION_RUNTIME,
 };
-use promql::{DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end, micros};
+use promql::{
+    DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end,
+    ast::{
+        at_modifier::resolve_query, result_order::top_level_sort_descending,
+        selector_window::selector_window,
+    },
+    micros,
+};
+use promql_parser::parser;
 use proto::cluster_rpc;
 use search_service::server_internal_error;
 use tracing::{Instrument, info_span};
@@ -110,6 +118,13 @@ pub async fn search(
     req.org_id = org_id.to_string();
     req.timeout = timeout as i64;
     req.is_super_cluster = is_super_cluster;
+    // whatever splits the range below sees only its own part of it
+    let stmt = req.query.as_mut().unwrap();
+    if let Some(query) = resolve_query(&stmt.query, stmt.start, stmt.end, stmt.step)
+        .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?
+    {
+        stmt.query = query;
+    }
 
     let mut stop_watch = TookWatcher::new();
 
@@ -275,6 +290,9 @@ async fn search_in_cluster(
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = req.timeout as u64;
+    let window = parser::parse(&req.query.as_ref().unwrap().query)
+        .map(|ast| selector_window(&ast))
+        .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
 
     let &cluster_rpc::MetricsQueryStmt {
         ref query,
@@ -288,7 +306,10 @@ async fn search_in_cluster(
     let nr_queriers = nodes.len() as i64;
 
     // cache enabled if result cache is enabled and use_cache is true and start != end
-    let use_cache = cfg.common.result_cache_enabled && req.use_cache && start != end;
+    // the cache keys on the output range, but a pinned value follows the data at `T` (#14688)
+    // the cache key ignores the query type, so exemplar results never share it with samples
+    let cacheable = cfg.common.result_cache_enabled && window.pinned.is_none() && !query_exemplars;
+    let use_cache = cacheable && req.use_cache && start != end;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step);
 
@@ -388,9 +409,8 @@ async fn search_in_cluster(
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
         // if the end time is within the last 3 retention time, we need to fetch wal data
-        if req_query.end
-            >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3)
-        {
+        let wal_floor = now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
+        if window.reaches(req_query.end, wal_floor) {
             req.need_wal = true;
         }
         let req_need_wal = req.need_wal;
@@ -408,11 +428,13 @@ async fn search_in_cluster(
         let grpc_span = info_span!("promql:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
             async move {
+                let response_compression = ResponseCompression::for_node(&node);
                 let node = Arc::new(node) as _;
                 let org_id = req.org_id.clone();
                 let mut request = tonic::Request::new(req);
-                let mut client = make_grpc_metrics_client(&trace_id, &org_id, &mut request, &node, timeout)
-                    .await?;
+                let mut client = make_grpc_metrics_client_with_policy(
+                    &trace_id, &org_id, &mut request, &node, timeout, response_compression,
+                ).await?;
                 let response: cluster_rpc::MetricsQueryResponse = match client.query(request).await
                 {
                     Ok(res) => res.into_inner(),
@@ -479,9 +501,8 @@ async fn search_in_cluster(
         series_data.push(series);
     });
 
-    // with cache maybe we only get the last point from original data, then the result_type will
-    // return as vector, but if the query is range query, the result_type should be matrix
-    if result_type == "vector" && original_start != end {
+    // a worker left with a lone point answers as an instant query, the range is still a matrix
+    if (result_type == "vector" || result_type == "scalar") && original_start != end {
         result_type = "matrix".to_string();
     }
 
@@ -489,7 +510,7 @@ async fn search_in_cluster(
     let values = if result_type == "matrix" {
         merge_matrix_query(&series_data, &req.org_id).await?
     } else if result_type == "vector" {
-        merge_vector_query(&series_data, &req.org_id).await?
+        merge_vector_query(&series_data, &req.org_id, query).await?
     } else if result_type == "scalar" {
         merge_scalar_query(&series_data)
     } else if result_type == "exemplars" {
@@ -515,6 +536,8 @@ async fn search_in_cluster(
         min_ts: Some(start),
         max_ts: Some(end),
         trace_id: Some(trace_id.to_string()),
+        search_event_context: req.search_event_context.map(Into::into),
+        search_type: SearchEventType::try_from(req.search_event_type.as_str()).ok(),
         ..Default::default()
     };
 
@@ -530,7 +553,7 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    if cfg.common.result_cache_enabled
+    if cacheable
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,
@@ -565,7 +588,7 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
         let entry = merged_data
             .entry(signature(&labels))
             .or_insert_with(HashMap::new);
-        ser.samples.iter().for_each(|v| {
+        ser.samples.iter().chain(ser.sample.iter()).for_each(|v| {
             entry.insert(v.time, v.value);
         });
         merged_metrics.insert(signature(&labels), labels);
@@ -596,7 +619,11 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
     Ok(value)
 }
 
-async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
+async fn merge_vector_query(
+    series: &[cluster_rpc::Series],
+    org_id: &str,
+    query: &str,
+) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
@@ -626,7 +653,13 @@ async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
     }
 
     let mut value = Value::Vector(merged_data);
-    value.sort();
+    let sort_descending = promql_parser::parser::parse(query)
+        .ok()
+        .and_then(|expr| top_level_sort_descending(&expr));
+    match sort_descending {
+        Some(descending) => value.sort_by_value(descending),
+        None => value.sort(),
+    }
     Ok(value)
 }
 
@@ -646,6 +679,9 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
+        let Some(exemplars) = ser.exemplars.as_ref() else {
+            continue;
+        };
         let labels: Labels = ser
             .metric
             .iter()
@@ -654,14 +690,9 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
         let entry = merged_data
             .entry(signature(&labels))
             .or_insert_with(HashMap::new);
-        ser.exemplars
-            .as_ref()
-            .unwrap()
-            .exemplars
-            .iter()
-            .for_each(|v| {
-                entry.insert(v.time, v);
-            });
+        exemplars.exemplars.iter().for_each(|v| {
+            entry.insert(v.time, v);
+        });
         merged_metrics.insert(signature(&labels), labels);
     }
     let mut merged_data = merged_data
@@ -747,6 +778,84 @@ fn should_truncate_series(series_count: usize, max_limit: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_merge_matrix_preserves_instant_worker_sample_with_cached_prefix() {
+        let latest = Sample::new(3_000_000, 3.0);
+        let labels = vec![Arc::new(Label::new("job", "test"))];
+        for (worker_value, expected_labels) in [
+            (Value::Sample(latest), Labels::default()),
+            (
+                Value::Vector(vec![InstantValue {
+                    labels: labels.clone(),
+                    sample: latest,
+                }]),
+                labels,
+            ),
+        ] {
+            let mut response = cluster_rpc::MetricsQueryResponse::default();
+            grpc::add_value(&mut response, worker_value);
+            grpc::add_value(
+                &mut response,
+                Value::Matrix(vec![RangeValue::new(
+                    expected_labels.clone(),
+                    vec![Sample::new(1_000_000, 1.0), Sample::new(2_000_000, 2.0)],
+                )]),
+            );
+
+            let value = merge_matrix_query(&response.series, "test_instant_worker_merge")
+                .await
+                .unwrap();
+            let Value::Matrix(matrix) = value else {
+                panic!("expected matrix result");
+            };
+            assert_eq!(matrix.len(), 1);
+            assert_eq!(matrix[0].labels, expected_labels);
+            let samples: Vec<_> = matrix[0]
+                .samples
+                .iter()
+                .map(|sample| (sample.timestamp, sample.value))
+                .collect();
+            assert_eq!(
+                samples,
+                vec![(1_000_000, 1.0), (2_000_000, 2.0), (3_000_000, 3.0)]
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_merge_exemplars_skips_series_without_exemplars() {
+        let labels = vec![Arc::new(Label::new("job", "test"))];
+        let mut response = cluster_rpc::MetricsQueryResponse::default();
+        grpc::add_value(
+            &mut response,
+            Value::Matrix(vec![RangeValue::new(
+                labels.clone(),
+                vec![Sample::new(1_000_000, 1.0)],
+            )]),
+        );
+        grpc::add_value(
+            &mut response,
+            Value::Matrix(vec![RangeValue::new_with_exemplars(
+                labels.clone(),
+                vec![Arc::new(Exemplar {
+                    timestamp: 2_000_000,
+                    value: 2.0,
+                    labels: vec![],
+                })],
+            )]),
+        );
+
+        let value = merge_exemplars_query(&response.series, "test_exemplars_merge")
+            .await
+            .unwrap();
+        let Value::Matrix(matrix) = value else {
+            panic!("expected matrix result");
+        };
+        assert_eq!(matrix.len(), 1);
+        assert_eq!(matrix[0].labels, labels);
+        assert_eq!(matrix[0].exemplars.as_ref().unwrap().len(), 1);
+    }
 
     #[test]
     fn test_should_truncate_series_within_limit() {

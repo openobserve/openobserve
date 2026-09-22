@@ -435,6 +435,37 @@ class FunctionsPage {
   }
 
   /**
+   * Click a function row's delete button and wait for the confirm dialog.
+   * @param {string} functionName
+   */
+  async openDeleteConfirmFor(functionName) {
+    const deleteButton = this.getRowByName(functionName).locator(this.rowDeleteButtonSelector);
+    await deleteButton.waitFor({ state: 'visible', timeout: 30000 });
+    await deleteButton.click();
+    await this.confirmDialog.waitFor({ state: 'visible', timeout: 10000 });
+  }
+
+  /** Title + body text of the open confirm dialog. */
+  async getConfirmDialogText() {
+    await this.confirmDialog.waitFor({ state: 'visible', timeout: 10000 });
+    return ((await this.confirmDialog.textContent()) ?? '').trim();
+  }
+
+  async cancelDeleteConfirm() {
+    await this.confirmDialogSecondaryBtn.click();
+    await this.confirmDialog.waitFor({ state: 'hidden', timeout: 10000 });
+  }
+
+  async acceptDeleteConfirm() {
+    await this.confirmDialogPrimaryBtn.click();
+    await this.confirmDialog.waitFor({ state: 'hidden', timeout: 10000 });
+  }
+
+  async expectFunctionAbsent(functionName) {
+    await expect(this.getFunctionNameCell(functionName)).toHaveCount(0, { timeout: 30000 });
+  }
+
+  /**
    * Test a function with input data and return output.
    * The toolbar "Test Function" button directly triggers the API call using
    * the current function code and events editor content. Default test events

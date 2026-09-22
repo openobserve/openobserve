@@ -32,13 +32,16 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 const mockList = vi.fn();
 const mockGetAlert = vi.fn();
 const mockUpdateAlert = vi.fn();
-vi.mock("@/services/alerts", () => ({
-  default: {
-    listByFolderId: (...a: any[]) => mockList(...a),
-    get_by_alert_id: (...a: any[]) => mockGetAlert(...a),
-    update_by_alert_id: (...a: any[]) => mockUpdateAlert(...a),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: (...a: any[]) => mockList(...a),
+      get_by_alert_id: (...a: any[]) => mockGetAlert(...a),
+      update_by_alert_id: (...a: any[]) => mockUpdateAlert(...a),
+    },
+  });
+});
 
 import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 

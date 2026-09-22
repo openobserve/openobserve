@@ -293,17 +293,23 @@ vi.mock("@/utils/traces/constants", async (importOriginal) => {
 });
 
 // Mock services
-vi.mock("@/services/search", () => ({
-  default: {
-    get_traces: vi.fn(() => Promise.resolve({ data: mockTracesResponse })),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_traces: vi.fn(() => Promise.resolve({ data: mockTracesResponse })),
+    },
+  });
+});
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    list: vi.fn(() => Promise.resolve({ data: mockFunctions })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(() => Promise.resolve({ data: mockFunctions })),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
@@ -373,9 +379,16 @@ describe("Index.vue (Main Traces Page)", () => {
     if (wrapper) {
       wrapper.unmount();
     }
-    // Drain all pending microtasks/promises before clearing mocks so
-    // lingering async chains from the current test cannot contaminate the
-    // next test's beforeEach or mount lifecycle.
+    // Drain pending async before clearing mocks so lingering chains from this
+    // test cannot contaminate the next one. `flushPromises` alone only drains
+    // microtasks; the field-grouping path awaits the query client, whose
+    // scheduling spans a few macrotask hops, so the loop alternates the two.
+    // Bounded and deterministic — no arbitrary sleep. Two iterations were not
+    // always enough; three are.
+    for (let i = 0; i < 3; i++) {
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 0));
+    }
     await flushPromises();
     vi.clearAllMocks();
   });

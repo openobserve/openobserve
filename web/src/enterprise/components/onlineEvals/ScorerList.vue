@@ -35,16 +35,15 @@
         </template>
 
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
+            :last-run-at="lastRunAt"
+            :loading="refreshing || loading"
+            shortcut-id="scorersRefresh"
             data-test="scorer-list-refresh-btn"
             @click="emit('refresh')"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="scorersRefresh" />
-          </OButton>
+          />
         </template>
 
         <!-- Type breakdown (catalog signal) — doubles as a filter synced to the
@@ -222,7 +221,7 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -252,6 +251,10 @@ const props = defineProps<{
   search: string;
   loading?: boolean;
   forbidden?: boolean;
+  /** Epoch-ms of the last list read, for the refresh button's age label. */
+  lastRunAt?: number | null;
+  /** A reload is in flight — spins the refresh button and blocks a second click. */
+  refreshing?: boolean;
 }>();
 
 const emit = defineEmits<{

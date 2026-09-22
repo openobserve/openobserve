@@ -4,7 +4,10 @@
     data-test="oncall-response-detail-page"
     :title="title"
     icon="notifications-active"
-    :back="{ label: t('oncall.backToResponses'), to: { name: 'onCallResponses' } }"
+    :back="{
+      label: t('oncall.backToResponses'),
+      to: { name: 'onCallResponses', query: { org_identifier: orgId } },
+    }"
   >
     <!-- Team, which firing this is, and when it opened — the tagline reads as
          one short line rather than a metadata grid below the fold. Team is a
@@ -343,6 +346,7 @@
               :handover-to="handoverTo"
               :closed-at="response.closed_at"
               :acked-by="response.acked_by"
+              :loading="onCallPositionsLoading"
             />
 
             <OnCallWhatFired
@@ -530,24 +534,10 @@
         <!-- Asked HERE and nowhere else. A cause collected later is a cause
              never collected, and it is the only input the prior-causes panel
              has. -->
-        <div class="flex flex-col gap-1">
-          <span class="text-text-secondary text-xs">{{ t("oncall.resolveCause") }}</span>
-          <span class="text-text-secondary text-xs">{{ t("oncall.resolveCauseHint") }}</span>
-          <OSelect
-            v-model="resolveCause"
-            :options="causeOptions"
-            clearable
-            :placeholder="t('oncall.resolveCausePlaceholder')"
-            data-test="oncall-resolve-cause"
-          />
-        </div>
-
-        <OTextarea
-          v-model="resolveNote"
-          :label="t('oncall.resolveCauseNote')"
-          :placeholder="t('oncall.resolveCauseNotePlaceholder')"
-          :rows="2"
-          data-test="oncall-resolve-cause-note"
+        <OnCallResolveCauseForm
+          v-model:cause="resolveCause"
+          v-model:note="resolveNote"
+          data-test-prefix="oncall-resolve"
         />
       </div>
 
@@ -602,6 +592,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallActivityTimeline from "@/components/oncall/OnCallActivityTimeline.vue";
+import OnCallResolveCauseForm from "@/components/oncall/OnCallResolveCauseForm.vue";
 import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
 import OnCallResponseDetailSkeleton from "./OnCallResponseDetailSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -626,7 +617,6 @@ import type {
   PromoteSeverity,
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
-import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
@@ -788,6 +778,7 @@ const subjectAlert = ref<{
 const escalation = ref<EscalationProgress | null>(null);
 /// Who a page to this team reaches right now, and where the pager goes next.
 const onCallPositions = ref<OnCallPosition[]>([]);
+const onCallPositionsLoading = ref(false);
 const handoverAt = ref<number | null>(null);
 const handoverTo = ref<string | null>(null);
 /// The team's own policy, for the one thing progress cannot say: what the
@@ -967,10 +958,6 @@ const subjectStream = computed(() => {
   return alert.stream_type ? `${alert.stream_name} (${alert.stream_type})` : alert.stream_name;
 });
 
-const causeOptions = computed(() =>
-  RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
-);
-
 const handoffTarget = computed(() =>
   handoffMode.value === "person" ? handoffPerson.value : handoffTeam.value,
 );
@@ -1004,6 +991,8 @@ async function fetchResponse() {
     });
     response.value = res.data.response;
     events.value = res.data.events ?? [];
+    // Flip before the awaits below so the card skeletons instead of reading an empty roster as "nobody on call".
+    onCallPositionsLoading.value = true;
     await fetchTeamName();
     await fetchSubjectAlert();
     await fetchHandoffTargets();
@@ -1251,24 +1240,29 @@ async function fetchDeliveries() {
 async function fetchTeamContext() {
   const r = response.value;
   if (!r) return;
-  const [slots, policyRes, reach] = await Promise.allSettled([
-    // A closed record is history, and the live rotation is not its history:
-    // hours later the pager has moved on, and the rail named whoever holds it
-    // now as though they had been the one paged. The schedule endpoint answers
-    // as of any instant, so a closed record asks it about its own last moment.
-    oncallService.whoIsOnCall({
-      org_identifier: orgId.value,
-      team_id: r.team_id,
-      at: r.closed_at ?? undefined,
-    }),
-    oncallService.getPolicy({ org_identifier: orgId.value, team_id: r.team_id }),
-    oncallService.teamReachability({ org_identifier: orgId.value, team_id: r.team_id }),
-  ]);
-  onCallPositions.value = slots.status === "fulfilled" ? (slots.value.data ?? []) : [];
-  policy.value = policyRes.status === "fulfilled" ? (policyRes.value.data ?? null) : null;
-  smtpConfigured.value =
-    reach.status === "fulfilled" ? (reach.value.data?.smtp_configured ?? null) : null;
-  await fetchHandover();
+  onCallPositionsLoading.value = true;
+  try {
+    const [slots, policyRes, reach] = await Promise.allSettled([
+      // A closed record is history, and the live rotation is not its history:
+      // hours later the pager has moved on, and the rail named whoever holds it
+      // now as though they had been the one paged. The schedule endpoint answers
+      // as of any instant, so a closed record asks it about its own last moment.
+      oncallService.whoIsOnCall({
+        org_identifier: orgId.value,
+        team_id: r.team_id,
+        at: r.closed_at ?? undefined,
+      }),
+      oncallService.getPolicy({ org_identifier: orgId.value, team_id: r.team_id }),
+      oncallService.teamReachability({ org_identifier: orgId.value, team_id: r.team_id }),
+    ]);
+    onCallPositions.value = slots.status === "fulfilled" ? (slots.value.data ?? []) : [];
+    policy.value = policyRes.status === "fulfilled" ? (policyRes.value.data ?? null) : null;
+    smtpConfigured.value =
+      reach.status === "fulfilled" ? (reach.value.data?.smtp_configured ?? null) : null;
+    await fetchHandover();
+  } finally {
+    onCallPositionsLoading.value = false;
+  }
 }
 
 /// When the default slot's current span ends, and who inherits it. The
@@ -1324,7 +1318,7 @@ function escalateOutcome(result: EscalateResult | undefined): {
   if (result?.escalated_to === "ladder_exhausted") {
     return { variant: "info", message: t("oncall.escalateExhausted", { team: teamName.value }) };
   }
-  const reached = result?.escalated_to === "rung" ? [...result.recipients, ...result.chased] : [];
+  const reached = result?.escalated_to === "rung" ? result.recipients : [];
   if (!reached.length) {
     // A rung that resolved to nobody is a real outcome and the one worth
     // saying loudest: the ladder moved and no phone rang.
