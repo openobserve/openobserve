@@ -41,6 +41,7 @@ vectorscan = [
     "openobserve-jobs/vectorscan",
     "super_cluster_queue/vectorscan",
     "search_service/vectorscan",
+    "enrichment-data/vectorscan",
 ]
 cloud = [
     "openobserve-api-http/cloud",

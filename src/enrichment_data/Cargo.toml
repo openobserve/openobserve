@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = ["dep:o2_enterprise"]
+vectorscan = ["dep:o2_enterprise", "o2_enterprise/vectorscan"]
 
 [dependencies]
 anyhow.workspace = true

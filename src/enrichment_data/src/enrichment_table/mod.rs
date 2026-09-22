@@ -53,7 +53,7 @@ pub use url_processor::init_url_processor;
 pub async fn save_enrichment_data(
     org_id: &str,
     table_name: &str,
-    payload: Vec<json::Map<String, json::Value>>,
+    mut payload: Vec<json::Map<String, json::Value>>,
     append_data: bool,
 ) -> Result<HttpResponse, Error> {
     // let start = std::time::Instant::now();
@@ -142,6 +142,8 @@ pub async fn save_enrichment_data(
         .await;
         stream_schema_map.remove(&stream_name);
     }
+
+    apply_redaction(org_id, &stream_name, &mut payload).await;
 
     let mut records = vec![];
     let mut records_size = 0;
@@ -477,6 +479,44 @@ pub async fn delete_from_file_list(
         }
     }
     Ok(())
+}
+
+/// Redacts an enrichment payload in place; unredacted rows are joined into search results.
+pub(crate) async fn apply_redaction(
+    _org_id: &str,
+    _stream_name: &str,
+    _payload: &mut [json::Map<String, json::Value>],
+) {
+    #[cfg(feature = "vectorscan")]
+    {
+        // the engine keys rows by (timestamp, record); enrichment rows carry no timestamp yet
+        let mut rows: Vec<(i64, json::Map<String, json::Value>)> = _payload
+            .iter_mut()
+            .map(|record| (0_i64, std::mem::take(record)))
+            .collect();
+        match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+            Ok(pattern_manager) => {
+                if let Err(e) = pattern_manager.process_at_ingestion(
+                    _org_id,
+                    StreamType::EnrichmentTables,
+                    _stream_name,
+                    &mut rows,
+                ) {
+                    log::error!(
+                        "[ENRICHMENT_TABLE] error applying SDR patterns for table {_stream_name}: {e}"
+                    );
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[ENRICHMENT_TABLE] failed to get pattern manager for SDR redaction: {e}"
+                );
+            }
+        }
+        for (record, (_, redacted)) in _payload.iter_mut().zip(rows) {
+            *record = redacted;
+        }
+    }
 }
 
 #[cfg(test)]

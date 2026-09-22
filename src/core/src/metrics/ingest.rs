@@ -221,6 +221,48 @@ pub(super) async fn resolve_batch_schema(
     Ok((Arc::new(schema), schema_key))
 }
 
+/// Redacts one stream's records; callers must run this before the series hash is computed.
+#[cfg(feature = "vectorscan")]
+pub(super) async fn apply_redaction<T>(
+    org_id: &str,
+    stream_name: &str,
+    records: &mut Vec<(json::Map<String, json::Value>, T)>,
+) {
+    if records.is_empty() {
+        return;
+    }
+    // the engine takes (timestamp, record); the timestamp is not read, only the record is rewritten
+    let mut rows: Vec<(i64, json::Map<String, json::Value>)> = records
+        .iter_mut()
+        .map(|(record, _)| (0_i64, std::mem::take(record)))
+        .collect();
+    match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+        Ok(pattern_manager) => {
+            if let Err(e) = pattern_manager.process_at_ingestion(
+                org_id,
+                StreamType::Metrics,
+                stream_name,
+                &mut rows,
+            ) {
+                log::error!("[METRICS] error applying SDR patterns for stream {stream_name}: {e}");
+            }
+        }
+        Err(e) => {
+            log::error!("[METRICS] failed to get pattern manager for SDR redaction: {e}");
+            crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                org_id,
+                StreamType::Metrics,
+                std::iter::once((stream_name, rows.as_slice())),
+                config::meta::self_reporting::redaction::FailPosture::Open,
+            )
+            .await;
+        }
+    }
+    for ((record, _), (_, redacted)) in records.iter_mut().zip(rows) {
+        *record = redacted;
+    }
+}
+
 /// Buffers one stream's records into write partitions, running its realtime alerts on each first.
 pub(super) async fn buffer_stream_records(
     org_id: &str,

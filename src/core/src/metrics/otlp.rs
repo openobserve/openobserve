@@ -576,6 +576,17 @@ pub async fn handle_otlp_request(
 
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     for (local_metric_name, json_data) in json_data_by_stream {
+        // the records carry a `__hash__` taken from the raw labels, so redaction re-derives it
+        #[cfg(feature = "vectorscan")]
+        let json_data = {
+            let mut json_data = json_data;
+            ingest::apply_redaction(org_id, &local_metric_name, &mut json_data).await;
+            for (record, _) in json_data.iter_mut() {
+                let hash = super::signature_without_labels(record, METRICS_HASH_EXCLUDED_LABELS);
+                record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
+            }
+            json_data
+        };
         let record_refs: Vec<&json::Map<String, json::Value>> =
             json_data.iter().map(|(record, _)| record).collect();
         let min_timestamp = batch_min_timestamp(&record_refs, Utc::now().timestamp_micros());

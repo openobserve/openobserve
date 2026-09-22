@@ -185,6 +185,10 @@ pub(super) fn columnar_stream_for(
     stream_alerts_map: &HashMap<String, Vec<alert::Alert>>,
     stream_partitioning_map: &HashMap<String, Vec<StreamPartition>>,
 ) -> Option<ColumnarStream> {
+    // pattern associations rewrite the JSON records, which the columnar path never builds
+    if cfg!(feature = "vectorscan") {
+        return None;
+    }
     let alert_key = format!("{org_id}/{}/{stream_name}", StreamType::Metrics);
     let plain = !stream_executable_pipelines
         .get(stream_name)
