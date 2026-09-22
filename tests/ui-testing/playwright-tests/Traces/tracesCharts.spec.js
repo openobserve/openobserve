@@ -21,6 +21,7 @@ test.describe("Traces Charts testcases", () => {
   let pm;
 
   // The Errors panel plots an empty series unless the window holds at least one error span.
+  // Seeded spans are stamped "now" in the shared `default` stream, so they age out and need no teardown.
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
     const context = await browser.newContext({
@@ -482,8 +483,9 @@ test.describe("Traces Charts testcases", () => {
 
     await searchAndShowCharts();
 
-    const opened = await pm.tracesPage.openMetricsContextMenu('Duration');
-    expect(opened, 'Duration canvas must accept a right-click').toBeTruthy();
+    const { dispatched, opened } = await pm.tracesPage.openMetricsContextMenu('Duration');
+    expect(dispatched, 'Right-click must reach the Duration panel').toBeTruthy();
+    expect(opened, 'Duration right-click must open the gte/lte menu').toBeTruthy();
 
     await pm.tracesPage.expectMetricsContextMenuVisible();
     expect(await pm.tracesPage.isMetricsContextMenuItemVisible('gte'), 'gte item must render').toBeTruthy();
@@ -551,8 +553,10 @@ test.describe("Traces Charts testcases", () => {
 
     await searchAndShowCharts();
 
-    const opened = await pm.tracesPage.openMetricsContextMenu('Rate');
-    expect(opened, 'Rate canvas must accept a right-click').toBeTruthy();
+    const { dispatched, opened } = await pm.tracesPage.openMetricsContextMenu('Rate');
+    // Without this the assertion below would also pass on a right-click that missed the canvas.
+    expect(dispatched, 'Right-click must reach the Rate panel for this test to mean anything').toBeTruthy();
+    expect(opened, 'Rate must not open the Duration-only context menu').toBeFalsy();
 
     await pm.tracesPage.expectMetricsContextMenuStaysHidden();
   });

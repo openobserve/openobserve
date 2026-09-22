@@ -485,8 +485,7 @@ export class TracesPage {
     await this.page.locator(this.searchToggle).click();
   }
 
-  // Switch the search mode to spans and verify the toggle actually flipped, so a
-  // silently-failed click cannot produce a false green on downstream assertions.
+  // Verify the toggle flipped, so a silently-failed click cannot green downstream assertions.
   async switchToSpansMode() {
     await this.page.locator(this.spansToggle).click();
     await this.expectSpansModeActive();
@@ -596,8 +595,7 @@ export class TracesPage {
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
   }
 
-  // Text of the date-time button (e.g. "Past 1 Hour") — used to guard that a
-  // time-range change actually took effect before asserting downstream re-renders.
+  // Guards that a time-range change took effect before asserting downstream re-renders.
   async getTimeRangeLabel() {
     return (await this.page.locator(this.dateTimeButton).textContent().catch(() => '')) || '';
   }
@@ -2135,7 +2133,11 @@ export class TracesPage {
    */
   async isErrorOnlyFilterActive() {
     const badge = this.page.locator(this.errorOnlyToggle);
-    if (!(await badge.isVisible({ timeout: 3000 }).catch(() => false))) return false;
+    const shown = await badge
+      .waitFor({ state: 'visible', timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!shown) return false;
     const cls = (await badge.getAttribute('class').catch(() => '')) || '';
     return cls.includes('bg-badge-error-solid-bg');
   }
@@ -2542,37 +2544,72 @@ export class TracesPage {
   // --- Right-click Context Menu (TracesMetricsContextMenu.vue) ---
 
   /**
-   * Right-click a data point on a metrics panel chart to open the Duration-only
-   * gte/lte context menu. Aiming at the canvas center targets the p50 percentile
-   * line's ink so the ECharts contextmenu handler emits a real data-point value.
-   * Retries because ECharts arms its contextmenu handler a beat after the panel
-   * data resolves.
+   * Record which metrics panel each contextmenu event reaches.
+   * Capture phase runs before ChartRenderer's handler, so the record survives its
+   * stopPropagation() and a "menu did not open" result can be told apart from a
+   * right-click that simply missed the canvas.
+   */
+  async armMetricsContextMenuProbe() {
+    await this.page.evaluate(() => {
+      window.__o2CtxMenuHits = [];
+      if (window.__o2CtxMenuProbe) return;
+      window.__o2CtxMenuProbe = (e) => {
+        const panel = e.target && e.target.closest && e.target.closest('[data-test-panel-title]');
+        if (panel) window.__o2CtxMenuHits.push(panel.getAttribute('data-test-panel-title'));
+      };
+      document.addEventListener('contextmenu', window.__o2CtxMenuProbe, true);
+    });
+  }
+
+  /**
+   * Panel titles that received a contextmenu event since the probe was armed.
+   * @returns {Promise<string[]>}
+   */
+  async getMetricsContextMenuProbeHits() {
+    return await this.page.evaluate(() => window.__o2CtxMenuHits || []);
+  }
+
+  /**
+   * Right-click the centre of a metrics panel chart to open the Duration-only
+   * gte/lte context menu, retrying because ECharts arms its contextmenu handler a
+   * beat after the panel data resolves.
    * @param {string} title - Panel title ('Duration', 'Rate', 'Errors')
-   * @returns {Promise<boolean>} true when the right-click landed on the canvas
+   * @returns {Promise<{ dispatched: boolean, opened: boolean }>} whether the
+   *   right-click reached the panel, and whether the menu opened
    */
   async openMetricsContextMenu(title = 'Duration') {
+    await this.armMetricsContextMenuProbe();
     const canvas = this.metricsPanelLocator(title).locator('canvas').first();
-    if (!(await canvas.isVisible({ timeout: 10000 }).catch(() => false))) return false;
+    const ready = await canvas
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ready) return { dispatched: false, opened: false };
     const box = await canvas.boundingBox();
-    if (!box) return false;
-    // ECharts stacks several canvas layers; a locator click on the first one is
-    // intercepted by the layer above, so right-click the shared center with the
-    // mouse (the topmost layer holds the series ink and the contextmenu handler).
-    for (let attempt = 0; attempt < 3; attempt++) {
+    if (!box) return { dispatched: false, opened: false };
+    // ECharts stacks canvas layers, so a locator click hits the wrong one — drive the mouse instead.
+    let opened = false;
+    for (let attempt = 0; attempt < 3 && !opened; attempt++) {
       await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, {
         button: 'right',
       });
-      if (await this.isMetricsContextMenuVisible()) break;
+      opened = await this.isMetricsContextMenuVisible(1000);
     }
-    return true;
+    const hits = await this.getMetricsContextMenuProbeHits();
+    return { dispatched: hits.includes(title), opened };
   }
 
   /**
    * Whether the metrics context menu is currently open.
+   * @param {number} timeout - How long to wait for it to appear
    * @returns {Promise<boolean>}
    */
-  async isMetricsContextMenuVisible() {
-    return await this.page.locator(this.metricsContextMenu).isVisible({ timeout: 3000 }).catch(() => false);
+  async isMetricsContextMenuVisible(timeout = 3000) {
+    return await this.page
+      .locator(this.metricsContextMenu)
+      .waitFor({ state: 'visible', timeout })
+      .then(() => true)
+      .catch(() => false);
   }
 
   /**
@@ -2606,7 +2643,11 @@ export class TracesPage {
    */
   async isMetricsContextMenuItemVisible(condition) {
     const selector = condition === 'gte' ? this.metricsContextMenuGte : this.metricsContextMenuLte;
-    return await this.page.locator(selector).isVisible({ timeout: 3000 }).catch(() => false);
+    return await this.page
+      .locator(selector)
+      .waitFor({ state: 'visible', timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
   }
 
   /**
@@ -2637,9 +2678,7 @@ export class TracesPage {
       const errored = panels.filter((p) =>
         p.querySelector('[data-test="panel-schema-renderer-error-message"]')
       );
-      // The no-data empty-state overlays the panel and can coexist with the
-      // (empty) chart canvas, so count a panel as charting only when it has a
-      // canvas and no no-data overlay — keeps charts/noData mutually exclusive.
+      // The no-data overlay coexists with an empty canvas, so exclude it to keep charts/noData disjoint.
       return {
         panels: panels.length,
         charts: panels.filter(
