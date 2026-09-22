@@ -1,0 +1,30 @@
+{
+  "feature_slug": "folder-pagination-reset",
+  "feature_title": "Folder Switch Pagination Reset",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboardPagination.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboardPagination.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/lib/core/Table/composables/useTablePagination.ts",
+    "web/src/lib/core/Table/OTable.vue",
+    "web/src/views/Dashboards/Dashboards.vue",
+    "web/src/views/slos/SloList.vue",
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/components/workflows/WorkflowsList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 23 changed files are under web/src/** (frontend components, views, and a shared OTable core composable). No path lives under enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/) and there are no enterprise keywords (SSO/SAML/RBAC/SDR/cipher/logo) in the paths or symbols, so this is a pure OSS frontend change.",
+    "skip": "Not skipped: the trigger comment and feature hint are empty (no explicit opt-out label or 'skip' request), and the change alters user-facing pagination behavior in the web UI rather than being docs/CI/comment-only.",
+    "e2e": "E2E is warranted: the change reworks list pagination restoration across several list views. The user-visible behavior is that switching folders now resets the list to page 1 (instead of restoring the previous folder's page), and a stale 'page' in the URL that is past the end of the list clamps back to page 1 and drops the param. This is an observable UI state/URL change worth verifying in a real browser.",
+    "area": "Dashboards: Dashboards.vue has the most complete, self-contained folder-switch behavior (resets currentPage to 1, drops the 'page' query param, keeps the 'folder' param) and there is an existing Dashboards Playwright area with folder-switching specs, making it the cleanest single surface to exercise the new restorePage/pagination-reset behavior end-to-end.",
+    "group": "Dashboards-Core is the closest existing matrix shard (actual_folder Dashboards) whose run_files already cover the Dashboards list UI (dashboard.spec.js, dashboard2.spec.js), so the new pagination spec joins that shard.",
+    "existing_tests": "No E2E specs in the diff: the only tests changed are Vitest unit specs under web/src/**/*.spec.ts (AlertList, OTable, Dashboards, SloListPagination, etc.), which are unit coverage, not Playwright E2E coverage under tests/ui-testing/playwright-tests/."
+  }
+}

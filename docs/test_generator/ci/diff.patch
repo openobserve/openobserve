@@ -1,0 +1,674 @@
+===== COMPLETE LIST OF CHANGED FILES (23 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/alerts/AlertList.spec.ts
+web/src/components/alerts/AlertList.vue
+web/src/components/alerts/AlertsDestinationList.spec.ts
+web/src/components/alerts/AlertsDestinationList.vue
+web/src/components/alerts/IncidentList.spec.ts
+web/src/components/alerts/IncidentList.vue
+web/src/components/alerts/TemplateList.spec.ts
+web/src/components/alerts/TemplateList.vue
+web/src/components/functions/EnrichmentTableList.spec.ts
+web/src/components/functions/EnrichmentTableList.vue
+web/src/components/functions/FunctionList.spec.ts
+web/src/components/functions/FunctionList.vue
+web/src/components/pipeline/PipelinesList.spec.ts
+web/src/components/pipeline/PipelinesList.vue
+web/src/components/workflows/WorkflowsList.spec.ts
+web/src/components/workflows/WorkflowsList.vue
+web/src/lib/core/Table/OTable.spec.ts
+web/src/lib/core/Table/OTable.vue
+web/src/lib/core/Table/composables/useTablePagination.ts
+web/src/views/Dashboards/Dashboards.spec.ts
+web/src/views/Dashboards/Dashboards.vue
+web/src/views/slos/SloList.vue
+web/src/views/slos/SloListPagination.spec.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/alerts/AlertList.spec.ts b/web/src/components/alerts/AlertList.spec.ts
+index 7a581432c95..073603fbbea 100644
+--- a/web/src/components/alerts/AlertList.spec.ts
++++ b/web/src/components/alerts/AlertList.spec.ts
+@@ -934,6 +934,27 @@ describe("AlertList - pagination restoration", () => {
+ 
+     expect(wrapper.vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+   });
++
++  it("resets the persisted page on a folder switch so it is not restored onto the new folder", async () => {
++    (store.state as any).organizationData.allAlertsListByFolderId = {};
++    alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
++    (store.state as any).alertListFilters = {
++      searchQuery: "",
++      filterQuery: "",
++      searchAcrossFolders: false,
++      perPage: 5,
++      currentPage: 3,
++    };
++    const wrapper: any = await mountAlertList();
++    await flushPromises();
++    expect(wrapper.vm.currentPage).toBe(3);
++
++    wrapper.vm.activeFolderId = "team-b";
++    await flushPromises();
++
++    expect(wrapper.vm.currentPage).toBe(1);
++    expect((store.state as any).alertListFilters.currentPage).toBe(1);
++  });
+ });
+ 
+ // 6. Search behaviors and debounce
+diff --git a/web/src/components/alerts/AlertList.vue b/web/src/components/alerts/AlertList.vue
+index 695fbb76be8..ba73ad76cb3 100644
+--- a/web/src/components/alerts/AlertList.vue
++++ b/web/src/components/alerts/AlertList.vue
+@@ -1130,7 +1130,7 @@ export default defineComponent({
+       (isLoading) => {
+         if (isLoading) return;
+         setTimeout(() => {
+-          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++          oTableRef.value?.restorePage?.(currentPage.value);
+         }, 0);
+       },
+       { once: true },
+@@ -2293,6 +2293,8 @@ export default defineComponent({
+           loading.value = false;
+           return;
+         }
++        // A folder switch starts a new list; the page persisted for the previous folder must not be restored onto it.
++        currentPage.value = 1;
+         if (searchAcrossFolders.value) {
+           searchAcrossFolders.value = false;
+           searchQuery.value = "";
+diff --git a/web/src/components/alerts/AlertsDestinationList.spec.ts b/web/src/components/alerts/AlertsDestinationList.spec.ts
+index acc6581db48..4d861ba58ec 100644
+--- a/web/src/components/alerts/AlertsDestinationList.spec.ts
++++ b/web/src/components/alerts/AlertsDestinationList.spec.ts
+@@ -552,7 +552,7 @@ describe("AlertsDestinationList", () => {
+ 
+   // ── pagination restoration ──────────────────────────────────────────────────
+   // OTable is stubbed in this harness (see OTableStub above), so the actual
+-  // TanStack pageIndex restoration (setTimeout(0) + table.setPageIndex) cannot
++  // TanStack pageIndex restoration (setTimeout(0) + OTable restorePage) cannot
+   // be exercised end-to-end here. These tests cover what IS reachable: seeding
+   // currentPage from the URL, and that navigating to/from the add/edit/import
+   // views preserves the `page` query param instead of stripping it.
+diff --git a/web/src/components/alerts/AlertsDestinationList.vue b/web/src/components/alerts/AlertsDestinationList.vue
+index 03891b09052..00e2c257fa7 100644
+--- a/web/src/components/alerts/AlertsDestinationList.vue
++++ b/web/src/components/alerts/AlertsDestinationList.vue
+@@ -593,7 +593,7 @@ export default defineComponent({
+       (isLoading) => {
+         if (isLoading) return;
+         setTimeout(() => {
+-          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++          oTableRef.value?.restorePage?.(currentPage.value);
+         }, 0);
+       },
+       { once: true },
+diff --git a/web/src/components/alerts/IncidentList.spec.ts b/web/src/components/alerts/IncidentList.spec.ts
+index 78cc8799736..6492e39da7c 100644
+--- a/web/src/components/alerts/IncidentList.spec.ts
++++ b/web/src/components/alerts/IncidentList.spec.ts
+@@ -660,15 +660,15 @@ describe("IncidentList.vue", () => {
+         shouldRefresh: false,
+       };
+       wrapper = createWrapper();
+-      const setPageIndex = vi.fn();
++      const restorePage = vi.fn();
+       // OTable is stubbed in this suite, so plant the piece of its exposed surface the fix depends on directly onto the template ref.
+-      (wrapper.vm as any).qTableRef.table = { setPageIndex };
++      (wrapper.vm as any).qTableRef.restorePage = restorePage;
+ 
+       await flushPromises();
+       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+       vi.runOnlyPendingTimers();
+ 
+-      expect(setPageIndex).toHaveBeenCalledWith(2);
++      expect(restorePage).toHaveBeenCalledWith(3);
+       store.state.incidents = { incidents: {}, isInitialized: false };
+       vi.useRealTimers();
+     });
+diff --git a/web/src/components/alerts/IncidentList.vue b/web/src/components/alerts/IncidentList.vue
+index 228320acc4b..5cd8f8ba247 100644
+--- a/web/src/components/alerts/IncidentList.vue
++++ b/web/src/components/alerts/IncidentList.vue
+@@ -386,7 +386,7 @@ export default defineComponent({
+       (isLoading) => {
+         if (isLoading) return;
+         setTimeout(() => {
+-          qTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++          qTableRef.value?.restorePage?.(currentPage.value);
+         }, 0);
+       },
+       { once: true },
+diff --git a/web/src/components/alerts/TemplateList.spec.ts b/web/src/components/alerts/TemplateList.spec.ts
+index 1deb8018b30..7236c2f959f 100644
+--- a/web/src/components/alerts/TemplateList.spec.ts
++++ b/web/src/components/alerts/TemplateList.spec.ts
+@@ -151,7 +151,7 @@ describe("Alert List", async () => {
+ 
+ // ── pagination restoration ────────────────────────────────────────────────
+ // This spec mounts the real OTable (not stubbed), so the TanStack pageIndex
+-// restoration itself (setTimeout(0) + table.setPageIndex) isn't exercised
++// restoration itself (setTimeout(0) + OTable restorePage) isn't exercised
+ // end-to-end here. These tests cover what IS reachable: seeding currentPage
+ // from the URL, and that navigating to/from the add/edit/clone/import views
+ // preserves the `page` query param instead of stripping it.
+@@ -174,10 +174,32 @@ describe("TemplateList pagination persistence", () => {
+ 
+   it("seeds currentPage from the URL's page query param", async () => {
+     (router as any).currentRoute.value.query = { page: "3" };
++    // Mocked so the clamp's own URL rewrite (covered below) never becomes a real navigation that leaks into later tests.
++    const replaceSpy = vi
++      .spyOn(router, "replace")
++      .mockImplementation((() => Promise.resolve()) as any);
+     wrapper = mountComponent();
+-    await flushPromises();
+ 
++    // Read before the fetch settles: once it does, a page past the end is clamped.
+     expect((wrapper.vm as any).currentPage).toBe(3);
++
++    await vi.waitFor(() => expect((wrapper.vm as any).currentPage).toBe(1));
++    replaceSpy.mockRestore();
++  });
++
++  it("falls back to page 1 once the list loads shorter than the URL's page", async () => {
++    (router as any).currentRoute.value.query = { page: "3" };
++    const replaceSpy = vi
++      .spyOn(router, "replace")
++      .mockImplementation((() => Promise.resolve()) as any);
++    wrapper = mountComponent();
++    // The restore runs in a setTimeout(0) after the fetch lands, so poll rather than guess the delay.
++    await vi.waitFor(() => expect((wrapper.vm as any).currentPage).toBe(1));
++
++    expect(replaceSpy).toHaveBeenCalledWith(
++      expect.objectContaining({ query: expect.objectContaining({ page: "1" }) }),
++    );
++    replaceSpy.mockRestore();
+   });
+ 
+   it("defaults currentPage to 1 when no page query param is present", async () => {
+diff --git a/web/src/components/alerts/TemplateList.vue b/web/src/components/alerts/TemplateList.vue
+index f1c46b4c371..e0f951f7e8e 100644
+--- a/web/src/components/alerts/TemplateList.vue
++++ b/web/src/components/alerts/TemplateList.vue
+@@ -492,7 +492,7 @@ watch(
+   (isLoading) => {
+     if (isLoading) return;
+     setTimeout(() => {
+-      oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++      oTableRef.value?.restorePage?.(currentPage.value);
+     }, 0);
+   },
+   { once: true },
+diff --git a/web/src/components/functions/EnrichmentTableList.spec.ts b/web/src/components/functions/EnrichmentTableList.spec.ts
+index 7adcd1243f6..1e98131ed5c 100644
+--- a/web/src/components/functions/EnrichmentTableList.spec.ts
++++ b/web/src/components/functions/EnrichmentTableList.spec.ts
+@@ -547,15 +547,15 @@ describe("EnrichmentTableList", () => {
+       vi.useFakeTimers();
+       const vm = wrapper.vm as any;
+       vm.currentPage = 3;
+-      const setPageIndex = vi.fn();
+-      vm.oTableRef = { table: { setPageIndex } };
++      const restorePage = vi.fn();
++      vm.oTableRef = { restorePage };
+ 
+       vm.restorePageIndex();
+-      expect(setPageIndex).not.toHaveBeenCalled();
++      expect(restorePage).not.toHaveBeenCalled();
+ 
+       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+       vi.runOnlyPendingTimers();
+-      expect(setPageIndex).toHaveBeenCalledWith(2);
++      expect(restorePage).toHaveBeenCalledWith(3);
+     });
+ 
+     it("keeps the page after Cancel unmounts and remounts OTable via the AddEnrichmentTable v-if swap", async () => {
+diff --git a/web/src/components/functions/EnrichmentTableList.vue b/web/src/components/functions/EnrichmentTableList.vue
+index f30cdebc307..b125970ae88 100644
+--- a/web/src/components/functions/EnrichmentTableList.vue
++++ b/web/src/components/functions/EnrichmentTableList.vue
+@@ -572,7 +572,7 @@ export default defineComponent({
+     // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+     const restorePageIndex = () => {
+       setTimeout(() => {
+-        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++        oTableRef.value?.restorePage?.(currentPage.value);
+       }, 0);
+     };
+     const { track } = useReo();
+diff --git a/web/src/components/functions/FunctionList.spec.ts b/web/src/components/functions/FunctionList.spec.ts
+index 30de76160c9..7f1ad2be96d 100644
+--- a/web/src/components/functions/FunctionList.spec.ts
++++ b/web/src/components/functions/FunctionList.spec.ts
+@@ -996,15 +996,15 @@ describe("FunctionList", () => {
+       vi.useFakeTimers();
+       const vm = wrapper.vm as any;
+       vm.currentPage = 3;
+-      const setPageIndex = vi.fn();
+-      vm.oTableRef = { table: { setPageIndex } };
++      const restorePage = vi.fn();
++      vm.oTableRef = { restorePage };
+ 
+       vm.restorePageIndex();
+-      expect(setPageIndex).not.toHaveBeenCalled();
++      expect(restorePage).not.toHaveBeenCalled();
+ 
+       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+       vi.runOnlyPendingTimers();
+-      expect(setPageIndex).toHaveBeenCalledWith(2);
++      expect(restorePage).toHaveBeenCalledWith(3);
+     });
+ 
+     it("keeps the page after Cancel unmounts and remounts OTable via the AddFunction v-if swap", async () => {
+diff --git a/web/src/components/functions/FunctionList.vue b/web/src/components/functions/FunctionList.vue
+index 0976a20c163..71d85bb6d39 100644
+--- a/web/src/components/functions/FunctionList.vue
++++ b/web/src/components/functions/FunctionList.vue
+@@ -386,7 +386,7 @@ export default defineComponent({
+     // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+     const restorePageIndex = () => {
+       setTimeout(() => {
+-        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++        oTableRef.value?.restorePage?.(currentPage.value);
+       }, 0);
+     };
+ 
+diff --git a/web/src/components/pipeline/PipelinesList.spec.ts b/web/src/components/pipeline/PipelinesList.spec.ts
+index 50eb5348cbf..84291056ee9 100644
+--- a/web/src/components/pipeline/PipelinesList.spec.ts
++++ b/web/src/components/pipeline/PipelinesList.spec.ts
+@@ -985,16 +985,16 @@ describe("PipelinesList", () => {
+     it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", () => {
+       vi.useFakeTimers();
+       wrapper.vm.currentPage = 3;
+-      const setPageIndex = vi.fn();
++      const restorePage = vi.fn();
+       // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
+-      wrapper.vm.oTableRef = { table: { setPageIndex } };
++      wrapper.vm.oTableRef = { restorePage };
+ 
+       wrapper.vm.restorePageIndex();
+-      expect(setPageIndex).not.toHaveBeenCalled();
++      expect(restorePage).not.toHaveBeenCalled();
+ 
+       vi.runAllTimers();
+ 
+-      expect(setPageIndex).toHaveBeenCalledWith(2);
++      expect(restorePage).toHaveBeenCalledWith(3);
+       vi.useRealTimers();
+     });
+ 
+@@ -1017,25 +1017,25 @@ describe("PipelinesList", () => {
+       await nextTick();
+ 
+       // Only now, once nothing will re-render and re-bind the ref again, plant the fake — restorePageIndex() reads oTableRef.value lazily when its timer fires, so this still lands in time.
+-      const setPageIndex = vi.fn();
+-      wrapper.vm.oTableRef = { table: { setPageIndex } };
++      const restorePage = vi.fn();
++      wrapper.vm.oTableRef = { restorePage };
+ 
+       vi.runAllTimers();
+ 
+-      expect(setPageIndex).toHaveBeenCalledWith(2);
++      expect(restorePage).toHaveBeenCalledWith(3);
+       vi.useRealTimers();
+     });
+ 
+     it("does not reassert the page on an unrelated route-name change (e.g. re-entering pipelines from itself)", async () => {
+       wrapper.vm.currentPage = 3;
+-      const setPageIndex = vi.fn();
+-      wrapper.vm.oTableRef = { table: { setPageIndex } };
++      const restorePage = vi.fn();
++      wrapper.vm.oTableRef = { restorePage };
+ 
+       // Same name twice: the watcher's guard (`newName === oldName`) must skip it.
+       mockRouter.currentRoute.value.name = "pipelines";
+       await flushPromises();
+ 
+-      expect(setPageIndex).not.toHaveBeenCalled();
++      expect(restorePage).not.toHaveBeenCalled();
+     });
+ 
+     it("resets currentPage to 1 when the user explicitly switches tabs", () => {
+diff --git a/web/src/components/pipeline/PipelinesList.vue b/web/src/components/pipeline/PipelinesList.vue
+index e57e7b517f6..56e32fd1717 100644
+--- a/web/src/components/pipeline/PipelinesList.vue
++++ b/web/src/components/pipeline/PipelinesList.vue
+@@ -661,7 +661,7 @@ const onPageChange = (page: number) => {
+ // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+ const restorePageIndex = () => {
+   setTimeout(() => {
+-    oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++    oTableRef.value?.restorePage?.(currentPage.value);
+   }, 0);
+ };
+ 
+diff --git a/web/src/components/workflows/WorkflowsList.spec.ts b/web/src/components/workflows/WorkflowsList.spec.ts
+index 3c6b5861553..c078a4750bb 100644
+--- a/web/src/components/workflows/WorkflowsList.spec.ts
++++ b/web/src/components/workflows/WorkflowsList.spec.ts
+@@ -1073,16 +1073,16 @@ describe("WorkflowsList", () => {
+       await flushPromises();
+       vi.useFakeTimers();
+       wrapper.vm.currentPage = 3;
+-      const setPageIndex = vi.fn();
++      const restorePage = vi.fn();
+       // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
+-      wrapper.vm.oTableRef = { table: { setPageIndex } };
++      wrapper.vm.oTableRef = { restorePage };
+ 
+       wrapper.vm.restorePageIndex();
+-      expect(setPageIndex).not.toHaveBeenCalled();
++      expect(restorePage).not.toHaveBeenCalled();
+ 
+       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+       vi.runOnlyPendingTimers();
+-      expect(setPageIndex).toHaveBeenCalledWith(2);
++      expect(restorePage).toHaveBeenCalledWith(3);
+     });
+ 
+     it("reasserts the persisted page once the initial fetch resolves on mount", async () => {
+@@ -1101,13 +1101,13 @@ describe("WorkflowsList", () => {
+       await flushPromises();
+ 
+       // Only now, once the fetched data has re-rendered OTable and re-bound the ref, plant the fake — restorePageIndex() reads oTableRef.value lazily when its timer fires, so this still lands in time.
+-      const setPageIndex = vi.fn();
+-      wrapper.vm.oTableRef = { table: { setPageIndex } };
+-      expect(setPageIndex).not.toHaveBeenCalled();
++      const restorePage = vi.fn();
++      wrapper.vm.oTableRef = { restorePage };
++      expect(restorePage).not.toHaveBeenCalled();
+ 
+       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+       vi.runOnlyPendingTimers();
+-      expect(setPageIndex).toHaveBeenCalledWith(2);
++      expect(restorePage).toHaveBeenCalledWith(3);
+     });
+ 
+     it("reasserts the restored page when a save lands while OTable has remounted mid-fetch", async () => {
+@@ -1133,13 +1133,13 @@ describe("WorkflowsList", () => {
+       await flushPromises();
+ 
+       // Only now, once the fetched data has re-rendered OTable and re-bound the ref, plant the fake.
+-      const setPageIndex = vi.fn();
+-      wrapper.vm.oTableRef = { table: { setPageIndex } };
+-      expect(setPageIndex).not.toHaveBeenCalled();
++      const restorePage = vi.fn();
++      wrapper.vm.oTableRef = { restorePage };
++      expect(restorePage).not.toHaveBeenCalled();
+ 
+       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+       vi.runOnlyPendingTimers();
+-      expect(setPageIndex).toHaveBeenCalledWith(2);
++      expect(restorePage).toHaveBeenCalledWith(3);
+     });
+   });
+ });
+diff --git a/web/src/components/workflows/WorkflowsList.vue b/web/src/components/workflows/WorkflowsList.vue
+index 4cbdce7e50c..b16cbae72e2 100644
+--- a/web/src/components/workflows/WorkflowsList.vue
++++ b/web/src/components/workflows/WorkflowsList.vue
+@@ -443,6 +443,8 @@ watch(activeFolderId, (folderId) => {
+     searchAcrossFolders.value = false;
+     filterQuery.value = "";
+   }
++  // A folder switch starts a new list, so the page kept for the previous folder must not be restored onto it.
++  currentPage.value = 1;
+   getWorkflows(folderId);
+ });
+ 
+@@ -485,7 +487,7 @@ const onPageChange = (page: number) => {
+ // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+ const restorePageIndex = () => {
+   setTimeout(() => {
+-    oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++    oTableRef.value?.restorePage?.(currentPage.value);
+   }, 0);
+ };
+ 
+diff --git a/web/src/lib/core/Table/OTable.spec.ts b/web/src/lib/core/Table/OTable.spec.ts
+index 32552b9d3f0..3bbc5facb2a 100644
+--- a/web/src/lib/core/Table/OTable.spec.ts
++++ b/web/src/lib/core/Table/OTable.spec.ts
+@@ -2215,6 +2215,36 @@ describe("OTable", () => {
+       await nextTick();
+       expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+     });
++
++    it("restorePage lands on the requested page when it exists, without touching the parent", async () => {
++      wrapper = mount(OTable, {
++        props: { data: makeRows(20), columns: makeColumns(), pagination: "client", pageSize: 5 },
++      });
++      (wrapper.vm as any).restorePage(3);
++      await nextTick();
++      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(2);
++      expect(wrapper.emitted("update:currentPage")).toBeUndefined();
++    });
++
++    it("restorePage falls back to page 1 and tells the parent when the page is past the end", async () => {
++      wrapper = mount(OTable, {
++        props: { data: makeRows(7), columns: makeColumns(), pagination: "client", pageSize: 5 },
++      });
++      (wrapper.vm as any).restorePage(3);
++      await nextTick();
++      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
++      expect(wrapper.emitted("update:currentPage")).toEqual([[1]]);
++    });
++
++    it("restorePage treats a page below 1 like one past the end", async () => {
++      wrapper = mount(OTable, {
++        props: { data: makeRows(7), columns: makeColumns(), pagination: "client", pageSize: 5 },
++      });
++      (wrapper.vm as any).restorePage(0);
++      await nextTick();
++      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
++      expect(wrapper.emitted("update:currentPage")).toEqual([[1]]);
++    });
+   });
+ });
+ 
+diff --git a/web/src/lib/core/Table/OTable.vue b/web/src/lib/core/Table/OTable.vue
+index 5bb0718f6f9..a36cc428e06 100644
+--- a/web/src/lib/core/Table/OTable.vue
++++ b/web/src/lib/core/Table/OTable.vue
+@@ -1192,6 +1192,7 @@ watch(
+  */
+ defineExpose({
+   table,
++  restorePage: pagination.restorePage,
+   toggleAllRows: selection.toggleAllRows,
+   clearSelection: selection.clearSelection,
+   // Callers that render their own OTableColumnToggle (outside the built-in
+diff --git a/web/src/lib/core/Table/composables/useTablePagination.ts b/web/src/lib/core/Table/composables/useTablePagination.ts
+index 262b771ef2d..4b34fb2db9a 100644
+--- a/web/src/lib/core/Table/composables/useTablePagination.ts
++++ b/web/src/lib/core/Table/composables/useTablePagination.ts
+@@ -111,6 +111,14 @@ export function useTablePagination<TData>(
+     goToPage(totalPages.value);
+   }
+ 
++  // A stored page can outlive the rows it was chosen for (folder/tab switch resets the table but not the URL/store), so a page past the end falls back to 1 and the parent is told to fix its copy.
++  function restorePage(page: number) {
++    if (!isClientMode.value) return;
++    const target = page >= 1 && page <= totalPages.value ? page : 1;
++    table.setPageIndex(target - 1);
++    if (target !== page) emit("update:currentPage", target);
++  }
++
+   return {
+     isClientMode,
+     isServerMode,
+@@ -130,5 +138,6 @@ export function useTablePagination<TData>(
+     prevPage,
+     firstPage,
+     lastPage,
++    restorePage,
+   };
+ }
+diff --git a/web/src/views/Dashboards/Dashboards.spec.ts b/web/src/views/Dashboards/Dashboards.spec.ts
+index bfb92f7fc18..acaad318002 100644
+--- a/web/src/views/Dashboards/Dashboards.spec.ts
++++ b/web/src/views/Dashboards/Dashboards.spec.ts
+@@ -818,6 +818,26 @@ describe("Dashboards.vue", () => {
+       expect(router.currentRoute.value.query.page).toBe("3");
+     });
+ 
++    it("resets to page 1 and drops page from the URL on a folder switch after landing", async () => {
++      await router.push({ path: "/dashboards", query: { folder: "default", page: "3" } });
++      wrapper = shallowMount(Dashboards, {
++        global: buildGlobalConfig(storeWithTwo(), router, i18n),
++      });
++      await settle();
++      await flushPromises();
++      await settle();
++      expect(wrapper.vm.currentPage).toBe(3);
++
++      wrapper.vm.updateActiveFolderId("folder1");
++      await settle();
++      await flushPromises();
++      await settle();
++
++      expect(wrapper.vm.currentPage).toBe(1);
++      expect(router.currentRoute.value.query.folder).toBe("folder1");
++      expect(router.currentRoute.value.query.page).toBeUndefined();
++    });
++
+     it("toggleFavorite persists the per-user setting resolved to the active folder", async () => {
+       const testStore = storeWithTwo();
+       (testStore.state.userInfo as any).email = "me@example.com";
+diff --git a/web/src/views/Dashboards/Dashboards.vue b/web/src/views/Dashboards/Dashboards.vue
+index f936d4e01af..15d72a3cd8d 100644
+--- a/web/src/views/Dashboards/Dashboards.vue
++++ b/web/src/views/Dashboards/Dashboards.vue
+@@ -945,10 +945,15 @@ export default defineComponent({
+ 
+     watch(
+       activeFolderId,
+-      async () => {
++      async (_folder, previousFolder) => {
+         //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder
+         //the selected dashboards are not shown
+         selectedIds.value = [];
++        // A folder switch starts a new list (page 1 in table and URL alike); the landing run has no previous folder and is the Back restore, which keeps the page.
++        const switching = previousFolder !== null;
++        if (switching) currentPage.value = 1;
++        const { page: _page, ...carriedQuery } = route.query;
++        const baseQuery = switching ? carriedQuery : route.query;
+         // The Favorites pseudo-folder has no backend list. Rows render
+         // immediately from the stored favorites; fetch the involved folders'
+         // lists in the background purely to enrich them (owner/created/fresh
+@@ -966,7 +971,7 @@ export default defineComponent({
+           router.push({
+             path: "/dashboards",
+             query: {
+-              ...route.query,
++              ...baseQuery,
+               org_identifier: store.state.selectedOrganization.identifier,
+               folder: activeFolderId.value,
+             },
+@@ -999,7 +1004,7 @@ export default defineComponent({
+           router.push({
+             path: "/dashboards",
+             query: {
+-              ...route.query,
++              ...baseQuery,
+               org_identifier: store.state.selectedOrganization.identifier,
+               folder: activeFolderId.value,
+             },
+@@ -1238,7 +1243,7 @@ export default defineComponent({
+       (isLoading) => {
+         if (isLoading) return;
+         setTimeout(() => {
+-          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++          oTableRef.value?.restorePage?.(currentPage.value);
+         }, 0);
+       },
+       { once: true },
+diff --git a/web/src/views/slos/SloList.vue b/web/src/views/slos/SloList.vue
+index 327cd389f44..dc3069085c1 100644
+--- a/web/src/views/slos/SloList.vue
++++ b/web/src/views/slos/SloList.vue
+@@ -876,7 +876,7 @@ watch(
+   (isLoading) => {
+     if (isLoading) return;
+     setTimeout(() => {
+-      oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++      oTableRef.value?.restorePage?.(currentPage.value);
+     }, 0);
+   },
+   { once: true },
+@@ -909,9 +909,12 @@ async function load(orgId?: string | null, folderId?: string, force = false) {
+ 
+ function onFolderChange(folderId: string) {
+   if (folderId === activeFolderId.value) return;
++  // A folder switch starts a new list: page 1 in table and URL alike.
++  currentPage.value = 1;
++  const { page: _page, ...carriedQuery } = route.query;
+   router.push({
+     name: "sloList",
+-    query: { ...route.query, org_identifier: org.value, folder: folderId },
++    query: { ...carriedQuery, org_identifier: org.value, folder: folderId },
+   });
+   load(org.value, folderId);
+ }
+diff --git a/web/src/views/slos/SloListPagination.spec.ts b/web/src/views/slos/SloListPagination.spec.ts
+index b9c7337c2f5..c0eec29ef9e 100644
+--- a/web/src/views/slos/SloListPagination.spec.ts
++++ b/web/src/views/slos/SloListPagination.spec.ts
+@@ -121,6 +121,32 @@ describe("SloList pagination persistence", () => {
+     expect((wrapper.vm as any).oTableRef.table.getState().pagination.pageIndex).toBe(1);
+   });
+ 
++  it("resets to page 1 and drops page from the URL on a folder switch", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(30) } } as any);
++    (router as any).currentRoute.value.query = { page: "2", folder: "default" };
++    wrapper = await mountList();
++    expect((wrapper.vm as any).currentPage).toBe(2);
++    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
++
++    (wrapper.vm as any).onFolderChange("team-b");
++
++    expect((wrapper.vm as any).currentPage).toBe(1);
++    const pushedQuery = pushSpy.mock.calls[0][0].query;
++    expect(pushedQuery.folder).toBe("team-b");
++    expect(pushedQuery.page).toBeUndefined();
++  });
++
++  // The URL rewrite itself is onPageChange's job, covered below; the shared router's pending navigations make its call timing here unreliable.
++  it("falls back to page 1 when the URL's page is past the end of the list", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(5) } } as any);
++    (router as any).currentRoute.value.query = { page: "2" };
++    vi.spyOn(router, "replace").mockImplementation((() => Promise.resolve()) as any);
++    wrapper = await mountList();
++    await vi.waitFor(() => expect((wrapper.vm as any).currentPage).toBe(1));
++
++    expect((wrapper.vm as any).oTableRef.table.getState().pagination.pageIndex).toBe(0);
++  });
++
+   it("onPageChange updates currentPage and replaces the URL, preserving other query params", async () => {
+     vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
+     (router as any).currentRoute.value.query = { org_identifier: "test-org" };
+@@ -206,20 +232,4 @@ describe("SloList pagination persistence", () => {
+     expect(pushed.query.page).toBe("3");
+     expect(pushed.query.folder).toBe("team-a");
+   });
+-
+-  it("onFolderChange keeps carrying the page query param (already correct, guarded against regression)", async () => {
+-    vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
+-    (router as any).currentRoute.value.query = { page: "3" };
+-    wrapper = await mountList();
+-    // No call-through: this targets a different route, and a real navigation resolving async would leave the shared router's query mutated for the next test.
+-    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
+-    // Re-asserted: the shared router's own async effects can touch query between mount and this call.
+-    (router as any).currentRoute.value.query = { page: "3" };
+-
+-    (wrapper.vm as any).onFolderChange("team-b");
+-
+-    const pushed = pushSpy.mock.calls[0][0] as any;
+-    expect(pushed.query.page).toBe("3");
+-    expect(pushed.query.folder).toBe("team-b");
+-  });
+ });

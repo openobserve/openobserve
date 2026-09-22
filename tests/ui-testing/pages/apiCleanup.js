@@ -249,6 +249,73 @@ class APICleanup {
     }
 
     /**
+     * Create a dashboards folder via the v2 folders API.
+     * @param {string} name - Unique folder name
+     * @returns {Promise<{folderId: string, name: string}>}
+     */
+    async createDashboardFolder(name) {
+        const response = await this._fetch(
+            `${this.baseUrl}/api/v2/${this.org}/folders/dashboards`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description: '', icon: null })
+            }
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createDashboardFolder: HTTP ${response.status} — ${body}`);
+        }
+        const folder = await response.json();
+        testLogger.info('Created dashboard folder', { name, folderId: folder.folderId });
+        return { folderId: folder.folderId, name: folder.name };
+    }
+
+    /**
+     * Seed `count` minimal dashboards into a folder via createMinimalDashboard.
+     * @param {string} folderId
+     * @param {number} count
+     * @param {string} prefix - Dashboard title prefix (deterministic ordering by name)
+     * @returns {Promise<Array<{dashboardId: string, title: string}>>}
+     */
+    async seedDashboardsInFolder(folderId, count, prefix) {
+        const created = [];
+        for (let i = 0; i < count; i++) {
+            const title = `${prefix}_${i}`;
+            const { dashboardId } = await this.createMinimalDashboard(title, folderId);
+            created.push({ dashboardId, title });
+        }
+        return created;
+    }
+
+    /**
+     * Delete a dashboards folder by id. Dashboards inside must be removed first,
+     * otherwise the backend returns 400 ("Folder contains dashboards").
+     * @param {string} folderId
+     * @returns {Promise<Object>} { code, message }
+     */
+    async deleteDashboardFolder(folderId) {
+        try {
+            const response = await this._fetch(
+                `${this.baseUrl}/api/v2/${this.org}/folders/dashboards/${folderId}`,
+                {
+                    method: 'DELETE',
+                    headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+                }
+            );
+            const text = await response.text();
+            if (response.ok) {
+                return { code: 200, message: text };
+            }
+            testLogger.warn('Failed to delete dashboard folder', { folderId, status: response.status, body: text });
+            return { code: response.status, message: text };
+        } catch (error) {
+            testLogger.error('Failed to delete dashboard folder', { folderId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
      * Fetch all dashboards in a specific folder
      * @param {string} folderName - The folder name (e.g., 'default')
      * @returns {Promise<Array>} Array of dashboard objects

@@ -1,0 +1,22 @@
+{
+  "feature_slug": "folder-pagination-reset",
+  "feature_title": "Folder Switch Pagination Reset",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboardPagination.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboardPagination.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/lib/core/Table/composables/useTablePagination.ts",
+    "web/src/lib/core/Table/OTable.vue",
+    "web/src/views/Dashboards/Dashboards.vue",
+    "web/src/views/slos/SloList.vue",
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/components/workflows/WorkflowsList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
