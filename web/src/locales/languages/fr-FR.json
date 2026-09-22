@@ -13506,7 +13506,7 @@
     "variables": {
       "newButton": "Nouvelle variable",
       "createTitle": "Ajouter une variable",
-      "created": "Variable créée",
+      "created": "Variable {name} créée",
       "deleteConfirm": "Supprimer {name} ?",
       "deleteFailed": "Impossible de supprimer la variable.",
       "deleteTitle": "Supprimer la variable",
@@ -13518,7 +13518,7 @@
       "shadowGlobalMessage": "{name} remplacera la valeur globale dans {env}. Les autres environnements continueront d'utiliser la valeur globale.",
       "shadowedGlobalTitle": "Certains environnements conservent leurs propres valeurs",
       "shadowedGlobalMessage": "{name} a déjà sa propre valeur dans : {envs}. Ces environnements conservent la leur ; partout ailleurs, celle-ci sera utilisée.",
-      "deleteUsed": "La variable {name} est référencée par {n} contrôles. Ils l'interpréteront comme du texte littéral jusqu'à ce que vous les mettiez à jour. Supprimer quand même ?",
+      "deleteUsed": "{name} est référencée par {n} vérification. Elle sera interprétée comme texte littéral jusqu'à ce que vous la mettiez à jour. Supprimer quand même ? | {name} est référencée par {n} vérifications. Elles seront interprétées comme texte littéral jusqu'à ce que vous les mettiez à jour. Supprimer quand même ?",
       "deleted": "Variable supprimée",
       "description": "Description",
       "editTitle": "Modifier la variable",
@@ -13530,6 +13530,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "Globale",
       "globalSubtitle": "S'applique dans tous les environnements.",
+      "globalReachesProduction": "Les valeurs globales s'appliquent dans chaque environnement, y compris la production. Une modification ici atteint chaque vérification qui utilise ce nom sans valeur propre.",
       "kind": "Type",
       "kindPlain": "En clair",
       "kindSecret": "Secret",
@@ -13549,11 +13550,13 @@
       "scopeGlobal": "Cette variable s'applique dans tous les environnements.",
       "searchPlaceholder": "Rechercher des variables",
       "secretNeedsEnvironment": "Global ne contient aucun secret. Créez le secret dans l'environnement qui doit le protéger.",
+      "secretWriteOnly": "La valeur est en écriture seule. Elle ne sera plus jamais affichée après son enregistrement.",
       "title": "Variables",
       "updated": "Variable mise à jour",
       "usedBy": "Utilisée par",
-      "usedByChecks": "{n} tests",
+      "usedByChecks": "Non utilisé | {n} vérification | {n} vérifications",
       "value": "Valeur",
+      "valueEmpty": "Vide",
       "valuePlaceholder": "Valeur",
       "valueRequired": "Valeur requise",
       "valueSet": "Définie · mise à jour {when}"
@@ -13594,7 +13597,7 @@
       "subtitle": "Définissez le périmètre des variables et des secrets et contrôlez qui peut les gérer.",
       "title": "Environnements",
       "updated": "Environnement mis à jour",
-      "usedByChecks": "Utilisé par {n} contrôles",
+      "usedByChecks": "Non utilisé | Utilisé par {n} vérification | Utilisé par {n} vérifications",
       "variables": "Variables"
     },
     "duplicateVariable": {
@@ -13634,6 +13637,18 @@
       "secretBlocked": "Les secrets ne peuvent pas être déplacés entre environnements",
       "toGlobal": "Rendre globale"
     },
+    "promoteCheck": {
+      "action": "Partager {name}",
+      "confirm": "Déplacer",
+      "description": "Déplace cette variable hors de la vérification vers un environnement partagé, où d'autres vérifications peuvent aussi l'utiliser.",
+      "destination": "Destination",
+      "done": "Variable déplacée",
+      "failed": "Impossible de déplacer la variable",
+      "global": "Global",
+      "secretHint": "Cette valeur est marquée comme sécurisée : elle devient un secret et ne peut donc pas être globale.",
+      "title": "Partager {name}",
+      "tooltip": "Déplacer vers un environnement partagé"
+    },
     "split": {
       "action": "Limiter à des environnements",
       "alreadyOwn": "A déjà sa propre valeur — conservée telle quelle.",
@@ -13644,16 +13659,9 @@
       "failed": "Impossible de définir la portée de la variable.",
       "title": "Définir la portée de {name} par environnement.",
       "unselectedWarning": "Non sélectionnés : {envs}. Les tests qui s'exécutent sur eux cesseront de résoudre cette variable.",
-      "valuePlaceholder": "Valeur pour cet environnement"
-    },
-    "replaySecrets": {
-      "confirm": "Réexécuter",
-      "description": "La réexécution s'effectue dans votre navigateur. Les secrets partagés ne peuvent donc pas être saisis automatiquement. Entrez-les pour réexécuter avec les valeurs réelles.",
-      "remember": "Mémoriser pour cette session",
-      "rememberHint": "Conservé uniquement dans cet onglet, jamais enregistré dans le navigateur ni envoyé où que ce soit.",
-      "skip": "Réexécuter sans eux",
-      "title": "Valeurs requises pour la réexécution",
-      "valuePlaceholder": "Valeur"
+      "valuePlaceholder": "Valeur pour cet environnement",
+      "usedBy": "Utilisé par {n} vérifications : {names}",
+      "usedByHint": "Le fractionnement est refusé tant que l'une de ces vérifications perdrait la valeur : une vérification sans environnement, ou une qui s'exécute dans un environnement auquel aucune valeur n'est attribuée ici."
     },
     "versionPrefix": "v",
     "tokens": {
@@ -14074,7 +14082,8 @@
       "timeoutLabel": "Délai d'attente (ms)",
       "valueFallback": "Valeur",
       "showSetupSteps": "Afficher les étapes de configuration",
-      "waitingForActions": "En attente d'actions dans le navigateur…"
+      "waitingForActions": "En attente d'actions dans le navigateur…",
+      "unboundVariables": "{names} n'est pas défini dans cette vérification, ses environnements ou global ; il est donc saisi tel quel. | {names} ne sont pas définis dans cette vérification, ses environnements ou global ; ils sont donc saisis tels quels."
     },
     "labels": {
       "copyOf": "Copie de {name}",
@@ -14686,7 +14695,7 @@
       "stepNameRequired": "Donnez un nom à cette étape — c'est ce que montrent les résultats d'exécution",
       "typeTextRequired": "Saisissez le texte que cette étape doit taper",
       "expectedRequired": "Saisissez la valeur que cette assertion doit attendre",
-      "urlInvalid": "Saisissez une URL valide commençant par http:// ou https://",
+      "urlInvalid": "Saisissez une URL commençant par http://, https:// ou un espace réservé de variable",
       "navigateUrlInvalid": "Saisissez une URL commençant par http://, https:// ou un espace réservé de variable.",
       "urlRequired": "L'URL de départ est requise",
       "fixHighlightedFields": "Corrigez les champs en surbrillance avant d'enregistrer",

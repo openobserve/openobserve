@@ -13506,7 +13506,7 @@
     "variables": {
       "newButton": "Yeni Değişken",
       "createTitle": "Değişken Ekle",
-      "created": "Değişken oluşturuldu",
+      "created": "{name} değişkeni oluşturuldu",
       "deleteConfirm": "{name} silinsin mi?",
       "deleteFailed": "Değişken silinemedi",
       "deleteTitle": "Değişkeni Sil",
@@ -13518,7 +13518,7 @@
       "shadowGlobalMessage": "{name}, {env} içinde genel değeri geçersiz kılacak. Diğer ortamlar genel değeri kullanmaya devam edecek.",
       "shadowedGlobalTitle": "Bazı ortamlar kendi değerlerini korur",
       "shadowedGlobalMessage": "{name} zaten şu ortamlarda kendi değerine sahip: {envs}. Bu ortamlar kendi değerlerini korur; diğer her yer bu değeri kullanır.",
-      "deleteUsed": "{name}, {n} kontrolde kullanılıyor. Siz güncelleyene kadar bu değişken düz metin olarak çözülecek. Yine de silinsin mi?",
+      "deleteUsed": "{name}, {n} kontrol tarafından referans alınıyor. Güncelleyene kadar bunu düz metin olarak çözer. Yine de silinsin mi? | {name}, {n} kontrol tarafından referans alınıyor. Güncelleyene kadar bunları düz metin olarak çözerler. Yine de silinsin mi?",
       "deleted": "Değişken silindi",
       "description": "Açıklama",
       "editTitle": "Değişkeni Düzenle",
@@ -13530,6 +13530,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "Genel",
       "globalSubtitle": "Her ortamda geçerlidir.",
+      "globalReachesProduction": "Genel değerler, üretim dahil her ortamda geçerlidir. Buradaki bir değişiklik, bu adı kendi değeri olmadan kullanan her kontrole ulaşır.",
       "kind": "Tür",
       "kindPlain": "Normal",
       "kindSecret": "Gizli",
@@ -13549,11 +13550,13 @@
       "scopeGlobal": "Bu değişken her ortamda geçerlidir.",
       "searchPlaceholder": "Değişken ara",
       "secretNeedsEnvironment": "Global hiçbir gizli bilgi tutmaz. Gizli bilgiyi, onu koruması gereken ortamda oluşturun.",
+      "secretWriteOnly": "Değer yalnızca yazılabilir. Kaydedildikten sonra hiçbir şey onu tekrar göstermez.",
       "title": "Değişkenler",
       "updated": "Değişken güncellendi",
       "usedBy": "Kullananlar",
-      "usedByChecks": "{n} kontrol",
+      "usedByChecks": "Kullanılmıyor | {n} kontrol | {n} kontrol",
       "value": "Değer",
+      "valueEmpty": "Boş",
       "valuePlaceholder": "Değer",
       "valueRequired": "Değer zorunludur",
       "valueSet": "Ayarlandı · {when} güncellendi"
@@ -13594,7 +13597,7 @@
       "subtitle": "Değişkenlerin ve sırların kapsamını belirleyin ve bunları kimlerin yönetebileceğini denetleyin.",
       "title": "Ortamlar",
       "updated": "Ortam güncellendi",
-      "usedByChecks": "{n} kontrol tarafından kullanılıyor",
+      "usedByChecks": "Kullanılmıyor | {n} kontrol tarafından kullanılıyor | {n} kontrol tarafından kullanılıyor",
       "variables": "Değişkenler"
     },
     "duplicateVariable": {
@@ -13634,6 +13637,18 @@
       "secretBlocked": "Sırlar ortamlar arasında taşınamaz",
       "toGlobal": "Genel yap"
     },
+    "promoteCheck": {
+      "action": "{name} paylaş",
+      "confirm": "Taşı",
+      "description": "Bu değişkeni kontrolden çıkarıp diğer kontrollerin de kullanabileceği paylaşılan bir ortama taşır.",
+      "destination": "Hedef",
+      "done": "Değişken taşındı",
+      "failed": "Değişken taşınamadı",
+      "global": "Genel",
+      "secretHint": "Bu değer güvenli olarak işaretlenmiş, bu nedenle bir gizli değere dönüşür ve genele gidemez.",
+      "title": "{name} paylaş",
+      "tooltip": "Paylaşılan bir ortama taşı"
+    },
     "split": {
       "action": "Ortam kapsamına al",
       "alreadyOwn": "Zaten kendi değeri var — olduğu gibi korunur.",
@@ -13644,16 +13659,9 @@
       "failed": "Değişken ortam kapsamına alınamadı.",
       "title": "{name} değişkenini ortam kapsamına al",
       "unselectedWarning": "Seçilmedi: {envs}. Bu ortamlarda çalışan kontroller bu değişkeni çözümlemeyi bırakacak.",
-      "valuePlaceholder": "Bu ortam için değer"
-    },
-    "replaySecrets": {
-      "confirm": "Yeniden Oynat",
-      "description": "Yeniden oynatma tarayıcınızda çalışır, bu nedenle paylaşılan sırlar otomatik olarak doldurulamaz. Gerçek değerlerle yeniden oynatmak için bunları girin.",
-      "remember": "Bu oturum için hatırla",
-      "rememberHint": "Yalnızca bu sekmede tutulur, tarayıcıya asla kaydedilmez veya hiçbir yere gönderilmez.",
-      "skip": "Bunlar olmadan yeniden oynat",
-      "title": "Yeniden oynatma için gerekli değerler",
-      "valuePlaceholder": "Değer"
+      "valuePlaceholder": "Bu ortam için değer",
+      "usedBy": "{n} kontrol tarafından kullanılıyor: {names}",
+      "usedByHint": "Bu kontrollerden herhangi biri değeri kaybedecekse bölme reddedilir: ortamı olmayan bir kontrol ya da burada değer verilmeyen bir ortamda çalışan bir kontrol."
     },
     "versionPrefix": "v",
     "tokens": {
@@ -14074,7 +14082,8 @@
       "timeoutLabel": "Zaman aşımı (ms)",
       "valueFallback": "Değer",
       "showSetupSteps": "Kurulum adımlarını göster",
-      "waitingForActions": "Tarayıcıda eylemler bekleniyor…"
+      "waitingForActions": "Tarayıcıda eylemler bekleniyor…",
+      "unboundVariables": "{names}, bu kontrolde, ortamlarında veya genel değerlerde tanımlı değil, bu nedenle yazıldığı gibi düz metin olarak işlenir. | {names}, bu kontrolde, ortamlarında veya genel değerlerde tanımlı değil, bu nedenle yazıldıkları gibi düz metin olarak işlenir."
     },
     "labels": {
       "copyOf": "{name} kopyası",
@@ -14686,7 +14695,7 @@
       "stepNameRequired": "Bu adıma bir ad verin — çalıştırma sonuçlarında gösterilen budur",
       "typeTextRequired": "Bu adımın yazması gereken metni girin",
       "expectedRequired": "Bu iddianın beklediği değeri girin",
-      "urlInvalid": "http:// veya https:// ile başlayan geçerli bir URL girin",
+      "urlInvalid": "http://, https:// veya bir değişken yer tutucusu ile başlayan bir URL girin",
       "navigateUrlInvalid": "http://, https:// veya bir değişken yer tutucusu ile başlayan bir URL girin.",
       "urlRequired": "Başlangıç URL'si gereklidir",
       "fixHighlightedFields": "Kaydetmeden önce vurgulanan alanları düzeltin",

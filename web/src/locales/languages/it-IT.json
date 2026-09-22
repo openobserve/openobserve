@@ -13506,7 +13506,7 @@
     "variables": {
       "newButton": "Nuova variabile",
       "createTitle": "Aggiungi variabile",
-      "created": "Variabile creata",
+      "created": "Variabile {name} creata",
       "deleteConfirm": "Eliminare {name}?",
       "deleteFailed": "Non è stato possibile eliminare la variabile.",
       "deleteTitle": "Elimina variabile",
@@ -13518,7 +13518,7 @@
       "shadowGlobalMessage": "{name} sovrascriverà il valore globale in {env}. Gli altri ambienti continueranno a usare il valore globale.",
       "shadowedGlobalTitle": "Alcuni ambienti mantengono i propri valori",
       "shadowedGlobalMessage": "{name} ha già un proprio valore in: {envs}. Questi ambienti mantengono i propri; tutti gli altri usano questo valore.",
-      "deleteUsed": "{name} è usato da {n} controlli. Lo tratteranno come testo letterale finché non li aggiorni. Eliminare comunque?",
+      "deleteUsed": "{name} è referenziata da {n} controllo. Verrà risolta come testo letterale finché non la aggiorni. Eliminare comunque? | {name} è referenziata da {n} controlli. Verranno risolte come testo letterale finché non le aggiorni. Eliminare comunque?",
       "deleted": "Variabile eliminata",
       "description": "Descrizione",
       "editTitle": "Modifica variabile",
@@ -13530,6 +13530,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "Globale",
       "globalSubtitle": "Si applica in ogni ambiente.",
+      "globalReachesProduction": "I valori globali si applicano in ogni ambiente, inclusa la produzione. Una modifica qui raggiunge ogni controllo che usa questo nome senza un valore proprio.",
       "kind": "Tipo",
       "kindPlain": "In chiaro",
       "kindSecret": "Segreto",
@@ -13549,11 +13550,13 @@
       "scopeGlobal": "Questa variabile si applica in ogni ambiente.",
       "searchPlaceholder": "Cerca variabili",
       "secretNeedsEnvironment": "Global non contiene segreti. Crea il segreto nell'ambiente che deve proteggerlo.",
+      "secretWriteOnly": "Il valore è di sola scrittura. Non viene più mostrato dopo il salvataggio.",
       "title": "Variabili",
       "updated": "Variabile aggiornata",
       "usedBy": "Usata da",
-      "usedByChecks": "{n} controlli",
+      "usedByChecks": "Non utilizzata | {n} controllo | {n} controlli",
       "value": "Valore",
+      "valueEmpty": "Vuoto",
       "valuePlaceholder": "Valore",
       "valueRequired": "Il valore è obbligatorio",
       "valueSet": "Impostato · aggiornato {when}"
@@ -13594,7 +13597,7 @@
       "subtitle": "Assegna variabili e segreti a un ambito e controlla chi può gestirli.",
       "title": "Ambienti",
       "updated": "Ambiente aggiornato",
-      "usedByChecks": "Usato da {n} check",
+      "usedByChecks": "Non utilizzato | Utilizzato da {n} controllo | Utilizzato da {n} controlli",
       "variables": "Variabili"
     },
     "duplicateVariable": {
@@ -13634,6 +13637,18 @@
       "secretBlocked": "I segreti non possono essere spostati tra ambienti",
       "toGlobal": "Rendi globale"
     },
+    "promoteCheck": {
+      "action": "Condividi {name}",
+      "confirm": "Sposta",
+      "description": "Sposta questa variabile dal controllo a un ambiente condiviso, dove possono usarla anche altri controlli.",
+      "destination": "Destinazione",
+      "done": "Variabile spostata",
+      "failed": "Impossibile spostare la variabile",
+      "global": "Globale",
+      "secretHint": "Questo valore è contrassegnato come sicuro, quindi diventa un segreto e non può passare a globale.",
+      "title": "Condividi {name}",
+      "tooltip": "Sposta in un ambiente condiviso"
+    },
     "split": {
       "action": "Rendi per ambiente",
       "alreadyOwn": "Ha già un valore proprio — viene mantenuto invariato.",
@@ -13644,16 +13659,9 @@
       "failed": "Non è stato possibile definire l'ambito della variabile",
       "title": "Limita {name} agli ambienti",
       "unselectedWarning": "Non selezionati: {envs}. I check eseguiti su di essi smetteranno di risolvere questa variabile.",
-      "valuePlaceholder": "Valore per questo ambiente"
-    },
-    "replaySecrets": {
-      "confirm": "Riproduci",
-      "description": "La riproduzione viene eseguita nel browser, quindi i segreti condivisi non possono essere inseriti automaticamente. Inseriscili per riprodurre con valori reali.",
-      "remember": "Ricorda per questa sessione",
-      "rememberHint": "Mantenuti solo in questa scheda, mai salvati nel browser né inviati da nessuna parte.",
-      "skip": "Riproduci senza di essi",
-      "title": "Valori necessari per la riproduzione",
-      "valuePlaceholder": "Valore"
+      "valuePlaceholder": "Valore per questo ambiente",
+      "usedBy": "Utilizzato da {n} controlli: {names}",
+      "usedByHint": "La suddivisione viene rifiutata se uno di questi controlli perderebbe il valore: un controllo senza ambienti, o uno che viene eseguito in un ambiente a cui non è stato assegnato un valore qui."
     },
     "versionPrefix": "v",
     "tokens": {
@@ -14074,7 +14082,8 @@
       "timeoutLabel": "Timeout (ms)",
       "valueFallback": "Valore",
       "showSetupSteps": "Mostra i passaggi di configurazione",
-      "waitingForActions": "In attesa di azioni nel browser…"
+      "waitingForActions": "In attesa di azioni nel browser…",
+      "unboundVariables": "{names} non è definita in questo controllo, nei suoi ambienti o a livello globale, quindi viene digitata così com'è. | {names} non sono definite in questo controllo, nei suoi ambienti o a livello globale, quindi vengono digitate così come sono."
     },
     "labels": {
       "copyOf": "Copia di {name}",
@@ -14686,7 +14695,7 @@
       "stepNameRequired": "Assegna un nome a questo passo — è ciò che mostrano i risultati dell'esecuzione",
       "typeTextRequired": "Inserisci il testo che questo passo deve digitare",
       "expectedRequired": "Inserisci il valore che questa asserzione dovrebbe aspettarsi",
-      "urlInvalid": "Inserisci un URL valido che inizi con http:// o https://",
+      "urlInvalid": "Inserisci un URL che inizi con http://, https:// o un segnaposto di variabile",
       "navigateUrlInvalid": "Inserisci un URL che inizi con http://, https:// o un segnaposto di variabile",
       "urlRequired": "L'URL iniziale è obbligatorio",
       "fixHighlightedFields": "Correggi i campi evidenziati prima di salvare",

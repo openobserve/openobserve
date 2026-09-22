@@ -13506,7 +13506,7 @@
     "variables": {
       "newButton": "Nova variável",
       "createTitle": "Adicionar variável",
-      "created": "Variável criada",
+      "created": "Variável {name} criada",
       "deleteConfirm": "Excluir {name}?",
       "deleteFailed": "Não foi possível excluir a variável",
       "deleteTitle": "Excluir variável",
@@ -13518,7 +13518,7 @@
       "shadowGlobalMessage": "{name} sobrescreverá o valor global em {env}. Outros ambientes continuarão usando o valor global.",
       "shadowedGlobalTitle": "Alguns ambientes mantêm seus próprios valores",
       "shadowedGlobalMessage": "{name} já tem seu próprio valor em: {envs}. Esses ambientes mantêm os seus; todos os demais usarão este valor.",
-      "deleteUsed": "{name} é referenciada por {n} verificações. Até que você as atualize, a referência será tratada como texto literal. Excluir mesmo assim?",
+      "deleteUsed": "{name} é referenciada por {n} verificação. Ela será resolvida como texto literal até que você a atualize. Excluir mesmo assim? | {name} é referenciada por {n} verificações. Elas serão resolvidas como texto literal até que você as atualize. Excluir mesmo assim?",
       "deleted": "Variável excluída",
       "description": "Descrição",
       "editTitle": "Editar variável",
@@ -13530,6 +13530,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "Global",
       "globalSubtitle": "Aplica-se em todos os ambientes.",
+      "globalReachesProduction": "Valores globais se aplicam em todos os ambientes, incluindo produção. Uma alteração aqui alcança todas as verificações que usam este nome sem um valor próprio.",
       "kind": "Tipo",
       "kindPlain": "Normal",
       "kindSecret": "Segredo",
@@ -13549,11 +13550,13 @@
       "scopeGlobal": "Esta variável aplica-se em todos os ambientes.",
       "searchPlaceholder": "Pesquisar variáveis",
       "secretNeedsEnvironment": "O Global não guarda segredos. Crie o segredo no ambiente que deve protegê-lo.",
+      "secretWriteOnly": "O valor é somente gravação. Nada o exibirá novamente depois de salvo.",
       "title": "Variáveis",
       "updated": "Variável atualizada",
       "usedBy": "Usado por",
-      "usedByChecks": "{n} verificações",
+      "usedByChecks": "Sem uso | {n} verificação | {n} verificações",
       "value": "Valor",
+      "valueEmpty": "Vazio",
       "valuePlaceholder": "Valor",
       "valueRequired": "O valor é obrigatório",
       "valueSet": "Definido · atualizado {when}"
@@ -13594,7 +13597,7 @@
       "subtitle": "Defina o escopo de variáveis e segredos e controle quem pode gerenciá-los.",
       "title": "Ambientes",
       "updated": "Ambiente atualizado",
-      "usedByChecks": "Usado por {n} verificações",
+      "usedByChecks": "Sem uso | Usado por {n} verificação | Usado por {n} verificações",
       "variables": "Variáveis"
     },
     "duplicateVariable": {
@@ -13634,6 +13637,18 @@
       "secretBlocked": "Segredos não podem ser transferidos entre ambientes",
       "toGlobal": "Tornar global"
     },
+    "promoteCheck": {
+      "action": "Compartilhar {name}",
+      "confirm": "Mover",
+      "description": "Move esta variável para fora da verificação, para um ambiente compartilhado, onde outras verificações também podem usá-la.",
+      "destination": "Destino",
+      "done": "Variável movida",
+      "failed": "Não foi possível mover a variável",
+      "global": "Global",
+      "secretHint": "Este valor está marcado como seguro, então se torna um segredo e não pode ir para o global.",
+      "title": "Compartilhar {name}",
+      "tooltip": "Mover para um ambiente compartilhado"
+    },
     "split": {
       "action": "Definir escopo para ambientes",
       "alreadyOwn": "Já tem seu próprio valor — mantido como está.",
@@ -13644,16 +13659,9 @@
       "failed": "Não foi possível definir o escopo da variável",
       "title": "Definir escopo de {name} para os ambientes",
       "unselectedWarning": "Não selecionados: {envs}. As verificações executadas neles deixarão de resolver esta variável.",
-      "valuePlaceholder": "Valor para este ambiente"
-    },
-    "replaySecrets": {
-      "confirm": "Reproduzir",
-      "description": "A reprodução é executada no seu navegador, portanto os segredos compartilhados não podem ser preenchidos automaticamente. Digite-os para reproduzir com valores reais.",
-      "remember": "Lembrar nesta sessão",
-      "rememberHint": "Mantido apenas nesta aba, nunca salvo no navegador nem enviado a lugar algum.",
-      "skip": "Reproduzir sem eles",
-      "title": "Valores necessários para a reprodução",
-      "valuePlaceholder": "Valor"
+      "valuePlaceholder": "Valor para este ambiente",
+      "usedBy": "Usado por {n} verificações: {names}",
+      "usedByHint": "A divisão é recusada enquanto qualquer uma dessas verificações perder o valor: uma verificação sem ambientes, ou uma que roda em um ambiente ao qual nenhum valor foi atribuído aqui."
     },
     "versionPrefix": "v",
     "tokens": {
@@ -14074,7 +14082,8 @@
       "timeoutLabel": "Tempo limite (ms)",
       "valueFallback": "Valor",
       "showSetupSteps": "Mostrar etapas de configuração",
-      "waitingForActions": "Aguardando ações no navegador…"
+      "waitingForActions": "Aguardando ações no navegador…",
+      "unboundVariables": "{names} não está definida nesta verificação, em seus ambientes ou no global, então é usada como digitada. | {names} não estão definidas nesta verificação, em seus ambientes ou no global, então são usadas como digitadas."
     },
     "labels": {
       "copyOf": "Cópia de {name}",
@@ -14686,7 +14695,7 @@
       "stepNameRequired": "Dê um nome a esta etapa — é o que os resultados da execução mostram",
       "typeTextRequired": "Insira o texto que esta etapa deve digitar",
       "expectedRequired": "Insira o valor que esta asserção deve esperar",
-      "urlInvalid": "Insira uma URL válida começando com http:// ou https://",
+      "urlInvalid": "Insira uma URL começando com http://, https:// ou um placeholder de variável",
       "navigateUrlInvalid": "Digite uma URL que comece com http://, https:// ou um espaço reservado de variável.",
       "urlRequired": "A URL inicial é obrigatória",
       "fixHighlightedFields": "Corrija os campos destacados antes de salvar",

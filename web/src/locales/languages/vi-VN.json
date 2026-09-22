@@ -13506,7 +13506,7 @@
     "variables": {
       "newButton": "Biến mới",
       "createTitle": "Thêm biến",
-      "created": "Đã tạo biến",
+      "created": "Đã tạo biến {name}",
       "deleteConfirm": "Xóa {name}?",
       "deleteFailed": "Không thể xóa biến",
       "deleteTitle": "Xóa biến",
@@ -13518,7 +13518,7 @@
       "shadowGlobalMessage": "{name} sẽ ghi đè giá trị toàn cục trong {env}. Các môi trường khác tiếp tục sử dụng giá trị toàn cục.",
       "shadowedGlobalTitle": "Một số môi trường giữ giá trị riêng của chúng",
       "shadowedGlobalMessage": "{name} đã có giá trị riêng trong: {envs}. Các môi trường đó giữ giá trị riêng của chúng; mọi môi trường khác sẽ sử dụng giá trị này.",
-      "deleteUsed": "{name} được tham chiếu bởi {n} kiểm tra. Chúng sẽ coi nó là văn bản nguyên văn cho đến khi bạn cập nhật chúng. Vẫn xóa?",
+      "deleteUsed": "{name} được tham chiếu bởi {n} kiểm tra. Nó sẽ được phân giải thành văn bản nguyên văn cho đến khi bạn cập nhật. Vẫn xóa? | {name} được tham chiếu bởi {n} kiểm tra. Chúng sẽ được phân giải thành văn bản nguyên văn cho đến khi bạn cập nhật. Vẫn xóa?",
       "deleted": "Đã xóa biến",
       "description": "Mô tả",
       "editTitle": "Chỉnh sửa biến",
@@ -13530,6 +13530,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "Toàn cục",
       "globalSubtitle": "Áp dụng trong mọi môi trường.",
+      "globalReachesProduction": "Giá trị toàn cục áp dụng trong mọi môi trường, kể cả production. Thay đổi ở đây sẽ ảnh hưởng đến mọi kiểm tra dùng tên này mà không có giá trị riêng.",
       "kind": "Loại",
       "kindPlain": "Thường",
       "kindSecret": "Bí mật",
@@ -13549,11 +13550,13 @@
       "scopeGlobal": "Biến này áp dụng trong mọi môi trường.",
       "searchPlaceholder": "Tìm kiếm biến",
       "secretNeedsEnvironment": "Global không lưu secret. Hãy tạo secret trong môi trường sẽ bảo vệ nó.",
+      "secretWriteOnly": "Giá trị này chỉ ghi. Không có gì hiển thị lại nó sau khi được lưu.",
       "title": "Biến",
       "updated": "Đã cập nhật biến",
       "usedBy": "Được sử dụng bởi",
-      "usedByChecks": "{n} kiểm tra",
+      "usedByChecks": "Không dùng | {n} kiểm tra | {n} kiểm tra",
       "value": "Giá trị",
+      "valueEmpty": "Trống",
       "valuePlaceholder": "Giá trị",
       "valueRequired": "Giá trị là bắt buộc",
       "valueSet": "Đã đặt · cập nhật {when}"
@@ -13594,7 +13597,7 @@
       "subtitle": "Phân phạm vi các biến và bí mật, đồng thời kiểm soát ai có thể quản lý chúng.",
       "title": "Môi trường",
       "updated": "Đã cập nhật môi trường",
-      "usedByChecks": "Được sử dụng bởi {n} kiểm tra",
+      "usedByChecks": "Không dùng | Được dùng bởi {n} kiểm tra | Được dùng bởi {n} kiểm tra",
       "variables": "Biến"
     },
     "duplicateVariable": {
@@ -13634,6 +13637,18 @@
       "secretBlocked": "Không thể di chuyển bí mật giữa các môi trường",
       "toGlobal": "Đặt làm toàn cục"
     },
+    "promoteCheck": {
+      "action": "Chia sẻ {name}",
+      "confirm": "Di chuyển",
+      "description": "Di chuyển biến này ra khỏi kiểm tra vào một môi trường chia sẻ, nơi các kiểm tra khác cũng có thể dùng nó.",
+      "destination": "Đích",
+      "done": "Đã di chuyển biến",
+      "failed": "Không thể di chuyển biến",
+      "global": "Toàn cục",
+      "secretHint": "Giá trị này được đánh dấu bảo mật, nên nó trở thành secret và không thể chuyển sang toàn cục.",
+      "title": "Chia sẻ {name}",
+      "tooltip": "Di chuyển đến môi trường chia sẻ"
+    },
     "split": {
       "action": "Chuyển sang phạm vi môi trường",
       "alreadyOwn": "Đã có giá trị riêng — giữ nguyên.",
@@ -13644,16 +13659,9 @@
       "failed": "Không thể đặt phạm vi cho biến.",
       "title": "Đặt phạm vi {name} theo môi trường.",
       "unselectedWarning": "Không được chọn: {envs}. Các kiểm tra chạy trên các môi trường đó sẽ ngừng phân giải biến này.",
-      "valuePlaceholder": "Giá trị cho môi trường này"
-    },
-    "replaySecrets": {
-      "confirm": "Chạy lại",
-      "description": "Quá trình chạy lại diễn ra trong trình duyệt của bạn, nên các bí mật dùng chung không thể được điền tự động. Hãy nhập chúng để chạy lại với giá trị thực.",
-      "remember": "Ghi nhớ cho phiên này",
-      "rememberHint": "Chỉ giữ trong tab này, không bao giờ được lưu trong trình duyệt hay gửi đi bất cứ đâu.",
-      "skip": "Chạy lại mà không có chúng",
-      "title": "Các giá trị cần để chạy lại",
-      "valuePlaceholder": "Giá trị"
+      "valuePlaceholder": "Giá trị cho môi trường này",
+      "usedBy": "Được dùng bởi {n} kiểm tra: {names}",
+      "usedByHint": "Việc tách bị từ chối khi bất kỳ kiểm tra nào trong số này sẽ mất giá trị: một kiểm tra không có môi trường, hoặc một kiểm tra chạy trong môi trường chưa được gán giá trị ở đây."
     },
     "versionPrefix": "v",
     "tokens": {
@@ -14074,7 +14082,8 @@
       "timeoutLabel": "Thời gian chờ (ms)",
       "valueFallback": "Giá trị",
       "showSetupSteps": "Hiển thị các bước thiết lập",
-      "waitingForActions": "Đang chờ hành động trong trình duyệt…"
+      "waitingForActions": "Đang chờ hành động trong trình duyệt…",
+      "unboundVariables": "{names} không được định nghĩa trong kiểm tra này, các môi trường của nó hoặc toàn cục, nên nó được nhập nguyên văn. | {names} không được định nghĩa trong kiểm tra này, các môi trường của nó hoặc toàn cục, nên chúng được nhập nguyên văn."
     },
     "labels": {
       "copyOf": "Bản sao của {name}",
@@ -14686,7 +14695,7 @@
       "stepNameRequired": "Đặt tên cho bước này — đây là tên sẽ hiển thị trong kết quả chạy",
       "typeTextRequired": "Nhập văn bản mà bước này sẽ nhập",
       "expectedRequired": "Nhập giá trị mà xác nhận này sẽ mong đợi",
-      "urlInvalid": "Nhập URL hợp lệ bắt đầu bằng http:// hoặc https://",
+      "urlInvalid": "Nhập một URL bắt đầu bằng http://, https:// hoặc một placeholder biến",
       "navigateUrlInvalid": "Nhập URL bắt đầu bằng http://, https:// hoặc một biến giữ chỗ.",
       "urlRequired": "URL bắt đầu là bắt buộc",
       "fixHighlightedFields": "Sửa các trường được đánh dấu trước khi lưu",

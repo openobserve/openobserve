@@ -16674,7 +16674,7 @@
       "subtitle": "e8aa204dc5267aa1",
       "title": "07437cd651bed86e",
       "updated": "465743a33e9473f3",
-      "usedByChecks": "37a9aca9b84c5d4d",
+      "usedByChecks": "bc5cd7d5f3e65c3e",
       "variables": "02db55bac5e3f7ce"
     },
     "evidence": {
@@ -16953,6 +16953,7 @@
       "timeoutHelpInteraction": "a27af7c8113953c3",
       "timeoutHelpNavAssert": "fb8d4c37d9cf5970",
       "timeoutLabel": "3b453bc8bd286be4",
+      "unboundVariables": "bfb765613019f1a0",
       "valueFallback": "8e37953d23daca5f",
       "valueLabels": {
         "navigate": "e7a241debad56609",
@@ -17195,6 +17196,18 @@
       "secretBlocked": "b056279d42274fee",
       "toGlobal": "3216a6097946f55f"
     },
+    "promoteCheck": {
+      "action": "2d3c925f1e0c3efc",
+      "confirm": "6ecc3df6bffdd06c",
+      "description": "eb3edeaa135527fc",
+      "destination": "293d404a500f5f9a",
+      "done": "7bd06785f0ec0aaf",
+      "failed": "f5d5fe945fd05300",
+      "global": "a258b30f88c30650",
+      "secretHint": "97e885402912f007",
+      "title": "2d3c925f1e0c3efc",
+      "tooltip": "2ed44d029fab337a"
+    },
     "protocolConfig": {
       "http": {
         "addAssertion": "c23b291f94a76b46",
@@ -17287,15 +17300,6 @@
     },
     "queryFailed": "222d8657e6ce5036",
     "relationNotContaining": "b1ded2b4bacbda8d",
-    "replaySecrets": {
-      "confirm": "c8dae6371b33b8d6",
-      "description": "18f65bd3e74ee8c7",
-      "remember": "230560029b543c44",
-      "rememberHint": "b37c599489544d62",
-      "skip": "7f22eaf91b616d15",
-      "title": "105ddcef6fedc721",
-      "valuePlaceholder": "8e37953d23daca5f"
-    },
     "results": {
       "allEnvironments": "f19ac5a6af557f79",
       "clearFilters": "7179ea0035fca783",
@@ -17520,6 +17524,8 @@
       "overrideHint": "85526b36ac52f2f3",
       "title": "eae592f89b54f8a6",
       "unselectedWarning": "6995e4e18ca0ee5b",
+      "usedBy": "447010a360ab3e10",
+      "usedByHint": "8ab7fefd0d4a41ee",
       "valuePlaceholder": "600dcea71deaa040"
     },
     "status": {
@@ -17689,18 +17695,18 @@
       "selectorRequired": "06f956cd08539ade",
       "stepNameRequired": "b17db646239541c2",
       "typeTextRequired": "a54687c5ed47fd66",
-      "urlInvalid": "6477e3cc2ffbc22e",
+      "urlInvalid": "bbee7d47e0c05005",
       "urlRequired": "677d0a8e72df23d5"
     },
     "variables": {
       "createTitle": "f95fcf61a86350ab",
-      "created": "7ddbe9c65a7c2e37",
+      "created": "0ee2e55aa6ec4c9f",
       "deleteConfirm": "a4b982a9e0bc2413",
       "deleteEnvFallback": "9d48bc1bc0310e9d",
       "deleteFailed": "864a6c9c1f344827",
       "deleteGlobalFallback": "7a815fa4cb704341",
       "deleteTitle": "7159eea8d3dbd077",
-      "deleteUsed": "ec9b93faea0556f2",
+      "deleteUsed": "370b4372cbbac727",
       "deleted": "8c9d5a1a2a26fee4",
       "description": "526e0087cc3f254d",
       "editTitle": "f55f82a7dbdde9f9",
@@ -17711,6 +17717,7 @@
       "exampleHint": "fb6052986c00d84c",
       "examplePlaceholder": "b4981fa592968d8b",
       "global": "a258b30f88c30650",
+      "globalReachesProduction": "367e7bdb03d6b617",
       "globalSubtitle": "ef3877e0675b8e9e",
       "kind": "f5387f9bb6ed7031",
       "kindPlain": "8b854ade2cd01bdc",
@@ -17734,6 +17741,7 @@
       "scopeGlobal": "920daf766b3e91a5",
       "searchPlaceholder": "413b60a7e9206900",
       "secretNeedsEnvironment": "e0513c3b44288f72",
+      "secretWriteOnly": "2bc62a80dd49e8a0",
       "shadowGlobalMessage": "fc1ee538620aacb5",
       "shadowGlobalTitle": "beed90de5a36716c",
       "shadowedGlobalMessage": "bd28b2a02cf3e7f6",
@@ -17741,8 +17749,9 @@
       "title": "02db55bac5e3f7ce",
       "updated": "21c9479996130600",
       "usedBy": "681bf81aba87bd68",
-      "usedByChecks": "55d852724334031f",
+      "usedByChecks": "15d60240360bb054",
       "value": "8e37953d23daca5f",
+      "valueEmpty": "c6c094bc0054f9cb",
       "valuePlaceholder": "8e37953d23daca5f",
       "valueRequired": "1fbf278b53995ff3",
       "valueSet": "e34cc41ba2783181"

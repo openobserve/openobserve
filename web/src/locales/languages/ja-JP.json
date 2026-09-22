@@ -13506,7 +13506,7 @@
     "variables": {
       "newButton": "新しい変数",
       "createTitle": "変数を追加",
-      "created": "変数を作成しました",
+      "created": "変数 {name} を作成しました",
       "deleteConfirm": "{name} を削除しますか？",
       "deleteFailed": "変数を削除できませんでした",
       "deleteTitle": "変数を削除",
@@ -13518,7 +13518,7 @@
       "shadowGlobalMessage": "{env} では {name} がグローバル値を上書きします。その他の環境では引き続きグローバル値が使用されます。",
       "shadowedGlobalTitle": "一部の環境は独自の値を保持します",
       "shadowedGlobalMessage": "{name} はすでに {envs} で独自の値を持っています。これらの環境はその値を保持し、その他の環境ではこの値が使用されます。",
-      "deleteUsed": "{name} is referenced by {n} checks. They will resolve it as literal text until you update them. Delete anyway?",
+      "deleteUsed": "{name} は {n} 件のチェックから参照されています。更新するまでリテラルテキストとして解決されます。それでも削除しますか？ | {name} は {n} 件のチェックから参照されています。更新するまでリテラルテキストとして解決されます。それでも削除しますか？",
       "deleted": "変数を削除しました",
       "description": "説明",
       "editTitle": "変数を編集",
@@ -13530,6 +13530,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "グローバル",
       "globalSubtitle": "すべての環境に適用されます。",
+      "globalReachesProduction": "グローバル値は本番環境を含むすべての環境に適用されます。ここでの変更は、独自の値を持たずにこの名前を使用するすべてのチェックに反映されます。",
       "kind": "種類",
       "kindPlain": "平文",
       "kindSecret": "シークレット",
@@ -13549,11 +13550,13 @@
       "scopeGlobal": "この変数はすべての環境に適用されます。",
       "searchPlaceholder": "変数を検索",
       "secretNeedsEnvironment": "グローバルにはシークレットが保持されません。シークレットは、それを保護すべき環境で作成してください。",
+      "secretWriteOnly": "この値は書き込み専用です。保存後は再び表示されることはありません。",
       "title": "変数",
       "updated": "変数を更新しました",
       "usedBy": "使用元",
-      "usedByChecks": "{n} チェック",
+      "usedByChecks": "未使用 | {n} 件のチェック | {n} 件のチェック",
       "value": "値",
+      "valueEmpty": "空",
       "valuePlaceholder": "値",
       "valueRequired": "値は必須です",
       "valueSet": "設定済み · 更新 {when}"
@@ -13594,7 +13597,7 @@
       "subtitle": "変数とシークレットをスコープし、誰が管理できるかを制御します。",
       "title": "環境",
       "updated": "環境が更新されました",
-      "usedByChecks": "{n} 件のチェックで使用されています",
+      "usedByChecks": "未使用 | {n} 件のチェックで使用中 | {n} 件のチェックで使用中",
       "variables": "変数"
     },
     "duplicateVariable": {
@@ -13634,6 +13637,18 @@
       "secretBlocked": "シークレットは環境間で移動できません",
       "toGlobal": "グローバルにする"
     },
+    "promoteCheck": {
+      "action": "{name} を共有",
+      "confirm": "移動",
+      "description": "この変数をチェックから共有環境に移動し、他のチェックでも使用できるようにします。",
+      "destination": "移動先",
+      "done": "変数を移動しました",
+      "failed": "変数を移動できませんでした",
+      "global": "グローバル",
+      "secretHint": "この値はセキュアとしてマークされているため、シークレットとなりグローバルには移動できません。",
+      "title": "{name} を共有",
+      "tooltip": "共有環境に移動"
+    },
     "split": {
       "action": "環境にスコープする",
       "alreadyOwn": "既に独自の値があるため、そのまま維持されます。",
@@ -13644,16 +13659,9 @@
       "failed": "変数をスコープできませんでした。",
       "title": "「{name}」を環境にスコープする",
       "unselectedWarning": "未選択: {envs}。それらの環境で実行中のチェックは、この変数を解決しなくなります。",
-      "valuePlaceholder": "この環境の値"
-    },
-    "replaySecrets": {
-      "confirm": "リプレイ",
-      "description": "リプレイはブラウザーで実行されるため、共有シークレットは自動的に入力できません。実際の値でリプレイするには入力してください。",
-      "remember": "このセッション中は記憶する",
-      "rememberHint": "このタブ内にのみ保持され、ブラウザに保存されたり、どこかに送信されたりすることはありません。",
-      "skip": "シークレットなしでリプレイ",
-      "title": "リプレイに必要な値",
-      "valuePlaceholder": "値"
+      "valuePlaceholder": "この環境の値",
+      "usedBy": "{n} 件のチェックで使用中: {names}",
+      "usedByHint": "これらのチェックのいずれかが値を受け取れなくなる間は分割できません。環境を持たないチェック、またはここで値が指定されていない環境で実行されるチェックが該当します。"
     },
     "versionPrefix": "v",
     "tokens": {
@@ -14074,7 +14082,8 @@
       "timeoutLabel": "タイムアウト（ms）",
       "valueFallback": "値",
       "showSetupSteps": "セットアップ手順を表示",
-      "waitingForActions": "ブラウザでのアクションを待機中..."
+      "waitingForActions": "ブラウザでのアクションを待機中...",
+      "unboundVariables": "{names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。 | {names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。"
     },
     "labels": {
       "copyOf": "{name} のコピー",
@@ -14686,7 +14695,7 @@
       "stepNameRequired": "このステップに名前を付けてください — 実行結果に表示されます",
       "typeTextRequired": "このステップが入力するテキストを入力してください",
       "expectedRequired": "このアサーションが期待する値を入力してください",
-      "urlInvalid": "http:// または https:// で始まる有効な URL を入力してください",
+      "urlInvalid": "http://、https://、または変数プレースホルダーで始まる URL を入力してください",
       "navigateUrlInvalid": "http://、https://、または変数プレースホルダーで始まる URL を入力してください。",
       "urlRequired": "開始 URL は必須です",
       "fixHighlightedFields": "保存する前にハイライトされたフィールドを修正してください",

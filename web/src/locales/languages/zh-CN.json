@@ -13506,7 +13506,7 @@
     "variables": {
       "newButton": "新建变量",
       "createTitle": "添加变量",
-      "created": "变量已创建",
+      "created": "变量 {name} 已创建",
       "deleteConfirm": "删除 {name}？",
       "deleteFailed": "无法删除变量",
       "deleteTitle": "删除变量",
@@ -13518,7 +13518,7 @@
       "shadowGlobalMessage": "{name} 将覆盖 {env} 中的全局值。其他环境继续使用全局值。",
       "shadowedGlobalTitle": "某些环境保留各自的值",
       "shadowedGlobalMessage": "{name} 在以下环境中已有自己的值：{envs}。这些环境保留各自的值，其他环境使用此值。",
-      "deleteUsed": "{name} 被 {n} 个检查引用。在更新这些检查前，它们会把它当作字面文本解析。仍要删除吗？",
+      "deleteUsed": "{name} 被 {n} 个检查项引用。在你更新它之前，它将解析为字面文本。仍要删除？ | {name} 被 {n} 个检查项引用。在你更新它们之前，它们将解析为字面文本。仍要删除？",
       "deleted": "变量已删除",
       "description": "描述",
       "editTitle": "编辑变量",
@@ -13530,6 +13530,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "全局",
       "globalSubtitle": "适用于所有环境。",
+      "globalReachesProduction": "全局值适用于所有环境，包括生产环境。在此处修改后，会影响到所有使用该名称且自身未设置值的检查项。",
       "kind": "类型",
       "kindPlain": "明文",
       "kindSecret": "机密",
@@ -13549,11 +13550,13 @@
       "scopeGlobal": "此变量适用于所有环境。",
       "searchPlaceholder": "搜索变量",
       "secretNeedsEnvironment": "全局不存储密钥。请在应保护该密钥的环境中创建密钥。",
+      "secretWriteOnly": "该值仅可写入。保存后将不再显示。",
       "title": "变量",
       "updated": "变量已更新",
       "usedBy": "使用方",
-      "usedByChecks": "{n} 个检查",
+      "usedByChecks": "未使用 | {n} 个检查项 | {n} 个检查项",
       "value": "值",
+      "valueEmpty": "空",
       "valuePlaceholder": "值",
       "valueRequired": "值为必填项",
       "valueSet": "已设置 · 更新于 {when}"
@@ -13594,7 +13597,7 @@
       "subtitle": "限定变量和机密的作用域，并控制谁可以管理它们。",
       "title": "环境",
       "updated": "环境已更新",
-      "usedByChecks": "被 {n} 个检查使用",
+      "usedByChecks": "未使用 | 被 {n} 个检查项使用 | 被 {n} 个检查项使用",
       "variables": "变量"
     },
     "duplicateVariable": {
@@ -13634,6 +13637,18 @@
       "secretBlocked": "机密无法跨环境移动",
       "toGlobal": "设为全局变量"
     },
+    "promoteCheck": {
+      "action": "共享 {name}",
+      "confirm": "移动",
+      "description": "将此变量从该检查项移出，放入共享环境，其他检查项也可以使用它。",
+      "destination": "目标",
+      "done": "变量已移动",
+      "failed": "无法移动该变量",
+      "global": "全局",
+      "secretHint": "该值被标记为安全，因此会成为密钥，无法设为全局。",
+      "title": "共享 {name}",
+      "tooltip": "移动到共享环境"
+    },
     "split": {
       "action": "限定到环境",
       "alreadyOwn": "已有自己的值 — 保持原样。",
@@ -13644,16 +13659,9 @@
       "failed": "无法将该变量限定到环境",
       "title": "将 {name} 限定到环境",
       "unselectedWarning": "未选择：{envs}。在这些环境上运行的检查将停止解析此变量。",
-      "valuePlaceholder": "此环境的值"
-    },
-    "replaySecrets": {
-      "confirm": "重放",
-      "description": "重放将在你的浏览器中运行，因此无法自动填充共享密钥。请输入它们以使用真实值进行重放。",
-      "remember": "在此会话中记住",
-      "rememberHint": "仅保留在此标签页中，不会保存到浏览器或发送到任何地方。",
-      "skip": "不使用它们重放",
-      "title": "重放所需的值",
-      "valuePlaceholder": "值"
+      "valuePlaceholder": "此环境的值",
+      "usedBy": "被 {n} 个检查项使用：{names}",
+      "usedByHint": "当其中任何一个检查项会丢失该值时，将拒绝拆分：没有环境的检查项，或在未在此处设置值的环境中运行的检查项。"
     },
     "versionPrefix": "v",
     "tokens": {
@@ -14074,7 +14082,8 @@
       "timeoutLabel": "超时（毫秒）",
       "valueFallback": "值",
       "showSetupSteps": "显示设置步骤",
-      "waitingForActions": "等待浏览器中的操作…"
+      "waitingForActions": "等待浏览器中的操作…",
+      "unboundVariables": "{names} 未在此检查项、其环境或全局中定义，因此按原样输入。 | {names} 未在此检查项、其环境或全局中定义，因此按原样输入。"
     },
     "labels": {
       "copyOf": "{name} 的副本",
@@ -14686,7 +14695,7 @@
       "stepNameRequired": "为此步骤命名 — 运行结果将显示该名称。",
       "typeTextRequired": "输入此步骤应输入的文本。",
       "expectedRequired": "输入此断言应期望的值。",
-      "urlInvalid": "输入以 http:// 或 https:// 开头的有效 URL",
+      "urlInvalid": "请输入以 http://、https:// 或变量占位符开头的 URL",
       "navigateUrlInvalid": "请输入以 http://、https:// 或变量占位符开头的 URL",
       "urlRequired": "起始 URL 是必填项",
       "fixHighlightedFields": "保存前请修正高亮字段",

@@ -13506,7 +13506,7 @@
     "variables": {
       "newButton": "Nieuwe variabele",
       "createTitle": "Variabele toevoegen",
-      "created": "Variabele gemaakt",
+      "created": "Variabele {name} aangemaakt",
       "deleteConfirm": "{name} verwijderen?",
       "deleteFailed": "Kan de variabele niet verwijderen",
       "deleteTitle": "Variabele verwijderen",
@@ -13518,7 +13518,7 @@
       "shadowGlobalMessage": "{name} overschrijft de globale waarde in {env}. Andere omgevingen blijven de globale waarde gebruiken.",
       "shadowedGlobalTitle": "Sommige omgevingen behouden hun eigen waarden",
       "shadowedGlobalMessage": "{name} heeft al een eigen waarde in: {envs}. Die omgevingen behouden hun waarde; overal elders wordt deze gebruikt.",
-      "deleteUsed": "{name} wordt gebruikt door {n} checks. Deze gebruiken het als letterlijke tekst totdat u ze bijwerkt. Toch verwijderen?",
+      "deleteUsed": "{name} wordt gebruikt door {n} check. Deze wordt als letterlijke tekst opgelost totdat je die aanpast. Toch verwijderen? | {name} wordt gebruikt door {n} checks. Deze worden als letterlijke tekst opgelost totdat je ze aanpast. Toch verwijderen?",
       "deleted": "Variabele verwijderd",
       "description": "Beschrijving",
       "editTitle": "Variabele bewerken",
@@ -13530,6 +13530,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "Globaal",
       "globalSubtitle": "Geldt in elke omgeving.",
+      "globalReachesProduction": "Globale waarden gelden in elke omgeving, inclusief productie. Een wijziging hier bereikt elke check die deze naam gebruikt zonder eigen waarde.",
       "kind": "Soort",
       "kindPlain": "Normaal",
       "kindSecret": "Geheim",
@@ -13549,11 +13550,13 @@
       "scopeGlobal": "Deze variabele geldt in elke omgeving.",
       "searchPlaceholder": "Zoek variabelen",
       "secretNeedsEnvironment": "Global bevat geen secrets. Maak het secret aan in de omgeving die het moet beveiligen.",
+      "secretWriteOnly": "De waarde is alleen-schrijven. Na opslaan wordt deze nergens meer getoond.",
       "title": "Variabelen",
       "updated": "Variabele bijgewerkt",
       "usedBy": "Gebruikt door",
-      "usedByChecks": "{n} controles",
+      "usedByChecks": "Ongebruikt | {n} check | {n} checks",
       "value": "Waarde",
+      "valueEmpty": "Leeg",
       "valuePlaceholder": "Waarde",
       "valueRequired": "Waarde is verplicht",
       "valueSet": "Ingesteld · bijgewerkt {when}"
@@ -13594,7 +13597,7 @@
       "subtitle": "Baken variabelen en geheimen af en bepaal wie ze mag beheren.",
       "title": "Omgevingen",
       "updated": "Omgeving bijgewerkt",
-      "usedByChecks": "Gebruikt door {n} controles",
+      "usedByChecks": "Ongebruikt | Gebruikt door {n} check | Gebruikt door {n} checks",
       "variables": "Variabelen"
     },
     "duplicateVariable": {
@@ -13634,6 +13637,18 @@
       "secretBlocked": "Geheimen kunnen niet tussen omgevingen worden verplaatst.",
       "toGlobal": "Globaal maken"
     },
+    "promoteCheck": {
+      "action": "Deel {name}",
+      "confirm": "Verplaatsen",
+      "description": "Verplaatst deze variabele uit de check naar een gedeelde omgeving, waar andere checks deze ook kunnen gebruiken.",
+      "destination": "Bestemming",
+      "done": "Variabele verplaatst",
+      "failed": "Kon de variabele niet verplaatsen",
+      "global": "Globaal",
+      "secretHint": "Deze waarde is gemarkeerd als beveiligd, dus wordt het een secret en kan niet naar globaal.",
+      "title": "Deel {name}",
+      "tooltip": "Verplaats naar een gedeelde omgeving"
+    },
     "split": {
       "action": "Beperken tot omgevingen",
       "alreadyOwn": "Heeft al een eigen waarde — blijft zoals het is.",
@@ -13644,16 +13659,9 @@
       "failed": "De variabele kon niet per omgeving worden ingesteld",
       "title": "Stel {name} per omgeving in",
       "unselectedWarning": "Niet geselecteerd: {envs}. Controles die in deze omgevingen draaien, stoppen met het oplossen van deze variabele.",
-      "valuePlaceholder": "Waarde voor deze omgeving"
-    },
-    "replaySecrets": {
-      "confirm": "Herhalen",
-      "description": "Een herhaling wordt in je browser uitgevoerd, dus gedeelde geheimen kunnen niet automatisch worden ingevuld. Voer ze in om de herhaling met echte waarden uit te voeren.",
-      "remember": "Onthoud voor deze sessie",
-      "rememberHint": "Alleen in dit tabblad bewaard, nooit in de browser opgeslagen of ergens naartoe gestuurd.",
-      "skip": "Herhalen zonder deze",
-      "title": "Waarden nodig voor herhaling",
-      "valuePlaceholder": "Waarde"
+      "valuePlaceholder": "Waarde voor deze omgeving",
+      "usedBy": "Gebruikt door {n} checks: {names}",
+      "usedByHint": "De splitsing wordt geweigerd zolang een van deze checks de waarde zou verliezen: een check zonder omgevingen, of een die draait in een omgeving waarvoor hier geen waarde is opgegeven."
     },
     "versionPrefix": "v",
     "tokens": {
@@ -14074,7 +14082,8 @@
       "timeoutLabel": "Time-out (ms)",
       "valueFallback": "Waarde",
       "showSetupSteps": "Toon instellingsstappen",
-      "waitingForActions": "Wachten op acties in de browser…"
+      "waitingForActions": "Wachten op acties in de browser…",
+      "unboundVariables": "{names} is niet gedefinieerd in deze check, de bijbehorende omgevingen of globaal, dus wordt het getypt zoals geschreven. | {names} zijn niet gedefinieerd in deze check, de bijbehorende omgevingen of globaal, dus worden ze getypt zoals geschreven."
     },
     "labels": {
       "copyOf": "Kopie van {name}",
@@ -14686,7 +14695,7 @@
       "stepNameRequired": "Geef deze stap een naam — dit is wat runresultaten tonen",
       "typeTextRequired": "Voer de tekst in die deze stap moet typen",
       "expectedRequired": "Voer de waarde in die deze assertie moet verwachten",
-      "urlInvalid": "Voer een geldige URL in die begint met http:// of https://",
+      "urlInvalid": "Voer een URL in die begint met http://, https:// of een variabele-placeholder",
       "navigateUrlInvalid": "Voer een URL in die begint met http://, https:// of een variabele-placeholder.",
       "urlRequired": "Start-URL is verplicht",
       "fixHighlightedFields": "Corrigeer de gemarkeerde velden voordat u opslaat",

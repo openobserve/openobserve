@@ -13506,7 +13506,7 @@
     "variables": {
       "newButton": "Nowa zmienna",
       "createTitle": "Dodaj zmienną",
-      "created": "Utworzono zmienną",
+      "created": "Utworzono zmienną {name}",
       "deleteConfirm": "Usunąć {name}?",
       "deleteFailed": "Nie udało się usunąć zmiennej.",
       "deleteTitle": "Usuń zmienną",
@@ -13518,7 +13518,7 @@
       "shadowGlobalMessage": "{name} nadpisze wartość globalną w {env}. Pozostałe środowiska będą nadal używać wartości globalnej.",
       "shadowedGlobalTitle": "Niektóre środowiska zachowują swoje wartości",
       "shadowedGlobalMessage": "{name} ma już własną wartość w: {envs}. Te środowiska zachowują swoją, a pozostałe będą używać tej wartości.",
-      "deleteUsed": "{name} występuje w {n} testach. Dopóki ich nie zaktualizujesz, odwołanie będzie traktowane jako tekst dosłowny. Usunąć mimo to?",
+      "deleteUsed": "{name} jest przywoływana przez {n} kontrolę. Będzie rozwiązywana jako tekst dosłowny, dopóki jej nie zaktualizujesz. Usunąć mimo to? | {name} jest przywoływana przez {n} kontroli. Będą rozwiązywane jako tekst dosłowny, dopóki ich nie zaktualizujesz. Usunąć mimo to?",
       "deleted": "Usunięto zmienną",
       "description": "Opis",
       "editTitle": "Edytuj zmienną",
@@ -13530,6 +13530,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "Globalna",
       "globalSubtitle": "Dotyczy każdego środowiska.",
+      "globalReachesProduction": "Wartości globalne obowiązują w każdym środowisku, w tym produkcyjnym. Zmiana tutaj wpłynie na każdą kontrolę, która używa tej nazwy bez własnej wartości.",
       "kind": "Rodzaj",
       "kindPlain": "Zwykła",
       "kindSecret": "Sekretna",
@@ -13549,11 +13550,13 @@
       "scopeGlobal": "Ta zmienna obowiązuje we wszystkich środowiskach.",
       "searchPlaceholder": "Szukaj zmiennych",
       "secretNeedsEnvironment": "Zakres globalny nie przechowuje sekretów. Utwórz sekret w środowisku, które powinno go chronić.",
+      "secretWriteOnly": "Wartość jest tylko do zapisu. Po zapisaniu nie zostanie już nigdzie wyświetlona.",
       "title": "Zmienne",
       "updated": "Zaktualizowano zmienną",
       "usedBy": "Używana przez",
-      "usedByChecks": "{n} testów",
+      "usedByChecks": "Nieużywana | {n} kontrola | {n} kontroli",
       "value": "Wartość",
+      "valueEmpty": "Pusta",
       "valuePlaceholder": "Wartość",
       "valueRequired": "Wartość jest wymagana",
       "valueSet": "Ustawiono · zaktualizowano {when}"
@@ -13594,7 +13597,7 @@
       "subtitle": "Definiuj zakres zmiennych i sekretów i kontroluj, kto może nimi zarządzać.",
       "title": "Środowiska",
       "updated": "Zaktualizowano środowisko",
-      "usedByChecks": "Używane przez {n} testów",
+      "usedByChecks": "Nieużywane | Używane przez {n} kontrolę | Używane przez {n} kontroli",
       "variables": "Zmienne"
     },
     "duplicateVariable": {
@@ -13634,6 +13637,18 @@
       "secretBlocked": "Sekretów nie można przenosić między środowiskami",
       "toGlobal": "Ustaw jako globalną"
     },
+    "promoteCheck": {
+      "action": "Udostępnij {name}",
+      "confirm": "Przenieś",
+      "description": "Przenosi tę zmienną z kontroli do współdzielonego środowiska, w którym mogą jej używać również inne kontrole.",
+      "destination": "Miejsce docelowe",
+      "done": "Zmienna została przeniesiona",
+      "failed": "Nie udało się przenieść zmiennej",
+      "global": "Globalne",
+      "secretHint": "Ta wartość jest oznaczona jako bezpieczna, więc staje się sekretem i nie może trafić do zakresu globalnego.",
+      "title": "Udostępnij {name}",
+      "tooltip": "Przenieś do współdzielonego środowiska"
+    },
     "split": {
       "action": "Przypisz do środowisk",
       "alreadyOwn": "Ma już własną wartość — pozostaje bez zmian.",
@@ -13644,16 +13659,9 @@
       "failed": "Nie udało się ustawić zakresu zmiennej na środowiska",
       "title": "Ustaw zakres {name} na środowiska",
       "unselectedWarning": "Nie wybrano: {envs}. Testy uruchamiane dla nich przestaną odczytywać tę zmienną.",
-      "valuePlaceholder": "Wartość dla tego środowiska"
-    },
-    "replaySecrets": {
-      "confirm": "Odtwórz",
-      "description": "Odtwarzanie odbywa się w Twojej przeglądarce, więc współdzielone sekrety nie mogą zostać uzupełnione automatycznie. Wpisz je, aby odtworzyć z rzeczywistymi wartościami.",
-      "remember": "Zapamiętaj na tę sesję",
-      "rememberHint": "Przechowywane tylko w tej karcie, nigdy nie zapisywane w przeglądarce ani nie wysyłane nigdzie.",
-      "skip": "Odtwórz bez nich",
-      "title": "Wartości wymagane do odtworzenia",
-      "valuePlaceholder": "Wartość"
+      "valuePlaceholder": "Wartość dla tego środowiska",
+      "usedBy": "Używane przez {n} kontroli: {names}",
+      "usedByHint": "Podział zostanie odrzucony, jeśli którakolwiek z tych kontroli utraciłaby wartość: kontrola bez środowisk lub taka, która działa w środowisku, dla którego nie podano tu wartości."
     },
     "versionPrefix": "v",
     "tokens": {
@@ -14074,7 +14082,8 @@
       "timeoutLabel": "Limit czasu (ms)",
       "valueFallback": "Wartość",
       "showSetupSteps": "Pokaż kroki konfiguracji",
-      "waitingForActions": "Oczekiwanie na działania w przeglądarce…"
+      "waitingForActions": "Oczekiwanie na działania w przeglądarce…",
+      "unboundVariables": "{names} nie jest zdefiniowana w tej kontroli, jej środowiskach ani globalnie, więc zostanie wpisana dosłownie. | {names} nie są zdefiniowane w tej kontroli, jej środowiskach ani globalnie, więc zostaną wpisane dosłownie."
     },
     "labels": {
       "copyOf": "Kopia {name}",
@@ -14686,7 +14695,7 @@
       "stepNameRequired": "Nadaj temu krokowi nazwę — to ona pojawia się w wynikach uruchomienia",
       "typeTextRequired": "Wprowadź tekst, który ten krok ma wpisać",
       "expectedRequired": "Wprowadź wartość, jakiej powinna oczekiwać ta asercja.",
-      "urlInvalid": "Wprowadź prawidłowy URL zaczynający się od http:// lub https://",
+      "urlInvalid": "Podaj adres URL zaczynający się od http://, https:// lub symbol zastępczy zmiennej",
       "navigateUrlInvalid": "Wpisz URL zaczynający się od http://, https:// lub symbolu zastępczego zmiennej.",
       "urlRequired": "Początkowy URL jest wymagany",
       "fixHighlightedFields": "Popraw zaznaczone pola przed zapisaniem",

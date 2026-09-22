@@ -13506,7 +13506,7 @@
     "variables": {
       "newButton": "Neue Variable",
       "createTitle": "Variable hinzufügen",
-      "created": "Variable erstellt",
+      "created": "Variable {name} erstellt",
       "deleteConfirm": "{name} löschen?",
       "deleteFailed": "Die Variable konnte nicht gelöscht werden.",
       "deleteTitle": "Variable löschen",
@@ -13518,7 +13518,7 @@
       "shadowGlobalMessage": "{name} überschreibt den globalen Wert in {env}. Andere Umgebungen verwenden weiterhin den globalen Wert.",
       "shadowedGlobalTitle": "Einige Umgebungen behalten ihre eigenen Werte",
       "shadowedGlobalMessage": "{name} hat bereits einen eigenen Wert in: {envs}. Diese Umgebungen behalten ihre eigenen Werte; alle anderen verwenden diesen Wert.",
-      "deleteUsed": "{name} is referenced by {n} checks. They will resolve it as literal text until you update them. Delete anyway?",
+      "deleteUsed": "{name} wird von {n} Check referenziert. Er löst ihn bis zur Aktualisierung als Literaltext auf. Trotzdem löschen? | {name} wird von {n} Checks referenziert. Sie lösen ihn bis zur Aktualisierung als Literaltext auf. Trotzdem löschen?",
       "deleted": "Variable gelöscht",
       "description": "Beschreibung",
       "editTitle": "Variable bearbeiten",
@@ -13530,6 +13530,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "Global",
       "globalSubtitle": "Gilt in jeder Umgebung.",
+      "globalReachesProduction": "Globale Werte gelten in jeder Umgebung, einschließlich Produktion. Eine Änderung hier wirkt sich auf jeden Check aus, der diesen Namen ohne eigenen Wert verwendet.",
       "kind": "Art",
       "kindPlain": "Normal",
       "kindSecret": "Secret",
@@ -13549,11 +13550,13 @@
       "scopeGlobal": "Diese Variable gilt in jeder Umgebung.",
       "searchPlaceholder": "Variablen suchen",
       "secretNeedsEnvironment": "Global enthält keine Secrets. Erstellen Sie das Secret in der Umgebung, die es schützen soll.",
+      "secretWriteOnly": "Der Wert ist nur schreibbar. Nach dem Speichern wird er nicht mehr angezeigt.",
       "title": "Variablen",
       "updated": "Variable aktualisiert",
       "usedBy": "Verwendet von",
-      "usedByChecks": "{n} Checks",
+      "usedByChecks": "Nicht verwendet | {n} Check | {n} Checks",
       "value": "Wert",
+      "valueEmpty": "Leer",
       "valuePlaceholder": "Wert",
       "valueRequired": "Wert ist erforderlich",
       "valueSet": "Gesetzt · aktualisiert {when}"
@@ -13594,7 +13597,7 @@
       "subtitle": "Definieren Sie Variablen und Geheimnisse pro Umgebung und steuern Sie, wer sie verwalten darf.",
       "title": "Umgebungen",
       "updated": "Umgebung aktualisiert",
-      "usedByChecks": "Von {n} Checks verwendet",
+      "usedByChecks": "Nicht verwendet | Von {n} Check verwendet | Von {n} Checks verwendet",
       "variables": "Variablen"
     },
     "duplicateVariable": {
@@ -13634,6 +13637,18 @@
       "secretBlocked": "Geheimnisse können nicht zwischen Umgebungen verschoben werden",
       "toGlobal": "Global machen"
     },
+    "promoteCheck": {
+      "action": "{name} teilen",
+      "confirm": "Verschieben",
+      "description": "Verschiebt diese Variable aus dem Check in eine gemeinsame Umgebung, in der auch andere Checks sie verwenden können.",
+      "destination": "Ziel",
+      "done": "Variable verschoben",
+      "failed": "Die Variable konnte nicht verschoben werden",
+      "global": "Global",
+      "secretHint": "Dieser Wert ist als sicher markiert, daher wird er zu einem Secret und kann nicht nach Global übernommen werden.",
+      "title": "{name} teilen",
+      "tooltip": "In eine gemeinsame Umgebung verschieben"
+    },
     "split": {
       "action": "Auf Umgebungen aufteilen",
       "alreadyOwn": "Hat bereits einen eigenen Wert – bleibt unverändert.",
@@ -13644,16 +13659,9 @@
       "failed": "Variable konnte nicht auf Umgebungen begrenzt werden.",
       "title": "{name} auf Umgebungen begrenzen",
       "unselectedWarning": "Nicht ausgewählt: {envs}. Prüfungen, die gegen diese Umgebungen laufen, werden diese Variable nicht mehr auflösen.",
-      "valuePlaceholder": "Wert für diese Umgebung"
-    },
-    "replaySecrets": {
-      "confirm": "Wiederholen",
-      "description": "Die Wiederholung läuft in Ihrem Browser, daher können gemeinsame Geheimnisse nicht automatisch ausgefüllt werden. Geben Sie sie ein, um mit echten Werten zu wiederholen.",
-      "remember": "Für diese Sitzung merken",
-      "rememberHint": "Wird nur in diesem Tab aufbewahrt, niemals im Browser gespeichert oder irgendwohin gesendet.",
-      "skip": "Ohne sie wiederholen",
-      "title": "Erforderliche Werte für die Wiederholung",
-      "valuePlaceholder": "Wert"
+      "valuePlaceholder": "Wert für diese Umgebung",
+      "usedBy": "Verwendet von {n} Checks: {names}",
+      "usedByHint": "Die Aufteilung wird abgelehnt, solange einer dieser Checks den Wert verlieren würde: ein Check ohne Umgebungen oder einer, der in einer Umgebung läuft, der hier kein Wert zugewiesen wurde."
     },
     "versionPrefix": "v",
     "tokens": {
@@ -14074,7 +14082,8 @@
       "timeoutLabel": "Timeout (ms)",
       "valueFallback": "Wert",
       "showSetupSteps": "Einrichtungsschritte anzeigen",
-      "waitingForActions": "Warte auf Aktionen im Browser…"
+      "waitingForActions": "Warte auf Aktionen im Browser…",
+      "unboundVariables": "{names} ist weder in diesem Check noch in seinen Umgebungen oder global definiert, daher wird er unverändert wie eingegeben verwendet. | {names} sind weder in diesem Check noch in seinen Umgebungen oder global definiert, daher werden sie unverändert wie eingegeben verwendet."
     },
     "labels": {
       "copyOf": "Kopie von {name}",
@@ -14686,7 +14695,7 @@
       "stepNameRequired": "Geben Sie diesem Schritt einen Namen — er wird in den Laufergebnissen angezeigt.",
       "typeTextRequired": "Geben Sie den Text ein, den dieser Schritt tippen soll.",
       "expectedRequired": "Geben Sie den Wert ein, den diese Assertion erwarten soll.",
-      "urlInvalid": "Geben Sie eine gültige URL ein, die mit http:// oder https:// beginnt",
+      "urlInvalid": "Geben Sie eine URL ein, die mit http://, https:// oder einem Variablenplatzhalter beginnt",
       "navigateUrlInvalid": "Geben Sie eine URL ein, die mit http://, https:// oder einem Variablen-Platzhalter beginnt.",
       "urlRequired": "Start-URL ist erforderlich",
       "fixHighlightedFields": "Korrigieren Sie die markierten Felder vor dem Speichern",
