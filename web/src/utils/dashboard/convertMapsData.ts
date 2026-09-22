@@ -26,6 +26,7 @@ import { getCountryName } from "./countryMappings";
  * @return {Object} - the option object for rendering the map chart
  */
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { escapeHtml } from "@/utils/html";
 
 export const convertMapsData = (panelSchema: any, mapData: any) => {
   //if no name and value than return it
@@ -58,7 +59,7 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
         );
       }
 
-      return `${params.name}: ${formattedValue}`;
+      return `${escapeHtml(params.name)}: ${escapeHtml(formattedValue)}`;
     },
   };
 

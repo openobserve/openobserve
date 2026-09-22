@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.meta.searchMode !== 'service-graph' &&
             searchObj.meta.searchMode !== 'services-catalog'
           "
-          class="flex items-center gap-1.5 max-lg:w-full"
+          class="flex items-center gap-1.5 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
           <DateTime
             ref="dateTimeRef"

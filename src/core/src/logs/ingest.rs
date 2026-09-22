@@ -56,7 +56,10 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use transform::TRANSFORM_FAILED;
 
-use super::{IngestJsonData, bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
+use super::{
+    IngestJsonData, bulk::TS_PARSE_FAILED, columnar::JsonColumnar, ingestion_log_enabled,
+    log_failed_record,
+};
 use crate::{
     ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
     service::get_formatted_stream_name,
@@ -83,6 +86,7 @@ struct FinalizeRecordContext<'a> {
     streams_need_all_values_map: &'a HashMap<String, bool>,
     need_usage_report: bool,
     log_ingestion_errors: bool,
+    dbm_enabled: bool,
     stream_status: &'a mut StreamStatus,
     json_data_by_stream: &'a mut LogDataByStream,
 }
@@ -198,13 +202,31 @@ pub async fn ingest(
 
     let flatten_level = get_flatten_level(org_id, &stream_name, stream_type).await;
 
+    let needs_json_records = !executable_pipelines.is_empty()
+        || extend_json.is_some()
+        || matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)))
+        || streams_need_original_map
+            .get(&stream_name)
+            .is_some_and(|v| *v)
+        || streams_need_all_values_map
+            .get(&stream_name)
+            .is_some_and(|v| *v);
+    let mut columnar = if matches!(in_req, IngestionRequest::JSON(_)) && !needs_json_records {
+        JsonColumnar::plan(org_id, &stream_name, flatten_level, (min_ts, max_ts)).await
+    } else {
+        None
+    };
+
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
     let (endpoint, usage_type, data) = match in_req {
         IngestionRequest::JSON(req) => {
-            json_req = json::from_slice(&req).unwrap_or({
-                let val: json::Value = json::from_slice(&req)?;
-                vec![val]
-            });
+            json_req = match columnar.as_mut().and_then(|c| c.parse(&req)) {
+                Some(unaccepted) => unaccepted,
+                None => {
+                    columnar = None;
+                    parse_json_body(&req)?
+                }
+            };
             (
                 "/api/org/ingest/logs/_json",
                 UsageType::Json,
@@ -247,10 +269,7 @@ pub async fn ingest(
             IngestionData::Multi(req),
         ),
         IngestionRequest::Usage(req) => {
-            json_req = json::from_slice(&req).unwrap_or({
-                let val: json::Value = json::from_slice(&req)?;
-                vec![val]
-            });
+            json_req = parse_json_body(&req)?;
             (
                 "/api/org/ingest/logs/_usage",
                 UsageType::Json,
@@ -321,6 +340,7 @@ pub async fn ingest(
                 streams_need_all_values_map: &streams_need_all_values_map,
                 need_usage_report,
                 log_ingestion_errors,
+                dbm_enabled: cfg.db_monitoring.enabled,
                 stream_status: &mut stream_status,
                 json_data_by_stream: &mut json_data_by_stream,
             },
@@ -328,6 +348,13 @@ pub async fn ingest(
             continue;
         }
         tokio::task::coop::consume_budget().await;
+    }
+
+    if let Some(columnar) = columnar.as_ref().filter(|c| c.rows() > 0) {
+        *size_by_stream.entry(stream_name.clone()).or_insert(0) += columnar.input_bytes();
+        json_data_by_stream
+            .entry(stream_name.clone())
+            .or_insert_with(|| (Vec::new(), need_usage_report.then_some(0)));
     }
 
     // batch process records through pipeline
@@ -563,6 +590,7 @@ pub async fn ingest(
                         streams_need_all_values_map: &streams_need_all_values_map,
                         need_usage_report,
                         log_ingestion_errors,
+                        dbm_enabled: cfg.db_monitoring.enabled,
                         stream_status: &mut stream_status,
                         json_data_by_stream: &mut json_data_by_stream,
                     },
@@ -573,6 +601,8 @@ pub async fn ingest(
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
+        // Wholly-discarded batch skips the write path below, so count/warn its drops here.
+        warn_and_count_discards(org_id, endpoint, &stream_status);
         return Ok(IngestionResponse::new(
             http::StatusCode::OK.into(),
             vec![stream_status],
@@ -625,6 +655,7 @@ pub async fn ingest(
             json_data_by_stream,
             size_by_stream,
             derived_streams,
+            columnar,
         )
         .await;
         match status {
@@ -671,7 +702,7 @@ pub async fn ingest(
             .inc();
     }
 
-    warn_if_wholly_discarded(org_id, endpoint, &response_body);
+    warn_and_count_discards(org_id, endpoint, &response_body);
 
     // A write failure used to be visible only in the metric label while the
     // caller still saw 200. Signalled on `write_failed` and NOT on `code`, which
@@ -702,6 +733,14 @@ pub fn prepare_record(
     }
 }
 
+/// A body is an array of records or a single record.
+fn parse_json_body(body: &[u8]) -> Result<Vec<json::Value>> {
+    match json::from_slice(body) {
+        Ok(records) => Ok(records),
+        Err(_) => Ok(vec![json::from_slice(body)?]),
+    }
+}
+
 /// Count one rejected record on a stream's status, separating an ingestion-window
 /// POLICY drop from a record that genuinely could not be prepared.
 ///
@@ -722,20 +761,44 @@ fn is_wholly_discarded(status: &RecordStatus) -> bool {
     status.failed > 0 && status.successful == 0
 }
 
-/// The 200 stays (non-2xx reads as retryable), so this warn is the only loud total-loss signal.
-fn warn_if_wholly_discarded(org_id: &str, endpoint: &str, status: &StreamStatus) {
-    if !is_wholly_discarded(&status.status) {
+/// True when a discarded batch is worth a warn at all.
+///
+/// A partial drop qualifies: a mixed batch keeps `successful > 0` forever, so a source with
+/// skewed timestamps loses records indefinitely with nothing said.
+fn warrants_discard_warn(status: &RecordStatus) -> bool {
+    status.failed > 0
+}
+
+/// Warn and count the records a success status hides.
+fn warn_and_count_discards(org_id: &str, endpoint: &str, status: &StreamStatus) {
+    if status.status.policy_dropped > 0 {
+        metrics::INGEST_RECORDS_DROPPED
+            .with_label_values(&[org_id, StreamType::Logs.as_str(), "ingestion_window"])
+            .inc_by(status.status.policy_dropped as u64);
+    }
+    if !warrants_discard_warn(&status.status) {
         return;
     }
     if !discard_warn_permitted(&format!("{org_id}/{}", status.name), Instant::now()) {
         return;
     }
-    log::warn!(
-        "[INGEST] {endpoint} {org_id}/{}: discarded all {} record(s), none stored: {}",
-        status.name,
-        status.status.failed,
-        status.status.error
-    );
+    if is_wholly_discarded(&status.status) {
+        log::warn!(
+            "[INGEST] {endpoint} {org_id}/{}: discarded all {} record(s), none stored: {}",
+            status.name,
+            status.status.failed,
+            status.status.error
+        );
+    } else {
+        log::warn!(
+            "[INGEST] {endpoint} {org_id}/{}: discarded {} of {} record(s), {} stored: {}",
+            status.name,
+            status.status.failed,
+            status.status.failed + status.status.successful,
+            status.status.successful,
+            status.status.error
+        );
+    }
 }
 
 /// At most one warn per stream per interval; a poisoned lock silences rather than panics.
@@ -802,7 +865,9 @@ fn finalize_and_buffer_record(
     // Client-supplied `o2_dbm_*` keys are dropped first — the logs path flattens
     // user keys directly, so without this a caller could spoof a deadlock event
     // (the same exposure D1 condition 1 closes for spans).
-    crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+    if ctx.dbm_enabled {
+        crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
+    }
 
     if let Some(Some(fields)) = ctx.user_defined_schema_map.get(ctx.stream_name) {
         local_val = crate::ingestion::refactor_map(local_val, fields);
@@ -1038,7 +1103,7 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                     value = json::to_value(event)?;
                     let local_val = value
                         .as_object_mut()
-                        .ok_or(anyhow::anyhow!("Error to convert Value to object"))?;
+                        .ok_or_else(|| anyhow::anyhow!("Error to convert Value to object"))?;
 
                     local_val.insert("requestId".to_owned(), request_id.into());
                     local_val.insert(
@@ -1086,22 +1151,21 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                 let timestamp = kfh_metric_data.timestamp;
 
                 let mut parsed_metric_value = json::to_value(kfh_metric_data)?;
-                let local_parsed_metric_value = parsed_metric_value.as_object_mut().ok_or(
-                    anyhow::anyhow!("CloudWatch metrics failed to parse Metric Object"),
-                )?;
+                let local_parsed_metric_value =
+                    parsed_metric_value.as_object_mut().ok_or_else(|| {
+                        anyhow::anyhow!("CloudWatch metrics failed to parse Metric Object")
+                    })?;
 
-                for (value_name, value_val) in values.as_object().ok_or(anyhow::anyhow!(
-                    "CloudWatch metrics failed to Metric Value Object"
-                ))? {
+                for (value_name, value_val) in values.as_object().ok_or_else(|| {
+                    anyhow::anyhow!("CloudWatch metrics failed to Metric Value Object")
+                })? {
                     local_parsed_metric_value.insert(value_name.to_owned(), value_val.to_owned());
                 }
                 local_parsed_metric_value.remove("value");
 
                 let metric_dimensions = dimensions
                     .as_object()
-                    .ok_or(anyhow::anyhow!(
-                        "CloudWatch metrics dimensions parsing failed"
-                    ))?
+                    .ok_or_else(|| anyhow::anyhow!("CloudWatch metrics dimensions parsing failed"))?
                     .iter()
                     .map(|(k, v)| format!("{k}=[{v}]"))
                     .collect::<Vec<_>>()
@@ -1297,6 +1361,47 @@ mod tests {
             policy_dropped: 0,
             error: String::new(),
         }));
+    }
+
+    #[test]
+    fn a_partial_drop_warrants_a_warn_even_though_the_batch_stored_records() {
+        let partial = RecordStatus {
+            successful: 9,
+            failed: 1,
+            policy_dropped: 1,
+            error: "too old".to_string(),
+        };
+        // The regression: gating the warn on `is_wholly_discarded` alone skips this,
+        // so a skewed source loses records indefinitely with nothing logged.
+        assert!(!is_wholly_discarded(&partial));
+        assert!(warrants_discard_warn(&partial));
+
+        // A batch that stored everything stays silent.
+        assert!(!warrants_discard_warn(&RecordStatus {
+            successful: 10,
+            failed: 0,
+            policy_dropped: 0,
+            error: String::new(),
+        }));
+    }
+
+    #[test]
+    fn a_policy_drop_increments_the_dropped_counter() {
+        let mut status = StreamStatus::new("s");
+        status.status = RecordStatus {
+            successful: 9,
+            failed: 1,
+            policy_dropped: 1,
+            error: "too old".to_string(),
+        };
+        let counter = metrics::INGEST_RECORDS_DROPPED
+            .get_metric_with_label_values(&["org_partial_drop", "logs", "ingestion_window"])
+            .unwrap();
+        let before = counter.get();
+
+        warn_and_count_discards("org_partial_drop", "/test", &status);
+
+        assert_eq!(counter.get(), before + 1);
     }
 
     /// The interval throttles per stream, so one bad client cannot drown the log.
@@ -1582,5 +1687,18 @@ mod tests {
             extract_resource_id_from_amazon_resource_number(arn),
             "resource-id"
         );
+    }
+
+    #[test]
+    fn test_parse_json_body_takes_an_array_or_a_single_record() {
+        assert_eq!(
+            parse_json_body(br#"[{"a":1},{"b":2}]"#).unwrap(),
+            vec![json::json!({"a": 1}), json::json!({"b": 2})]
+        );
+        assert_eq!(
+            parse_json_body(br#"{"a":1}"#).unwrap(),
+            vec![json::json!({"a": 1})]
+        );
+        assert!(parse_json_body(br#"[{"a":1}"#).is_err());
     }
 }

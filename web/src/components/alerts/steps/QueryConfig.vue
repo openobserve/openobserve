@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="isEventBased">
                 <!-- Alert if row -->
                 <div
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                   data-test="alert-if-row-logs"
                 >
                   <span
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="selectedFunction === 'total_events'">
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            critical's operator, so the row only echoes it. -->
                       <div v-if="countWarningVisible" class="flex items-start gap-2">
                         <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-else>
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            critical's operator, so the row only echoes it. -->
                       <div v-if="aggWarningVisible" class="flex items-start gap-2">
                         <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
@@ -381,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      meaning there and M-10 rejects it at save time. -->
                 <div
                   v-if="selectedFunction !== 'total_events' && hasLogGroupByFields && !isMultiAlert"
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                   data-test="alert-having-groups-row"
                 >
                   <span
@@ -430,7 +430,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- METRICS -->
               <template v-else>
                 <!-- Alert if row -->
-                <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+                <div
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                >
                   <span
                     class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                     >{{ t("alerts.threshold") }}*</span
@@ -507,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="selectedFunction === 'total_events'">
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
@@ -541,7 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            critical's operator, so the row only echoes it. -->
                       <div v-if="countWarningVisible" class="flex items-start gap-2">
                         <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
@@ -595,7 +597,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-else>
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
@@ -630,7 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            critical's operator, so the row only echoes it. -->
                       <div v-if="aggWarningVisible" class="flex items-start gap-2">
                         <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
@@ -742,7 +744,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="
                     selectedFunction !== 'total_events' && hasMetricGroupByFields && !isMultiAlert
                   "
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
                     class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
@@ -788,7 +790,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <!-- Check every row -->
-              <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+              <div
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+              >
                 <span
                   class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-bold whitespace-nowrap"
                 >
@@ -796,7 +800,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="flex flex-col gap-1">
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 max-md:flex-wrap">
                     <!-- Minutes/hours mode: number input -->
                     <template v-if="frequencyMode !== 'cron'">
                       <OFormInput
@@ -1211,7 +1215,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- SQL/PromQL condition rows (scheduled only): Check every + Alert if in one block -->
             <div v-if="isRealTime === 'false'" class="mt-2 flex flex-col gap-0 px-1">
               <!-- Check every -->
-              <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+              <div
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+              >
                 <span
                   class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-7 font-bold whitespace-nowrap"
                 >
@@ -1306,7 +1312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- SQL Simple: Alert if No. of events -->
               <div
                 v-if="localTab === 'sql' && !isMultiAlert"
-                class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
                   class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
@@ -1315,7 +1321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex flex-col gap-1.5">
                   <div class="flex items-start gap-2">
                     <span
-                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                       >{{ t("alerts.criticalIf") }}</span
                     >
                     <OFormSelect
@@ -1356,7 +1362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        critical's operator, so the row only echoes it. -->
                   <div v-if="countWarningVisible" class="flex items-start gap-2">
                     <span
-                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                       >{{ t("alerts.warningIf") }}</span
                     >
                     <span
@@ -1418,7 +1424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    pass as the SQL editor's own validation. -->
               <div
                 v-if="localTab === 'sql' && isMultiAlert"
-                class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
                   class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
@@ -1427,7 +1433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex flex-col gap-1.5">
                   <div class="flex items-start gap-2">
                     <span
-                      class="text-text-secondary text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      class="text-text-secondary text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                       >{{ t("alerts.column") }}</span
                     >
                     <!-- onLogMeasureColumnChange's body is generic (reads/writes
@@ -1445,7 +1451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="flex items-start gap-2">
                     <span
-                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                       >{{ t("alerts.criticalIf") }}</span
                     >
                     <OFormSelect
@@ -1483,7 +1489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        only echoes it. -->
                   <div v-if="aggWarningVisible" class="flex items-start gap-2">
                     <span
-                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                       >{{ t("alerts.warningIf") }}</span
                     >
                     <span
@@ -1536,7 +1542,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- PromQL: Alert if the value is + Having series -->
               <template v-if="localTab === 'promql' && promqlCondition">
-                <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+                <div
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                >
                   <span
                     class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                     >{{ t("alerts.alertIfValueIs") }} *
@@ -1549,7 +1557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex flex-col gap-1.5">
                     <div class="flex items-start gap-2">
                       <span
-                        class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                        class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                         >{{ t("alerts.criticalIf") }}</span
                       >
                       <OFormSelect
@@ -1588,7 +1596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          Shares critical's operator, so the row only echoes it. -->
                     <div v-if="promqlWarningVisible" class="flex items-start gap-2">
                       <span
-                        class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                        class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                         >{{ t("alerts.warningIf") }}</span
                       >
                       <span
@@ -1657,7 +1665,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      meaning and M-10 rejects it at save time. -->
                 <div
                   v-if="!isPromqlMultiAlert"
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
                     class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"

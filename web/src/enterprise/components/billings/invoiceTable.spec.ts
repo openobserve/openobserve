@@ -46,13 +46,16 @@ vi.mock("@/components/shared/grid/NoData.vue", () => ({
 }));
 
 // Mock BillingService
-vi.mock("@/services/billings", () => ({
-  default: {
-    list_invoice_history: vi.fn().mockResolvedValue({
-      data: { invoices: [] },
-    }),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_invoice_history: vi.fn().mockResolvedValue({
+        data: { invoices: [] },
+      }),
+    },
+  });
+});
 
 // Mock getImageURL
 vi.mock("@/utils/zincutils", async (importOriginal) => {

@@ -152,6 +152,40 @@ describe("workflows service", () => {
 
       expect(mockHttpInstance.post.mock.calls[0][0]).toBe("/api/o/workflows");
     });
+
+    it("names the destination folder", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({ org_identifier: "o", data: {}, folder: "ops" });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows?folder=ops", {});
+    });
+
+    // A folderless draft is appended to every folder's listing, so the folder has
+    // to travel with the draft save too, not only the published one.
+    it("names the destination folder on a draft save", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({
+        org_identifier: "o",
+        data: {},
+        draft: true,
+        folder: "ops",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/o/workflows?draft=true&folder=ops",
+        {},
+      );
+    });
+
+    it("omits the folder query when no folder is given", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({ org_identifier: "o", data: {}, folder: "" });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows", {});
+    });
   });
 
   describe("updateWorkflow", () => {
@@ -288,6 +322,36 @@ describe("workflows service", () => {
       await expect(
         workflows.promoteWorkflow({ org_identifier: "o", id: "w1", trigger_type: "AlertFired" }),
       ).rejects.toEqual(error);
+    });
+
+    it("names the folder to publish into", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.promoteWorkflow({
+        org_identifier: "o",
+        id: "w1",
+        trigger_type: "AlertFired",
+        folder: "ops",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/o/workflows/promote/w1?trigger_type=AlertFired&folder=ops",
+      );
+    });
+
+    // The backend then publishes into the folder the draft already sits in.
+    it("omits the folder query when none is given", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.promoteWorkflow({
+        org_identifier: "o",
+        id: "w1",
+        trigger_type: "AlertFired",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/o/workflows/promote/w1?trigger_type=AlertFired",
+      );
     });
   });
 

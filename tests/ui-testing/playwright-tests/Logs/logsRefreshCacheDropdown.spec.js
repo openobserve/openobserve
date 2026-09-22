@@ -77,6 +77,13 @@ test.describe('Logs — Refresh Cache & Run Query dropdown (GH #14488)', () => {
       // Same dropdown, same item, on the Visualize tab — GH #14488's core ask
       // is that a user sees the same option regardless of which tab they're on.
       await pm.logsVisualise.openVisualiseTab();
+      // Confirm the tab actually switched before asserting anything about the
+      // Visualize tab — openVisualiseTab() only gates on "attached", which is a
+      // no-op under v-show, so visibility here is the real state guard.
+      await expect(
+        pm.logsVisualise.getPanelEditorContainer(),
+        'Visualize tab must be active (panel editor visible) before asserting its dropdown item'
+      ).toBeVisible();
       await pm.logsPage.openRefreshCacheDropdown();
       await expect(
         pm.logsPage.getRefreshCacheAndRunQueryMenuItem(),

@@ -31,33 +31,10 @@
 
 use std::net::IpAddr;
 
-/// Derived field names. Already in flattened (underscore) form so they pass
-/// through `flatten::flatten` unchanged. Listed in `BLOCK_FIELDS` so user
-/// attributes with the same names get an `attr_` prefix instead of colliding.
-pub const INFER_SERVICE_NAME: &str = "infer_service_name";
-pub const INFER_SERVICE_TYPE: &str = "infer_service_type";
-pub const INFER_SERVICE_SYSTEM: &str = "infer_service_system";
-
-/// Service-graph join keys; unlike `infer_service_*` they keep IP literals, to join on.
-pub const INFER_PEER_KEY: &str = "infer_peer_key";
-pub const INFER_PEER_PORT: &str = "infer_peer_port";
-pub const INFER_PEER_IP: &str = "infer_peer_ip";
-pub const INFER_SELF_KEY: &str = "infer_self_key";
-pub const INFER_SELF_PORT: &str = "infer_self_port";
-pub const INFER_SELF_IP: &str = "infer_self_ip";
-
-/// Every column this module derives, for the ingest paths that handle them as one set.
-pub const ALL_INFER_FIELDS: [&str; 9] = [
-    INFER_SERVICE_NAME,
-    INFER_SERVICE_TYPE,
-    INFER_SERVICE_SYSTEM,
-    INFER_PEER_KEY,
-    INFER_PEER_PORT,
-    INFER_PEER_IP,
-    INFER_SELF_KEY,
-    INFER_SELF_PORT,
-    INFER_SELF_IP,
-];
+pub use config::meta::traces::{
+    ALL_INFER_FIELDS, INFER_PEER_IP, INFER_PEER_KEY, INFER_PEER_PORT, INFER_SELF_IP,
+    INFER_SELF_KEY, INFER_SELF_PORT, INFER_SERVICE_NAME, INFER_SERVICE_SYSTEM, INFER_SERVICE_TYPE,
+};
 
 /// `infer_service_type` values.
 pub const INFER_TYPE_DATABASE: &str = "database";
@@ -186,18 +163,20 @@ where
             .filter(|host| !host.is_empty() && !is_ip_address(host))
     };
 
-    let fallback_host = host_attr("server.address")
-        .or_else(|| host_attr("net.peer.name"))
-        .or_else(|| host_attr("http.host"))
-        .or_else(|| {
-            attr("url.full")
-                .or_else(|| attr("http.url"))
-                .and_then(|u| url::Url::parse(&u).ok())
-                .and_then(|u| match u.host() {
-                    Some(url::Host::Domain(d)) => Some(d.to_string()),
-                    _ => None, // IP hosts are redacted, same as host_attr
-                })
-        });
+    let fallback_host = || {
+        host_attr("server.address")
+            .or_else(|| host_attr("net.peer.name"))
+            .or_else(|| host_attr("http.host"))
+            .or_else(|| {
+                attr("url.full")
+                    .or_else(|| attr("http.url"))
+                    .and_then(|u| url::Url::parse(&u).ok())
+                    .and_then(|u| match u.host() {
+                        Some(url::Host::Domain(d)) => Some(d.to_string()),
+                        _ => None, // IP hosts are redacted, same as host_attr
+                    })
+            })
+    };
 
     // Explicit peer.service overrides every naming rule.
     let peer_service = attr("peer.service");
@@ -208,7 +187,7 @@ where
     if db_system.is_some() || db_name.is_some() {
         let name = peer_service
             .or(db_name)
-            .or(fallback_host)
+            .or_else(fallback_host)
             .or_else(|| db_system.clone())?;
         return Some(InferredService {
             name,
@@ -223,7 +202,7 @@ where
     if messaging_system.is_some() || destination.is_some() {
         let name = peer_service
             .or(destination)
-            .or(fallback_host)
+            .or_else(fallback_host)
             .or_else(|| messaging_system.clone())?;
         return Some(InferredService {
             name,
@@ -238,7 +217,7 @@ where
     if rpc_system.is_some() || rpc_service.is_some() {
         let name = peer_service
             .or(rpc_service)
-            .or(fallback_host)
+            .or_else(fallback_host)
             .or_else(|| rpc_system.clone())?;
         return Some(InferredService {
             name,
@@ -248,7 +227,7 @@ where
     }
 
     // external (http or generic network peer)
-    let name = peer_service.or(fallback_host)?;
+    let name = peer_service.or_else(fallback_host)?;
     let is_http = attr("http.request.method")
         .or_else(|| attr("http.method"))
         .or_else(|| attr("url.full"))
@@ -448,6 +427,116 @@ mod tests {
 
     fn peer_key(attrs: &[(&str, &str)]) -> Option<String> {
         peer_keys(SPAN_KIND_CLIENT, attrs).and_then(|keys| keys.key)
+    }
+
+    #[test]
+    fn test_explicit_names_skip_host_lookup_and_preserve_classification() {
+        for (system_key, system, name_key, service_type) in [
+            (
+                "db.system",
+                "postgresql",
+                "db.namespace",
+                INFER_TYPE_DATABASE,
+            ),
+            (
+                "messaging.system",
+                "kafka",
+                "messaging.destination.name",
+                INFER_TYPE_QUEUE,
+            ),
+            ("rpc.system", "grpc", "rpc.service", INFER_TYPE_RPC),
+        ] {
+            for explicit_peer in [false, true] {
+                let result = derive_inferred_service(SPAN_KIND_CLIENT, |key| {
+                    assert!(
+                        !matches!(
+                            key,
+                            "server.address"
+                                | "net.peer.name"
+                                | "http.host"
+                                | "url.full"
+                                | "http.url"
+                        ),
+                        "unexpected fallback lookup: {key}"
+                    );
+                    if key == system_key {
+                        Some(system.to_string())
+                    } else if key == name_key {
+                        Some("named-dependency".to_string())
+                    } else if explicit_peer && key == "peer.service" {
+                        Some("explicit-peer".to_string())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap();
+                assert_eq!(
+                    result.name,
+                    if explicit_peer {
+                        "explicit-peer"
+                    } else {
+                        "named-dependency"
+                    }
+                );
+                assert_eq!(result.service_type, service_type);
+                assert_eq!(result.system.as_deref(), Some(system));
+            }
+        }
+    }
+
+    #[test]
+    fn test_external_peer_skips_host_but_keeps_http_classification() {
+        let result = derive_inferred_service(SPAN_KIND_CLIENT, |key| {
+            assert!(
+                !matches!(key, "server.address" | "net.peer.name" | "http.host"),
+                "unexpected host lookup: {key}"
+            );
+            match key {
+                "peer.service" => Some("payments".to_string()),
+                "url.full" => Some("https://example.com/payments".to_string()),
+                _ => None,
+            }
+        })
+        .unwrap();
+        assert_eq!(result.name, "payments");
+        assert_eq!(result.service_type, INFER_TYPE_EXTERNAL);
+        assert_eq!(result.system.as_deref(), Some("http"));
+    }
+
+    #[test]
+    fn test_host_fallback_preserves_precedence() {
+        for (attrs, name) in [
+            (
+                vec![
+                    ("server.address", "primary:443"),
+                    ("net.peer.name", "secondary"),
+                    ("url.full", "https://url-host/path"),
+                ],
+                "primary",
+            ),
+            (
+                vec![
+                    ("server.address", "127.0.0.1"),
+                    ("net.peer.name", "secondary:80"),
+                    ("url.full", "https://url-host/path"),
+                ],
+                "secondary",
+            ),
+            (
+                vec![
+                    ("server.address", "127.0.0.1"),
+                    ("url.full", "https://url-host/path"),
+                ],
+                "url-host",
+            ),
+        ] {
+            let mut attrs = attrs;
+            attrs.push(("db.system", "postgresql"));
+            let result = derive(SPAN_KIND_CLIENT, &attrs).unwrap();
+            assert_eq!(result.name, name);
+            assert_eq!(result.service_type, INFER_TYPE_DATABASE);
+            assert_eq!(result.system.as_deref(), Some("postgresql"));
+        }
     }
 
     #[test]

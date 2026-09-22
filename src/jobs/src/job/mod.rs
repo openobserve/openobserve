@@ -27,6 +27,8 @@ use {
 
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
+#[cfg(feature = "enterprise")]
+mod agent_signals;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
@@ -719,6 +721,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(compactor::run());
     tokio::task::spawn(flatten_compactor::run());
     #[cfg(feature = "enterprise")]
+    tokio::task::spawn(agent_signals::run());
+    #[cfg(feature = "enterprise")]
     tokio::task::spawn(service_graph::run());
     // No cfg, unlike service_graph above: parts of DBM's read API are
     // enterprise-only, but this rollup works on ordinary database spans and is
@@ -731,6 +735,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // so callbacks must be available everywhere before consumers start.
     #[cfg(feature = "enterprise")]
     {
+        o2_enterprise::enterprise::llm_evaluations::llm_scores_search::register_schema_initializer(
+            |org_id| {
+                Box::pin(async move {
+                    openobserve_core::self_reporting::llm_scores_schema::ensure_llm_scores_stream_initialized(
+                        &org_id,
+                    )
+                    .await
+                })
+            },
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_score_writer(
             |org_id, records| {
                 Box::pin(async move {
@@ -1074,6 +1089,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         tokio::task::spawn(anomaly_claim_supervisor());
     }
+    // Every node that serves writes publishes them, not only the scheduler.
+    openobserve_synthetics::service::start_publish_queue();
     if LOCAL_NODE.is_scheduler() {
         // Ungated: synthetics is OSS, and without this an OSS build accepts a
         // check, stores it, and never runs it — the routes would be registered

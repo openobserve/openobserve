@@ -15,16 +15,19 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import onlineEvalsService from "@/services/online-evals.service";
 import i18n from "@/locales";
 
-vi.mock("@/services/online-evals.service", () => ({
-  default: {
-    scorers: {
-      create: vi.fn(),
-      update: vi.fn(),
-      test: vi.fn(),
-      previewLlmJudgeOutputSchema: vi.fn(),
+vi.mock("@/services/online-evals.service", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      scorers: {
+        create: vi.fn(),
+        update: vi.fn(),
+        test: vi.fn(),
+        previewLlmJudgeOutputSchema: vi.fn(),
+      },
     },
-  },
-}));
+  });
+});
 
 const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "test-org" } },

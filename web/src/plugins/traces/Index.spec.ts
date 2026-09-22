@@ -293,17 +293,23 @@ vi.mock("@/utils/traces/constants", async (importOriginal) => {
 });
 
 // Mock services
-vi.mock("@/services/search", () => ({
-  default: {
-    get_traces: vi.fn(() => Promise.resolve({ data: mockTracesResponse })),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_traces: vi.fn(() => Promise.resolve({ data: mockTracesResponse })),
+    },
+  });
+});
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    list: vi.fn(() => Promise.resolve({ data: mockFunctions })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(() => Promise.resolve({ data: mockFunctions })),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
@@ -373,9 +379,16 @@ describe("Index.vue (Main Traces Page)", () => {
     if (wrapper) {
       wrapper.unmount();
     }
-    // Drain all pending microtasks/promises before clearing mocks so
-    // lingering async chains from the current test cannot contaminate the
-    // next test's beforeEach or mount lifecycle.
+    // Drain pending async before clearing mocks so lingering chains from this
+    // test cannot contaminate the next one. `flushPromises` alone only drains
+    // microtasks; the field-grouping path awaits the query client, whose
+    // scheduling spans a few macrotask hops, so the loop alternates the two.
+    // Bounded and deterministic — no arbitrary sleep. Two iterations were not
+    // always enough; three are.
+    for (let i = 0; i < 3; i++) {
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 0));
+    }
     await flushPromises();
     vi.clearAllMocks();
   });
@@ -2937,6 +2950,79 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.streamChangeDialog.show).toBe(false);
       // Stream must remain unchanged — the cancel did not apply the pending change
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+    });
+  });
+
+  // Placed last in the file: this test drives fetchQueryDataWithHttpStream's
+  // handlers directly and calls mockFetchQueryDataWithHttpStream.mockReset()
+  // at the end, so it cannot leak an implementation into tests declared after it.
+  describe("Stale search error handling (o2-enterprise#2643)", () => {
+    // Regression: a rejected query's RED metrics charts stayed hidden forever,
+    // even after the query was fixed and the next search succeeded — because a
+    // cancelled search's late error callback overwrote the newer search's state.
+    it("should not let a cancelled search's late error overwrite a newer search's state", async () => {
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.datetime = {
+        startTime: new Date().getTime() * 1000 - 900000000,
+        endTime: new Date().getTime() * 1000,
+        relativeTimePeriod: "15m",
+        type: "relative",
+      };
+
+      const capturedHandlers: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_data: any, handlers: any) => {
+        capturedHandlers.push(handlers);
+      });
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      capturedHandlers.length = 0;
+
+      // Search #1 starts and is left in-flight (never resolves on its own).
+      await wrapper.vm.getQueryData();
+      expect(capturedHandlers.length).toBe(1);
+
+      // Search #2 starts before #1 finishes — this cancels #1 (deletes its
+      // request-state entry) and clears errorMsg for the new attempt.
+      await wrapper.vm.getQueryData();
+      expect(capturedHandlers.length).toBe(2);
+
+      expect(mockSearchObj.data.errorMsg).toBe("");
+
+      // #1's HTTP stream finally errors out after being cancelled/superseded.
+      capturedHandlers[0].error({}, { message: "stale failure from search #1", code: 500 });
+      await flushPromises();
+
+      // The stale error must not resurrect the error banner / hide the charts
+      // for the still-in-flight, newer search.
+      expect(mockSearchObj.data.errorMsg).toBe("");
+
+      // A genuine error for the CURRENT (non-superseded) search must still work.
+      capturedHandlers[1].error({}, { message: "real failure from search #2", code: 500 });
+      await flushPromises();
+
+      expect(mockSearchObj.data.errorMsg).toBe("real failure from search #2");
+
+      mockFetchQueryDataWithHttpStream.mockReset();
     });
   });
 });

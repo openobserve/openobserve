@@ -891,7 +891,7 @@ pub struct MergeJobPendingRecord {
 }
 
 #[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
-#[repr(i64)]
+#[repr(i32)]
 pub enum FileListJobStatus {
     #[default]
     Pending,
@@ -899,8 +899,8 @@ pub enum FileListJobStatus {
     Done,
 }
 
-impl From<i64> for FileListJobStatus {
-    fn from(status: i64) -> Self {
+impl From<i32> for FileListJobStatus {
+    fn from(status: i32) -> Self {
         match status {
             0 => Self::Pending,
             1 => Self::Running,
@@ -976,10 +976,10 @@ mod tests {
         assert!(parse_stream_key("org/logs/stream/extra").is_none());
     }
 
-    // ── FileListJobStatus::from(i64) ──────────────────────────────────────────
+    // ── FileListJobStatus::from(i32) ──────────────────────────────────────────
 
     #[test]
-    fn test_file_list_job_status_from_i64() {
+    fn test_file_list_job_status_from_i32() {
         assert_eq!(FileListJobStatus::from(0), FileListJobStatus::Pending);
         assert_eq!(FileListJobStatus::from(1), FileListJobStatus::Running);
         assert_eq!(FileListJobStatus::from(2), FileListJobStatus::Done);

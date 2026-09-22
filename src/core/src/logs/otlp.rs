@@ -35,8 +35,12 @@ use infra::{errors::Result, schema::get_flatten_level};
 use ingestion_common::{IngestionStatus, StreamStatus};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
-use opentelemetry_proto::tonic::collector::logs::v1::{
-    ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
+use opentelemetry_proto::tonic::{
+    collector::logs::v1::{
+        ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
+    },
+    common::v1::InstrumentationScope,
+    logs::v1::LogRecord,
 };
 use prost::Message;
 use schema::{get_future_discard_error, get_upto_discard_error};
@@ -44,13 +48,136 @@ use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
     db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
         grpc::{get_val, get_val_with_type_retained},
     },
 };
+
+/// The resource map with flatten's key spelling, or `None` when two wire keys would share a name.
+fn normalized_resource_map(
+    service_att_map: &json::Map<String, json::Value>,
+) -> Option<json::Map<String, json::Value>> {
+    let mut normalized = json::Map::with_capacity(service_att_map.len());
+    for (key, value) in service_att_map {
+        let key = flatten::format_label_name_cow(key).into_owned();
+        if normalized.insert(key, value.clone()).is_some() {
+            return None;
+        }
+    }
+    Some(normalized)
+}
+
+/// One OTLP log record as a JSON object, keys normalized up front when that is provably exact.
+fn otlp_log_record(
+    service_att_map: &json::Map<String, json::Value>,
+    normalized_resource: Option<&json::Map<String, json::Value>>,
+    scope: Option<&InstrumentationScope>,
+    log_record: &LogRecord,
+    timestamp: i64,
+) -> json::Value {
+    if let Some(base) = normalized_resource
+        && let Some(rec) = build_otlp_log_record(base, true, scope, log_record, timestamp)
+    {
+        return rec;
+    }
+    build_otlp_log_record(service_att_map, false, scope, log_record, timestamp)
+        .expect("raw keys never collide")
+}
+
+/// `None` when a normalized attribute key lands on an existing entry: only the wire spelling
+/// decides that.
+fn build_otlp_log_record(
+    base: &json::Map<String, json::Value>,
+    normalize: bool,
+    scope: Option<&InstrumentationScope>,
+    log_record: &LogRecord,
+    timestamp: i64,
+) -> Option<json::Value> {
+    let mut rec = json::Value::Object(base.clone());
+
+    if let Some(lib) = scope {
+        let library_name = lib.name.to_owned();
+        if !library_name.is_empty() {
+            rec["instrumentation_library_name"] = serde_json::Value::String(library_name);
+        }
+        let lib_version = lib.version.to_owned();
+        if !lib_version.is_empty() {
+            rec["instrumentation_library_version"] = serde_json::Value::String(lib_version);
+        }
+    }
+
+    rec["severity"] = if !log_record.severity_text.is_empty() {
+        log_record.severity_text.to_owned().into()
+    } else {
+        log_record.severity_number.into()
+    };
+
+    rec["body"] = get_val(&log_record.body.as_ref());
+    rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
+
+    let rec_map = rec.as_object_mut().unwrap();
+    for local_attr in &log_record.attributes {
+        let key = if normalize {
+            flatten::format_label_name_cow(&local_attr.key).into_owned()
+        } else {
+            local_attr.key.clone()
+        };
+        let value = get_val_with_type_retained(&local_attr.value.as_ref());
+        if rec_map.insert(key, value).is_some() && normalize {
+            return None;
+        }
+    }
+    rec[TIMESTAMP_COL_NAME] = timestamp.into();
+    Some(rec)
+}
+
+/// ProtoJSON rules: int64 as a decimal string, and `partial_success` omitted on a clean success.
+fn export_response_to_proto_json(res: &ExportLogsServiceResponse) -> json::Value {
+    match &res.partial_success {
+        Some(ps) if ps.rejected_log_records != 0 || !ps.error_message.is_empty() => {
+            let mut partial = json::Map::new();
+            if ps.rejected_log_records != 0 {
+                partial.insert(
+                    "rejectedLogRecords".to_string(),
+                    json::Value::String(ps.rejected_log_records.to_string()),
+                );
+            }
+            if !ps.error_message.is_empty() {
+                partial.insert(
+                    "errorMessage".to_string(),
+                    json::Value::String(ps.error_message.clone()),
+                );
+            }
+            json::json!({ "partialSuccess": partial })
+        }
+        _ => json::json!({}),
+    }
+}
+
+/// OTLP/HTTP requires the response body to use the encoding the request arrived in.
+fn format_http_response(res: ExportLogsServiceResponse, req_type: OtlpRequestType) -> Response {
+    match req_type {
+        OtlpRequestType::HttpJson => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, CONTENT_TYPE_JSON)],
+            json::to_vec(&export_response_to_proto_json(&res)).expect("serialize response"),
+        )
+            .into_response(),
+        _ => {
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, CONTENT_TYPE_PROTO)],
+                out.freeze(),
+            )
+                .into_response()
+        }
+    }
+}
 
 pub async fn handle_request(
     thread_id: usize,
@@ -66,7 +193,7 @@ pub async fn handle_request(
     // check stream
     let stream_name = in_stream_name
         .map(|name| format_stream_name(name.to_string()))
-        .unwrap_or("default".to_string());
+        .unwrap_or_else(|| "default".to_string());
     check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
 
     let cfg = get_config();
@@ -107,13 +234,32 @@ pub async fn handle_request(
     .await;
 
     // with pipeline, we need to store original if any of the destinations requires original
-    let store_original_when_pipeline_exists =
-        !executable_pipelines.is_empty() && streams_need_original_map.values().any(|val| *val);
+    // with a pipeline the destinations are unknown, so any destination wanting `_original` keeps it
+    let need_original = if executable_pipelines.is_empty() {
+        streams_need_original_map
+            .get(&stream_name)
+            .is_some_and(|v| *v)
+    } else {
+        streams_need_original_map.values().any(|val| *val)
+    };
+    let need_all_values = streams_need_all_values_map
+        .get(&stream_name)
+        .is_some_and(|v| *v);
+    let uds_fields = user_defined_schema_map
+        .get(&stream_name)
+        .and_then(|fields| fields.as_ref());
+    // only a plain write pre-normalizes keys: pipelines and `_original` see the wire spelling
+    let normalize_keys = executable_pipelines.is_empty() && !need_original;
+    let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+    let dbm_enabled = cfg.db_monitoring.enabled;
     // End get user defined schema
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
     let mut size_by_stream = HashMap::new();
+    // the request writes one stream, so its records and size are collected without map probes
+    let mut stream_records: Vec<(i64, json::Map<String, json::Value>)> = Vec::new();
+    let mut stream_size = 0usize;
     let mut derived_streams = HashSet::new();
     let mut res = ExportLogsServiceResponse {
         partial_success: None,
@@ -127,11 +273,16 @@ pub async fn handle_request(
         if let Some(resource) = resource_log.resource {
             for res_attr in resource.attributes {
                 service_att_map.insert(
-                    res_attr.key.to_string(),
+                    res_attr.key,
                     get_val_with_type_retained(&res_attr.value.as_ref()),
                 );
             }
         }
+        let normalized_resource = if normalize_keys {
+            normalized_resource_map(&service_att_map)
+        } else {
+            None
+        };
 
         for instrumentation_logs in &resource_log.scope_logs {
             for log_record in &instrumentation_logs.log_records {
@@ -166,36 +317,13 @@ pub async fn handle_request(
                     continue;
                 }
 
-                let mut rec = json::json!({});
-                rec.as_object_mut().unwrap().extend(service_att_map.clone());
-
-                if let Some(lib) = &instrumentation_logs.scope {
-                    let library_name = lib.name.to_owned();
-                    if !library_name.is_empty() {
-                        rec["instrumentation_library_name"] =
-                            serde_json::Value::String(library_name);
-                    }
-                    let lib_version = lib.version.to_owned();
-                    if !lib_version.is_empty() {
-                        rec["instrumentation_library_version"] =
-                            serde_json::Value::String(lib_version);
-                    }
-                }
-
-                rec["severity"] = if !log_record.severity_text.is_empty() {
-                    log_record.severity_text.to_owned().into()
-                } else {
-                    log_record.severity_number.into()
-                };
-
-                rec["body"] = get_val(&log_record.body.as_ref());
-                rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
-
-                log_record.attributes.iter().for_each(|local_attr| {
-                    rec[local_attr.key.as_str()] =
-                        get_val_with_type_retained(&local_attr.value.as_ref());
-                });
-                rec[TIMESTAMP_COL_NAME.to_string()] = timestamp.into();
+                let mut rec = otlp_log_record(
+                    &service_att_map,
+                    normalized_resource.as_ref(),
+                    instrumentation_logs.scope.as_ref(),
+                    log_record,
+                    timestamp,
+                );
 
                 match TraceId::from_bytes(
                     log_record
@@ -222,23 +350,7 @@ pub async fn handle_request(
 
                 // store a copy of original data before it's modified, when
                 // 1. original data is an object
-                let original_data = if rec.is_object() {
-                    // 2. current stream does not have pipeline
-                    if executable_pipelines.is_empty() {
-                        // current stream requires original
-                        streams_need_original_map
-                            .get(&stream_name)
-                            .is_some_and(|v| *v)
-                            .then(|| rec.to_string())
-                    } else {
-                        // 3. with pipeline, storing original as long as streams_need_original_set
-                        //    is not empty
-                        // because not sure the pipeline destinations
-                        store_original_when_pipeline_exists.then(|| rec.to_string())
-                    }
-                } else {
-                    None // `item` won't be flattened, no need to store original
-                };
+                let original_data = (need_original && rec.is_object()).then(|| rec.to_string());
 
                 // Surface the OTLP LogRecord `EventName` as `o2_event_name`.
                 //
@@ -273,11 +385,7 @@ pub async fn handle_request(
                     pipeline_inputs.push(rec);
                     original_options.push(original_data);
                 } else {
-                    let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                    *size += json::estimate_json_bytes(&rec);
-                    // JSON Flattening - use per-stream flatten level
-                    let flatten_level =
-                        get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                    stream_size += json::estimate_json_bytes(&rec);
                     rec = flatten::flatten_with_level(rec, flatten_level)?;
 
                     // get json object
@@ -288,7 +396,11 @@ pub async fn handle_request(
 
                     // DBM server-vantage canonicalization — the shipped collector recipes all
                     // export over OTLP, so this path is the one that matters for them.
-                    crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                    if dbm_enabled {
+                        crate::db_monitoring::server_vantage::canonicalize_dbm_record(
+                            &mut local_val,
+                        );
+                    }
 
                     // Re-insert the trusted event name AFTER canonicalization.
                     //
@@ -306,16 +418,12 @@ pub async fn handle_request(
                         );
                     }
 
-                    if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
+                    if let Some(fields) = uds_fields {
                         local_val = crate::ingestion::refactor_map(local_val, fields);
                     }
 
                     // add `_original` and '_record_id` if required by StreamSettings
-                    if streams_need_original_map
-                        .get(&stream_name)
-                        .is_some_and(|v| *v)
-                        && let Some(original_data) = original_data
-                    {
+                    if need_original && let Some(original_data) = original_data {
                         local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
 
                         let record_id = crate::ingestion::generate_record_id(
@@ -328,10 +436,7 @@ pub async fn handle_request(
                     }
 
                     // add `_all_values` if required by StreamSettings
-                    if streams_need_all_values_map
-                        .get(&stream_name)
-                        .is_some_and(|v| *v)
-                    {
+                    if need_all_values {
                         let values = local_val
                             .iter()
                             .filter(|(k, v)| {
@@ -352,14 +457,15 @@ pub async fn handle_request(
                             .insert(ALL_VALUES_COL_NAME.to_string(), json::Value::String(values));
                     }
 
-                    let (ts_data, fn_num) = json_data_by_stream
-                        .entry(stream_name.clone())
-                        .or_insert((Vec::new(), None));
-                    ts_data.push((timestamp, local_val));
-                    *fn_num = Some(0); // no pl -> no func
+                    stream_records.push((timestamp, local_val));
                 }
             }
         }
+    }
+
+    if !stream_records.is_empty() {
+        size_by_stream.insert(stream_name.clone(), stream_size);
+        json_data_by_stream.insert(stream_name.clone(), (stream_records, Some(0)));
     }
 
     // batch process records through pipeline
@@ -454,7 +560,11 @@ pub async fn handle_request(
 
                             // Pipeline-routed records are canonicalized too: a VRL transform may
                             // have produced the receiver fields we dispatch on.
-                            crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                            if dbm_enabled {
+                                crate::db_monitoring::server_vantage::canonicalize_dbm_record(
+                                    &mut local_val,
+                                );
+                            }
 
                             if let Some(event_name) = trusted_event_name {
                                 local_val.insert(O2_EVENT_NAME.to_string(), event_name);
@@ -557,7 +667,6 @@ pub async fn handle_request(
                 let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
                 *size += json::estimate_json_bytes(&res);
 
-                let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
                 res = flatten::flatten_with_level(res, flatten_level)?;
 
                 let mut local_val = match res.take() {
@@ -575,7 +684,9 @@ pub async fn handle_request(
                 let trusted_event_name = local_val.get(O2_EVENT_NAME).cloned();
 
                 // DBM server-vantage canonicalization (see the note at the first call site).
-                crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                if dbm_enabled {
+                    crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
+                }
 
                 if let Some(event_name) = trusted_event_name {
                     local_val.insert(O2_EVENT_NAME.to_string(), event_name);
@@ -649,67 +760,41 @@ pub async fn handle_request(
         });
     }
 
-    let (content_type, endpoint) = match req_type {
-        OtlpRequestType::HttpJson => (CONTENT_TYPE_JSON, "/api/otlp/v1/logs"),
-        OtlpRequestType::HttpProtobuf => (CONTENT_TYPE_PROTO, "/api/otlp/v1/logs"),
-        OtlpRequestType::Grpc => (CONTENT_TYPE_PROTO, "/grpc/otlp/logs"),
+    let endpoint = match req_type {
+        OtlpRequestType::Grpc => "/grpc/otlp/logs",
+        _ => "/api/otlp/v1/logs",
     };
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
-        let mut out = BytesMut::with_capacity(res.encoded_len());
-        res.encode(&mut out).expect("Out of memory");
-        return Ok((
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, content_type)],
-            out.freeze(),
-        )
-            .into_response()); // just return
+        return Ok(format_http_response(res, req_type)); // just return
     }
 
-    let mut status = IngestionStatus::Record(stream_status.status);
-    let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+    // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
+    let write_result = super::write_logs_by_stream(
         thread_id,
         org_id,
         user_email,
         (started_at, &start),
         UsageType::Logs,
-        &mut status,
+        &mut IngestionStatus::Record(stream_status.status),
         json_data_by_stream,
         size_by_stream,
         derived_streams,
+        None,
     )
-    .await
-    {
-        // A deleting-stream skip is surfaced on IngestionResponse for the HEC
-        // collector; OTLP's protobuf response has no field for it, so it keeps
-        // reporting 200 exactly as before.
-        Ok(_skipped) => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            ("200", out)
-        }
-        Err(e) => {
-            log::error!("Error while writing logs: {e}");
-            stream_status.status = match status {
-                IngestionStatus::Record(status) => status,
-                IngestionStatus::Bulk(_) => unreachable!(),
-            };
-            res.partial_success = Some(ExportLogsPartialSuccess {
-                rejected_log_records: stream_status.status.failed as i64,
-                error_message: stream_status.status.error,
-            });
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            ("500", out)
-        }
+    .await;
+
+    let status = match &write_result {
+        Ok(_) => StatusCode::OK,
+        Err(e) => crate::ingestion::write_error_status(e),
     };
 
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     let label_values = [
         endpoint,
-        metric_rpt_status_code,
+        status.as_str(),
         org_id,
         StreamType::Logs.as_str(),
         "",
@@ -722,25 +807,156 @@ pub async fn handle_request(
         .with_label_values(&label_values)
         .inc();
 
-    Ok((
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, content_type)],
-        response_body.freeze(),
-    )
-        .into_response())
+    if let Err(e) = write_result {
+        log::error!("Error while writing logs: {e}");
+        return Ok(MetaHttpResponse::error_with_header(
+            status,
+            format!("error while writing log data: {e}"),
+        ));
+    }
+
+    Ok(format_http_response(res, req_type))
 }
 
 #[cfg(test)]
 mod tests {
-    use config::meta::otlp::OtlpRequestType;
+    use config::{
+        meta::otlp::OtlpRequestType,
+        utils::{flatten, json},
+    };
     use opentelemetry_proto::tonic::{
-        collector::logs::v1::ExportLogsServiceRequest,
+        collector::logs::v1::{
+            ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
+        },
         common::v1::{
             AnyValue, InstrumentationScope, KeyValue,
             any_value::Value::{BoolValue, DoubleValue, IntValue, StringValue},
         },
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     };
+    use prost::Message;
+
+    use super::{
+        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, export_response_to_proto_json, format_http_response,
+        normalized_resource_map, otlp_log_record,
+    };
+
+    fn partial_response(rejected: i64, error: &str) -> ExportLogsServiceResponse {
+        ExportLogsServiceResponse {
+            partial_success: Some(ExportLogsPartialSuccess {
+                rejected_log_records: rejected,
+                error_message: error.to_string(),
+            }),
+        }
+    }
+
+    async fn response_parts(
+        res: ExportLogsServiceResponse,
+        req_type: OtlpRequestType,
+    ) -> (axum::http::StatusCode, String, Vec<u8>) {
+        let response = format_http_response(res, req_type);
+        let status = response.status();
+        let content_type = response
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .expect("content-type header")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap()
+            .to_vec();
+        (status, content_type, body)
+    }
+
+    fn kv(key: &str, value: opentelemetry_proto::tonic::common::v1::any_value::Value) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue { value: Some(value) }),
+            ..Default::default()
+        }
+    }
+
+    fn kvlist(pairs: &[(&str, i64)]) -> opentelemetry_proto::tonic::common::v1::any_value::Value {
+        use opentelemetry_proto::tonic::common::v1::{KeyValueList, any_value::Value};
+        Value::KvlistValue(KeyValueList {
+            values: pairs
+                .iter()
+                .map(|(k, v)| kv(k, Value::IntValue(*v)))
+                .collect(),
+        })
+    }
+
+    /// The pre-normalized build must flatten to exactly what the raw build flattens to.
+    fn assert_normalized_build_matches_raw(
+        resource: json::Map<String, json::Value>,
+        attributes: Vec<KeyValue>,
+    ) -> json::Map<String, json::Value> {
+        let record = LogRecord {
+            attributes,
+            severity_text: "INFO".to_string(),
+            ..Default::default()
+        };
+        let normalized = normalized_resource_map(&resource);
+        let fast = otlp_log_record(&resource, normalized.as_ref(), None, &record, 1);
+        let raw = otlp_log_record(&resource, None, None, &record, 1);
+        let fast = flatten::flatten_with_level(fast, 0).unwrap();
+        let raw = flatten::flatten_with_level(raw, 0).unwrap();
+        assert_eq!(fast, raw);
+        fast.as_object().unwrap().clone()
+    }
+
+    #[test]
+    fn test_object_valued_attributes_colliding_after_normalization_keep_both() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        let rec = assert_normalized_build_matches_raw(
+            json::Map::new(),
+            vec![
+                kv("a.b", kvlist(&[("x", 1)])),
+                kv("a_b", kvlist(&[("y", 2)])),
+                kv("plain", Value::StringValue("v".to_string())),
+            ],
+        );
+        assert_eq!(rec["a_b_x"], json::json!(1));
+        assert_eq!(rec["a_b_y"], json::json!(2));
+    }
+
+    #[test]
+    fn test_scalar_collision_across_resource_and_record_keeps_flatten_precedence() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        let mut resource = json::Map::new();
+        resource.insert("a.b".to_string(), json::json!(1));
+        resource.insert("a_b".to_string(), json::json!(2));
+        let rec =
+            assert_normalized_build_matches_raw(resource, vec![kv("a.b", Value::IntValue(3))]);
+        // flatten keeps the first key's position and the last key's value
+        assert_eq!(rec["a_b"], json::json!(2));
+    }
+
+    #[test]
+    fn test_collision_free_record_is_pre_normalized() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        let mut resource = json::Map::new();
+        resource.insert("k8s.pod.name".to_string(), json::json!("p"));
+        let normalized = normalized_resource_map(&resource).unwrap();
+        let record = LogRecord {
+            attributes: vec![kv("http.method", Value::StringValue("GET".to_string()))],
+            ..Default::default()
+        };
+        let rec = otlp_log_record(&resource, Some(&normalized), None, &record, 1);
+        let keys: Vec<&String> = rec.as_object().unwrap().keys().collect();
+        assert!(keys.iter().all(|k| !k.contains('.')), "{keys:?}");
+        assert!(
+            normalized_resource_map(&{
+                let mut r = json::Map::new();
+                r.insert("a.b".to_string(), json::json!(1));
+                r.insert("a_b".to_string(), json::json!(2));
+                r
+            })
+            .is_none()
+        );
+    }
 
     use crate::logs::otlp::handle_request;
 
@@ -1457,5 +1673,174 @@ mod tests {
         .await;
 
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn json_request_gets_a_json_body_not_protobuf() {
+        let (status, content_type, body) = response_parts(
+            partial_response(1, "Too old data, only last 5 hours data can be ingested."),
+            OtlpRequestType::HttpJson,
+        )
+        .await;
+
+        assert_eq!(status, axum::http::StatusCode::OK);
+        assert_eq!(content_type, CONTENT_TYPE_JSON);
+        let parsed: json::Value = json::from_slice(&body).expect("body must parse as JSON");
+        assert_eq!(
+            parsed["partialSuccess"]["rejectedLogRecords"],
+            json::Value::String("1".into())
+        );
+        assert!(
+            parsed["partialSuccess"]["errorMessage"]
+                .as_str()
+                .unwrap()
+                .contains("Too old data")
+        );
+        assert_ne!(body.first(), Some(&0x0a), "must not be a protobuf payload");
+    }
+
+    #[tokio::test]
+    async fn json_request_with_nothing_rejected_gets_an_empty_json_object() {
+        let (_, content_type, body) = response_parts(
+            ExportLogsServiceResponse {
+                partial_success: None,
+            },
+            OtlpRequestType::HttpJson,
+        )
+        .await;
+
+        assert_eq!(content_type, CONTENT_TYPE_JSON);
+        assert_eq!(String::from_utf8(body).unwrap(), "{}");
+    }
+
+    #[tokio::test]
+    async fn protobuf_request_still_gets_a_protobuf_body() {
+        let (status, content_type, body) = response_parts(
+            partial_response(1, "rejected"),
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await;
+
+        assert_eq!(status, axum::http::StatusCode::OK);
+        assert_eq!(content_type, CONTENT_TYPE_PROTO);
+        let decoded = ExportLogsServiceResponse::decode(body.as_slice()).expect("valid protobuf");
+        assert_eq!(
+            decoded.partial_success.unwrap().rejected_log_records,
+            1,
+            "protobuf clients must keep the payload they had before"
+        );
+    }
+
+    #[tokio::test]
+    async fn grpc_request_still_gets_a_protobuf_body() {
+        let (_, content_type, body) =
+            response_parts(partial_response(2, "rejected"), OtlpRequestType::Grpc).await;
+
+        assert_eq!(content_type, CONTENT_TYPE_PROTO);
+        let decoded = ExportLogsServiceResponse::decode(body.as_slice()).expect("valid protobuf");
+        assert_eq!(decoded.partial_success.unwrap().rejected_log_records, 2);
+    }
+
+    #[test]
+    fn proto_json_omits_partial_success_when_nothing_was_rejected() {
+        let res = ExportLogsServiceResponse {
+            partial_success: None,
+        };
+        assert_eq!(export_response_to_proto_json(&res), json::json!({}));
+
+        let empty = partial_response(0, "");
+        assert_eq!(export_response_to_proto_json(&empty), json::json!({}));
+    }
+
+    #[test]
+    fn proto_json_encodes_the_reject_count_as_a_decimal_string() {
+        let value = export_response_to_proto_json(&partial_response(7, "boom"));
+        assert_eq!(
+            value["partialSuccess"]["rejectedLogRecords"],
+            json::Value::String("7".into()),
+            "ProtoJSON encodes int64 as a string, not a number"
+        );
+        assert_eq!(
+            value["partialSuccess"]["errorMessage"],
+            json::Value::String("boom".into())
+        );
+    }
+
+    #[test]
+    fn test_otlp_json_decodes_non_canonical_doubles() {
+        use crate::ingestion::grpc::get_val_with_type_retained;
+
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"ratio","value":{"doubleValue":0.10}}]},"scopeLogs":[{"scope":{"name":"s","attributes":[{"key":"exp","value":{"doubleValue":1e0}}]},"logRecords":[{"timeUnixNano":"1789000000000000001","body":{"doubleValue":-2.50},"attributes":[{"key":"r","value":{"doubleValue":1.5}},{"key":"nested","value":{"kvlistValue":{"values":[{"key":"k","value":{"arrayValue":{"values":[{"doubleValue":1E-7}]}}}]}}},{"key":"id","value":{"intValue":"9223372036854775807"}}]},{"timeUnixNano":1789000000000000002,"body":{"stringValue":"valid record in the same batch"}}]}]}]}"#;
+        // arbitrary_precision is enabled workspace-wide, so the plain decode must fail here
+        assert!(json::from_slice::<ExportLogsServiceRequest>(body).is_err());
+
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_floats(body).unwrap();
+        let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
+        let resource_logs = &request.resource_logs[0];
+        let resource = resource_logs.resource.as_ref().unwrap();
+        assert_eq!(value(&resource.attributes[0]), Some(DoubleValue(0.1)));
+        let scope_logs = &resource_logs.scope_logs[0];
+        let scope = scope_logs.scope.as_ref().unwrap();
+        assert_eq!(value(&scope.attributes[0]), Some(DoubleValue(1.0)));
+
+        let records = &scope_logs.log_records;
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].time_unix_nano, 1_789_000_000_000_000_001);
+        assert_eq!(records[1].time_unix_nano, 1_789_000_000_000_000_002);
+        assert_eq!(
+            records[0].body.as_ref().and_then(|v| v.value.clone()),
+            Some(DoubleValue(-2.5))
+        );
+        assert_eq!(value(&records[0].attributes[0]), Some(DoubleValue(1.5)));
+        assert_eq!(
+            get_val_with_type_retained(&records[0].attributes[1].value.as_ref()),
+            json::json!({"k": [1e-7]})
+        );
+        assert_eq!(value(&records[0].attributes[2]), Some(IntValue(i64::MAX)));
+    }
+
+    #[test]
+    fn test_otlp_json_keeps_strict_errors() {
+        for body in [
+            &br#"{"resourceLogs":[{"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#[..],
+            br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":1}}]}]}]}"#,
+            br#"{"resourceLogs":["#,
+        ] {
+            let strict = json::from_slice::<ExportLogsServiceRequest>(body).map(|_| ());
+            let lenient =
+                json::from_slice_lenient_floats::<ExportLogsServiceRequest>(body).map(|_| ());
+            assert!(strict.is_err());
+            assert_eq!(
+                strict.map_err(|e| e.to_string()),
+                lenient.map_err(|e| e.to_string())
+            );
+        }
+
+        let float_with_bad_bytes = br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"doubleValue":1.5},"attributes":[{"key":"b","value":{"bytesValue":"!"}}]}]}]}]}"#;
+        assert!(
+            json::from_slice_lenient_floats::<ExportLogsServiceRequest>(float_with_bad_bytes)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_otlp_json_without_floats_decodes_exactly_as_before() {
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"s","value":{"stringValue":"x"}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1789000000000000001","body":{"stringValue":"x"},"attributes":[{"key":"i","value":{"intValue":"42"}},{"key":"b","value":{"boolValue":true}}]}]}]}]}"#;
+        assert_eq!(
+            json::from_slice_lenient_floats::<ExportLogsServiceRequest>(body).unwrap(),
+            json::from_slice::<ExportLogsServiceRequest>(body).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_otlp_json_float_rescues_a_body_that_repeats_a_field() {
+        // the retry decodes through a Value, which keeps the last of two repeated fields
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"r","value":{"doubleValue":1.5}}]},"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#;
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_floats(body).unwrap();
+        let scope = request.resource_logs[0].scope_logs[0]
+            .scope
+            .as_ref()
+            .unwrap();
+        assert_eq!(scope.name, "b");
     }
 }

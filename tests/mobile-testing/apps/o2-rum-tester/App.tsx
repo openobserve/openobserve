@@ -233,8 +233,11 @@ function App(): React.JSX.Element {
         SessionReplay.enable({
           replaySampleRate: 100,
           startRecordingImmediately: true,
-          // Replay does NOT inherit the RUM endpoint and needs the full /replay path.
-          customEndpoint: RUM_INTAKE + '/replay',
+          // Pass the RUM base only — the native SDK appends the replay path itself. Suffixing '/replay'
+          // double-paths the endpoint and on iOS throws during init, cascading to kill the WHOLE SDK
+          // (0 telemetry AND 0 replay) — this was openobserve#13942. Validated on SDK 0.1.2: base
+          // endpoint → RN-iOS telemetry (19 events) + replay (7 segments) both land.
+          customEndpoint: RUM_INTAKE,
           // Test the SDK's strict default masking posture.
           textAndInputPrivacyLevel: TextAndInputPrivacyLevel.MASK_ALL,
           imagePrivacyLevel: ImagePrivacyLevel.MASK_ALL,

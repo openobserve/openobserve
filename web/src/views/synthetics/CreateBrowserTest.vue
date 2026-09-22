@@ -15,7 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
+import { saveMonitorMutation } from "@/services/synthetics.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { cloneDeep } from "lodash-es";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -31,6 +37,14 @@ import type {
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import type { WireStep } from "@/types/synthetics";
+import { buildResolvedGrouped } from "@/components/synthetics/variables/resolved";
+import {
+  defaultReplayEnvironmentId,
+  replayInputs,
+  sharedPlainValues,
+} from "@/components/synthetics/variables/replayInputs";
+import { useSharedVariables } from "@/components/synthetics/variables/useSharedVariables";
 import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
@@ -45,7 +59,6 @@ import { CHROME_UI_LABELS, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
-import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -71,6 +84,8 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
+const orgIdForWrites = useOrgId();
+const saveMonitor = useMutation(() => saveMonitorMutation(orgIdForWrites.value));
 
 // Private locations are served by agents deployed inside the customer's network,
 // the one enterprise part of synthetics. Gated on its own /config flag so an OSS
@@ -95,12 +110,9 @@ const journeySplitterLimits = computed<[number, number]>(() =>
   variablesPanelOpen.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
 );
 
-// Computed literals to avoid `{{` template delimiter conflicts in Vue templates.
-// The i18n message "Supports {variables} like {baseUrl}." uses these params to
-// show literal "{{variables}}" and "{{baseUrl}}" as user-facing syntax examples.
 const variablesHintParams = computed(() => ({
   variables: "{{variables}}",
-  baseUrl: "{{baseUrl}}",
+  baseUrl: "{{BASE_URL}}",
 }));
 
 // Three top-level phases:
@@ -307,8 +319,7 @@ async function openAgentSetup(locationId?: string) {
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getAgentSetup(org);
+    const res = await syntheticsService.getAgentSetup(orgIdForWrites.value);
     agentSetup.value = (res.data ?? null) as AgentSetup | null;
   } catch {
     agentSetup.value = null;
@@ -318,8 +329,7 @@ async function openAgentSetup(locationId?: string) {
 async function fetchLocations() {
   locationsLoading.value = true;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getLocations(org);
+    const res = await syntheticsService.getLocations(orgIdForWrites.value);
     const data = res.data ?? {};
     // Public browser locations (Lambda) plus private locations whose agents
     // advertise `browser` (self-hosted browser agent). A protocol-only private
@@ -343,16 +353,19 @@ async function fetchLocations() {
   }
 }
 
-async function fetchDestinations() {
+async function loadDestinations(force = false) {
   try {
-    const res = await destinationService.list({
-      org_identifier: store.state.selectedOrganization.identifier,
-      page_num: 1,
-      page_size: 1000,
-      sort_by: "name",
-      desc: false,
-    });
-    destinations.value = (res.data ?? []).map((d: any) => d.name as string);
+    const options = destinationsQuery(store.state.selectedOrganization.identifier);
+    // A destination created in another tab never expires this tab's cache, so refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const list = await queryClient.fetchQuery(options);
+    destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];
   }
@@ -370,6 +383,7 @@ async function loadForEdit(id: string) {
     const res = await syntheticsService.get(org, id, String(route.query.folder ?? ""));
     const mapped = mapResponseToBrowserCheck(res.data as Record<string, unknown>);
     check.value = mapped;
+    savedCheck.value = cloneDeep(mapped);
     checkName.value = mapped.name;
     startUrl.value = mapped.url;
     journeyStepDone.value = true;
@@ -420,7 +434,7 @@ onMounted(() => {
 
   fetchFolders();
   fetchLocations();
-  fetchDestinations();
+  loadDestinations();
 
   if (props.editId) {
     loadForEdit(props.editId).catch(console.error);
@@ -465,6 +479,9 @@ onMounted(() => {
 
 // When true, BrowserJourney starts recording immediately on mount
 const autoRecord = ref(false);
+
+/** The check as last loaded or saved, which is what server-side moves act on. */
+const savedCheck = ref<BrowserCheck | null>(null);
 
 const check = ref<BrowserCheck>({
   name: "",
@@ -744,17 +761,24 @@ async function persist(): Promise<boolean> {
     timeout: 0,
   });
   try {
-    const org = store.state.selectedOrganization.identifier;
     if (props.editId) {
-      await syntheticsService.update(org, props.editId, apiPayload.value, check.value.folder);
+      await saveMonitor.mutateAsync({
+        id: props.editId,
+        payload: apiPayload.value,
+        folderId: check.value.folder,
+      });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.updated") });
     } else {
-      await syntheticsService.create(org, apiPayload.value, check.value.folder);
+      await saveMonitor.mutateAsync({
+        payload: apiPayload.value,
+        folderId: check.value.folder,
+      });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
     isDirty.value = false;
+    savedCheck.value = cloneDeep(check.value);
     return true;
   } catch (err: any) {
     dismiss();
@@ -880,18 +904,68 @@ function validateJourneyBeforeReplay(): boolean {
   return journeyRef.value?.validateStepSelectors?.() ?? true;
 }
 
+const {
+  environments: sharedEnvironments,
+  globals: sharedGlobals,
+  loaded: sharedVariablesLoaded,
+  refresh: fetchSharedVariables,
+} = useSharedVariables();
+onMounted(fetchSharedVariables);
+
+function onVariablePromoted(name: string) {
+  // The promoted row is now shared, so replay and the unbound warning need the fresh lists.
+  void fetchSharedVariables();
+  if (!savedCheck.value) return;
+  savedCheck.value = {
+    ...savedCheck.value,
+    variables: (savedCheck.value.variables ?? []).filter((v) => v.name !== name),
+  };
+}
+
+/** Written by the environment selector when it lands; until then the default rule decides. */
+const replayEnvironmentOverride = ref<string | undefined>();
+/** Replay resolves one environment: the override, else the check's first, else the org's first. */
+const replayEnvironmentId = computed(
+  () =>
+    replayEnvironmentOverride.value ??
+    defaultReplayEnvironmentId(check.value.environments ?? [], sharedEnvironments.value),
+);
+
+/** The url and variables replay and recording run with, resolved against that environment. */
+const replayInputsForCheck = computed(() =>
+  replayInputs(
+    check.value.url,
+    check.value.variables ?? [],
+    sharedPlainValues(sharedEnvironments.value, sharedGlobals.value, replayEnvironmentId.value),
+  ),
+);
+
+/** Every name the check resolves in any of its environments; undefined until the shared tiers load. */
+const knownVariableNames = computed(() => {
+  if (!sharedVariablesLoaded.value) return undefined;
+  const grouped = buildResolvedGrouped(
+    sharedEnvironments.value,
+    sharedGlobals.value,
+    check.value.environments ?? [],
+    check.value.variables ?? [],
+  );
+  return new Set(
+    Object.values(grouped.resolved)
+      .flat()
+      .map((v) => v.name),
+  );
+});
+
 function runReplay(journey: BrowserStep[]) {
   const steps = journeyToWireSteps(journey);
   if (steps.length === 0) return;
+  startReplay(steps);
+}
+
+function startReplay(steps: WireStep[]) {
+  const { url, variables } = replayInputsForCheck.value;
   recorder
-    .replay(
-      steps,
-      check.value.url,
-      check.value.variables,
-      check.value.auth,
-      check.value.headers,
-      check.value.cookies,
-    )
+    .replay(steps, url, variables, check.value.auth, check.value.headers, check.value.cookies)
     .catch((err) => {
       recorder.error.value = err instanceof Error ? err.message : String(err);
     });
@@ -960,7 +1034,7 @@ function onClearResults() {
               <OIcon name="link" size="sm" />
             </template>
           </OInput>
-          <small class="mt-1 block">{{
+          <small class="mt-1 block" data-test="synthetics-create-url-hint">{{
             t("synthetics.createBrowserTest.variablesHint", variablesHintParams)
           }}</small>
         </div>
@@ -1104,7 +1178,8 @@ function onClearResults() {
                   <BrowserJourney
                     ref="journeyRef"
                     v-model="check.journey"
-                    :start-url="check.url"
+                    :start-url="replayInputsForCheck.url"
+                    :known-variables="knownVariableNames"
                     :extension-ready="extensionReady"
                     :can-record-from="canRecordFrom"
                     :can-record-from-failure="canRecordFromFailure"
@@ -1137,8 +1212,11 @@ function onClearResults() {
                 <CheckVariablesPanel
                   v-if="variablesPanelOpen"
                   :check="check"
+                  :check-id="check.id"
+                  :saved="savedCheck"
                   class="border-border-default border-t"
                   @update:check="onConfigureUpdate"
+                  @promoted="onVariablePromoted"
                 />
               </template>
             </OSplitter>
@@ -1163,7 +1241,7 @@ function onClearResults() {
               :validation-errors="validationErrors"
               :allow-private-locations="privateLocationsEnabled"
               class="border-border-default w-full! border-t"
-              @refresh:destinations="fetchDestinations"
+              @refresh:destinations="loadDestinations(true)"
               @update:check="onConfigureUpdate"
               @new-location="openAgentSetup()"
               @add-agent="(id: string) => openAgentSetup(id)"

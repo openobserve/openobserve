@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::otlp::OtlpRequestType, metrics};
+use config::meta::otlp::OtlpRequestType;
 use ingestion_common::IngestUser;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
     metrics_service_server::MetricsService,
 };
 use tonic::{Response, Status};
+
+use crate::handler::grpc::request::otlp::{export_reply, observe_ok};
 
 #[derive(Default)]
 pub struct MetricsIngester;
@@ -64,22 +66,11 @@ impl MetricsService for MetricsIngester {
             OtlpRequestType::Grpc,
             user,
         )
-        .await;
-        if resp.is_ok() {
-            // metrics
-            let time = start.elapsed().as_secs_f64();
-            metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/otlp/v1/metrics", "200", "", "", "", ""])
-                .observe(time);
-            metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/otlp/v1/metrics", "200", "", "", "", ""])
-                .inc();
-            return Ok(Response::new(ExportMetricsServiceResponse {
-                partial_success: None,
-            }));
-        } else {
-            Err(Status::internal(resp.err().unwrap().to_string()))
-        }
+        .await
+        .map_err(|e| Status::internal(e.to_string()))?;
+        let reply = export_reply(resp).await?;
+        observe_ok("/otlp/v1/metrics", start);
+        Ok(Response::new(reply))
     }
 }
 
