@@ -5388,6 +5388,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Odśwież, aby zastosować najnowsze zmiany zmiennych",
       "refresh": "Odśwież",
+      "refreshCacheReload": "Odśwież pamięć podręczną i przeładuj",
+      "moreRefreshOptions": "Więcej opcji odświeżania",
       "dashboard": "Pulpit nawigacyjny",
       "dashboardNotFound": "Pulpit nawigacyjny nie został znaleziony lub został usunięty. Przekierowanie do listy pulpitów nawigacyjnych.",
       "failedToLoadDashboard": "Nie udało się załadować pulpitu nawigacyjnego. Przekierowanie do listy pulpitów nawigacyjnych.",

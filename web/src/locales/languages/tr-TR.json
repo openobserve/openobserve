@@ -5388,6 +5388,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "En son değişken değişikliklerini uygulamak için yenileyin",
       "refresh": "Yenile",
+      "refreshCacheReload": "Önbelleği yenile ve yeniden yükle",
+      "moreRefreshOptions": "Daha fazla yenileme seçeneği",
       "dashboard": "Pano",
       "dashboardNotFound": "Pano bulunamadı veya silinmiş. Pano listesine yönlendiriliyor.",
       "failedToLoadDashboard": "Pano yüklenemedi. Pano listesine yönlendiriliyor.",

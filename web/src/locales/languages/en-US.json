@@ -5389,6 +5389,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Refresh to apply latest variable changes",
       "refresh": "Refresh",
+      "refreshCacheReload": "Refresh cache & reload",
+      "moreRefreshOptions": "More refresh options",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard not found or has been deleted. Redirecting to dashboard list.",
       "failedToLoadDashboard": "Failed to load dashboard. Redirecting to dashboard list.",
