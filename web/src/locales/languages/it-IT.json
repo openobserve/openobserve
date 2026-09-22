@@ -5388,6 +5388,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Aggiorna per applicare le ultime modifiche alle variabili",
       "refresh": "Aggiorna",
+      "refreshCacheReload": "Aggiorna cache e ricarica",
+      "moreRefreshOptions": "Altre opzioni di aggiornamento",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard non trovato o è stato eliminato. Reindirizzamento all'elenco dei dashboard.",
       "failedToLoadDashboard": "Impossibile caricare il dashboard. Reindirizzamento all'elenco dei dashboard.",

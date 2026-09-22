@@ -5388,6 +5388,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "最新の変数変更を適用するには更新してください",
       "refresh": "更新",
+      "refreshCacheReload": "キャッシュを更新して再読み込み",
+      "moreRefreshOptions": "その他の更新オプション",
       "dashboard": "ダッシュボード",
       "dashboardNotFound": "ダッシュボードが見つからないか、削除されました。ダッシュボード一覧にリダイレクトします。",
       "failedToLoadDashboard": "ダッシュボードの読み込みに失敗しました。ダッシュボード一覧にリダイレクトします。",
