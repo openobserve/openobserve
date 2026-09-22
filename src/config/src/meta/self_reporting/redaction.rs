@@ -108,6 +108,7 @@ pub struct EvidenceScope {
     pub stream_type: String,
     pub patterns_configured: u64,
     pub pattern_names: Vec<String>,
+    pub pattern_rules: Vec<String>,
     pub pattern_hash: String,
     pub pattern_updated_at: Option<i64>,
 }
@@ -129,6 +130,8 @@ impl EvidenceScope {
         pattern_updated_at: Option<i64>,
     ) -> Self {
         self.patterns_configured = pattern_names.len() as u64;
+        // No policy to state, so the label carries the name alone rather than inventing one.
+        self.pattern_rules = sorted_labels(pattern_names.iter().cloned());
         self.pattern_names = pattern_names;
         self.pattern_hash = pattern_set_hash(pattern_bodies);
         self.pattern_updated_at = pattern_updated_at;
@@ -138,16 +141,29 @@ impl EvidenceScope {
     /// Carries each body's policy into the hash, so an audit can tell Redact from Detect.
     pub fn with_pattern_rules(
         mut self,
-        pattern_names: Vec<String>,
-        pattern_rules: &[(String, String)],
+        rules: &[PatternRule],
         pattern_updated_at: Option<i64>,
     ) -> Self {
-        self.patterns_configured = pattern_names.len() as u64;
-        self.pattern_names = pattern_names;
-        self.pattern_hash = pattern_rule_set_hash(pattern_rules);
+        self.patterns_configured = rules.len() as u64;
+        self.pattern_names = rules.iter().map(|rule| rule.name.clone()).collect();
+        self.pattern_rules = pattern_rule_labels(rules);
+        self.pattern_hash = pattern_rule_set_hash(
+            &rules
+                .iter()
+                .map(|rule| (rule.body.clone(), rule.policy.clone()))
+                .collect::<Vec<_>>(),
+        );
         self.pattern_updated_at = pattern_updated_at;
         self
     }
+}
+
+/// One configured pattern as evidence sees it: a name and policy to publish, a body only to hash.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PatternRule {
+    pub name: String,
+    pub body: String,
+    pub policy: String,
 }
 
 /// What one field's scan produced in one batch. Regions and drops are never summed.
@@ -206,6 +222,8 @@ pub struct RedactionEvidence {
     pub fields_scanned: u64,
     pub patterns_configured: u64,
     pub pattern_names: Vec<String>,
+    /// `name:policy` per pattern, so a row says what the ruleset does without decoding the hash.
+    pub pattern_rules: Vec<String>,
     pub pattern_hash: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_updated_at: Option<i64>,
@@ -324,6 +342,7 @@ impl RedactionEvidence {
             fields_scanned: 0,
             patterns_configured: scope.patterns_configured,
             pattern_names: scope.pattern_names.clone(),
+            pattern_rules: scope.pattern_rules.clone(),
             pattern_hash: scope.pattern_hash.clone(),
             pattern_updated_at: scope.pattern_updated_at,
             data_min_ts: None,
@@ -359,6 +378,7 @@ impl RedactionEvidence {
             fields_scanned: 0,
             patterns_configured: 0,
             pattern_names: vec![String::new()],
+            pattern_rules: vec![String::new()],
             pattern_hash: String::new(),
             pattern_updated_at: Some(0),
             data_min_ts: Some(0),
@@ -514,6 +534,15 @@ pub fn pattern_set_hash(pattern_bodies: &[String]) -> String {
     pattern_rule_set_hash(&rules)
 }
 
+/// The readable twin of `pattern_rule_set_hash`, over the same rules and never over a body.
+pub fn pattern_rule_labels(rules: &[PatternRule]) -> Vec<String> {
+    sorted_labels(
+        rules
+            .iter()
+            .map(|rule| format!("{}:{}", rule.name, rule.policy)),
+    )
+}
+
 /// What a body did, not just which body ran: the same regex under Redact and Detect differ.
 pub fn pattern_rule_set_hash(rules: &[(String, String)]) -> String {
     let mut digests: Vec<String> = rules
@@ -523,6 +552,13 @@ pub fn pattern_rule_set_hash(rules: &[(String, String)]) -> String {
     digests.sort();
     digests.dedup();
     sha256::digest(digests.join(""))
+}
+
+fn sorted_labels<I: IntoIterator<Item = String>>(labels: I) -> Vec<String> {
+    let mut labels: Vec<String> = labels.into_iter().collect();
+    labels.sort();
+    labels.dedup();
+    labels
 }
 
 #[cfg(test)]
@@ -819,22 +855,65 @@ mod tests {
         assert_eq!(one, twice);
     }
 
+    fn rule(name: &str, body: &str, policy: &str) -> PatternRule {
+        PatternRule {
+            name: name.to_string(),
+            body: body.to_string(),
+            policy: policy.to_string(),
+        }
+    }
+
     #[test]
     fn with_pattern_rules_separates_a_redact_scope_from_a_detect_one() {
         let scope = || EvidenceScope::new("org", "logs", StreamType::Logs);
-        let names = vec!["card".to_string()];
-        let redact = scope().with_pattern_rules(
-            names.clone(),
-            &[("[0-9]{16}".to_string(), "Redact".to_string())],
-            None,
-        );
-        let detect = scope().with_pattern_rules(
-            names,
-            &[("[0-9]{16}".to_string(), "Detect".to_string())],
-            None,
-        );
+        let redact = scope().with_pattern_rules(&[rule("card", "[0-9]{16}", "Redact")], None);
+        let detect = scope().with_pattern_rules(&[rule("card", "[0-9]{16}", "Detect")], None);
         assert_ne!(redact.pattern_hash, detect.pattern_hash);
         assert_eq!(redact.patterns_configured, 1);
+        assert_eq!(redact.pattern_names, vec!["card".to_string()]);
+        assert_eq!(redact.pattern_rules, vec!["card:Redact".to_string()]);
+        assert_eq!(detect.pattern_rules, vec!["card:Detect".to_string()]);
+    }
+
+    #[test]
+    fn pattern_rules_are_sorted_and_never_carry_a_regex_body() {
+        let rules = [
+            rule("ssn", "[0-9]{3}-[0-9]{2}-[0-9]{4}", "Detect"),
+            rule("card", "[0-9]{13,16}", "Redact"),
+        ];
+        let labels = pattern_rule_labels(&rules);
+        assert_eq!(
+            labels,
+            vec!["card:Redact".to_string(), "ssn:Detect".to_string()]
+        );
+        // Bodies are sensitive in their own right, so no label may leak one.
+        for label in &labels {
+            assert!(!label.contains("0-9"), "{label} leaked a regex body");
+            assert!(!label.contains('{'), "{label} leaked a regex body");
+        }
+        let scope =
+            EvidenceScope::new("org", "logs", StreamType::Logs).with_pattern_rules(&rules, Some(7));
+        assert_eq!(scope.pattern_rules, labels);
+        assert!(!scope.pattern_rules.iter().any(|l| l.contains("0-9")));
+    }
+
+    #[test]
+    fn pattern_rules_cover_the_same_set_the_hash_covers() {
+        let rules = [
+            rule("card", "[0-9]{16}", "Redact"),
+            rule("card", "[0-9]{16}", "Detect"),
+        ];
+        let scope =
+            EvidenceScope::new("org", "logs", StreamType::Logs).with_pattern_rules(&rules, None);
+        // One name under two policies is two rules, and the labels must say so as the hash does.
+        assert_eq!(
+            scope.pattern_rules,
+            vec!["card:Detect".to_string(), "card:Redact".to_string()]
+        );
+        let flipped = EvidenceScope::new("org", "logs", StreamType::Logs)
+            .with_pattern_rules(&[rule("card", "[0-9]{16}", "Detect")], None);
+        assert_ne!(scope.pattern_hash, flipped.pattern_hash);
+        assert_ne!(scope.pattern_rules, flipped.pattern_rules);
     }
 
     #[test]
@@ -870,6 +949,7 @@ mod tests {
             "fields_scanned",
             "patterns_configured",
             "pattern_names",
+            "pattern_rules",
             "pattern_hash",
             "pattern_updated_at",
             "data_min_ts",
@@ -895,6 +975,8 @@ mod tests {
             "field",
             "policy",
             "detected_regions",
+            "pattern_names",
+            "pattern_rules",
             "pattern_hash",
             "data_min_ts",
             "data_max_ts",
@@ -927,5 +1009,14 @@ mod tests {
                 "{field} is not Int64"
             );
         }
+    }
+
+    #[test]
+    fn pattern_rules_is_the_same_queryable_shape_as_pattern_names() {
+        let schema = RedactionEvidence::schema_for_reflection().unwrap();
+        let names = schema.field_with_name("pattern_names").unwrap();
+        let rules = schema.field_with_name("pattern_rules").unwrap();
+        assert_eq!(rules.data_type(), names.data_type());
+        assert_eq!(rules.data_type(), &arrow_schema::DataType::Utf8);
     }
 }

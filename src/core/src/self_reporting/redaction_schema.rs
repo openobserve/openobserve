@@ -176,6 +176,15 @@ mod tests {
         assert_eq!(settings.index_fields_updated_at.get("kind"), None);
     }
 
+    #[test]
+    fn the_initialized_schema_carries_the_readable_pattern_rules_column() {
+        let schema = RedactionEvidence::schema_for_reflection().unwrap();
+        let rules = schema.field_with_name("pattern_rules").unwrap();
+        let names = schema.field_with_name("pattern_names").unwrap();
+        // Same shape as `pattern_names`, so an auditor queries it the way they already do.
+        assert_eq!(rules.data_type(), names.data_type());
+    }
+
     #[tokio::test]
     async fn concurrent_callers_wait_for_the_same_initialization() {
         let cache = Arc::new(InitializationCache::default());
