@@ -52,6 +52,22 @@ pub type ClassicHistogramRecord = (&'static str, Option<String>, f64);
 /// Prometheus's stale-marker bit pattern in `sum`; an ordinary NaN is NOT stale.
 const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
 
+/// Emitted schema is `min(producer schema, target_schema)`; `max_buckets` is only a safety valve.
+#[derive(Clone, Copy, Debug)]
+pub struct ExpansionLimits {
+    pub target_schema: i32,
+    pub max_buckets: usize,
+}
+
+impl ExpansionLimits {
+    pub fn from_config(cfg: &config::Config) -> Self {
+        Self {
+            target_schema: cfg.prom.exp_histogram_target_schema,
+            max_buckets: cfg.prom.native_histogram_max_buckets,
+        }
+    }
+}
+
 pub struct ExponentialHistogram {
     pub schema: i32,
     pub count: f64,
@@ -64,7 +80,7 @@ pub struct ExponentialHistogram {
 }
 
 impl ExponentialHistogram {
-    pub fn expand(self, max_buckets: usize) -> Vec<ClassicHistogramRecord> {
+    pub fn expand(self, limits: ExpansionLimits) -> Vec<ClassicHistogramRecord> {
         let Self {
             mut schema,
             count,
@@ -81,13 +97,22 @@ impl ExponentialHistogram {
             zero_count = 0.0;
         }
 
-        // schemas finer than 8 are merged down in one step, so any i32 schema is cheap
-        if schema > MAX_SCHEMA {
-            positive = downscale(positive, (schema - MAX_SCHEMA) as u32);
-            negative = downscale(negative, (schema - MAX_SCHEMA) as u32);
-            schema = MAX_SCHEMA;
+        // one deterministic step to the target, so the layout only follows the producer's schema
+        let target = limits.target_schema.clamp(MIN_DOWNSCALE_SCHEMA, MAX_SCHEMA);
+        if schema > target {
+            let steps = (i64::from(schema) - i64::from(target)).min(i64::from(u32::MAX)) as u32;
+            positive = downscale(positive, steps);
+            negative = downscale(negative, steps);
+            schema = target;
         }
-        while le_estimate(&positive, &negative, zero_threshold) > max_buckets.max(3)
+        // merging past the target changes the series layout, so this valve must stay exceptional
+        let max_labels = limits.max_buckets.max(3);
+        if le_estimate(&positive, &negative, zero_threshold) > max_labels {
+            log::warn!(
+                "[METRICS] exponential histogram exceeds {max_labels} le labels at schema {schema}; downscaling"
+            );
+        }
+        while le_estimate(&positive, &negative, zero_threshold) > max_labels
             && schema > MIN_DOWNSCALE_SCHEMA
         {
             schema -= 1;
@@ -146,7 +171,7 @@ impl ExponentialHistogram {
 
 pub fn expand_native_histogram(
     hp: &prometheus_rpc::Histogram,
-    max_buckets: usize,
+    limits: ExpansionLimits,
 ) -> Vec<ClassicHistogramRecord> {
     if !SCHEMA_RANGE.contains(&hp.schema) {
         log::warn!(
@@ -182,7 +207,7 @@ pub fn expand_native_histogram(
         positive: span_buckets(&hp.positive_spans, &hp.positive_deltas, &hp.positive_counts),
         negative: span_buckets(&hp.negative_spans, &hp.negative_deltas, &hp.negative_counts),
     }
-    .expand(max_buckets)
+    .expand(limits)
 }
 
 /// `le` label: 4 significant digits, shortest decimal ("0.5946", "8"). Cannot collide
@@ -287,6 +312,14 @@ fn span_buckets(
 mod tests {
     use super::*;
 
+    /// No target downscaling: the producer's schema is emitted as is, capped only by the valve.
+    fn lim(max_buckets: usize) -> ExpansionLimits {
+        ExpansionLimits {
+            target_schema: MAX_SCHEMA,
+            max_buckets,
+        }
+    }
+
     fn native_histogram_base() -> prometheus_rpc::Histogram {
         prometheus_rpc::Histogram {
             schema: 0, // base = 2
@@ -340,7 +373,7 @@ mod tests {
             ..native_histogram_base()
         };
 
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_eq!(scalar_record(&recs, "_count"), 12.0);
         assert_eq!(scalar_record(&recs, "_sum"), 100.0);
         // gap markers: le=4 pins the empty (2,4], le=-0.001/0.5 open each bucket run
@@ -381,7 +414,7 @@ mod tests {
             ..native_histogram_base()
         };
 
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_eq!(
             bucket_records(&recs),
             vec![
@@ -404,7 +437,7 @@ mod tests {
             count: Some(prometheus_rpc::histogram::Count::CountInt(5)),
             ..Default::default()
         };
-        assert!(expand_native_histogram(&hp, 16).is_empty());
+        assert!(expand_native_histogram(&hp, lim(16)).is_empty());
     }
 
     /// A stale marker drops the whole sample; an ordinary NaN sum keeps count/buckets
@@ -415,7 +448,7 @@ mod tests {
             sum: f64::from_bits(0x7ff0_0000_0000_0002),
             ..native_histogram_base()
         };
-        assert!(expand_native_histogram(&stale, 16).is_empty());
+        assert!(expand_native_histogram(&stale, lim(16)).is_empty());
 
         let plain_nan = prometheus_rpc::Histogram {
             sum: f64::NAN,
@@ -427,7 +460,7 @@ mod tests {
             positive_deltas: vec![7],
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&plain_nan, 16);
+        let recs = expand_native_histogram(&plain_nan, lim(16));
         assert_eq!(scalar_record(&recs, "_count"), 7.0);
         assert!(scalar_record(&recs, "_sum").is_nan());
         assert_eq!(
@@ -440,7 +473,7 @@ mod tests {
     /// back to the bucket total so `le="inf"` stays monotonic.
     #[test]
     fn test_expand_native_histogram_empty_and_short_count() {
-        let empty = expand_native_histogram(&native_histogram_base(), 16);
+        let empty = expand_native_histogram(&native_histogram_base(), lim(16));
         assert_eq!(scalar_record(&empty, "_count"), 0.0);
         assert_eq!(
             bucket_records(&empty),
@@ -455,7 +488,7 @@ mod tests {
             positive_deltas: vec![7],
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_eq!(
             bucket_records(&recs),
             vec![(0.0, 0.0), (0.5, 0.0), (1.0, 7.0), (f64::INFINITY, 7.0)]
@@ -484,7 +517,7 @@ mod tests {
             positive_deltas: vec![2, -1, 2, -1, 1],
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         assert_eq!(scalar_record(&recs, "_count"), 13.0);
         assert_eq!(scalar_record(&recs, "_sum"), 175.5);
@@ -519,7 +552,7 @@ mod tests {
             positive_deltas: vec![5, -2],
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         let buckets = bucket_records(&recs);
         // zero bucket, lower marker at idx 249's bound, uppers for idx 250 and 251, then inf
@@ -577,7 +610,7 @@ mod tests {
             positive_deltas: vec![3],
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         // both uppers format to "1" and merge, keeping the full cumulative 5
         assert_eq!(
@@ -601,11 +634,11 @@ mod tests {
         };
 
         // no limit pressure: 8 buckets stay at schema 2
-        let full = expand_native_histogram(&hp, 64);
+        let full = expand_native_histogram(&hp, lim(64));
         assert_eq!(bucket_records(&full).len(), 11); // zero bucket + 8 uppers + 1 lower marker + inf
 
         // limit 5 le labels: two halvings land on schema 0
-        let scaled = expand_native_histogram(&hp, 5);
+        let scaled = expand_native_histogram(&hp, lim(5));
         assert_bucket_invariants(&scaled);
         assert_eq!(
             bucket_records(&scaled),
@@ -639,7 +672,7 @@ mod tests {
         };
 
         // 4 buckets + 4 markers + zero bucket + inf = 10 > 8: one halving makes 7 contiguous labels
-        let recs = expand_native_histogram(&hp, 8);
+        let recs = expand_native_histogram(&hp, lim(8));
         assert_bucket_invariants(&recs);
         assert_eq!(bucket_records(&recs).len(), 7);
         assert_eq!(scalar_record(&recs, "_count"), 4.0);
@@ -661,7 +694,7 @@ mod tests {
             positive_deltas: vec![1, 0, 0, 0, 0, 0], // idx 0,2,4,6,8,10
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 5);
+        let recs = expand_native_histogram(&hp, lim(5));
         assert_bucket_invariants(&recs);
         assert!(bucket_records(&recs).len() <= 5);
         assert_eq!(scalar_record(&recs, "_count"), 6.0);
@@ -684,7 +717,7 @@ mod tests {
             positive_deltas: vec![3],
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         assert_eq!(
             bucket_records(&recs),
@@ -710,7 +743,7 @@ mod tests {
             negative_deltas: vec![1, 1], // idx 0: 1, idx 1: 2
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         assert_eq!(
             bucket_records(&recs),
@@ -735,7 +768,7 @@ mod tests {
             positive: vec![(1, 1.0), (5, 1.0)],
             negative: vec![(1, 1.0)],
         }
-        .expand(16);
+        .expand(lim(16));
         assert_bucket_invariants(&recs);
         // every index collapses onto schema-8 bucket 1, (1, 2^(1/256)], on both sides
         assert_eq!(
@@ -752,6 +785,83 @@ mod tests {
     }
 
     #[test]
+    fn test_layout_follows_target_schema_not_counts() {
+        // schema 3, one contiguous run: 13 then 14 then 28 populated buckets
+        let sample = |n: i64, per: f64| ExponentialHistogram {
+            schema: 3,
+            count: n as f64 * per,
+            sum: None,
+            zero_count: 0.0,
+            zero_threshold: 0.0,
+            positive: (1..=n).map(|i| (i, per)).collect(),
+            negative: vec![],
+        };
+        let limits = ExpansionLimits {
+            target_schema: 2,
+            max_buckets: 512,
+        };
+        let les = |recs: &[ClassicHistogramRecord]| -> Vec<String> {
+            recs.iter().filter_map(|(_, le, _)| le.clone()).collect()
+        };
+        let a = les(&sample(13, 1.0).expand(limits));
+        let b = les(&sample(14, 2.0).expand(limits));
+        let c = les(&sample(28, 3.0).expand(limits));
+        // every emitted schema-2 bound survives into the next sample; the old valve switched here
+        assert!(a.iter().all(|le| b.contains(le)), "{a:?} vs {b:?}");
+        assert!(b.iter().all(|le| c.contains(le)), "{b:?} vs {c:?}");
+        assert_eq!(a.len(), 7 + 1 + 1 + 1); // ceil(13/2)=7 uppers + marker + zero + inf
+    }
+
+    #[test]
+    fn test_layout_identical_across_producer_schemas() {
+        // the same distribution at schema 5 and schema 3 lands on identical schema-2 records
+        let coarse = ExponentialHistogram {
+            schema: 3,
+            count: 10.0,
+            sum: Some(1.0),
+            zero_count: 0.0,
+            zero_threshold: 0.0,
+            positive: vec![(1, 3.0), (2, 0.0), (3, 7.0)],
+            negative: vec![],
+        };
+        // schema 5 splits each schema-3 bucket k into 4k-3..=4k
+        let fine = ExponentialHistogram {
+            schema: 5,
+            count: 10.0,
+            sum: Some(1.0),
+            zero_count: 0.0,
+            zero_threshold: 0.0,
+            positive: vec![(2, 3.0), (5, 0.0), (11, 7.0)],
+            negative: vec![],
+        };
+        let limits = ExpansionLimits {
+            target_schema: 2,
+            max_buckets: 512,
+        };
+        assert_eq!(coarse.expand(limits), fine.expand(limits));
+    }
+
+    #[test]
+    fn test_valve_only_past_max_buckets() {
+        let hp = prometheus_rpc::Histogram {
+            count: Some(prometheus_rpc::histogram::Count::CountInt(40)),
+            positive_spans: vec![prometheus_rpc::BucketSpan {
+                offset: 0,
+                length: 40,
+            }],
+            positive_deltas: std::iter::once(1)
+                .chain(std::iter::repeat_n(0, 39))
+                .collect(),
+            ..native_histogram_base()
+        };
+        let stable = expand_native_histogram(&hp, lim(512));
+        assert_eq!(bucket_records(&stable).len(), 40 + 1 + 1 + 1);
+        let valve = expand_native_histogram(&hp, lim(16));
+        assert!(bucket_records(&valve).len() <= 16);
+        assert_bucket_invariants(&valve);
+    }
+
+    #[test]
     fn test_bucket_bound_extreme_negative_schema() {
         assert_eq!(bucket_bound(i32::MIN, 0), 1.0);
         assert_eq!(bucket_bound(i32::MIN, 1), f64::MAX);
@@ -765,7 +875,7 @@ mod tests {
             positive: vec![(1, 1.0)],
             negative: vec![(1, 1.0)],
         }
-        .expand(16);
+        .expand(lim(16));
         assert_bucket_invariants(&recs);
     }
 
@@ -796,8 +906,8 @@ mod tests {
             ..counter.clone()
         };
         assert_eq!(
-            expand_native_histogram(&counter, 16),
-            expand_native_histogram(&gauge, 16)
+            expand_native_histogram(&counter, lim(16)),
+            expand_native_histogram(&gauge, lim(16))
         );
     }
 
@@ -811,7 +921,7 @@ mod tests {
             zero_count: Some(prometheus_rpc::histogram::ZeroCount::ZeroCountInt(5)),
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         assert_eq!(
             bucket_records(&recs),
@@ -832,7 +942,7 @@ mod tests {
             positive_deltas: vec![9], // carries 1
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         assert_eq!(
             bucket_records(&recs),
@@ -852,7 +962,7 @@ mod tests {
             positive_deltas: vec![7],
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         assert_eq!(scalar_record(&recs, "_count"), 10.0);
         assert_eq!(
@@ -880,7 +990,7 @@ mod tests {
             positive_deltas: vec![3, -2],
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         assert_eq!(
             bucket_records(&recs),
@@ -908,7 +1018,7 @@ mod tests {
             positive_counts: vec![f64::NAN, 0.0, -1.0, 5.0],
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         // idx 1 (NaN) skipped, so le=2 is the gap marker; idx 2 empty but kept; idx 3 (-1) skipped
         assert_eq!(
@@ -936,7 +1046,7 @@ mod tests {
             positive_deltas: vec![3, -4, 5], // buckets 3, -1, 4
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         assert_eq!(
             bucket_records(&recs),
@@ -962,7 +1072,7 @@ mod tests {
             positive_deltas: vec![3, -3, 4], // buckets 3, 0, 4
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         assert_eq!(
             bucket_records(&recs),
@@ -990,7 +1100,7 @@ mod tests {
             positive_deltas: vec![0, 0, 2], // buckets (1,2]=0, (2,4]=0, (4,8]=2
             ..native_histogram_base()
         };
-        let recs = expand_native_histogram(&hp, 16);
+        let recs = expand_native_histogram(&hp, lim(16));
         assert_bucket_invariants(&recs);
         assert_eq!(
             bucket_records(&recs),
@@ -1014,7 +1124,7 @@ mod tests {
                 positive_deltas: vec![3],
                 ..native_histogram_base()
             };
-            let recs = expand_native_histogram(&hp, 16);
+            let recs = expand_native_histogram(&hp, lim(16));
             assert_bucket_invariants(&recs);
             bucket_records(&recs)
         };
@@ -1050,7 +1160,7 @@ mod tests {
                 negative_counts: vec![3.0],
                 ..native_histogram_base()
             };
-            let recs = expand_native_histogram(&hp, 16);
+            let recs = expand_native_histogram(&hp, lim(16));
             assert_bucket_invariants(&recs);
             assert_eq!(
                 bucket_records(&recs),

@@ -871,10 +871,10 @@ fn process_exponential_histogram(
     );
     let mut records = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
-    let max_buckets = config::get_config().prom.native_histogram_max_buckets;
+    let limits = native_histogram::ExpansionLimits::from_config(&config::get_config());
     for data_point in &hist.data_points {
         let mut dp_rec = rec.clone();
-        for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point, max_buckets) {
+        for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point, limits) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
@@ -991,7 +991,7 @@ fn process_hist_data_point(
 fn process_exp_hist_data_point(
     rec: &mut json::Value,
     data_point: &ExponentialHistogramDataPoint,
-    max_buckets: usize,
+    limits: native_histogram::ExpansionLimits,
 ) -> Vec<serde_json::Value> {
     let mut bucket_recs = vec![];
 
@@ -1021,7 +1021,7 @@ fn process_exp_hist_data_point(
         positive: otlp_buckets(&data_point.positive),
         negative: otlp_buckets(&data_point.negative),
     }
-    .expand(max_buckets);
+    .expand(limits);
     for (suffix, le, value) in expanded {
         let Some(value) = super::metric_value(value) else {
             continue;
@@ -1220,6 +1220,14 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    /// No target downscaling: the producer's scale is emitted as is, capped only by the valve.
+    fn lim(max_buckets: usize) -> native_histogram::ExpansionLimits {
+        native_histogram::ExpansionLimits {
+            target_schema: 8,
+            max_buckets,
+        }
+    }
 
     fn process_gauge(
         rec: &json::Value,
@@ -1670,7 +1678,7 @@ mod tests {
             }),
         };
 
-        let result = process_exp_hist_data_point(&mut rec, &data_point, 16);
+        let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
 
         let count_rec = &result[0];
         assert!(count_rec["__name__"].as_str().unwrap().ends_with("_count"));
@@ -2654,7 +2662,7 @@ mod tests {
                 }),
             };
 
-            let result = process_exp_hist_data_point(&mut rec, &data_point, 16);
+            let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
 
             assert_eq!(result[0]["__name__"], "test_exp_histogram_count");
             assert_eq!(result[0]["value"], 200.0);
@@ -2707,7 +2715,7 @@ mod tests {
                 }),
             };
 
-            let result = process_exp_hist_data_point(&mut rec, &data_point, 16);
+            let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
 
             let expected = [
                 ("-1.189", 0.0),
@@ -2748,7 +2756,7 @@ mod tests {
                     }),
                     negative: None,
                 };
-                let result = process_exp_hist_data_point(&mut rec, &data_point, 16);
+                let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
                 assert_eq!(result[0]["__name__"], "h_count", "scale {scale}");
                 assert_eq!(result[1]["__name__"], "h_sum", "scale {scale}");
                 let buckets = exp_hist_buckets(&result);
@@ -2790,7 +2798,7 @@ mod tests {
                 negative: None,
             };
 
-            let result = process_exp_hist_data_point(&mut rec, &data_point, 16);
+            let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
 
             let expected = [("-1.5", 0.0), ("1.5", 0.0), ("2", 10.0), ("inf", 10.0)];
             let expected: Vec<(String, f64)> = expected
@@ -2798,6 +2806,46 @@ mod tests {
                 .map(|(le, v)| (le.to_string(), *v))
                 .collect();
             assert_eq!(exp_hist_buckets(&result), expected);
+        }
+
+        #[test]
+        fn test_exponential_histogram_layout_stable_as_buckets_grow() {
+            // scale 0, 13 then 14 buckets: the old 16-label default downscaled the second sample
+            let sample = |counts: Vec<u64>| {
+                let mut rec = json!({"__name__": "h"});
+                let dp = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    exemplars: vec![],
+                    flags: 0,
+                    count: counts.iter().sum(),
+                    sum: None,
+                    min: None,
+                    max: None,
+                    scale: 0,
+                    zero_count: 0,
+                    zero_threshold: 0.0,
+                    positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                        offset: 0,
+                        bucket_counts: counts,
+                    }),
+                    negative: None,
+                };
+                let limits = native_histogram::ExpansionLimits {
+                    target_schema: 2,
+                    max_buckets: 512,
+                };
+                exp_hist_buckets(&process_exp_hist_data_point(&mut rec, &dp, limits))
+                    .into_iter()
+                    .map(|(le, _)| le)
+                    .collect::<Vec<_>>()
+            };
+            let a = sample(vec![1; 13]);
+            let b = sample(vec![1; 14]);
+            assert_eq!(a.len(), 13 + 1 + 1 + 1);
+            assert_eq!(b.len(), 14 + 1 + 1 + 1);
+            assert!(a.iter().all(|le| b.contains(le)), "{a:?} vs {b:?}");
         }
 
         #[test]
@@ -2823,7 +2871,7 @@ mod tests {
                 negative: None,
             };
 
-            let result = process_exp_hist_data_point(&mut rec, &data_point, 16);
+            let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
 
             // scale 10 buckets 1..=3 merge into schema-8 bucket 1: (1, 2^(1/256)]
             let expected = [("0", 0.0), ("1", 0.0), ("1.003", 3.0), ("inf", 3.0)];
@@ -2858,7 +2906,7 @@ mod tests {
                     }),
                     negative: None,
                 };
-                exp_hist_buckets(&process_exp_hist_data_point(&mut rec, &data_point, 16))
+                exp_hist_buckets(&process_exp_hist_data_point(&mut rec, &data_point, lim(16)))
             };
             let expect = |pairs: &[(&str, f64)]| -> Vec<(String, f64)> {
                 pairs.iter().map(|(le, v)| (le.to_string(), *v)).collect()
@@ -2927,7 +2975,7 @@ mod tests {
                     }),
                     negative: None,
                 };
-                exp_hist_buckets(&process_exp_hist_data_point(&mut rec, &data_point, 16))
+                exp_hist_buckets(&process_exp_hist_data_point(&mut rec, &data_point, lim(16)))
             };
             let expect = |pairs: &[(&str, f64)]| -> Vec<(String, f64)> {
                 pairs.iter().map(|(le, v)| (le.to_string(), *v)).collect()
@@ -3287,7 +3335,7 @@ mod tests {
                     negative: None,
                 };
 
-            let result = process_exp_hist_data_point(&mut rec, &data_point, 16);
+            let result = process_exp_hist_data_point(&mut rec, &data_point, lim(16));
 
             // Should have at least count and sum records
             let metric_names: Vec<&str> = result
@@ -3446,7 +3494,7 @@ mod tests {
                     }),
                     negative: None,
                 },
-                16,
+                lim(16),
             )
         }
 
