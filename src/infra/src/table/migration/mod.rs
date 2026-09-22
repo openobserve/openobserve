@@ -192,10 +192,13 @@ mod m20260912_000001_add_anomaly_alert_budget;
 mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
 mod m20260916_000001_add_folder_id_to_workflow_drafts;
+mod m20260917_000001_add_env_to_synthetics_jobs;
 mod m20260917_000001_create_llm_experiment_slot_retries;
-mod m20260918_000001_add_password_policy_columns_to_users;
-mod m20260918_000002_create_user_password_history_table;
-mod m20260918_000003_create_user_auth_state_table;
+mod m20260917_000001_create_synthetics_shared_variables;
+mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
+mod m20260922_000001_add_password_policy_columns_to_users;
+mod m20260922_000002_create_user_password_history_table;
+mod m20260922_000003_create_user_auth_state_table;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -474,9 +477,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
             Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
             Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
-            Box::new(m20260918_000001_add_password_policy_columns_to_users::Migration),
-            Box::new(m20260918_000002_create_user_password_history_table::Migration),
-            Box::new(m20260918_000003_create_user_auth_state_table::Migration),
+            Box::new(m20260917_000001_create_synthetics_shared_variables::Migration),
+            Box::new(m20260917_000001_add_env_to_synthetics_jobs::Migration),
+            Box::new(m20260921_000001_add_input_preview_to_llm_annotation_queue_items::Migration),
+            Box::new(m20260922_000001_add_password_policy_columns_to_users::Migration),
+            Box::new(m20260922_000002_create_user_password_history_table::Migration),
+            Box::new(m20260922_000003_create_user_auth_state_table::Migration),
         ]
     }
 }
@@ -518,7 +524,12 @@ mod tests {
         (83, "m20260910_000001_add_folder_id_to_workflows"),
         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
         (85, "m20260917_000001_create_llm_experiment_slot_retries"),
-        (86, "m20260918_000001_add_password_policy_columns_to_users"),
+        (86, "m20260917_000001_create_synthetics_shared_variables"),
+        (
+            87,
+            "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
+        ),
+        (88, "m20260922_000001_add_password_policy_columns_to_users"),
     ];
 
     #[test]
@@ -555,37 +566,50 @@ mod tests {
     }
 
     #[test]
-    fn auth_policy_migrations_are_registered_after_existing_migrations() {
+    fn each_migration_is_registered_once_and_after_the_schema_it_builds_on() {
         let names: Vec<String> = Migrator::migrations()
             .into_iter()
             .map(|migration| migration.name().to_string())
             .collect();
-        for name in [
-            "m20260812_000001_create_composite_alerts",
-            "m20260917_000001_add_password_policy_columns_to_users",
-            "m20260917_000002_create_user_password_history_table",
-            "m20260917_000003_create_user_auth_state_table",
-        ] {
-            assert_eq!(names.iter().filter(|n| n.as_str() == name).count(), 1);
-        }
-        assert_eq!(
-            names
+        let position = |name: &str| {
+            let found: Vec<usize> = names
                 .iter()
-                .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")
-                .count(),
-            1
-        );
-        // Asserting on the last entry coupled this to whichever migration was newest, so every
-        // feature added after it broke a test about composite alerts.
-        let composite = names
-            .iter()
-            .position(|name| name == "m20260812_000001_create_composite_alerts");
-        let later = names
-            .iter()
-            .position(|name| name == "m20260825_000001_create_status_page_custom_domains");
-        assert!(
-            composite.is_some() && composite < later,
-            "the composite migration must stay registered before the ones that follow it, got {composite:?} and {later:?}"
-        );
+                .enumerate()
+                .filter(|(_, n)| n.as_str() == name)
+                .map(|(i, _)| i)
+                .collect();
+            assert_eq!(found.len(), 1, "{name} is registered {} times", found.len());
+            found[0]
+        };
+
+        let unique: std::collections::HashSet<&String> = names.iter().collect();
+        assert_eq!(unique.len(), names.len(), "a migration is registered twice");
+
+        // Registration alone is what makes a migration run at all.
+        position("m20260812_000001_create_composite_alerts");
+
+        for (earlier, later) in [
+            (
+                "m20260707_000003_create_synthetics_jobs",
+                "m20260917_000001_add_env_to_synthetics_jobs",
+            ),
+            (
+                "m20260917_000001_create_synthetics_shared_variables",
+                "m20260917_000001_add_env_to_synthetics_jobs",
+            ),
+            (
+                "m20260812_000001_create_composite_alerts",
+                "m20260825_000001_create_status_page_custom_domains",
+            ),
+            (
+                "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
+                "m20260922_000001_add_password_policy_columns_to_users",
+            ),
+        ] {
+            assert!(
+                position(earlier) < position(later),
+                "{later} must be registered after {earlier}"
+            );
+        }
     }
 }

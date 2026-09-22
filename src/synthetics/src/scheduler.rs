@@ -182,6 +182,8 @@ struct EnqueueRun<'a> {
 /// One location slot that survived gates 2 and 3 and is about to be enqueued.
 struct PlannedSlot {
     location: String,
+    /// `None` for a check with no environments — the pre-environments shape.
+    env: Option<String>,
     pool: String,
     /// Frozen `browser_devices` JSON, `None` for a protocol check.
     browser_devices: Option<String>,
@@ -473,10 +475,27 @@ pub async fn run() {
             // so counting it would leave the run permanently short — never
             // complete, never alerted on. `job_count` is knowable only after the
             // gate has run.
-            let mut planned: Vec<PlannedSlot> = Vec::with_capacity(synthetic.locations.len());
+            let environments: Vec<Option<&str>> = if synthetic.environments.is_empty() {
+                vec![None]
+            } else {
+                synthetic
+                    .environments
+                    .iter()
+                    .map(|e| Some(e.as_str()))
+                    .collect()
+            };
+
+            let mut fanout: Vec<(Option<&str>, &String)> = Vec::new();
+            for env in &environments {
+                for location in &synthetic.locations {
+                    fanout.push((*env, location));
+                }
+            }
+
+            let mut planned: Vec<PlannedSlot> = Vec::with_capacity(fanout.len());
             let mut denied: Vec<String> = Vec::new();
 
-            for location in &synthetic.locations {
+            for (env, location) in fanout {
                 // ---- Gate 2 of §7.1 — the VENUE -----------------------------
                 //
                 // One registry read per location, already needed to pick the
@@ -505,10 +524,14 @@ pub async fn run() {
 
                 planned.push(PlannedSlot {
                     location: location.clone(),
+                    env: env.map(str::to_owned),
                     pool,
                     browser_devices: browser_devices_json,
                 });
             }
+
+            denied.sort();
+            denied.dedup();
 
             // Every slot denied: no run row, no jobs, no Lambda.
             if planned.is_empty() {
@@ -734,6 +757,7 @@ async fn enqueue_planned(
             synthetics_name: &synthetic.name,
             org_id: &synthetic.org_id,
             location: &slot.location,
+            env: slot.env.as_deref(),
             pool: &slot.pool,
             scheduled_ts: run.scheduled_ts,
             valid_until: run.valid_until,
@@ -752,6 +776,7 @@ async fn enqueue_planned(
                     run_id = %run.run_id,
                     job_id = %job_id,
                     location = %slot.location,
+                    env = slot.env.as_deref().unwrap_or("-"),
                     "[synthetics scheduler] job enqueued"
                 );
             }
@@ -2195,6 +2220,7 @@ mod pool_gate_tests {
             org_id: "acme".to_string(),
             check_type: SyntheticType::Browser,
             locations: vec![A_LOCATION.to_string()],
+            environments: Vec::new(),
             frequency: SyntheticFrequency {
                 frequency_type: SyntheticFrequencyType::Minutes,
                 interval: 5,

@@ -963,11 +963,6 @@ export default defineComponent({
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
           if (isEmptyDataExempt(router.currentRoute.value)) return;
-          toast({
-            variant: "warning",
-            message: t("toastMessages.layouts.ingestionNotStarted"),
-            timeout: 5000,
-          });
           router.push({ name: "ingestion" });
         } else {
           store.dispatch("setIsDataIngested", true);
@@ -1167,6 +1162,7 @@ export default defineComponent({
         dark_mode_theme_color: undefined,
         claim_parser_function: "",
         org_storage_enabled: false,
+        domain_org_mappings: [],
       };
 
       try {
@@ -1210,6 +1206,7 @@ export default defineComponent({
           cross_links: orgSettings?.data?.data?.cross_links ?? [],
           org_storage_enabled:
             orgSettings?.data?.data?.org_storage_enabled ?? defaultSettings.org_storage_enabled,
+          domain_org_mappings: orgSettings?.data?.data?.domain_org_mappings ?? [],
         });
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org

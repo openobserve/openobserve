@@ -1096,6 +1096,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         tokio::task::spawn(anomaly_claim_supervisor());
     }
+    // Every node that serves writes publishes them, not only the scheduler.
+    openobserve_synthetics::service::start_publish_queue();
     if LOCAL_NODE.is_scheduler() {
         // Ungated: synthetics is OSS, and without this an OSS build accepts a
         // check, stores it, and never runs it — the routes would be registered
