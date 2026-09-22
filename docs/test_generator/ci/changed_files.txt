@@ -1,2 +1,0 @@
-web/src/components/ingestion/logs/SplunkHec.spec.ts
-web/src/components/ingestion/logs/SplunkHec.vue

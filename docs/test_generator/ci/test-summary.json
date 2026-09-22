@@ -1,6 +1,0 @@
-[
-  { "title": "should render the endpoint URL root-mounted with no org or base-uri", "action": "extend", "verifies": "the endpoint URL is root-mounted and shared by the curl and health snippets, decoupled from the browser origin" },
-  { "title": "should render the auth header snippet 'Authorization: Splunk <token>'", "action": "append", "verifies": "the auth section documents the Splunk auth scheme with a literal token placeholder" },
-  { "title": "should render an unauthenticated health probe at the collector health path", "action": "append", "verifies": "the health check is an unauthenticated curl GET at /services/collector/health" },
-  { "title": "should carry the collector URL and Splunk auth scheme in the curl example", "action": "append", "verifies": "the curl example embeds the collector URL and the Splunk HEC token authorization header" }
-]
