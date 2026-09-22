@@ -86,6 +86,21 @@ const useManagementRoutes = () => {
     },
   });
 
+  if (config.isCloud == "true") {
+    routes[0].children.push({
+      path: "paid_usage",
+      name: "paidUsage",
+      component: () => import("@/components/settings/PaidUsageSettings.vue"),
+      meta: {
+        keepAlive: true,
+        titleKey: "paidUsage.settingsTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+  }
+
   // LLM Model Pricing, LLM Providers and GenAI Agent Mapping (used by the AI
   // Observability / Online Evals flows) are enterprise/cloud-only features — the
   // backend routes only exist behind the enterprise feature flag, so they must
