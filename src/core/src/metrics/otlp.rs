@@ -576,14 +576,24 @@ pub async fn handle_otlp_request(
 
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     for (local_metric_name, json_data) in json_data_by_stream {
-        // the records carry a `__hash__` taken from the raw labels, so redaction re-derives it
         #[cfg(feature = "vectorscan")]
         let json_data = {
             let mut json_data = json_data;
+            let before: Vec<u64> = json_data
+                .iter()
+                .map(|(record, _)| {
+                    super::signature_without_labels(record, METRICS_HASH_EXCLUDED_LABELS)
+                })
+                .collect();
             ingest::apply_redaction(org_id, &local_metric_name, &mut json_data).await;
-            for (record, _) in json_data.iter_mut() {
-                let hash = super::signature_without_labels(record, METRICS_HASH_EXCLUDED_LABELS);
-                record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
+            // The stored hash was taken pre-trim, so rehashing an untouched UDS record forks its
+            // series identity.
+            for (prior, (record, _)) in before.into_iter().zip(json_data.iter_mut()) {
+                let redacted =
+                    super::signature_without_labels(record, METRICS_HASH_EXCLUDED_LABELS);
+                if redacted != prior {
+                    record.insert(HASH_LABEL.to_string(), json::Value::Number(redacted.into()));
+                }
             }
             json_data
         };

@@ -966,7 +966,6 @@ mod tests {
         let batch = runner.take_batch();
         assert_eq!(batch.len(), 4);
 
-        // Verify we have all four types
         let mut usage_count = 0;
         let mut trigger_count = 0;
         let mut error_count = 0;

@@ -19,6 +19,8 @@ use std::{
     time::Instant,
 };
 
+#[cfg(feature = "vectorscan")]
+use config::TIMESTAMP_COL_NAME;
 use config::{
     get_config,
     meta::{
@@ -226,15 +228,20 @@ pub(super) async fn resolve_batch_schema(
 pub(super) async fn apply_redaction<T>(
     org_id: &str,
     stream_name: &str,
-    records: &mut Vec<(json::Map<String, json::Value>, T)>,
+    records: &mut [(json::Map<String, json::Value>, T)],
 ) {
     if records.is_empty() {
         return;
     }
-    // the engine takes (timestamp, record); the timestamp is not read, only the record is rewritten
     let mut rows: Vec<(i64, json::Map<String, json::Value>)> = records
         .iter_mut()
-        .map(|(record, _)| (0_i64, std::mem::take(record)))
+        .map(|(record, _)| {
+            let ts = record
+                .get(TIMESTAMP_COL_NAME)
+                .and_then(json::Value::as_i64)
+                .unwrap_or_default();
+            (ts, std::mem::take(record))
+        })
         .collect();
     match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
         Ok(pattern_manager) => {

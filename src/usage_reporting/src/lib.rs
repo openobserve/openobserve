@@ -5,6 +5,8 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+pub mod redaction_evidence;
+
 use std::{
     sync::{Arc, LazyLock as Lazy, OnceLock},
     time::Duration,

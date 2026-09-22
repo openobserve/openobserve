@@ -26,6 +26,10 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+use super::usage::{
+    AUDIT_STREAM, DATA_RETENTION_USAGE_STREAM, ERROR_STREAM, STATS_STREAM, TRIGGERS_STREAM,
+    USAGE_STREAM,
+};
 use crate::{get_config, meta::stream::StreamType, utils::time::now_micros};
 
 pub const REDACTION_EVIDENCE_STREAM: &str = "_redaction_evidence";
@@ -436,7 +440,11 @@ impl GapAccumulator {
             window_start_ts: now,
             window_end_ts: now,
         });
-        entry.dropped_rows = entry.dropped_rows.saturating_add(dropped_rows);
+        // The column is inferred Int64 from a `0` sample, so a u64 above i64::MAX cannot fit.
+        entry.dropped_rows = entry
+            .dropped_rows
+            .saturating_add(dropped_rows)
+            .min(i64::MAX as u64);
         entry.window_end_ts = now;
     }
 
@@ -467,6 +475,20 @@ struct PendingGap {
     dropped_rows: u64,
     window_start_ts: i64,
     window_end_ts: i64,
+}
+
+/// True for streams the platform writes itself, whose scan evidence would feed the next scan.
+pub fn is_self_reporting_stream(stream_name: &str) -> bool {
+    matches!(
+        stream_name,
+        REDACTION_EVIDENCE_STREAM
+            | USAGE_STREAM
+            | AUDIT_STREAM
+            | TRIGGERS_STREAM
+            | ERROR_STREAM
+            | STATS_STREAM
+            | DATA_RETENTION_USAGE_STREAM
+    )
 }
 
 /// Identity of the pattern set in effect: bodies are hashed individually, sorted, then joined.
@@ -707,12 +729,12 @@ mod tests {
     }
 
     #[test]
-    fn gap_counts_saturate_rather_than_overflow() {
+    fn gap_counts_saturate_at_what_an_int64_column_holds() {
         let scope = EvidenceScope::new("org", "logs", StreamType::Logs);
         let mut acc = GapAccumulator::default();
         acc.record(&scope, GapReason::QueueFull, u64::MAX, 1);
         acc.record(&scope, GapReason::QueueFull, 5, 2);
-        assert_eq!(acc.drain()[0].dropped_rows, Some(u64::MAX));
+        assert_eq!(acc.drain()[0].dropped_rows, Some(i64::MAX as u64));
     }
 
     #[test]
@@ -803,6 +825,27 @@ mod tests {
             "window_end_ts",
         ] {
             assert!(schema.field_with_name(field).is_ok(), "missing {field}");
+        }
+    }
+
+    #[test]
+    fn the_counter_columns_are_inferred_as_int64() {
+        let schema = RedactionEvidence::schema_for_reflection().unwrap();
+        for field in [
+            "redacted_regions",
+            "detected_regions",
+            "dropped_fields",
+            "records_scanned",
+            "records_affected",
+            "fields_scanned",
+            "dropped_rows",
+            "patterns_configured",
+        ] {
+            assert_eq!(
+                schema.field_with_name(field).unwrap().data_type(),
+                &arrow_schema::DataType::Int64,
+                "{field} is not Int64"
+            );
         }
     }
 }

@@ -45,5 +45,6 @@ serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 transform.workspace = true
+usage_reporting.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true

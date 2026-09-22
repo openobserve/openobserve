@@ -4042,6 +4042,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.usage_publish_interval = 60;
     }
 
+    // A zero interval makes every batch overdue, so heartbeats overflow their own queue.
+    if cfg.common.sdr_evidence_heartbeat_interval == 0 {
+        cfg.common.sdr_evidence_heartbeat_interval = 300;
+    }
+
     cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();
     if !matches!(
         cfg.common.log_page_default_field_list.as_str(),

@@ -733,10 +733,11 @@ fn build_sample_records(
                 record.insert(key.clone(), value.clone());
             }
 
+            // `stack` is excluded: redaction runs later, so its digest would outlive the text.
             let event_id = format!(
                 "{:x}",
                 md5::compute(format!(
-                    "{org_id}/{stream_name}/{timestamp}/{profile_id}/{sample_idx}/{obs_idx}/{stack}/{value}"
+                    "{org_id}/{stream_name}/{timestamp}/{profile_id}/{sample_idx}/{obs_idx}/{value}"
                 ))
             );
             record.insert("event_id".to_string(), json::Value::String(event_id));

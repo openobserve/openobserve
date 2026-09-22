@@ -481,7 +481,7 @@ pub async fn delete_from_file_list(
     Ok(())
 }
 
-/// Redacts an enrichment payload in place; unredacted rows are joined into search results.
+/// Redacts an enrichment payload in place, so sensitive values cannot reach a search-result join.
 pub(crate) async fn apply_redaction(
     _org_id: &str,
     _stream_name: &str,
@@ -489,7 +489,7 @@ pub(crate) async fn apply_redaction(
 ) {
     #[cfg(feature = "vectorscan")]
     {
-        // the engine keys rows by (timestamp, record); enrichment rows carry no timestamp yet
+        // Enrichment rows genuinely carry no timestamp; a real zero would claim a 1970 window.
         let mut rows: Vec<(i64, json::Map<String, json::Value>)> = _payload
             .iter_mut()
             .map(|record| (0_i64, std::mem::take(record)))
@@ -511,6 +511,18 @@ pub(crate) async fn apply_redaction(
                 log::error!(
                     "[ENRICHMENT_TABLE] failed to get pattern manager for SDR redaction: {e}"
                 );
+                let scope = config::meta::self_reporting::redaction::EvidenceScope::new(
+                    _org_id,
+                    _stream_name,
+                    StreamType::EnrichmentTables,
+                );
+                usage_reporting::redaction_evidence::publish_scan_unavailable(
+                    &scope,
+                    config::meta::self_reporting::redaction::FailPosture::Open,
+                    rows.len() as u64,
+                    config::meta::self_reporting::redaction::DataWindow::default(),
+                )
+                .await;
             }
         }
         for (record, (_, redacted)) in _payload.iter_mut().zip(rows) {

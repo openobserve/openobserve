@@ -4602,6 +4602,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "transform",
+ "usage_reporting",
  "vrl",
 ]
 

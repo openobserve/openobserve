@@ -66,6 +66,69 @@ static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
 pub type IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
+/// No association names `_original` or `_all_values`, so the scan leaves their original text.
+#[cfg(feature = "vectorscan")]
+pub fn snapshot_derived_sources(records: &[(i64, Map<String, Value>)]) -> Vec<String> {
+    let max_len = get_config().limit.index_all_max_value_length;
+    records
+        .iter()
+        .map(|(_, record)| {
+            if record.contains_key(config::ORIGINAL_DATA_COL_NAME)
+                || record.contains_key(config::ALL_VALUES_COL_NAME)
+            {
+                all_values_of(record, max_len)
+            } else {
+                String::new()
+            }
+        })
+        .collect()
+}
+
+/// `_original` cannot be rebuilt from redacted fields, so a changed record drops it.
+#[cfg(feature = "vectorscan")]
+pub fn refresh_derived_columns(before: &[String], records: &mut [(i64, Map<String, Value>)]) {
+    let max_len = get_config().limit.index_all_max_value_length;
+    for (stale, (_, record)) in before.iter().zip(records.iter_mut()) {
+        if !record.contains_key(config::ORIGINAL_DATA_COL_NAME)
+            && !record.contains_key(config::ALL_VALUES_COL_NAME)
+        {
+            continue;
+        }
+        let values = all_values_of(record, max_len);
+        if &values == stale {
+            continue;
+        }
+        record.remove(config::ORIGINAL_DATA_COL_NAME);
+        if record.contains_key(config::ALL_VALUES_COL_NAME) {
+            record.insert(
+                config::ALL_VALUES_COL_NAME.to_string(),
+                Value::String(values),
+            );
+        }
+    }
+}
+
+/// The `_all_values` concatenation: every field but the derived ones, space-joined.
+#[cfg(feature = "vectorscan")]
+fn all_values_of(record: &Map<String, Value>, max_len: usize) -> String {
+    let mut values = Vec::with_capacity(record.len());
+    for (k, value) in record.iter() {
+        if [
+            TIMESTAMP_COL_NAME,
+            config::ID_COL_NAME,
+            config::ORIGINAL_DATA_COL_NAME,
+            config::ALL_VALUES_COL_NAME,
+        ]
+        .contains(&k.as_str())
+            || (max_len != 0 && value.as_str().is_some_and(|s| s.len() > max_len))
+        {
+            continue;
+        }
+        values.push(value.to_string());
+    }
+    values.join(" ")
+}
+
 fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
     let local_val = v.as_object()?;
     for action in BULK_OPERATORS {

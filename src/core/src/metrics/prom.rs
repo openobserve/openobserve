@@ -1028,7 +1028,7 @@ fn metadata_sql(
 /// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
 /// Redacts a stream's pending records and drops the series hash computed from the raw labels.
 #[cfg(feature = "vectorscan")]
-async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut Vec<PendingRecord>) {
+async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [PendingRecord]) {
     if json_data.is_empty() {
         return;
     }
@@ -1065,6 +1065,7 @@ async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut Vec<Pe
     }
 }
 
+/// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
 fn finish_identity_columns(json_data: &mut [PendingRecord]) {
     for (val_map, timestamp, known_hash) in json_data.iter_mut() {
         // a `__hash__` the handler did not compute is an input field and gets overwritten

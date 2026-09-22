@@ -112,11 +112,10 @@ fn is_blocked_internal_rollup_write(
     is_internal_rollup_stream(stream_name) && !is_derived && matches!(user, IngestUser::User(_))
 }
 
-/// False for every system-job write, not just self-reporting: gRPC relabels a
-/// self-reporting ingest as `InternalGrpc`, so a narrower guard never fires on a router.
+/// Keyed on the destination: gRPC relabels forwarded customer writes as `InternalGrpc`.
 #[cfg(any(feature = "vectorscan", test))]
-fn should_apply_sdr(user: &IngestUser) -> bool {
-    !matches!(user, IngestUser::SystemJob(_))
+fn should_apply_sdr(stream_name: &str) -> bool {
+    !config::meta::self_reporting::redaction::is_self_reporting_stream(stream_name)
 }
 
 pub async fn ingest(
@@ -133,12 +132,11 @@ pub async fn ingest(
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
     let log_ingestion_errors = ingestion_log_enabled().await;
-    // This path fails closed, unlike the OTLP and traces sites; the row says which applied.
+    // A stream that was never going to be scanned must not be failed by the scanner.
     #[cfg(feature = "vectorscan")]
     let pattern_manager = match get_pattern_manager().await {
-        Ok(manager) => manager,
-        // A system-job write emitting its own evidence here would feed itself forever.
-        Err(e) if !should_apply_sdr(&user) => return Err(e.into()),
+        Ok(manager) => Some(manager),
+        Err(_) if !should_apply_sdr(in_stream_name) => None,
         Err(e) => {
             crate::self_reporting::redaction_evidence::publish_scan_unavailable(
                 &config::meta::self_reporting::redaction::EvidenceScope::new(
@@ -228,7 +226,9 @@ pub async fn ingest(
 
     let flatten_level = get_flatten_level(org_id, &stream_name, stream_type).await;
 
-    let needs_json_records = !executable_pipelines.is_empty()
+    // pattern associations rewrite the JSON records, which the columnar path never builds
+    let needs_json_records = cfg!(feature = "vectorscan")
+        || !executable_pipelines.is_empty()
         || extend_json.is_some()
         || matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)))
         || streams_need_original_map
@@ -643,21 +643,18 @@ pub async fn ingest(
     drop(user_defined_schema_map);
 
     #[cfg(feature = "vectorscan")]
-    if should_apply_sdr(&user) {
+    if let Some(pattern_manager) = pattern_manager.as_ref() {
         for (stream, data) in json_data_by_stream.iter_mut() {
-            match pattern_manager.process_at_ingestion(
-                org_id,
-                StreamType::Logs,
-                stream,
-                &mut data.0,
-            ) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!(
-                        "error in processing records for patterns for stream {stream} : {e}"
-                    );
-                }
+            if !should_apply_sdr(stream) {
+                continue;
             }
+            let before = super::snapshot_derived_sources(&data.0);
+            if let Err(e) =
+                pattern_manager.process_at_ingestion(org_id, StreamType::Logs, stream, &mut data.0)
+            {
+                log::error!("error in processing records for patterns for stream {stream} : {e}");
+            }
+            super::refresh_derived_columns(&before, &mut data.0);
         }
     }
 
@@ -1350,6 +1347,13 @@ fn construct_values_from_open_telemetry_v1_metric(
 #[cfg(test)]
 mod tests {
 
+    use config::meta::self_reporting::{
+        redaction::REDACTION_EVIDENCE_STREAM,
+        usage::{
+            AUDIT_STREAM, DATA_RETENTION_USAGE_STREAM, ERROR_STREAM, STATS_STREAM, TRIGGERS_STREAM,
+            USAGE_STREAM,
+        },
+    };
     use ingestion_common::{IngestUser, SystemJobType};
 
     use super::*;
@@ -1525,25 +1529,26 @@ mod tests {
     }
 
     #[test]
-    fn test_should_apply_sdr_exempts_every_system_job() {
-        // InternalGrpc is the case a SelfReporting-only guard would miss, because
-        // the gRPC handler relabels a self-reporting write with that identity.
-        for job in [
-            SystemJobType::InternalGrpc,
-            SystemJobType::SelfReporting,
-            SystemJobType::SelfMetricsPromql,
-            SystemJobType::ServiceGraph,
-            SystemJobType::AnomalyDetection,
+    fn test_should_apply_sdr_exempts_only_self_reporting_streams() {
+        for stream in [
+            REDACTION_EVIDENCE_STREAM,
+            USAGE_STREAM,
+            AUDIT_STREAM,
+            TRIGGERS_STREAM,
+            ERROR_STREAM,
+            STATS_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
         ] {
-            assert!(!should_apply_sdr(&IngestUser::SystemJob(job)));
+            assert!(!should_apply_sdr(stream), "{stream} must not be scanned");
         }
     }
 
     #[test]
-    fn test_should_apply_sdr_scans_user_writes() {
-        assert!(should_apply_sdr(&IngestUser::User(
-            "someone@example.com".to_string()
-        )));
+    fn test_should_apply_sdr_scans_customer_streams() {
+        // The gRPC funnel stamps InternalGrpc on these too, and they carry customer data.
+        for stream in ["default", "app_logs", "_o2_service_graph", "k8s_events"] {
+            assert!(should_apply_sdr(stream), "{stream} must be scanned");
+        }
     }
 
     #[test]

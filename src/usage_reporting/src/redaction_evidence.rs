@@ -15,43 +15,22 @@
 
 //! The async entry point every SDR call site hands its evidence rows to.
 //!
-//! The enqueue happens here, never on a rayon worker: the reporting queue is a
-//! `Lazy` whose initializer calls `tokio::spawn`, which panics off-runtime.
-
-use std::sync::{LazyLock as Lazy, Mutex};
+//! It lives beside the reporting queue rather than in `openobserve-core`, so the crates
+//! that ingest outside the log path -- enrichment tables among them -- can report a scan
+//! they could not run without depending on the whole ingest crate.
 
 use config::{
-    get_config,
-    meta::self_reporting::{
-        ReportingData,
-        redaction::{
-            DataWindow, EvidenceScope, FieldOutcome, GapAccumulator, GapReason, HeartbeatTracker,
-            RedactionEvidence,
+    meta::{
+        self_reporting::{
+            ReportingData,
+            redaction::{DataWindow, EvidenceScope, GapReason, RedactionEvidence},
         },
+        stream::StreamType,
     },
     metrics,
-    utils::time::now_micros,
+    utils::json::{Map, Value},
 };
 use tokio::sync::mpsc::error::TrySendError;
-
-// Emitting a heartbeat off a timer would claim coverage for streams that stopped
-// sending data, so the batch path drives it instead.
-static HEARTBEATS: Lazy<HeartbeatTracker> = Lazy::new(HeartbeatTracker::default);
-
-// A dropped row is itself best-effort; coalescing keeps a sustained overflow from
-// producing a flood of gap rows that guarantees its own loss.
-static PENDING_GAPS: Lazy<Mutex<GapAccumulator>> =
-    Lazy::new(|| Mutex::new(GapAccumulator::default()));
-
-/// Enqueue the rows one batch produced, plus any heartbeat and retried gap rows.
-pub async fn publish(scope: &EvidenceScope, rows: Vec<RedactionEvidence>, batch: BatchTotals) {
-    let mut rows = rows;
-    if let Some(heartbeat) = heartbeat_row(scope, &batch) {
-        rows.push(heartbeat);
-    }
-    rows.extend(drain_pending_gaps());
-    enqueue_rows(scope, rows);
-}
 
 /// Record that the pattern manager was unavailable, so a zero is not read as "clean".
 pub async fn publish_scan_unavailable(
@@ -67,19 +46,11 @@ pub async fn publish_scan_unavailable(
 /// One `scan_unavailable` row per stream in a batch the pattern manager could not scan.
 pub async fn publish_scan_unavailable_for_streams<'a, I>(
     org_id: &str,
-    stream_type: config::meta::stream::StreamType,
+    stream_type: StreamType,
     streams: I,
     posture: config::meta::self_reporting::redaction::FailPosture,
 ) where
-    I: Iterator<
-        Item = (
-            &'a str,
-            &'a [(
-                i64,
-                config::utils::json::Map<String, config::utils::json::Value>,
-            )],
-        ),
-    >,
+    I: Iterator<Item = (&'a str, &'a [(i64, Map<String, Value>)])>,
 {
     for (stream_name, records) in streams {
         let scope = EvidenceScope::new(org_id, stream_name, stream_type);
@@ -93,46 +64,12 @@ pub fn record_gap(scope: &EvidenceScope, reason: GapReason, dropped_rows: u64) {
     metrics::SDR_EVIDENCE_DROPPED_TOTAL
         .with_label_values(&[&scope.org_id, &reason.to_string()])
         .inc_by(dropped_rows);
-    let Ok(mut pending) = PENDING_GAPS.lock() else {
-        log::error!("[SDR-EVIDENCE] gap accumulator poisoned; {dropped_rows} rows unrecorded");
-        return;
-    };
-    pending.record(scope, reason, dropped_rows, now_micros());
-}
-
-/// Per-batch totals for one (org, stream), used to fill a heartbeat row.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BatchTotals {
-    pub outcome: FieldOutcome,
-    pub data: DataWindow,
-}
-
-fn heartbeat_row(scope: &EvidenceScope, batch: &BatchTotals) -> Option<RedactionEvidence> {
-    let interval = get_config().common.sdr_evidence_heartbeat_interval as i64 * 1_000_000;
-    let (start, end) = HEARTBEATS.due(&scope.org_id, &scope.stream_name, now_micros(), interval)?;
-    Some(RedactionEvidence::interval_marker(
-        scope,
-        batch.outcome,
-        batch.data,
-        start,
-        end,
-    ))
-}
-
-fn drain_pending_gaps() -> Vec<RedactionEvidence> {
-    let Ok(mut pending) = PENDING_GAPS.lock() else {
-        return Vec::new();
-    };
-    if pending.is_empty() {
-        return Vec::new();
-    }
-    pending.drain()
 }
 
 fn enqueue_rows(scope: &EvidenceScope, rows: Vec<RedactionEvidence>) {
     for row in rows {
         count_regions(scope, &row);
-        let reason = match usage_reporting::try_enqueue(ReportingData::Redaction(Box::new(row))) {
+        let reason = match super::try_enqueue(ReportingData::Redaction(Box::new(row))) {
             Ok(()) => continue,
             Err(TrySendError::Full(_)) => GapReason::QueueFull,
             Err(TrySendError::Closed(_)) => GapReason::QueueClosed,
@@ -153,35 +90,21 @@ fn count_regions(scope: &EvidenceScope, row: &RedactionEvidence) {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::StreamType;
+    use config::meta::{
+        self_reporting::redaction::{FailPosture, FieldOutcome},
+        stream::StreamType,
+    };
 
     use super::*;
 
     #[test]
-    fn a_gap_is_coalesced_until_it_is_drained() {
-        let scope = EvidenceScope::new("gap-org", "gap-stream", StreamType::Logs);
-        record_gap(&scope, GapReason::PersistFailed, 3);
-        record_gap(&scope, GapReason::PersistFailed, 4);
-
-        let rows: Vec<_> = drain_pending_gaps()
-            .into_iter()
-            .filter(|row| row.org_id == "gap-org")
-            .collect();
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].dropped_rows, Some(7));
-        assert_eq!(rows[0].reason.as_deref(), Some("persist_failed"));
-        assert_eq!(rows[0].kind, "gap");
-    }
-
-    #[test]
     fn the_region_counter_ignores_rows_with_nothing_to_count() {
         let scope = EvidenceScope::new("metric-org", "metric-stream", StreamType::Logs);
-        let marker = RedactionEvidence::interval_marker(
+        let marker = RedactionEvidence::scan_unavailable(
             &scope,
-            FieldOutcome::default(),
+            FailPosture::Open,
+            3,
             DataWindow::default(),
-            0,
-            1,
         );
         let before = metrics::SDR_REDACTED_REGIONS_TOTAL
             .with_label_values(&["metric-org", "logs", "Redact"])
@@ -210,6 +133,21 @@ mod tests {
                 .with_label_values(&["metric-org", "logs", "Hash"])
                 .get(),
             5
+        );
+    }
+
+    #[test]
+    fn a_queue_failure_counts_a_dropped_row() {
+        let scope = EvidenceScope::new("drop-org", "drop-stream", StreamType::Logs);
+        let before = metrics::SDR_EVIDENCE_DROPPED_TOTAL
+            .with_label_values(&["drop-org", "queue_full"])
+            .get();
+        record_gap(&scope, GapReason::QueueFull, 2);
+        assert_eq!(
+            metrics::SDR_EVIDENCE_DROPPED_TOTAL
+                .with_label_values(&["drop-org", "queue_full"])
+                .get(),
+            before + 2
         );
     }
 }
