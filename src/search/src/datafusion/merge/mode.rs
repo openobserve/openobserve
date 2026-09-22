@@ -231,7 +231,6 @@ pub struct MergeOutput {
     pub parquet_compression: Option<&'static str>,
     /// Where a single merged file is built.
     pub sink: CompactMergeOutput,
-    pub metrics_blocks_enabled: bool,
     pub file_key_prefix: Option<Arc<str>>,
 }
 
@@ -251,7 +250,6 @@ impl MergeOutput {
                 .feature_ingester_none_compression
                 .then_some("none"),
             sink: CompactMergeOutput::Memory,
-            metrics_blocks_enabled: false,
             file_key_prefix: None,
         }
     }
@@ -263,8 +261,6 @@ impl MergeOutput {
             file_format: output_file_format(stream_type, false, cfg.common.file_format),
             parquet_compression: None,
             sink: cfg.compact.merge_output,
-            metrics_blocks_enabled: cfg.compact.metrics_index_enabled
-                && cfg.compact.metrics_index_blocks_enabled,
             file_key_prefix: None,
         }
     }

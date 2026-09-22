@@ -124,6 +124,7 @@ pub async fn merge_files(
         compressed_size: 0,
         flattened: false,
         index_size: 0,
+        mindex_size: 0,
         bloom_ver: 0,
     };
     if new_file_meta.records == 0 {
@@ -484,6 +485,11 @@ where
     } else {
         None
     };
+    meta.mindex_size = index
+        .as_ref()
+        .map(|(_, bytes)| i64::try_from(bytes.len()))
+        .transpose()?
+        .unwrap_or_default();
     if cache_locally {
         infra::cache::file_data::disk::set(key, bytes.clone()).await?;
     }
@@ -503,6 +509,10 @@ mod tests {
     const PLANNED_SIZE: usize = 1024;
 
     async fn produced_indexed_output(format: FileFormat) -> MergedFile {
+        produced_metrics_output(format, "block").await
+    }
+
+    async fn produced_metrics_output(format: FileFormat, kind: &str) -> MergedFile {
         use datafusion::{
             arrow::{
                 array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
@@ -513,15 +523,22 @@ mod tests {
         let schema = Arc::new(Schema::new(vec![
             Field::new("__hash__", DataType::UInt64, false),
             Field::new("_timestamp", DataType::Int64, false),
-            Field::new("value", DataType::Float64, false),
-            Field::new("tag", DataType::Utf8, true),
+            Field::new("value", DataType::Float64, true),
+            Field::new(
+                if kind == "legacy" { "trace_id" } else { "tag" },
+                DataType::Utf8,
+                true,
+            ),
         ]));
         let batch = RecordBatch::try_new(
             Arc::clone(&schema),
             vec![
                 Arc::new(UInt64Array::from(vec![1, 1])),
                 Arc::new(Int64Array::from(vec![10, 20])),
-                Arc::new(Float64Array::from(vec![1., 2.])),
+                Arc::new(Float64Array::from(vec![
+                    Some(1.),
+                    if kind == "fallback" { None } else { Some(2.) },
+                ])),
                 Arc::new(StringArray::from(vec!["x", "x"])),
             ],
         )
@@ -530,7 +547,6 @@ mod tests {
         let mut output = MergeOutput::for_compactor(StreamType::Metrics)
             .with_file_key_prefix("files/publish/metrics/m/2026/09/20/00");
         output.file_format = format;
-        output.metrics_blocks_enabled = true;
         merge::merge_parquet_files(
             schema,
             vec![table],
@@ -540,13 +556,59 @@ mod tests {
                 original_size: 128,
                 ..Default::default()
             },
-            &MergeMode::MetricsIndexed,
+            if kind == "none" {
+                &MergeMode::MetricsHashMerged
+            } else {
+                &MergeMode::MetricsIndexed
+            },
             output,
         )
         .await
         .unwrap()
         .files
         .remove(0)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn mindex_size_matches_full_published_object_for_every_output_kind() {
+        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+            for kind in ["block", "legacy", "fallback", "none"] {
+                let mut file = produced_metrics_output(format, kind).await;
+                let meta = match &mut file {
+                    MergedFile::MetricsIndexed { meta, .. }
+                    | MergedFile::MetricsHashMerged { meta, .. } => meta,
+                    _ => panic!("metrics output expected"),
+                };
+                meta.index_size = 79;
+                meta.mindex_size = 999_999;
+                let key = file
+                    .file_key("files/publish/metrics/m/2026/09/20/00", "unused", format)
+                    .unwrap();
+                let uploads = Arc::new(std::sync::Mutex::new(Vec::new()));
+                let sink = Arc::clone(&uploads);
+                let (data, meta) = publish_merged_output(file, &key, false, move |key, bytes| {
+                    let sink = Arc::clone(&sink);
+                    async move {
+                        sink.lock().unwrap().push((key, bytes));
+                        Ok(())
+                    }
+                })
+                .await
+                .unwrap();
+                let uploads = uploads.lock().unwrap();
+                let index = uploads.iter().find(|(key, _)| key.ends_with(".midx"));
+                assert_eq!(meta.index_size, 79);
+                assert_eq!(meta.compressed_size, data.len() as i64);
+                assert_eq!(
+                    meta.mindex_size,
+                    index.map_or(0, |(_, bytes)| bytes.len() as i64)
+                );
+                assert_eq!(index.is_none(), kind == "none");
+                if let Some((_, bytes)) = index {
+                    assert_eq!(bytes.starts_with(b"ARROW1"), kind != "block");
+                }
+            }
+        }
     }
 
     #[tokio::test(flavor = "multi_thread")]

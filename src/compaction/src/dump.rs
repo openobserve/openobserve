@@ -301,6 +301,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         storage_size: 0.0,
         compressed_size: 0.0,
         index_size: 0.0,
+        mindex_size: 0.0,
     };
     for file in &files {
         stats.file_num += 1;
@@ -310,6 +311,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         stats.storage_size += file.original_size as f64;
         stats.compressed_size += file.compressed_size as f64;
         stats.index_size += file.index_size as f64;
+        stats.mindex_size += file.mindex_size as f64;
     }
     if stats.doc_time_min == i64::MAX {
         stats.doc_time_min = 0;
@@ -594,6 +596,7 @@ async fn generate_dump(
         original_size: buf.len() as i64,
         compressed_size: buf.len() as i64,
         index_size: 0,
+        mindex_size: 0,
         flattened: false,
         bloom_ver: 0,
     };
@@ -674,6 +677,7 @@ async fn calculate_dump_file_stats(account: &str, file_key: &str) -> Result<Stre
         storage_size: 0.0,
         compressed_size: 0.0,
         index_size: 0.0,
+        mindex_size: 0.0,
     };
 
     while let Some(batch_result) = reader.next().await {
@@ -686,6 +690,7 @@ async fn calculate_dump_file_stats(account: &str, file_key: &str) -> Result<Stre
                     stats.storage_size += record.original_size as f64;
                     stats.compressed_size += record.compressed_size as f64;
                     stats.index_size += record.index_size as f64;
+                    stats.mindex_size += record.mindex_size as f64;
                     if record.min_ts > 0 {
                         stats.doc_time_min = stats.doc_time_min.min(record.min_ts);
                     }
@@ -744,6 +749,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
     let mut field_bloom_ver = Int64Builder::with_capacity(batch_size);
     let mut field_flattened = BooleanBuilder::with_capacity(batch_size);
     let mut field_updated_at = Int64Builder::with_capacity(batch_size);
+    let mut field_mindex_size = Int64Builder::with_capacity(batch_size);
 
     for file in files {
         field_id.append_value(file.id);
@@ -762,6 +768,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
         field_bloom_ver.append_value(file.bloom_ver);
         field_flattened.append_value(file.flattened);
         field_updated_at.append_value(file.updated_at);
+        field_mindex_size.append_value(file.mindex_size);
     }
 
     let batch = RecordBatch::try_new(
@@ -783,6 +790,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
             Arc::new(field_index_size.finish()),
             Arc::new(field_bloom_ver.finish()),
             Arc::new(field_updated_at.finish()),
+            Arc::new(field_mindex_size.finish()),
         ],
     )?;
     Ok(batch)
@@ -914,7 +922,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 0);
-        assert_eq!(batch.num_columns(), 16);
+        assert_eq!(batch.num_columns(), 17);
     }
 
     #[test]
@@ -934,6 +942,7 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 1100,
         };
@@ -944,7 +953,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 16);
+        assert_eq!(batch.num_columns(), 17);
 
         // Verify column values
         let id_col = batch
@@ -994,6 +1003,7 @@ mod tests {
                 original_size: 10000,
                 compressed_size: 5000,
                 index_size: 500,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: 1100,
             },
@@ -1012,6 +1022,7 @@ mod tests {
                 original_size: 20000,
                 compressed_size: 10000,
                 index_size: 1000,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: 2100,
             },
@@ -1030,6 +1041,7 @@ mod tests {
                 original_size: 30000,
                 compressed_size: 15000,
                 index_size: 1500,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: 3100,
             },
@@ -1087,6 +1099,7 @@ mod tests {
             original_size: 500000,
             compressed_size: 250000,
             index_size: 25000,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 1234568000,
         };
@@ -1129,6 +1142,7 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 1100,
         };
@@ -1184,6 +1198,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 0,
         };
@@ -1225,6 +1240,7 @@ mod tests {
             original_size: i64::MAX,
             compressed_size: i64::MAX,
             index_size: i64::MAX,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: i64::MAX,
         };
@@ -1266,6 +1282,7 @@ mod tests {
                 original_size: 1024,
                 compressed_size: 512,
                 index_size: 64,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: i * 1000 + 1000,
             })
@@ -1304,6 +1321,7 @@ mod tests {
                 original_size: 2048,
                 compressed_size: 1024,
                 index_size: 128,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: 3000,
             })
@@ -1341,6 +1359,7 @@ mod tests {
             original_size: 100,
             compressed_size: 50,
             index_size: 5,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 200,
         };
@@ -1374,6 +1393,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 0,
         };
@@ -1414,6 +1434,7 @@ mod tests {
             original_size: 100_000,
             compressed_size: 40_000,
             index_size: 5_000,
+            mindex_size: 7_000,
             bloom_ver: 0,
             updated_at: 9999,
         };
@@ -1442,6 +1463,18 @@ mod tests {
             .downcast_ref::<Int64Array>()
             .unwrap();
         assert_eq!(idx_col.value(0), 5_000);
+        let midx = batch
+            .column_by_name("mindex_size")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(midx.value(0), 7_000);
+        let restored = search_service::file_list_dump::record_batch_to_file_record(batch.clone());
+        assert_eq!(
+            (restored[0].index_size, restored[0].mindex_size),
+            (5_000, 7_000)
+        );
 
         // bloom_ver was inserted at index 14 between index_size (13) and updated_at (15).
         let upd_col = batch
@@ -1471,6 +1504,7 @@ mod tests {
                 original_size: i * 1000,
                 compressed_size: i * 500,
                 index_size: i * 50,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: i * 100 + 100,
             })
@@ -1501,6 +1535,7 @@ mod tests {
             original_size: 25_000,
             compressed_size: 12_500,
             index_size: 1_250,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 20_001,
         };
@@ -1545,6 +1580,7 @@ mod tests {
                 original_size: i * 100,
                 compressed_size: i * 50,
                 index_size: i * 5,
+                mindex_size: 0,
                 bloom_ver: 0,
                 updated_at: i * 1000 + 1000,
             })
@@ -1644,6 +1680,7 @@ mod tests {
             storage_size: 0.0,
             compressed_size: 0.0,
             index_size: 0.0,
+            mindex_size: 0.0,
         };
         // Check the sentinel value for doc_time_min (as used in dump() function)
         assert_eq!(stats.doc_time_min, i64::MAX);
@@ -1682,6 +1719,7 @@ mod tests {
             storage_size: 0.0,
             compressed_size: 0.0,
             index_size: 0.0,
+            mindex_size: 0.0,
         };
 
         for (records, min_ts, max_ts, file_num_delta, _doc, orig, comp, idx) in &file_records {
@@ -1720,6 +1758,7 @@ mod tests {
             storage_size: 0.0,
             compressed_size: 0.0,
             index_size: 0.0,
+            mindex_size: 0.0,
         };
 
         if stats.doc_time_min == i64::MAX {
@@ -1774,6 +1813,7 @@ mod tests {
             original_size: 1,
             compressed_size: 1,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
             updated_at: 0,
         }

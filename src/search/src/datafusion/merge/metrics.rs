@@ -80,7 +80,6 @@ pub(super) struct MetricsOutput {
     pub layout: MetricsFileLayout,
     pub sink: CompactMergeOutput,
     pub file_key_prefix: Option<Arc<str>>,
-    pub blocks_enabled: bool,
     pub stats: GenerationStats,
 }
 
@@ -91,7 +90,6 @@ impl MetricsOutput {
         with_index: bool,
     ) -> Result<(Blocks, Option<String>)> {
         let eligible = with_index
-            && self.blocks_enabled
             && self.file_key_prefix.is_some()
             && metrics_block::is_supported_schema(schema);
         let object_key = eligible.then(|| {
@@ -759,7 +757,6 @@ mod tests {
             layout: MetricsFileLayout::Indexed,
             sink,
             file_key_prefix: Some(Arc::from("files/single-pass/metrics/m/2026/09/20/00")),
-            blocks_enabled: true,
             stats,
         }
     }
@@ -1146,13 +1143,118 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn configured_metrics_index_dispatch_controls_block_generation() {
+        use config::meta::stream::StreamType;
+        use datafusion::datasource::MemTable;
+
+        use super::super::{MergeMode, MergeOutput, merge_parquet_files};
+
+        let schema = block_schema(None, false);
+        let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
+        let enabled = config::get_config().compact.metrics_index_enabled;
+        for configured_format in [FileFormat::Parquet, FileFormat::Vortex] {
+            for (ingester, closed_hour) in [(false, true), (false, false), (true, false)] {
+                let (mode, output) = if ingester {
+                    (
+                        MergeMode::for_ingester(StreamType::Metrics, "dispatch", &schema),
+                        MergeOutput::for_ingester(StreamType::Metrics),
+                    )
+                } else {
+                    let mut output = MergeOutput::for_compactor(StreamType::Metrics)
+                        .with_file_key_prefix("files/dispatch/metrics/m/2026/09/20/00");
+                    output.file_format = configured_format;
+                    (
+                        MergeMode::for_compactor(
+                            StreamType::Metrics,
+                            "dispatch",
+                            &schema,
+                            0,
+                            closed_hour,
+                        ),
+                        output,
+                    )
+                };
+                let format = output.file_format;
+                let table = Arc::new(
+                    MemTable::try_new(schema.clone(), vec![vec![block_batch(&schema, &rows)]])
+                        .unwrap(),
+                );
+                let file = merge_parquet_files(
+                    schema.clone(),
+                    vec![table],
+                    &[],
+                    FileMeta {
+                        records: 2,
+                        original_size: 128,
+                        ..Default::default()
+                    },
+                    &mode,
+                    output,
+                )
+                .await
+                .unwrap()
+                .files
+                .remove(0);
+                let key = file
+                    .file_key("files/dispatch/metrics/m/2026/09/20/00", "plain", format)
+                    .unwrap();
+                let (data, meta, path) = file.into_upload_parts().await.unwrap();
+                let mut actual = sample_rows_for(format, bytes::Bytes::from(data.clone())).await;
+                actual.sort_unstable();
+                assert_eq!(actual, rows);
+                assert_eq!(path.is_some(), enabled && closed_hour && !ingester);
+                if let Some(path) = path {
+                    let encoded = tokio::fs::read(path).await.unwrap();
+                    assert!(!encoded.starts_with(b"ARROW1"));
+                    let footer = metrics_block::read_footer(
+                        &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
+                        encoded.len() as u64,
+                    )
+                    .unwrap();
+                    let parent = metrics_block::ParentIdentity {
+                        object_key: key,
+                        rows: meta.records as u64,
+                        compressed_size: data.len() as u64,
+                    };
+                    let index = metrics_block::decode_index(
+                        bytes::Bytes::copy_from_slice(
+                            &encoded[footer.metadata_range.start as usize
+                                ..footer.metadata_range.end as usize],
+                        ),
+                        &footer,
+                        &parent,
+                        &["tag".into()],
+                    )
+                    .unwrap();
+                    let mut decoded_rows = Vec::new();
+                    for block in &index.blocks {
+                        let range = block.payload_range();
+                        let decoded = metrics_block::decode_block(
+                            &encoded[range.start as usize..range.end as usize],
+                            &block,
+                        )
+                        .unwrap();
+                        decoded_rows.extend(
+                            decoded
+                                .timestamps
+                                .into_iter()
+                                .zip(decoded.value_bits)
+                                .map(|(time, value)| (block.hash, time, Some(value))),
+                        );
+                    }
+                    assert_eq!(decoded_rows, rows);
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn open_hour_and_ingester_outputs_do_not_generate_blocks() {
         use std::sync::atomic::Ordering;
         let schema = block_schema(None, false);
         let rows = [(1, 10, Some(1f64.to_bits()))];
         let ingester =
             super::super::MergeOutput::for_ingester(config::meta::stream::StreamType::Metrics);
-        assert!(!ingester.metrics_blocks_enabled);
         assert_eq!(ingester.file_format, FileFormat::Parquet);
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let stats = GenerationStats::default();
@@ -1175,17 +1277,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn single_pass_selects_legacy_directly_when_disabled_or_schema_unsupported() {
+    async fn single_pass_selects_legacy_directly_when_schema_unsupported() {
         use std::sync::atomic::Ordering;
-        for (format, (enabled, unsupported)) in [FileFormat::Parquet, FileFormat::Vortex]
-            .into_iter()
-            .flat_map(|format| [(false, false), (true, true)].map(|state| (format, state)))
-        {
-            let schema = block_schema(None, unsupported);
+        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+            let schema = block_schema(None, true);
             let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
             let stats = GenerationStats::default();
             let mut output = block_output(CompactMergeOutput::Disk, stats.clone());
-            output.blocks_enabled = enabled;
             output.file_format = format;
             let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
                 .await
@@ -1414,35 +1512,6 @@ mod tests {
             assert_eq!(stats.counters.vortex_replays.load(Ordering::SeqCst), 0);
             assert_eq!(stats.counters.parquet_replays.load(Ordering::SeqCst), 0);
         }
-    }
-
-    #[tokio::test]
-    async fn single_pass_vortex_uses_legacy_when_blocks_disabled() {
-        use std::sync::atomic::Ordering;
-        let schema = block_schema(None, false);
-        let stats = GenerationStats::default();
-        let mut output = block_output(CompactMergeOutput::Disk, stats.clone());
-        output.file_format = FileFormat::Vortex;
-        output.blocks_enabled = false;
-        let file = produce(
-            &schema,
-            vec![block_batch(&schema, &[(1, 10, Some(1f64.to_bits()))])],
-            output,
-        )
-        .await
-        .unwrap()
-        .remove(0);
-        let (_, meta, path) = file.into_upload_parts().await.unwrap();
-        assert_eq!(meta.records, 1);
-        assert!(
-            tokio::fs::read(path.unwrap())
-                .await
-                .unwrap()
-                .starts_with(b"ARROW1")
-        );
-        assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 1);
-        assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), 0);
-        assert_eq!(stats.counters.parquet_replays.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
@@ -1697,7 +1766,6 @@ mod tests {
                 layout: MetricsFileLayout::HashMerged,
                 sink: CompactMergeOutput::Disk,
                 file_key_prefix: None,
-                blocks_enabled: false,
                 stats: GenerationStats::default(),
             },
             rx,
@@ -1795,7 +1863,6 @@ mod tests {
                 layout: MetricsFileLayout::Indexed,
                 sink: CompactMergeOutput::Disk,
                 file_key_prefix: None,
-                blocks_enabled: false,
                 stats: GenerationStats::default(),
             },
             rx,

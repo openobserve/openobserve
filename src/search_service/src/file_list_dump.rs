@@ -15,7 +15,7 @@
 
 use std::sync::{Arc, LazyLock as Lazy};
 
-use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
+use arrow::array::{Array, BooleanArray, Int64Array, RecordBatch, StringArray};
 use arrow_schema::{DataType, Field, Schema};
 use config::{
     get_config, ider,
@@ -55,6 +55,7 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
         Field::new("index_size", DataType::Int64, false),
         Field::new("bloom_ver", DataType::Int64, false),
         Field::new("updated_at", DataType::Int64, false),
+        Field::new("mindex_size", DataType::Int64, true),
     ]))
 });
 
@@ -114,6 +115,7 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
             original_size: original_size_col.value(idx),
             compressed_size: compressed_size_col.value(idx),
             index_size: index_size_col.value(idx),
+            mindex_size: optional_size(&rb, "mindex_size", idx),
             bloom_ver: bloom_ver_col.map(|c| c.value(idx)).unwrap_or(0),
             updated_at: updated_at_col.value(idx),
         };
@@ -122,6 +124,13 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     ret.par_sort_unstable_by_key(|f| f.id);
     ret.dedup_by_key(|f| f.id);
     ret
+}
+
+fn optional_size(rb: &RecordBatch, name: &str, row: usize) -> i64 {
+    rb.column_by_name(name)
+        .and_then(|column| column.as_any().downcast_ref::<Int64Array>())
+        .filter(|column| !column.is_null(row))
+        .map_or(0, |column| column.value(row))
 }
 
 fn record_batch_to_file_id(rb: RecordBatch) -> Vec<FileId> {
@@ -165,6 +174,7 @@ fn record_batch_to_stats(rb: RecordBatch) -> Vec<(String, StreamStats)> {
             storage_size: original_size_col.value(idx) as f64,
             compressed_size: compressed_size_col.value(idx) as f64,
             index_size: index_size_col.value(idx) as f64,
+            mindex_size: optional_size(&rb, "mindex_size", idx) as f64,
         };
         let stream = stream_col.value(idx).to_string();
         ret.push((stream, t));
@@ -411,6 +421,7 @@ pub async fn stats(
                 storage_size: -stats.storage_size,
                 compressed_size: -stats.compressed_size,
                 index_size: -stats.index_size,
+                mindex_size: -stats.mindex_size,
                 doc_time_min: 0,
                 doc_time_max: 0,
                 created_at: 0,
@@ -442,7 +453,7 @@ async fn stats_inner(
     let sql = format!(
         r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num, 
-SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size
+SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size, COALESCE(SUM(mindex_size), 0)::BIGINT AS mindex_size
 FROM file_list {filter} GROUP BY stream
         "#
     );
@@ -885,8 +896,7 @@ mod tests {
         // Verify the schema has the expected fields
         let schema = FILE_LIST_SCHEMA.clone();
 
-        // 14 historical fields + bloom_ver + updated_at = 16
-        assert_eq!(schema.fields().len(), 16);
+        assert_eq!(schema.fields().len(), 17);
 
         // Check key field names and types
         assert_eq!(schema.field(0).name(), "id");
@@ -1043,6 +1053,7 @@ mod tests {
             ("index_size", DataType::Int64),
             ("bloom_ver", DataType::Int64),
             ("updated_at", DataType::Int64),
+            ("mindex_size", DataType::Int64),
         ];
 
         for (i, (name, dtype)) in expected_fields.iter().enumerate() {
@@ -1055,11 +1066,10 @@ mod tests {
     fn test_file_list_schema_nullability() {
         let schema = FILE_LIST_SCHEMA.clone();
 
-        // All fields should be non-nullable
         for field in schema.fields() {
             assert!(
-                !field.is_nullable(),
-                "Field {} should not be nullable",
+                field.is_nullable() == (field.name() == "mindex_size"),
+                "Unexpected nullability for field {}",
                 field.name()
             );
         }
@@ -1089,5 +1099,71 @@ mod tests {
         let result1 = generate_dump_stream_name(StreamType::Logs, "test_stream");
         let result2 = generate_dump_stream_name(StreamType::Logs, "test_stream");
         assert_eq!(result1, result2);
+    }
+    #[tokio::test]
+    async fn mindex_size_dump_legacy_null_and_mixed_parquet_roundtrip() {
+        use datafusion::prelude::{ParquetReadOptions, SessionContext};
+        use parquet::arrow::ArrowWriter;
+        let old = create_test_record_batch();
+        assert!(
+            record_batch_to_file_record(old.clone())
+                .iter()
+                .all(|r| r.mindex_size == 0)
+        );
+        let mut fields = old.schema().fields().to_vec();
+        fields.push(Arc::new(Field::new("mindex_size", DataType::Int64, true)));
+        let mut columns = old.columns().to_vec();
+        columns.push(Arc::new(Int64Array::from(vec![Some(19), None, Some(23)])));
+        let new = RecordBatch::try_new(Arc::new(Schema::new(fields)), columns).unwrap();
+        let records = record_batch_to_file_record(new.clone());
+        assert_eq!(
+            records.iter().map(|r| r.mindex_size).collect::<Vec<_>>(),
+            vec![19, 0, 23]
+        );
+        let directory = std::path::Path::new(&config::get_config().common.data_tmp_dir)
+            .join(config::ider::uuid());
+        std::fs::create_dir_all(&directory).unwrap();
+        for (name, batch) in [("old.parquet", old), ("new.parquet", new)] {
+            let file = std::fs::File::create(directory.join(name)).unwrap();
+            let mut writer = ArrowWriter::try_new(file, batch.schema(), None).unwrap();
+            writer.write(&batch).unwrap();
+            writer.close().unwrap();
+        }
+        let ctx = SessionContext::new();
+        ctx.register_parquet(
+            "mixed",
+            directory.to_str().unwrap(),
+            ParquetReadOptions::default().schema(FILE_LIST_SCHEMA.as_ref()),
+        )
+        .await
+        .unwrap();
+        let batches = ctx
+            .sql(
+                "SELECT COALESCE(SUM(mindex_size),0)::BIGINT AS total, COUNT(*) AS rows FROM mixed",
+            )
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        assert_eq!(
+            batches[0]
+                .column(0)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap()
+                .value(0),
+            42
+        );
+        assert_eq!(
+            batches[0]
+                .column(1)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap()
+                .value(0),
+            6
+        );
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

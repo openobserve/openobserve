@@ -793,6 +793,8 @@ pub struct FileRecord {
     #[sqlx(default)]
     pub index_size: i64,
     #[sqlx(default)]
+    pub mindex_size: i64,
+    #[sqlx(default)]
     pub bloom_ver: i64,
     #[sqlx(default)]
     pub flattened: bool,
@@ -823,6 +825,7 @@ impl From<&FileRecord> for FileMeta {
             original_size: r.original_size,
             compressed_size: r.compressed_size,
             index_size: r.index_size,
+            mindex_size: r.mindex_size,
             bloom_ver: r.bloom_ver,
             flattened: r.flattened,
         }
@@ -840,6 +843,7 @@ pub struct StatsRecord {
     pub original_size: i64,
     pub compressed_size: i64,
     pub index_size: i64,
+    pub mindex_size: i64,
 }
 
 impl From<&StatsRecord> for StreamStats {
@@ -853,6 +857,7 @@ impl From<&StatsRecord> for StreamStats {
             storage_size: record.original_size as f64,
             compressed_size: record.compressed_size as f64,
             index_size: record.index_size as f64,
+            mindex_size: record.mindex_size as f64,
         }
     }
 }
@@ -1011,6 +1016,7 @@ mod tests {
             original_size: 102400,
             compressed_size: 51200,
             index_size: 1024,
+            mindex_size: 0,
             bloom_ver: 0,
             flattened: true,
             updated_at: 9999,
@@ -1044,6 +1050,7 @@ mod tests {
             original_size: 4096,
             compressed_size: 2048,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
             flattened: false,
             updated_at: 0,
@@ -1080,6 +1087,7 @@ mod tests {
             original_size: 4,
             compressed_size: 5,
             index_size: 6,
+            mindex_size: 0,
             bloom_ver: 1_715_000_000_000_000,
             flattened: false,
             updated_at: 0,
@@ -1105,6 +1113,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
             flattened: false,
             updated_at: 0,
@@ -1128,6 +1137,7 @@ mod tests {
             original_size: 1_048_576,
             compressed_size: 524_288,
             index_size: 8192,
+            mindex_size: 0,
         };
 
         let stats = StreamStats::from(&record);
@@ -1152,6 +1162,7 @@ mod tests {
             original_size: 256,
             compressed_size: 128,
             index_size: 0,
+            mindex_size: 0,
         };
 
         let stats = StreamStats::from(&record);
@@ -1170,6 +1181,7 @@ mod tests {
             original_size: 512,
             compressed_size: 256,
             index_size: 64,
+            mindex_size: 0,
         };
 
         // owned conversion should produce the same result as ref conversion
@@ -1201,6 +1213,7 @@ mod tests {
                 original_size,
                 compressed_size,
                 index_size,
+                mindex_size: 0,
                 flattened: false,
                 bloom_ver: 0,
             },

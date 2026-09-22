@@ -70,7 +70,6 @@ pub async fn merge_parquet_files(
                     max_file_size: get_config().compact.max_file_size,
                     sink: output.sink,
                     file_key_prefix: output.file_key_prefix,
-                    blocks_enabled: output.metrics_blocks_enabled,
                     stats: metrics_blocks::GenerationStats::default(),
                     layout: mode
                         .metrics_file_layout()
