@@ -3568,6 +3568,12 @@
     "joinSlack": "加入 Slack",
     "maybeLater": "稍後再說"
   },
+  "connectDataSourcePopup": {
+    "title": "首先，讓我們連接您的第一個資料來源。",
+    "description": "我們有很多內容想向您展示，但首先需要連接您的資料。大多數團隊大約一分鐘內就能看到第一批日誌。",
+    "connectButton": "連接資料來源",
+    "slackLink": "也加入我們的 Slack 社群"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "從暫停處繼續",
     "startFromNow": "從現在開始。",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "事件承載內容",
       "payloadIndex": "{field} 欄位會選取串流。沒有此欄位的事件會進入 {stream} 串流。",
       "payloadTime": "{field} 欄位是 epoch 秒數，且接受小數值。當該欄位缺少或不是正數時，會使用接收時間。",
+      "windowTitle": "超出擷取視窗的時間戳記將被捨棄",
+      "windowBody": "早於 {past}（預設 5 小時）或晚於 {future}（預設 24 小時）的事件將被捨棄，而要求仍會回應 代碼 0，因為 Splunk 用戶端不會重試錯誤。因此，硬式編碼或過期的時間戳記看起來像是傳送成功，實際卻沒有儲存任何資料。",
       "payloadMetadata": "{fields} 欄位會儲存為事件上的資料行。",
       "healthTitle": "健康檢查",
       "healthBody": "GET 請求不需要驗證，並會回應 {response}。",
@@ -5897,6 +5905,9 @@
         "details": "詳細資料",
         "json": "JSON",
         "insights": "深入解析",
+        "back": "返回結果",
+        "prevEvent": "上一個事件",
+        "nextEvent": "下一個事件",
         "copyLink": "複製連結",
         "copy": "複製",
         "copyValue": "複製值",
@@ -9346,7 +9357,28 @@
     "listConjunctionAnd": "{list} 和 {last}",
     "runsIn": "執行於",
     "recommendedByFieldCoverage": "根據您串流中的欄位覆蓋率推薦。",
-    "listConjunctionAndTwo": "{first} 和 {last}"
+    "listConjunctionAndTwo": "{first} 和 {last}",
+    "domainOrgMappings": {
+      "title": "網域至組織的對應",
+      "subtitle": "使用符合電子郵件網域登入的新使用者會自動加入該組織。",
+      "addMapping": "新增對應",
+      "editMapping": "編輯對應",
+      "empty": "尚無對應。使用「{addLabel}」新增一筆。",
+      "domain": "電子郵件網域",
+      "domainHelp": "使用者電子郵件地址中 {at_sign} 之後的部分。",
+      "organization": "組織",
+      "organizationPlaceholder": "組織識別碼",
+      "organizationHelp": "符合的使用者所加入之組織的識別碼。",
+      "organizationRequired": "必須填寫組織",
+      "baseRole": "基本角色",
+      "baseRoleHelp": "符合的使用者在該組織中被賦予的角色。",
+      "userGroup": "使用者群組",
+      "userGroupPlaceholder": "群組名稱",
+      "userGroupHelp": "選填。符合的使用者也會加入該組織中的此群組。",
+      "duplicateDomain": "此網域的對應已存在",
+      "confirmRemove": "您確定要刪除 {domain} 的對應嗎？",
+      "deleteTitle": "刪除對應"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -16460,13 +16492,10 @@
       "columnMemory": "記憶體（目前）",
       "columnDisk": "磁碟 %（目前）",
       "columnLoad": "15 分鐘負載（目前）",
+      "columnCores": "核心數",
       "columnLastSeen": "上次出現",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "主機指標儀表板",
-      "importConfirmTitle": "要新增「主機指標」儀表板嗎？",
-      "importConfirmMessage": "你還沒有這個儀表板。新增後會在預設資料夾中建立名為「主機指標」的儀表板，然後為這台主機開啟它。",
-      "importConfirmOk": "新增並開啟",
-      "importConfirmCancel": "取消",
+      "loadPerCore": "({value}/核心)",
       "windowsLivenessNote": "只有當代理程式回報負載指標（system_cpu_load_average_15m）時，Windows 主機才會出現在此清單中 — 如果你的 Windows 代理程式正在執行卻未顯示在這裡，請在收集器設定中啟用負載抓取器，或更新代理程式。",
       "panel": {
         "cpuBusy": "CPU 忙碌",
@@ -17876,6 +17905,7 @@
     "target_rotation_all": "{rotation} 的所有人",
     "target_rotation_deleted": "此團隊已不再擁有的輪值",
     "target_rotation_legacy": "目前值班的人",
+    "target_unrecognized": "此畫面無法辨識的目標",
     "ladderPoolEveryone": "{rotation} 的所有人",
     "target_user": "特定人員",
     "target_whole_team": "整個團隊",

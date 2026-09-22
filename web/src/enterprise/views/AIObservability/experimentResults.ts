@@ -16,6 +16,8 @@
 import type { ExperimentResultSlot } from "@/services/llm-experiments.service";
 import type { ExperimentExecution } from "@/services/llm-experiments.service";
 
+export type ExperimentTraceTarget = Pick<ExperimentExecution, "traceId" | "timestamp">;
+
 const EMPTY_SCORE = "—";
 
 /** Render one successful typed Score without leaking its storage envelope. */
@@ -82,7 +84,7 @@ export function filterExperimentResultSlots(
   return slots.filter((slot) => experimentResultSlotStatus(slot) === filter);
 }
 
-export function experimentTraceLocation(orgId: string, execution: ExperimentExecution) {
+export function experimentTraceLocation(orgId: string, execution: ExperimentTraceTarget) {
   if (!execution.traceId) return null;
   const padding = 3_600_000_000;
   return {
@@ -99,7 +101,7 @@ export function experimentTraceLocation(orgId: string, execution: ExperimentExec
 
 export function openExperimentTrace(
   orgId: string,
-  execution: ExperimentExecution,
+  execution: ExperimentTraceTarget,
   resolve: (location: NonNullable<ReturnType<typeof experimentTraceLocation>>) => { href: string },
   open: (url: string, target: string, features: string) => unknown,
 ) {

@@ -18,14 +18,17 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 
 // Mock service_accounts service
-vi.mock("@/services/service_accounts", () => ({
-  default: {
-    list: vi.fn(),
-    delete: vi.fn(),
-    bulkDelete: vi.fn(),
-    refresh_token: vi.fn(),
-  },
-}));
+vi.mock("@/services/service_accounts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+      bulkDelete: vi.fn(),
+      refresh_token: vi.fn(),
+    },
+  });
+});
 
 // Mock usePermissions composable
 const mockServiceAccountsState = {
@@ -1405,7 +1408,8 @@ describe("ServiceAccountsList Component", () => {
       vi.mocked(service_accounts.list).mockResolvedValueOnce({
         data: { data: [] },
       });
-      await wrapper.vm.getServiceAccountsUsers();
+      // Forced: a plain reload would be served from the cache the mount warmed.
+      await wrapper.vm.getServiceAccountsUsers(true);
       await flushPromises();
 
       // The service accounts list should be empty

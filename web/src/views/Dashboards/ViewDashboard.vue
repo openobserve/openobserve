@@ -276,6 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @searchRequestTraceIds="searchRequestTraceIds"
           :runId="runId"
           @update:runId="updateRunId"
+          @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
         />
         <DashboardSettings
           v-model:open="showDashboardSettingsDialog"
@@ -364,6 +365,8 @@ import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { queryClient } from "@/composables/query/queryClient";
+import { annotationKeys } from "@/services/dashboard_annotations.querykeys";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -379,7 +382,7 @@ const ScheduledDashboards = defineAsyncComponent(() => {
 
 export default defineComponent({
   name: "ViewDashboard",
-  emits: ["onDeletePanel"],
+  emits: ["onDeletePanel", "sendToAiChat"],
   components: {
     OPageLayout,
     DateTimePickerDashboard,
@@ -651,9 +654,8 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
-      if (!store.state.organizationData.folders.length) {
-        await getFoldersList(store);
-      }
+      // Caught: a folder-list failure must not abort the panel setup below.
+      await getFoldersList(store).catch(() => null);
 
       // Set up dashboard context provider
       const dashboardProvider = createDashboardsContextProvider(
@@ -1246,6 +1248,17 @@ export default defineComponent({
         // This allows all panels to refresh, not just the one previously refreshed
         panelIdToBeRefreshed.value = null;
 
+        // Annotations added elsewhere never expire this tab's cache, and a fixed range keeps the same key.
+        if (dashboardId.value) {
+          void queryClient.invalidateQueries({
+            queryKey: annotationKeys.dashboard(
+              store.state.selectedOrganization.identifier,
+              String(dashboardId.value),
+            ),
+            refetchType: "none",
+          });
+        }
+
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();
 
@@ -1468,6 +1481,23 @@ export default defineComponent({
         // Get global time params - ensure we always have time params
         const timeParams = getQueryParamsForDuration(selectedDate.value);
 
+        // Preserve the cell-explorer deep-link params so a shared "Copy link" reopens the drawer.
+        const cellParams: Record<string, any> = {};
+        for (const k of [
+          "cell_panel",
+          "cell_field",
+          "cell_value",
+          "cell_vtype",
+          "cell_stream",
+          "cell_stype",
+          "cell_t0",
+          "cell_t1",
+          "cell_where",
+          "cell_event_ts",
+        ]) {
+          if (route.query[k] !== undefined) cellParams[k] = route.query[k];
+        }
+
         const newQuery = {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
@@ -1479,6 +1509,7 @@ export default defineComponent({
           ...panelTimeParams, // Panel time params (generated + preserved)
           print: store.state.printMode,
           searchtype: route.query.searchtype,
+          ...cellParams, // Keep cell-explorer deep link intact
         };
 
         // CRITICAL: Only update URL if query has actually changed

@@ -1654,6 +1654,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum-tracing-opentelemetry"
+version = "0.39.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fabc5593bb3e47953228a64103b76ba58464d793b81eaef985444bf37e2d0bf3"
+dependencies = [
+ "axum",
+ "futures-core",
+ "futures-util",
+ "http 1.5.0",
+ "opentelemetry",
+ "opentelemetry-semantic-conventions",
+ "pin-project-lite",
+ "tower",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-opentelemetry-instrumentation-sdk",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5934,8 +5953,10 @@ dependencies = [
  "thiserror 2.0.19",
  "tokio",
  "tonic",
+ "tonic-tracing-opentelemetry",
+ "tower",
  "tracing",
- "tracing-opentelemetry",
+ "tracing-subscriber",
  "url",
 ]
 
@@ -7909,6 +7930,7 @@ dependencies = [
  "arrow-flight",
  "arrow-schema",
  "async-stream",
+ "axum",
  "bytes",
  "common",
  "config",
@@ -7937,8 +7959,10 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
+ "tonic-tracing-opentelemetry",
  "tracing",
  "tracing-opentelemetry",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -7949,6 +7973,7 @@ dependencies = [
  "audit",
  "axum",
  "axum-server",
+ "axum-tracing-opentelemetry",
  "base64 0.22.1",
  "bytes",
  "common",
@@ -7984,6 +8009,8 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http",
+ "tracing",
+ "tracing-subscriber",
  "url",
  "utoipa",
  "utoipa-swagger-ui",
@@ -8509,6 +8536,12 @@ dependencies = [
  "tonic",
  "tonic-prost",
 ]
+
+[[package]]
+name = "opentelemetry-semantic-conventions"
+version = "0.32.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c913ac17a6c451661ee255f4625d143e51647ae78ebd969b75e41c4442f4fe47"
 
 [[package]]
 name = "opentelemetry_sdk"
@@ -13030,6 +13063,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonic-tracing-opentelemetry"
+version = "0.38.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad2ced0841c6df7c8f1750b1bc68f714f169747b525e0689de6bba35860e114c"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "http 1.5.0",
+ "http-body 1.1.0",
+ "hyper",
+ "opentelemetry",
+ "pin-project-lite",
+ "tonic",
+ "tower",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-opentelemetry-instrumentation-sdk",
+]
+
+[[package]]
 name = "tonic-types"
 version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13168,6 +13221,19 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "web-time",
+]
+
+[[package]]
+name = "tracing-opentelemetry-instrumentation-sdk"
+version = "0.38.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8884891560864c229e82653b02641a808711111fc34ce8555c0c47fec947b549"
+dependencies = [
+ "http 1.5.0",
+ "opentelemetry",
+ "opentelemetry-semantic-conventions",
+ "tracing",
+ "tracing-opentelemetry",
 ]
 
 [[package]]

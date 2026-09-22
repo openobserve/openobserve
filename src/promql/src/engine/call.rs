@@ -20,10 +20,15 @@ use std::{str::FromStr, sync::Arc};
 
 use config::meta::promql::value::*;
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{Expr as PromExpr, Function, FunctionArgs, MatrixSelector};
+use promql_parser::parser::{
+    Expr as PromExpr, Function, FunctionArgs, MatrixSelector, value::ValueType,
+};
 
 use super::Engine;
-use crate::functions::{self, Func, RangeFunc, SingleArgFunc};
+use crate::{
+    ast::at_modifier::{Pin, pin},
+    functions::{self, Func, RangeFunc, SingleArgFunc},
+};
 
 impl Engine {
     pub(super) async fn call_expr(
@@ -118,11 +123,11 @@ impl Engine {
                 let err =
                     "Invalid args, expected holt_winters(v range-vector, sf scalar, tf scalar)";
                 self.ensure_args_len(args, 3, err)?;
-                let input = self.call_expr_arg(args, 0).await?;
+                let (input, pinned) = self.call_range_arg(args, 0).await?;
                 let scaling_factor = self.call_scalar_arg(args, 1, err).await?;
                 let trend_factor = self.call_scalar_arg(args, 2, err).await?;
 
-                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)
+                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx, pinned)
             }
             Func::LabelJoin => {
                 let err = "Invalid args, expected label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)";
@@ -171,18 +176,18 @@ impl Engine {
             Func::PredictLinear => {
                 let err = "Invalid args, expected predict_linear(v range-vector, t scalar)";
                 self.ensure_args_len(args, 2, err)?;
-                let input = self.call_expr_arg(args, 0).await?;
+                let (input, pinned) = self.call_range_arg(args, 0).await?;
                 let prediction_steps_f = self.call_scalar_arg(args, 1, err).await?;
 
-                functions::predict_linear(input, prediction_steps_f, &self.eval_ctx)
+                functions::predict_linear(input, prediction_steps_f, &self.eval_ctx, pinned)
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected quantile_over_time(scalar, range-vector)";
                 self.ensure_args_len(args, 2, err)?;
                 let phi_quantile_f = self.call_scalar_arg(args, 0, err).await?;
-                let input = self.call_expr_arg(args, 1).await?;
+                let (input, pinned) = self.call_range_arg(args, 1).await?;
 
-                functions::quantile_over_time(phi_quantile_f, input, &self.eval_ctx)
+                functions::quantile_over_time(phi_quantile_f, input, &self.eval_ctx, pinned)
             }
             Func::Round => {
                 let err = "Invalid args, expected round(v instant-vector, to_nearest=1 scalar)";
@@ -195,13 +200,16 @@ impl Engine {
 
                 functions::round(input, to_nearest)
             }
-            Func::HistogramCount
-            | Func::HistogramFraction
-            | Func::HistogramSum
-            | Func::Sort
-            | Func::SortDesc => Err(DataFusionError::NotImplemented(format!(
-                "Unsupported Function: {func_name:?}"
-            ))),
+            Func::Sort | Func::SortDesc => {
+                let err = "Invalid args, expected sort(v instant-vector)";
+                self.ensure_args_len(args, 1, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+
+                functions::sort(input, func_name == Func::SortDesc, &self.eval_ctx)
+            }
+            Func::HistogramCount | Func::HistogramFraction | Func::HistogramSum => Err(
+                DataFusionError::NotImplemented(format!("Unsupported Function: {func_name:?}")),
+            ),
             _ => self.call_single_arg_builtin(func_name, args).await,
         }
     }
@@ -247,6 +255,25 @@ impl Engine {
             .get(index)
             .ok_or_else(|| DataFusionError::NotImplemented(format!("Missing argument {index}")))?;
         self.exec_expr(arg).await
+    }
+
+    /// A range argument and the instant an `@` pins its window to, which every step then reads.
+    async fn call_range_arg(
+        &mut self,
+        args: &FunctionArgs,
+        index: usize,
+    ) -> Result<(Value, Option<i64>)> {
+        let arg = args
+            .args
+            .get(index)
+            .ok_or_else(|| DataFusionError::NotImplemented(format!("Missing argument {index}")))?;
+        if self.has_at_modifier
+            && arg.value_type() == ValueType::Matrix
+            && let Pin::At(at) = pin(arg)?
+        {
+            return Ok((self.exec_at(arg, at).await?, Some(at)));
+        }
+        Ok((self.exec_expr(arg).await?, None))
     }
 
     fn ensure_args_len(&self, args: &FunctionArgs, count: usize, err: &str) -> Result<()> {
@@ -372,8 +399,10 @@ mod tests {
             ("3 < vector(5)", 5.0),
             ("3 < bool vector(5)", 1.0),
             ("7 < bool vector(5)", 0.0),
+            // predict_linear is absent deliberately: vector(5) yields one sample per evaluation
+            // timestamp, and one reading is not a trend, so it has no value to preserve here.
+            // Its dispatch is covered in functions::predict_linear.
             ("quantile_over_time(0.5, vector(5)[1m:1s])", 5.0),
-            ("predict_linear(vector(5)[1m:1s], 10)", 5.0),
             (r#"label_join(vector(5), "dst", ",", "src")"#, 5.0),
             (
                 r#"label_replace(vector(5), "dst", "$1", "src", "(.*)")"#,

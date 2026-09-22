@@ -471,4 +471,32 @@ describe("applyLineAreaScatterBarChart - additional coverage", () => {
     const result = formatter([]);
     expect(result).toBe("");
   });
+
+  it("scatter tooltip formatter escapes HTML in category and series names", () => {
+    const ctx = makeMockContext({
+      panelSchema: {
+        type: "scatter",
+        config: {
+          unit: "default",
+          unit_custom: "",
+          decimals: 2,
+          axis_label_rotate: 0,
+          axis_label_truncate_width: 120,
+          trellis: { layout: null },
+          background: { value: { color: "#FFFFFF" } },
+        },
+        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+      },
+      breakDownKeys: [],
+    });
+    applyLineAreaScatterBarChart(ctx);
+    const marker = '<span style="color:red">●</span>';
+    const result = ctx.options.tooltip.formatter([
+      { name: "<b>cat</b>", seriesName: "<img src=x onerror=alert(1)>", data: 1, marker },
+    ]);
+    expect(result).not.toContain("<img");
+    expect(result).not.toContain("<b>cat");
+    expect(result).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(result).toContain(marker);
+  });
 });
