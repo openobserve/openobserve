@@ -134,6 +134,20 @@ impl EvidenceScope {
         self.pattern_updated_at = pattern_updated_at;
         self
     }
+
+    /// Carries each body's policy into the hash, so an audit can tell Redact from Detect.
+    pub fn with_pattern_rules(
+        mut self,
+        pattern_names: Vec<String>,
+        pattern_rules: &[(String, String)],
+        pattern_updated_at: Option<i64>,
+    ) -> Self {
+        self.patterns_configured = pattern_names.len() as u64;
+        self.pattern_names = pattern_names;
+        self.pattern_hash = pattern_rule_set_hash(pattern_rules);
+        self.pattern_updated_at = pattern_updated_at;
+        self
+    }
 }
 
 /// What one field's scan produced in one batch. Regions and drops are never summed.
@@ -491,10 +505,23 @@ pub fn is_self_reporting_stream(stream_name: &str) -> bool {
     )
 }
 
-/// Identity of the pattern set in effect: bodies are hashed individually, sorted, then joined.
+/// Identity of the pattern set in effect, for callers that cannot yet supply per-pattern policies.
 pub fn pattern_set_hash(pattern_bodies: &[String]) -> String {
-    let mut digests: Vec<String> = pattern_bodies.iter().map(sha256::digest).collect();
+    let rules: Vec<(String, String)> = pattern_bodies
+        .iter()
+        .map(|body| (body.clone(), String::new()))
+        .collect();
+    pattern_rule_set_hash(&rules)
+}
+
+/// What a body did, not just which body ran: the same regex under Redact and Detect differ.
+pub fn pattern_rule_set_hash(rules: &[(String, String)]) -> String {
+    let mut digests: Vec<String> = rules
+        .iter()
+        .map(|(body, policy)| sha256::digest(format!("{}:{policy}", sha256::digest(body))))
+        .collect();
     digests.sort();
+    digests.dedup();
     sha256::digest(digests.join(""))
 }
 
@@ -755,6 +782,59 @@ mod tests {
     fn pattern_set_hash_never_contains_the_regex_body() {
         let body = "[0-9]{13,16}".to_string();
         assert!(!pattern_set_hash(std::slice::from_ref(&body)).contains("0-9"));
+        let rules = [("[0-9]{13,16}".to_string(), "Redact".to_string())];
+        assert!(!pattern_rule_set_hash(&rules).contains("0-9"));
+    }
+
+    #[test]
+    fn the_same_body_under_redact_and_detect_hash_differently() {
+        let body = "[0-9]{13,16}".to_string();
+        let redact = pattern_rule_set_hash(&[(body.clone(), "Redact".to_string())]);
+        let detect = pattern_rule_set_hash(&[(body.clone(), "Detect".to_string())]);
+        let drop_field = pattern_rule_set_hash(&[(body, "DropField".to_string())]);
+        assert_ne!(redact, detect);
+        assert_ne!(redact, drop_field);
+        assert_ne!(detect, drop_field);
+    }
+
+    #[test]
+    fn a_rule_set_hash_is_order_independent_and_deduped() {
+        let a = ("aaa".to_string(), "Redact".to_string());
+        let b = ("bbb".to_string(), "Detect".to_string());
+        assert_eq!(
+            pattern_rule_set_hash(&[a.clone(), b.clone()]),
+            pattern_rule_set_hash(&[b, a.clone()])
+        );
+        // A duplicated rule is the same ruleset, so it must not change the identity.
+        assert_eq!(
+            pattern_rule_set_hash(std::slice::from_ref(&a)),
+            pattern_rule_set_hash(&[a.clone(), a])
+        );
+    }
+
+    #[test]
+    fn a_repeated_body_does_not_change_the_pattern_set_hash() {
+        let one = pattern_set_hash(&["aaa".to_string()]);
+        let twice = pattern_set_hash(&["aaa".to_string(), "aaa".to_string()]);
+        assert_eq!(one, twice);
+    }
+
+    #[test]
+    fn with_pattern_rules_separates_a_redact_scope_from_a_detect_one() {
+        let scope = || EvidenceScope::new("org", "logs", StreamType::Logs);
+        let names = vec!["card".to_string()];
+        let redact = scope().with_pattern_rules(
+            names.clone(),
+            &[("[0-9]{16}".to_string(), "Redact".to_string())],
+            None,
+        );
+        let detect = scope().with_pattern_rules(
+            names,
+            &[("[0-9]{16}".to_string(), "Detect".to_string())],
+            None,
+        );
+        assert_ne!(redact.pattern_hash, detect.pattern_hash);
+        assert_eq!(redact.patterns_configured, 1);
     }
 
     #[test]

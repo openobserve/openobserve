@@ -126,8 +126,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     // Node-to-node, not user input: rejecting here would wedge the queue.
                     for item in update.add.iter() {
                         if !PatternPolicy::is_recognised(&item.policy) {
-                            log::warn!(
-                                "[SUPER_CLUSTER:DB] unrecognised policy {:?} for {org}/{stype}/{stream} field {}; applying it as Redact",
+                            log::error!(
+                                "[SUPER_CLUSTER:DB] policy {:?} for {org}/{stype}/{stream} field {} cannot be decoded by this build; degrading it to Detect, so this field is counted but NOT redacted",
                                 item.policy,
                                 item.field
                             );

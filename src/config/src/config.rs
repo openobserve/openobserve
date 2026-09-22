@@ -2262,7 +2262,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_SDR_DETECT_POLICY_ENABLED",
         default = false,
-        help = "Allow the Detect (count-only) redaction policy. EVERY node in the cluster must ALREADY run a build that understands Detect before enabling this. An older node coerces Detect to Redact and rewrites data irreversibly, and the coercion propagates cluster-wide within seconds. Before rolling back to a build without Detect, delete or convert every Detect association first."
+        help = "Allow AUTHORING the Detect (count-only) redaction policy on this node. It gates writes made here only; it does NOT stop a Detect association authored elsewhere from replicating to this node, which honours it as count-only either way. On a build that predates Detect the association stops redacting instead of being applied as Redact, so the field is left unredacted until that build is upgraded."
     )]
     pub sdr_detect_policy_enabled: bool,
     #[env_config(

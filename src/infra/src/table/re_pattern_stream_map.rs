@@ -37,7 +37,7 @@ impl PatternPolicy {
         Self::parse_strict_with(value, config::get_config().common.sdr_detect_policy_enabled)
     }
 
-    /// False means the lossy read silently coerced this stored value to `Redact`.
+    /// False means the lossy read could not decode this stored value and degraded it to `Detect`.
     pub fn is_recognised(value: &str) -> bool {
         matches!(value, "DropField" | "Redact" | "Hash" | "Detect")
     }
@@ -47,12 +47,12 @@ impl PatternPolicy {
             "DropField" => Ok(Self::DropField),
             "Redact" => Ok(Self::Redact),
             "Hash" => Ok(Self::Hash),
-            // The gate is advisory: propagation to other nodes bypasses this check entirely.
+            // Authoring gate only: a Detect replicated from elsewhere never reaches this check.
             "Detect" if detect_enabled => Ok(Self::Detect),
             "Detect" => Err(UnknownPolicy {
                 value: value.to_string(),
                 hint: Some(
-                    "the Detect policy requires ZO_SDR_DETECT_POLICY_ENABLED=true on every node"
+                    "the Detect policy requires ZO_SDR_DETECT_POLICY_ENABLED=true on this node"
                         .to_string(),
                 ),
             }),
@@ -109,7 +109,8 @@ where
             "Hash" => Self::Hash,
             // Config-free by design: coercing a stored Detect here would rewrite untouched data.
             "Detect" => Self::Detect,
-            _ => Self::Redact,
+            // An unreadable policy must not destroy data, so it degrades to the count-only one.
+            _ => Self::Detect,
         }
     }
 }
@@ -326,8 +327,7 @@ pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-/// A downgrade silently applies an unknown policy as `Redact` and rewrites live data,
-/// so the load says so loudly. Returns the number of rows affected.
+/// An undecodable policy stops redacting rather than guessing, so the gap must be visible.
 fn log_unrecognised_policies(records: &[Model]) -> usize {
     let unrecognised: Vec<&Model> = records
         .iter()
@@ -338,7 +338,7 @@ fn log_unrecognised_policies(records: &[Model]) -> usize {
     }
     for record in &unrecognised {
         log::error!(
-            "[SDR] association {}/{}/{} field {} has policy {:?}, which this build does not recognise; it is being applied as Redact and will rewrite data",
+            "[SDR] association {}/{}/{} field {} has policy {:?}, which this build cannot decode; it is degraded to Detect, so this field is counted but NOT redacted",
             record.org,
             record.stream_type,
             record.stream,
@@ -347,7 +347,7 @@ fn log_unrecognised_policies(records: &[Model]) -> usize {
         );
     }
     log::error!(
-        "[SDR] {} pattern association(s) carry an unrecognised policy; delete or convert them before running this build",
+        "[SDR] {} pattern association(s) carry a policy this build cannot decode and are no longer redacting; convert them to a supported policy or run a build that understands them",
         unrecognised.len()
     );
     unrecognised.len()
@@ -366,9 +366,30 @@ mod tests {
     }
 
     #[test]
-    fn test_pattern_policy_from_unknown_defaults_to_redact() {
-        assert_eq!(PatternPolicy::from("Unknown"), PatternPolicy::Redact);
-        assert_eq!(PatternPolicy::from(""), PatternPolicy::Redact);
+    fn test_pattern_policy_from_unknown_degrades_to_detect_not_redact() {
+        // Redact rewrites data; an undecodable policy must never be resolved into destruction.
+        for value in ["Unknown", "", "SomeFuturePolicy", "redact"] {
+            assert_eq!(PatternPolicy::from(value), PatternPolicy::Detect, "{value}");
+            assert_ne!(PatternPolicy::from(value), PatternPolicy::Redact, "{value}");
+        }
+    }
+
+    #[test]
+    fn test_association_row_with_a_future_policy_does_not_become_redact() {
+        let model = Model {
+            id: 3,
+            org: "org".to_string(),
+            stream: "logs".to_string(),
+            stream_type: "logs".to_string(),
+            field: "message".to_string(),
+            pattern_id: "p-future".to_string(),
+            policy: "SomeFuturePolicy".to_string(),
+            apply_at: "AtIngestion".to_string(),
+        };
+        assert_eq!(
+            PatternAssociationEntry::from(model).policy,
+            PatternPolicy::Detect
+        );
     }
 
     #[test]
