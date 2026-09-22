@@ -100,7 +100,8 @@
       "crossLinkMultiStream.spec.js",
       "dashboards-form-validation.spec.js",
       "dashboard-refresh-without-cache.spec.js",
-      "dashboard-print-layout.spec.js"
+      "dashboard-print-layout.spec.js",
+      "dashboardPagination.spec.js"
     ],
     "disabled": [
       {
