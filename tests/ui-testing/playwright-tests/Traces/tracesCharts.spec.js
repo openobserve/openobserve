@@ -399,6 +399,10 @@ test.describe("Traces Charts testcases", () => {
     expect(await pm.tracesPage.isSearchErrorVisible(), 'The query must be rejected').toBeTruthy();
 
     expect(await pm.tracesPage.clearTraceQueryByKeyboard(), 'Editor must end up empty').toBeTruthy();
+    // CodeQueryEditor commits Monaco's content to the app after a 500ms debounce;
+    // clicking Run before that flushes re-submits the query it just replaced.
+    // No real user clears and clicks inside that window.
+    await page.waitForTimeout(600);
     await pm.tracesPage.runQuery();
     await pm.tracesPage.waitForTraceSearchResults();
 
