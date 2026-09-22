@@ -2470,11 +2470,6 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
 
     // Execute migration in a transaction
     let mut tx = pool.begin().await?;
-    sqlx::query(&format!(
-        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
-    ))
-    .execute(&mut *tx)
-    .await?;
 
     // 1. Ensure all columns exist
     sqlx::query(&format!(
@@ -2489,6 +2484,11 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     .await?;
     sqlx::query(&format!(
         "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS index_size BIGINT DEFAULT 0 NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
     ))
     .execute(&mut *tx)
     .await?;
@@ -2872,14 +2872,6 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let tables = vec!["file_list", "file_list_history", "file_list_dump_stats"];
     for table in &tables {
         let relkind = get_table_relkind(pool, table).await?;
-        if matches!(relkind.as_deref(), Some("p" | "r")) {
-            // The supplied pool can target a different schema than the global DDL pool.
-            sqlx::query(&format!(
-                "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
-            ))
-            .execute(pool)
-            .await?;
-        }
         match relkind.as_deref() {
             None => {
                 // Fresh install: create partitioned table directly
@@ -2902,6 +2894,12 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
                     .execute(pool)
                     .await?;
                 }
+                // Add mindex_size for version: <=1.0.0
+                sqlx::query(&format!(
+                    "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
+                ))
+                .execute(pool)
+                .await?;
             }
             Some("r") => {
                 // Regular table: needs migration
@@ -3128,6 +3126,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column("file_list_jobs", "dumped", "BOOLEAN default false not null").await?;
     add_column("stream_stats", "index_size", "BIGINT default 0 not null").await?;
     add_column("stream_stats", "mindex_size", "BIGINT DEFAULT 0 NOT NULL").await?;
+    add_column("steram", "mindex_size", "BIGINT DEFAULT 0 NOT NULL").await?;
     add_column(
         "stream_stats",
         "is_recent",

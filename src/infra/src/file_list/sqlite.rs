@@ -1881,30 +1881,39 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     .execute(&client)
     .await?;
 
-    // create column flattened for old version <= 0.10.5
+    // create column flattened for version <= 0.10.5
     let column = "flattened";
     let data_type = "BOOLEAN default false not null";
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
     add_column(&client, "file_list_deleted", column, data_type).await?;
 
-    // create column started_at for old version <= 0.10.8
+    // create column started_at for version <= 0.10.8
     let column = "started_at";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list_jobs", column, data_type).await?;
 
-    // create column index_size for old version <= 0.13.1
+    // create column index_size for version <= 0.13.1
     let column = "index_size";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
     add_column(&client, "stream_stats", column, data_type).await?;
-    add_mindex_size_columns(&client).await?;
+    add_column(&client, "file_list_dump_stats", column, data_type).await?;
+
+    // create column mindex_size for version <=1.0.0
+    let column = "mindex_size";
+    let data_type = "BIGINT default 0 not null";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
+    add_column(&client, "stream_stats", column, data_type).await?;
+    add_column(&client, "file_list_dump_stats", column, data_type).await?;
+
     let column = "index_file";
     let data_type = "BOOLEAN default false not null";
     add_column(&client, "file_list_deleted", column, data_type).await?;
 
-    // create col dumped for file_list_jobs for version <=0.14.0
+    // create column dumped for file_list_jobs for version <=0.14.0
     add_column(
         &client,
         "file_list_jobs",
@@ -2103,18 +2112,6 @@ pub async fn create_table_index() -> Result<()> {
         .execute(&client)
         .await?;
 
-    Ok(())
-}
-
-async fn add_mindex_size_columns(pool: &sqlx::Pool<Sqlite>) -> Result<()> {
-    for table in [
-        "file_list",
-        "file_list_history",
-        "file_list_dump_stats",
-        "stream_stats",
-    ] {
-        add_column(pool, table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL").await?;
-    }
     Ok(())
 }
 
