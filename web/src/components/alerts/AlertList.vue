@@ -2293,6 +2293,8 @@ export default defineComponent({
           loading.value = false;
           return;
         }
+        // A folder switch starts a new list; the page persisted for the previous folder must not be restored onto it.
+        currentPage.value = 1;
         if (searchAcrossFolders.value) {
           searchAcrossFolders.value = false;
           searchQuery.value = "";

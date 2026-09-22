@@ -121,6 +121,21 @@ describe("SloList pagination persistence", () => {
     expect((wrapper.vm as any).oTableRef.table.getState().pagination.pageIndex).toBe(1);
   });
 
+  it("resets to page 1 and drops page from the URL on a folder switch", async () => {
+    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(30) } } as any);
+    (router as any).currentRoute.value.query = { page: "2", folder: "default" };
+    wrapper = await mountList();
+    expect((wrapper.vm as any).currentPage).toBe(2);
+    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
+
+    (wrapper.vm as any).onFolderChange("team-b");
+
+    expect((wrapper.vm as any).currentPage).toBe(1);
+    const pushedQuery = pushSpy.mock.calls[0][0].query;
+    expect(pushedQuery.folder).toBe("team-b");
+    expect(pushedQuery.page).toBeUndefined();
+  });
+
   // The URL rewrite itself is onPageChange's job, covered below; the shared router's pending navigations make its call timing here unreliable.
   it("falls back to page 1 when the URL's page is past the end of the list", async () => {
     vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(5) } } as any);
@@ -216,21 +231,5 @@ describe("SloList pagination persistence", () => {
     expect(pushed.params).toEqual({ slo_id: "slo-1" });
     expect(pushed.query.page).toBe("3");
     expect(pushed.query.folder).toBe("team-a");
-  });
-
-  it("onFolderChange keeps carrying the page query param (already correct, guarded against regression)", async () => {
-    vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
-    (router as any).currentRoute.value.query = { page: "3" };
-    wrapper = await mountList();
-    // No call-through: this targets a different route, and a real navigation resolving async would leave the shared router's query mutated for the next test.
-    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
-    // Re-asserted: the shared router's own async effects can touch query between mount and this call.
-    (router as any).currentRoute.value.query = { page: "3" };
-
-    (wrapper.vm as any).onFolderChange("team-b");
-
-    const pushed = pushSpy.mock.calls[0][0] as any;
-    expect(pushed.query.page).toBe("3");
-    expect(pushed.query.folder).toBe("team-b");
   });
 });

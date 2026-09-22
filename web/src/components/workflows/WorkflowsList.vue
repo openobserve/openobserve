@@ -443,6 +443,8 @@ watch(activeFolderId, (folderId) => {
     searchAcrossFolders.value = false;
     filterQuery.value = "";
   }
+  // A folder switch starts a new list, so the page kept for the previous folder must not be restored onto it.
+  currentPage.value = 1;
   getWorkflows(folderId);
 });
 
