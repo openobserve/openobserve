@@ -261,7 +261,11 @@ describe("sessionReplayChangeFormat", () => {
       const out = converter.convert({
         type: 12,
         timestamp: 1000,
-        data: [[ADD_NODE, [1, "SPAN"]], [REMOVE_NODE, 4], [ATTRIBUTE, [2, ["class", "x"]]]],
+        data: [
+          [ADD_NODE, [1, "SPAN"]],
+          [REMOVE_NODE, 4],
+          [ATTRIBUTE, [2, ["class", "x"]]],
+        ],
       });
 
       expect(out).toHaveLength(1);
