@@ -306,9 +306,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            an access summary (creation only — rotate shows the token alone). -->
       <div data-test="service-accounts-token-wizard">
         <div data-test="service-accounts-token-step-1">
-          <p class="text-text-secondary mb-3 text-xs">
+          <OBanner
+            variant="warning"
+            icon="warning"
+            dense
+            data-test="service-accounts-token-copy-hint"
+            class="mb-3"
+          >
             {{ t("serviceAccounts.tokenReveal.copyHint") }}
-          </p>
+          </OBanner>
 
           <OTabs v-model="tokenTab" dense align="left">
             <OTab name="curl" :label="t('serviceAccounts.tokenReveal.curl')" />
@@ -334,36 +340,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTabPanel>
           </OTabPanels>
 
-          <div class="mt-3 flex items-center gap-2">
+          <div class="mt-3 grid grid-cols-2 gap-2">
             <OButton
               data-test="service-accounts-list-token-copy-btn"
               variant="outline"
-              size="icon-md"
+              size="sm"
+              icon-left="content-copy"
               :title="t('serviceAccounts.copyToken')"
               @click.stop="
-                copyToClipboard(serviceToken, t, {
+                copyToClipboard(activeTokenSnippet, t, {
                   successMessage: t('serviceAccounts.toast.tokenCopied'),
                   timeout: 5000,
                 })
               "
             >
-              <OIcon name="content-copy" size="sm" />
+              {{ t("serviceAccounts.copyToken") }}
             </OButton>
-            <span class="text-text-secondary text-xs">{{ t("serviceAccounts.copyToken") }}</span>
 
             <OButton
               data-test="service-accounts-list-token-download-btn"
               variant="outline"
-              size="icon-md"
-              class="ms-2"
+              size="sm"
+              icon-left="file-download"
               :title="t('serviceAccounts.downloadToken')"
               @click.stop="downloadTokenAsFile(serviceToken)"
             >
-              <OIcon name="file-download" size="sm" />
+              {{ t("serviceAccounts.downloadToken") }}
             </OButton>
-            <span class="text-text-secondary text-xs">{{
-              t("serviceAccounts.downloadToken")
-            }}</span>
           </div>
 
           <!-- ── Access grant status ──
@@ -389,13 +392,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-accounts-token-access-summary"
             class="mt-4"
           >
-            <div v-if="grantedRolesText" class="mb-1 flex items-start gap-2">
-              <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
-              <span class="text-text-secondary text-xs">{{ grantedRolesText }}</span>
+            <div v-if="grantedRolesText" class="mb-1 flex items-start">
+              <OBadge variant="success" icon="check" size="sm">{{ grantedRolesText }}</OBadge>
             </div>
-            <div v-if="grantedGroupsText" class="mb-1 flex items-start gap-2">
-              <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
-              <span class="text-text-secondary text-xs">{{ grantedGroupsText }}</span>
+            <div v-if="grantedGroupsText" class="mb-1 flex items-start">
+              <OBadge variant="success" icon="check" size="sm">{{ grantedGroupsText }}</OBadge>
             </div>
 
             <div
@@ -488,6 +489,8 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -539,6 +542,8 @@ export default defineComponent({
     ORefreshButton,
     OTable,
     OTag,
+    OBadge,
+    OBanner,
     OCodeCell,
     OUserCell,
     OTimeCell,
@@ -650,6 +655,15 @@ export default defineComponent({
     const tokenEnvSnippet = computed(() => {
       const orgId = store.state.selectedOrganization.identifier;
       return `OPENOBSERVE_AUTH="Basic ${tokenBasicCredential.value}"\nOPENOBSERVE_ORG_ID=${orgId}`;
+    });
+
+    // "Copy Token" copies whatever the active tab is showing (curl / header /
+    // env), not always the raw token — otherwise switching to the Header or
+    // Env tab and hitting Copy silently copies the wrong thing.
+    const activeTokenSnippet = computed(() => {
+      if (tokenTab.value === "header") return tokenHeaderSnippet.value;
+      if (tokenTab.value === "env") return tokenEnvSnippet.value;
+      return tokenCurlSnippet.value;
     });
 
     // Enterprise/Cloud builds have a Groups UI, so a freshly created account
@@ -1210,6 +1224,7 @@ export default defineComponent({
       tokenCurlSnippet,
       tokenHeaderSnippet,
       tokenEnvSnippet,
+      activeTokenSnippet,
       tokenNextStepHint,
       showGroupLink,
       groupLinkTarget,

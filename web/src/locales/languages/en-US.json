@@ -2031,7 +2031,7 @@
       "addToGroup": "Add to a user group",
       "addToRole": "Assign a role",
       "step1Title": "Copy your token",
-      "copyHint": "Copy this token now — you won't be able to see it again.",
+      "copyHint": "This is the only time you'll see this token. Copy or download it now — it can't be retrieved again.",
       "done": "Done",
       "applying": "Applying access grants…",
       "grantedRoles": "Roles assigned: {roles}",
