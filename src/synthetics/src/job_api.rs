@@ -1176,11 +1176,12 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         }
     }
 
+    inject_journey_secrets(&synthetic, &mut env_inject);
     synthetic.target = resolved_target(
         &synthetic.check_type,
         &substitute_placeholders(&synthetic.target, &env_inject),
     )?;
-    expand_for_resolve(conn, &mut synthetic, &mut env_inject).await?;
+    expand_for_resolve(conn, &mut synthetic).await?;
 
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);
@@ -1374,6 +1375,17 @@ fn resolvable_names(synthetic: &config::meta::synthetics::Synthetic) -> HashSet<
     names
 }
 
+// The probe fills {{NAME}} only from env_inject, so a journey with or without subtests needs its
+// secrets there.
+fn inject_journey_secrets(
+    synthetic: &config::meta::synthetics::Synthetic,
+    env_inject: &mut HashMap<String, String>,
+) {
+    if synthetic.check_type == SyntheticType::Browser {
+        inject_browser_secrets(&synthetic.config, env_inject);
+    }
+}
+
 // Browser secrets substitute {{NAME}} like variables, so their decrypted values join env_inject.
 fn inject_browser_secrets(config: &serde_json::Value, env_inject: &mut HashMap<String, String>) {
     let Some(secrets) = config.get("secrets").and_then(|s| s.as_array()) else {
@@ -1499,7 +1511,6 @@ fn within_replication_grace(parent_updated_at: i64) -> bool {
 async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
     conn: &C,
     synthetic: &mut config::meta::synthetics::Synthetic,
-    env_inject: &mut HashMap<String, String>,
 ) -> anyhow::Result<()> {
     use config::meta::{
         synthetics::{BrowserConfig, is_composition_action},
@@ -1522,8 +1533,6 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
     }) {
         return Ok(());
     }
-    // Only a child's `{{NAME}}` needs a parent secret in env_inject; a plain journey reads config.
-    inject_browser_secrets(&synthetic.config, env_inject);
     let refs = subtest_refs(&steps);
     let mut children = HashMap::new();
     for child_id in refs.iter().collect::<std::collections::HashSet<_>>() {
@@ -3561,22 +3570,32 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn a_plain_journey_keeps_its_secrets_out_of_env_inject() {
+        async fn a_plain_journey_resolves_unchanged() {
             let mut synthetic = browser_synthetic(json!(parent(&[], 2)));
             let before = synthetic.config.clone();
-            let mut env_inject = HashMap::new();
-            expand_for_resolve(&empty_db().await, &mut synthetic, &mut env_inject)
+            expand_for_resolve(&empty_db().await, &mut synthetic)
                 .await
                 .unwrap();
-            assert!(env_inject.is_empty(), "{env_inject:?}");
             assert_eq!(synthetic.config, before);
+        }
+
+        #[test]
+        fn a_plain_journey_gets_its_secrets_in_env_inject() {
+            let mut synthetic = browser_synthetic(json!(parent(&[], 2)));
+            synthetic.config["secrets"] = json!([{ "name": "PASSWORD", "value": "s3cret" }]);
+            let mut env_inject = HashMap::new();
+            inject_journey_secrets(&synthetic, &mut env_inject);
+            assert_eq!(
+                env_inject.get("PASSWORD").map(String::as_str),
+                Some("s3cret")
+            );
         }
 
         #[tokio::test]
         async fn a_reference_naming_no_child_reaches_the_boundary_check() {
             let mut synthetic =
                 browser_synthetic(json!([nav("s0"), { "id": "r0", "action": "subtest" }]));
-            let err = expand_for_resolve(&empty_db().await, &mut synthetic, &mut HashMap::new())
+            let err = expand_for_resolve(&empty_db().await, &mut synthetic)
                 .await
                 .unwrap_err();
             let err = err.downcast_ref::<ConfigError>().expect("a ConfigError");
