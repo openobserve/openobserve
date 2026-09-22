@@ -102,6 +102,7 @@ export default defineComponent({
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
       genAiAgentMapping: "gen_ai_agent_mapping",
+      paidUsage: "paid_usage",
     };
 
     const settingsTab = ref(
@@ -254,6 +255,16 @@ export default defineComponent({
             (!isCloud ||
               store.state.organizationData.organizationSettings.org_storage_enabled === true),
           dataTest: "storage-settings-tab",
+          group: "Data & AI",
+        },
+        {
+          key: "paid_usage",
+          label: t("paidUsage.settingsTitle"),
+          description: t("paidUsage.settingsDescription"),
+          icon: "paid",
+          to: { name: "paidUsage", query: { org_identifier: org } },
+          visible: isCloud,
+          dataTest: "paid-usage-settings-tab",
           group: "Data & AI",
         },
         {

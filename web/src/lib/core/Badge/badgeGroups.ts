@@ -1803,11 +1803,12 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      payasyougo: { variant: "primary-soft", labelKey: "billing.aiModePayAsYouGo" },
-      exhausted: { variant: "error-soft", labelKey: "billing.aiModeExhausted" },
-      free: { variant: "success-soft", labelKey: "billing.aiModeFree" },
+      payasyougo: { variant: "primary-soft", labelKey: "paidUsage.modePayAsYouGo" },
+      consentrequired: { variant: "warning-soft", labelKey: "paidUsage.modeConsentRequired" },
+      exhausted: { variant: "error-soft", labelKey: "paidUsage.modeExhausted" },
+      free: { variant: "success-soft", labelKey: "paidUsage.modeFree" },
     },
-    fallback: { variant: "success-soft", labelKey: "billing.aiModeFree" },
+    fallback: { variant: "default-soft", labelKey: "paidUsage.modeUnknown" },
   },
 
   // Billing-group member status — dot, PILL. i18n labels.

@@ -1487,6 +1487,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
+import { isAxiosError } from "axios";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
@@ -1530,6 +1531,10 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import {
+  isPaidOverageConsentError,
+  usePaidOverageConsent,
+} from "@/composables/usePaidOverageConsent";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1561,6 +1566,8 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { confirm } = useConfirmDialog();
+    const { promptForConsent } = usePaidOverageConsent();
+    const consentLifecycle = new AbortController();
 
     const incidentOrgId = useOrgId();
     const updateIncidentStatus = useMutation(() =>
@@ -2643,6 +2650,7 @@ export default defineComponent({
       stopInFlightPolling();
       rcaAbortController?.abort();
       rcaAbortController = null;
+      consentLifecycle.abort();
     });
 
     const close = () => {
@@ -2955,6 +2963,43 @@ export default defineComponent({
       }
     };
 
+    const requestRcaWithConsent = async (
+      org: string,
+      incidentId: string,
+      params: { reanalysis?: boolean; build_on_previous?: boolean },
+      signal?: AbortSignal,
+    ) => {
+      try {
+        return await incidentsService.triggerRca(org, incidentId, params, { signal });
+      } catch (error: unknown) {
+        const status = isAxiosError(error) ? (error.response?.status ?? 0) : 0;
+        const body: unknown = isAxiosError(error) ? error.response?.data : null;
+        if (!isPaidOverageConsentError(status, body)) throw error;
+
+        // A denied request never started on the server. Stop optimistic loading
+        // and polling while the user decides whether to authorize paid usage.
+        rcaLoading.value = false;
+        analysisStartedAt.value = null;
+        if (!analysisInFlight.value) stopInFlightPolling();
+
+        const consentSignal = signal ?? consentLifecycle.signal;
+        const accepted = await promptForConsent(org, "ai_credits", body.consent, consentSignal);
+        const drawerStillActive =
+          !consentSignal.aborted &&
+          store.state.selectedOrganization.identifier === org &&
+          incidentDetails.value?.id === incidentId;
+        if (!accepted || !drawerStillActive) {
+          if (!accepted && drawerStillActive) {
+            toast({ variant: "info", message: t("paidUsage.declinedNotice") });
+          }
+          return null;
+        }
+
+        // Exactly one guarded replacement request. A second denial propagates.
+        return incidentsService.triggerRca(org, incidentId, params, { signal });
+      }
+    };
+
     // Handle severity change from dropdown
     const handleSeverityChange = async (newSeverity: "P1" | "P2" | "P3" | "P4") => {
       if (!incidentDetails.value || updating.value) return;
@@ -2999,18 +3044,25 @@ export default defineComponent({
             });
             if (ok) {
               try {
-                await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
+                const response = await requestRcaWithConsent(org, incidentId, {
+                  reanalysis: true,
+                });
+                if (!response) return;
                 toast({
                   variant: "success",
                   message: t("toastMessages.alerts.aiReanalysisStarted"),
                 });
                 await loadDetails(incidentId);
-              } catch (e: any) {
-                toast({
-                  variant: "error",
-                  message:
-                    e?.response?.data?.message || t("alerts.incidents.reanalysisStartFailed"),
-                });
+              } catch (error: unknown) {
+                const responseData: unknown = isAxiosError(error) ? error.response?.data : null;
+                const message =
+                  responseData &&
+                  typeof responseData === "object" &&
+                  "message" in responseData &&
+                  typeof responseData.message === "string"
+                    ? raw(responseData.message)
+                    : t("alerts.incidents.reanalysisStartFailed");
+                toast({ variant: "error", message });
               }
             }
           }
@@ -3474,13 +3526,14 @@ export default defineComponent({
       rcaAbortController = new AbortController();
 
       try {
-        const response = await incidentsService.triggerRca(
+        const response = await requestRcaWithConsent(
           org,
           incidentId,
           // Fresh analysis unless the user explicitly asked to build on the previous one.
           { build_on_previous: options.buildOnPrevious === true },
-          { signal: rcaAbortController.signal },
+          rcaAbortController.signal,
         );
+        if (!response) return;
 
         // Set the RCA content immediately
         rcaStreamContent.value = response.data.rca_content;

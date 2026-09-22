@@ -444,8 +444,10 @@ pub struct TriggerRcaQuery {
     ),
     responses(
         (status = 200, description = "RCA analysis completed or SSE stream", content_type = "application/json", body = RcaResponse),
+        (status = 402, description = "AI credits exhausted", content_type = "application/json", body = ()),
+        (status = 412, description = "Paid usage requires organization consent", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
-        (status = 503, description = "RCA agent unavailable", content_type = "application/json", body = ()),
+        (status = 503, description = "RCA agent or billing state unavailable", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -479,62 +481,64 @@ pub async fn trigger_incident_rca(
             .unwrap();
     }
 
-    // In-flight guard
-    {
-        let cooldown = o2_cfg.incidents.reanalysis_cooldown_minutes;
-        let events = infra::table::incident_events::get(&org_id, &incident_id)
-            .await
-            .unwrap_or_default();
-        if openobserve_core::alerts::incidents::is_analysis_in_flight(&events, cooldown * 2) {
-            return MetaHttpResponse::bad_request("Analysis already in progress");
-        }
+    // In-flight guard. Keep the events to distinguish a first analysis from
+    // a rerun when a caller omits the explicit reanalysis flag.
+    let cooldown = o2_cfg.incidents.reanalysis_cooldown_minutes;
+    let events = infra::table::incident_events::get(&org_id, &incident_id)
+        .await
+        .unwrap_or_default();
+    if openobserve_core::alerts::incidents::is_analysis_in_flight(&events, cooldown * 2) {
+        return MetaHttpResponse::bad_request("Analysis already in progress");
     }
 
-    // AI credit deduction is handled inside trigger_rca_for_incident at the service layer
-    // (cloud-only). Do NOT deduct here — it would cause double charging.
+    // Validate the incident before consuming quota or starting the lifecycle.
+    let incident =
+        match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
+            .await
+        {
+            Ok(Some(i)) => i,
+            Ok(None) => return MetaHttpResponse::not_found("Incident not found"),
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
 
-    // Emit AIAnalysisBegin — all error paths below this point must emit Complete to
-    // clear the in-flight guard, otherwise it stays locked until the stale threshold.
+    #[cfg(feature = "cloud")]
+    let usage_permit = {
+        let is_reanalysis = query.reanalysis
+            || events.iter().any(|event| {
+                matches!(
+                    event.event_type,
+                    config::meta::alerts::incidents::IncidentEventType::AIAnalysisComplete
+                )
+            });
+        let feature = if is_reanalysis {
+            openobserve_core::trial_quota::TrialQuotaFeature::IncidentReAnalysis
+        } else {
+            openobserve_core::trial_quota::TrialQuotaFeature::NewIncident
+        };
+        let usage_context = openobserve_core::trial_quota::AiUsageContext {
+            user_email: user_email.user_id.clone(),
+            incident_id: Some(incident_id.clone()),
+            ..Default::default()
+        };
+        match openobserve_core::trial_quota::authorize_ai_usage(&org_id, feature, &usage_context)
+            .await
+        {
+            Ok(permit) => Some(permit),
+            Err(error) => {
+                return crate::request::ai::chat::ai_authorization_error_response(error);
+            }
+        }
+    };
+    #[cfg(not(feature = "cloud"))]
+    let usage_permit = None;
+
+    // Authorization succeeded. Every error below must terminate the lifecycle.
     let _ = openobserve_core::incidents::append_event(
         &org_id,
         &incident_id,
         config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
     )
     .await;
-
-    // Get incident with alerts
-    let incident =
-        match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
-            .await
-        {
-            Ok(Some(i)) => i,
-            Ok(None) => {
-                let _ = openobserve_core::incidents::append_event(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Incident not found",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        None,
-                    ),
-                )
-                .await;
-                return MetaHttpResponse::not_found("Incident not found");
-            }
-            Err(e) => {
-                let _ = openobserve_core::incidents::append_event(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Database error",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        Some(format!("{:#}", e)),
-                    ),
-                )
-                .await;
-                return MetaHttpResponse::internal_error(e);
-            }
-        };
 
     // Build RCA context. Each run is a fresh analysis unless the caller explicitly opts
     // into continuity — chaining every run compounds the report (and the agent's context)
@@ -642,6 +646,7 @@ pub async fn trigger_incident_rca(
                 true,
                 user_email_bg,
                 build_on_previous,
+                usage_permit,
             )
             .await
             {

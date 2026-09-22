@@ -160,6 +160,7 @@ async fn run_trial_quota_flush() {
         interval.tick().await;
         openobserve_core::trial_quota::flush_to_db().await;
         openobserve_core::trial_quota::refresh_limits_from_db().await;
+        openobserve_core::trial_quota::refresh_paid_overage_from_db().await;
     }
 }
 
@@ -214,11 +215,34 @@ async fn check_all_orgs_ai_quota() {
             }
         };
 
-        let policy =
-            o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+        let resolution =
+            match o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_billing(&org_id)
+                .await
+            {
+                Ok(resolution) => resolution,
+                Err(error) => {
+                    log::warn!(
+                        "[AI_QUOTA] Failed to resolve billing consent target for org={org_id}: {error}"
+                    );
+                    o2_enterprise::enterprise::cloud::ai_credits::AiCreditBillingResolution {
+                        policy: o2_enterprise::enterprise::cloud::ai_credits::AiCreditExhaustionPolicy::SubscriptionRequired,
+                        payer_org_id: None,
+                    }
+                }
+            };
+        let consent = o2_enterprise::enterprise::cloud::ai_credits::AiCreditConsentState {
+            organization_enabled: trial_quota::get_paid_overage_enabled_for_pool(
                 &org_id,
-            )
-            .await;
+                trial_quota::TrialQuotaPool::AiCredits,
+            ),
+            payer_enabled: resolution.payer_org_id.as_ref().map(|payer_org_id| {
+                trial_quota::get_paid_overage_enabled_for_pool(
+                    payer_org_id,
+                    trial_quota::TrialQuotaPool::AiCredits,
+                )
+            }),
+            payer_org_id: resolution.payer_org_id.clone(),
+        };
         let used = trial_quota::get_used(&org_id);
         let limit = trial_quota::get_limit(&org_id);
 
@@ -232,7 +256,13 @@ async fn check_all_orgs_ai_quota() {
 
         let (subject, body) =
             o2_enterprise::enterprise::cloud::ai_credits::build_ai_credit_quota_email(
-                &org_id, &org_name, checkpoint, policy, used, limit,
+                &org_id,
+                &org_name,
+                checkpoint,
+                resolution.policy,
+                &consent,
+                used,
+                limit,
             );
 
         let email = Email {

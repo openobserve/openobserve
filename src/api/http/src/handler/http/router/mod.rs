@@ -1856,6 +1856,11 @@ pub fn service_routes() -> Router {
                 put(organization::org::set_quota_usage_limit),
             )
             .route(
+                "/{org_id}/quota/{feature}/paid_overage",
+                get(organization::org::get_paid_overage_status)
+                    .put(organization::org::set_paid_overage_status),
+            )
+            .route(
                 "/{org_id}/billings/data_usage/{usage_date}",
                 get(cloud::org_usage::get_org_usage),
             )

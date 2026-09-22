@@ -602,6 +602,14 @@ pub struct ApiDoc;
 )))]
 struct EnterpriseExperimentApiDoc;
 
+#[cfg(feature = "cloud")]
+#[derive(OpenApi)]
+#[openapi(paths(
+    openobserve_api_management::request::organization::org::get_paid_overage_status,
+    openobserve_api_management::request::organization::org::set_paid_overage_status,
+))]
+struct CloudQuotaApiDoc;
+
 pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
@@ -615,6 +623,17 @@ impl Modify for SecurityAddon {
             {
                 components.schemas.extend(enterprise_components.schemas);
                 components.responses.extend(enterprise_components.responses);
+            }
+        }
+        #[cfg(feature = "cloud")]
+        {
+            let cloud = CloudQuotaApiDoc::openapi();
+            openapi.paths.paths.extend(cloud.paths.paths);
+            if let (Some(components), Some(cloud_components)) =
+                (openapi.components.as_mut(), cloud.components)
+            {
+                components.schemas.extend(cloud_components.schemas);
+                components.responses.extend(cloud_components.responses);
             }
         }
         let cfg = get_config();

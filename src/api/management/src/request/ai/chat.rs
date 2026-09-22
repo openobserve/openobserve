@@ -74,6 +74,37 @@ fn is_valid_session_id(val: &str) -> bool {
     val.len() == 36 && uuid::Uuid::try_parse(val).is_ok()
 }
 
+#[cfg(feature = "cloud")]
+pub(crate) fn ai_authorization_error_response(
+    error: openobserve_core::trial_quota::AiUsageAuthorizationError,
+) -> Response {
+    use openobserve_core::trial_quota::AiUsageAuthorizationError;
+
+    match error {
+        AiUsageAuthorizationError::PaidOverageConsentRequired(consent) => (
+            StatusCode::PRECONDITION_FAILED,
+            Json(serde_json::json!({
+                "code": StatusCode::PRECONDITION_FAILED.as_u16(),
+                "message": "Paid usage requires organization consent.",
+                "error_type": "paid_overage_consent_required",
+                "consent": consent,
+            })),
+        )
+            .into_response(),
+        AiUsageAuthorizationError::PaymentRequired(message) => {
+            MetaHttpResponse::payment_required(message)
+        }
+        AiUsageAuthorizationError::Unavailable(message) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(MetaHttpResponse::error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                message,
+            )),
+        )
+            .into_response(),
+    }
+}
+
 /// Extract headers from the request that match the configured passthrough patterns.
 /// Supports exact matches and prefix wildcards (e.g., "x-forwarded-*").
 fn extract_passthrough_headers(
@@ -146,6 +177,9 @@ fn extract_passthrough_headers(
         (status = StatusCode::OK, description = "Chat response", body = inline(PromptResponse)),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
+        (status = StatusCode::PRECONDITION_FAILED, description = "Paid overage consent required", body = Object),
+        (status = StatusCode::PAYMENT_REQUIRED, description = "Subscription or additional credits required", body = Object),
+        (status = StatusCode::SERVICE_UNAVAILABLE, description = "Usage authorization unavailable", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"}))
@@ -192,48 +226,24 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             return MetaHttpResponse::bad_request("AI agent URL is not set");
         }
 
-        // AI credit check (cloud only)
-        // All orgs try free quota first. On exhaustion, paid orgs overflow to
-        // Stripe billing; unpaid orgs get a hard 402.
+        // AI credit authorization (cloud only). This records exactly one free or
+        // paid event before the agent call, or returns a typed denial.
         #[cfg(feature = "cloud")]
         {
-            let deduction = openobserve_core::trial_quota::try_deduct(
-                org_id_str,
-                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
-            )
-            .await;
-
             let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
                 user_email: user_id.to_string(),
                 trace_id: Some(trace_id.clone()),
                 session_id: None,
                 incident_id: None,
             };
-            match &deduction {
-                Ok(_) => {
-                    openobserve_core::trial_quota::record_free_ai_usage(
-                        org_id_str,
-                        &usage_ctx,
-                        openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
-                    );
-                }
-                Err(e) => {
-                    let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
-                        org_id_str,
-                    )
-                    .await;
-                    if policy.allows_metered_overage() {
-                        openobserve_core::trial_quota::record_billable_ai_usage(
-                            org_id_str,
-                            &usage_ctx,
-                            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
-                        );
-                    } else {
-                        return MetaHttpResponse::payment_required(
-                            policy.quota_exhausted_message(e.as_ref()),
-                        );
-                    }
-                }
+            if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
+                org_id_str,
+                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
+                &usage_ctx,
+            )
+            .await
+            {
+                return ai_authorization_error_response(error);
             }
         }
 
@@ -490,6 +500,9 @@ impl TraceInfo {
         (status = StatusCode::OK, description = "Chat response", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
+        (status = StatusCode::PRECONDITION_FAILED, description = "Paid overage consent required", body = Object),
+        (status = StatusCode::PAYMENT_REQUIRED, description = "Subscription or additional credits required", body = Object),
+        (status = StatusCode::SERVICE_UNAVAILABLE, description = "Usage authorization unavailable", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"})),
@@ -667,17 +680,9 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
-        // AI credit check (cloud only)
-        // All orgs try free quota first. On exhaustion, paid orgs overflow to
-        // Stripe billing; unpaid orgs get a hard 402.
+        // AI credit authorization (cloud only).
         #[cfg(feature = "cloud")]
         {
-            let deduction = openobserve_core::trial_quota::try_deduct(
-                &org_id_str,
-                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
-            )
-            .await;
-
             let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
                 user_email: user_id.clone(),
                 trace_id: Some(trace_id.clone()),
@@ -686,31 +691,14 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                     .cloned(),
                 incident_id: None,
             };
-            match &deduction {
-                Ok(_) => {
-                    openobserve_core::trial_quota::record_free_ai_usage(
-                        &org_id_str,
-                        &usage_ctx,
-                        openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
-                    );
-                }
-                Err(e) => {
-                    let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
-                        &org_id_str,
-                    )
-                    .await;
-                    if policy.allows_metered_overage() {
-                        openobserve_core::trial_quota::record_billable_ai_usage(
-                            &org_id_str,
-                            &usage_ctx,
-                            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
-                        );
-                    } else {
-                        return MetaHttpResponse::payment_required(
-                            policy.quota_exhausted_message(e.as_ref()),
-                        );
-                    }
-                }
+            if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
+                &org_id_str,
+                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
+                &usage_ctx,
+            )
+            .await
+            {
+                return ai_authorization_error_response(error);
             }
         }
 
@@ -1159,6 +1147,47 @@ pub async fn confirm_action(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn paid_overage_denial_is_a_structured_precondition_response() {
+        use openobserve_core::trial_quota::{
+            AiUsageAuthorizationError, PaidOverageBillingStatus, PaidOverageOrganizationStatus,
+            PaidOverageStatus,
+        };
+
+        let response = ai_authorization_error_response(
+            AiUsageAuthorizationError::PaidOverageConsentRequired(PaidOverageStatus {
+                feature: "ai_credits".to_string(),
+                organization: PaidOverageOrganizationStatus {
+                    org_id: "member".to_string(),
+                    enabled: false,
+                    can_manage: true,
+                },
+                payer: Some(PaidOverageOrganizationStatus {
+                    org_id: "payer".to_string(),
+                    enabled: false,
+                    can_manage: false,
+                }),
+                effective: false,
+                billing_status: PaidOverageBillingStatus::Eligible,
+            }),
+        );
+
+        assert_eq!(response.status(), StatusCode::PRECONDITION_FAILED);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["error_type"], "paid_overage_consent_required");
+        assert_eq!(body["consent"]["feature"], "ai_credits");
+        assert_eq!(body["consent"]["organization"]["org_id"], "member");
+        assert_eq!(body["consent"]["payer"]["org_id"], "payer");
+        let serialized = body.to_string();
+        assert!(!serialized.contains("ai_chat"));
+        assert!(!serialized.contains("new_incident"));
+        assert!(!serialized.contains("incident_reanalysis"));
+    }
 
     #[test]
     fn test_valid_session_ids_are_accepted() {

@@ -747,51 +747,6 @@ pub async fn correlate_alert_to_incident(
         }
     }
 
-    // AI credit deduction for incident creation (cloud only).
-    // Only deduct when a NEW incident is created — alerts joining an existing
-    // incident or repeated firings must not consume credits or post usage events.
-    #[cfg(feature = "cloud")]
-    if matches!(
-        outcome,
-        IncidentCorrelationOutcome::NewIncidentCreated { .. }
-    ) {
-        let deduction = crate::trial_quota::try_deduct(
-            &alert.org_id,
-            crate::trial_quota::TrialQuotaFeature::NewIncident,
-        )
-        .await;
-
-        let usage_ctx = crate::trial_quota::AiUsageContext {
-            user_email: "system@openobserve.ai".to_string(),
-            incident_id: Some(outcome.incident_id().to_string()),
-            ..Default::default()
-        };
-        match &deduction {
-            Ok(_) => {
-                crate::trial_quota::record_free_ai_usage(
-                    &alert.org_id,
-                    &usage_ctx,
-                    crate::trial_quota::TrialQuotaFeature::NewIncident,
-                );
-            }
-            Err(_) => {
-                let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
-                    &alert.org_id,
-                )
-                .await;
-                if policy.allows_metered_overage() {
-                    crate::trial_quota::record_billable_ai_usage(
-                        &alert.org_id,
-                        &usage_ctx,
-                        crate::trial_quota::TrialQuotaFeature::NewIncident,
-                    );
-                }
-                // Note: incident is already created at this point — we don't roll it
-                // back on quota exhaustion. The deduction failure is logged by try_deduct.
-            }
-        }
-    }
-
     // Send incident notification unless rows are empty (manual trigger path)
     // or the outcome is a repeated alert (suppressed by design).
     if !notify_rows.is_empty() {
@@ -1294,49 +1249,79 @@ async fn create_new_incident(
             && o2_cfg.incidents.rca_enabled
             && !o2_cfg.ai.agent_url.is_empty()
         {
-            if let Err(e) = crate::incidents::append_event(
-                org_id,
-                &incident.id,
-                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-            )
-            .await
-            {
-                log::error!(
-                    "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {}: {e}",
-                    incident.id
-                );
-            }
-
-            let org_id_rca = org_id.to_string();
-            let incident_id_rca = incident.id.clone();
-            let handle = tokio::spawn(async move {
-                if let Err(e) = trigger_rca_for_incident(
-                    org_id_rca.clone(),
-                    incident_id_rca.clone(),
-                    false,
-                    true,
-                    "system@openobserve.ai".to_string(),
-                    // First analysis for this incident — there is nothing to build on.
-                    false,
+            #[cfg(feature = "cloud")]
+            let usage_permit = {
+                let usage_context = crate::trial_quota::AiUsageContext {
+                    user_email: "system@openobserve.ai".to_string(),
+                    incident_id: Some(incident.id.clone()),
+                    ..Default::default()
+                };
+                match crate::trial_quota::authorize_ai_usage(
+                    org_id,
+                    crate::trial_quota::TrialQuotaFeature::NewIncident,
+                    &usage_context,
                 )
                 .await
                 {
-                    log::debug!(
-                        "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
-                    );
-
-                    emit_analysis_failure(
-                        &org_id_rca,
-                        &incident_id_rca,
-                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
-                        "Background spawn failed",
-                        Some(&e),
-                    )
-                    .await;
+                    Ok(permit) => Some(permit),
+                    Err(error) => {
+                        log::info!(
+                            "[INCIDENTS::RCA] New incident {} retained without RCA: {error}",
+                            incident.id
+                        );
+                        None
+                    }
                 }
-                unregister_rca_task(&org_id_rca, &incident_id_rca);
-            });
-            register_rca_task(org_id, &incident.id, handle.abort_handle());
+            };
+            #[cfg(not(feature = "cloud"))]
+            let usage_permit = None;
+
+            if !cfg!(feature = "cloud") || usage_permit.is_some() {
+                if let Err(e) = crate::incidents::append_event(
+                    org_id,
+                    &incident.id,
+                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                )
+                .await
+                {
+                    log::error!(
+                        "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {}: {e}",
+                        incident.id
+                    );
+                }
+
+                let org_id_rca = org_id.to_string();
+                let incident_id_rca = incident.id.clone();
+                let handle = tokio::spawn(async move {
+                    if let Err(e) = trigger_rca_for_incident(
+                        org_id_rca.clone(),
+                        incident_id_rca.clone(),
+                        false,
+                        true,
+                        "system@openobserve.ai".to_string(),
+                        // First analysis for this incident — there is nothing to build on.
+                        false,
+                        usage_permit,
+                    )
+                    .await
+                    {
+                        log::debug!(
+                            "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
+                        );
+
+                        emit_analysis_failure(
+                            &org_id_rca,
+                            &incident_id_rca,
+                            config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
+                            "Background spawn failed",
+                            Some(&e),
+                        )
+                        .await;
+                    }
+                    unregister_rca_task(&org_id_rca, &incident_id_rca);
+                });
+                register_rca_task(org_id, &incident.id, handle.abort_handle());
+            }
         }
     }
 
@@ -1642,40 +1627,69 @@ async fn find_or_create_incident(
                         .await
                         .unwrap_or_default();
                     if !is_analysis_in_flight(&events, cooldown * 2) {
-                        let _ = crate::incidents::append_event(
-                            &org_id_rca,
-                            &incident_id_rca,
-                            config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                        )
-                        .await;
-                        let handle = tokio::spawn(async move {
-                            if let Err(e) = trigger_rca_for_incident(
-                                org_id_rca.clone(),
-                                incident_id_rca.clone(),
-                                true,
-                                true,
-                                "system@openobserve.ai".to_string(),
-                                // Fresh analysis: a new alert type changes the picture,
-                                // so the agent should reassess rather than extend.
-                                false,
+                        #[cfg(feature = "cloud")]
+                        let usage_permit = {
+                            let usage_context = crate::trial_quota::AiUsageContext {
+                                user_email: "system@openobserve.ai".to_string(),
+                                incident_id: Some(incident_id_rca.clone()),
+                                ..Default::default()
+                            };
+                            match crate::trial_quota::authorize_ai_usage(
+                                &org_id_rca,
+                                crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+                                &usage_context,
                             )
                             .await
                             {
-                                log::debug!(
-                                    "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
-                                );
-
-                                emit_analysis_failure(
-                                    &org_id_rca,
-                                    &incident_id_rca,
-                                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
-                                    "Reanalysis trigger failed",
-                                    Some(&e),
-                                ).await;
+                                Ok(permit) => Some(permit),
+                                Err(error) => {
+                                    log::info!(
+                                        "[INCIDENTS::RCA] Skipping new-alert reanalysis for {incident_id_rca}: {error}"
+                                    );
+                                    None
+                                }
                             }
-                            unregister_rca_task(&org_id_rca, &incident_id_rca);
-                        });
-                        register_rca_task(org_id, &existing.id, handle.abort_handle());
+                        };
+                        #[cfg(not(feature = "cloud"))]
+                        let usage_permit = None;
+
+                        if !cfg!(feature = "cloud") || usage_permit.is_some() {
+                            let _ = crate::incidents::append_event(
+                                &org_id_rca,
+                                &incident_id_rca,
+                                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                            )
+                            .await;
+                            let handle = tokio::spawn(async move {
+                                if let Err(e) = trigger_rca_for_incident(
+                                    org_id_rca.clone(),
+                                    incident_id_rca.clone(),
+                                    true,
+                                    true,
+                                    "system@openobserve.ai".to_string(),
+                                    // Fresh analysis: a new alert type changes the picture,
+                                    // so the agent should reassess rather than extend.
+                                    false,
+                                    usage_permit,
+                                )
+                                .await
+                                {
+                                    log::debug!(
+                                        "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
+                                    );
+
+                                    emit_analysis_failure(
+                                        &org_id_rca,
+                                        &incident_id_rca,
+                                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
+                                        "Reanalysis trigger failed",
+                                        Some(&e),
+                                    ).await;
+                                }
+                                unregister_rca_task(&org_id_rca, &incident_id_rca);
+                            });
+                            register_rca_task(org_id, &existing.id, handle.abort_handle());
+                        }
                     } else {
                         log::debug!(
                             "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping NewAlertTypeJoined trigger"
@@ -2278,10 +2292,13 @@ pub async fn trigger_rca_for_incident(
     begin_already_emitted: bool,
     // Email of the user who triggered the analysis, used for AI usage tracking.
     // For automated/system-initiated calls, use "system@openobserve.ai".
-    _user_email: String,
+    user_email: String,
     // When true, the previous report is sent to the agent so it extends that analysis.
     // Automatic triggers pass false so each run stands on its own.
     build_on_previous: bool,
+    // A caller that emits Begin before spawning must authorize synchronously and
+    // pass this one-shot proof so the spawned task cannot meter twice.
+    usage_permit: Option<crate::trial_quota::AiUsagePermit>,
 ) -> Result<(), anyhow::Error> {
     use o2_enterprise::enterprise::{
         ai::client::get_agent_client, common::config::get_config as get_o2_config,
@@ -2365,6 +2382,35 @@ pub async fn trigger_rca_for_incident(
         "[INCIDENTS::RCA] Triggering RCA for incident {incident_id} (reanalysis={reanalysis})"
     );
 
+    #[cfg(feature = "cloud")]
+    let usage_permit = match usage_permit {
+        Some(permit) => permit,
+        None => {
+            let feature = if reanalysis {
+                crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
+            } else {
+                crate::trial_quota::TrialQuotaFeature::NewIncident
+            };
+            let usage_context = crate::trial_quota::AiUsageContext {
+                user_email: user_email.clone(),
+                incident_id: Some(incident_id.clone()),
+                ..Default::default()
+            };
+            crate::trial_quota::authorize_ai_usage(&org_id, feature, &usage_context)
+                .await
+                .map_err(|error| anyhow::anyhow!(error))?
+        }
+    };
+    #[cfg(feature = "cloud")]
+    debug_assert_eq!(
+        usage_permit.feature(),
+        if reanalysis {
+            crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
+        } else {
+            crate::trial_quota::TrialQuotaFeature::NewIncident
+        }
+    );
+
     // Emit AIAnalysisBegin only when the caller hasn't already done so
     if !begin_already_emitted
         && let Err(e) = crate::incidents::append_event(
@@ -2377,46 +2423,8 @@ pub async fn trigger_rca_for_incident(
         log::error!("[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {incident_id}: {e}");
     }
 
-    // AI credit check for reanalysis (cloud only)
-    #[cfg(feature = "cloud")]
-    if reanalysis {
-        let deduction = crate::trial_quota::try_deduct(
-            &org_id,
-            crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-        )
-        .await;
-
-        let usage_ctx = crate::trial_quota::AiUsageContext {
-            user_email: _user_email.clone(),
-            incident_id: Some(incident_id.clone()),
-            ..Default::default()
-        };
-        match &deduction {
-            Ok(_) => {
-                crate::trial_quota::record_free_ai_usage(
-                    &org_id,
-                    &usage_ctx,
-                    crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                );
-            }
-            Err(e) => {
-                let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
-                    &org_id,
-                )
-                .await;
-                if policy.allows_metered_overage() {
-                    crate::trial_quota::record_billable_ai_usage(
-                        &org_id,
-                        &usage_ctx,
-                        crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                    );
-                } else {
-                    log::info!("[INCIDENTS::RCA] Skipping reanalysis for org {org_id}: {e}");
-                    return Ok(());
-                }
-            }
-        }
-    }
+    // Authorization and metering happen before Begin, either synchronously in
+    // the caller or directly above. No quota work occurs after the lifecycle starts.
 
     // Create RCA agent client with SA credentials
     let (email, token) = crate::organization::get_sre_agent_credentials(&org_id).await?;
@@ -2497,8 +2505,7 @@ pub async fn trigger_rca_for_incident(
                 );
             }
 
-            // Reanalysis usage reporting is handled by the try_deduct
-            // quota block earlier in this function (paid orgs only).
+            // Authorization and usage reporting completed before AIAnalysisBegin.
 
             Ok(())
         }
@@ -2507,7 +2514,7 @@ pub async fn trigger_rca_for_incident(
 
             // Determine trigger type based on function context
             let trigger_type = if reanalysis {
-                if _user_email == "system@openobserve.ai" {
+                if user_email == "system@openobserve.ai" {
                     config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis
                 } else {
                     config::meta::alerts::incidents::AnalysisTriggerType::Manual
@@ -2626,41 +2633,70 @@ pub async fn update_status(
             .await
             .unwrap_or_default();
         if !is_analysis_in_flight(&events, cooldown * 2) {
-            // Emit Begin synchronously so the frontend sees it on the next poll
-            let _ = crate::incidents::append_event(
-                &org_id_rca,
-                &incident_id_rca,
-                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-            )
-            .await;
-            let handle = tokio::spawn(async move {
-                // reanalysis on reopen: deduct credits and report usage;
-                // begin_already_emitted=true skips cooldown/in-flight guards
-                if let Err(e) = trigger_rca_for_incident(
-                    org_id_rca.clone(),
-                    incident_id_rca.clone(),
-                    true, // reanalysis — deduct credits and report usage
-                    true, // begin already emitted above
-                    "system@openobserve.ai".to_string(),
-                    // Reopened incidents get a fresh read of the current state.
-                    false,
+            #[cfg(feature = "cloud")]
+            let usage_permit = {
+                let usage_context = crate::trial_quota::AiUsageContext {
+                    user_email: "system@openobserve.ai".to_string(),
+                    incident_id: Some(incident_id_rca.clone()),
+                    ..Default::default()
+                };
+                match crate::trial_quota::authorize_ai_usage(
+                    &org_id_rca,
+                    crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+                    &usage_context,
                 )
                 .await
                 {
-                    log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
-
-                    emit_analysis_failure(
-                        &org_id_rca,
-                        &incident_id_rca,
-                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
-                        "Reanalysis after reopen failed",
-                        Some(&e),
-                    )
-                    .await;
+                    Ok(permit) => Some(permit),
+                    Err(error) => {
+                        log::info!(
+                            "[INCIDENTS::RCA] Reopened incident {incident_id_rca} retained without reanalysis: {error}"
+                        );
+                        None
+                    }
                 }
-                unregister_rca_task(&org_id_rca, &incident_id_rca);
-            });
-            register_rca_task(org_id, incident_id, handle.abort_handle());
+            };
+            #[cfg(not(feature = "cloud"))]
+            let usage_permit = None;
+
+            if !cfg!(feature = "cloud") || usage_permit.is_some() {
+                // Emit Begin synchronously so the frontend sees it on the next poll.
+                let _ = crate::incidents::append_event(
+                    &org_id_rca,
+                    &incident_id_rca,
+                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                )
+                .await;
+                let handle = tokio::spawn(async move {
+                    if let Err(e) = trigger_rca_for_incident(
+                        org_id_rca.clone(),
+                        incident_id_rca.clone(),
+                        true,
+                        true,
+                        "system@openobserve.ai".to_string(),
+                        // Reopened incidents get a fresh read of the current state.
+                        false,
+                        usage_permit,
+                    )
+                    .await
+                    {
+                        log::debug!(
+                            "[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}"
+                        );
+
+                        emit_analysis_failure(
+                            &org_id_rca,
+                            &incident_id_rca,
+                            config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
+                            "Reanalysis after reopen failed",
+                            Some(&e),
+                        )
+                        .await;
+                    }
+                    unregister_rca_task(&org_id_rca, &incident_id_rca);
+                });
+                register_rca_task(org_id, incident_id, handle.abort_handle());
+            }
         } else {
             log::debug!(
                 "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping Reopened trigger"

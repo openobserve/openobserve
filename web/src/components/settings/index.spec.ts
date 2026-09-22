@@ -202,6 +202,16 @@ describe("SettingsIndex", () => {
       expect(item.visible).toBe(true);
     });
 
+    it("should include the cloud-only paid_usage item under Data & AI", () => {
+      const wrapper = createWrapper();
+      const item = getAllItems(wrapper).find((i: any) => i.key === "paid_usage");
+      expect(item).toBeDefined();
+      expect(item.dataTest).toBe("paid-usage-settings-tab");
+      expect(item.group).toBe("Data & AI");
+      expect(item.visible).toBe(true);
+      expect(item.to).toEqual({ name: "paidUsage", query: { org_identifier: "test-org" } });
+    });
+
     it("should include enterprise items when isEnterprise is true", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);

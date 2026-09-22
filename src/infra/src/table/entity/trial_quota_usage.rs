@@ -9,6 +9,7 @@ pub struct Model {
     pub feature: String,
     pub usage_count: i64,
     pub usage_limit: Option<i64>,
+    pub paid_overage_enabled: bool,
     pub updated_at: i64,
     pub notified_checkpoint: i16,
     /// `0` is a lifetime row. A monthly pool carries the `YYYYMM` its count belongs to.
@@ -31,6 +32,7 @@ mod tests {
             feature: "ingest".to_string(),
             usage_count: 100,
             usage_limit: Some(1_000),
+            paid_overage_enabled: false,
             updated_at: 1000,
             notified_checkpoint: 0,
             period: 0,
@@ -38,6 +40,7 @@ mod tests {
         assert_eq!(m.org_id, "org");
         assert_eq!(m.usage_count, 100);
         assert_eq!(m.usage_limit, Some(1_000));
+        assert!(!m.paid_overage_enabled);
         assert_eq!(m.notified_checkpoint, 0);
         assert_eq!(m.period, 0);
     }

@@ -28,6 +28,12 @@ impl MigrationTrait for Migration {
                             .default(0),
                     )
                     .col(
+                        ColumnDef::new(TrialQuotaUsage::PaidOverageEnabled)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
                         ColumnDef::new(TrialQuotaUsage::UpdatedAt)
                             .big_integer()
                             .not_null()
@@ -62,6 +68,7 @@ enum TrialQuotaUsage {
     OrgId,
     Feature,
     UsageCount,
+    PaidOverageEnabled,
     UpdatedAt,
     NotifiedCheckpoint,
 }
@@ -77,6 +84,38 @@ mod tests {
         assert_eq!(
             Migration.name(),
             "m20260305_000001_create_trial_quota_usage_table"
+        );
+    }
+
+    #[tokio::test]
+    async fn fresh_table_has_paid_overage_disabled_by_default() {
+        use sea_orm::{ConnectionTrait, Database, Statement};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        Migration.up(&SchemaManager::new(&db)).await.unwrap();
+
+        db.execute_unprepared(
+            "INSERT INTO trial_quota_usage (org_id, feature) VALUES ('new-org', 'ai_chat')",
+        )
+        .await
+        .unwrap();
+        let row = db
+            .query_one(Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "SELECT paid_overage_enabled FROM trial_quota_usage WHERE org_id = 'new-org'"
+                    .to_string(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!row.try_get::<bool>("", "paid_overage_enabled").unwrap());
+
+        let manager = SchemaManager::new(&db);
+        assert!(
+            manager
+                .has_column("trial_quota_usage", "paid_overage_enabled")
+                .await
+                .unwrap()
         );
     }
 }

@@ -60,6 +60,7 @@ vi.mock("@/composables/useChatHistory", () => ({
 // vi.hoisted, not a plain const: O2AIChat.vue destructures useAiChat() at module
 // scope, so the factory runs during import.
 const { mockFetchAiChat } = vi.hoisted(() => ({ mockFetchAiChat: vi.fn() }));
+const mockPromptForConsent = vi.hoisted(() => vi.fn());
 
 vi.mock("@/composables/useAiChat", () => ({
   default: vi.fn(() => ({
@@ -69,6 +70,16 @@ vi.mock("@/composables/useAiChat", () => ({
     removeAiChatHandler: vi.fn(),
     getStructuredContext: vi.fn().mockResolvedValue(null),
   })),
+}));
+
+vi.mock("@/composables/usePaidOverageConsent", () => ({
+  isPaidOverageConsentError: (status: number, body: unknown) =>
+    status === 412 &&
+    typeof body === "object" &&
+    body !== null &&
+    "error_type" in body &&
+    body.error_type === "paid_overage_consent_required",
+  usePaidOverageConsent: () => ({ promptForConsent: mockPromptForConsent }),
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -821,6 +832,81 @@ describe("O2AIChat", () => {
 
         expect(ok).toBe(false);
         expect((wrapper.vm as any).chatMessages.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe("paid usage consent retry", () => {
+      const denialBody = {
+        error_type: "paid_overage_consent_required",
+        consent: {
+          feature: "ai_credits",
+          organization: { org_id: "default", enabled: false, can_manage: true },
+          payer: null,
+          effective: false,
+          billing_status: "eligible",
+        },
+      };
+      const completedStream = {
+        ok: true,
+        body: {
+          getReader: () => ({
+            read: () => Promise.resolve({ done: true, value: undefined }),
+            releaseLock: () => {},
+            cancel: () => Promise.resolve(),
+          }),
+        },
+      };
+
+      it("retries the active turn exactly once after consent", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as unknown as {
+          inputMessage: string;
+          sendMessage: () => Promise<void>;
+        };
+        mockPromptForConsent.mockResolvedValue(true);
+        mockFetchAiChat
+          .mockResolvedValueOnce({
+            ok: false,
+            status: 412,
+            json: vi.fn().mockResolvedValue(denialBody),
+          })
+          .mockResolvedValueOnce(completedStream);
+        vm.inputMessage = "count errors";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(mockPromptForConsent).toHaveBeenCalledTimes(1);
+        expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
+        expect(mockFetchAiChat.mock.calls[1]).toEqual(mockFetchAiChat.mock.calls[0]);
+      });
+
+      it("shows a neutral notice and does not retry after decline", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as unknown as {
+          inputMessage: string;
+          chatMessages: Array<{ content: string }>;
+          sendMessage: () => Promise<void>;
+        };
+        mockPromptForConsent.mockResolvedValue(false);
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 412,
+          json: vi.fn().mockResolvedValue(denialBody),
+        });
+        vm.inputMessage = "count errors";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
+        // The refactored stream reports notices as an error contentBlock, not message content.
+        const last = vm.chatMessages.at(-1) as unknown as {
+          contentBlocks?: Array<{ message: string }>;
+        };
+        expect(last?.contentBlocks?.at(-1)?.message).toBe(
+          "Paid AI usage was not authorized. No paid request was started.",
+        );
       });
     });
 
