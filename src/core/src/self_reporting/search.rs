@@ -67,7 +67,6 @@ pub async fn get_usage(
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
-            bypass_index_optimizer: false,
         },
         encoding: RequestEncoding::Empty,
         regions,
