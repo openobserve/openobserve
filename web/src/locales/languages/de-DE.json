@@ -1954,6 +1954,7 @@
     "ok": "OK",
     "sendInvite": "Einladung senden",
     "inviteByEmail": "Per E-Mail einladen. Mehrere E-Mails, getrennt durch Semikolon (;) oder Komma (,)",
+    "inviteByEmailPlaceholder": "Per E-Mail einladen",
     "changePassword": "Passwort ändern",
     "oldPassword": "Altes Passwort",
     "newPassword": "Neues Passwort",

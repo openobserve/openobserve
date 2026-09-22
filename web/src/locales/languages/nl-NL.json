@@ -1954,6 +1954,7 @@
     "ok": "Oké",
     "sendInvite": "Uitnodiging verzenden",
     "inviteByEmail": "Uitnodigen via e-mail. Meerdere e-mails gescheiden door een puntkomma (;) of komma (,)",
+    "inviteByEmailPlaceholder": "Uitnodigen via e-mail",
     "changePassword": "Wachtwoord wijzigen",
     "oldPassword": "Oud wachtwoord",
     "newPassword": "Nieuw wachtwoord",

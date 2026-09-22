@@ -1954,6 +1954,7 @@
     "ok": "OK",
     "sendInvite": "招待を送信",
     "inviteByEmail": "メールで招待します。セミコロン (;) またはコンマ (,) で区切られた複数のEメール",
+    "inviteByEmailPlaceholder": "メールで招待",
     "changePassword": "パスワードを変更",
     "oldPassword": "古いパスワード",
     "newPassword": "新しいパスワード",

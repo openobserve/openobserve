@@ -1954,6 +1954,7 @@
     "ok": "OK",
     "sendInvite": "Gửi Lời mời",
     "inviteByEmail": "Mời qua email. Nhiều email cách nhau bằng dấu chấm phẩy (;) hoặc dấu phẩy (,).",
+    "inviteByEmailPlaceholder": "Mời bằng email",
     "changePassword": "Đổi Mật khẩu",
     "oldPassword": "Mật khẩu cũ",
     "newPassword": "Mật khẩu mới",
