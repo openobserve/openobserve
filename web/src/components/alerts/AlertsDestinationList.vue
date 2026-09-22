@@ -593,7 +593,7 @@ export default defineComponent({
       (isLoading) => {
         if (isLoading) return;
         setTimeout(() => {
-          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+          oTableRef.value?.restorePage?.(currentPage.value);
         }, 0);
       },
       { once: true },

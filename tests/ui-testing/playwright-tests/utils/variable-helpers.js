@@ -329,7 +329,7 @@ export async function trackPanelReload(page, panelId, action, timeout = 10000) {
  * Extract panel ID from URL (helper function)
  */
 function extractPanelIdFromURL(url) {
-  const match = url.match(/panelId=([^&]+)/);
+  const match = url.match(/panel_id=([^&]+)/);
   return match ? match[1] : null;
 }
 

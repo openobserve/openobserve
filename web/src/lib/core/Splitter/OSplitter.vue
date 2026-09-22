@@ -95,8 +95,8 @@ const maxValue = computed(() => props.limits?.[1] || (props.unit === "%" ? 100 :
 const { value: currentValue, onMouseDown } = useResizer({
   direction: !props.horizontal ? "horizontal" : "vertical",
   initialValue: props.modelValue,
-  minValue: minValue.value,
-  maxValue: maxValue.value,
+  minValue: () => minValue.value,
+  maxValue: () => maxValue.value,
   unit: props.unit,
   containerRef,
   throttleMs: 16, // 60fps for smooth movement
