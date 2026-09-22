@@ -53,9 +53,9 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
         Field::new("original_size", DataType::Int64, false),
         Field::new("compressed_size", DataType::Int64, false),
         Field::new("index_size", DataType::Int64, false),
+        Field::new("mindex_size", DataType::Int64, false),
         Field::new("bloom_ver", DataType::Int64, false),
         Field::new("updated_at", DataType::Int64, false),
-        Field::new("mindex_size", DataType::Int64, true),
     ]))
 });
 
@@ -75,6 +75,13 @@ macro_rules! get_col {
     };
 }
 
+fn optional_size(rb: &RecordBatch, name: &str, row: usize) -> i64 {
+    rb.column_by_name(name)
+        .and_then(|column| column.as_any().downcast_ref::<Int64Array>())
+        .filter(|column| !column.is_null(row))
+        .map_or(0, |column| column.value(row))
+}
+
 pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(id_col, "id", Int64Array, rb);
     get_col!(account_col, "account", StringArray, rb);
@@ -91,13 +98,7 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(compressed_size_col, "compressed_size", Int64Array, rb);
     get_col!(index_size_col, "index_size", Int64Array, rb);
     get_col!(updated_at_col, "updated_at", Int64Array, rb);
-    // bloom_ver is OPTIONAL on read — dump parquets written before the
-    // bloom-filter pruning layer was added don't have this column.
-    // Missing → 0 (the "no .bf" sentinel), so search for those legacy
-    // rows falls through to the original tantivy path.
-    let bloom_ver_col = rb
-        .column_by_name("bloom_ver")
-        .and_then(|c| c.as_any().downcast_ref::<Int64Array>());
+
     let mut ret = Vec::with_capacity(rb.num_rows());
     for idx in 0..rb.num_rows() {
         let t = FileRecord {
@@ -116,7 +117,7 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
             compressed_size: compressed_size_col.value(idx),
             index_size: index_size_col.value(idx),
             mindex_size: optional_size(&rb, "mindex_size", idx),
-            bloom_ver: bloom_ver_col.map(|c| c.value(idx)).unwrap_or(0),
+            bloom_ver: optional_size(&rb, "bloom_ver", idx),
             updated_at: updated_at_col.value(idx),
         };
         ret.push(t);
@@ -124,13 +125,6 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     ret.par_sort_unstable_by_key(|f| f.id);
     ret.dedup_by_key(|f| f.id);
     ret
-}
-
-fn optional_size(rb: &RecordBatch, name: &str, row: usize) -> i64 {
-    rb.column_by_name(name)
-        .and_then(|column| column.as_any().downcast_ref::<Int64Array>())
-        .filter(|column| !column.is_null(row))
-        .map_or(0, |column| column.value(row))
 }
 
 fn record_batch_to_file_id(rb: RecordBatch) -> Vec<FileId> {
