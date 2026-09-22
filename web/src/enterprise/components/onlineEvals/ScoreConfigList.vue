@@ -207,7 +207,9 @@
 </template>
 
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -259,7 +261,13 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const typeFilter = ref<DataType | null>(null);
-const selectedIds = ref<string[]>([]);
+const store = useStore();
+const { selectedIds } = usePersistedSelection<any>({
+  tableId: "score-config-list",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: computed(() => props.rows),
+  getRowId: (row) => row.id,
+});
 
 function handleBulkExport() {
   // Snapshot the ids before clearing so the parent receives a stable array

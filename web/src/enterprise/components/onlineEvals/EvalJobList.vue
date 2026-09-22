@@ -216,7 +216,9 @@
 </template>
 
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { computed, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -274,7 +276,13 @@ function canPause(status: EvalJobStatus): boolean {
 
 const { t } = useI18nTyped();
 const statusFilter = ref<EvalJobStatus | null>(null);
-const selectedIds = ref<string[]>([]);
+const store = useStore();
+const { selectedIds } = usePersistedSelection<any>({
+  tableId: "eval-job-list",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: computed(() => props.rows),
+  getRowId: (row) => row.id,
+});
 
 function handleBulkDelete() {
   const ids = [...selectedIds.value];

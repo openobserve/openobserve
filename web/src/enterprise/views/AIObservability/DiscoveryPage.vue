@@ -243,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { computed, onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -317,7 +318,12 @@ const scope = ref<DiscoveryScope>(loadDiscoveryScope());
 const items = ref<LlmDiscoveryItem[]>([]);
 const loading = ref(false);
 const lastRunAt = ref<number | null>(null);
-const selectedIds = ref<string[]>([]);
+const { selectedIds } = usePersistedSelection<any>({
+  tableId: "ai-discovery",
+  scope: () => `${store.state.selectedOrganization?.identifier ?? ""}:${scope.value}`,
+  rows: items,
+  getRowId: (row) => row.targetId,
+});
 const queueStatus = ref<DiscoveryQueueStatus>(DEFAULT_QUEUE_STATUS);
 const search = ref("");
 

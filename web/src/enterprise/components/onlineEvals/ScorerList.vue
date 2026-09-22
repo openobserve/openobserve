@@ -216,7 +216,9 @@
 </template>
 
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -274,7 +276,13 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const typeFilter = ref<ScorerType | null>(null);
-const selectedIds = ref<string[]>([]);
+const store = useStore();
+const { selectedIds } = usePersistedSelection<any>({
+  tableId: "scorer-list",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: computed(() => props.rows),
+  getRowId: (row) => row.id,
+});
 
 function handleBulkExport() {
   const ids = [...selectedIds.value];
