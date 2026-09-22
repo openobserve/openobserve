@@ -1,0 +1,18 @@
+{
+  "feature_slug": "dashboard-zoom-brush",
+  "feature_title": "Dashboard Chart Zoom Brush & Panel Drag",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-zoom-brush.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-zoom-brush.spec.js",
+  "playwright_group": "Dashboards-Charts",
+  "source_files": [
+    "web/src/components/dashboards/ChartRenderer.vue",
+    "web/src/components/dashboards/PanelSchemaRenderer.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

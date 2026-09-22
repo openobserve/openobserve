@@ -1,0 +1,646 @@
+===== COMPLETE LIST OF CHANGED FILES (4 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/ci-matrix/ci_matrix.json
+tests/ui-testing/pages/dashboardPages/dashboard-zoom-drag.js
+tests/ui-testing/pages/page-manager.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-zoom-brush.spec.js
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/ci-matrix/ci_matrix.json b/tests/ui-testing/ci-matrix/ci_matrix.json
+index 1864876350a..f2bbd99aef8 100644
+--- a/tests/ui-testing/ci-matrix/ci_matrix.json
++++ b/tests/ui-testing/ci-matrix/ci_matrix.json
+@@ -74,7 +74,8 @@
+       "dashboard-sankey.spec.js",
+       "dashboard-pie-donut.spec.js",
+       "dashboard-metric-camelcase.spec.js",
+-      "dashboard-create-alert.spec.js"
++      "dashboard-create-alert.spec.js",
++      "dashboard-zoom-brush.spec.js"
+     ],
+     "disabled": []
+   },
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-zoom-drag.js b/tests/ui-testing/pages/dashboardPages/dashboard-zoom-drag.js
+new file mode 100644
+index 00000000000..b435b43e570
+--- /dev/null
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-zoom-drag.js
+@@ -0,0 +1,290 @@
++// Dashboard zoom-brush & panel-drag interactions.
++//
++// The ECharts dataZoom brush is canvas-drawn (not a DOM node), so a brush-to-zoom
++// is a page.mouse drag on the chart canvas, and a panel reposition is a page.mouse
++// drag on the panel header bar (GridStack only cancels the `.drag-cancel` body).
++
++// The dashboard chart lives inside a GridStack tile, where a press competes with
++// a tile drag; the expanded panel renders outside the grid, so a press there can
++// only ever reach ECharts. Selection appearance is asserted in the expanded view
++// for that reason, and the drag rule in the grid view where it actually applies.
++const GRID_CHART_HOST = '.grid-stack-item [data-test="chart-renderer"]';
++const EXPANDED_CHART_HOST =
++  '[data-test="dashboard-viewpanel-panel-schema-renderer"] [data-test="chart-renderer"]';
++
++const BRUSH_START_FRACTION = 0.2;
++const BRUSH_END_FRACTION = 0.8;
++
++// Sampled well inside the brushed band so a read never straddles its edges.
++const TINT_SAMPLE_X = [0.35, 0.65];
++const TINT_SAMPLE_Y = [0.35, 0.65];
++
++export default class DashboardZoomDrag {
++  constructor(page) {
++    this.page = page;
++    this.chartHostSelector = GRID_CHART_HOST;
++    this.globalPickerBtn = page.locator(
++      '[data-test="dashboard-global-date-time-picker"] [data-test="date-time-btn"]'
++    );
++    this.expandedCloseBtn = page.locator(
++      '[data-test="dashboard-viewpanel-close-btn"]'
++    );
++    this.expandedRefreshBtn = page.locator(
++      '[data-test="dashboard-viewpanel-refresh-data-btn"]'
++    );
++  }
++
++  get chartRenderer() {
++    return this.page.locator(this.chartHostSelector);
++  }
++
++  get chartCanvas() {
++    return this.page.locator(`${this.chartHostSelector} canvas`);
++  }
++
++  // The GridStack tile for a panel by id — the host carrying the persisted layout.
++  getPanelTile(panelId) {
++    return this.page.locator(`.grid-stack-item[gs-id="${panelId}"]`);
++  }
++
++  // The panel header bar — the GridStack drag handle (the body is `.drag-cancel`).
++  getPanelHeader(panelId) {
++    return this.page.locator(
++      `[data-test-panel-id="${panelId}"] [data-test="dashboard-panel-bar"]`
++    );
++  }
++
++  // The panel body — `.drag-cancel`, so a press here must reach ECharts, not GridStack.
++  getPanelBody(panelId) {
++    return this.page.locator(
++      `[data-test-panel-id="${panelId}"] [data-test="dashboard-panel-body"]`
++    );
++  }
++
++  // The global date-time picker button — the zoom brush's observable surface.
++  getGlobalPickerBtn() {
++    return this.globalPickerBtn;
++  }
++
++  // Expand the panel to the full-window view. The fullscreen button is revealed
++  // on hover, so the panel must be hovered before it can be waited for.
++  async openExpandedPanel(timeout = 30000) {
++    await this.page
++      .locator('[data-test="dashboard-panel-container"]')
++      .first()
++      .hover();
++    const button = this.page
++      .locator('[data-test="dashboard-panel-fullscreen-btn"]')
++      .first();
++    await button.waitFor({ state: "visible", timeout });
++    await button.click();
++    await this.expandedCloseBtn.waitFor({ state: "visible", timeout });
++    this.chartHostSelector = EXPANDED_CHART_HOST;
++  }
++
++  async closeExpandedPanel(timeout = 30000) {
++    await this.expandedCloseBtn.click();
++    await this.expandedCloseBtn.waitFor({ state: "hidden", timeout });
++    this.chartHostSelector = GRID_CHART_HOST;
++  }
++
++  // Re-run the expanded panel's query, which re-applies the chart options and so
++  // dispatches takeGlobalCursor again — the path that used to leak a brush handler.
++  async refreshExpandedPanel(timeout = 30000) {
++    await this.expandedRefreshBtn.waitFor({ state: "visible", timeout });
++    const searched = this.page
++      .waitForResponse((r) => r.url().includes("/_search"), { timeout })
++      .catch(() => null);
++    await this.expandedRefreshBtn.click();
++    await searched;
++    // The re-render keeps the same geometry, so a stale dwell count would pass instantly.
++    await this.page.evaluate(() => {
++      window.__o2ChartBox = null;
++    });
++  }
++
++  // Poll until ECharts has mounted a canvas that has stopped moving. A non-zero
++  // canvas is not enough: the dashboard reflows after load, so a brush path
++  // measured too early is offset by hundreds of pixels and the drag lands off
++  // the chart. Position matters as much as size, and the reflow outlasts a
++  // couple of frames — hence the dwell.
++  async waitForChartMounted(timeout = 30000) {
++    await this.page.waitForFunction(
++      (selector) => {
++        const host = document.querySelector(selector);
++        if (!host || !host.hasAttribute("_echarts_instance_")) return false;
++        const canvas = host.querySelector("canvas");
++        if (!canvas) return false;
++        const rect = canvas.getBoundingClientRect();
++        if (rect.width < 200 || rect.height < 80) return false;
++        const key = [rect.left, rect.top, rect.width, rect.height]
++          .map((n) => Math.round(n))
++          .join(":");
++        const prev = window.__o2ChartBox;
++        window.__o2ChartBox =
++          prev && prev.key === key ? { key, count: prev.count + 1 } : { key, count: 1 };
++        return window.__o2ChartBox.count >= 4;
++      },
++      this.chartHostSelector,
++      { timeout, polling: 100 }
++    );
++  }
++
++  // Wait for a panel's tile and header bar to be mounted, so the drag handle
++  // actually exists (an off-screen panel renders a placeholder, not the bar).
++  async waitForPanelTile(panelId, timeout = 30000) {
++    await this.getPanelTile(panelId).waitFor({ state: "visible", timeout });
++    await this.getPanelHeader(panelId).waitFor({ state: "visible", timeout });
++  }
++
++  // Read the persisted GridStack layout of a panel off its tile attributes.
++  async readPanelLayout(panelId) {
++    const tile = this.getPanelTile(panelId);
++    const [x, y, w, h] = await Promise.all([
++      tile.getAttribute("gs-x"),
++      tile.getAttribute("gs-y"),
++      tile.getAttribute("gs-w"),
++      tile.getAttribute("gs-h"),
++    ]);
++    return { x, y, w, h };
++  }
++
++  // zrender paints the selection cover on the next frame, so a sample taken in
++  // the same tick as the mouse move would read the chart without its overlay.
++  async settleFrames() {
++    await this.page.evaluate(
++      () =>
++        new Promise((resolve) =>
++          requestAnimationFrame(() => requestAnimationFrame(resolve))
++        )
++    );
++  }
++
++  // Resolve the brush path in viewport coordinates and cache it, so the
++  // hold/release pair drags along exactly the band the tint sampler reads.
++  async resolveBrushPath() {
++    await this.waitForChartMounted();
++    const canvas = this.chartCanvas.first();
++    await canvas.waitFor({ state: "visible", timeout: 30000 });
++    const box = await canvas.boundingBox();
++    if (!box) {
++      throw new Error("chart canvas has no bounding box");
++    }
++    this.brushPath = {
++      startX: box.x + box.width * BRUSH_START_FRACTION,
++      endX: box.x + box.width * BRUSH_END_FRACTION,
++      y: box.y + box.height * 0.5,
++    };
++    return this.brushPath;
++  }
++
++  // Park the cursor at the brush origin without pressing, so the axis pointer is
++  // already painted when the caller samples the pre-drag baseline.
++  async moveToBrushStart() {
++    const { startX, y } = await this.resolveBrushPath();
++    await this.page.mouse.move(startX, y);
++    await this.settleFrames();
++  }
++
++  // Press and drag across the band WITHOUT releasing, leaving the cover painted.
++  async holdBrushAcrossCanvas() {
++    const path = await this.resolveBrushPath();
++    await this.page.mouse.move(path.startX, path.y);
++    await this.page.mouse.down();
++    await this.page.mouse.move(path.endX, path.y, { steps: 12 });
++    await this.settleFrames();
++  }
++
++  async releaseBrush() {
++    await this.page.mouse.up();
++    this.brushPath = null;
++  }
++
++  // Mean (blue - red) over the sampled band. The selection fill is deep sky blue
++  // at low alpha, so the overlay lifts this well clear of the chart's own
++  // baseline, while echarts' default near-neutral grey barely moves it.
++  async measureBandBlueShift() {
++    return this.page.evaluate(
++      ({ xs, ys, selector }) => {
++        const host = document.querySelector(selector);
++        if (!host) return null;
++        const layers = Array.from(host.querySelectorAll("canvas"));
++        if (!layers.length) return null;
++
++        // zrender may paint the series and the selection cover on separate
++        // layers, and leaves the plot area itself transparent — so flatten onto
++        // opaque white, or the sampled band is all alpha 0 and carries no colour.
++        const flat = document.createElement("canvas");
++        flat.width = layers[0].width;
++        flat.height = layers[0].height;
++        const flatCtx = flat.getContext("2d");
++        flatCtx.fillStyle = "#ffffff";
++        flatCtx.fillRect(0, 0, flat.width, flat.height);
++        for (const layer of layers) {
++          flatCtx.drawImage(layer, 0, 0, flat.width, flat.height);
++        }
++
++        const x = Math.floor(flat.width * xs[0]);
++        const w = Math.max(1, Math.floor(flat.width * (xs[1] - xs[0])));
++        const y = Math.floor(flat.height * ys[0]);
++        const h = Math.max(1, Math.floor(flat.height * (ys[1] - ys[0])));
++        const { data } = flatCtx.getImageData(x, y, w, h);
++
++        let sum = 0;
++        let counted = 0;
++        for (let i = 0; i < data.length; i += 4) {
++          sum += data[i + 2] - data[i];
++          counted++;
++        }
++        return counted ? sum / counted : null;
++      },
++      { xs: TINT_SAMPLE_X, ys: TINT_SAMPLE_Y, selector: this.chartHostSelector }
++    );
++  }
++
++  // True while GridStack has a tile drag in flight — stamped on mouse-down only
++  // when the grab point is outside `.drag-cancel`.
++  async isGridDragActive() {
++    return this.page.evaluate(() =>
++      Boolean(
++        document.querySelector(".grid-stack-dragging") ||
++          document.querySelector(".ui-draggable-dragging")
++      )
++    );
++  }
++
++  // Press on an element and drag by a viewport-pixel offset WITHOUT releasing,
++  // so the caller can observe whether a grid drag actually started.
++  async holdDragFrom(locator, { deltaX, deltaY }) {
++    await locator.waitFor({ state: "visible", timeout: 30000 });
++    await locator.scrollIntoViewIfNeeded();
++    const box = await locator.boundingBox();
++    if (!box) {
++      throw new Error("drag source has no bounding box");
++    }
++    const startX = box.x + box.width / 2;
++    const startY = box.y + box.height / 2;
++    await this.page.mouse.move(startX, startY);
++    await this.page.mouse.down();
++    await this.page.mouse.move(startX + deltaX, startY + deltaY, { steps: 15 });
++    await this.settleFrames();
++  }
++
++  async releaseDrag() {
++    await this.page.mouse.up();
++  }
++
++  // Drag a panel's header bar by a viewport-pixel offset (GridStack snaps to cells).
++  async dragPanelHeader(panelId, { deltaX, deltaY }) {
++    await this.holdDragFrom(this.getPanelHeader(panelId), { deltaX, deltaY });
++    await this.releaseDrag();
++  }
++
++  // Brush a horizontal dataZoom selection across the chart canvas: mouse down at
++  // ~20% width, drag to ~80% width at mid-height, release. The toolbox dataZoom
++  // tool is auto-selected on init, so no toolbox button click is required.
++  async brushChartCanvas() {
++    await this.holdBrushAcrossCanvas();
++    await this.releaseBrush();
++  }
++}
+diff --git a/tests/ui-testing/pages/page-manager.js b/tests/ui-testing/pages/page-manager.js
+index 2d95d87eae5..d2a79261bdd 100644
+--- a/tests/ui-testing/pages/page-manager.js
++++ b/tests/ui-testing/pages/page-manager.js
+@@ -23,6 +23,7 @@ import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
+ import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
+ import DateTimeHelper from "./dashboardPages/dashboard-time";
+ import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
++import DashboardZoomDrag from "./dashboardPages/dashboard-zoom-drag";
+ import LogsVisualise from "./dashboardPages/visualise";
+ import { DashboardPage } from "./dashboardPages/dashboardPage.js";
+ import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDrawer.js";
+@@ -158,6 +159,7 @@ class PageManager {
+     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
+     this.dateTimeHelper = new DateTimeHelper(page);
+     this.dashboardPanelTime = new DashboardPanelTime(page);
++    this.dashboardZoomDrag = new DashboardZoomDrag(page);
+     this.logsVisualise = new LogsVisualise(page);
+     this.dashboardPage = new DashboardPage(page);
+     this.scheduledReportsDrawer = new ScheduledReportsDrawerPage(page);
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-zoom-brush.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-zoom-brush.spec.js
+new file mode 100644
+index 00000000000..4a4f4f5e694
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-zoom-brush.spec.js
+@@ -0,0 +1,301 @@
++const {
++  test,
++  expect,
++  navigateToBase,
++} = require("../utils/enhanced-baseFixtures.js");
++import PageManager from "../../pages/page-manager";
++import { ingestion } from "./utils/dashIngestion.js";
++import { cleanupTestDashboard, setupTestDashboard } from "./utils/dashCreation.js";
++import { generateDashboardName } from "./utils/configPanelHelpers.js";
++import { createDashboardWithMultiplePanels } from "./utils/panelTimeSetup.js";
++const testLogger = require("../utils/test-logger.js");
++
++// The selection fill rgba(0,191,255,0.15) lifts (blue - red) by ~38 over the
++// chart; echarts' own rgba(234,237,245,0.5) default lifts it by ~5 while washing
++// the series out, so anything under this floor means the brush style was lost.
++const MIN_SELECTION_TINT = 20;
++
++// A brush controller left bound to the same zrender repaints the cover, roughly
++// doubling that lift — a reading past this ceiling is a stacked overlay.
++const MAX_SELECTION_TINT = 60;
++
++test.describe("Dashboard Chart Zoom Brush & Panel Drag testcases", () => {
++  test.describe.configure({ mode: "parallel" });
++
++  test.beforeEach(async ({ page }, testInfo) => {
++    testLogger.testStart(testInfo.title, testInfo.file);
++    await navigateToBase(page);
++    // Deduped per worker inside the helper — the repeat posts add nothing and
++    // cost ~90 s of each test's budget on cloud.
++    await ingestion(page);
++    testLogger.info("Test setup completed");
++  });
++
++  // Build a saved single panel over e2e_automate and return to the dashboard view.
++  async function buildSavedPanel(page, pm, dashboardName, panelName, chartType) {
++    await setupTestDashboard(page, pm, dashboardName);
++    await pm.dashboardCreate.addPanel();
++    await pm.chartTypeSelector.selectChartType(chartType);
++    await pm.chartTypeSelector.selectStreamType("logs");
++    await pm.chartTypeSelector.selectStream("e2e_automate");
++    await pm.chartTypeSelector.removeField("y_axis_1", "y");
++    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
++    await pm.dashboardPanelActions.addPanelName(panelName);
++    await pm.dashboardPanelActions.applyDashboardBtn();
++    await pm.dashboardPanelActions
++      .waitForChartToRender()
++      .catch((e) => testLogger.warn("waitForChartToRender:", e.message));
++    await pm.dashboardPanelActions.savePanel();
++  }
++
++  test("TC-ZOOM-001: Dragging a brush on a time-series chart switches the dashboard to an absolute range", {
++    tag: ["@dashboard-chart-zoom-brush", "@all", "@functional", "@P0"],
++  }, async ({ page }) => {
++    const pm = new PageManager(page);
++    const dashboardName = generateDashboardName();
++
++    await buildSavedPanel(page, pm, dashboardName, "Zoom Line", "line");
++    testLogger.info("Line chart panel saved on dashboard view");
++
++    // Saved dashboard view: wait for the chart to mount and paint data.
++    await pm.dashboardZoomDrag.waitForChartMounted();
++    await pm.dashboardPanelActions.verifyChartHasData(expect);
++
++    // Initial global time is relative: URL carries period= and no from=/to=.
++    await expect
++      .poll(
++        () => {
++          const url = page.url();
++          return url.includes("period=") && !url.includes("from=") && !url.includes("to=");
++        },
++        { timeout: 15000 }
++      )
++      .toBe(true);
++
++    // Register a re-query listener before brushing, so we can assert the
++    // dashboard re-ran its panel queries after the zoom (not just the initial load).
++    const searchResponsePromise = page
++      .waitForResponse((r) => r.url().includes("/_search"), { timeout: 30000 })
++      .catch(() => null);
++
++    await pm.dashboardZoomDrag.brushChartCanvas();
++
++    // Vue Router uses replaceState, so poll until the URL flips to absolute.
++    await expect
++      .poll(
++        () => {
++          const url = page.url();
++          return url.includes("from=") && url.includes("to=") && !url.includes("period=");
++        },
++        { intervals: [100, 200, 500, 1000, 2000], timeout: 30000 }
++      )
++      .toBe(true);
++
++    // The brush must have triggered a dashboard re-query.
++    const searchResponse = await searchResponsePromise;
++    expect(searchResponse).not.toBeNull();
++
++    // The global picker now reflects an absolute range, not a relative "Last …" label.
++    await expect(pm.dashboardZoomDrag.getGlobalPickerBtn()).not.toContainText(/last/i);
++
++    await cleanupTestDashboard(page, pm, dashboardName);
++  });
++
++  test("TC-DRAG-001: Dragging a panel's header bar repositions it and saves the layout", {
++    tag: ["@dashboard-chart-zoom-brush", "@all", "@functional", "@P1"],
++  }, async ({ page }) => {
++    const pm = new PageManager(page);
++    const dashboardName = generateDashboardName();
++
++    const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
++      dashboardName,
++      panels: [
++        { panelName: "Drag Panel A", panelTimeEnabled: false },
++        { panelName: "Drag Panel B", panelTimeEnabled: false },
++      ],
++    });
++    const panelBId = panelIds[1];
++    testLogger.info("Two panels created", { panelIds });
++
++    await pm.dashboardZoomDrag.waitForPanelTile(panelBId);
++    const before = await pm.dashboardZoomDrag.readPanelLayout(panelBId);
++    testLogger.info("Pre-drag panel B layout", before);
++
++    // Register the layout-save listener before dragging, so we can assert the
++    // GridStack change handler persisted the new layout to the backend.
++    const putResponsePromise = page
++      .waitForResponse(
++        (r) => r.request().method() === "PUT" && r.url().includes("/dashboards/"),
++        { timeout: 30000 }
++      )
++      .catch(() => null);
++
++    await pm.dashboardZoomDrag.dragPanelHeader(panelBId, { deltaX: -400, deltaY: 200 });
++
++    const putResponse = await putResponsePromise;
++    expect(putResponse).not.toBeNull();
++
++    const after = await pm.dashboardZoomDrag.readPanelLayout(panelBId);
++    testLogger.info("Post-drag panel B layout", after);
++    expect(after.x !== before.x || after.y !== before.y).toBe(true);
++
++    await cleanupTestDashboard(page, pm, dashboardName);
++  });
++
++  test("TC-ZOOM-002: Dragging on a pie chart does not change the global time range", {
++    tag: ["@dashboard-chart-zoom-brush", "@all", "@functional", "@P2"],
++  }, async ({ page }) => {
++    const pm = new PageManager(page);
++    const dashboardName = generateDashboardName();
++
++    await buildSavedPanel(page, pm, dashboardName, "Pie No Zoom", "pie");
++    testLogger.info("Pie chart panel saved on dashboard view");
++
++    await pm.dashboardZoomDrag.waitForChartMounted();
++    await pm.dashboardPanelActions.verifyChartHasData(expect);
++
++    // Initial global time is relative.
++    await expect
++      .poll(
++        () => {
++          const url = page.url();
++          return url.includes("period=") && !url.includes("from=") && !url.includes("to=");
++        },
++        { timeout: 15000 }
++      )
++      .toBe(true);
++
++    // Same horizontal drag on the pie canvas — toolbox.show is false for pie,
++    // so no dataZoom event fires and the global time range must stay relative.
++    await pm.dashboardZoomDrag.brushChartCanvas();
++
++    await expect
++      .poll(
++        () => {
++          const url = page.url();
++          return url.includes("period=") && !url.includes("from=") && !url.includes("to=");
++        },
++        { intervals: [100, 200, 500, 1000, 1000], timeout: 5000 }
++      )
++      .toBe(true);
++
++    await cleanupTestDashboard(page, pm, dashboardName);
++  });
++
++  test("TC-ZOOM-003: Selecting a range on an expanded panel paints the translucent tint, not an opaque grey", {
++    tag: ["@dashboard-chart-zoom-brush", "@all", "@functional", "@P0"],
++  }, async ({ page }) => {
++    const pm = new PageManager(page);
++    const dashboardName = generateDashboardName();
++
++    await buildSavedPanel(page, pm, dashboardName, "Zoom Tint", "line");
++
++    // Expanded view: the chart is outside the GridStack tile, so the press can
++    // only reach ECharts and this measures the selection fill, nothing else.
++    await pm.dashboardZoomDrag.openExpandedPanel();
++    await pm.dashboardZoomDrag.waitForChartMounted();
++    await pm.dashboardPanelActions.verifyChartHasData(expect);
++
++    // Baseline read with the cursor already parked on the canvas, so the axis
++    // pointer is in both samples and only the selection cover differs.
++    await pm.dashboardZoomDrag.moveToBrushStart();
++    const baseline = await pm.dashboardZoomDrag.measureBandBlueShift();
++    expect(baseline).not.toBeNull();
++
++    await pm.dashboardZoomDrag.holdBrushAcrossCanvas();
++    const brushed = await pm.dashboardZoomDrag.measureBandBlueShift();
++    await pm.dashboardZoomDrag.releaseBrush();
++    expect(brushed).not.toBeNull();
++
++    const tint = brushed - baseline;
++    testLogger.info("Selection cover tint", { baseline, brushed, tint });
++    expect(tint).toBeGreaterThan(MIN_SELECTION_TINT);
++    expect(tint).toBeLessThan(MAX_SELECTION_TINT);
++
++    await pm.dashboardZoomDrag.closeExpandedPanel();
++    await cleanupTestDashboard(page, pm, dashboardName);
++  });
++
++  test("TC-ZOOM-004: Repeated re-renders do not stack the selection cover", {
++    tag: ["@dashboard-chart-zoom-brush", "@all", "@functional", "@P1"],
++  }, async ({ page }) => {
++    const pm = new PageManager(page);
++    const dashboardName = generateDashboardName();
++
++    await buildSavedPanel(page, pm, dashboardName, "Zoom Restack", "line");
++
++    await pm.dashboardZoomDrag.openExpandedPanel();
++    await pm.dashboardZoomDrag.waitForChartMounted();
++    await pm.dashboardPanelActions.verifyChartHasData(expect);
++
++    // Every re-apply of the chart options dispatches takeGlobalCursor, the path
++    // that used to bind a fresh brush controller to the same zrender without
++    // unbinding the previous one, so each repaint darkened the cover further.
++    for (let i = 0; i < 3; i++) {
++      await pm.dashboardZoomDrag.refreshExpandedPanel();
++      await pm.dashboardZoomDrag.waitForChartMounted();
++    }
++
++    await pm.dashboardZoomDrag.moveToBrushStart();
++    const baseline = await pm.dashboardZoomDrag.measureBandBlueShift();
++    expect(baseline).not.toBeNull();
++
++    await pm.dashboardZoomDrag.holdBrushAcrossCanvas();
++    const brushed = await pm.dashboardZoomDrag.measureBandBlueShift();
++    await pm.dashboardZoomDrag.releaseBrush();
++    expect(brushed).not.toBeNull();
++
++    const tint = brushed - baseline;
++    testLogger.info("Selection cover tint after repeated re-renders", {
++      baseline,
++      brushed,
++      tint,
++    });
++    expect(tint).toBeGreaterThan(MIN_SELECTION_TINT);
++    expect(tint).toBeLessThan(MAX_SELECTION_TINT);
++
++    await pm.dashboardZoomDrag.closeExpandedPanel();
++    await cleanupTestDashboard(page, pm, dashboardName);
++  });
++
++  test("TC-DRAG-002: Pressing the panel body never starts a grid drag, while the header still does", {
++    tag: ["@dashboard-chart-zoom-brush", "@all", "@functional", "@P1"],
++  }, async ({ page }) => {
++    const pm = new PageManager(page);
++    const dashboardName = generateDashboardName();
++
++    const { panelIds } = await createDashboardWithMultiplePanels(page, pm, {
++      dashboardName,
++      panels: [
++        { panelName: "Cancel Panel A", panelTimeEnabled: false },
++        { panelName: "Cancel Panel B", panelTimeEnabled: false },
++      ],
++    });
++    const panelBId = panelIds[1];
++    await pm.dashboardZoomDrag.waitForPanelTile(panelBId);
++
++    // Vertical only: a horizontal press on the body would also brush the chart,
++    // and what is under test here is the grid, not the zoom.
++    const gesture = { deltaX: 0, deltaY: -200 };
++
++    await pm.dashboardZoomDrag.holdDragFrom(
++      pm.dashboardZoomDrag.getPanelBody(panelBId),
++      gesture
++    );
++    const bodyStartedDrag = await pm.dashboardZoomDrag.isGridDragActive();
++    await pm.dashboardZoomDrag.releaseDrag();
++    testLogger.info("Grid drag from panel body", { bodyStartedDrag });
++    expect(bodyStartedDrag).toBe(false);
++
++    await pm.dashboardZoomDrag.holdDragFrom(
++      pm.dashboardZoomDrag.getPanelHeader(panelBId),
++      gesture
++    );
++    const headerStartedDrag = await pm.dashboardZoomDrag.isGridDragActive();
++    await pm.dashboardZoomDrag.releaseDrag();
++    testLogger.info("Grid drag from panel header", { headerStartedDrag });
++    expect(headerStartedDrag).toBe(true);
++
++    await cleanupTestDashboard(page, pm, dashboardName);
++  });
++});

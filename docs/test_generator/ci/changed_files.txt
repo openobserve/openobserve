@@ -1,0 +1,4 @@
+tests/ui-testing/ci-matrix/ci_matrix.json
+tests/ui-testing/pages/dashboardPages/dashboard-zoom-drag.js
+tests/ui-testing/pages/page-manager.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-zoom-brush.spec.js
