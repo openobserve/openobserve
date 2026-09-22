@@ -29,7 +29,7 @@ import {
   calculateChartDimensions,
   calculatePieChartRadius,
 } from "../../legendConfiguration";
-import { chartColor } from "@/utils/chartTheme";
+import { chartColor, dataZoomBrushStyle } from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
 import { processData } from "../../sqlProcessData";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
@@ -753,6 +753,7 @@ export function buildSQLContext(
       bottom: "100%",
       feature: {
         dataZoom: {
+          brushStyle: dataZoomBrushStyle(),
           yAxisIndex:
             panelSchema.config?.dataZoom &&
             Object.prototype.hasOwnProperty.call(panelSchema.config.dataZoom, "yAxisIndex")

@@ -5910,6 +5910,9 @@
         "details": "Szczegóły",
         "json": "JSON",
         "insights": "Wnioski",
+        "back": "Powrót do wyników",
+        "prevEvent": "Poprzednie zdarzenie",
+        "nextEvent": "Następne zdarzenie",
         "copyLink": "Kopiuj link",
         "copy": "Kopiuj",
         "copyValue": "Kopiuj wartość",
@@ -9359,7 +9362,28 @@
     "listConjunctionAnd": "{list} i {last}",
     "runsIn": "Działa w",
     "recommendedByFieldCoverage": "Zalecane na podstawie pokrycia pól w Twoich strumieniach.",
-    "listConjunctionAndTwo": "{first} i {last}"
+    "listConjunctionAndTwo": "{first} i {last}",
+    "domainOrgMappings": {
+      "title": "Mapowania domen na organizacje",
+      "subtitle": "Nowi użytkownicy logujący się z pasującą domeną e-mail są automatycznie dodawani do organizacji.",
+      "addMapping": "Dodaj mapowanie",
+      "editMapping": "Edytuj mapowanie",
+      "empty": "Brak mapowań. Użyj „{addLabel}”, aby dodać mapowanie.",
+      "domain": "Domena e-mail",
+      "domainHelp": "Część po {at_sign} w adresie e-mail użytkownika.",
+      "organization": "Organizacja",
+      "organizationPlaceholder": "Identyfikator organizacji",
+      "organizationHelp": "Identyfikator organizacji, do której dodawani są pasujący użytkownicy.",
+      "organizationRequired": "Organizacja jest wymagana",
+      "baseRole": "Rola podstawowa",
+      "baseRoleHelp": "Rola przyznawana pasującym użytkownikom w tej organizacji.",
+      "userGroup": "Grupa użytkowników",
+      "userGroupPlaceholder": "Nazwa grupy",
+      "userGroupHelp": "Opcjonalne. Pasujący użytkownicy dołączają także do tej grupy w tej organizacji.",
+      "duplicateDomain": "Mapowanie dla tej domeny już istnieje",
+      "confirmRemove": "Czy na pewno chcesz usunąć mapowanie dla {domain}?",
+      "deleteTitle": "Usuń mapowanie"
+    }
   },
   "reports": {
     "frequencyUnits": {
