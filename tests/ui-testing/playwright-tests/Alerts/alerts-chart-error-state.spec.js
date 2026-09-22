@@ -58,7 +58,8 @@ test.describe('Alert Chart Error State testcases', {
     // the alert over it, then delete the stream — generate_sql (the chart)
     // then 400s exactly as it would for a stream deleted after the fact.
     const stream = `alert_chart_missing_${uniq('x')}`;
-    await ingest(page, stream, [{ city: 'bangalore', latency: 890, status: 500 }]);
+    const ing = await ingest(page, stream, [{ city: 'bangalore', latency: 890, status: 500 }]);
+    expect(ing.status(), await ing.text()).toBe(200);
     const name = uniq('chart_missing');
     const id = await createAlertViaApi(page, name, { ...simpleAlert(name), stream_name: stream });
     created.push(id);
