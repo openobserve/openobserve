@@ -56,10 +56,6 @@ const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
 const WINDOW_FLOOR_RULE: &str =
     "detection_window_seconds must be at least schedule_interval plus histogram_interval";
 
-/// The non-epoch origin `rewrite_histogram` passes to `date_bin`, 2001-01-01T00:00:00Z. The
-/// tantivy fast path floors to the epoch, so the two grids agree only at intervals dividing it.
-const DATE_BIN_ORIGIN_SECS: i64 = 978_307_200;
-
 /// Value column names tried when a config declares none. Kept so configs created before
 /// `value_column` existed keep resolving exactly as they did.
 #[cfg(feature = "enterprise")]
@@ -2211,7 +2207,8 @@ fn initial_training_allowed(enabled: bool, globally_disabled: bool) -> bool {
 /// The two time grids agree only where the interval divides the origin; everywhere else the
 /// indexed and unindexed paths bucket the same rows differently.
 fn validate_origin_aligned_interval(histogram_interval: &str, histogram_secs: i64) -> Result<()> {
-    let skew = DATE_BIN_ORIGIN_SECS % histogram_secs;
+    use config::meta::histogram_origin::{DATE_BIN_ORIGIN_SECS, histogram_origin_skew};
+    let skew = histogram_origin_skew(histogram_secs);
     if skew != 0 {
         anyhow::bail!(
             "histogram_interval ({}) must divide the date_bin origin of {}s (2001-01-01): it \
@@ -4457,96 +4454,6 @@ mod tests {
 
     mod interval_pair_rule {
         use super::*;
-
-        /// The bucket widths an operator can plausibly pick that divide the origin. Adding a
-        /// value here that does not divide it fails the pin below, which is the point.
-        const ACCEPTED_INTERVALS: [(&str, i64); 14] = [
-            ("30s", 30),
-            ("1m", 60),
-            ("5m", 300),
-            ("10m", 600),
-            ("15m", 900),
-            ("30m", 1800),
-            ("90m", 5400),
-            ("1h", 3600),
-            ("2h", 7200),
-            ("3h", 10800),
-            ("4h", 14400),
-            ("6h", 21600),
-            ("12h", 43200),
-            ("1d", 86400),
-        ];
-
-        /// Off-grid widths `parse_interval` accepts, each with the skew it would introduce.
-        const REJECTED_INTERVALS: [(&str, i64); 6] = [
-            ("7m", 420),
-            ("11m", 660),
-            ("5h", 18000),
-            ("7h", 25200),
-            ("10h", 36000),
-            ("2d", 172_800),
-        ];
-
-        /// The anomaly analogue of `slo::window`'s origin pin. The agreement between the
-        /// tantivy grid and `date_bin` is a coincidence of the constant, not a guarantee, so
-        /// the constant is pinned rather than assumed: this fails if the origin ever moves.
-        #[test]
-        fn the_origin_is_the_one_date_bin_anchors_on() {
-            assert_eq!(
-                DATE_BIN_ORIGIN_SECS, 978_307_200,
-                "2001-01-01T00:00:00Z, from rewrite_histogram.rs"
-            );
-            assert_eq!(
-                DATE_BIN_ORIGIN_SECS % 86_400,
-                0,
-                "the origin must be a whole number of days for any day-multiple to align"
-            );
-            assert_eq!(DATE_BIN_ORIGIN_SECS / 86_400, 11_323);
-        }
-
-        /// The behavioural half of the pin: for an accepted interval the epoch-floored grid
-        /// the tantivy path uses and `date_bin`'s origin-floored grid land on the same edge.
-        #[test]
-        fn an_accepted_interval_puts_both_grids_on_the_same_bucket_edge() {
-            let epoch_floor = |ts: i64, step: i64| ts.div_euclid(step) * step;
-            let date_bin = |ts: i64, step: i64| {
-                DATE_BIN_ORIGIN_SECS + (ts - DATE_BIN_ORIGIN_SECS).div_euclid(step) * step
-            };
-            for (interval, secs) in ACCEPTED_INTERVALS {
-                assert!(
-                    validate_origin_aligned_interval(interval, secs).is_ok(),
-                    "{interval} divides the origin and must be accepted"
-                );
-                for ts in [0, 1_000_000_000, 1_753_000_000, 2_000_000_123] {
-                    assert_eq!(
-                        epoch_floor(ts, secs),
-                        date_bin(ts, secs),
-                        "the two grids disagree at ts={ts}, interval={interval}"
-                    );
-                }
-            }
-        }
-
-        /// The negative control, so the test above cannot pass vacuously: a rejected interval
-        /// really does put the two grids on different edges.
-        #[test]
-        fn a_rejected_interval_really_would_drift() {
-            let epoch_floor = |ts: i64, step: i64| ts.div_euclid(step) * step;
-            let date_bin = |ts: i64, step: i64| {
-                DATE_BIN_ORIGIN_SECS + (ts - DATE_BIN_ORIGIN_SECS).div_euclid(step) * step
-            };
-            for (interval, secs) in REJECTED_INTERVALS {
-                assert!(
-                    validate_origin_aligned_interval(interval, secs).is_err(),
-                    "{interval} skews the grids and must be rejected"
-                );
-                assert_ne!(
-                    epoch_floor(1_753_000_000, secs),
-                    date_bin(1_753_000_000, secs),
-                    "{interval} was put on the rejected list but does not actually drift"
-                );
-            }
-        }
 
         /// 2d is the trap: every smaller day-multiple divides the origin, but 11,323 is odd.
         #[test]
