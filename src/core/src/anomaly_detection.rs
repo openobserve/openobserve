@@ -3678,6 +3678,7 @@ mod tests {
         CreateAnomalyConfigRequest {
             name: "test".to_string(),
             description: None,
+            level_half_width_seconds: None,
             stream_name: "logs".to_string(),
             stream_type: "logs".to_string(),
             query_mode: "filters".to_string(),
@@ -4472,6 +4473,7 @@ mod tests {
             infra::table::entity::anomaly_detection_config::Model {
                 anomaly_id: "a1".to_string(),
                 org_id: "default".to_string(),
+                level_half_width_seconds: None,
                 stream_name: "logs".to_string(),
                 stream_type: "logs".to_string(),
                 enabled: true,
@@ -5073,6 +5075,7 @@ mod tests {
             infra::table::entity::anomaly_detection_config::Model {
                 anomaly_id: "a1".to_string(),
                 org_id: "default".to_string(),
+                level_half_width_seconds: None,
                 stream_name: "logs".to_string(),
                 stream_type: "logs".to_string(),
                 enabled: true,
