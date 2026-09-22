@@ -338,12 +338,18 @@ export const responsesForIncidentQuery = (org: string, incidentId: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
-/** Whether anybody holds the pager right now — no write moves it, the clock does. */
-export const coverageGapsQuery = (org: string, at?: number, limit?: number) =>
+/**
+ * Whether anybody holds the pager right now — no write moves it, the clock does.
+ *
+ * Takes no `at` or `limit`: the key could not tell two of those apart, so a
+ * second caller would be served the first's answer. The save-time guards that
+ * do pass a limit read the endpoint directly, as they did before.
+ */
+export const coverageGapsQuery = (org: string) =>
   queryOptions({
     queryKey: oncallKeys.coverageGaps(org),
     queryFn: async (): Promise<CoverageGaps | null> =>
-      (await oncallService.coverageGaps({ org_identifier: org, at, limit })).data ?? null,
+      (await oncallService.coverageGaps({ org_identifier: org })).data ?? null,
     staleTime: LIVE_STALE_TIME,
   });
 
