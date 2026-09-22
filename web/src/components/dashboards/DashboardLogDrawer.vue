@@ -3,7 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- Log-explorer results filtered by a clicked dashboard cell; row click opens a detail drawer. -->
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, defineAsyncComponent } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
@@ -17,14 +17,8 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTime from "@/components/DateTime.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
-import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 const JsonPreview = defineAsyncComponent(() => import("@/plugins/logs/JsonPreview.vue"));
 const ChartRenderer = defineAsyncComponent(
@@ -34,6 +28,12 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
 import searchService from "@/services/search";
 import patternsService from "@/services/patterns";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { buildChipDimensionsFromFilters } from "@/services/service_streams";
+import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
+import { extractSeverity } from "@/utils/sourceEventSeverity";
+import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTable.vue"));
 
 const props = defineProps<{
   stream: string;
@@ -44,6 +44,8 @@ const props = defineProps<{
   endTime: number; // microseconds
   baseWhere?: string; // panel's own WHERE, AND-combined with the clicked cell
 }>();
+
+const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -83,23 +85,19 @@ const pageSize = ref(100);
 const loading = ref(false);
 const errorMsg = ref("");
 
-const cols = computed((): string[] => {
-  if (!events.value.length) return [];
-  const keys = Object.keys(events.value[0]);
-  return [
-    ...keys.filter((k) => k === "_timestamp"),
-    ...keys.filter((k) => k !== "_timestamp" && !k.startsWith("_")),
-  ];
-});
-// OTable column defs for the results grid (same table component as the alert list).
-const resultColumns = computed<OTableColumnDef[]>(() =>
-  (cols.value.length ? cols.value : ["_timestamp", "source"]).map((c) => ({
-    id: c,
-    header: c === "_timestamp" ? t("panel.logExplorer.timestamp") : raw(c),
-    accessorKey: c,
-  })),
-);
-const resultPageSizeOptions = [50, 100, 250, 500];
+const resultTotalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
+
+// Inline per-row JSON expand (same interaction as Surrounding events), keyed by page index.
+const resultExpandedIdx = ref(new Set<number>());
+function toggleResultExpand(i: number) {
+  const next = new Set(resultExpandedIdx.value);
+  if (next.has(i)) next.delete(i);
+  else next.add(i);
+  resultExpandedIdx.value = next;
+}
+function isResultExpanded(i: number) {
+  return resultExpandedIdx.value.has(i);
+}
 
 // ── SQL editor ────────────────────────────────────────────────────────────────
 const customSql = ref("");
@@ -130,7 +128,6 @@ function activeSql() {
 // ── Event detail drawer ───────────────────────────────────────────────────────
 const selectedEvent = ref<Record<string, any> | null>(null);
 const detailOpen = computed(() => !!selectedEvent.value);
-const detailTab = ref("insights");
 
 // ── Insights state (loaded when detail drawer opens) ──────────────────────────
 const insightsLoading = ref(false);
@@ -413,7 +410,6 @@ async function loadInsights(ev: Record<string, any>) {
 
 function openEventDetail(ev: Record<string, any>) {
   selectedEvent.value = ev;
-  detailTab.value = "insights";
   router.replace({ query: { ...route.query, cell_event_ts: String(ev._timestamp ?? "") } });
   loadInsights(ev);
 }
@@ -425,36 +421,137 @@ function closeEventDetail() {
   router.replace({ query: q });
 }
 
-// Details tab: field/value rows, filtered by the search box.
-const detailFilter = ref("");
-const wrapDetailValues = ref(false);
-// Format the timestamp column; pass everything else through for LogsHighLighting.
-function getDetailDisplayValue(field: string, value: any): any {
-  return field === "_timestamp" ? fmtTs(value) : value;
+// Push-nav: step through the loaded events without returning to the list.
+const selectedIndex = computed(() =>
+  selectedEvent.value ? events.value.indexOf(selectedEvent.value) : -1,
+);
+const hasPrev = computed(() => selectedIndex.value > 0);
+const hasNext = computed(
+  () => selectedIndex.value >= 0 && selectedIndex.value < events.value.length - 1,
+);
+function goPrev() {
+  if (hasPrev.value) openEventDetail(events.value[selectedIndex.value - 1]);
 }
-const detailRows = computed<[string, any][]>(() => {
-  const entries = Object.entries(selectedEvent.value ?? {});
-  const q = detailFilter.value.trim().toLowerCase();
-  if (!q) return entries;
-  return entries.filter(
-    ([k, v]) =>
-      k.toLowerCase().includes(q) ||
-      String(v ?? "")
-        .toLowerCase()
-        .includes(q),
-  );
-});
-// Name/Value grid rendered with OTable (same component as the other tables).
-const detailTableRows = computed(() => detailRows.value.map(([name, value]) => ({ name, value })));
-const detailColumns = computed<OTableColumnDef[]>(() => [
-  { id: "name", header: t("search.sourceName"), accessorKey: "name", size: 220 },
+function goNext() {
+  if (hasNext.value) openEventDetail(events.value[selectedIndex.value + 1]);
+}
+function onDetailKeydown(e: KeyboardEvent) {
+  if (!selectedEvent.value) return;
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    goPrev();
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    goNext();
+  } else if (e.key === "Escape") {
+    // Return to the results list instead of letting the drawer close.
+    e.preventDefault();
+    e.stopPropagation();
+    closeEventDetail();
+  }
+}
+onMounted(() => window.addEventListener("keydown", onDetailKeydown, true));
+onBeforeUnmount(() => window.removeEventListener("keydown", onDetailKeydown, true));
+
+// ── Source Details (DetailTable) — Insights leading tab + correlation wiring ────
+const detailLeadingTabs = computed(() => [
   {
-    id: "value",
-    header: t("search.sourceValue"),
-    accessorKey: "value",
-    meta: { autoWidth: true, fillRemaining: true },
+    name: "insights",
+    label: t("panel.logExplorer.detail.insights"),
+    dataTest: "log-detail-insights-tab",
+    icon: "insights",
   },
 ]);
+
+const correlationDashboardProps = ref<any>(null);
+const correlationLoading = ref(false);
+const correlationError = ref<string | null>(null);
+const correlationFetchInProgress = ref(false);
+const {
+  findRelatedTelemetry,
+  semanticGroups,
+  noMatch: correlationNoMatch,
+  error: serviceCorrelationError,
+} = useServiceCorrelation();
+
+// Fresh correlation per event (mirrors the Logs page reset on row change).
+watch(selectedEvent, () => {
+  correlationDashboardProps.value = null;
+  correlationLoading.value = false;
+  correlationError.value = null;
+  correlationFetchInProgress.value = false;
+});
+
+// Lazy correlation fetch — replicated from SearchResult.vue's openCorrelationFromLog.
+async function openCorrelationFromLog(logData: any) {
+  if (correlationFetchInProgress.value) return;
+  try {
+    correlationFetchInProgress.value = true;
+    correlationLoading.value = true;
+    correlationError.value = null;
+    const context: TelemetryContext = {
+      timestamp: logData._timestamp || Date.now() * 1000,
+      fields: logData,
+    };
+    const result = await findRelatedTelemetry(context, "logs", 5, props.stream);
+    if (!result) {
+      correlationError.value = correlationNoMatch.value
+        ? t("logs.searchResult.noMatchingService")
+        : serviceCorrelationError.value || t("logs.searchResult.unableToRetrieveCorrelation");
+      return;
+    }
+    if (!result.correlationData) {
+      correlationError.value = t("logs.searchResult.unableToRetrieveCorrelation");
+      return;
+    }
+    const timeWindowMicros = 5 * 60 * 1000000;
+    const startTimeMicros = context.timestamp - timeWindowMicros;
+    let endTimeMicros = context.timestamp + timeWindowMicros;
+    const currentTimeMicros = Date.now() * 1000;
+    if (endTimeMicros > currentTimeMicros) endTimeMicros = currentTimeMicros;
+    const logFilters = result.correlationData.related_streams.logs?.[0]?.filters || {};
+    const actualMatchedDimensions =
+      Object.keys(logFilters).length > 0 ? logFilters : result.correlationData.matched_dimensions;
+    correlationDashboardProps.value = {
+      serviceName: result.correlationData.service_name,
+      matchedDimensions: actualMatchedDimensions,
+      additionalDimensions: {},
+      matchedSetId: result.correlationData.matched_set_id,
+      chipDimensions: {
+        ...buildChipDimensionsFromFilters(result.correlationData, semanticGroups.value),
+        ...buildWorkloadChipDimensions(
+          result.correlationData.matched_set_id,
+          semanticGroups.value,
+          logData,
+        ),
+      },
+      sourceEvent: {
+        timestamp: logData._timestamp,
+        severity: extractSeverity(logData) ?? undefined,
+        message: logData.body || logData.message || logData.log || logData.msg,
+      },
+      metricStreams: result.correlationData.related_streams.metrics || [],
+      logStreams: result.correlationData.related_streams.logs || [],
+      traceStreams: result.correlationData.related_streams.traces || [],
+      sourceStream: props.stream,
+      sourceType: "logs",
+      availableDimensions: { ...logFilters, ...context.fields },
+      semanticGroups: semanticGroups.value,
+      // FTS fields drive full log-body colorization in the correlated logs table;
+      // "body" is the log message field for the default log stream.
+      ftsFields: ["body"],
+      timeRange: { startTime: startTimeMicros, endTime: endTimeMicros },
+    };
+  } catch (err: any) {
+    correlationError.value = t("logs.searchResult.correlationError", {
+      error: err?.message || err,
+    });
+    correlationDashboardProps.value = null;
+  } finally {
+    correlationLoading.value = false;
+    correlationFetchInProgress.value = false;
+  }
+}
 
 // JsonPreview's @copy emits an object; stringify non-strings as pretty JSON.
 function copyToClipboard(value: unknown) {
@@ -541,6 +638,7 @@ async function runSql(sql: string, fromOffset: number) {
     );
     events.value = res.data?.hits ?? [];
     total.value = res.data?.total ?? events.value.length;
+    resultExpandedIdx.value = new Set();
   } catch (e: any) {
     errorMsg.value = `${e?.response?.data?.error ?? e?.message ?? "Search failed"}\n\n${sql}`;
     events.value = [];
@@ -591,7 +689,6 @@ async function restoreEventDetail() {
     const found = res.data?.hits?.[0];
     if (found) {
       selectedEvent.value = found;
-      detailTab.value = "insights";
       loadInsights(found);
     }
   } catch {
@@ -675,95 +772,82 @@ function openInLogs() {
 
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-hidden">
-    <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
-    <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
-      <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
-        <div class="flex-1" />
-        <DateTime
-          default-type="absolute"
-          :default-absolute-time="{ startTime: rangeStart, endTime: rangeEnd }"
-          data-test-name="dashboard-log-drawer-date-time"
-          @on:date-change="onDateChange"
-        />
-        <OButton
-          size="sm"
-          :variant="showSql ? 'primary' : 'outline'"
-          icon-left="code"
-          data-test="log-explorer-sql-toggle"
-          @click="showSql = !showSql"
-        >
-          {{ t("panel.logExplorer.queryMode") }}
-        </OButton>
-        <OButton
-          size="sm"
-          variant="outline"
-          icon-left="open-in-new"
-          data-test="log-explorer-open-in-logs"
-          @click="openInLogs"
-        >
-          {{ t("panel.logExplorer.openInLogs") }}
-        </OButton>
-        <OButton
-          size="icon-sm"
-          variant="outline"
-          icon-left="refresh"
-          :loading="loading"
-          data-test="log-explorer-run"
-          @click="runQuery"
-        >
-          <OTooltip :content="t('panel.logExplorer.runQuery')" />
-        </OButton>
-      </div>
-      <div v-if="showSql" class="px-2 pb-2">
-        <div class="border-border-default rounded-default overflow-hidden border">
-          <QueryEditor
-            :query="customSql"
-            :languages="['sql']"
-            editor-height="4rem"
-            hide-nl-toggle
-            data-test-prefix="log-explorer-editor"
-            @update:query="customSql = $event"
-            @run-query="runQuery"
+    <div v-show="!detailOpen" class="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
+      <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
+        <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
+          <div class="flex-1" />
+          <DateTime
+            default-type="absolute"
+            :default-absolute-time="{ startTime: rangeStart, endTime: rangeEnd }"
+            data-test-name="dashboard-log-drawer-date-time"
+            @on:date-change="onDateChange"
           />
+          <OButton
+            size="sm"
+            :variant="showSql ? 'primary' : 'outline'"
+            icon-left="code"
+            data-test="log-explorer-sql-toggle"
+            @click="showSql = !showSql"
+          >
+            {{ t("panel.logExplorer.queryMode") }}
+          </OButton>
+          <OButton
+            size="sm"
+            variant="outline"
+            icon-left="open-in-new"
+            data-test="log-explorer-open-in-logs"
+            @click="openInLogs"
+          >
+            {{ t("panel.logExplorer.openInLogs") }}
+          </OButton>
+          <OButton
+            size="icon-sm"
+            variant="outline"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="log-explorer-run"
+            @click="runQuery"
+          >
+            <OTooltip :content="t('panel.logExplorer.runQuery')" />
+          </OButton>
+        </div>
+        <div v-if="showSql" class="px-2 pb-2">
+          <div class="border-border-default rounded-default overflow-hidden border">
+            <QueryEditor
+              :query="customSql"
+              :languages="['sql']"
+              editor-height="4rem"
+              hide-nl-toggle
+              data-test-prefix="log-explorer-editor"
+              @update:query="customSql = $event"
+              @run-query="runQuery"
+            />
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- ── Error ────────────────────────────────────────────────────── -->
-    <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
-      <OIcon name="error-outline" size="sm" class="text-error-500 mt-0.5 shrink-0" />
-      <code class="text-error-500 font-mono text-xs break-all whitespace-pre-wrap">{{
-        errorMsg
-      }}</code>
-    </div>
+      <!-- ── Error ────────────────────────────────────────────────────── -->
+      <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
+        <OIcon name="error-outline" size="sm" class="text-error-500 mt-0.5 shrink-0" />
+        <code class="text-error-500 font-mono text-xs break-all whitespace-pre-wrap">{{
+          errorMsg
+        }}</code>
+      </div>
 
-    <!-- ── Results — same OTable as the alert list (sticky header, loading
-         skeleton, server pagination); no hand-rolled table/header gap ── -->
-    <OTable
-      v-else
-      class="min-h-0 flex-1"
-      :frame="false"
-      :data="events"
-      :columns="resultColumns"
-      :loading="loading"
-      :horizontal-scroll="true"
-      :row-class="(row: any) => (selectedEvent === row ? 'dld-row--active' : '')"
-      pagination="server"
-      :current-page="page + 1"
-      :total-count="total"
-      :page-size="pageSize"
-      :page-size-options="resultPageSizeOptions"
-      width="100%"
-      :show-global-filter="false"
-      :default-columns="false"
-      data-test="log-explorer-results-table"
-      @update:current-page="(p: number) => goToPage(p - 1)"
-      @update:page-size="(n: number) => (pageSize = n)"
-      @row-click="(row: any) => openEventDetail(row)"
-    >
-      <template #cell-_timestamp="{ value }">{{ fmtTs(value) }}</template>
-      <template #empty>
-        <div class="flex flex-col items-center justify-center gap-4 px-6 py-10">
+      <!-- ── Results — rendered by the dashboard table-panel renderer for parity ── -->
+      <div
+        v-else
+        class="relative flex min-h-0 flex-1 flex-col"
+        data-test="log-explorer-results-table"
+      >
+        <OInnerLoading :showing="loading" size="sm" :label="t('common.loading')" />
+
+        <!-- Empty state (after the fetch settles) -->
+        <div
+          v-if="!loading && !events.length"
+          class="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10"
+        >
           <OIcon name="manage-search" size="xl" class="text-text-secondary opacity-30" />
           <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
           <code
@@ -771,49 +855,150 @@ function openInLogs() {
             >{{ customSql }}</code
           >
         </div>
-      </template>
-    </OTable>
 
-    <!-- ── Event detail drawer ─────────────────────────────────────── -->
-    <ODrawer
-      :open="detailOpen"
-      side="right"
-      :width="55"
-      bleed
-      :title="t('panel.logExplorer.detail.drawerTitle')"
-      data-test="log-explorer-event-detail-drawer"
-      @update:open="
-        (v) => {
-          if (!v) closeEventDetail();
-        }
-      "
-    >
-      <div v-if="selectedEvent" class="flex h-full min-h-0 flex-col">
-        <!-- Event meta strip -->
+        <!-- Highlighted log rows — same LogsHighLighting + expandable JSON as Surrounding events. -->
+        <div v-else class="min-h-0 flex-1 overflow-y-auto">
+          <template v-for="(ev, i) in events" :key="i">
+            <div
+              class="dld-result-row border-border-default hover:bg-surface-subtle flex cursor-pointer items-center gap-2 border-b px-2 py-1"
+              @click="toggleResultExpand(i)"
+            >
+              <button
+                class="dld-expand-btn shrink-0"
+                :aria-label="isResultExpanded(i) ? t('common.collapse') : t('common.expand')"
+                @click.stop="toggleResultExpand(i)"
+              >
+                <OIcon :name="isResultExpanded(i) ? 'expand-less' : 'expand-more'" size="xs" />
+              </button>
+              <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums">{{
+                fmtTs(ev._timestamp)
+              }}</span>
+              <span class="min-w-0 flex-1 truncate font-mono text-xs">
+                <LogsHighLighting :data="ev" :show-braces="true" />
+              </span>
+              <span
+                class="text-text-secondary hover:text-accent flex w-8 shrink-0 cursor-pointer items-center justify-center"
+                data-test="log-explorer-row-open"
+                @click.stop="openEventDetail(ev)"
+              >
+                <OIcon name="chevron-right" size="sm" />
+                <OTooltip :content="t('panel.logExplorer.detail.insights')" />
+              </span>
+            </div>
+            <div
+              v-if="isResultExpanded(i)"
+              class="dld-json-preview border-border-default bg-surface-panel border-b px-2 py-2"
+              @click.stop
+            >
+              <JsonPreview
+                :value="ev"
+                mode="sidebar"
+                :stream-name="stream"
+                :show-copy-button="true"
+                hide-view-related
+                hide-search-term-actions
+                hide-field-options
+                @copy="copyToClipboard"
+              />
+            </div>
+          </template>
+        </div>
+
+        <!-- Server pagination: the list shows one loaded page; controls fetch the next. -->
         <div
-          class="border-border-default bg-surface-panel flex shrink-0 items-center gap-3 border-b px-2 py-2"
+          v-if="total > 0"
+          class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center border-t px-3 py-2"
         >
-          <div class="flex min-w-0 flex-1 flex-col">
+          <div class="flex-1" />
+          <TablePaginationControls
+            :show-pagination="true"
+            :pagination="{ page: page + 1, rowsPerPage: pageSize }"
+            :total-rows="total"
+            :pages-number="resultTotalPages"
+            :is-first-page="page === 0"
+            :is-last-page="page >= resultTotalPages - 1"
+            @update:rows-per-page="(n: number) => (pageSize = n)"
+            @first-page="goToPage(0)"
+            @prev-page="goToPage(page - 1)"
+            @next-page="goToPage(page + 1)"
+            @last-page="goToPage(resultTotalPages - 1)"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DETAIL MODE: pushed in place of the list (single surface, no stacked drawer) ── -->
+    <template v-if="detailOpen">
+      <div v-if="selectedEvent" class="flex h-full min-h-0 flex-col">
+        <!-- Push-nav header: back to results · event position · copy link -->
+        <div
+          class="border-border-default bg-surface-panel flex shrink-0 items-center gap-2 border-b px-2 py-1"
+        >
+          <OButton
+            size="icon-xs"
+            variant="ghost"
+            icon-left="arrow-back"
+            :aria-label="t('panel.logExplorer.detail.back')"
+            data-test="log-explorer-detail-back"
+            @click="closeEventDetail"
+          >
+            <OTooltip :content="t('panel.logExplorer.detail.back')" />
+          </OButton>
+          <div class="flex min-w-0 flex-1 items-center gap-2">
             <span class="text-text-heading text-xs font-medium tabular-nums">{{
               fmtTs(selectedEvent["_timestamp"])
             }}</span>
-            <span class="text-text-secondary text-xs">{{ stream }}</span>
+            <span class="text-text-secondary truncate text-xs">{{ stream }}</span>
           </div>
-          <OButton size="sm" variant="outline" icon-left="link" @click="copyCurrentUrl()">
+          <div class="flex shrink-0 items-center gap-1">
+            <OButton
+              size="icon-xs"
+              variant="outline"
+              icon-left="chevron-left"
+              :disabled="!hasPrev"
+              data-test="log-explorer-detail-prev"
+              @click="goPrev"
+            >
+              <OTooltip :content="t('panel.logExplorer.detail.prevEvent')" />
+            </OButton>
+            <span class="text-text-secondary w-12 text-center text-xs tabular-nums"
+              >{{ selectedIndex + 1 }} / {{ events.length }}</span
+            >
+            <OButton
+              size="icon-xs"
+              variant="outline"
+              icon-left="chevron-right"
+              :disabled="!hasNext"
+              data-test="log-explorer-detail-next"
+              @click="goNext"
+            >
+              <OTooltip :content="t('panel.logExplorer.detail.nextEvent')" />
+            </OButton>
+          </div>
+          <OButton size="sm-toolbar" variant="outline" icon-left="link" @click="copyCurrentUrl()">
             {{ t("panel.logExplorer.detail.copyLink") }}
           </OButton>
         </div>
 
-        <!-- Tabs -->
-        <OTabs v-model="detailTab" dense bordered class="mb-2 shrink-0 px-2">
-          <OTab name="insights" :label="t('panel.logExplorer.detail.insights')" icon="insights" />
-          <OTab name="details" :label="t('panel.logExplorer.detail.details')" />
-          <OTab name="json" :label="t('panel.logExplorer.detail.json')" />
-        </OTabs>
-
-        <OTabPanels v-model="detailTab" :grow="true" scroll="y" class="min-h-0">
-          <!-- ═══ INSIGHTS TAB ═══════════════════════════════════════ -->
-          <OTabPanel name="insights" class="p-0">
+        <!-- Unified detail bar: Insights (leading) + DetailTable's JSON/Table/correlation tabs -->
+        <DetailTable
+          :model-value="selectedEvent"
+          :stream-type="props.streamType || 'logs'"
+          :current-index="selectedIndex"
+          :total-length="events.length"
+          :correlation-props="correlationDashboardProps"
+          :correlation-loading="correlationLoading"
+          :correlation-error="correlationError ?? undefined"
+          :leading-tabs="detailLeadingTabs"
+          initial-tab="insights"
+          embedded
+          class="min-h-0 flex-1"
+          @load-correlation="openCorrelationFromLog"
+          @showPrevDetail="goPrev"
+          @showNextDetail="goNext"
+          @sendToAiChat="(v: unknown, a?: boolean) => emit('sendToAiChat', v, a)"
+        >
+          <template #panel-insights>
             <!-- Global loading bar -->
             <div v-if="insightsLoading" class="dld-progress shrink-0" />
 
@@ -1140,72 +1325,10 @@ function openInLogs() {
                 </template>
               </div>
             </section>
-          </OTabPanel>
-
-          <!-- ═══ DETAILS TAB (searchable Name/Value table) ═════════════ -->
-          <OTabPanel name="details" class="px-2 pb-2">
-            <div class="mb-2 flex items-center gap-2 px-2">
-              <OInput
-                v-model="detailFilter"
-                size="sm"
-                icon-left="search"
-                :placeholder="t('common.search')"
-                class="flex-1"
-                data-test="log-explorer-detail-search"
-              />
-              <OSwitch
-                v-model="wrapDetailValues"
-                :label="t('common.wrap')"
-                size="md"
-                data-test="log-explorer-detail-wrap"
-              />
-            </div>
-            <OTable
-              :data="detailTableRows"
-              :columns="detailColumns"
-              :default-columns="false"
-              :show-global-filter="false"
-              :bordered="true"
-              :frame="false"
-              pagination="none"
-              sorting="none"
-              :wrap="wrapDetailValues"
-              :row-class="(row: any) => (row.name === field ? 'dld-kv-row--highlight' : '')"
-            >
-              <template #cell-name="{ value }">
-                <span class="log-key font-mono">{{ value }}</span>
-              </template>
-              <template #cell-value="{ row }">
-                <pre
-                  class="m-0 block w-full min-w-0 p-0 font-mono font-normal"
-                  :class="
-                    wrapDetailValues
-                      ? 'break-all whitespace-pre-wrap'
-                      : 'overflow-hidden text-ellipsis whitespace-nowrap'
-                  "
-                ><LogsHighLighting :data="getDetailDisplayValue(row.name, row.value)" :show-braces="false" /></pre>
-              </template>
-            </OTable>
-          </OTabPanel>
-
-          <!-- ═══ JSON TAB (tree — same as Source Details) ═══════════════ -->
-          <OTabPanel name="json" class="px-2 pb-2">
-            <div class="dld-json-preview">
-              <JsonPreview
-                :value="selectedEvent"
-                mode="sidebar"
-                :stream-name="stream"
-                :show-copy-button="true"
-                hide-view-related
-                hide-search-term-actions
-                hide-field-options
-                @copy="copyToClipboard"
-              />
-            </div>
-          </OTabPanel>
-        </OTabPanels>
+          </template>
+        </DetailTable>
       </div>
-    </ODrawer>
+    </template>
   </div>
 </template>
 
@@ -1279,14 +1402,6 @@ function openInLogs() {
 .dld-editor__body :deep(textarea:focus) {
   border-left-color: color-mix(in srgb, var(--color-accent) 90%, transparent);
   outline: none;
-}
-
-/* Active results row (selected event) — applied to OTable's row via :row-class. */
-.dld-row--active {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-}
-.dld-row--active:hover {
-  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
 }
 
 /* ── Insight sections ────────────────────────────────────────────────────── */

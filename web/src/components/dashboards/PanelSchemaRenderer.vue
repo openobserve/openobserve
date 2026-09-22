@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODrawer
       v-model:open="cellDrawer.open"
       side="right"
-      :width="75"
+      :width="85"
       bleed
       :title="t('panel.logExplorer.title')"
       data-test="dashboard-cell-explorer-drawer"
@@ -250,6 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :start-time="cellDrawer.startTime"
         :end-time="cellDrawer.endTime"
         :base-where="cellDrawer.baseWhere"
+        @send-to-ai-chat="onCellSendToAiChat"
       />
     </ODrawer>
   </div>
@@ -501,6 +502,7 @@ export default defineComponent({
     "contextmenu",
     "show-legends",
     "format-column",
+    "sendToAiChat",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -1756,6 +1758,12 @@ export default defineComponent({
       }
     }
 
+    // Opening the AI chat: close the cell explorer so the two panels don't overlap.
+    function onCellSendToAiChat(value: unknown, append?: boolean) {
+      onCellDrawerOpenChange(false);
+      emit("sendToAiChat", value, append);
+    }
+
     // Called directly by the search icon so it works even with a panel drilldown config.
     async function exploreCellInLogs(alias: string, value: unknown, row: any) {
       const queries = props.panelSchema.queries ?? [];
@@ -1862,6 +1870,7 @@ export default defineComponent({
       hideContextMenu,
       handleCreateAlert,
       cellDrawer,
+      onCellSendToAiChat,
       exploreCellInLogs,
       onCellDrawerOpenChange,
     };

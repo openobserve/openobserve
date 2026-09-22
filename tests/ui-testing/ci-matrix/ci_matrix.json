@@ -22,7 +22,8 @@
       "alerts-clone-dialog.spec.js",
       "alerts-composite-preview.spec.js",
       "alerts-composite-detail.spec.js",
-      "alerts-evaluation-chart.spec.js"
+      "alerts-evaluation-chart.spec.js",
+      "alerts-chart-error-state.spec.js"
     ],
     "disabled": [
       {
@@ -74,7 +75,8 @@
       "dashboard-sankey.spec.js",
       "dashboard-pie-donut.spec.js",
       "dashboard-metric-camelcase.spec.js",
-      "dashboard-create-alert.spec.js"
+      "dashboard-create-alert.spec.js",
+      "dashboard-zoom-brush.spec.js"
     ],
     "disabled": []
   },
@@ -96,7 +98,8 @@
       "crossLinking.spec.js",
       "dashboard-multi-sql.spec.js",
       "crossLinkMultiStream.spec.js",
-      "dashboards-form-validation.spec.js"
+      "dashboards-form-validation.spec.js",
+      "dashboard-refresh-without-cache.spec.js"
     ],
     "disabled": [
       {
@@ -165,7 +168,8 @@
       "dashboard-table-column-filtering.spec.js",
       "dashboard-table-pagination.spec.js",
       "dashboard-pivot-table.spec.js",
-      "interactive-dashboard-table.spec.js"
+      "interactive-dashboard-table.spec.js",
+      "dashboard-cell-explorer-detail.spec.js"
     ],
     "disabled": []
   },
@@ -246,7 +250,9 @@
       "rum-form-validation.spec.js",
       "login-form-validation.spec.js",
       "datetime-picker-copy-paste.spec.js",
-      "connectDataSourcePopup.spec.js"
+      "splunk-hec-ingestion-window.spec.js",
+      "connectDataSourcePopup.spec.js",
+      "theme.spec.js"
     ],
     "disabled": []
   },
@@ -289,7 +295,9 @@
       "monaco-query-prefill.spec.js",
       "logsqueries.matchall.spec.js",
       "ftsDefaultColumn.spec.js",
-      "logsVisualizePersistence.spec.js"
+      "logsVisualizePersistence.spec.js",
+      "streamNotFound.spec.js",
+      "logsRefreshCacheDropdown.spec.js"
     ],
     "disabled": [
       {
@@ -311,7 +319,8 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js"
+      "timezoneDisplay.spec.js",
+      "logsRefreshCacheDropdown.spec.js"
     ],
     "disabled": [
       {

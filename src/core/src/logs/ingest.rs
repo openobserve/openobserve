@@ -601,6 +601,8 @@ pub async fn ingest(
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
+        // Wholly-discarded batch skips the write path below, so count/warn its drops here.
+        warn_and_count_discards(org_id, endpoint, &stream_status);
         return Ok(IngestionResponse::new(
             http::StatusCode::OK.into(),
             vec![stream_status],

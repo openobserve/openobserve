@@ -101,7 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {}
             "
             :shouldRefreshWithoutCache="
-              (panels?.[0]?.id ? shouldRefreshWithoutCacheObj?.[panels?.[0]?.id] : undefined) ||
+              (panels?.[0]?.id ? shouldRefreshWithoutCacheObj?.[panels?.[0]?.id] : undefined) ??
+              shouldRefreshWithoutCacheObj?.__global ??
               false
             "
             :variablesData="getMergedVariablesForPanel(panels[0]?.id)"
@@ -122,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:initial-variable-values="updateInitialVariableValues"
             @onEditLayout="openEditLayout"
             @contextmenu="$emit('chart:contextmenu', $event)"
+            @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
           />
         </div>
         <div
@@ -165,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    Mounting everything up front froze large dashboards. -->
               <div
                 v-else-if="!shouldMountPanel(item.id)"
-                class="flex h-full flex-col p-2"
+                class="drag-cancel flex h-full flex-col p-2"
                 :data-test="`dashboard-panel-placeholder-${item.id}`"
               >
                 <span class="text-text-secondary truncate text-sm" :title="item.title">
@@ -186,7 +188,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :folderId="folderId"
                   :reportId="reportId"
                   :selectedTimeDate="currentTimeObj?.[item?.id] || currentTimeObj['__global'] || {}"
-                  :shouldRefreshWithoutCache="shouldRefreshWithoutCacheObj?.[item?.id] || false"
+                  :shouldRefreshWithoutCache="
+                    shouldRefreshWithoutCacheObj?.[item?.id] ??
+                    shouldRefreshWithoutCacheObj?.__global ??
+                    false
+                  "
                   :variablesData="getMergedVariablesForPanel(item.id)"
                   :currentVariablesData="getLiveVariablesForPanel(item.id)"
                   :width="getPanelLayout(item, 'w')"
@@ -211,6 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @onEditLayout="openEditLayout"
                   @update:runId="updateRunId"
                   @contextmenu="$emit('chart:contextmenu', $event)"
+                  @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
                 >
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
                   <template #panel-variables>
@@ -349,6 +356,7 @@ export default defineComponent({
     "panelsValues",
     "searchRequestTraceIds",
     "variablesManagerReady",
+    "sendToAiChat",
   ],
   props: {
     viewOnly: {},
@@ -852,7 +860,7 @@ export default defineComponent({
           draggable: {
             enable:
               !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable dragging unless view-only or saving
-            handle: ".drag-allow", // Only allow dragging from specific handle
+            cancel: ".drag-cancel", // panel body defers to ECharts; only the header starts a grid drag
           },
           resizable: {
             enable:

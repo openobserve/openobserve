@@ -23,6 +23,7 @@ import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
 import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
+import DashboardZoomDrag from "./dashboardPages/dashboard-zoom-drag";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDrawer.js";
@@ -49,6 +50,7 @@ import { IngestionPage } from "./generalPages/ingestionPage.js";
 import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
 import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
+import { SplunkHecPage } from "./generalPages/splunkHecPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
@@ -157,6 +159,7 @@ class PageManager {
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
     this.dateTimeHelper = new DateTimeHelper(page);
     this.dashboardPanelTime = new DashboardPanelTime(page);
+    this.dashboardZoomDrag = new DashboardZoomDrag(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
     this.scheduledReportsDrawer = new ScheduledReportsDrawerPage(page);
@@ -193,6 +196,7 @@ class PageManager {
     this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);
+    this.splunkHecPage = new SplunkHecPage(page);
 
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);

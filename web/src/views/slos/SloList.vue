@@ -876,7 +876,7 @@ watch(
   (isLoading) => {
     if (isLoading) return;
     setTimeout(() => {
-      oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+      oTableRef.value?.restorePage?.(currentPage.value);
     }, 0);
   },
   { once: true },
@@ -909,9 +909,12 @@ async function load(orgId?: string | null, folderId?: string, force = false) {
 
 function onFolderChange(folderId: string) {
   if (folderId === activeFolderId.value) return;
+  // A folder switch starts a new list: page 1 in table and URL alike.
+  currentPage.value = 1;
+  const { page: _page, ...carriedQuery } = route.query;
   router.push({
     name: "sloList",
-    query: { ...route.query, org_identifier: org.value, folder: folderId },
+    query: { ...carriedQuery, org_identifier: org.value, folder: folderId },
   });
   load(org.value, folderId);
 }
