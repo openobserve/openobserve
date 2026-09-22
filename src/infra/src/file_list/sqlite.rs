@@ -1046,8 +1046,18 @@ DO UPDATE SET
                 return Err(e.into());
             }
         };
-        let id = ret.try_get::<i64, &str>("id").unwrap_or_default();
-        let status = ret.try_get::<i64, &str>("status").unwrap_or_default();
+        let (id, status) = match ret
+            .try_get::<i64, &str>("id")
+            .and_then(|id| Ok((id, ret.try_get::<i32, &str>("status")?)))
+        {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback add job error: {e}");
+                }
+                return Err(e.into());
+            }
+        };
         if id > 0
             && super::FileListJobStatus::from(status) == super::FileListJobStatus::Done
             && let Err(e) =

@@ -836,11 +836,11 @@ test.describe("Logs Regression Bug Fixes", () => {
       await pm.logsPage.selectStream('e2e_automate');
       await page.waitForTimeout(1000);
 
-      // Step 1: Enable VRL toggle
+      // Not wrapped in a catch: if the editor cannot be opened this test has
+      // nothing to assert, and swallowing that is what made it pass for months
+      // without exercising VRL at all.
       testLogger.info('Step 1: Enabling VRL function toggle');
-      await pm.logsPage.clickVrlToggleButton().catch(() => {
-        testLogger.warn('VRL toggle click failed, trying alternative');
-      });
+      await pm.logsPage.clickVrlToggleButton();
       await page.waitForTimeout(1000);
 
       // Step 2: Enter VRL function in the editor
@@ -905,9 +905,10 @@ test.describe("Logs Regression Bug Fixes", () => {
       // Step 8: Verify VRL function is loaded
       testLogger.info('Step 8: Verifying VRL function loaded');
 
-      // Toggle VRL editor to make it visible (it's collapsed by default after loading saved view)
-      await pm.logsPage.clickVrlToggle();
-      await page.waitForTimeout(1000);
+      // Restoring a saved view that carried a function re-opens the editor by
+      // itself, so this must be idempotent — the old blind toggle closed it and
+      // then waited for it to be visible.
+      await pm.logsPage.ensureVrlEditorOpen();
 
       // Check if VRL editor has content
       const vrlEditorContent = await pm.logsPage.getVrlEditorContent();
@@ -976,19 +977,19 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should have timestamp column selected by default for multi stream @bug-5894 @P2 @timestamp @multiStream @regression", async ({ page }) => {
     testLogger.info('Test: Verify timestamp default selected for multi stream (Bug #5894)');
 
+    // The stream select's options are fetched when the logs page loads, so the second
+    // stream must exist before that navigation or it never appears in the dropdown.
+    const secondStream = `e2e_multistream_${Date.now()}`;
+    fieldCacheStreamsToCleanup.push(secondStream);
+    testLogger.info(`Ingesting test data into second stream: ${secondStream}`);
+    await ingestTestData(page, secondStream);
+    await pm.logsPage.waitForStreamAvailable(secondStream, 90000, 3000);
+
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(1000);
 
-    // Ingest data into a second stream for multi-stream testing
-    const secondStream = `e2e_multistream_${Date.now()}`;
-    fieldCacheStreamsToCleanup.push(secondStream);
-    testLogger.info(`Ingesting test data into second stream: ${secondStream}`);
-    await ingestTestData(page, secondStream);
-    await page.waitForTimeout(2000);
-
-    // Select second stream for multi-stream mode (without page navigation)
     testLogger.info('Selecting second stream for multi-stream mode');
     await pm.logsPage.addStreamToSelection(secondStream);
     await page.waitForTimeout(1000);
@@ -1847,9 +1848,11 @@ test.describe("Logs Regression Bug Fixes", () => {
   // ==========================================================================
   // Bug #5277: After moving column, click on query again and position changes back
   // https://github.com/openobserve/openobserve/issues/5277
+  // #4483 is the same defect filed again; both numbers are tagged so a
+  // coverage audit keyed on either one finds this test.
   // ==========================================================================
   test("column positions should persist after re-running query", {
-    tag: ['@bug-5277', '@P2', '@regression', '@logsRegression']
+    tag: ['@bug-5277', '@bug-4483', '@P2', '@regression', '@logsRegression']
   }, async ({ page }) => {
     testLogger.info('Test: Column positions persist after re-query (Bug #5277)');
 

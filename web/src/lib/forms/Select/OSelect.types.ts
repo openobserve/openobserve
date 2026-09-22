@@ -160,7 +160,11 @@ export interface SelectProps {
    *   and closes the dropdown), while clicking the checkbox still toggles it.
    */
   rowClickSingleSelect?: boolean;
-  /** When true, shows the full option label as a native tooltip on hover (useful when labels are truncated). */
+  /**
+   * @deprecated No longer needed — the trigger and option labels now show a
+   * tooltip with the full value automatically whenever they're truncated.
+   * Kept only so existing call sites don't break; has no effect.
+   */
   optionTooltip?: boolean;
 }
 

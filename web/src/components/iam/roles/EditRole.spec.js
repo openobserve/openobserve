@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
@@ -29,13 +29,38 @@ vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
 }));
 
+// Mocked so these specs stay independent of the real DBM catalogs' contents.
+vi.mock("@/components/iam/roles/dbmViewerPreset", () => ({
+  DBM_VIEWER_STREAMS: ["postgresql_backends", "mysql_threads", "dbm_absent_stream"],
+  DBM_VIEWER_STREAM_ROW_PERMS: ["AllowGet"],
+  DBM_VIEWER_TYPE_NODE_PERMS: ["AllowList"],
+  DBM_MODULE_RESOURCE: "db_monitoring",
+}));
+
+// Mocked so these specs stay independent of the real curated set's contents.
+vi.mock("@/components/iam/roles/k8sViewerPreset", () => ({
+  K8S_VIEWER_STREAMS: ["k8s_pod_cpu", "k8s_node_memory", "k8s_absent_stream"],
+  K8S_VIEWER_STREAM_ROW_PERMS: ["AllowGet"],
+  K8S_VIEWER_TYPE_NODE_PERMS: ["AllowList"],
+}));
+
+// Mutable so a spec can shrink the org's metric streams (the zero-match case).
+const metricStreamsOverride = { list: null };
+
 // Mock composable useStreams
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: vi.fn(async (type) => {
       const map = {
         logs: { list: [{ name: "app" }, { name: "sys" }] },
-        metrics: { list: [{ name: "cpu" }, { name: "mem" }] },
+        metrics: {
+          list: metricStreamsOverride.list ?? [
+            { name: "cpu" },
+            { name: "mem" },
+            { name: "postgresql_backends" },
+            { name: "mysql_threads" },
+          ],
+        },
         traces: { list: [{ name: "svc-a" }] },
         index: { list: [{ name: "users" }] },
         enrichment_tables: { list: [{ name: "geo" }] },
@@ -47,8 +72,9 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 // Mock all external services used inside EditRole.vue
-vi.mock("@/services/iam", () => ({
-  getResources: vi.fn(async () => ({
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const getResources = vi.fn(async () => ({
     data: [
       {
         key: "stream",
@@ -182,84 +208,142 @@ vi.mock("@/services/iam", () => ({
         visible: true,
         order: 16,
       },
+      {
+        key: "db_monitoring",
+        display_name: "Database Monitoring",
+        has_entities: false,
+        top_level: true,
+        visible: true,
+        order: 17,
+      },
     ],
-  })),
-  getResourcePermission: vi.fn(async () => ({ data: [] })),
-  getAllRolePermissions: vi.fn(async () => ({ data: [] })),
-  getRoleUsers: vi.fn(async () => ({ data: ["u1@example.com", "u2@example.com"] })),
-  updateRole: vi.fn(async () => ({ data: { code: 200 } })),
-  getGroups: vi.fn(async () => ({ data: [] })),
-  getRoles: vi.fn(async () => ({ data: [] })),
-}));
+  }));
+  const getAllRolePermissions = vi.fn(async () => ({ data: [] }));
+  return overlayServiceMock(await importOriginal(), {
+    getResources,
+    getResourcePermission: vi.fn(async () => ({ data: [] })),
+    getAllRolePermissions,
+    getRoleUsers: vi.fn(async () => ({ data: ["u1@example.com", "u2@example.com"] })),
+    updateRole: vi.fn(async () => ({ data: { code: 200 } })),
+    getGroups: vi.fn(async () => ({ data: [] })),
+    getRoles: vi.fn(async () => ({ data: [] })),
+  });
+});
 
-vi.mock("@/services/stream", () => ({ default: {} }));
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    getPipelines: vi.fn(async () => ({ data: { list: [{ pipeline_id: "p1", name: "P1" }] } })),
-  },
-}));
-vi.mock("@/services/alerts", () => ({
-  default: {
-    listByFolderId: vi.fn(async () => ({ data: { list: [{ alertId: "a1", name: "A1" }] } })),
-  },
-}));
-vi.mock("@/services/reports", () => ({
-  default: { list: vi.fn(async () => ({ data: [{ name: "r1" }] })) },
-}));
-vi.mock("@/services/alert_templates", () => ({
-  default: { list: vi.fn(async () => ({ data: [{ name: "t1" }] })) },
-}));
-vi.mock("@/services/alert_destination", () => ({
-  default: { list: vi.fn(async () => ({ data: [{ name: "dest1" }] })) },
-}));
-vi.mock("@/services/jstransform", () => ({
-  default: { list: vi.fn(async () => ({ data: { list: [{ name: "f1" }] } })) },
-}));
-vi.mock("@/services/organizations", () => ({
-  default: {
-    list: vi.fn(async () => ({ data: { data: [{ identifier: "org1" }, { identifier: "org2" }] } })),
-  },
-}));
-vi.mock("@/services/saved_views", () => ({
-  default: { get: vi.fn(async () => ({ data: { views: [{ view_id: "v1", view_name: "V1" }] } })) },
-}));
-vi.mock("@/services/dashboards", () => ({
-  default: {
-    list: vi.fn(async () => ({ data: { dashboards: [{ dashboardId: "d1", title: "D1" }] } })),
-    list_Folders: vi.fn(async () => ({
-      data: { list: [{ folderId: "default", name: "default" }] },
-    })),
-  },
-}));
-vi.mock("@/services/service_accounts", () => ({
-  default: { list: vi.fn(async () => ({ data: { data: ["svc1@example.com"] } })) },
-}));
-vi.mock("@/services/cipher_keys", () => ({
-  default: { list: vi.fn(async () => ({ data: { keys: [{ name: "key1" }] } })) },
-}));
-vi.mock("@/services/common", () => ({
-  default: {
-    list_Folders: vi.fn(async () => ({
-      data: { list: [{ folderId: "default", name: "default" }] },
-    })),
-  },
-}));
-vi.mock("@/services/online-evals.service", () => ({
-  default: {
-    providers: {
-      list: vi.fn(async () => [{ id: "openai", name: "OpenAI" }]),
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPipelines: vi.fn(async () => ({ data: { list: [{ pipeline_id: "p1", name: "P1" }] } })),
     },
-    scoreConfigs: {
-      list: vi.fn(async () => [{ entity_id: "quality-score", name: "Quality Score" }]),
+  });
+});
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: vi.fn(async () => ({ data: { list: [{ alertId: "a1", name: "A1" }] } })),
     },
-    scorers: {
-      list: vi.fn(async () => [{ entityId: "llm-judge", name: "LLM Judge" }]),
+  });
+});
+vi.mock("@/services/reports", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: [{ name: "r1" }] })) },
+  });
+});
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: [{ name: "t1" }] })) },
+  });
+});
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: [{ name: "dest1" }] })) },
+  });
+});
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: { list: [{ name: "f1" }] } })) },
+  });
+});
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(async () => ({
+        data: { data: [{ identifier: "org1" }, { identifier: "org2" }] },
+      })),
     },
-    jobs: {
-      list: vi.fn(async () => [{ id: "daily-eval", name: "Daily Eval" }]),
+  });
+});
+vi.mock("@/services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn(async () => ({ data: { views: [{ view_id: "v1", view_name: "V1" }] } })),
     },
-  },
-}));
+  });
+});
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(async () => ({ data: { dashboards: [{ dashboardId: "d1", title: "D1" }] } })),
+      list_Folders: vi.fn(async () => ({
+        data: { list: [{ folderId: "default", name: "default" }] },
+      })),
+    },
+  });
+});
+vi.mock("@/services/service_accounts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: { data: ["svc1@example.com"] } })) },
+  });
+});
+vi.mock("@/services/cipher_keys", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: { keys: [{ name: "key1" }] } })) },
+  });
+});
+vi.mock("@/services/common", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_Folders: vi.fn(async () => ({
+        data: { list: [{ folderId: "default", name: "default" }] },
+      })),
+    },
+  });
+});
+vi.mock("@/services/online-evals.service", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      providers: {
+        list: vi.fn(async () => [{ id: "openai", name: "OpenAI" }]),
+      },
+      scoreConfigs: {
+        list: vi.fn(async () => [{ entity_id: "quality-score", name: "Quality Score" }]),
+      },
+      scorers: {
+        list: vi.fn(async () => [{ entityId: "llm-judge", name: "LLM Judge" }]),
+      },
+      jobs: {
+        list: vi.fn(async () => [{ id: "daily-eval", name: "Daily Eval" }]),
+      },
+    },
+  });
+});
 vi.mock("@/services/llm-queues.service", () => ({
   default: {
     list: vi.fn(async () => [{ id: "review-queue", name: "Review Queue" }]),
@@ -758,6 +842,33 @@ describe("EditRole - micro validations", () => {
     expect(Array.isArray(permissions[0].entities)).toBe(true);
   });
 
+  // The type node's own AllowList grant used to forceShow every sibling, so Selected listed all ~80 streams.
+  it("under the Selected filter a granted TYPE node keeps its ungranted children hidden", async () => {
+    const wrapper = await mountEditRole();
+    const granted = {
+      name: "k8s_node_cpu",
+      show: false,
+      permission: { AllowGet: { value: true } },
+    };
+    const ungranted = { name: "mysql_up", show: false, permission: { AllowGet: { value: false } } };
+    wrapper.vm.heavyResourceEntities = { metrics: [granted, ungranted] };
+    wrapper.vm.filter.permissions = "selected";
+    const permissions = [
+      {
+        name: "metrics",
+        resourceName: "metrics",
+        type: "Type",
+        // expandPermission seeds the visible slice, so the real node is never empty here.
+        entities: [granted, ungranted],
+        permission: { AllowList: { value: true } },
+      },
+    ];
+    wrapper.vm.updatePermissionVisibility(permissions);
+    expect(permissions[0].show).toBe(true);
+    expect(granted.show).toBe(true);
+    expect(ungranted.show).toBe(false);
+  });
+
   it("getResourceByName finds nested resource", async () => {
     const wrapper = await mountEditRole();
     const permissions = [
@@ -975,6 +1086,454 @@ describe("EditRole - read-only preset", () => {
   it("does not seed permissions without the readonly preset", async () => {
     router.currentRoute.value.query = {};
     const wrapper = await mountEditRole();
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+});
+
+describe("EditRole - dbm viewer preset", () => {
+  const mountWithDbmPreset = async () => {
+    router.currentRoute.value.query = { preset: "dbm" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+    return wrapper;
+  };
+
+  afterEach(() => {
+    metricStreamsOverride.list = null;
+  });
+
+  it("stages AllowGet on the curated DBM metric streams present in the org", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).toEqual(
+      expect.arrayContaining([
+        { object: "metrics:postgresql_backends", permission: "AllowGet" },
+        { object: "metrics:mysql_threads", permission: "AllowGet" },
+      ]),
+    );
+  });
+
+  // A leaf stream row hides its AllowList checkbox, so seeding it would stage a grant the user cannot see or untick.
+  it("does not stage a permission the table hides on a stream row", async () => {
+    const wrapper = await mountWithDbmPreset();
+    const rows = wrapper.vm.heavyResourceEntities["metrics"] ?? [];
+    const seeded = rows.find((r) => r.name === "postgresql_backends");
+    expect(seeded.permission.AllowList.show).toBe(false);
+    expect(
+      Object.values(wrapper.vm.addedPermissions).some(
+        (p) => p.permission === "AllowList" && p.object.startsWith("metrics:postgresql_"),
+      ),
+    ).toBe(false);
+  });
+
+  // GET /{org}/streams checks `metrics:_all_<org>`, and FGA's LIST relation does
+  // not accept ALLOW_GET — without this grant the Metrics tab cannot load its
+  // stream list at all.
+  it("stages AllowList on the metrics stream-type node", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).toEqual(
+      expect.arrayContaining([{ object: "metrics:_all_default", permission: "AllowList" }]),
+    );
+  });
+
+  // ALLOW_GET on `metrics:_all_<org>` reads as a wildcard over every metric stream in the org, which would make the curated per-stream grants decorative.
+  it("never stages AllowGet on the metrics stream-type node", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).not.toContainEqual({
+      object: "metrics:_all_default",
+      permission: "AllowGet",
+    });
+  });
+
+  // db_monitoring is a module-level toggle with no entities of its own — it
+  // authorizes every /{org}/db_monitoring/* endpoint (the DB-load and
+  // health-ratio panels riding _o2_dbm_server), a separate grant object from
+  // the raw metrics:<name> streams above.
+  it("stages AllowList and AllowGet on the db_monitoring module resource", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).toEqual(
+      expect.arrayContaining([
+        { object: "db_monitoring:_all_default", permission: "AllowList" },
+        { object: "db_monitoring:_all_default", permission: "AllowGet" },
+      ]),
+    );
+  });
+
+  it("ticks the metrics type-node checkboxes so the grant is reviewable", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    const streamResource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "stream",
+    );
+    const metricsNode = streamResource.entities.find((e) => e.name === "metrics");
+    expect(metricsNode.type).toBe("Type");
+    expect(metricsNode.permission.AllowList.show).toBe(true);
+    expect(metricsNode.permission.AllowList.value).toBe(true);
+    expect(metricsNode.permission.AllowGet.value).toBe(false);
+  });
+
+  it("does not grant a wildcard beyond metrics and db_monitoring", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("stream:_all_default");
+    expect(objects).not.toContain("logs:_all_default");
+    expect(objects).not.toContain("traces:_all_default");
+  });
+
+  it("stages exactly the curated streams plus the metrics and db_monitoring grants", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    expect(
+      [...new Set(Object.values(wrapper.vm.addedPermissions).map((p) => p.object))].sort(),
+    ).toEqual([
+      "db_monitoring:_all_default",
+      "metrics:_all_default",
+      "metrics:mysql_threads",
+      "metrics:postgresql_backends",
+    ]);
+  });
+
+  it("sets the permissions filter to 'selected' so the seeded rows are easy to review", async () => {
+    const wrapper = await mountWithDbmPreset();
+    expect(wrapper.vm.filter.permissions).toBe("selected");
+  });
+
+  it("writes the seeded permissions into the save payload", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountWithDbmPreset();
+
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    const payload = vi.mocked(updateRole).mock.calls[0][0].payload;
+    expect(payload.remove).toEqual([]);
+    expect(payload.add).toEqual(
+      expect.arrayContaining([
+        { object: "db_monitoring:_all_default", permission: "AllowList" },
+        { object: "db_monitoring:_all_default", permission: "AllowGet" },
+        { object: "metrics:_all_default", permission: "AllowList" },
+        { object: "metrics:postgresql_backends", permission: "AllowGet" },
+        { object: "metrics:mysql_threads", permission: "AllowGet" },
+      ]),
+    );
+    expect(payload.add).not.toContainEqual({
+      object: "metrics:_all_default",
+      permission: "AllowGet",
+    });
+    expect(payload.add).toHaveLength(5);
+  });
+
+  it("reports how many curated streams matched this org", async () => {
+    mockToast.mockClear();
+    await mountWithDbmPreset();
+
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "info",
+        message: expect.stringContaining("2 of 3"),
+      }),
+    );
+  });
+
+  it("reports the zero-match case instead of implying success", async () => {
+    metricStreamsOverride.list = [{ name: "cpu" }];
+    mockToast.mockClear();
+
+    const wrapper = await mountWithDbmPreset();
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("metrics:_all_default");
+    expect(objects).toContain("db_monitoring:_all_default");
+
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "warning",
+        message: expect.stringContaining("None"),
+      }),
+    );
+  });
+
+  it("does not seed when the role already has permissions", async () => {
+    const { getAllRolePermissions } = await import("@/services/iam");
+    vi.mocked(getAllRolePermissions).mockResolvedValueOnce({
+      data: [{ object: "stream:_all_default", permission: "AllowGet" }],
+    });
+
+    const wrapper = await mountWithDbmPreset();
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+
+  it("does not seed permissions without the dbm preset", async () => {
+    router.currentRoute.value.query = {};
+    const wrapper = await mountEditRole();
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+});
+
+describe("EditRole - kubernetes viewer preset", () => {
+  beforeEach(() => {
+    metricStreamsOverride.list = [
+      { name: "cpu" },
+      { name: "mem" },
+      { name: "k8s_pod_cpu" },
+      { name: "k8s_node_memory" },
+    ];
+  });
+
+  afterEach(() => {
+    metricStreamsOverride.list = null;
+  });
+
+  const mountWithK8sPreset = async () => {
+    router.currentRoute.value.query = { preset: "k8s" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+    return wrapper;
+  };
+
+  // Per-stream GET is what narrows the type node's LIST down to the curated set.
+  it("stages AllowGet on the curated metric streams present in the org", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).toEqual(
+      expect.arrayContaining([
+        { object: "metrics:k8s_pod_cpu", permission: "AllowGet" },
+        { object: "metrics:k8s_node_memory", permission: "AllowGet" },
+      ]),
+    );
+  });
+
+  it("stages exactly the curated streams plus the metrics type node", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    expect(
+      [...new Set(Object.values(wrapper.vm.addedPermissions).map((p) => p.object))].sort(),
+    ).toEqual(["metrics:_all_default", "metrics:k8s_node_memory", "metrics:k8s_pod_cpu"]);
+  });
+
+  // GET /{org}/streams checks `metrics:_all_<org>` (EntitySource::Org rewrites the
+  // object to the wildcard), and FGA's LIST relation does not accept ALLOW_GET —
+  // without this grant the curated pages fail their one hard dependency.
+  it("stages AllowList on the metrics stream-type node", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).toEqual(
+      expect.arrayContaining([{ object: "metrics:_all_default", permission: "AllowList" }]),
+    );
+  });
+
+  // ALLOW_GET on `metrics:_all_<org>` reads as a wildcard over every metric stream in the org, which would make the 37 per-stream grants decorative.
+  it("never stages AllowGet on the metrics stream-type node", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).not.toContainEqual({
+      object: "metrics:_all_default",
+      permission: "AllowGet",
+    });
+  });
+
+  it("does not grant a wildcard beyond the metrics stream type", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("stream:_all_default");
+    expect(objects).not.toContain("logs:_all_default");
+    expect(objects).not.toContain("traces:_all_default");
+  });
+
+  it("ticks the metrics type-node checkboxes so the grant is reviewable", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const streamResource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "stream",
+    );
+    const metricsNode = streamResource.entities.find((e) => e.name === "metrics");
+    expect(metricsNode.type).toBe("Type");
+    expect(metricsNode.permission.AllowList.show).toBe(true);
+    expect(metricsNode.permission.AllowList.value).toBe(true);
+    expect(metricsNode.permission.AllowGet.value).toBe(false);
+  });
+
+  it("does not stage a permission the table hides on a stream row", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const rows = wrapper.vm.heavyResourceEntities.metrics || [];
+    const seeded = rows.find((r) => r.name === "k8s_pod_cpu");
+    expect(seeded.permission.AllowList.show).toBe(false);
+    expect(
+      Object.values(wrapper.vm.addedPermissions).some(
+        (p) => p.permission === "AllowList" && p.object.startsWith("metrics:k8s_"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not stage unrelated metric streams", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("metrics:cpu");
+    expect(objects).not.toContain("metrics:mem");
+  });
+
+  it("only stages read permissions (never write or delete)", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const perms = Object.values(wrapper.vm.addedPermissions).map((p) => p.permission);
+    expect(perms.length).toBeGreaterThan(0);
+    expect(perms.every((p) => p === "AllowList" || p === "AllowGet")).toBe(true);
+  });
+
+  it("skips curated streams absent from this org without throwing", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("metrics:k8s_absent_stream");
+  });
+
+  it("ticks the checkbox state on the seeded stream rows", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const rows = wrapper.vm.heavyResourceEntities.metrics || [];
+    const seeded = rows.find((r) => r.name === "k8s_pod_cpu");
+    expect(seeded).toBeDefined();
+    expect(seeded.resourceName).toBe("metrics");
+    expect(seeded.permission.AllowGet.value).toBe(true);
+
+    const untouched = rows.find((r) => r.name === "cpu");
+    expect(untouched.permission.AllowGet.value).toBe(false);
+  });
+
+  it("expands the stream + metrics nodes so the seeded rows are visible", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const streamResource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "stream",
+    );
+    expect(streamResource.expand).toBe(true);
+    const metricsNode = streamResource.entities.find((e) => e.name === "metrics");
+    expect(metricsNode).toBeDefined();
+    expect(metricsNode.expand).toBe(true);
+  });
+
+  it("switches the filter to Selected so the seeded rows are not buried", async () => {
+    const wrapper = await mountWithK8sPreset();
+    expect(wrapper.vm.filter.permissions).toBe("selected");
+  });
+
+  // The granted metrics type node forces its children to show, so every stream it covers is listed.
+  it("leaves the seeded stream rows visible in the table", async () => {
+    const wrapper = await mountWithK8sPreset();
+    await wrapper.vm.updateTableData();
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const streamResource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "stream",
+    );
+    expect(streamResource.show).toBe(true);
+    const metricsNode = streamResource.entities.find((e) => e.name === "metrics");
+    expect(metricsNode.show).toBe(true);
+    const visible = metricsNode.entities.map((e) => e.name);
+    expect(visible).toContain("k8s_pod_cpu");
+    expect(visible).toContain("k8s_node_memory");
+    expect(streamResource.entities.filter((e) => e.name !== "metrics").every((e) => !e.show)).toBe(
+      true,
+    );
+  });
+
+  it("writes the seeded permissions into the save payload", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountWithK8sPreset();
+
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    const payload = vi.mocked(updateRole).mock.calls[0][0].payload;
+    expect(payload.remove).toEqual([]);
+    expect(payload.add).toEqual(
+      expect.arrayContaining([
+        { object: "metrics:_all_default", permission: "AllowList" },
+        { object: "metrics:k8s_pod_cpu", permission: "AllowGet" },
+        { object: "metrics:k8s_node_memory", permission: "AllowGet" },
+      ]),
+    );
+    expect(payload.add).not.toContainEqual({
+      object: "metrics:_all_default",
+      permission: "AllowGet",
+    });
+    expect(payload.add).toHaveLength(3);
+  });
+
+  it("reports how many curated streams matched this org", async () => {
+    mockToast.mockClear();
+    await mountWithK8sPreset();
+
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "info",
+        message: expect.stringContaining("2 of 3"),
+      }),
+    );
+  });
+
+  it("reports the zero-match case instead of implying success", async () => {
+    metricStreamsOverride.list = [{ name: "cpu" }];
+    mockToast.mockClear();
+
+    try {
+      const wrapper = await mountWithK8sPreset();
+      expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+    } finally {
+      metricStreamsOverride.list = null;
+    }
+
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "warning",
+        message: expect.stringContaining("None"),
+      }),
+    );
+  });
+
+  it("does not seed when the role already has permissions", async () => {
+    const { getAllRolePermissions } = await import("@/services/iam");
+    vi.mocked(getAllRolePermissions).mockImplementationOnce(async () => ({
+      data: [{ object: "logs:app", permission: "AllowGet" }],
+    }));
+
+    router.currentRoute.value.query = { preset: "k8s" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+
+    expect(wrapper.vm.selectedPermissionsHash.size).toBeGreaterThan(0);
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+
+  it("does not seed k8s streams for the readonly preset", async () => {
+    router.currentRoute.value.query = { preset: "readonly" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("metrics:k8s_pod_cpu");
+  });
+
+  it("does not seed k8s streams with no preset at all", async () => {
+    router.currentRoute.value.query = {};
+    const wrapper = await mountEditRole();
+    await flushPromises();
+
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
   });
 });

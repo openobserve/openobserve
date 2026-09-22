@@ -54,19 +54,25 @@ vi.mock("@/composables/usePipelines", () => ({
   }),
 }));
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    list: vi.fn().mockResolvedValue({ data: { list: [] } }),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn().mockResolvedValue({ data: { list: [] } }),
+    },
+  });
+});
 
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    getPipelines: vi.fn().mockResolvedValue({ data: { list: [] } }),
-    createPipeline: vi.fn().mockResolvedValue({}),
-    updatePipeline: vi.fn().mockResolvedValue({}),
-  },
-}));
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPipelines: vi.fn().mockResolvedValue({ data: { list: [] } }),
+      createPipeline: vi.fn().mockResolvedValue({}),
+      updatePipeline: vi.fn().mockResolvedValue({}),
+    },
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),

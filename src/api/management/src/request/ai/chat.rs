@@ -623,7 +623,8 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         user_id,
         forward_headers
             .get(X_O2_ASSISTANT_SESSION_ID.as_str())
-            .unwrap_or(&"none".to_string())
+            .map(String::as_str)
+            .unwrap_or("none")
     );
 
     // Parse JSON body
@@ -1123,7 +1124,7 @@ pub async fn confirm_action(
                         StatusCode::OK,
                         axum::Json(
                             serde_json::from_str::<serde_json::Value>(&response_body)
-                                .unwrap_or(serde_json::json!({"ok": true})),
+                                .unwrap_or_else(|_| serde_json::json!({"ok": true})),
                         ),
                     )
                         .into_response()

@@ -2,11 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 
 // Mock services
-vi.mock("@/services/search", () => ({
-  default: {
-    get_promql_series: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_promql_series: vi.fn(),
+    },
+  });
+});
 
 // Mock vuex store
 vi.mock("vuex", async (importOriginal) => {

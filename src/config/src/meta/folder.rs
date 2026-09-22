@@ -48,6 +48,7 @@ pub enum FolderType {
     Alerts,
     Reports,
     Synthetics,
+    Workflows,
 }
 
 pub const DEFAULT_FOLDER: &str = "default";

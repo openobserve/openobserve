@@ -15,19 +15,25 @@
 
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { reactive } from "vue";
 import {
   makeExperimentDetail,
   makeExperiment,
 } from "@/enterprise/views/AIObservability/experimentTestFixtures";
+import type {
+  ExperimentDetail,
+  ExperimentResultSlot,
+  ExperimentRowDetail,
+} from "@/services/llm-experiments.service";
 
 const route = reactive({ params: { id: "exp-1" }, query: {} }) as any;
 const push = vi.fn();
+const back = vi.fn();
 vi.mock("vue-router", () => ({
   useRoute: () => route,
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, back }),
 }));
 vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
@@ -36,6 +42,7 @@ const get = vi.fn();
 const getRow = vi.fn();
 const listRows = vi.fn();
 const clone = vi.fn();
+const retrySlot = vi.fn();
 const toast = vi.fn();
 vi.mock("@/services/llm-experiments.service", () => ({
   default: {
@@ -44,6 +51,13 @@ vi.mock("@/services/llm-experiments.service", () => ({
     listRows: (...a: any[]) => listRows(...a),
     cancel: vi.fn(),
     retry: vi.fn(),
+    retrySlot: (
+      orgId: string,
+      experimentId: string,
+      rowId: string,
+      trialIndex: number,
+      idempotencyKey: string,
+    ) => retrySlot(orgId, experimentId, rowId, trialIndex, idempotencyKey),
     clone: (...a: any[]) => clone(...a),
   },
 }));
@@ -56,10 +70,13 @@ vi.mock("@/services/llm-datasets.service", () => ({
 }));
 
 import ExperimentDetailPage from "@/enterprise/views/AIObservability/ExperimentDetailPage.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { experimentKeys } from "@/services/llm-experiments.querykeys";
 
 beforeEach(() => {
   getRow.mockReset();
   getRow.mockResolvedValue(undefined);
+  retrySlot.mockReset();
   listRows.mockReset();
   listRows.mockResolvedValue({
     rows: [],
@@ -67,7 +84,41 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("ExperimentDetailPage", () => {
+  it("shows task and scoring costs under the full total and labels task latency", async () => {
+    get.mockResolvedValue(
+      makeExperimentDetail(makeExperiment(), {
+        results: {
+          executions: [],
+          scores: [],
+          aggregateSummary: {
+            p50LatencyMs: 4511,
+            totalCost: 0.118156603,
+            taskCost: 0.040630363,
+            scoringCost: 0.07752624,
+            costIncomplete: false,
+            incomplete: false,
+            incompleteTaskSlots: 0,
+            incompleteScoreDimensions: 0,
+            errorTaskSlots: 0,
+          },
+        },
+      }),
+    );
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+    const cost = wrapper.get('[data-test="ai-experiment-detail-cost"]').text();
+    expect(cost).toContain("$0.1182");
+    expect(cost).toContain("Task $0.0406 · Scoring $0.0775");
+    expect(wrapper.get('[data-test="ai-experiment-detail-p50"]').text()).toContain(
+      "P50 Task Latency",
+    );
+  });
+
   it("renders the experiment without runtime errors", async () => {
     const experiment = makeExperiment({ id: "exp-1", name: "run one", datasetId: "ds-1" });
     get.mockResolvedValue(makeExperimentDetail(experiment, {}));
@@ -79,6 +130,21 @@ describe("ExperimentDetailPage", () => {
     expect(errors).toEqual([]);
     expect(get).toHaveBeenCalled();
     expect(wrapper.text()).toContain("run one");
+  });
+
+  it("uses real browser back when there's history to pop, instead of the bare Experiments list", async () => {
+    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+    const experiment = makeExperiment({ id: "exp-1", name: "run one", datasetId: "ds-1" });
+    get.mockResolvedValue(makeExperimentDetail(experiment, {}));
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+    push.mockClear();
+
+    await wrapper.get('[data-test="app-page-header-back"]').trigger("click");
+
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+    window.history.replaceState(null, "");
   });
 
   // The meta line contains an "@", which vue-i18n parses as a linked message
@@ -226,6 +292,55 @@ describe("ExperimentDetailPage", () => {
     expect(scoring.text()).toContain("0 successful · 8 failed · 21 pending · 0 skipped");
   });
 
+  it("shows full score coverage and explains task-failed dimensions", async () => {
+    const experiment = makeExperiment({
+      id: "exp-1",
+      name: "run one",
+      datasetId: "ds-1",
+      scorers: [{ id: "scorer-9", version: 1 }],
+    });
+    get.mockResolvedValue(
+      makeExperimentDetail(experiment, {
+        results: {
+          executions: [],
+          scores: [],
+          taskProgress: { completed: 29, total: 30, skipped: 0 },
+          scoringProgress: { completed: 25, total: 26, skipped: 0 },
+          taskOutcomes: {
+            total: 30,
+            succeeded: 25,
+            failed: 4,
+            pending: 1,
+            skipped: 0,
+          },
+          scoreOutcomes: {
+            completed: 25,
+            total: 30,
+            scored: 25,
+            failed: 0,
+            pending: 1,
+            skipped: 0,
+            unscored: 4,
+          },
+          scoreSummaries: [],
+        },
+      }),
+    );
+
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+
+    const tasks = wrapper.get('[data-test="ai-experiment-detail-progress"]');
+    expect(tasks.text()).toContain("Tasks");
+    expect(tasks.text()).toContain("29/30");
+    expect(tasks.text()).toContain("25 succeeded · 4 failed · 1 pending · 0 skipped");
+
+    const scores = wrapper.get('[data-test="ai-experiment-detail-scoring"]');
+    expect(scores.text()).toContain("Scores");
+    expect(scores.text()).toContain("25/30");
+    expect(scores.text()).toContain("25 scored · 0 failed · 1 pending · 0 skipped · 4 unscored");
+  });
+
   it("reads as prose: humanized task type and singular counts", async () => {
     const experiment = makeExperiment({ id: "exp-1", name: "run one", datasetId: "ds-1" });
     experiment.task = {
@@ -365,9 +480,12 @@ describe("ExperimentDetailPage", () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain("0.718");
-    expect(wrapper.text()).toContain("false");
-    expect(wrapper.text()).toContain("safe");
+    expect(
+      wrapper
+        .findAll("tbody tr")[2]
+        .findAll("td")
+        .map((cell) => cell.text()),
+    ).toEqual(expect.arrayContaining(["0.718", "false", "safe"]));
     // Text labels keep row status accessible without relying on color.
     const chipText = taskStatuses.map((_, index) =>
       wrapper.get(`[data-test="ai-experiment-row-status-row-${index}"]`).text(),
@@ -468,7 +586,11 @@ describe("ExperimentDetailPage", () => {
   // "Incomplete" can be zero on a failed run — errors are terminal — so the
   // retry affordance keys off the error count instead.
   it("offers retry when the run holds errored slots", async () => {
-    const experiment = makeExperiment({ id: "exp-1", status: "failed" });
+    const experiment = makeExperiment({
+      id: "exp-1",
+      status: "execution_failed",
+      executionStatus: "failed",
+    });
     const detail = makeExperimentDetail(experiment, {
       results: {
         executions: [],
@@ -489,6 +611,192 @@ describe("ExperimentDetailPage", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="ai-experiment-detail-retry"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("shows an accepted slot retry as queued without changing experiment lifecycle", async () => {
+    vi.useFakeTimers();
+    const experiment = makeExperiment({
+      id: "exp-1",
+      status: "execution_failed",
+      executionStatus: "failed",
+    });
+    get.mockResolvedValue(makeExperimentDetail(experiment));
+    const failedSlot = {
+      rowId: "row-1",
+      logicalId: "case-1",
+      trialIndex: 0,
+      input: "question",
+      expectedOutput: null,
+      status: "task_failed" as const,
+      taskStatus: "error" as const,
+      execution: null,
+      scores: [],
+    };
+    const queuedExecution = {
+      experimentId: "exp-1",
+      itemLogicalId: "case-1",
+      rowId: "row-1",
+      trialIndex: 0,
+      status: "queued" as const,
+      output: null,
+      errorMessage: null,
+      latencyMs: null,
+      tokensIn: null,
+      tokensOut: null,
+      cost: null,
+      traceId: null,
+      taskFingerprint: "retry-1",
+      timestamp: 100,
+    };
+    retrySlot.mockResolvedValue(queuedExecution);
+
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+    // Vue Test Utils does not expose script-setup bindings on its public VM type.
+    const mounted = wrapper.vm as unknown as {
+      $: {
+        setupState: {
+          selectedRowDetail: ExperimentRowDetail | null;
+          detail: ExperimentDetail | null;
+          retryRowSlot: (slot: ExperimentResultSlot) => Promise<void>;
+        };
+      };
+    };
+    const state = mounted.$.setupState;
+    state.selectedRowDetail = {
+      experimentId: "exp-1",
+      snapshot: { datasetId: "ds-1", datasetVersion: 1 },
+      navigation: {
+        rowIndex: 0,
+        totalRows: 1,
+        previousRowId: null,
+        nextRowId: null,
+      },
+      rowId: "row-1",
+      logicalId: "case-1",
+      input: "question",
+      expectedOutput: null,
+      trials: [failedSlot],
+      scoreSummaries: [],
+    };
+    const initialGetCalls = get.mock.calls.length;
+    const initialListCalls = listRows.mock.calls.length;
+    // The experiments list shows run status, so it expires on submit and again once the retry settles.
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const listScope = { queryKey: experimentKeys.all("acme") };
+
+    await state.retryRowSlot(failedSlot);
+    await flushPromises();
+    expect(invalidate).toHaveBeenCalledWith(listScope);
+    const invalidationsAfterSubmit = invalidate.mock.calls.length;
+
+    expect(state.selectedRowDetail?.trials[0]).toMatchObject({
+      status: "pending",
+      taskStatus: "queued",
+      execution: queuedExecution,
+      scores: [],
+    });
+    expect(state.detail?.experiment).toMatchObject({
+      status: "execution_failed",
+      executionStatus: "failed",
+    });
+    expect(
+      wrapper.get('[data-test="ai-experiment-detail-retry"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(get).toHaveBeenCalledTimes(initialGetCalls);
+    expect(listRows).toHaveBeenCalledTimes(initialListCalls);
+    expect(getRow).not.toHaveBeenCalled();
+
+    const scoringScore = {
+      scorerId: "quality",
+      scorerVersion: 1,
+      status: "in_progress" as const,
+      score: null,
+    };
+    const finalScore = {
+      ...scoringScore,
+      status: "success" as const,
+      score: {
+        value: 0.9,
+        reasoning: "The response is accurate.",
+        evaluatorTraceId: "score-trace-1",
+        timestamp: 123,
+      },
+    };
+    const completedTrial = {
+      ...failedSlot,
+      status: "completed" as const,
+      taskStatus: "ok" as const,
+      execution: { ...queuedExecution, status: "ok" as const },
+    };
+    get
+      .mockResolvedValueOnce(
+        makeExperimentDetail(
+          makeExperiment({
+            id: "exp-1",
+            status: "execution_failed",
+            executionStatus: "failed",
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        makeExperimentDetail(
+          makeExperiment({
+            id: "exp-1",
+            status: "execution_failed",
+            executionStatus: "failed",
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        makeExperimentDetail(
+          makeExperiment({
+            id: "exp-1",
+            status: "execution_failed",
+            executionStatus: "failed",
+          }),
+        ),
+      );
+    getRow
+      .mockResolvedValueOnce({
+        ...state.selectedRowDetail,
+        trials: [{ ...completedTrial, status: "scoring", scores: [scoringScore] }],
+      })
+      .mockResolvedValueOnce({
+        ...state.selectedRowDetail,
+        trials: [{ ...completedTrial, scores: [finalScore] }],
+      })
+      .mockResolvedValueOnce({
+        ...state.selectedRowDetail,
+        trials: [{ ...completedTrial, scores: [finalScore] }],
+      });
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await flushPromises();
+
+    expect(get).toHaveBeenCalledTimes(initialGetCalls + 1);
+    expect(listRows).toHaveBeenCalledTimes(initialListCalls + 1);
+    expect(getRow).toHaveBeenCalledWith("acme", "exp-1", "row-1");
+    expect(state.detail?.experiment.executionStatus).toBe("failed");
+    expect(state.selectedRowDetail?.trials[0]).toMatchObject({
+      taskStatus: "ok",
+      scores: [scoringScore],
+    });
+    expect(invalidate).toHaveBeenCalledTimes(invalidationsAfterSubmit);
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await flushPromises();
+    expect(get).toHaveBeenCalledTimes(initialGetCalls + 2);
+    expect(state.detail?.experiment.status).toBe("execution_failed");
+    expect(state.selectedRowDetail?.trials[0].scores).toEqual([finalScore]);
+    expect(invalidate).toHaveBeenCalledTimes(invalidationsAfterSubmit + 1);
+    expect(invalidate).toHaveBeenLastCalledWith(listScope);
+    invalidate.mockRestore();
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await flushPromises();
+    expect(get).toHaveBeenCalledTimes(initialGetCalls + 2);
     wrapper.unmount();
   });
 

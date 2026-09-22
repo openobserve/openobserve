@@ -3,6 +3,7 @@ import { computeTreeLayout } from "./computeTreeLayout";
 import { resolveModelVendorLogo } from "./modelVendorLogo";
 import { cssToken } from "@/utils/theme";
 import { gt } from "@/types/i18n";
+import { dataZoomBrushStyle } from "@/utils/chartTheme";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
     backgroundColor: "transparent",
@@ -76,6 +77,7 @@ export const convertTraceData = (props: any, timezone: string) => {
       bottom: "100%",
       feature: {
         dataZoom: {
+          brushStyle: dataZoomBrushStyle(),
           show: true,
           yAxisIndex: "none",
         },

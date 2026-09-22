@@ -145,3 +145,29 @@ describe("AlertGroupChart — threshold visibility", () => {
     expect(config.y_axis_min).toBeUndefined();
   });
 });
+
+describe("AlertGroupChart — stream deleted after the alert was created", () => {
+  it("shows the backend's error instead of a blank 'chart unavailable' state", async () => {
+    // generate_sql validates the stream up front, so a deleted stream 400s
+    // here rather than reaching PanelSchemaRenderer with a doomed query.
+    vi.mocked(alertsService.generate_sql).mockRejectedValue({
+      response: {
+        status: 400,
+        data: { code: 400, message: "Stream 'logs' of type 'logs' does not exist" },
+      },
+    });
+
+    wrapper = await mountChart({
+      stream_name: "logs",
+      stream_type: "logs",
+      query_condition: { type: "sql", sql: "SELECT 1" },
+      trigger_condition: { threshold: 500 },
+    });
+
+    expect(wrapper.findComponent({ name: "PanelSchemaRenderer" }).exists()).toBe(false);
+    expect(wrapper.find('[data-test="alerts-alertgroupchart-error"]').text()).toContain(
+      "Stream 'logs' of type 'logs' does not exist",
+    );
+    expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(false);
+  });
+});

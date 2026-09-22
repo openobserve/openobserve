@@ -13,74 +13,64 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
-use hashbrown::HashSet;
-use promql_parser::parser::LabelModifier;
+use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use crate::aggregations::{Accumulate, AggFunc};
+use crate::aggregations::{Accumulate, AggFunc, group_series};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators
-pub fn group(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] group() started",
-        eval_ctx.trace_id,
-    );
-
-    let result = super::eval_aggregate(param, data, Group, eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] group() execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
-}
-
+#[derive(Clone, Copy)]
 pub struct Group;
 
 impl AggFunc for Group {
+    type Accumulator = GroupAccumulate;
+
     fn name(&self) -> &'static str {
         "group"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(GroupAccumulate::new())
-    }
-}
-
-pub struct GroupAccumulate {
-    // Track which timestamps have been seen (group returns 1 if any series exists)
-    timestamps: HashSet<i64>,
-}
-
-impl GroupAccumulate {
-    fn new() -> Self {
+    fn build(&self, slots: usize) -> Self::Accumulator {
         GroupAccumulate {
-            timestamps: HashSet::new(),
+            present: vec![false; slots],
         }
     }
 }
 
+pub struct GroupAccumulate {
+    present: Vec<bool>,
+}
+
+impl GroupAccumulate {
+    fn push(&mut self, slot: usize, _value: f64) {
+        self.present[slot] = true;
+    }
+}
+
 impl Accumulate for GroupAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        self.timestamps.insert(sample.timestamp);
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
+        }
     }
 
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        self.timestamps.extend(other.timestamps);
+    fn merge(&mut self, other: Self) {
+        for (present, other) in self.present.iter_mut().zip(other.present) {
+            *present |= other;
+        }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.timestamps
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .present
             .into_iter()
-            .map(|timestamp| Sample::new(timestamp, 1.0))
-            .collect()
+            .enumerate()
+            .filter(|(_, present)| *present)
+            .map(|(slot, _)| Sample::new(timestamps[slot], 1.0))
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 
@@ -88,15 +78,16 @@ impl Accumulate for GroupAccumulate {
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+    use config::meta::promql::value::{EvalContext, Label, RangeValue, Sample, Value};
 
     use super::*;
+    use crate::aggregations::eval_aggregate;
 
     #[test]
     fn test_group_value_none_input() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = group(&None, Value::None, &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::None, Group, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -104,7 +95,7 @@ mod tests {
     fn test_group_invalid_input_returns_err() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = group(&None, Value::Float(1.0), &eval_ctx);
+        let result = eval_aggregate(&None, Value::Float(1.0), Group, &eval_ctx);
         assert!(result.is_err());
     }
 
@@ -112,7 +103,7 @@ mod tests {
     fn test_group_empty_matrix_returns_none() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = group(&None, Value::Matrix(vec![]), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::Matrix(vec![]), Group, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -155,7 +146,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test group without label grouping - should return 1.0 for each group
-        let result = group(&None, data.clone(), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, data.clone(), Group, &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

@@ -159,11 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="flex min-h-0 flex-1">
+      <div class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div
           :class="[
-            'flex min-h-0 min-w-0 flex-col gap-2 py-2',
+            'flex min-h-0 min-w-0 flex-col gap-2 py-2 max-lg:flex-none',
             isCompositeMode ? 'flex-1' : 'flex-[6.5]',
           ]"
         >
@@ -180,7 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OToggleGroup
                 :model-value="formData.is_real_time"
                 :disabled="beingUpdated || anomalyEditMode"
-                class="shrink-0"
+                class="min-w-0"
+                mobile-dropdown
                 data-test="add-alert-type-tabs"
                 @update:model-value="onAlertTypeChange"
               >
@@ -198,7 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OToggleGroup>
             </div>
-            <div v-if="!isCompositeMode" class="flex items-center gap-4 px-3 py-2">
+            <div
+              v-if="!isCompositeMode"
+              class="flex items-center gap-4 px-3 py-2 max-md:flex-wrap max-md:gap-2"
+            >
               <!-- Stream Type -->
               <div v-if="!isCompositeMode" class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
@@ -219,7 +223,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Stream Name -->
-              <div v-if="!isCompositeMode" class="flex min-w-0 flex-1 items-center gap-1.5">
+              <div
+                v-if="!isCompositeMode"
+                class="flex min-w-0 flex-1 items-center gap-1.5 max-md:basis-full"
+              >
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
@@ -242,7 +249,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- TIER 3: Configuration Tabs -->
-          <div class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col">
+          <div
+            class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col max-lg:flex-none"
+          >
             <!-- Tab Headers -->
             <OToggleGroup
               :model-value="activeTab"
@@ -271,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
 
             <!-- Tab Content -->
-            <div class="flex-1 overflow-auto">
+            <div class="flex-1 overflow-auto max-lg:flex-none max-lg:overflow-visible">
               <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
               <!-- data-tab-pane: lets focusOnFirstError find the tab owning an
                invalid field and bring it forward before focusing it. -->
@@ -456,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- border-s: full-height vertical divider flush against the Preview/Summary pane -->
         <div
           v-if="!isCompositeMode"
-          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2 max-lg:h-160 max-lg:flex-none max-lg:border-s-0 max-lg:border-t"
         >
           <!-- Preview Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">

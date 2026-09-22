@@ -51,14 +51,13 @@ describe("toDetectionFunctionSql", () => {
     expect(toDetectionFunctionSql("p50", "duration")).toBe("approx_percentile_cont(duration, 0.5)");
   });
 
-  it("converts p75 to approx_percentile_cont", () => {
-    expect(toDetectionFunctionSql("p75", "duration")).toBe(
-      "approx_percentile_cont(duration, 0.75)",
-    );
+  // p75/p90 are not DetectionFunction variants, so they must not expand into a query the API rejects.
+  it("leaves p75 unexpanded — the backend has no such detection function", () => {
+    expect(toDetectionFunctionSql("p75", "duration")).toBe("p75(duration)");
   });
 
-  it("converts p90 to approx_percentile_cont", () => {
-    expect(toDetectionFunctionSql("p90", "duration")).toBe("approx_percentile_cont(duration, 0.9)");
+  it("leaves p90 unexpanded — the backend has no such detection function", () => {
+    expect(toDetectionFunctionSql("p90", "duration")).toBe("p90(duration)");
   });
 
   it("converts p95 to approx_percentile_cont", () => {
@@ -75,10 +74,8 @@ describe("toDetectionFunctionSql", () => {
 
   // ── Already-wrapped forms (API returns parenthesized) ─────────────────────
 
-  it("converts already-wrapped p90(duration) from API", () => {
-    expect(toDetectionFunctionSql("p90(duration)", "*")).toBe(
-      "approx_percentile_cont(duration, 0.9)",
-    );
+  it("leaves an already-wrapped p90(duration) alone", () => {
+    expect(toDetectionFunctionSql("p90(duration)", "*")).toBe("p90(duration)");
   });
 
   it("converts already-wrapped p95(latency) from API", () => {
@@ -105,8 +102,10 @@ describe("toDetectionFunctionSql", () => {
 
   // ── Case insensitivity ────────────────────────────────────────────────────
 
-  it("handles uppercase P90", () => {
-    expect(toDetectionFunctionSql("P90", "duration")).toBe("approx_percentile_cont(duration, 0.9)");
+  it("handles uppercase P99", () => {
+    expect(toDetectionFunctionSql("P99", "duration")).toBe(
+      "approx_percentile_cont(duration, 0.99)",
+    );
   });
 
   it("handles mixed-case P95(Duration) from API", () => {
@@ -134,13 +133,13 @@ describe("toDetectionFunctionSql", () => {
   });
 
   it("handles unknown percentile name like p99_9", () => {
-    // only p50/p75/p90/p95/p99 are in the map
+    // only p50/p95/p99 are in the map
     expect(toDetectionFunctionSql("p99_9", "duration")).toBe("p99_9(duration)");
   });
 
   it("handles percentile with complex field expression", () => {
-    expect(toDetectionFunctionSql("p90", "response_time_ms")).toBe(
-      "approx_percentile_cont(response_time_ms, 0.9)",
+    expect(toDetectionFunctionSql("p95", "response_time_ms")).toBe(
+      "approx_percentile_cont(response_time_ms, 0.95)",
     );
   });
 
@@ -153,15 +152,49 @@ describe("toDetectionFunctionSql", () => {
 
   // ── Match existing behavior in alertQueryBuilder.ts ───────────────────────
 
-  it("matches alertQueryBuilder format for p90", () => {
-    // alertQueryBuilder produces: approx_percentile_cont(column, 0.9)
-    const result = toDetectionFunctionSql("p90", "duration");
-    expect(result).toBe("approx_percentile_cont(duration, 0.9)");
+  it("matches alertQueryBuilder format for p95", () => {
+    // alertQueryBuilder produces: approx_percentile_cont(column, 0.95)
+    const result = toDetectionFunctionSql("p95", "duration");
+    expect(result).toBe("approx_percentile_cont(duration, 0.95)");
   });
 
   it("matches alertQueryBuilder format for p99", () => {
     const result = toDetectionFunctionSql("p99", "latency");
     expect(result).toBe("approx_percentile_cont(latency, 0.99)");
+  });
+});
+
+// ─── Detection function coverage ─────────────────────────────────────────────
+
+// The backend DetectionFunction enum is the contract; a name the dropdown cannot
+// offer must never be expanded into SQL, or the preview would show a query the
+// API rejects on save.
+describe("detection function coverage", () => {
+  const BACKEND_PERCENTILES: Record<string, string> = {
+    p50: "0.5",
+    p95: "0.95",
+    p99: "0.99",
+  };
+
+  it.each(Object.entries(BACKEND_PERCENTILES))(
+    "expands %s, which the backend accepts",
+    (fn, fraction) => {
+      expect(toDetectionFunctionSql(fn, "duration")).toBe(
+        `approx_percentile_cont(duration, ${fraction})`,
+      );
+    },
+  );
+
+  it.each(["p25", "p75", "p90", "p999"])(
+    "leaves %s unexpanded, since the backend rejects it",
+    (fn) => {
+      expect(toDetectionFunctionSql(fn, "duration")).toBe(`${fn}(duration)`);
+    },
+  );
+
+  it.each(["count", "avg", "sum", "min", "max"])("passes %s through as a plain aggregate", (fn) => {
+    const expected = fn === "count" ? "count(*)" : `${fn}(duration)`;
+    expect(toDetectionFunctionSql(fn, "duration")).toBe(expected);
   });
 });
 
@@ -266,16 +299,16 @@ describe("buildAnomalyPreviewSql", () => {
     expect(result).toContain("approx_percentile_cont(duration, 0.95) AS value");
   });
 
-  it("generates SQL with p90 as approx_percentile_cont", () => {
+  it("generates SQL with p50 as approx_percentile_cont", () => {
     const result = buildAnomalyPreviewSql({
       query_mode: "filters",
       stream_name: "metrics",
-      detection_function: "p90",
+      detection_function: "p50",
       detection_function_field: "latency",
       training_window_days: 7,
       histogram_interval: "1m",
     });
-    expect(result).toContain("approx_percentile_cont(latency, 0.9) AS value");
+    expect(result).toContain("approx_percentile_cont(latency, 0.5) AS value");
   });
 
   it("generates SQL with p99 as approx_percentile_cont", () => {
@@ -405,15 +438,15 @@ describe("buildAnomalyPreviewSql", () => {
     expect(result).toContain("count(*) AS value");
   });
 
-  it("handles already-wrapped p90(duration) from API", () => {
+  it("handles already-wrapped p99(duration) from API", () => {
     const result = buildAnomalyPreviewSql({
       query_mode: "filters",
       stream_name: "logs",
-      detection_function: "p90(duration)",
+      detection_function: "p99(duration)",
       training_window_days: 7,
       histogram_interval: "10m",
     });
-    expect(result).toContain("approx_percentile_cont(duration, 0.9) AS value");
+    expect(result).toContain("approx_percentile_cont(duration, 0.99) AS value");
   });
 
   // ── Full SQL structure ────────────────────────────────────────────────────

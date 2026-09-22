@@ -312,6 +312,29 @@ describe("TraceTree", () => {
     expect(serviceNameElements[1].text()).toBe(mockSpans[1].serviceName);
   });
 
+  it("should constrain span names so long ones ellipsise", () => {
+    for (const span of mockSpans) {
+      const operationName = wrapper.find(
+        `[data-test="trace-tree-span-operation-name-${span.spanId}"]`,
+      );
+      // min-w-0: without it the flex item keeps its full text width and the row's ellipsis never fires.
+      expect(operationName.classes()).toEqual(expect.arrayContaining(["truncate", "min-w-0"]));
+
+      const serviceName = wrapper.find(`[data-test="trace-tree-span-service-name-${span.spanId}"]`);
+      // shrink-0 + a cap: flex shrinks in proportion to width, so a long operation name would otherwise eat the service name first.
+      expect(serviceName.classes()).toEqual(
+        expect.arrayContaining(["truncate", "shrink-0", "max-w-[50%]"]),
+      );
+    }
+  });
+
+  it("should size the name row from the column, not from its own text", () => {
+    // Without w-full the row is content-sized and the service name's cap would
+    // bound it against its own text, truncating names that had room to spare.
+    const nameRow = wrapper.find(".span-name-section-content");
+    expect(nameRow.classes()).toEqual(expect.arrayContaining(["w-full", "min-w-0"]));
+  });
+
   it("should render error icon for error spans", () => {
     const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]');
     expect(errorIcon.exists()).toBe(true);
@@ -1409,6 +1432,24 @@ describe("TraceTree", () => {
       );
       expect(badge.exists()).toBe(true);
       expect(badge.attributes("title")).toContain("collapse");
+    });
+  });
+
+  describe("span name tooltips", () => {
+    // Both names sit in one row; a title on their shared ancestor made the
+    // service name report the operation name on hover.
+    it("titles the service name with the service name", () => {
+      const serviceName = wrapper.find(
+        '[data-test="trace-tree-span-service-name-d9603ec7f76eb499"]',
+      );
+      expect(serviceName.attributes("title")).toBe("scheduler");
+    });
+
+    it("titles the operation name with the operation name", () => {
+      const operationName = wrapper.find(
+        '[data-test="trace-tree-span-operation-name-d9603ec7f76eb499"]',
+      );
+      expect(operationName.attributes("title")).toBe("service:alerts:evaluate_scheduled");
     });
   });
 

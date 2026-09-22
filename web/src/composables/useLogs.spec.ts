@@ -79,11 +79,14 @@ vi.mock("../../services/search", () => {
   };
 });
 
-vi.mock("../../services/saved_views", () => ({
-  default: {
-    get: vi.fn().mockImplementation(() => Promise.resolve()),
-  },
-}));
+vi.mock("../../services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn().mockImplementation(() => Promise.resolve()),
+    },
+  });
+});
 
 // Mock getStreams and getStream functions
 const mockGetStreams = vi.fn();
@@ -2497,6 +2500,26 @@ describe("Use Logs Composable", () => {
       expect(wrapper.vm.getFilterExpressionByFieldType("user", "alice", "include")).toBe(
         "user = 'alice'",
       );
+    });
+
+    // Regression: the Logs page's own include/exclude filter builder (distinct
+    // from the sidebar's) must double an embedded single quote too.
+    it("escapes an embedded single quote when including a value", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("op", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("op", "notificationHandling's", "include"),
+      ).toBe("op = 'notificationHandling''s'");
+    });
+
+    it("escapes an embedded single quote when excluding a value", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("op", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("op", "notificationHandling's", "exclude"),
+      ).toBe("op != 'notificationHandling''s'");
     });
   });
 

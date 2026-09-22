@@ -37,6 +37,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import useStreamingSearch from "@/composables/useStreamingSearch";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
@@ -569,7 +570,7 @@ const useLogs = (t: TranslateFn) => {
       let expression =
         field_value == "null"
           ? `${quotedField} ${operator} ${field_value}`
-          : `${quotedField} ${operator} '${field_value}'`;
+          : `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
 
       const isNumericType = (type: string) => ["int64", "float64"].includes(type.toLowerCase());
       const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
@@ -586,7 +587,7 @@ const useLogs = (t: TranslateFn) => {
       console.log("Error while getting filter expression by field type", e);
       const quotedField =
         searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(String(field)) : field;
-      return `${quotedField} ${operator} '${field_value}'`;
+      return `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
     }
   };
 

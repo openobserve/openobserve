@@ -190,7 +190,6 @@ export class LogsPage {
         this.searchResultTitle = '[data-test="logs-search-result-title"]';
         this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
-        this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"]';
@@ -499,6 +498,10 @@ export class LogsPage {
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
         this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
+        this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
+        this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
+        this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
+        this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -1116,7 +1119,16 @@ export class LogsPage {
         const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
         );
-        await option.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+        // The options are fetched once when the page loads, so a stream created after
+        // that is absent until a reload. Swallowing this made the caller a silent no-op.
+        try {
+            await option.first().waitFor({ state: 'attached', timeout: 5000 });
+        } catch {
+            throw new Error(
+                `Stream "${streamName}" is not among the stream select's options. A stream `
+                + 'created after the logs page loaded only appears after a page reload.',
+            );
+        }
         // Click the checkbox to ADD to the multi-selection (not replace it).
         const streamCheckbox = option.first().locator('[data-select-checkbox]');
         await streamCheckbox.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
@@ -1130,6 +1142,16 @@ export class LogsPage {
         // Close the popover after selection
         await popover.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         await this.page.keyboard.press('Escape').catch(() => {});
+
+        // rowClickSingleSelect makes a row click REPLACE the selection, so prove it was added.
+        await expect(
+            this.page.locator(this.indexDropDownTrigger).first(),
+            `"${streamName}" should have been added to the stream selection, not replaced it`,
+        ).toHaveAttribute(
+            'data-test-selected-value',
+            new RegExp(`(^|,)${streamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(,|$)`),
+            { timeout: 5000 },
+        );
     }
 
     async expectTimestampColumnVisible() {
@@ -1363,22 +1385,22 @@ export class LogsPage {
     }
 
     async clearAndFillQueryEditor(query) {
-        // Wait for query editor to be ready
-        const editor = this.page.locator(this.queryEditor);
-        await editor.waitFor({ state: 'visible', timeout: 10000 });
-
-        // Click to focus the editor
-        await editor.click();
-
-        // Use .inputarea.fill() directly - this is more reliable than keyboard.type()
-        // as it avoids Monaco editor line number interference (the "1 SELECT" bug)
-        // The .fill() method will replace the selected content
-        const inputArea = editor.locator('.inputarea');
-        await inputArea.waitFor({ state: 'visible', timeout: 5000 });
-
-        // Select all existing content
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await inputArea.fill(query);
+        // Enabling SQL mode re-populates the editor from the selected stream, and that write
+        // lands asynchronously — content set before it arrives is silently wiped, leaving an
+        // empty editor and a "SQL query is missing or invalid" page with no result title.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                await this.setQueryEditorContent(query);
+            } catch {
+                continue;
+            }
+            await this.page.waitForTimeout(1200);
+            if ((await this.getQueryEditorText()) === query) {
+                return;
+            }
+            testLogger.warn(`Query editor was reset after the write (attempt ${attempt}/3); retrying`);
+        }
+        throw new Error(`Query editor did not retain "${query}" after 3 attempts`);
     }
 
     async typeQuery(query) {
@@ -2235,46 +2257,55 @@ export class LogsPage {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
         await this.setQueryEditorContent(`SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "${streamA}" as a join "${streamB}" as b on a.kubernetes_container_name  = b.kubernetes_container_name`);
         await this.waitForEditorValue(`FROM "${streamA}"`);
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameJoinLimit() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
         await this.waitForEditorValue('LIMIT 10');
-        // waitForEditorValue only confirms searchObj.data.query has flushed — it says
-        // nothing about searchObj.meta.sqlMode, a SEPARATE debounced auto-detect effect
-        // (SearchBar.vue's onQueryEditorUpdate) that can still be mid-flight. A LIMIT
-        // clause is invalid outside SQL mode, so callers that skip an explicit SQL-mode
-        // step (e.g. Streams/streaming.spec.js) would race the backend into rejecting it
-        // with "LIMIT is not supported without SQL mode". Force the real flag here so this
-        // query is deterministically SQL-mode regardless of caller or auto-detect timing.
-        if (!(await this._isSqlModeEnabledViaVue())) {
-            await this._setSqlModeViaVue(true);
-        }
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameJoinLike() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE \'%ziox%\'');
         await this.waitForEditorValue("LIKE '%ziox%'");
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameLeftJoin() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the LEFT JOIN unwritten.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('LEFT JOIN');
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameRightJoin() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the RIGHT JOIN unwritten.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('RIGHT JOIN');
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameFullJoin() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the FULL JOIN unwritten.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('FULL JOIN');
+        await this._ensureSqlModeAfterJoinQuery();
+    }
+
+    // waitForEditorValue only confirms searchObj.data.query has flushed — it says nothing
+    // about searchObj.meta.sqlMode, a SEPARATE debounced auto-detect effect (SearchBar.vue's
+    // onQueryEditorUpdate) that can still be mid-flight. A join query built this way is
+    // invalid outside SQL mode (e.g. a LIMIT clause), so callers that skip an explicit
+    // SQL-mode step (e.g. Streams/streaming.spec.js) race the backend into rejecting it.
+    // Force the real flag here so every kubernetesContainerName*Join* helper is
+    // deterministically SQL-mode regardless of caller or auto-detect timing.
+    async _ensureSqlModeAfterJoinQuery() {
+        if (!(await this._isSqlModeEnabledViaVue())) {
+            await this._setSqlModeViaVue(true);
+        }
     }
 
     /**
@@ -3454,6 +3485,48 @@ export class LogsPage {
             return expectedSubstring ? last.includes(expectedSubstring) : last.trim().length > 0;
         }, { timeout, intervals: [300, 500, 800, 1200] }).toBe(true);
         return last;
+    }
+
+    async getSelectedStreamTriggerLabel() {
+        const trigger = this.page.locator(this.indexDropDownTrigger);
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        return await trigger.getAttribute('data-test-selected-label');
+    }
+
+    async getRenderedStreamNameStyles() {
+        // Assert computed text-transform, not textContent — o2-enterprise#1745 regresses via CSS capitalize, not the stored name.
+        const triggerSel = this.indexDropDownTrigger;
+        return await this.page.evaluate((sel) => {
+            const out = [];
+            const record = (el) => {
+                const text = (el.textContent || '').trim();
+                if (text) out.push({ text, textTransform: getComputedStyle(el).textTransform });
+            };
+            const trigger = document.querySelector(sel);
+            if (trigger) trigger.querySelectorAll('span').forEach(record);
+            document.querySelectorAll('.text-field-list-group-text').forEach(record);
+            return out;
+        }, triggerSel);
+    }
+
+    async clearPersistedStreamSelection() {
+        const orgId = getOrgIdentifier();
+        await this.page.evaluate((id) => {
+            try {
+                localStorage.removeItem(`oo_selected_stream_logs_${id}`);
+                localStorage.removeItem(`oo_logs_stream_type_${id}`);
+            } catch (e) { /* storage unavailable in this context */ }
+        }, orgId);
+    }
+
+    async expectSelectStreamPrompt() {
+        await expect(this.page.locator(this.noStreamHero)).toBeVisible({ timeout: 20000 });
+        await expect(this.page.locator(this.selectStreamCard)).toBeVisible();
+        await expect(this.page.locator(this.queryGuideCard)).toBeVisible();
+    }
+
+    async isRunQueryButtonVisible(timeout = 3000) {
+        return await this.page.locator(this.searchBarRefreshButton).first().isVisible({ timeout }).catch(() => false);
     }
 
     async clickLogTableColumnSource() {
@@ -8425,23 +8498,90 @@ export class LogsPage {
     // Rule 3 Compliance: Extract raw locators from spec files into POM
     // ============================================================================
 
+    // Idempotent: restoring a saved view re-opens the editor, so a blind toggle would close it.
+    async ensureVrlEditorOpen() {
+        const editor = this.page.locator(this.fnEditor).first();
+        if (await editor.isVisible({ timeout: 2000 }).catch(() => false)) {
+            testLogger.info('VRL editor already open');
+            return;
+        }
+        await this.toggleQueryModeEditor();
+        testLogger.info('Opened the VRL/function editor');
+    }
+
     /**
      * Click the VRL toggle button to enable/disable VRL editor
      * @returns {Promise<void>}
      */
+    // Tees the UI-histogram SSE stream in-page: Chrome frees a streamed body once
+    // the app consumes it, so Playwright's response event reads it only sometimes.
+    async captureHistogramFrames() {
+        await this.page.addInitScript(() => {
+            const w = /** @type {any} */ (window);
+            w.__histFrames = [];
+            const origFetch = w.fetch;
+            w.fetch = async (...args) => {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                const res = await origFetch(...args);
+                if (!/is_ui_histogram=true/.test(url) || !res.body) return res;
+                const [mine, theirs] = res.body.tee();
+                (async () => {
+                    const reader = mine.getReader();
+                    const decoder = new TextDecoder();
+                    let buf = '';
+                    try {
+                        for (;;) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            buf += decoder.decode(value, { stream: true });
+                            let nl;
+                            while ((nl = buf.indexOf('\n')) >= 0) {
+                                const line = buf.slice(0, nl);
+                                buf = buf.slice(nl + 1);
+                                if (!line.startsWith('data:')) continue;
+                                try {
+                                    w.__histFrames.push(JSON.parse(line.slice(5).trim()));
+                                } catch {
+                                    // keepalive/progress frames are not JSON payloads
+                                }
+                            }
+                        }
+                    } catch {
+                        // stream aborted by a newer query; what was read still counts
+                    }
+                })();
+                return new Response(theirs, {
+                    status: res.status,
+                    statusText: res.statusText,
+                    headers: res.headers,
+                });
+            };
+        });
+    }
+
+    async getHistogramFrames() {
+        return await this.page.evaluate(() => /** @type {any} */ (window).__histFrames || []);
+    }
+
+    /** The search_response_metadata payloads, where the histogram decisions live. */
+    async getHistogramMetadata() {
+        return await this.page.evaluate(() =>
+            (/** @type {any} */ (window).__histFrames || []).map((f) => f.results).filter(Boolean),
+        );
+    }
+
     async clickVrlToggleButton() {
-        const vrlToggle = this.page.locator('[data-test="logs-search-bar-vrl-toggle-btn"]');
-        await vrlToggle.waitFor({ state: 'visible', timeout: 10000 });
-        await vrlToggle.click();
-        testLogger.info('Clicked VRL toggle button');
+        await this.toggleQueryModeEditor();
+        testLogger.info('Opened the VRL/function editor');
     }
 
     /**
      * Get the VRL editor locator
      * @returns {import('@playwright/test').Locator} VRL editor locator
      */
+    // Scoped to the container: a bare `.monaco-editor` also matches the SQL editor.
     getVrlEditor() {
-        return this.page.locator('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor');
+        return this.page.locator('[data-test="logs-vrl-function-editor"]').locator('.monaco-editor');
     }
 
     /**
@@ -10762,6 +10902,21 @@ export class LogsPage {
         testLogger.info('Logs table is visible');
     }
 
+    /** Assert the settled results grid shows real rows, not the skeleton or a banner. */
+    async expectResultsGridSettledWithRows() {
+        await expect(this.page.locator(this.logsSearchResultTableRows).first()).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator(this.resultsSkeleton)).toHaveCount(0);
+        await expect(this.page.locator(this.resultsLoadingBanner)).toHaveCount(0);
+        testLogger.info('Results grid settled with rows, no skeleton or loading banner');
+    }
+
+    /** Assert the results progress bar has faded out once the search settled. */
+    async expectResultsProgressBarFadedOut() {
+        // The bar stays mounted to run its own fade, so absence is opacity-0, not detachment.
+        await expect(this.page.locator(this.resultsProgressBar)).toHaveClass(/opacity-0/);
+        testLogger.info('Results progress bar faded out after the search settled');
+    }
+
     // ============================================================================
     // V0.40 REGRESSION TEST METHODS
     // VRL fields, Query Inspector, Sorting, and Highlight tests
@@ -11421,6 +11576,58 @@ export class LogsPage {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Open the "Refresh Cache & Run Query" / Live Mode dropdown next to the
+     * Run Query button. Works on both the Logs tab and the Visualize tab —
+     * both render the same trigger data-test (GH #14488 requires their
+     * dropdown to be visibility-consistent).
+     */
+    async openRefreshCacheDropdown() {
+        const trigger = this.page.locator(
+            '[data-test="logs-search-bar-refresh-cache-dropdown-trigger"]'
+        );
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        await trigger.click();
+    }
+
+    /**
+     * Locator for the "Refresh Cache & Run Query" item inside the open dropdown.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getRefreshCacheAndRunQueryMenuItem() {
+        return this.page.getByRole('menuitem', { name: 'Refresh Cache & Run Query' });
+    }
+
+    /**
+     * Locator for the Live Mode toggle item inside the open dropdown (Logs tab only).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLiveModeMenuItem() {
+        return this.page.locator('[data-test="logs-search-bar-live-mode-toggle-btn"]');
+    }
+
+    /**
+     * Open the dropdown and click "Refresh Cache & Run Query", waiting for the
+     * resulting search request — which must be issued with clear_cache=true,
+     * bypassing the result cache, matching the backend's meta::search::Request
+     * contract (src/config/src/meta/search.rs).
+     * @returns {Promise<URL>} the URL of the matching /_search request
+     */
+    async clickRefreshCacheAndRunQuery() {
+        await this.openRefreshCacheDropdown();
+        const item = this.getRefreshCacheAndRunQueryMenuItem();
+        await item.waitFor({ state: 'visible', timeout: 10000 });
+
+        const [request] = await Promise.all([
+            this.page.waitForRequest(
+                (req) => req.url().includes('/_search') && req.url().includes('clear_cache=true'),
+                { timeout: 30000 }
+            ),
+            item.click(),
+        ]);
+        return new URL(request.url());
     }
 
     /**
@@ -12160,5 +12367,169 @@ export class LogsPage {
             );
         }
         testLogger.info('Field list loaded after stream selection');
+    }
+
+    // The requested size is in the query string and the honoured size is hits.length — both sides of #10270.
+    /** Record the `_around` responses in-page. */
+    async captureAroundResponses() {
+        // search_around goes through axios, i.e. XHR — a fetch wrapper never sees it.
+        await this.page.addInitScript(() => {
+            const w = /** @type {any} */ (window);
+            w.__aroundCalls = [];
+            const origOpen = XMLHttpRequest.prototype.open;
+            const origSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+                this.__o2Url = String(url);
+                return origOpen.call(this, method, url, ...rest);
+            };
+            XMLHttpRequest.prototype.send = function (...args) {
+                if (/_around/.test(this.__o2Url || '')) {
+                    this.addEventListener('load', () => {
+                        try {
+                            const body = JSON.parse(this.responseText);
+                            w.__aroundCalls.push({
+                                requestedSize: Number(
+                                    new URL(this.__o2Url, location.origin).searchParams.get('size'),
+                                ),
+                                hits: Array.isArray(body?.hits) ? body.hits.length : -1,
+                                total: Number(body?.total ?? -1),
+                            });
+                        } catch {
+                            // non-JSON error bodies are not the subject of this assertion
+                        }
+                    });
+                }
+                return origSend.apply(this, args);
+            };
+        });
+    }
+
+    async getAroundResponses() {
+        return await this.page.evaluate(() => /** @type {any} */ (window).__aroundCalls || []);
+    }
+
+    // Scoped to the visible title: Visualize renders a second, stale copy of SearchResult.
+    /** Hits currently held by the results grid, from the title's `data-hits-count`. */
+    async getResultHitsCount() {
+        const title = this.page.locator(`${this.paginationRowCountTitle}:visible`).first();
+        await expect(title).toBeVisible({ timeout: 30000 });
+        await expect(title).toHaveAttribute('data-search-state', 'complete', { timeout: 60000 });
+        const raw = (await title.getAttribute('data-hits-count')) ?? '0';
+        return Number.parseInt(raw, 10) || 0;
+    }
+
+    /** Open the row-detail drawer for a result row and trigger its Search Around. */
+    async runSearchAroundFromRow(rowIndex = 0) {
+        const cell = this.page
+            .locator('[data-test="logs-search-result-logs-table"] td[data-test^="o2-table-cell-"]')
+            .nth(rowIndex);
+        await cell.waitFor({ state: 'visible', timeout: 30000 });
+        await cell.click();
+        const aroundBtn = this.page.locator(this.logsDetailTableSearchAroundBtn);
+        await aroundBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await aroundBtn.click();
+    }
+
+    /** Write `code` into the VRL editor through Monaco so the debounced v-model fires. */
+    async setVrlFunction(code) {
+        await this.ensureVrlEditorOpen();
+        const applied = await this.page.evaluate(
+            ({ selector, text }) => {
+                if (!window.monaco?.editor?.getEditors) return false;
+                const hosts = Array.from(document.querySelectorAll(selector));
+                const ed = window.monaco.editor.getEditors().find((e) => {
+                    const n = e.getDomNode?.();
+                    return n && hosts.some((h) => h.contains(n));
+                });
+                if (!ed) return false;
+                ed.focus();
+                const model = ed.getModel();
+                if (model) ed.executeEdits('vrl', [{ range: model.getFullModelRange(), text }]);
+                return true;
+            },
+            { selector: this.fnEditor, text: code },
+        );
+        if (!applied) throw new Error('setVrlFunction: no Monaco editor mounted inside the VRL host');
+        // CodeQueryEditor debounces at 500ms before searchObj.data.tempFunctionContent updates.
+        await this.page.waitForTimeout(1000);
+        testLogger.info(`VRL function set to: ${code}`);
+    }
+
+    // The fix resets the virtual scroll on close, so the reopen is what proves it.
+    /** Labels of the first stream options after scrolling the popover to the end, closing and reopening it. */
+    async getStreamListTopLabelsAfterScroll() {
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        const options = this.page.locator('[data-test="log-search-index-list-select-stream-option"]');
+
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        await trigger.click();
+        await options.first().waitFor({ state: 'visible', timeout: 15000 });
+        await options.last().scrollIntoViewIfNeeded();
+        await this.page.waitForTimeout(500);
+
+        await this.page.keyboard.press('Escape');
+        await options.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        await trigger.click();
+        await options.first().waitFor({ state: 'visible', timeout: 15000 });
+
+        const labels = [];
+        const sampled = Math.min(await options.count(), 3);
+        for (let i = 0; i < sampled; i++) {
+            labels.push(((await options.nth(i).textContent()) ?? '').trim());
+        }
+        await this.page.keyboard.press('Escape');
+        return labels;
+    }
+
+    // The bubble mounts lazily on hover, so an empty string means the tooltip never rendered.
+    /** Text of the stream-select tooltip after hovering its trigger. */
+    async getStreamSelectTooltipText() {
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        // The tooltip opens on the anchor's mouseenter, which never re-fires if the
+        // pointer is already inside it — park the mouse elsewhere so the hover is real.
+        await this.page.mouse.move(0, 0);
+        await trigger.hover();
+        const bubble = this.page.locator('[data-test="o-tooltip-content"]:visible').first();
+        const appeared = await bubble
+            .waitFor({ state: 'visible', timeout: 4000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!appeared) return '';
+        return ((await bubble.textContent()) ?? '').trim();
+    }
+
+    // A VRL-derived field never reaches the sidebar list, so the JSON preview's own
+    // dropdown is the only place it can be added to the table from.
+    /** Add a field to the results table from an expanded row's JSON detail. */
+    async addFieldToTableFromLogDetail(fieldName) {
+        const detailRow = this.page.locator(`[data-test="log-detail-row-${fieldName}"]`).first();
+        if (!(await detailRow.isVisible({ timeout: 2000 }).catch(() => false))) {
+            const expander = this.page.locator(this.tableRowExpandMenu).first();
+            await expander.waitFor({ state: 'visible', timeout: 15000 });
+            await expander.click();
+            await detailRow.waitFor({ state: 'visible', timeout: 15000 });
+        }
+        await detailRow.locator('[data-test="log-details-include-exclude-field-btn"]').first().click();
+        const addItem = this.page.locator('[data-test="log-details-add-field-btn"]').first();
+        await addItem.waitFor({ state: 'visible', timeout: 10000 });
+        await addItem.click();
+        await this.page
+            .locator(`[data-test="o2-table-th-${fieldName}"]`)
+            .waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info(`Added ${fieldName} to the table from its log detail`);
+    }
+
+    // The buttons are gated on the column being a real schema field, which is the whole of #9550.
+    /** Count of include/exclude term buttons in a column's hover actions. */
+    async countCellSearchTermActions(columnId, rowIndex = 0) {
+        const cell = this.page.locator(`td[data-test="o2-table-cell-${columnId}"]`).nth(rowIndex);
+        await cell.waitFor({ state: 'visible', timeout: 30000 });
+        await cell.hover();
+        const actions = this.page.locator(`[data-test="o2-table-cell-hover-actions-${columnId}"]`);
+        await actions.waitFor({ state: 'visible', timeout: 10000 });
+        return await actions
+            .locator('[data-test^="log-details-include-field-"], [data-test^="log-details-exclude-field-"]')
+            .count();
     }
 }

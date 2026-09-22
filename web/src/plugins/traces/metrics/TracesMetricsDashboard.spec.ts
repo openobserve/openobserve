@@ -76,9 +76,10 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: (data: any) => JSON.parse(JSON.stringify(data)),
 }));
 
-// parseDurationWhereClause: return the input filter string unchanged
+// parseDurationWhereClause: return the input filter string unchanged by default;
+// vi.fn so individual tests can override it to assert decoded output is used.
 vi.mock("@/composables/useDurationPercentiles", () => ({
-  parseDurationWhereClause: (_filter: string) => _filter,
+  parseDurationWhereClause: vi.fn((filter: string) => filter),
 }));
 
 // useParser: resolve immediately with a no-op parser object by default.
@@ -107,6 +108,7 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 import useParser from "@/composables/useParser";
+import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import TracesMetricsDashboard from "./TracesMetricsDashboard.vue";
 
 // ---------------------------------------------------------------------------
@@ -594,6 +596,21 @@ describe("TracesMetricsDashboard", () => {
       wrapper.vm.openUnifiedAnalysisDashboard();
       await flushPromises();
       expect(wrapper.vm.defaultAnalysisTab).toBe("volume");
+    });
+
+    it("should pass the decoded filter, not the raw display string, as baseFilter", async () => {
+      // Regression test: the query editor shows human-readable duration literals
+      // (e.g. duration <= '1.64s') which must be decoded to raw SQL values before
+      // reaching TracesAnalysisDashboard's generated queries.
+      vi.mocked(parseDurationWhereClause).mockReturnValueOnce("duration <= 1640000");
+      mockSearchObj.data.editorValue = "duration <= '1.64s'";
+      await flushPromises();
+
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+
+      const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
+      expect(analysisDashboard.attributes("basefilter")).toBe("duration <= 1640000");
     });
   });
 

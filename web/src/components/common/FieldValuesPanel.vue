@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OIcon>
         </OButton>
         <OButton
-          :variant="filterMode === 'exclude' ? 'destructive' : 'ghost-muted'"
+          :variant="filterMode === 'exclude' ? 'filter-exclude' : 'ghost-muted'"
           size="icon-chip"
           class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'exclude' && isModeToggleDisabled"

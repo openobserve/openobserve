@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
         @open-shortcuts="openShortcutsList"
+        @toggle-mobile-nav="mobileNavOpen = !mobileNavOpen"
         @signout="signout"
       />
     </header>
@@ -81,23 +82,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-h-0 flex-1">
       <ONavbar
         v-if="store.state.printMode !== true"
+        class="max-md:hidden"
         :links-list="navLinks"
         :mini-mode="miniMode"
-        :visible="leftDrawerOpen"
         @menu-hover="handleMenuHover"
       />
+
+      <!-- Not seamless: the scrim gives tap-outside-to-close a target. -->
+      <ODrawer
+        v-model:open="mobileNavOpen"
+        side="left"
+        :width="30"
+        bleed
+        :show-close="false"
+        data-test="main-layout-mobile-nav-drawer"
+      >
+        <div class="flex h-full min-h-0 flex-col">
+          <div
+            class="border-border-default flex shrink-0 items-center justify-between border-b px-4 py-3"
+          >
+            <img
+              class="h-6 w-auto"
+              :src="
+                getImageURL(
+                  isDark
+                    ? 'images/common/openobserve_latest_dark_2.svg'
+                    : 'images/common/openobserve_latest_light_2.svg',
+                )
+              "
+              :alt="raw('OpenObserve')"
+            />
+            <OButton
+              variant="ghost"
+              size="icon"
+              icon-left="close"
+              data-test="main-layout-mobile-nav-close"
+              @click="mobileNavOpen = false"
+            />
+          </div>
+          <ONavbar
+            class="min-h-0 flex-1 overflow-y-auto"
+            :links-list="navLinks"
+            :visible="true"
+            @menu-hover="handleMenuHover"
+          />
+        </div>
+      </ODrawer>
 
       <div class="flex h-full min-h-0 min-w-0 flex-1">
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2 max-md:pe-0"
           :style="{
-            width: !store.state.isAiChatEnabled
-              ? '100%'
-              : store.state.isAiChatExpanded
-                ? '50%'
-                : '75%',
+            width:
+              !store.state.isAiChatEnabled || isChatOverlay
+                ? '100%'
+                : store.state.isAiChatExpanded
+                  ? '50%'
+                  : '75%',
           }"
         >
           <!-- Content card — all pages render inside this. The border stays present in both
@@ -121,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
+          class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
@@ -129,17 +172,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             // card's right/bottom gap (+ rounded-surface corners) so they read as
             // the same card. Expanding only widens it; it never overlays the header.
             'pe-2 pb-2',
+            isChatOverlay
+              ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
+              : 'sticky top-[var(--navbar-height,2.25rem)] self-start',
           ]"
           :style="[
             {
               height: 'calc(100vh - var(--navbar-height, 2.25rem))',
               maxWidth: '100%',
             },
-            // Full-screen just widens the panel (25% → 50%) beside the content —
-            // same top position + height, so the main header stays visible.
-            store.state.isAiChatExpanded
-              ? { width: '50%', minWidth: '18.75rem' }
-              : { width: '25%', minWidth: '4.688rem' },
+            isChatOverlay
+              ? { width: '100%', top: 'var(--navbar-height, 2.25rem)' }
+              : // Full-screen just widens the panel (25% → 50%) beside the content —
+                // same top position + height, so the main header stays visible.
+                store.state.isAiChatExpanded
+                ? { width: '50%', minWidth: '18.75rem' }
+                : { width: '25%', minWidth: '4.688rem' },
           ]"
         >
           <O2AIChat
@@ -162,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
+    <ConnectDataSourcePopup />
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
@@ -169,6 +218,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { configFullQuery } from "@/services/config.queries";
+import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import AppHeader from "../components/Header.vue";
@@ -179,9 +230,8 @@ import {
   useLocalUserInfo,
   getImageURL,
   invalidateLoginData,
-  getDueDays,
-  trialPeriodAllowedPath,
-  emptyDataAllowedPaths,
+  shouldPaywallRoute,
+  isEmptyDataExempt,
 } from "../utils/zincutils";
 
 import {
@@ -207,16 +257,18 @@ import { getLocale } from "../locales";
 import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
-import configService from "@/services/config";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
+import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
-import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -225,8 +277,8 @@ import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
-import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
+import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 let mainLayoutMixin: any = null;
@@ -254,7 +306,10 @@ export default defineComponent({
     ShortcutCheatsheet,
     GetStarted,
     CommunitySlackInvite,
+    ConnectDataSourcePopup,
     ODialog,
+    ODrawer,
+    OButton,
   },
   methods: {
     navigateToDocs() {
@@ -322,8 +377,19 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18nTyped();
     const miniMode = ref(false);
+    const { isMobile, lgUp } = useBreakpoint();
+    // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
+    const isChatOverlay = computed(() => !lgUp.value);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
+
+    const mobileNavOpen = ref(false);
+    watch(
+      () => router.currentRoute.value.fullPath,
+      () => {
+        mobileNavOpen.value = false;
+      },
+    );
 
     const { getStreams, resetStreams } = useStreams(t);
     const { closeSocket } = useSearchWebSocket();
@@ -378,12 +444,25 @@ export default defineComponent({
       );
     });
 
+    // The AI Observability menu entry itself ships on true OSS builds too —
+    // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
+    // of the module. AIObservabilityShell (Index.vue) shows only the Monitor
+    // group there; Evaluate/Experiment/Annotate/Agent Graph/Agent Behavior stay
+    // behind `isOnlineEvalsEnabled` as before.
+    const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
+    const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
+
     // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
     // no longer an enterprise build check: synthetics ships in OSS, and only the
     // private-agent path behind it is enterprise. Reactive so the menu picks it
     // up regardless of whether the config response arrived before or after mount.
     const isSyntheticsEnabled = computed(() => {
       return Boolean(store.state.zoConfig?.synthetics_enabled);
+    });
+
+    // `ZO_FEATURE_PROFILING_ENABLED` is off by default while Profiles is early-stage.
+    const isProfilingEnabled = computed(() => {
+      return Boolean(store.state.zoConfig?.profiling_enabled);
     });
 
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
@@ -491,6 +570,10 @@ export default defineComponent({
       {
         label: raw("English"),
         code: "en-us",
+      },
+      {
+        label: raw("العربية"),
+        code: "ar",
       },
       {
         label: raw("Türkçe"),
@@ -697,10 +780,12 @@ export default defineComponent({
         (link: any) => link.name === "aiObservability",
       );
 
-      if (isOnlineEvalsEnabled.value) {
+      if (isAiObservabilityMenuVisible.value) {
         if (existingIndex !== -1) return;
-        const tracesIndex = linksList.value.findIndex((link: any) => link.name === "traces");
-        const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+        const anchorIndex = linksList.value.findIndex(
+          (link: any) => link.name === "profiles" || link.name === "traces",
+        );
+        const insertAt = anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
         linksList.value.splice(insertAt, 0, {
           title: t("menu.aiObservability"),
           icon: "auto-awesome",
@@ -714,7 +799,7 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or if the flag
     // ever flips at runtime), keep the menu in sync.
-    watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
+    watch(isAiObservabilityMenuVisible, () => updateAIObservabilityMenu(), { immediate: false });
 
     const updateSyntheticMenu = () => {
       const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");
@@ -747,10 +832,37 @@ export default defineComponent({
       immediate: false,
     });
 
+    const updateProfilesMenu = () => {
+      const existingIndex = linksList.value.findIndex((l: any) => l.name === "profiles");
+
+      if (!isProfilingEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+
+      const tracesIndex = linksList.value.findIndex((l: any) => l.name === "traces");
+      const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+
+      linksList.value.splice(insertAt, 0, {
+        title: t("menu.profiles"),
+        icon: "account-tree",
+        link: "/profiles",
+        name: "profiles",
+      });
+    };
+
+    watch(isProfilingEnabled, () => updateProfilesMenu(), { immediate: false });
+
+    // On-call's Pages/Teams/Routing entries live entirely inside the
+    // `reliability` flyout (navGroups.ts), gated there by `gate: "oncall"`.
+    // A separate top-level rail item here would be a second gate to keep in
+    // sync.
     const filterMenus = () => {
       updateIncidentsMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();
+      updateProfilesMenu();
       updateAIObservabilityMenu();
 
       const disableMenus = new Set(
@@ -847,23 +959,7 @@ export default defineComponent({
         });
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
-          // IAM is org-setup, not data consumption — don't bounce out of IAM
-          // screens just because no streams exist yet. General Settings is exempt
-          // because it hosts the Danger Zone: switching to an empty org must still
-          // leave the admin able to delete it. Mirrors the routeGuard exemptions —
-          // General only, not the rest of the Settings tree.
-          const currentPath = router.currentRoute.value.path || "";
-          if (
-            currentPath.indexOf("/iam") !== -1 ||
-            emptyDataAllowedPaths.indexOf(currentPath.replace(/\/$/, "")) !== -1
-          ) {
-            return;
-          }
-          toast({
-            variant: "warning",
-            message: t("toastMessages.layouts.ingestionNotStarted"),
-            timeout: 5000,
-          });
+          if (isEmptyDataExempt(router.currentRoute.value)) return;
           router.push({ name: "ingestion" });
         } else {
           store.dispatch("setIsDataIngested", true);
@@ -1063,13 +1159,18 @@ export default defineComponent({
         dark_mode_theme_color: undefined,
         claim_parser_function: "",
         org_storage_enabled: false,
+        domain_org_mappings: [],
       };
 
       try {
         //get organizations settings
-        const orgSettings: any = await organizations.get_organization_settings(
-          store.state?.selectedOrganization?.identifier,
-        );
+        // Cached: MainLayout re-reads this on every org switch, and the
+        // settings pages read it again on mount.
+        const orgSettings: any = {
+          data: await queryClient.fetchQuery(
+            orgSettingsQuery(store.state?.selectedOrganization?.identifier),
+          ),
+        };
 
         //set settings in store
         //scrape interval will be in number
@@ -1102,6 +1203,7 @@ export default defineComponent({
           cross_links: orgSettings?.data?.data?.cross_links ?? [],
           org_storage_enabled:
             orgSettings?.data?.data?.org_storage_enabled ?? defaultSettings.org_storage_enabled,
+          domain_org_mappings: orgSettings?.data?.data?.domain_org_mappings ?? [],
         });
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
@@ -1109,21 +1211,17 @@ export default defineComponent({
         await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
 
         if (
-          orgSettings?.data?.data?.free_trial_expiry != null &&
-          orgSettings?.data?.data?.free_trial_expiry != ""
+          shouldPaywallRoute(
+            orgSettings?.data?.data?.free_trial_expiry,
+            router.currentRoute.value.name,
+          )
         ) {
-          const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
-          if (
-            trialDueDays <= 0 &&
-            trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1
-          ) {
-            router.push({
-              name: "plans",
-              query: {
-                org_identifier: selectedOrg.value.identifier,
-              },
-            });
-          }
+          router.push({
+            name: "plans",
+            query: {
+              org_identifier: selectedOrg.value.identifier,
+            },
+          });
         }
       } catch (error: any) {
         // Handle permission errors gracefully (403 = Forbidden)
@@ -1158,9 +1256,21 @@ export default defineComponent({
         menuReady.value = true;
         return;
       }
-      await configService
-        .get_config_full(orgIdentifier)
-        .then(async (res: any) => {
+      // Cached per org, so a return to the shell inside the session does not
+      // re-download the config the menu is already filtered from. The retry
+      // below forces a real fetch, since the failure it recovers from is the
+      // reason there is nothing cached to serve.
+      if (attempt > 0) {
+        await queryClient.invalidateQueries({
+          queryKey: configFullQuery(orgIdentifier).queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
+      await queryClient
+        .fetchQuery(configFullQuery(orgIdentifier))
+        .then(async (data: any) => {
+          const res = { data };
           if (config.isCloud == "false") {
             linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
           }
@@ -1186,7 +1296,11 @@ export default defineComponent({
           }
         })
         .catch((error) => {
-          console.error("Failed to load the full configuration:", error);
+          if (error?.response?.status === 404) {
+            console.warn("Full configuration not found for this org (404):", error);
+          } else {
+            console.error("Failed to load the full configuration:", error);
+          }
           // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
           // Session replay must not be lost to a failed config fetch — the rum
@@ -1370,6 +1484,7 @@ export default defineComponent({
     return {
       isDark,
       t,
+      raw,
       router,
       store,
       config,
@@ -1380,8 +1495,10 @@ export default defineComponent({
       navLinks,
       selectedOrg,
       orgOptions,
-      leftDrawerOpen: true,
+      isMobile,
+      isChatOverlay,
       miniMode,
+      mobileNavOpen,
       user,
       zoBackendUrl,
       isLoading,
@@ -1444,9 +1561,13 @@ export default defineComponent({
       deep: true,
       immediate: true,
     },
-    async changeOrganizationIdentifier() {
+    async changeOrganizationIdentifier(_next: string, previous: string) {
       this.isLoading = false;
       this.resetStreams();
+      // Drops the previous org's persisted entries (plus any older session's
+      // other-org residue); in-memory ones stay, so switching back is free.
+      // Keys are org-rooted, so nothing can cross over.
+      if (previous) purgeOrgQueries(previous, _next);
       // Clear notifications from the previous org — they no longer apply.
       dismissAll();
       this.store.dispatch("setOrganizationPasscode", "");

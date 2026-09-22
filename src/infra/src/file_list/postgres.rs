@@ -1106,7 +1106,8 @@ WHERE stream = $1 {time_filter}
 GROUP BY stream;
             "#
         );
-        let pool = CLIENT_RO.clone();
+        // Read from the primary: a lagging hot standby cancels this scan with SQLSTATE 40001
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["stats_by_date_range", "file_list"])
             .inc();
@@ -1339,8 +1340,19 @@ DO UPDATE SET
                 return Err(e.into());
             }
         };
-        let id = ret.try_get::<i64, &str>("id").unwrap_or_default();
-        let status = ret.try_get::<i64, &str>("status").unwrap_or_default();
+        // status is an INT column: decoding it as i64 fails and must not be read as Pending
+        let (id, status) = match ret
+            .try_get::<i64, &str>("id")
+            .and_then(|id| Ok((id, ret.try_get::<i32, &str>("status")?)))
+        {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback add job error: {e}");
+                }
+                return Err(e.into());
+            }
+        };
         if id > 0
             && super::FileListJobStatus::from(status) == super::FileListJobStatus::Done
             && let Err(e) =
@@ -3524,7 +3536,7 @@ mod tests {
     use tokio::sync::OnceCell;
 
     use super::*;
-    use crate::file_list::FileList;
+    use crate::file_list::{FileList, FileListJobStatus};
 
     static _INIT: Once = Once::new();
     static DB_POOL: OnceCell<PgPool> = OnceCell::const_new();
@@ -3631,6 +3643,11 @@ mod tests {
                 dumped BOOLEAN default false not null
             )
             "#,
+        )
+        .execute(pool)
+        .await?;
+        sqlx::query(
+            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_jobs_stream_offsets_idx ON file_list_jobs (stream, offsets)",
         )
         .execute(pool)
         .await?;
@@ -5407,6 +5424,32 @@ mod tests {
                 .iter()
                 .any(|j| j.stream == free_stream && j.id == rowlock_max[&free_stream]),
             "the unlocked stream's max-id job must still be claimed in the same call"
+        );
+
+        // ---- add_job re-arms a Done job so the hour-end pass still runs ----
+        let rearm_stream = format!("rearm_{pid}");
+        let rearm_id = postgres_list
+            .add_job("fix4_org", StreamType::Logs, &rearm_stream, 3_600_000_000)
+            .await
+            .unwrap();
+        postgres_list.set_job_done(&[rearm_id]).await.unwrap();
+        let again_id = postgres_list
+            .add_job("fix4_org", StreamType::Logs, &rearm_stream, 3_600_000_000)
+            .await
+            .unwrap();
+        assert_eq!(
+            again_id, rearm_id,
+            "add_job must reuse the existing job row"
+        );
+        let status: i32 = sqlx::query_scalar("SELECT status FROM file_list_jobs WHERE id = $1")
+            .bind(rearm_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            status,
+            FileListJobStatus::Pending as i32,
+            "add_job must re-arm a Done job to Pending"
         );
     }
 }

@@ -17,7 +17,7 @@
           v-model="selectedMetric"
           :options="metrics"
           :label="t('metrics.metricSelector.metricName')"
-          class="showLabelOnTop max-w-125 min-w-75"
+          class="showLabelOnTop max-w-125 min-w-75 max-md:max-w-full max-md:min-w-0"
           @update:model-value="onMetricSelect"
           clearable
           data-test="metric-selector"

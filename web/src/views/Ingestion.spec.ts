@@ -22,68 +22,75 @@ import router from "@/test/unit/helpers/router";
 import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
 import segment from "@/services/segment_analytics";
+import { queryClient } from "@/composables/query/queryClient";
 
 // Mock services with default resolved values
-vi.mock("@/services/organizations", () => ({
-  default: {
-    get_organization_passcode: vi.fn(() =>
-      Promise.resolve({
-        data: {
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_organization_passcode: vi.fn(() =>
+        Promise.resolve({
           data: {
-            token: "default-token",
-            passcode: "default-passcode",
+            data: {
+              token: "default-token",
+              passcode: "default-passcode",
+            },
           },
-        },
-      }),
-    ),
-    update_organization_passcode: vi.fn(() =>
-      Promise.resolve({
-        data: {
+        }),
+      ),
+      update_organization_passcode: vi.fn(() =>
+        Promise.resolve({
           data: {
-            token: "updated-token",
-            passcode: "updated-passcode",
+            data: {
+              token: "updated-token",
+              passcode: "updated-passcode",
+            },
           },
-        },
-      }),
-    ),
-    list_org_ingestion_tokens: vi.fn(() =>
-      Promise.resolve({
-        data: {
-          data: [],
-        },
-      }),
-    ),
-  },
-}));
+        }),
+      ),
+      list_org_ingestion_tokens: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            data: [],
+          },
+        }),
+      ),
+    },
+  });
+});
 
-vi.mock("@/services/api_keys", () => ({
-  default: {
-    createRUMToken: vi.fn(() =>
-      Promise.resolve({
-        data: {
+vi.mock("@/services/api_keys", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createRUMToken: vi.fn(() =>
+        Promise.resolve({
           data: {
-            new_key: "default-rum-token",
+            data: {
+              new_key: "default-rum-token",
+            },
           },
-        },
-      }),
-    ),
-    updateRUMToken: vi.fn(() =>
-      Promise.resolve({
-        data: { success: true },
-      }),
-    ),
-    listRUMTokens: vi.fn(() =>
-      Promise.resolve({
-        data: {
+        }),
+      ),
+      updateRUMToken: vi.fn(() =>
+        Promise.resolve({
+          data: { success: true },
+        }),
+      ),
+      listRUMTokens: vi.fn(() =>
+        Promise.resolve({
           data: {
-            rum_token: "default-rum-token",
-            id: "default-rum-id",
+            data: {
+              rum_token: "default-rum-token",
+              id: "default-rum-id",
+            },
           },
-        },
-      }),
-    ),
-  },
-}));
+        }),
+      ),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
@@ -526,6 +533,9 @@ describe("Ingestion", () => {
       apiKeysService.listRUMTokens.mockResolvedValue(mockResponse);
       const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
 
+      // Mounting already cached a token, and the read is a cache hit for an
+      // hour — drop it so the call under test reaches the mock above.
+      queryClient.clear();
       await wrapper.vm.getRUMToken();
 
       expect(apiKeysService.listRUMTokens).toHaveBeenCalledWith("default");

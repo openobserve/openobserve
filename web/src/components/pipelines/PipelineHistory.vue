@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onPipelineSelected"
         :placeholder="t('pipeline.searchHistory')"
         data-test="pipeline-history-search-select"
-        class="min-w-62.5"
+        class="min-w-62.5 max-md:min-w-0"
         clearable
       >
         <template #empty>
@@ -58,17 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:column-visibility="setColumnVisibility"
         @reset:column-sizes="tableRef?.resetColumnSizes()"
       />
-      <OButton
+      <ORefreshButton
+        layout="inline"
         variant="outline"
-        size="icon-sm"
         class="shrink-0"
-        @click="refreshData"
-        data-test="pipeline-history-refresh-btn"
+        :last-run-at="lastUpdatedAt"
         :loading="loading"
-        icon-left="refresh"
-      >
-        <OTooltip :content="t('common.refresh')" side="top" />
-      </OButton>
+        data-test="pipeline-history-refresh-btn"
+        @click="refreshData"
+      />
     </Teleport>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div
@@ -76,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="pipeline-history-table bg-card-glass-bg h-full"
       >
         <OTable
+          :forbidden="forbidden"
           ref="tableRef"
           :frame="false"
           :data="rows"
@@ -218,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="{ totalRows }">
-            <div class="me-4 flex items-center py-2 text-xs font-normal">
+            <div class="me-4 flex items-center py-2 text-xs font-normal max-md:hidden">
               {{ totalRows }} {{ t("pipeline.header") }}
             </div>
           </template>
@@ -456,7 +455,7 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import * as dateUtils from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -469,7 +468,8 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import pipelinesService from "@/services/pipelines";
-import http from "@/services/http";
+import { pipelineHistoryQuery } from "@/services/pipelines.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -480,6 +480,8 @@ const store = useStore();
 
 // Data
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
+const forbidden = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
 const selectedPipeline = ref<any>();
@@ -697,8 +699,9 @@ const clearSearch = () => {
   fetchPipelineHistory();
 };
 
-const fetchPipelineHistory = async () => {
+const fetchPipelineHistory = async (force = false) => {
   loading.value = true;
+  forbidden.value = false;
   try {
     const org = store.state.selectedOrganization.identifier;
 
@@ -724,13 +727,21 @@ const fetchPipelineHistory = async () => {
       params.sort_order = pagination.value.descending ? "desc" : "asc";
     }
 
-    const url = `/api/${org}/pipelines/history`;
-    const response = await http().get(url, { params });
+    // Cached read — a revisit inside the freshness window paints without a
+    // request; the Refresh button forces.
+    const options = pipelineHistoryQuery(org, params);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const historyData: any = await queryClient.fetchQuery(options);
+    // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+    lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
 
-    if (response.data) {
-      // Handle the response data
-      const historyData = response.data;
-
+    if (historyData) {
       // Map the hits array or handle empty response
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
@@ -747,11 +758,17 @@ const fetchPipelineHistory = async () => {
   } catch (error: any) {
     console.error("Error fetching pipeline history:", error);
     console.error("Error response:", error.response);
-    toast({
-      variant: "error",
-      message:
-        error.response?.data?.message || error.message || t("pipeline.fetchPipelineHistoryFailed"),
-    });
+    forbidden.value = error?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({
+        variant: "error",
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          t("pipeline.fetchPipelineHistoryFailed"),
+      });
+    }
   } finally {
     loading.value = false;
   }
@@ -797,7 +814,7 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
 };
 
 const refreshData = () => {
-  fetchPipelineHistory();
+  fetchPipelineHistory(true);
 };
 
 const formatDate = (timestamp: number) => {

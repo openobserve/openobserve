@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'bg-badge-blue-solid-bg': st === 'logs',
                           'bg-badge-orange-solid-bg': st === 'traces',
                           'bg-badge-success-solid-bg': st === 'metrics',
+                          'bg-badge-purple-solid-bg': st === 'profiles',
                         }"
                         :title="st"
                       />
@@ -140,6 +141,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-center gap-1">
                       <span class="bg-badge-success-solid-bg h-1.5 w-1.5 rounded-full" />
                       {{ t("settings.correlation.foundInMetrics") }}
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <span class="bg-badge-purple-solid-bg h-1.5 w-1.5 rounded-full" />
+                      {{ t("settings.correlation.foundInProfiles") }}
                     </div>
                     <div v-if="unseenServiceFields.length > 0" class="flex items-center gap-1">
                       <span class="border-grey-4 h-1.5 w-1.5 rounded-full border border-dashed" />
@@ -637,6 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'bg-badge-blue-solid-bg': st === 'logs',
                           'bg-badge-orange-solid-bg': st === 'traces',
                           'bg-badge-success-solid-bg': st === 'metrics',
+                          'bg-badge-purple-solid-bg': st === 'profiles',
                         }" /></span
                   ></span>
                   <ODropdown
@@ -676,6 +682,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'bg-badge-blue-solid-bg': st === 'logs',
                               'bg-badge-orange-solid-bg': st === 'traces',
                               'bg-badge-success-solid-bg': st === 'metrics',
+                              'bg-badge-purple-solid-bg': st === 'profiles',
                             }" /></span
                       ></span>
                     </div>
@@ -698,6 +705,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
               <span class="bg-badge-success-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
               <span>{{ t("settings.correlation.foundInMetrics") }}</span>
+            </div>
+            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <span class="bg-badge-purple-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
+              <span>{{ t("settings.correlation.foundInProfiles") }}</span>
             </div>
           </div>
         </div>
@@ -1001,7 +1012,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span>{{
                   selectedStreamType ||
-                  ["logs", "metrics", "traces"].find(
+                  ["logs", "metrics", "traces", "profiles"].find(
                     (t) => selectedFieldAnalytics?.sample_values[t],
                   )
                 }}</span>
@@ -1036,7 +1047,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- All types: sticky section labels for 2nd+ types only; first is already in the static header -->
                 <template v-else>
                   <template
-                    v-for="(typeName, typeIdx) in ['logs', 'metrics', 'traces'].filter(
+                    v-for="(typeName, typeIdx) in ['logs', 'metrics', 'traces', 'profiles'].filter(
                       (t) => selectedFieldAnalytics?.sample_values[t],
                     )"
                     :key="typeName"

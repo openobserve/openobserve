@@ -13,13 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, RangeValue, Sample, Value};
+use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 use datafusion::error::Result;
-use hashbrown::HashMap;
 
 use crate::{
-    aggregations::{Accumulate, AggFunc},
-    common::quantile as calculate_quantile,
+    aggregations::{Accumulate, AggFunc, group_series},
+    common::quantile_in_place,
 };
 
 /// Note: quantile aggregates all series into a single result (no label grouping)
@@ -31,24 +30,9 @@ pub fn quantile(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value
     );
 
     // Handle invalid quantile parameter by returning special values
-    if !(0.0..=1.0).contains(&qtile) || qtile.is_nan() {
-        let value = match qtile.signum() as i32 {
-            1 => f64::INFINITY,
-            -1 => f64::NEG_INFINITY,
-            _ => f64::NAN,
-        };
-        let timestamps = eval_ctx.timestamps();
-        let samples: Vec<Sample> = timestamps
-            .iter()
-            .map(|&ts| Sample::new(ts, value))
-            .collect();
-        let range_value = RangeValue {
-            labels: Default::default(),
-            samples,
-            exemplars: None,
-            time_window: None,
-        };
-        return Ok(Value::Matrix(vec![range_value]));
+    if !(0.0..=1.0).contains(&qtile) {
+        let value = quantile_in_place(&mut [], qtile).unwrap();
+        return crate::functions::vector(Value::Float(value), eval_ctx);
     }
 
     let result = super::eval_aggregate(&None, data, Quantile { qtile }, eval_ctx);
@@ -64,13 +48,25 @@ pub struct Quantile {
     qtile: f64,
 }
 
+#[cfg(test)]
+impl Quantile {
+    pub(super) fn new(qtile: f64) -> Self {
+        Self { qtile }
+    }
+}
+
 impl AggFunc for Quantile {
+    type Accumulator = QuantileAccumulate;
+
     fn name(&self) -> &'static str {
         "quantile"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(QuantileAccumulate::new(self.qtile))
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        QuantileAccumulate {
+            qtile: self.qtile,
+            values: vec![Vec::new(); slots],
+        }
     }
 
     // Buffers every sample; merging partials would re-copy them at each
@@ -82,48 +78,46 @@ impl AggFunc for Quantile {
 
 pub struct QuantileAccumulate {
     qtile: f64,
-    // Store all values per timestamp for quantile calculation
-    values: HashMap<i64, Vec<f64>>,
+    values: Vec<Vec<f64>>,
 }
 
 impl QuantileAccumulate {
-    fn new(qtile: f64) -> Self {
-        QuantileAccumulate {
-            qtile,
-            values: HashMap::new(),
-        }
+    fn push(&mut self, slot: usize, value: f64) {
+        self.values[slot].push(value);
     }
 }
 
 impl Accumulate for QuantileAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let entry = self.values.entry(sample.timestamp).or_default();
-        entry.push(sample.value);
-    }
-
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, values) in other.values {
-            self.values.entry(timestamp).or_default().extend(values);
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
+    fn merge(&mut self, other: Self) {
+        for (values, other) in self.values.iter_mut().zip(other.values) {
+            values.extend(other);
+        }
     }
 
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.values
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .values
             .into_iter()
-            .filter_map(|(timestamp, values)| {
+            .enumerate()
+            .filter_map(|(slot, mut values)| {
                 if values.is_empty() {
-                    return Some(Sample::new(timestamp, f64::NAN));
+                    return None;
                 }
-                // Calculate quantile
-                calculate_quantile(&values, self.qtile)
-                    .map(|quantile_val| Sample::new(timestamp, quantile_val))
+                quantile_in_place(&mut values, self.qtile)
+                    .map(|quantile_val| Sample::new(timestamps[slot], quantile_val))
             })
-            .collect()
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 
@@ -194,24 +188,24 @@ mod tests {
     #[test]
     fn test_quantile_calculation() {
         // Test the core quantile calculation logic
-        let values = vec![10.0, 20.0, 30.0];
+        let mut values = vec![10.0, 20.0, 30.0];
         let qtile = 0.5; // 50th percentile
 
-        let quantile_value = calculate_quantile(&values, qtile).unwrap();
+        let quantile_value = quantile_in_place(&mut values, qtile).unwrap();
         assert_eq!(quantile_value, 20.0); // 50th percentile should be 20.0
     }
 
     #[test]
     fn test_quantile_edge_cases() {
         // Test edge cases for quantile calculation
-        let values = vec![10.0, 20.0, 30.0];
+        let mut values = vec![10.0, 20.0, 30.0];
 
         // 0th percentile (minimum)
-        let min_value = calculate_quantile(&values, 0.0).unwrap();
+        let min_value = quantile_in_place(&mut values, 0.0).unwrap();
         assert_eq!(min_value, 10.0);
 
         // 100th percentile (maximum)
-        let max_value = calculate_quantile(&values, 1.0).unwrap();
+        let max_value = quantile_in_place(&mut values, 1.0).unwrap();
         assert_eq!(max_value, 30.0);
     }
 }

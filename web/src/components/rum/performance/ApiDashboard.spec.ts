@@ -62,11 +62,14 @@ vi.mock("@/utils/rum/api.json", () => ({
   },
 }));
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+    },
+  });
+});
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data || { variables: { list: [] } }),
@@ -723,6 +726,20 @@ describe("ApiDashboard", () => {
 
       // Assert
       expect(result).toBe("");
+    });
+
+    it("escapes an embedded single quote in the variable value", () => {
+      // Arrange
+      wrapper.vm.variablesData = {
+        isVariablesLoading: false,
+        values: [{ name: "service", value: "o'brien", type: "query_values" }],
+      };
+
+      // Act
+      const result = wrapper.vm.getVariablesString();
+
+      // Assert
+      expect(result).toBe(" and service='o''brien'");
     });
   });
 

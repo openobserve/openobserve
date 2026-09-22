@@ -17,7 +17,7 @@
 // "view" tooltip. Its whole contract is: derive VueFlow nodes/edges from the raw
 // workflow row, and re-fit the view whenever the container resizes.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 const { mockFitView } = vi.hoisted(() => ({ mockFitView: vi.fn() }));
 
@@ -99,7 +99,6 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: () => "uuid-1",
 }));
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";

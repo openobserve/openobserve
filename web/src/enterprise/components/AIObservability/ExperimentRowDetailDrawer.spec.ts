@@ -65,6 +65,8 @@ const detail: ExperimentRowDetail = {
           score: {
             value_numeric: 0.5,
             reasoning: "Partially correct",
+            evaluator_trace_id: "evaluator-trace-1",
+            _timestamp: 200,
             source_type: "experiment",
             origin_source_type: "remote",
           },
@@ -158,6 +160,8 @@ describe("ExperimentRowDetailDrawer", () => {
     expect(wrapper.text()).toContain("Tomorrow");
     expect(wrapper.text()).toContain("provider timeout");
     expect(wrapper.text()).toContain("0.500");
+    expect(wrapper.text()).toContain("Why");
+    expect(wrapper.text()).toContain("Partially correct");
     expect(wrapper.text()).not.toContain('{"kind":"numeric"');
     expect(wrapper.text()).toContain("Row 2 of 3");
   });
@@ -170,9 +174,13 @@ describe("ExperimentRowDetailDrawer", () => {
     const buttons = wrapper.findAll("button");
     await buttons.find((button) => button.text().includes("Retry Failed Slot"))?.trigger("click");
     await buttons.find((button) => button.text().includes("View Trace"))?.trigger("click");
+    await wrapper.get('[data-test="ai-experiment-row-score-trace-quality:3"]').trigger("click");
 
     expect(wrapper.emitted("navigate")?.[0]).toEqual(["row-0"]);
     expect(wrapper.emitted("retry")?.[0]).toEqual([detail.trials[0]]);
     expect(wrapper.emitted("trace")?.[0]).toEqual([detail.trials[0].execution]);
+    expect(wrapper.emitted("score-trace")?.[0]).toEqual([
+      { traceId: "evaluator-trace-1", timestamp: 200 },
+    ]);
   });
 });
