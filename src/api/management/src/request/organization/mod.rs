@@ -60,16 +60,13 @@ const fn credential_access_allowed(
 /// The callers are the five routes that expose the org-wide `o2oi_` ingestion
 /// token:
 ///
-/// * `GET` and `PUT /{org}/passcode` — the two endpoints of
-///   GHSA-7hqf-3j8r-xf8p, which returned and rotated that token for any
-///   authenticated org member.
-/// * `GET`, `POST /{org}/ingestion-tokens` and `PATCH
-///   /{org}/ingestion-tokens/{name}` — the named-token surface onto the same
-///   credential. GHSA-8vc5-vfg9-w34m added Admin/Root checks here, but wrapped
-///   them in `#[cfg(not(feature = "enterprise"))]`, so on enterprise builds they
-///   were compiled out and — with OpenFGA disabled, the shipped default —
-///   nothing checked at all. Routing them through this guard closes that gap
-///   without changing OSS behaviour.
+/// * `GET` and `PUT /{org}/passcode` — the two endpoints of GHSA-7hqf-3j8r-xf8p, which returned and
+///   rotated that token for any authenticated org member.
+/// * `GET`, `POST /{org}/ingestion-tokens` and `PATCH /{org}/ingestion-tokens/{name}` — the
+///   named-token surface onto the same credential. GHSA-8vc5-vfg9-w34m added Admin/Root checks
+///   here, but wrapped them in `#[cfg(not(feature = "enterprise"))]`, so on enterprise builds they
+///   were compiled out and — with OpenFGA disabled, the shipped default — nothing checked at all.
+///   Routing them through this guard closes that gap without changing OSS behaviour.
 ///
 /// Incident-integration token rotation is deliberately *not* a caller: it was
 /// never part of either advisory and keeps the authorization it already had.
@@ -79,8 +76,12 @@ const fn credential_access_allowed(
 /// `fga_permission` on `resource` in this org. `resource` and `fga_permission`
 /// must match what the enterprise route table declares for the path being
 /// guarded, so that a role grant made in the IAM editor means the same thing
-/// here as it does in the middleware. For the two call sites that is
-/// `resource = "passcode"` with `LIST` for `GET` and `PUT` for `PUT`.
+/// here as it does in the middleware. All five call sites use
+/// `resource = "passcode"`, with three permissions: `LIST` for both `GET`s,
+/// `POST` for `POST /{org}/ingestion-tokens`, and `PUT` for `PUT
+/// /{org}/passcode` and for `PATCH /{org}/ingestion-tokens/{name}` (the route
+/// table maps that PATCH to `PUT`, because no type in `model.fga` defines a
+/// `PATCH` relation).
 ///
 /// ## Why the handler re-checks at all
 ///
@@ -103,7 +104,7 @@ const fn credential_access_allowed(
 ///
 /// ## Why the OpenFGA-enabled check is not redundant
 ///
-/// `crate::authz::check_permissions` returns `true` unconditionally when
+/// `openobserve_core::authz::check_permissions` returns `true` unconditionally when
 /// OpenFGA is disabled — it is answering "does FGA object?", and a disabled
 /// FGA objects to nothing. `O2_OPENFGA_ENABLED` defaults to **false**, so
 /// OR-ing that answer in unguarded would allow every authenticated user on a

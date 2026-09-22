@@ -323,7 +323,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
     tag = "Organizations",
     operation_id = "GetOrganizationUserIngestToken",
     summary = "Get user's ingestion token",
-    description = "Retrieves the current ingestion token (passcode) for the authenticated user within the specified organization. This token is used to authenticate data ingestion requests and can be used with various ingestion endpoints.",
+    description = "Retrieves the current ingestion token (passcode) for the authenticated user within the specified organization. This token is used to authenticate data ingestion requests and can be used with various ingestion endpoints. Requires Admin or Root role.",
     security(
         ("Authorization"= [])
     ),
@@ -378,7 +378,7 @@ pub async fn get_user_passcode(
     tag = "Organizations",
     operation_id = "UpdateOrganizationUserIngestToken",
     summary = "Update user's ingestion token",
-    description = "Generates a new ingestion token (passcode) for the authenticated user within the specified organization. The old token will be invalidated and all ingestion processes using the old token will need to be updated with the new token.",
+    description = "Generates a new ingestion token (passcode) for the authenticated user within the specified organization. The old token will be invalidated and all ingestion processes using the old token will need to be updated with the new token. Requires Admin or Root role.",
     security(
         ("Authorization"= [])
     ),
