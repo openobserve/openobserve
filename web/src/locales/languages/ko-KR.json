@@ -1954,6 +1954,7 @@
     "ok": "확인",
     "sendInvite": "초대 보내기",
     "inviteByEmail": "이메일로 초대하세요. 세미콜론(;) 또는 쉼표(,)로 여러 이메일이 구분됩니다",
+    "inviteByEmailPlaceholder": "이메일로 초대",
     "changePassword": "비밀번호 변경",
     "oldPassword": "이전 비밀번호",
     "newPassword": "새 비밀번호",

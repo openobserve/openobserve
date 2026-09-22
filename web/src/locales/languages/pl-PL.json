@@ -1954,6 +1954,7 @@
     "ok": "OK",
     "sendInvite": "Wyślij zaproszenie",
     "inviteByEmail": "Zaproś przez e-mail. Wiele adresów e-mail oddzielonych średnikami (;) lub przecinkami (,).",
+    "inviteByEmailPlaceholder": "Zaproś przez e-mail",
     "changePassword": "Zmień hasło",
     "oldPassword": "Stare hasło",
     "newPassword": "Nowe hasło",

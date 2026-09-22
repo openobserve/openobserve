@@ -1954,6 +1954,7 @@
     "ok": "ОК",
     "sendInvite": "Отправить приглашение",
     "inviteByEmail": "Приглашение по email. Несколько email, разделенных точкой с запятой (;) или запятой (,).",
+    "inviteByEmailPlaceholder": "Пригласить по email",
     "changePassword": "Изменить пароль",
     "oldPassword": "Старый пароль",
     "newPassword": "Новый пароль",

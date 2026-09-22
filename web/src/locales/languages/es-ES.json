@@ -1954,6 +1954,7 @@
     "ok": "Aceptar",
     "sendInvite": "Enviar invitación",
     "inviteByEmail": "Invitar por correo electrónico. Varios correos electrónicos separados por punto y coma (;) o coma (,)",
+    "inviteByEmailPlaceholder": "Invitar por correo electrónico",
     "changePassword": "Cambiar contraseña",
     "oldPassword": "Contraseña antigua",
     "newPassword": "Contraseña nueva",

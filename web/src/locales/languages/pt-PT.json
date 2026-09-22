@@ -1954,6 +1954,7 @@
     "ok": "Ok",
     "sendInvite": "Enviar convite",
     "inviteByEmail": "Convide por e-mail. Vários e-mails separados por ponto e vírgula (;) ou vírgula (,)",
+    "inviteByEmailPlaceholder": "Convidar por e-mail",
     "changePassword": "Alterar senha",
     "oldPassword": "Senha antiga",
     "newPassword": "Nova senha",

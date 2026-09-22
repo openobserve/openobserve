@@ -1954,6 +1954,7 @@
     "ok": "確定",
     "sendInvite": "傳送邀請",
     "inviteByEmail": "透過電子郵件邀請。多個電子郵件請以分號 (;) 或逗號 (,) 分隔。",
+    "inviteByEmailPlaceholder": "透過電子郵件邀請",
     "changePassword": "變更密碼",
     "oldPassword": "舊密碼",
     "newPassword": "新密碼",
