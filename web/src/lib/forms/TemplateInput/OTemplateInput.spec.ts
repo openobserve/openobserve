@@ -137,6 +137,18 @@ describe("OTemplateInput", { timeout: 20_000 }, () => {
     expect(list()).toBeNull();
   });
 
+  it("inserts on a row click without taking focus off the field", async () => {
+    mountHost();
+    await type("https://{{ba/path", 12);
+    const row = document.body.querySelector<HTMLElement>('[data-test="url-suggest-item-BASE_URL"]');
+    expect(row).not.toBeNull();
+    row?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    row?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await flushPromises();
+    expect(hostText()).toBe("https://{{BASE_URL}}/path");
+    expect(document.activeElement).toBe(field);
+  });
+
   it("renders the forwarded prefix and tooltip slots", () => {
     mountHost();
     expect(wrapper.find('[data-test="link-icon"]').exists()).toBe(true);

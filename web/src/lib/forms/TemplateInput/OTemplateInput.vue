@@ -16,13 +16,12 @@
 
 import { computed, ref, useAttrs } from "vue";
 import OInput from "../Input/OInput.vue";
-import OTemplateSuggestList from "./OTemplateSuggestList.vue";
+import OTemplateOverlay from "./OTemplateOverlay.vue";
 import { useTemplateSuggest } from "./useTemplateSuggest";
-import { raw } from "@/types/i18n";
 import type {
-  TemplateInputEmits,
   TemplateInputProps,
   TemplateInputSlots,
+  TemplateSuggestEmits,
   TemplateSuggestion,
 } from "./OTemplateInput.types";
 
@@ -30,7 +29,7 @@ import type {
 defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<TemplateInputProps<T>>(), { type: "text" });
-const emit = defineEmits<TemplateInputEmits>();
+const emit = defineEmits<TemplateSuggestEmits>();
 defineSlots<TemplateInputSlots<T>>();
 
 const $attrs = useAttrs();
@@ -43,10 +42,6 @@ const suggest = useTemplateSuggest<T>({
   values: () => props.values,
   emit,
 });
-
-function tokenFor(name: string) {
-  return raw(`{{${name}}}`);
-}
 
 function onUpdate(value: string | number) {
   const text = String(value);
@@ -125,38 +120,10 @@ function onKeydown(event: KeyboardEvent) {
       </template>
     </OInput>
 
-    <!-- The list owns the space below the field, so the peek sits above it and yields while the list is open. -->
-    <div
-      v-if="
-        suggest.peekName.value !== null &&
-        suggest.peekValue.value !== null &&
-        !suggest.listOpen.value
-      "
-      :data-test="dataTest ? `${dataTest}-peek` : undefined"
-      class="bg-select-content-bg border-dropdown-border rounded-default absolute start-0 bottom-full z-10 mb-1 max-w-72 border px-2 py-1.5 shadow-md"
-    >
-      <span class="text-accent text-2xs font-mono font-semibold">{{
-        tokenFor(suggest.peekName.value)
-      }}</span>
-      <span class="text-text-secondary block text-xs wrap-break-word">{{
-        suggest.peekValue.value
-      }}</span>
-    </div>
-
-    <OTemplateSuggestList
-      :open="suggest.listOpen.value"
-      :reference="suggest.element.value"
-      :boundary="rootEl"
-      :matches="suggest.matches.value"
-      :highlighted-index="suggest.highlightedIndex.value"
-      :data-test="dataTest"
-      @select="suggest.accept"
-      @highlight="(index: number) => (suggest.highlightedIndex.value = index)"
-      @close="suggest.close"
-    >
+    <OTemplateOverlay :suggest="suggest" :boundary="rootEl" :data-test="dataTest">
       <template v-if="$slots.suggestion" #suggestion="slotProps">
         <slot name="suggestion" v-bind="slotProps" />
       </template>
-    </OTemplateSuggestList>
+    </OTemplateOverlay>
   </div>
 </template>
