@@ -777,6 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -930,7 +931,6 @@ const priorityFilter = ref("all");
 /// `oncall/me` page now redirects to, so a bookmark from before still lands on
 /// the answer instead of a stub that told everybody they were on no team.
 const mineOnly = ref(false);
-const selectedIds = ref<string[]>([]);
 const grouped = ref(true);
 /// `"all"` is the default tab, and "all" means all — resolved included —
 /// so the very first fetch already asks for resolved pages too.
@@ -1256,6 +1256,13 @@ function toRows(records: OnCallResponse[]): PageRow[] {
 /// headings and the header's own "mine" toggle, so the list narrows from the
 /// header controls alone.
 const rows = computed(() => toRows(scopedResponses.value));
+
+const { selectedIds } = usePersistedSelection<any>({
+  tableId: "oncall-responses-list",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: rows,
+  getRowId: (row) => row.rowKey,
+});
 
 const causeOptions = computed(() => [
   { label: t("oncall.causeFilterAny"), value: "" },

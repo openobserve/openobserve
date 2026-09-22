@@ -457,6 +457,7 @@
 </template>
 
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { sloKeys } from "@/services/slos.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { useQuery } from "@tanstack/vue-query";
@@ -564,7 +565,12 @@ const typeFilter = ref("all");
 const healthFilter = ref<string | null>(null);
 const deleteDialog = ref(false);
 const pendingDelete = ref<SloListItem | null>(null);
-const selectedIds = ref<string[]>([]);
+const { selectedIds } = usePersistedSelection<any>({
+  tableId: "slos-list",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: rows,
+  getRowId: (row) => row.id,
+});
 const moveDialog = ref(false);
 const moveTarget = ref("");
 const pendingMove = ref<SloListItem[]>([]);
@@ -893,15 +899,20 @@ async function load(orgId?: string | null, folderId?: string, force = false) {
   loadError.value = null;
   // sometimes the folder id might not be updated so passed via
   // query params.
-  readOrg.value = orgId ?? org.value;
-  readFolder.value = folderId ?? activeFolderId.value;
+  const nextOrg = orgId ?? org.value;
+  const nextFolder = folderId ?? activeFolderId.value;
+  // The first load has no previous folder, and a selection saved before leaving is restored there.
+  const switched =
+    readFolder.value !== undefined &&
+    (readOrg.value !== nextOrg || readFolder.value !== nextFolder);
+  readOrg.value = nextOrg;
+  readFolder.value = nextFolder;
   // Let the key pick up the new org/folder before asking for the data.
   await nextTick();
   try {
     if (force) await slosList.refetch();
-    // Selection is per-folder; carrying ids across a folder switch would let a
-    // bulk move act on rows no longer on screen.
-    selectedIds.value = [];
+    // Selection is per-folder; ids carried across a switch would let a bulk move act on unseen rows.
+    if (switched) selectedIds.value = [];
   } catch (e: any) {
     loadError.value = e?.response?.data?.message || e?.message || t("slos.loadFailed");
   }

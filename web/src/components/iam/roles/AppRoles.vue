@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { useQuery } from "@tanstack/vue-query";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
@@ -121,7 +122,12 @@ const deleteConformDialog = ref({
   data: null as any,
 });
 
-const selectedRoleNames = ref<string[]>([]);
+const { selectedIds: selectedRoleNames } = usePersistedSelection<any>({
+  tableId: "iam-roles-list",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: rows,
+  getRowId: (row) => row.role_name,
+});
 const onSelectionChange = (ids: string[]) => {
   selectedRoleNames.value = ids;
 };

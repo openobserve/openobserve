@@ -428,6 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { syntheticsKeys } from "@/services/synthetics.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { useQuery } from "@tanstack/vue-query";
@@ -758,7 +759,6 @@ watch(searchAcrossFolders, async (newVal) => {
 });
 
 // ── Multi-select & bulk ops ────────────────────────────────────────────
-const selectedMonitorIds = ref<string[]>([]);
 const showMoveDialog = ref(false);
 const showBulkDeleteConfirm = ref(false);
 const monitorsToMove = ref<string[]>([]);
@@ -1072,6 +1072,13 @@ async function loadLocations() {
 // The list is the query, not a copy of it: a monitor write invalidates the
 // synthetics scope and these rows repaint with no wiring here.
 const monitors = computed<DisplayMonitor[]>(() => (monitorsList.data.value ?? []).map(mapMonitor));
+
+const { selectedIds: selectedMonitorIds } = usePersistedSelection<any>({
+  tableId: "synthetic-monitoring-table",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: monitors,
+  getRowId: (row) => row.id,
+});
 
 // Enrich monitors with folder names from Vuex store
 const enrichedMonitors = computed(() => {

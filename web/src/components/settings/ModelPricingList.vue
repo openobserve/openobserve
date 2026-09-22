@@ -626,6 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { useQuery } from "@tanstack/vue-query";
 import { modelPricingQuery } from "@/services/model_pricing.queries";
 import { modelPricingKeys } from "@/services/model_pricing.querykeys";
@@ -714,7 +715,6 @@ const resetConfirmDialog = () => {
 const filterQuery = ref("");
 const showImportModelPricingPage = ref(false);
 const showTestMatchDialog = ref(false);
-const selectedIds = ref<string[]>([]);
 const bulkDeleteLoading = ref(false);
 const selectedTab = ref("all");
 
@@ -736,6 +736,13 @@ const allModels = computed(() => {
     if (m.children?.length) result.push(...m.children);
   }
   return result;
+});
+
+const { selectedIds } = usePersistedSelection<any>({
+  tableId: "settings-model-pricing",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: allModels,
+  getRowId: (row) => row.id,
 });
 
 /** Set of model ids that are children of some parent (= shadowed rows). */

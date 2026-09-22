@@ -508,6 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 </template>
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { pipelinesQuery } from "@/services/pipelines.queries";
@@ -692,7 +693,12 @@ const filteredPipelines = computed<any[]>(() =>
 );
 const columns: any = ref([]);
 
-const selectedPipelineIds = ref<string[]>([]);
+const { selectedIds: selectedPipelineIds } = usePersistedSelection<any>({
+  tableId: "pipelines-pipeline-list",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: pipelines,
+  getRowId: (row) => row.pipeline_id,
+});
 const bulkDeleteLoading = ref(false);
 const selectedPipelines = computed(() =>
   filteredPipelines.value.filter((p: any) => selectedPipelineIds.value.includes(p.pipeline_id)),

@@ -374,6 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { useOrgId } from "@/composables/query/useOrgId";
 import type { ReportListFilters } from "@/services/reports";
 import { useQuery } from "@tanstack/vue-query";
@@ -480,7 +481,12 @@ const dynamicQueryModel = computed({
   },
 });
 
-const selectedReportIds = ref<string[]>([]);
+const { selectedIds: selectedReportIds } = usePersistedSelection<any>({
+  tableId: "reports-report-list",
+  scope: () => store.state.selectedOrganization?.identifier ?? "",
+  rows: reportsTableRows,
+  getRowId: (row) => row.report_id,
+});
 const selectedReports = computed({
   get: () =>
     (reportsTableRows.value || []).filter((row: any) =>

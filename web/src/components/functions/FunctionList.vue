@@ -263,6 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { defineAsyncComponent, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -479,7 +480,12 @@ export default defineComponent({
     const pageSize = ref(20);
     const pageSizeOptions = [20, 50, 100, 250, 500];
 
-    const selectedFunctionIds = ref<string[]>([]);
+    const { selectedIds: selectedFunctionIds } = usePersistedSelection<any>({
+      tableId: "pipelines-function-list",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: jsTransforms,
+      getRowId: (row) => row.name,
+    });
     const selectedFunctions = computed({
       get: () =>
         (jsTransforms.value || []).filter((row: any) =>
