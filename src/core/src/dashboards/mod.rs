@@ -1179,6 +1179,144 @@ async fn filter_permitted_dashboards(
     Ok(permitted_dashboards)
 }
 
+/// Imports every `*.json` file in `dir` as a dashboard for `org_id`.
+///
+/// Idempotent: files whose title already exists in the org are skipped.
+/// Per-file errors are logged and skipped; the function never returns `Err`.
+pub async fn import_dashboards_from_dir(org_id: &str, dir: &str) {
+    let read_dir = match std::fs::read_dir(dir) {
+        Ok(rd) => rd,
+        Err(e) => {
+            log::error!("[dashboard_import] cannot read directory '{dir}': {e}");
+            return;
+        }
+    };
+
+    // Collect existing titles once so we don't query the DB per file.
+    let existing_titles: hashbrown::HashSet<String> = {
+        let params = config::meta::dashboards::ListDashboardsParams::new(org_id);
+        match table::dashboards::list(params).await {
+            Ok(list) => list
+                .into_iter()
+                .filter_map(|(_, d)| d.title().map(|t| t.to_owned()))
+                .collect(),
+            Err(e) => {
+                log::error!(
+                    "[dashboard_import] failed to list existing dashboards for org '{org_id}': {e}"
+                );
+                return;
+            }
+        }
+    };
+
+    for entry in read_dir {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                log::warn!("[dashboard_import] directory entry error in '{dir}': {e}");
+                continue;
+            }
+        };
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        import_single_dashboard(org_id, &path, &existing_titles).await;
+    }
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub enum DashboardPayload {
+    V1(config::meta::dashboards::v1::Dashboard),
+    V2(config::meta::dashboards::v2::Dashboard),
+    V3(config::meta::dashboards::v3::Dashboard),
+    V4(config::meta::dashboards::v4::Dashboard),
+    V5(config::meta::dashboards::v5::Dashboard),
+    V6(config::meta::dashboards::v6::Dashboard),
+    V7(config::meta::dashboards::v7::Dashboard),
+    V8(config::meta::dashboards::v8::Dashboard),
+}
+
+impl<'de> serde::Deserialize<'de> for DashboardPayload {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
+        let version = value.get("version").and_then(serde_json::Value::as_i64).unwrap_or(8);
+
+        let dash = match version {
+            1 => Self::V1(serde::Deserialize::deserialize(value).map_err(serde::de::Error::custom)?),
+            2 => Self::V2(serde::Deserialize::deserialize(value).map_err(serde::de::Error::custom)?),
+            3 => Self::V3(serde::Deserialize::deserialize(value).map_err(serde::de::Error::custom)?),
+            4 => Self::V4(serde::Deserialize::deserialize(value).map_err(serde::de::Error::custom)?),
+            5 => Self::V5(serde::Deserialize::deserialize(value).map_err(serde::de::Error::custom)?),
+            6 => Self::V6(serde::Deserialize::deserialize(value).map_err(serde::de::Error::custom)?),
+            7 => Self::V7(serde::Deserialize::deserialize(value).map_err(serde::de::Error::custom)?),
+            8 => Self::V8(serde::Deserialize::deserialize(value).map_err(serde::de::Error::custom)?),
+            _ => {
+                return Err(serde::de::Error::custom(format!("unsupported version: {version}")));
+            }
+        };
+        Ok(dash)
+    }
+}
+
+async fn import_single_dashboard(
+    org_id: &str,
+    path: &std::path::Path,
+    existing_titles: &hashbrown::HashSet<String>,
+) {
+    let display = path.display();
+    let contents = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("[dashboard_import] cannot read '{display}': {e}");
+            return;
+        }
+    };
+    let payload: DashboardPayload = match serde_json::from_str(&contents) {
+        Ok(d) => d,
+        Err(e) => {
+            log::error!("[dashboard_import] cannot parse '{display}' as Dashboard JSON: {e}");
+            return;
+        }
+    };
+    let mut dashboard: config::meta::dashboards::Dashboard = match payload {
+        DashboardPayload::V1(d) => d.into(),
+        DashboardPayload::V2(d) => d.into(),
+        DashboardPayload::V3(d) => d.into(),
+        DashboardPayload::V4(d) => d.into(),
+        DashboardPayload::V5(d) => d.into(),
+        DashboardPayload::V6(d) => d.into(),
+        DashboardPayload::V7(d) => d.into(),
+        DashboardPayload::V8(d) => d.into(),
+    };
+    let title = match dashboard.title() {
+        Some(t) if !t.trim().is_empty() => t.to_owned(),
+        _ => {
+            log::warn!("[dashboard_import] '{display}' has no title; skipping");
+            return;
+        }
+    };
+    if existing_titles.contains(&title) {
+        log::info!("[dashboard_import] dashboard '{title}' already exists; skipping '{display}'");
+        return;
+    }
+    if dashboard.owner().filter(|v| !v.is_empty()).is_none() {
+        dashboard.set_owner("system".to_string());
+    }
+    match create_dashboard(org_id, config::meta::folder::DEFAULT_FOLDER, dashboard).await {
+        Ok(saved) => {
+            let id = saved.dashboard_id().unwrap_or("?");
+            log::info!("[dashboard_import] imported '{title}' as {id} from '{display}'");
+        }
+        Err(e) => {
+            log::error!("[dashboard_import] failed to import '{display}': {e}");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::dashboards::v8;
