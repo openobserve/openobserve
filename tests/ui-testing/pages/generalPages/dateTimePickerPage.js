@@ -35,6 +35,13 @@ export class DateTimePickerPage {
         this.copyBtn = page.locator('[data-test="date-time-copy-btn"]');
         this.pasteBtn = page.locator('[data-test="date-time-paste-btn"]');
 
+        // Shift buttons — Previous / Next flank the trigger (rendered when
+        // hideRangeShift is false, the default). PR #14683 caps the forward
+        // shift at "now", so Next is disabled in Relative mode and whenever
+        // the absolute window's end is within one second of the present.
+        this.prevShiftBtn = page.locator('[data-test="date-time-prev-btn"]');
+        this.nextShiftBtn = page.locator('[data-test="date-time-next-btn"]');
+
         // Absolute panel fields. OTime renders the data-test on a role=group
         // wrapper; the value lives on the descendant input[type=time].
         this.startTimeInput = page.locator('[data-test="datetime-start-time"] input');
@@ -124,6 +131,40 @@ export class DateTimePickerPage {
     async clickPaste() {
         await expect(this.pasteBtn).toBeVisible();
         await this.pasteBtn.click();
+    }
+
+    // ==================== Shift buttons (Previous / Next) ====================
+
+    async expectShiftButtonsVisible() {
+        await expect(this.prevShiftBtn).toBeVisible();
+        await expect(this.nextShiftBtn).toBeVisible();
+    }
+
+    async expectShiftAriaLabels() {
+        await expect(this.prevShiftBtn).toHaveAttribute('aria-label', 'Previous');
+        await expect(this.nextShiftBtn).toHaveAttribute('aria-label', 'Next');
+    }
+
+    async expectNextEnabled() {
+        await expect(this.nextShiftBtn).toBeEnabled();
+    }
+
+    async expectNextDisabled() {
+        await expect(this.nextShiftBtn).toBeDisabled();
+    }
+
+    async expectPrevEnabled() {
+        await expect(this.prevShiftBtn).toBeEnabled();
+    }
+
+    async clickNext() {
+        await expect(this.nextShiftBtn).toBeEnabled();
+        await this.nextShiftBtn.click();
+    }
+
+    async clickPrev() {
+        await expect(this.prevShiftBtn).toBeEnabled();
+        await this.prevShiftBtn.click();
     }
 
     // ==================== Clipboard helpers ====================

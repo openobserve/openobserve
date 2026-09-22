@@ -1,0 +1,25 @@
+{
+  "feature_slug": "date-time-next-shift-cap",
+  "feature_title": "Date-Time Picker Forward Shift Cap",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dateTime.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/dateTime.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/DateTime.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Both changed files live under web/src/components/ (DateTime.vue and DateTime.spec.ts), which are open-source paths; there are no enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/) and no enterprise keywords (cipher, SSO, SAML, RBAC, SDR, sensitive-data, logo-management) in the changed paths or symbols, so this is an OSS change.",
+    "skip": "Not skipped: the change is user-facing. DateTime.vue is the shared date-time range picker, and its 'next' shift button behavior is altered (forward shift now caps at now and the button disables when it would enter the future). No skip marker, tests-added label, or skip comment was present in the trigger comment, and the diff is not docs/CI-only.",
+    "e2e": "E2E is warranted because a user can exercise the changed interaction: clicking the 'next' shift button on the date-time picker now stops at the current time instead of advancing into the future, and the button becomes disabled for relative windows or windows already ending at now. This is a real UI flow change that needs browser-level verification.",
+    "area": "DateTime.vue is a shared component under web/src/components/ rather than an area-specific plugin (Logs/Metrics/Traces/Dashboards), so no single product area owns it; GeneralTests is the catch-all folder that best fits a cross-cutting shared-component behavior.",
+    "group": "The GeneralTests matrix shard is the closest existing testfolder in the ci-matrix for shared/general UI-component behavior, matching the GeneralTests area selection; no dedicated DateTime/time-range group exists, so the spec should join the GeneralTests run_files.",
+    "existing_tests": "The only test file in the diff is web/src/components/DateTime.spec.ts, which is a Vitest unit test and not an E2E spec under tests/ui-testing/playwright-tests/. No Playwright E2E specs were changed, so there is no existing E2E coverage in the diff for the new forward-shift-cap behavior."
+  }
+}
