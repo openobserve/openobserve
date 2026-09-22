@@ -55,6 +55,7 @@ mod status_pages;
 mod synthetics;
 mod synthetics_locations;
 mod synthetics_probe_tokens;
+mod synthetics_variables;
 mod templates;
 mod user;
 
@@ -180,6 +181,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_synthetics_msg: synthetics::process,
         on_locations_msg: synthetics_locations::process,
         on_probe_tokens_msg: synthetics_probe_tokens::process,
+        on_variables_msg: synthetics_variables::process,
     };
     let org_users_queue = OrgUsersQueue {
         on_org_users_msg: org_user::process,

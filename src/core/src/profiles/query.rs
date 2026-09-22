@@ -293,11 +293,11 @@ where
         if frames.is_empty() {
             continue;
         }
-        if let Some(&leaf) = frames.last() {
-            if !is_synthetic_top_name(leaf) {
-                let entry = agg.entry(leaf.to_string()).or_insert((0, 0));
-                entry.0 = entry.0.saturating_add(value);
-            }
+        if let Some(&leaf) = frames.last()
+            && !is_synthetic_top_name(leaf)
+        {
+            let entry = agg.entry(leaf.to_string()).or_insert((0, 0));
+            entry.0 = entry.0.saturating_add(value);
         }
         let mut seen = HashSet::with_capacity(frames.len());
         for &name in &frames {
