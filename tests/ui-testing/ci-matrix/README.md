@@ -114,14 +114,9 @@ Because that manifest is standalone (no OSS base, no merge), a spec added to
 spec here is nobody's obligation in a PR** — the author of an OSS spec has no way to know
 whether it works on cloud, and a guessed reason is worse than none.
 
-Instead, review the delta on purpose now and then (monthly is plenty):
-
-```
-node .github/scripts/alpha1-coverage-report.js <oss-checkout> <ent-checkout>   # in the ENT repo
-```
-
-It prints what alpha runs, what is recorded as not-cloud-viable, and what has no verdict
-yet. It is a report — nothing in CI runs it and it never fails a build.
+Review the delta on purpose now and then instead — monthly is plenty. Nothing enforces
+it, and nothing should: an alpha shard is only worth adding once someone has confirmed it
+passes there.
 
 The one thing CI does enforce is that this manifest cannot name a spec that no longer
 exists: the shard's test step fails on a missing file. That is the failure which kept
