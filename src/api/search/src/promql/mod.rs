@@ -196,7 +196,7 @@ async fn query(
             }
         };
         let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
-        if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
             log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
             return (
                 StatusCode::BAD_REQUEST,
@@ -496,7 +496,7 @@ async fn query_range(
             }
         };
         let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
-        if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
             log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
             return (
                 StatusCode::BAD_REQUEST,
@@ -1669,7 +1669,7 @@ fn get_max_lookback_window(query: &str) -> i64 {
         }
     };
     let mut visitor = MaxLookbackWindowVisitor::default();
-    if let Err(err) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+    if let Err(err) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
         log::error!("visit promql expr error: {err}");
         return 0;
     }
@@ -1704,18 +1704,11 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
     type Error = &'static str;
 
     fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
-        match expr {
-            Expr::VectorSelector(_) => {
-                return Ok(false);
-            }
-            Expr::MatrixSelector(ms) => {
-                if ms.range > self.range {
-                    self.range = ms.range;
-                }
-                return Ok(false);
-            }
-            Expr::NumberLiteral(_) | Expr::StringLiteral(_) => return Ok(false),
-            _ => (),
+        // Ok(false) aborts the whole walk, so a leaf must not return it or later selectors are lost
+        if let Expr::MatrixSelector(ms) = expr
+            && ms.range > self.range
+        {
+            self.range = ms.range;
         }
         Ok(true)
     }
@@ -1802,6 +1795,22 @@ mod tests {
     fn test_visitor_new_range_is_zero() {
         let v = MaxLookbackWindowVisitor::new();
         assert_eq!(v.get_range_micros(), 0);
+    }
+
+    #[test]
+    fn test_lookback_window_seen_after_a_vector_selector() {
+        assert_eq!(
+            get_max_lookback_window("a + rate(b[24h])"),
+            24 * 3600 * 1_000_000
+        );
+    }
+
+    #[test]
+    fn test_lookback_window_seen_in_aggregation_param() {
+        assert_eq!(
+            get_max_lookback_window("topk(scalar(max_over_time(k[24h])), m)"),
+            24 * 3600 * 1_000_000
+        );
     }
 
     // --- generate_search_partition ---

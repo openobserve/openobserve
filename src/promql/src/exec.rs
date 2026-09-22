@@ -27,7 +27,10 @@ use tokio::sync::{RwLock, Semaphore};
 use super::engine::Engine;
 use crate::{
     DEFAULT_LOOKBACK, TableProvider,
-    ast::{result_order::top_level_sort_descending, selector_visitor::MetricSelectorVisitor},
+    ast::{
+        result_order::top_level_sort_descending, selector_visitor::MetricSelectorVisitor,
+        visitor::walk_expr,
+    },
     micros, micros_since_epoch,
 };
 
@@ -144,7 +147,7 @@ impl PromqlContext {
 
         // pick all selectors from stmt
         let mut visitor = MetricSelectorVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &stmt.expr).unwrap();
+        walk_expr(&mut visitor, &stmt.expr).unwrap();
 
         let ctx = Arc::new(self.clone());
 
