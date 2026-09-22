@@ -2922,6 +2922,8 @@ mod tests {
         for table in [
             schema.create_table_from_entity(infra::table::entity::synthetics_environments::Entity),
             schema.create_table_from_entity(infra::table::entity::synthetics_variables::Entity),
+            // Saving a check also rewrites its subtest references.
+            schema.create_table_from_entity(infra::table::entity::synthetics_refs::Entity),
         ] {
             db.execute(backend.build(&table)).await.unwrap();
         }
