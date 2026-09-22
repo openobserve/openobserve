@@ -25,7 +25,8 @@ impl ExprVisitor for MetricSelectorVisitor {
 
     fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
         match expr {
-            Expr::VectorSelector(_) | Expr::MatrixSelector(_) => {
+            // each selector runs its own engine, so a repeated one would be scanned twice
+            Expr::VectorSelector(_) | Expr::MatrixSelector(_) if !self.exprs.contains(expr) => {
                 self.exprs.push(expr.clone());
             }
             _ => {}
@@ -102,6 +103,21 @@ mod tests {
         let mut visitor = MetricSelectorVisitor::default();
         walk_expr(&mut visitor, &ast).unwrap();
         assert!(visitor.exprs.is_empty());
+    }
+
+    #[test]
+    fn test_selector_visitor_dedups_repeated_selectors() {
+        let ast = parser::parse("topk(scalar(m), m) + m{a=\"b\"}").unwrap();
+        let mut visitor = MetricSelectorVisitor::default();
+        walk_expr(&mut visitor, &ast).unwrap();
+        let expected = ["m", "m{a=\"b\"}"];
+        assert_eq!(
+            visitor.exprs,
+            expected
+                .into_iter()
+                .map(|expr| parser::parse(expr).unwrap())
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
