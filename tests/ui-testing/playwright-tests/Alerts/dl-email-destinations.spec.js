@@ -14,23 +14,34 @@ const api = require('../utils/o2-api.js');
  * address the alias?) and the recipient-list half — where our code actually runs
  * and where regressions live.
  *
+ * RECIPIENTS ARE PICKED, NOT TYPED. The recipient control is a multi-select over
+ * the org's users and service accounts, so an address the org does not own cannot
+ * reach a destination at all. The cases below therefore assert what the PICKER
+ * guarantees — the chosen accounts are what gets stored, one entry each, the same
+ * account never twice, a non-member unselectable — instead of the string parsing
+ * (comma splitting, trimming, case folding, malformed-entry rejection) that the
+ * removed free-text field used to do. Those parsing cases went with the field:
+ * UI-03 now covers the picker's search filter, ML-05 and D-06 assert the server
+ * rules through the REST API (the only place a mixed or non-member list can still
+ * be handed over), and ML-07 (a 20-address pasted list) no longer has a subject.
+ *
  * TIERING (this is what makes the suite runnable in CI). Email tests were
  * historically all skipped for "no email infrastructure", but most never read a
  * mailbox:
- *   Tier A — needs SMTP switched on and nothing else. Validation, splitting,
- *            storage round-trips, error strings, form behaviour. Runs anywhere.
+ *   Tier A — needs SMTP switched on and nothing else. The picker, storage
+ *            round-trips, error strings, form behaviour. Runs anywhere.
  *   Tier B — needs a readable sink (Mailpit or a Mailinator inbox). Envelope
  *            headers, one-message-many-To, MIME. Skips cleanly with a reason.
  *   Tier C — needs a real distribution list (DL_ADDRESS). Multi-member fan-out.
  *
  * TWO RULES that keep the results honest:
- *   - storage is asserted from the REST API, never the form field (an input can
- *     echo what you typed while the stored value differs)
+ *   - storage is asserted from the REST API, never the form field (a picker can
+ *     render a chip while the stored value differs)
  *   - delivery is asserted from the sink, so "saved successfully" is never
  *     mistaken for "addressed correctly"
  *
  * Absorbs the two email tests previously skipped in
- * alerts-destinations-prebuilt.spec.js (create/edit/delete + format validation);
+ * alerts-destinations-prebuilt.spec.js (create/edit/delete + stored recipients);
  * see D-01, D-07, UI-12 and UI-02.
  *
  * Open defects from #2471 have regression tests below, skipped with the issue
@@ -41,6 +52,15 @@ const RUN = Date.now().toString().slice(-6);
 const ORG_USER = process.env['ZO_ROOT_USER_EMAIL'] || 'root@example.com';
 const DL_ADDRESS = process.env['DL_ADDRESS'] || '';
 const DL_MEMBERS = (process.env['DL_MEMBERS'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+
+// A SECOND org account: the picker only offers accounts the org owns, so a
+// multi-recipient case cannot be written against a single-user org at all.
+// Per-worker unique (RUN plus a random tail, since two workers can load this
+// module in the same millisecond) so no worker's afterAll can delete an account
+// another worker is still picking from — and whatever it does delete can only
+// ever be this suite's own account.
+const RCPT_ACCOUNT = `auto_dest_rcpt_${RUN}_${Math.random().toString(36).slice(2, 6)}@test.local`;
+let rcptAccountReady = false;
 
 const created = [];
 const uniq = (suffix) => {
@@ -72,8 +92,9 @@ async function fillEmailForm(pm, destName, recipients) {
 /**
  * Whole-suite gate: every case here saves or sends an email destination, which the
  * backend refuses unless ZO_SMTP_* is configured. On an environment without SMTP
- * we SKIP with the reason rather than fail 27 tests — that is exactly the state
- * these tests were previously parked in, and a red suite would tell nobody anything.
+ * we SKIP with the reason rather than fail the whole file — that is exactly the
+ * state these tests were previously parked in, and a red suite would tell nobody
+ * anything.
  */
 let smtpReady = null;
 // The probe DELIVERS a message and only a real send proves the transport (the membership gate runs first, so a non-member recipient never observes SMTP being off, and /config exposes nothing) — so it is claimed through a file in Playwright's outputDir, wiped every run, making it one probe per RUN rather than one per worker dropping uncounted mail in the shared inbox.
@@ -121,6 +142,22 @@ test.describe('Email destinations and distribution lists', () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
 
+  test.beforeAll(async () => {
+    const res = await api.createOrgUser(RCPT_ACCOUNT);
+    rcptAccountReady = res.status === 200 || res.status === 201;
+    if (!rcptAccountReady) {
+      // Already existing is the only acceptable non-2xx (a re-run inside the same
+      // worker) — and then the account still has to be there. Anything else is a
+      // missing prerequisite, which must fail HERE rather than as a mysterious
+      // empty picker in seven unrelated cases.
+      rcptAccountReady = (await api.orgAccounts()).includes(RCPT_ACCOUNT);
+    }
+    if (!rcptAccountReady) {
+      throw new Error(`Second org account ${RCPT_ACCOUNT} unavailable — multi-recipient`
+        + ` cases cannot run: HTTP ${res.status} ${JSON.stringify(res.body)}`);
+    }
+  });
+
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     const ready = await smtpAvailable();
@@ -141,6 +178,7 @@ test.describe('Email destinations and distribution lists', () => {
 
   test.afterAll(async () => {
     for (const n of created) await api.deleteDestination(n).catch(() => {});
+    if (rcptAccountReady) await api.deleteOrgUser(RCPT_ACCOUNT).catch(() => {});
     if (dlUserCreated) await api.deleteOrgUser(DL_ADDRESS).catch(() => {});
     testLogger.info('Cleaned up destinations created by this spec', { count: created.length });
   });
@@ -163,28 +201,49 @@ test.describe('Email destinations and distribution lists', () => {
       .toEqual([ORG_USER.toLowerCase()]);
   });
 
-  test('ML-01 · comma-separated recipients are split into individual entries', {
+  test('ML-01 · each selected account is stored as its own recipient', {
     tag: ['@dlEmailDestinations', '@email', '@P0', '@all'],
   }, async () => {
-    const destName = uniq('comma');
-    await fillEmailForm(pm, destName, `${ORG_USER},${ORG_USER}`);
+    const destName = uniq('multi');
+    await fillEmailForm(pm, destName, [ORG_USER, RCPT_ACCOUNT]);
     await pm.alertDestinationsPage.clickSave();
 
     const stored = await api.storedRecipients(destName);
-    expect(stored, 'a comma-separated string must become separate recipients').toHaveLength(2);
+    expect(stored, 'both picked accounts must be stored, one entry each').toHaveLength(2);
+    expect([...stored].sort()).toEqual([ORG_USER.toLowerCase(), RCPT_ACCOUNT.toLowerCase()].sort());
   });
 
-  test('D-03 · a recipient outside the org is refused, and the real reason is shown', {
+  test('D-03 · a non-member can never become a recipient', {
     tag: ['@dlEmailDestinations', '@email', '@negative', '@P0', '@all'],
   }, async () => {
     const destName = `auto_dest_dl_outsider_${RUN}`;
-    await fillEmailForm(pm, destName, 'outsider-not-a-member@test.local');
-    await pm.alertDestinationsPage.clickSave();
+    const outsider = 'outsider-not-a-member@test.local';
+    expect(await api.orgAccounts(), 'the outsider must genuinely be a non-member').not.toContain(outsider);
 
-    expect(await api.storedRecipients(destName), 'a refused destination must not persist').toBeNull();
-    const shown = await pm.alertDestinationsPage.getPageText();
-    expect(shown.toLowerCase(), 'the backend reason must reach the user, not a generic failure')
-      .toContain('part of this org');
+    await pm.alertDestinationsPage.clickNewDestination();
+    await pm.alertDestinationsPage.selectDestinationType('email');
+    await pm.alertDestinationsPage.fillDestinationName(destName);
+
+    // The picker is the gate the free-text field never was: an address the org
+    // does not own is not an option, so it cannot be chosen. A non-empty
+    // unfiltered list proves the control is live, so the empty filtered list
+    // below cannot pass merely because nothing rendered.
+    expect(await pm.alertDestinationsPage.getEmailRecipientOptions(),
+      'the picker must offer the org accounts').not.toHaveLength(0);
+    expect(await pm.alertDestinationsPage.getEmailRecipientOptions('outsider'),
+      'a non-member must not be offered').toHaveLength(0);
+
+    await pm.alertDestinationsPage.clickSave();
+    expect(await api.storedRecipients(destName), 'nothing selectable means nothing stored').toBeNull();
+
+    // The picker is a convenience in front of the real guard, not a replacement
+    // for it: a client that writes the destination directly is still refused,
+    // with the reason that names the actual rule.
+    const apiDestName = `${destName}_api`;
+    created.push(apiDestName);
+    const res = await api.createDestination({ name: apiDestName, type: 'email', emails: [outsider] });
+    expect(res.status, 'the backend must refuse a non-member recipient').toBe(400);
+    expect(String(res.body?.message || ''), 'and must say why').toContain('part of this org');
   });
 
   test('UI-01 · empty recipients blocks submission', {
@@ -200,17 +259,31 @@ test.describe('Email destinations and distribution lists', () => {
     expect(await api.storedRecipients(destName), 'nothing may reach the server').toBeNull();
   });
 
-  test('UI-02 · a malformed address is rejected before any request is sent', {
+  test('UI-02 · every offered recipient is a real org account', {
     tag: ['@dlEmailDestinations', '@email', '@validation', '@P0', '@all'],
   }, async () => {
-    const destName = `auto_dest_dl_malformed_${RUN}`;
-    await fillEmailForm(pm, destName, 'invalid-email-format');
-    await pm.alertDestinationsPage.clickSave();
+    await pm.alertDestinationsPage.clickNewDestination();
+    await pm.alertDestinationsPage.selectDestinationType('email');
 
-    expect(await api.storedRecipients(destName), 'a malformed address must never be stored').toBeNull();
-    await pm.alertDestinationsPage.expectFormOpen();
-    const errors = await pm.alertDestinationsPage.getVisibleErrors();
-    expect(errors.length, 'the user must see a validation error').toBeGreaterThan(0);
+    // The account list is read on both sides of the picker read: the DL alias is
+    // created and deleted by the fan-out case running in this same shard, so an
+    // entry that appears or vanishes in between is that case's doing, not a
+    // stowaway in the picker.
+    const before = await api.orgAccounts();
+    const offered = await pm.alertDestinationsPage.getEmailRecipientOptions();
+    const accounts = [...new Set([...before, ...(await api.orgAccounts())])];
+    expect(offered, 'the picker must offer the accounts the org owns')
+      .toContain(ORG_USER.toLowerCase());
+    for (const value of offered) {
+      expect(accounts, `${value} is offered but is not an account of this org`)
+        .toContain(String(value).toLowerCase());
+    }
+
+    // A term naming no account can only come back empty, so the list asserted
+    // above is everything the picker could ever store — there is no free text
+    // left for a malformed address to arrive through.
+    expect(await pm.alertDestinationsPage.getEmailRecipientOptions('invalid-email-format'))
+      .toHaveLength(0);
   });
 
   test('T-01 · an email destination is given a usable template automatically', {
@@ -257,27 +330,32 @@ test.describe('Email destinations and distribution lists', () => {
     await gotoDestinations(page, pm);
     await pm.alertDestinationsPage.searchDestinations(destName);
     await pm.alertDestinationsPage.openDestinationForEdit(destName);
-    await pm.alertDestinationsPage.fillEmailRecipients(`${ORG_USER},${ORG_USER}`);
+    // Selecting an account the destination already holds is a no-op, so an edit
+    // that saves the prefilled selection unchanged cannot lose the stored entry.
+    await pm.alertDestinationsPage.fillEmailRecipients([ORG_USER, RCPT_ACCOUNT]);
     await pm.alertDestinationsPage.clickSave();
 
-    expect(await api.storedRecipients(destName), 'the added recipient must persist').toHaveLength(2);
+    const stored = await api.storedRecipients(destName);
+    expect([...stored].sort(), 'the added account must persist alongside the original')
+      .toEqual([ORG_USER.toLowerCase(), RCPT_ACCOUNT.toLowerCase()].sort());
   });
 
   test('ML-08 · removing a recipient drops it from the stored list', {
     tag: ['@dlEmailDestinations', '@email', '@P1', '@all'],
   }, async ({ page }) => {
     const destName = uniq('remove');
-    await fillEmailForm(pm, destName, `${ORG_USER},${ORG_USER}`);
+    await fillEmailForm(pm, destName, [ORG_USER, RCPT_ACCOUNT]);
     await pm.alertDestinationsPage.clickSave();
     expect(await api.storedRecipients(destName)).toHaveLength(2);
 
     await gotoDestinations(page, pm);
     await pm.alertDestinationsPage.searchDestinations(destName);
     await pm.alertDestinationsPage.openDestinationForEdit(destName);
-    await pm.alertDestinationsPage.fillEmailRecipients(ORG_USER);
+    await pm.alertDestinationsPage.unselectEmailRecipient(RCPT_ACCOUNT);
     await pm.alertDestinationsPage.clickSave();
 
-    expect(await api.storedRecipients(destName), 'the removed recipient must be gone').toHaveLength(1);
+    expect(await api.storedRecipients(destName), 'the removed account must be gone')
+      .toEqual([ORG_USER.toLowerCase()]);
   });
 
   test('UI-12 · deleting an email destination removes it from the list', {
@@ -294,38 +372,53 @@ test.describe('Email destinations and distribution lists', () => {
     expect(await api.storedRecipients(destName), 'a deleted destination must be gone server-side').toBeNull();
   });
 
-  test('D-06 · a mixed-case address is stored lowercase', {
+  test('D-06 · a stored recipient is normalised to lowercase', {
     tag: ['@dlEmailDestinations', '@email', '@P1', '@all'],
   }, async () => {
     const destName = uniq('case');
-    await fillEmailForm(pm, destName, ORG_USER.toUpperCase());
-    await pm.alertDestinationsPage.clickSave();
 
+    // Unreachable through the picker — an account is offered under its own,
+    // already-lowercased address — so the contract is asserted at the boundary
+    // where a mixed-case entry can still arrive: a client writing the
+    // destination itself.
+    const res = await api.createDestination({
+      name: destName, type: 'email', emails: [ORG_USER.toUpperCase()],
+    });
+    expect(res.status, 'a real account must be accepted however it is cased').toBe(200);
     expect(await api.storedRecipients(destName), 'recipients are normalised to lowercase on save')
       .toEqual([ORG_USER.toLowerCase()]);
   });
 
-  test('ML-03 · padding around separators is trimmed', {
+  test('ML-03 · an edit prefills every stored recipient', {
     tag: ['@dlEmailDestinations', '@email', '@P1', '@all'],
-  }, async () => {
-    const destName = uniq('trim');
-    await fillEmailForm(pm, destName, `${ORG_USER} ,  ${ORG_USER}`);
+  }, async ({ page }) => {
+    const destName = uniq('prefill');
+    await fillEmailForm(pm, destName, [ORG_USER, RCPT_ACCOUNT]);
     await pm.alertDestinationsPage.clickSave();
 
-    const stored = await api.storedRecipients(destName);
-    expect(stored).toHaveLength(2);
-    for (const r of stored) {
-      expect(r, 'no stored recipient may carry whitespace').toBe(r.trim());
-    }
+    await gotoDestinations(page, pm);
+    await pm.alertDestinationsPage.searchDestinations(destName);
+    await pm.alertDestinationsPage.openDestinationForEdit(destName);
+
+    const selected = await pm.alertDestinationsPage.getEmailRecipients();
+    expect([...selected].sort(), 'every stored recipient must come back selected')
+      .toEqual([ORG_USER.toLowerCase(), RCPT_ACCOUNT.toLowerCase()].sort());
   });
 
   test('ML-05 · one non-member rejects the whole list, with no partial save', {
     tag: ['@dlEmailDestinations', '@email', '@negative', '@P1', '@all'],
   }, async () => {
     const destName = `auto_dest_dl_partial_${RUN}`;
-    await fillEmailForm(pm, destName, `${ORG_USER}, outsider-not-a-member@test.local`);
-    await pm.alertDestinationsPage.clickSave();
+    created.push(destName);
 
+    // The picker cannot build a mixed list, so the invariant is asserted where it
+    // can still be violated: a client posting both at once must have the WHOLE
+    // list refused, with no half-saved destination left behind.
+    const res = await api.createDestination({
+      name: destName, type: 'email',
+      emails: [ORG_USER, 'outsider-not-a-member@test.local'],
+    });
+    expect(res.status, 'a list carrying a non-member must be refused').toBe(400);
     expect(await api.storedRecipients(destName), 'no partial save may survive').toBeNull();
   });
 
@@ -359,52 +452,41 @@ test.describe('Email destinations and distribution lists', () => {
 
   // ══ TIER A · P2 — edge cases and form hygiene ════════════════════════════
 
-  test('ML-06 · duplicate recipients are recorded as entered', {
+  test('ML-06 · the same account cannot be recorded twice', {
     tag: ['@dlEmailDestinations', '@email', '@P2', '@all'],
   }, async () => {
     const destName = uniq('dupe');
-    await fillEmailForm(pm, destName, `${ORG_USER}, ${ORG_USER}`);
-    await pm.alertDestinationsPage.clickSave();
-
-    // Documents behaviour rather than asserting a fix: there is no de-duplication
-    // anywhere in the save or send path (#2471, suggestions).
-    const stored = await api.storedRecipients(destName);
-    testLogger.info('duplicate-recipient behaviour', { stored });
-    expect(stored).not.toBeNull();
-    // .every() alone is true for a would-be-deduped 1-element array too, so it
-    // cannot distinguish "duplicates preserved" from "duplicates removed" — the
-    // exact behaviour this test documents. Length pins that down.
-    expect(stored, 'duplicates are recorded as entered, not de-duplicated').toHaveLength(2);
-    expect(stored.every((r) => r === ORG_USER.toLowerCase())).toBe(true);
-  });
-
-  test('ML-07 · a large recipient list survives the form intact', {
-    tag: ['@dlEmailDestinations', '@email', '@P2', '@all'],
-  }, async () => {
-    const destName = uniq('bulk');
-    const many = Array(20).fill(ORG_USER);
-    await fillEmailForm(pm, destName, many.join(','));
+    // A multi-select holds values, not occurrences: picking one account twice
+    // still stores it once. (The free-text field this replaced could record a
+    // repeated address verbatim — #2471, suggestions.)
+    await fillEmailForm(pm, destName, [ORG_USER, ORG_USER]);
     await pm.alertDestinationsPage.clickSave();
 
     const stored = await api.storedRecipients(destName);
-    expect(stored, 'nothing may be truncated on save').not.toBeNull();
-    expect(stored).toHaveLength(many.length);
+    testLogger.info('repeated-selection behaviour', { stored });
+    expect(stored, 'one account, one recipient').toEqual([ORG_USER.toLowerCase()]);
   });
 
-  test('UI-03 · a trailing separator does not create an empty recipient', {
+  test('UI-03 · the picker search narrows the list to matching accounts', {
     tag: ['@dlEmailDestinations', '@email', '@validation', '@P2', '@all'],
   }, async () => {
-    const destName = `auto_dest_dl_trailing_${RUN}`;
-    created.push(destName);
-    await fillEmailForm(pm, destName, `${ORG_USER},`);
-    await pm.alertDestinationsPage.clickSave();
+    await pm.alertDestinationsPage.clickNewDestination();
+    await pm.alertDestinationsPage.selectDestinationType('email');
 
-    // The prebuilt validator rejects the trailing separator outright, which is a
-    // correct way to satisfy "no empty recipient". Asserted explicitly rather
-    // than accepting either outcome, which let a rejected save pass vacuously.
-    const stored = await api.storedRecipients(destName);
-    expect(stored, 'a trailing comma is rejected rather than stored as an empty recipient')
-      .toBeNull();
+    expect(await pm.alertDestinationsPage.getEmailRecipientOptions(),
+      'the search case needs the unfiltered list to compare against').not.toHaveLength(0);
+
+    // Filtering by the second account's local part must leave the accounts that
+    // carry the term and drop the root account, whose address does not contain it.
+    const term = RCPT_ACCOUNT.split('@')[0];
+    const filtered = await pm.alertDestinationsPage.getEmailRecipientOptions(term);
+    expect(filtered, 'the search must leave the matching account').not.toHaveLength(0);
+    for (const value of filtered) {
+      expect(String(value).toLowerCase(), 'a filtered option must match the search term')
+        .toContain(term);
+    }
+    expect(filtered, 'an account outside the search term must be filtered out')
+      .not.toContain(ORG_USER.toLowerCase());
   });
 
   test('UI-04 · switching type away from email drops the recipients', {
@@ -420,20 +502,20 @@ test.describe('Email destinations and distribution lists', () => {
       'the email field must be gone on a webhook type').toBe(false);
   });
 
-  test('UI-07 · a long recipient list breaks neither the field nor the page', {
+  test('UI-07 · a multi-account selection breaks neither the control nor the page', {
     tag: ['@dlEmailDestinations', '@email', '@P2', '@all'],
-  }, async ({ page }) => {
-    const destName = uniq('long');
-    const many = Array(8).fill(ORG_USER).join(', ');
-    await fillEmailForm(pm, destName, many);
+  }, async () => {
+    const destName = uniq('multiui');
+    await fillEmailForm(pm, destName, [ORG_USER, RCPT_ACCOUNT]);
 
-    expect(await pm.alertDestinationsPage.getEmailRecipientsValue(),
-      'the field must hold the whole value').toBe(many);
+    const shown = await pm.alertDestinationsPage.getEmailRecipients();
+    expect([...shown].sort(), 'the control must report the whole selection')
+      .toEqual([ORG_USER.toLowerCase(), RCPT_ACCOUNT.toLowerCase()].sort());
     expect(await pm.alertDestinationsPage.isPageScrolledHorizontally(),
-      'a long list must not make the page scroll sideways').toBe(false);
+      'a multi-account selection must not make the page scroll sideways').toBe(false);
 
     await pm.alertDestinationsPage.clickSave();
-    expect(await api.storedRecipients(destName)).toHaveLength(8);
+    expect(await api.storedRecipients(destName)).toHaveLength(2);
   });
 
   test('UI-08 · a duplicate destination name is refused', {
@@ -461,10 +543,11 @@ test.describe('Email destinations and distribution lists', () => {
     await gotoDestinations(page, pm);
     await pm.alertDestinationsPage.searchDestinations(destName);
     await pm.alertDestinationsPage.openDestinationForEdit(destName);
-    await pm.alertDestinationsPage.fillEmailRecipients(`${ORG_USER},${ORG_USER}`);
+    await pm.alertDestinationsPage.fillEmailRecipients(RCPT_ACCOUNT);
     await pm.alertDestinationsPage.clickCancel();
 
-    expect(await api.storedRecipients(destName), 'cancel must not write').toHaveLength(1);
+    expect(await api.storedRecipients(destName), 'cancel must not write')
+      .toEqual([ORG_USER.toLowerCase()]);
   });
 
   test('UI-10 · the form is operable from the keyboard alone', {
@@ -492,7 +575,9 @@ test.describe('Email destinations and distribution lists', () => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.setViewportSize({ width: 420, height: 900 });
     const destName = `auto_dest_dl_dark_${RUN}`;
-    await fillEmailForm(pm, destName, 'invalid-email-format');
+    await pm.alertDestinationsPage.clickNewDestination();
+    await pm.alertDestinationsPage.selectDestinationType('email');
+    await pm.alertDestinationsPage.fillDestinationName(destName);
     await pm.alertDestinationsPage.clickSave();
 
     const errors = await pm.alertDestinationsPage.getVisibleErrors();
@@ -549,7 +634,7 @@ test.describe('Email destinations and distribution lists', () => {
     // The prior serial delivery test also mails ORG_USER; its async delivery can land after clear() and, since only one org recipient exists, cannot be told apart by address — so drain to stable-empty before sending.
     await sink.waitUntilEmptyStable();
 
-    await fillEmailForm(pm, destName, `${ORG_USER},${ORG_USER}`);
+    await fillEmailForm(pm, destName, [ORG_USER, RCPT_ACCOUNT]);
     await pm.alertDestinationsPage.clickTest();
     await sink.waitForCount(1);
 
@@ -595,20 +680,8 @@ test.describe('Email destinations and distribution lists', () => {
   // These assert the CORRECT behaviour and therefore fail on today's build.
   // Skipped rather than left failing, since none of the defects is P0/blocking.
   // Un-skip the matching test as each issue closes — do not soften the assertion.
-
-  test.skip('ML-02 · semicolon-separated recipients are accepted [#2471 B4]', {
-    tag: ['@dlEmailDestinations', '@email', '@regression', '@P2', '@all'],
-  }, async () => {
-    // BLOCKED BY #2471 (B4): prebuilt-templates/email.ts splits on "," only, so a
-    // semicolon list is tested as one address and fails the regex. Outlook — where
-    // distribution lists live — uses ";" by default, so pasting a member list fails.
-    const destName = uniq('semi');
-    await fillEmailForm(pm, destName, `${ORG_USER};${ORG_USER}`);
-    await pm.alertDestinationsPage.clickSave();
-
-    expect(await api.storedRecipients(destName), 'a semicolon must separate recipients')
-      .toHaveLength(2);
-  });
+  // (#2471 B4, semicolon-separated lists, no longer has a subject: recipients are
+  // picked from accounts, so no separator is ever parsed.)
 
   test.skip('UI-13 · the email form shows no Skip TLS Verify control [#2471 B5]', {
     tag: ['@dlEmailDestinations', '@email', '@regression', '@P3', '@all'],
