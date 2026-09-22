@@ -36,9 +36,6 @@ pub use writer::BlockWriter;
 pub const VERSION: u32 = 2;
 pub const FOOTER_LEN: usize = 32;
 pub const MAX_BLOCK_ROWS: usize = 8192;
-pub const MAX_METADATA_BYTES: usize = 128 * 1024 * 1024;
-pub const MAX_WRITER_METADATA_BYTES: usize = 256 * 1024 * 1024;
-pub const MAX_BLOCKS: usize = 1_000_000;
 pub const MAX_LABEL_COLUMNS: usize = 128;
 const MAGIC: &[u8; 8] = b"O2MIDX02";
 const DIRECTORY_FIELDS: usize = 8;
@@ -89,18 +86,18 @@ pub struct BlockMeta {
     pub row_count: u32,
     pub min_timestamp: i64,
     pub max_timestamp: i64,
-    pub payload_offset: u64,
-    pub payload_len: u32,
+    pub block_offset: u64,
+    pub block_length: u32,
     pub strictly_increasing: bool,
 }
 
 impl BlockMeta {
     /// Metadata validation establishes that this addition cannot overflow.
-    pub fn payload_range(&self) -> Range<u64> {
-        self.payload_offset
+    pub fn block_range(&self) -> Range<u64> {
+        self.block_offset
             ..self
-                .payload_offset
-                .saturating_add(u64::from(self.payload_len))
+                .block_offset
+                .saturating_add(u64::from(self.block_length))
     }
 }
 
@@ -198,8 +195,6 @@ pub fn identity_label_columns(schema: &Schema) -> Result<Vec<String>> {
         schema.fields().len() <= MAX_LABEL_COLUMNS + 3,
         "MAX_LABEL_COLUMNS",
     )?;
-    // Check static metadata/name size before cloning any field names below.
-    writer::encoded_size(schema, MAX_METADATA_BYTES / 4)?;
     let mut names = HashSet::new();
     ensure!(
         schema

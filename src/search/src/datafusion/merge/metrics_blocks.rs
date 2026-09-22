@@ -13,30 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    io::Write,
-    sync::{Arc, LazyLock},
-};
+use std::sync::{Arc, LazyLock};
 
 use anyhow::Context;
 use arrow::array::RecordBatch;
 use arrow_schema::Schema;
-use config::{FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, get_config, meta::stream::FileMeta};
+use config::{get_config, meta::stream::FileMeta};
 use datafusion::error::{DataFusionError, Result};
-use futures::TryStreamExt;
 use metrics_block::{BlockWriter, ParentMetadata};
-use metrics_index::MetricsIndexWriter;
-use parquet::{
-    arrow::arrow_reader::ParquetRecordBatchReaderBuilder, file::metadata::ParquetMetaData,
-};
+use parquet::file::metadata::ParquetMetaData;
 use tokio::{sync::Semaphore, task::JoinHandle};
-use vortex::{
-    VortexSessionDefault, arrow::ArrowSessionExt, file::OpenOptionsSessionExt,
-    io::session::RuntimeSessionExt, session::VortexSession,
-};
+use vortex::{arrow::ArrowSessionExt, file::OpenOptionsSessionExt, session::VortexSession};
 
 use super::MergedFile;
-use crate::datafusion::vortex::VORTEX_RUNTIME;
 
 pub(super) const VORTEX_SOURCE_SCHEMA_KEY: &str = "o2_metrics_source_schema";
 
@@ -49,13 +38,6 @@ pub(super) enum SourceMetadata {
 }
 
 impl SourceMetadata {
-    fn format(&self) -> FileFormat {
-        match self {
-            Self::Parquet(_) => FileFormat::Parquet,
-            Self::Vortex(_) => FileFormat::Vortex,
-        }
-    }
-
     fn finish(
         self,
         writer: BlockWriter<std::fs::File>,
@@ -71,7 +53,6 @@ impl SourceMetadata {
 pub(super) enum Blocks {
     Disabled,
     Active(Box<BlockFile>),
-    Replay,
 }
 
 impl Blocks {
@@ -95,10 +76,8 @@ impl Blocks {
         {
             Ok(active) => Ok(Self::Active(active)),
             Err(error) => {
-                log::warn!(
-                    "metrics block write unavailable; retaining completed source for legacy-index replay: {error}"
-                );
-                Ok(Self::Replay)
+                log::warn!("metrics block write unavailable; skipping metrics index: {error}");
+                Ok(Self::Disabled)
             }
         }
     }
@@ -110,30 +89,31 @@ impl Blocks {
         source_metadata: SourceMetadata,
     ) -> Result<MergedFile> {
         EncodingJob::run(move || {
-            let format = source_metadata.format();
-            let block_path = match self {
-                Self::Active(active) => {
-                    let parent = ParentMetadata { rows: u64::try_from(meta.records)?, compressed_size: u64::try_from(meta.compressed_size)? };
-                    let BlockFile { writer, path } = *active;
-                    match source_metadata.finish(writer, parent) {
-                        Ok(file) => { drop(file); Some(path) }
-                        Err(error) => {
-
-                            log::warn!("metrics block finalization unavailable; rebuilding legacy index from completed source: {error}");
-                            drop(path);
-                            None
-                        }
-                    }
+            let Self::Active(active) = self else {
+                return Ok(MergedFile::MetricsHashMerged { data_path, meta });
+            };
+            let parent = ParentMetadata {
+                rows: u64::try_from(meta.records)?,
+                compressed_size: u64::try_from(meta.compressed_size)?,
+            };
+            let BlockFile { writer, path } = *active;
+            match source_metadata.finish(writer, parent) {
+                Ok(file) => {
+                    drop(file);
+                    Ok(MergedFile::MetricsIndexed {
+                        data_path,
+                        metrics_index_path: path,
+                        meta,
+                    })
                 }
-                Self::Replay => None,
-                Self::Disabled => anyhow::bail!("block finalization without a block attempt"),
-            };
-            let metrics_index_path = match block_path {
-                Some(path) => path,
-                None => replay_legacy(&data_path, &meta, format)?,
-            };
-            Ok(MergedFile::MetricsIndexed { data_path, metrics_index_path, meta })
-        }).await?.map_err(|error| DataFusionError::External(error.into()))
+                Err(error) => {
+                    log::warn!("metrics index finalization failed; skipping index: {error}");
+                    Ok(MergedFile::MetricsHashMerged { data_path, meta })
+                }
+            }
+        })
+        .await?
+        .map_err(|error| DataFusionError::External(error.into()))
     }
 }
 
@@ -213,89 +193,6 @@ fn new_file() -> anyhow::Result<(std::fs::File, tempfile::TempPath)> {
     let (file, path) = tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts();
 
     Ok((file, path))
-}
-
-fn replay_parquet(
-    data_path: &std::path::Path,
-    meta: &FileMeta,
-) -> anyhow::Result<tempfile::TempPath> {
-    let file = std::fs::File::open(data_path)?;
-    anyhow::ensure!(
-        file.metadata()?.len() == u64::try_from(meta.compressed_size)?,
-        "completed Parquet size changed"
-    );
-    let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
-    anyhow::ensure!(
-        builder.metadata().file_metadata().num_rows() == meta.records,
-        "completed Parquet row count changed"
-    );
-
-    let mut index = MetricsIndexWriter::try_new(builder.schema())?;
-
-    for batch in builder
-        .with_batch_size(metrics_block::MAX_BLOCK_ROWS)
-        .build()?
-    {
-        index.write_with_label_boundaries(&batch.context("failed to replay completed Parquet")?)?;
-    }
-    let bytes = index.finish(meta.records, Some(PARQUET_MAX_ROW_GROUP_SIZE))?;
-    let (mut file, path) = new_file()?;
-    file.write_all(&bytes)?;
-    drop(file);
-    Ok(path)
-}
-
-fn replay_legacy(
-    data_path: &std::path::Path,
-    meta: &FileMeta,
-    format: FileFormat,
-) -> anyhow::Result<tempfile::TempPath> {
-    match format {
-        FileFormat::Parquet => replay_parquet(data_path, meta),
-        FileFormat::Vortex => VORTEX_RUNTIME.block_on(replay_vortex(data_path, meta)),
-    }
-}
-
-async fn replay_vortex(
-    data_path: &std::path::Path,
-    meta: &FileMeta,
-) -> anyhow::Result<tempfile::TempPath> {
-    anyhow::ensure!(
-        tokio::fs::metadata(data_path).await?.len() == u64::try_from(meta.compressed_size)?,
-        "completed Vortex size changed"
-    );
-    let session = VortexSession::default().with_tokio();
-    let file = session
-        .open_options()
-        .open_path(data_path.to_path_buf())
-        .await?;
-    anyhow::ensure!(
-        file.row_count() == u64::try_from(meta.records)?,
-        "completed Vortex row count changed"
-    );
-    let schema = Arc::new(session.arrow().to_arrow_schema(file.dtype())?);
-    let dtype = arrow::datatypes::DataType::Struct(schema.fields().clone());
-
-    let mut index = MetricsIndexWriter::try_new(&schema)?;
-
-    let stream = file
-        .scan()?
-        .with_split_by(vortex::layout::scan::split_by::SplitBy::RowCount(
-            metrics_block::MAX_BLOCK_ROWS,
-        ))
-        .with_concurrency(1)
-        .with_ordered(true)
-        .into_array_stream()?;
-    futures::pin_mut!(stream);
-    while let Some(array) = stream.try_next().await? {
-        let batch = config::utils::parquet::vortex_array_to_record_batch(&session, array, &dtype)?;
-        index.write_with_label_boundaries(&batch)?;
-    }
-    let bytes = index.finish(meta.records, None)?;
-    let (mut file, path) = new_file()?;
-    file.write_all(&bytes)?;
-    drop(file);
-    Ok(path)
 }
 
 #[cfg(test)]

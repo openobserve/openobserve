@@ -44,15 +44,15 @@ impl BlockDirectory {
         let next_offset = self
             .entries
             .get(index + 1)
-            .map_or(self.payload_end, |next| next.payload_offset);
+            .map_or(self.payload_end, |next| next.block_offset);
         BlockMeta {
             hash: entry.hash,
             row_start: entry.row_start,
             row_count: u32::try_from(next_row - entry.row_start).expect("validated block row span"),
             min_timestamp: entry.min_timestamp,
             max_timestamp: entry.max_timestamp,
-            payload_offset: entry.payload_offset,
-            payload_len: u32::try_from(next_offset - entry.payload_offset)
+            block_offset: entry.block_offset,
+            block_length: u32::try_from(next_offset - entry.block_offset)
                 .expect("validated block payload span"),
             strictly_increasing: self.strict[index / 8] & (1 << (index % 8)) != 0,
         }
@@ -119,7 +119,7 @@ struct PackedBlock {
     row_start: u64,
     min_timestamp: i64,
     max_timestamp: i64,
-    payload_offset: u64,
+    block_offset: u64,
 }
 
 pub(crate) struct DirectoryBuilder {
@@ -149,7 +149,7 @@ impl DirectoryBuilder {
             row_start: block.row_start,
             min_timestamp: block.min_timestamp,
             max_timestamp: block.max_timestamp,
-            payload_offset: block.payload_offset,
+            block_offset: block.block_offset,
         });
     }
 
@@ -177,8 +177,8 @@ mod tests {
                 row_count: 3,
                 min_timestamp: i64::MIN,
                 max_timestamp: i64::MAX,
-                payload_offset: 0,
-                payload_len: u32::MAX,
+                block_offset: 0,
+                block_length: u32::MAX,
                 strictly_increasing: false,
             },
             BlockMeta {
@@ -187,8 +187,8 @@ mod tests {
                 row_count: u32::MAX,
                 min_timestamp: i64::MAX,
                 max_timestamp: i64::MAX,
-                payload_offset: u64::from(u32::MAX),
-                payload_len: u32::MAX,
+                block_offset: u64::from(u32::MAX),
+                block_length: u32::MAX,
                 strictly_increasing: true,
             },
         ];
@@ -203,7 +203,7 @@ mod tests {
         let offset_shift = u64::MAX - 2 * u64::from(u32::MAX);
         let shifted = input.map(|mut block| {
             block.row_start += row_shift;
-            block.payload_offset += offset_shift;
+            block.block_offset += offset_shift;
             block
         });
         let mut builder = DirectoryBuilder::new(2, u64::MAX, u64::MAX);

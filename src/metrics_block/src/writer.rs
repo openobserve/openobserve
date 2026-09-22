@@ -52,10 +52,7 @@ pub struct BlockWriter<W: Write> {
     offset: u64,
     blocks: Vec<BlockMeta>,
     labels: Vec<Vec<Option<String>>>,
-    writer_metadata_estimate: usize,
-    static_metadata_estimate: usize,
     metadata_properties: HashMap<String, String>,
-    current_block_charge: usize,
     failed: bool,
 }
 
@@ -110,24 +107,6 @@ impl<W: Write> BlockWriter<W> {
             schema_matches(&self.schema, &stored_schema),
             "stored source schema changed"
         );
-        let labels = self
-            .label_indices
-            .iter()
-            .map(|i| self.schema.field(*i).name().clone())
-            .collect::<Vec<_>>();
-        let charge =
-            static_metadata_charge(&stored_schema, Some(&parent), &labels, MAX_METADATA_BYTES)?;
-        let estimate = self
-            .writer_metadata_estimate
-            .checked_sub(self.static_metadata_estimate)
-            .and_then(|size| size.checked_add(charge))
-            .context("metadata accounting overflow")?;
-        capacity(
-            estimate <= MAX_WRITER_METADATA_BYTES,
-            "MAX_WRITER_METADATA_BYTES",
-        )?;
-        self.writer_metadata_estimate = estimate;
-        self.static_metadata_estimate = charge;
         self.schema = stored_schema;
         self.metadata_properties
             .insert(PARENT_KEY.to_owned(), serde_json::to_string(&parent)?);
@@ -167,7 +146,6 @@ impl<W: Write> BlockWriter<W> {
         self.current_labels.clear();
         let batch = self.metadata_batch()?;
         let metadata = crate::compact::encode(&batch)?;
-        capacity(metadata.len() <= MAX_METADATA_BYTES, "MAX_METADATA_BYTES")?;
         let metadata_len = u64::try_from(metadata.len())?;
         let mut footer = [0u8; FOOTER_LEN];
         footer[..4].copy_from_slice(&VERSION.to_le_bytes());
@@ -203,12 +181,6 @@ impl<W: Write> BlockWriter<W> {
         capacity(
             label_columns.len() <= MAX_LABEL_COLUMNS,
             "MAX_LABEL_COLUMNS",
-        )?;
-        let writer_metadata_estimate =
-            static_metadata_charge(&schema, parent.as_ref(), &label_columns, MAX_METADATA_BYTES)?;
-        capacity(
-            writer_metadata_estimate <= MAX_WRITER_METADATA_BYTES,
-            "MAX_WRITER_METADATA_BYTES",
         )?;
         let mut metadata_properties: HashMap<String, String> = [
             (VERSION_KEY.to_owned(), VERSION.to_string()),
@@ -286,10 +258,7 @@ impl<W: Write> BlockWriter<W> {
             offset: 0,
             blocks: Vec::new(),
             labels: Vec::new(),
-            writer_metadata_estimate,
-            static_metadata_estimate: writer_metadata_estimate,
             metadata_properties,
-            current_block_charge: 0,
             failed: false,
         })
     }
@@ -333,11 +302,7 @@ impl<W: Write> BlockWriter<W> {
                     .iter()
                     .map(|index| label_value(batch.column(*index).as_ref(), row))
                     .collect::<Result<Vec<_>>>()?;
-                let charge = block_metadata_charge(borrowed.iter().copied())?;
-                self.admit_block(charge)?;
-                // Admission happens while values are still borrowed from the input batch.
                 self.current_labels = borrowed.into_iter().map(|v| v.map(str::to_owned)).collect();
-                self.current_block_charge = charge;
                 self.current_hash = Some(hash);
             } else {
                 for (index, expected) in self.label_indices.iter().zip(&self.current_labels) {
@@ -346,9 +311,6 @@ impl<W: Write> BlockWriter<W> {
                         "identity label changes within one series hash"
                     );
                 }
-            }
-            if self.timestamps.is_empty() {
-                self.admit_block(self.current_block_charge)?;
             }
             ensure!(
                 self.parent
@@ -367,25 +329,10 @@ impl<W: Write> BlockWriter<W> {
         Ok(())
     }
 
-    fn admit_block(&self, charge: usize) -> Result<()> {
-        capacity(self.blocks.len() < MAX_BLOCKS, "MAX_BLOCKS")?;
-        capacity(
-            self.writer_metadata_estimate
-                .checked_add(charge)
-                .is_some_and(|n| n <= MAX_WRITER_METADATA_BYTES),
-            "MAX_WRITER_METADATA_BYTES",
-        )
-    }
-
     fn flush_block(&mut self) -> Result<()> {
         if self.timestamps.is_empty() {
             return Ok(());
         }
-        self.admit_block(self.current_block_charge)?;
-        self.writer_metadata_estimate = self
-            .writer_metadata_estimate
-            .checked_add(self.current_block_charge)
-            .context("metadata accounting overflow")?;
         let count = self.timestamps.len();
         let raw_size = count.checked_mul(16).context("sample bytes overflow")?;
         let mut raw = Vec::with_capacity(raw_size);
@@ -399,7 +346,7 @@ impl<W: Write> BlockWriter<W> {
             }
         }
         let payload = zstd::bulk::compress(&raw, 1)?;
-        let payload_len = u32::try_from(payload.len())?;
+        let block_length = u32::try_from(payload.len())?;
         ensure!(
             payload.len() <= max_compressed_block_len(u32::try_from(count)?)?,
             "compressed block exceeds format bound"
@@ -413,13 +360,13 @@ impl<W: Write> BlockWriter<W> {
             row_count: u32::try_from(count)?,
             min_timestamp: self.timestamps[0],
             max_timestamp: self.timestamps[count - 1],
-            payload_offset: self.offset,
-            payload_len,
+            block_offset: self.offset,
+            block_length,
             strictly_increasing: self.timestamps.windows(2).all(|w| w[0] < w[1]),
         };
         self.offset = self
             .offset
-            .checked_add(u64::from(payload_len))
+            .checked_add(u64::from(block_length))
             .context("payload offset overflow")?;
         self.output.write_all(&payload)?;
         self.blocks.push(meta);
@@ -458,10 +405,10 @@ impl<W: Write> BlockWriter<W> {
                 self.blocks.iter().map(|b| b.max_timestamp),
             )),
             Arc::new(UInt64Array::from_iter_values(
-                self.blocks.iter().map(|b| b.payload_offset),
+                self.blocks.iter().map(|b| b.block_offset),
             )),
             Arc::new(UInt32Array::from_iter_values(
-                self.blocks.iter().map(|b| b.payload_len),
+                self.blocks.iter().map(|b| b.block_length),
             )),
             Arc::new(BooleanArray::from(
                 self.blocks
@@ -490,39 +437,6 @@ impl<W: Write> BlockWriter<W> {
             &RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
         )?)
     }
-}
-
-struct CountingMetadata {
-    bytes: usize,
-    limit: usize,
-    exceeded: bool,
-}
-impl Write for CountingMetadata {
-    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        let next = self.bytes.checked_add(bytes.len());
-        if !next.is_some_and(|n| n <= self.limit) {
-            self.exceeded = true;
-            return Err(std::io::Error::other(FormatLimit {
-                message: "MAX_METADATA_BYTES",
-            }));
-        }
-        self.bytes = next.unwrap();
-        Ok(bytes.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-pub(super) fn encoded_size(value: &impl serde::Serialize, limit: usize) -> Result<usize> {
-    let mut counter = CountingMetadata {
-        bytes: 0,
-        limit,
-        exceeded: false,
-    };
-    let result = serde_json::to_writer(&mut counter, value);
-    capacity(!counter.exceeded, "MAX_METADATA_BYTES")?;
-    result?;
-    Ok(counter.bytes)
 }
 
 fn validate_parent(parent: &ParentMetadata) -> Result<()> {
@@ -562,101 +476,4 @@ fn canonical_schema_json(schema: &Schema) -> Result<String> {
     let mut value = serde_json::to_value(schema)?;
     value.sort_all_objects();
     Ok(serde_json::to_string(&value)?)
-}
-
-fn block_metadata_charge<'a>(labels: impl Iterator<Item = Option<&'a str>>) -> Result<usize> {
-    let mut total = 512usize;
-    for label in labels {
-        let bytes = label.map_or(0, str::len);
-        let charge = bytes
-            .checked_mul(2)
-            .and_then(|n| n.checked_add(2 * std::mem::size_of::<Option<String>>() + 32));
-        total = total
-            .checked_add(charge.ok_or(FormatLimit {
-                message: "MAX_WRITER_METADATA_BYTES",
-            })?)
-            .ok_or(FormatLimit {
-                message: "MAX_WRITER_METADATA_BYTES",
-            })?;
-    }
-    Ok(total)
-}
-
-fn static_metadata_charge(
-    schema: &Schema,
-    parent: Option<&ParentMetadata>,
-    labels: &[String],
-    limit: usize,
-) -> Result<usize> {
-    let source = encoded_size(schema, limit)?;
-    let parent = parent.map_or(Ok(0), |parent| encoded_size(parent, limit))?;
-    let labels = encoded_size(&labels, limit)?;
-    let total = source
-        .checked_add(parent)
-        .and_then(|n| n.checked_add(labels))
-        .and_then(|n| n.checked_mul(4))
-        .and_then(|n| n.checked_add(16 * 1024 + schema.fields().len() * 256));
-    capacity(total.is_some_and(|n| n <= limit), "MAX_METADATA_BYTES")?;
-    Ok(total.unwrap())
-}
-#[cfg(test)]
-mod bounds_tests {
-    use super::*;
-
-    #[test]
-    fn encoded_size_budget_counts_serialized_bytes() {
-        let value = "unicode-你好".repeat(32);
-        let size = serde_json::to_vec(&value).unwrap().len();
-        assert_eq!(encoded_size(&value, size).unwrap(), size);
-        assert!(is_format_limit_error(
-            &encoded_size(&value, size - 1).unwrap_err()
-        ));
-    }
-
-    #[test]
-    fn block_metadata_charge_accounts_for_nulls_and_borrowed_labels() {
-        let count = MAX_LABEL_COLUMNS;
-        let nulls = block_metadata_charge(std::iter::repeat_n(None, count)).unwrap();
-        assert_eq!(
-            nulls,
-            512 + count * (2 * std::mem::size_of::<Option<String>>() + 32)
-        );
-        let label = "你好";
-        let values = block_metadata_charge(std::iter::repeat_n(Some(label), count)).unwrap();
-        assert_eq!(values, nulls + count * label.len() * 2);
-    }
-
-    #[test]
-    fn constructor_rejects_schema_above_real_metadata_budget() {
-        let fields = vec![
-            Field::new("__hash__", DataType::UInt64, false),
-            Field::new("_timestamp", DataType::Int64, false),
-            Field::new("value", DataType::Float64, false),
-            Field::new("label", DataType::Utf8, true),
-        ];
-        for field_metadata in [false, true] {
-            let metadata =
-                HashMap::from([("semantic".into(), "x".repeat(MAX_METADATA_BYTES / 4 + 1))]);
-            let schema = if field_metadata {
-                let mut fields = fields.clone();
-                fields[3] = fields[3].clone().with_metadata(metadata);
-                Schema::new(fields)
-            } else {
-                Schema::new_with_metadata(fields.clone(), metadata)
-            };
-            let error = BlockWriter::new(
-                Vec::new(),
-                Arc::new(schema),
-                vec!["label".into()],
-                ParentMetadata {
-                    rows: 1,
-                    compressed_size: 1,
-                },
-                1,
-            )
-            .err()
-            .unwrap();
-            assert!(is_format_limit_error(&error));
-        }
-    }
 }

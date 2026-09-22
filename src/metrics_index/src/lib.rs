@@ -20,15 +20,16 @@
 
 mod cache;
 pub mod layout;
+#[cfg(test)]
+#[path = "tests/legacy_fixture.rs"]
+mod legacy_fixture;
 mod pruner;
 mod reader;
-mod writer;
 
 pub use layout::{
     METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_enabled, metrics_index_stream,
 };
 pub use pruner::search;
-pub use writer::MetricsIndexWriter;
 
 #[cfg(test)]
 mod tests {
@@ -44,7 +45,8 @@ mod tests {
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 
     use super::{
-        METRICS_INDEX_ROW_COUNT, MetricsIndexWriter, layout,
+        METRICS_INDEX_ROW_COUNT, layout,
+        legacy_fixture::MetricsIndexWriter,
         pruner::{
             create_physical_filter, metrics_index_labels, residual_matchers_covered,
             selection_cache_key, sidecar_covers_labels,

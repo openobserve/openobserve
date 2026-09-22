@@ -78,11 +78,11 @@ impl BlockDecoder {
             "invalid decoded row count"
         );
         ensure!(
-            block.payload_len as usize <= max_compressed_block_len(block.row_count)?,
+            block.block_length as usize <= max_compressed_block_len(block.row_count)?,
             "compressed block length exceeds format bound"
         );
         ensure!(
-            payload.len() == block.payload_len as usize,
+            payload.len() == block.block_length as usize,
             "payload length mismatch"
         );
         ensure!(
@@ -157,10 +157,7 @@ pub fn read_footer(bytes: &[u8], file_size: u64) -> Result<Footer> {
     );
     let offset = read_u64(bytes, 8)?;
     let length = read_u64(bytes, 16)?;
-    ensure!(
-        length > 0 && length <= MAX_METADATA_BYTES as u64,
-        "metadata size limit"
-    );
+    ensure!(length > 0, "metadata size limit");
     let end = offset
         .checked_add(length)
         .context("metadata range overflow")?;
@@ -209,9 +206,7 @@ fn decode_index_inner(
         "metadata byte length mismatch"
     );
     ensure!(
-        footer.version == VERSION
-            && footer.metadata_range.start == footer.payload_end
-            && metadata.len() <= MAX_METADATA_BYTES,
+        footer.version == VERSION && footer.metadata_range.start == footer.payload_end,
         "invalid metadata footer"
     );
     let compact = crate::compact::CompactMetadata::parse(&metadata)?;
@@ -313,7 +308,10 @@ fn decode_index_inner(
     projection.sort_unstable();
     let batch = compact.compact_batch(&projection)?;
     let count = batch.num_rows();
-    ensure!(count > 0 && count <= MAX_BLOCKS, "block count limit");
+    ensure!(
+        count > 0 && count as u64 <= expected.rows,
+        "block count limit"
+    );
     let row_group_size = properties
         .get(ROW_GROUP_SIZE_KEY)
         .map(|value| value.parse::<u32>())
@@ -362,7 +360,10 @@ fn decode_directory(
     footer: &Footer,
 ) -> Result<BlockDirectory> {
     let count = batch.num_rows();
-    ensure!(count > 0 && count <= MAX_BLOCKS, "block count limit");
+    ensure!(
+        count > 0 && count as u64 <= parent.rows,
+        "block count limit"
+    );
     for i in 0..DIRECTORY_FIELDS {
         ensure!(batch.column(i).null_count() == 0, "null block descriptor");
     }
@@ -418,8 +419,8 @@ fn decode_directory(
             row_count: counts.value(i),
             min_timestamp: min_times.value(i),
             max_timestamp: max_times.value(i),
-            payload_offset: offsets.value(i),
-            payload_len: lengths.value(i),
+            block_offset: offsets.value(i),
+            block_length: lengths.value(i),
             strictly_increasing: strict.value(i),
         };
         ensure!(
@@ -427,11 +428,11 @@ fn decode_directory(
             "invalid block row count"
         );
         ensure!(
-            block.payload_len as usize <= max_compressed_block_len(block.row_count)?,
+            block.block_length as usize <= max_compressed_block_len(block.row_count)?,
             "compressed block length exceeds format bound"
         );
         ensure!(
-            block.row_start == next_row && block.payload_len > 0,
+            block.row_start == next_row && block.block_length > 0,
             "noncontiguous row or payload directory"
         );
         ensure!(
@@ -457,11 +458,11 @@ fn decode_directory(
             .checked_add(u64::from(block.row_count))
             .context("row end overflow")?;
         ensure!(
-            block.payload_offset == next_offset,
+            block.block_offset == next_offset,
             "noncontiguous payload directory"
         );
         next_offset = next_offset
-            .checked_add(u64::from(block.payload_len))
+            .checked_add(u64::from(block.block_length))
             .context("payload end overflow")?;
         ensure!(
             next_row <= parent.rows && next_offset <= footer.payload_end,
@@ -519,8 +520,8 @@ mod decoder_tests {
             row_count: samples.len() as u32,
             min_timestamp: samples[0].0,
             max_timestamp: samples.last().unwrap().0,
-            payload_offset: 0,
-            payload_len: payload.len() as u32,
+            block_offset: 0,
+            block_length: payload.len() as u32,
             strictly_increasing: samples.windows(2).all(|w| w[0].0 < w[1].0),
         };
         (payload, block)
@@ -587,7 +588,7 @@ mod decoder_tests {
         corrupt[0] ^= 1;
         let bad_zstd = [1, 2, 3, 4];
         let mut bad_frame = block.clone();
-        bad_frame.payload_len = bad_zstd.len() as u32;
+        bad_frame.block_length = bad_zstd.len() as u32;
         let mut bad_endpoint = block.clone();
         bad_endpoint.max_timestamp += 1;
         let mut bad_strict = block.clone();
@@ -625,7 +626,7 @@ mod decoder_tests {
         for length in [15, 17] {
             let bytes = zstd::bulk::compress(&vec![0; length], 1).unwrap();
             let (_, mut metadata) = fixture(&[(0, 0)]);
-            metadata.payload_len = bytes.len() as u32;
+            metadata.block_length = bytes.len() as u32;
             assert!(decoder.decode(&bytes, &metadata).is_err());
             assert!(decoder.timestamps.is_empty());
             assert!(decoder.value_bits.is_empty());

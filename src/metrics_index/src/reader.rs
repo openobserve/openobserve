@@ -310,7 +310,7 @@ mod tests {
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 
     use super::*;
-    use crate::{MetricsFileLayout, MetricsIndexWriter};
+    use crate::{MetricsFileLayout, legacy_fixture::MetricsIndexWriter};
 
     fn fixture(
         format: config::FileFormat,

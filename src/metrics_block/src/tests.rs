@@ -175,7 +175,7 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
     assert!(index.blocks.block(1).strictly_increasing);
     let mut actual = Vec::new();
     for (i, block) in index.blocks.iter().enumerate() {
-        let range = block.payload_range();
+        let range = block.block_range();
         let decoded =
             decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap();
         for (time, value) in decoded.timestamps.iter().zip(&decoded.value_bits) {
@@ -242,7 +242,7 @@ fn numeric_parent_version_bounds_and_decoder_claims_are_checked() {
     assert!(read_footer(&end[..FOOTER_LEN - 1], blob.len() as u64).is_err());
     let index = index(&blob, &[]).unwrap();
     let b = &index.blocks.block(0);
-    let range = b.payload_range();
+    let range = b.block_range();
     let payload = &blob[range.start as usize..range.end as usize];
     let mut corrupt = payload.to_vec();
     corrupt[0] ^= 1;
@@ -422,8 +422,8 @@ fn excessive_compressed_length_and_capacity_classification() {
     let blob = fixture();
     let index = index(&blob, &[]).unwrap();
     let mut block = index.blocks.block(0).clone();
-    let range = block.payload_range();
-    block.payload_len =
+    let range = block.block_range();
+    block.block_length =
         u32::try_from(max_compressed_block_len(block.row_count).unwrap() + 1).unwrap();
     let error = decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap_err();
     assert!(
@@ -431,15 +431,15 @@ fn excessive_compressed_length_and_capacity_classification() {
             .to_string()
             .contains("compressed block length exceeds")
     );
-    let mut lengths: Vec<_> = index.blocks.iter().map(|b| b.payload_len).collect();
-    let delta = block.payload_len - lengths[0];
-    lengths[0] = block.payload_len;
+    let mut lengths: Vec<_> = index.blocks.iter().map(|b| b.block_length).collect();
+    let delta = block.block_length - lengths[0];
+    lengths[0] = block.block_length;
     let changed = replace_column(&blob, 6, Arc::new(UInt32Array::from(lengths)));
     let offsets: Vec<_> = index
         .blocks
         .iter()
         .enumerate()
-        .map(|(i, b)| b.payload_offset + if i == 0 { 0 } else { u64::from(delta) })
+        .map(|(i, b)| b.block_offset + if i == 0 { 0 } else { u64::from(delta) })
         .collect();
     let changed = replace_column(&changed, 5, Arc::new(UInt64Array::from(offsets)));
     let old_end = changed.len() - FOOTER_LEN;
@@ -456,7 +456,7 @@ fn excessive_compressed_length_and_capacity_classification() {
             .to_string()
             .contains("compressed block length exceeds")
     );
-    let limit = capacity(false, "MAX_BLOCKS").unwrap_err();
+    let limit = capacity(false, "MAX_LABEL_COLUMNS").unwrap_err();
     assert!(is_format_limit_error(&limit));
     assert!(is_format_limit_error(&limit.context("builder")));
     let ordinary = anyhow!("invalid sample frame");
@@ -583,7 +583,7 @@ fn lossless_transform_preserves_extreme_timestamps_resets_and_all_float_bits() {
         .unwrap();
         let mut actual = Vec::new();
         for block in &index.blocks {
-            let range = block.payload_range();
+            let range = block.block_range();
             let decoded =
                 decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap();
             actual.extend(decoded.timestamps.into_iter().zip(decoded.value_bits));
@@ -613,9 +613,9 @@ fn compact_metadata_rejects_truncation_corruption_and_excessive_claims() {
     for target in ["rows", "section"] {
         let mut h = header.clone();
         if target == "rows" {
-            h["rows"] = (MAX_BLOCKS + 1).into();
+            h["rows"] = usize::MAX.into();
         } else {
-            h["sections"][0]["raw"] = (MAX_METADATA_BYTES + 1).into();
+            h["sections"][0]["raw"] = usize::MAX.into();
         }
         let encoded = serde_json::to_vec(&h).unwrap();
         let mut bad = b"O2META01".to_vec();
@@ -627,7 +627,7 @@ fn compact_metadata_rejects_truncation_corruption_and_excessive_claims() {
 }
 
 #[test]
-fn compact_encoder_classifies_capacity_for_optional_format_fallback() {
+fn compact_encoder_accepts_large_metadata_header() {
     let blob = fixture();
     let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
     let encoded = crate::compact::CompactMetadata::parse(
@@ -642,8 +642,8 @@ fn compact_encoder_classifies_capacity_for_optional_format_fallback() {
         metadata,
     ));
     let oversized = RecordBatch::try_new(schema, original.columns().to_vec()).unwrap();
-    let error = crate::compact::encode(&oversized).unwrap_err();
-    assert!(is_format_limit_error(&error));
+    let bytes = crate::compact::encode(&oversized).unwrap();
+    assert!(crate::compact::CompactMetadata::parse(&bytes).is_ok());
 }
 
 #[test]
@@ -685,7 +685,7 @@ fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
     assert_eq!(parsed.source_schema, input.schema());
     let mut actual = Vec::new();
     for block in &parsed.blocks {
-        let range = block.payload_range();
+        let range = block.block_range();
         let decoded =
             decode_block(&container[range.start as usize..range.end as usize], &block).unwrap();
         actual.extend(decoded.timestamps.into_iter().zip(decoded.value_bits));
@@ -814,10 +814,7 @@ fn terminal_footer_rejects_previous_format_truncation_and_invalid_structure() {
         (4..8, 1u32.to_le_bytes().to_vec()),
         (8..16, u64::MAX.to_le_bytes().to_vec()),
         (16..24, 0u64.to_le_bytes().to_vec()),
-        (
-            16..24,
-            (MAX_METADATA_BYTES as u64 + 1).to_le_bytes().to_vec(),
-        ),
+        (16..24, u64::MAX.to_le_bytes().to_vec()),
         (24..32, b"INCOMPLT".to_vec()),
     ] {
         let mut invalid = blob[blob.len() - FOOTER_LEN..].to_vec();
@@ -831,7 +828,7 @@ fn terminal_footer_rejects_previous_format_truncation_and_invalid_structure() {
     let mut offsets: Vec<_> = parsed
         .blocks
         .iter()
-        .map(|block| block.payload_offset)
+        .map(|block| block.block_offset)
         .collect();
     offsets[1] += 1;
     assert!(
@@ -903,7 +900,7 @@ fn generic_source_finalizer_preserves_schema_without_row_groups() {
     assert_eq!(decoded.source_schema, input.schema());
     let mut actual = Vec::new();
     for block in &decoded.blocks {
-        let span = block.payload_range();
+        let span = block.block_range();
         let values =
             decode_block(&encoded[span.start as usize..span.end as usize], &block).unwrap();
         actual.extend(values.timestamps.into_iter().zip(values.value_bits));
@@ -1015,12 +1012,54 @@ fn sample_payload_requires_one_complete_frame() {
     let blob = fixture();
     let parsed = index(&blob, &[]).unwrap();
     let mut block = parsed.blocks.block(0);
-    let range = block.payload_range();
+    let range = block.block_range();
     let original = &blob[range.start as usize..range.end as usize];
     let mut trailing = original.to_vec();
     trailing.push(0);
-    block.payload_len = trailing.len() as u32;
+    block.block_length = trailing.len() as u32;
     assert!(decode_block(&trailing, &block).is_err());
-    block.payload_len = (original.len() - 1) as u32;
+    block.block_length = (original.len() - 1) as u32;
     assert!(decode_block(&original[..original.len() - 1], &block).is_err());
+}
+
+#[test]
+#[ignore = "Exercises a directory with over one million blocks"]
+fn more_than_one_million_blocks_roundtrip() {
+    let rows = 1_000_001usize;
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("__hash__", DataType::UInt64, false),
+        Field::new("_timestamp", DataType::Int64, false),
+        Field::new("value", DataType::Float64, false),
+    ]));
+    let batch = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(UInt64Array::from(vec![7; rows])),
+            Arc::new(Int64Array::from_iter_values(0..rows as i64)),
+            Arc::new(Float64Array::from(vec![1.; rows])),
+        ],
+    )
+    .unwrap();
+    let parent = ParentMetadata {
+        rows: rows as u64,
+        compressed_size: 100,
+    };
+    let mut writer = BlockWriter::new(Vec::new(), schema, vec![], parent.clone(), 1).unwrap();
+    writer.write(&batch).unwrap();
+    let bytes = writer.finish().unwrap();
+    let footer = read_footer(&bytes[bytes.len() - FOOTER_LEN..], bytes.len() as u64).unwrap();
+    let metadata = Bytes::copy_from_slice(
+        &bytes[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+    );
+    let index = decode_index(metadata, &footer, &parent, &[]).unwrap();
+    assert_eq!(index.blocks.len(), rows);
+    for (i, block) in index.blocks.iter().enumerate() {
+        assert_eq!(block.hash, 7);
+        let range = block.block_range();
+        let decoded =
+            decode_block(&bytes[range.start as usize..range.end as usize], &block).unwrap();
+        assert_eq!(decoded.timestamps, vec![i as i64]);
+        assert_eq!(decoded.value_bits, vec![1f64.to_bits()]);
+    }
+    eprintln!("one series, {} blocks, {} MIDX bytes", rows, bytes.len());
 }

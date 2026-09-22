@@ -68,6 +68,7 @@ pub async fn merge_parquet_files(
                 metrics::MetricsOutput {
                     file_format: output.file_format,
                     max_file_size: get_config().compact.max_file_size,
+                    max_series_per_file: get_config().compact.metrics_max_series_per_file,
                     sink: output.sink,
                     layout: mode
                         .metrics_file_layout()

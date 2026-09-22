@@ -17,7 +17,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use arrow::{
     array::{Array, ArrayRef as ArrowArrayRef, RecordBatch, UInt32Array, UInt64Array},
-    compute::{concat_batches, partition, take},
+    compute::{concat_batches, take},
     datatypes::{DataType, Field, Schema},
     ipc::{
         CompressionType,
@@ -109,35 +109,6 @@ impl MetricsIndexWriter {
             run_start = run_end;
         }
 
-        self.append_runs(batch, first_rows, row_counts)
-    }
-
-    /// Replay batches must preserve label boundaries even when distinct identities share a hash.
-    pub fn write_with_label_boundaries(&mut self, batch: &RecordBatch) -> Result<()> {
-        self.hashes(batch)?;
-        let columns = std::iter::once(&self.hash_index)
-            .chain(self.label_indices.iter())
-            .map(|index| Arc::clone(batch.column(*index)))
-            .collect::<Vec<_>>();
-        let runs = partition(&columns)?.ranges();
-        let first_rows = runs
-            .iter()
-            .map(|run| {
-                u32::try_from(run.start).map_err(|_| {
-                    DataFusionError::Execution("metrics batch exceeds u32 row index".to_string())
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let row_counts = runs
-            .iter()
-            .map(|run| {
-                u32::try_from(run.len()).map_err(|_| {
-                    DataFusionError::Execution(
-                        "metrics series run exceeds u32 row count".to_string(),
-                    )
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
         self.append_runs(batch, first_rows, row_counts)
     }
 

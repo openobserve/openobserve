@@ -2921,7 +2921,11 @@ mod tests {
             .await
             .unwrap();
         }
-        add_mindex_size_columns(&pool).await.unwrap();
+        for table in tables {
+            add_column(&pool, table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL")
+                .await
+                .unwrap();
+        }
         for table in tables {
             let old: (i64, i64) = sqlx::query_as(&format!(
                 "SELECT index_size, mindex_size FROM {table} WHERE id = 1"
@@ -2943,7 +2947,11 @@ mod tests {
             .await
             .unwrap();
         }
-        add_mindex_size_columns(&pool).await.unwrap();
+        for table in tables {
+            add_column(&pool, table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL")
+                .await
+                .unwrap();
+        }
         for table in tables {
             let rows: Vec<(i64, i64)> = sqlx::query_as(&format!(
                 "SELECT index_size, mindex_size FROM {table} ORDER BY id"

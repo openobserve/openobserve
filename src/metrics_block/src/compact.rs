@@ -26,10 +26,9 @@ use arrow::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{DIRECTORY_FIELDS, MAX_BLOCKS, MAX_LABEL_COLUMNS, MAX_METADATA_BYTES, label_value};
+use crate::{DIRECTORY_FIELDS, MAX_LABEL_COLUMNS, label_value};
 
 const MAGIC: &[u8; 8] = b"O2META01";
-const MAX_HEADER: usize = 1024 * 1024;
 
 #[derive(Serialize, Deserialize)]
 struct Header {
@@ -51,18 +50,11 @@ pub(crate) struct CompactMetadata<'a> {
 
 impl<'a> CompactMetadata<'a> {
     pub(crate) fn parse(bytes: &'a [u8]) -> Result<Self> {
-        ensure!(
-            bytes.len() <= MAX_METADATA_BYTES && bytes.get(..8) == Some(MAGIC),
-            "invalid compact metadata"
-        );
+        ensure!(bytes.get(..8) == Some(MAGIC), "invalid compact metadata");
         let mut input = Input::new(bytes.get(8..).context("missing compact header")?);
         let len = input.u32()? as usize;
-        ensure!(len <= MAX_HEADER, "compact header limit");
         let header: Header = serde_json::from_slice(input.take(len)?)?;
-        ensure!(
-            header.rows > 0 && header.rows <= MAX_BLOCKS,
-            "compact row limit"
-        );
+        ensure!(header.rows > 0, "compact row limit");
         ensure!(
             header.schema.fields().len() >= DIRECTORY_FIELDS
                 && header.schema.fields().len() <= DIRECTORY_FIELDS + MAX_LABEL_COLUMNS,
@@ -72,22 +64,33 @@ impl<'a> CompactMetadata<'a> {
             header.sections.len() == header.schema.fields().len(),
             "compact section count"
         );
+        ensure!(
+            header.sections[0].raw
+                == header
+                    .rows
+                    .checked_mul(8)
+                    .context("directory size overflow")?,
+            "compact directory row count mismatch"
+        );
         let mut total = 0usize;
         let mut sections = Vec::with_capacity(header.sections.len());
         for section in &header.sections {
             total = total
                 .checked_add(section.raw)
                 .context("compact size overflow")?;
-            ensure!(
-                total <= MAX_METADATA_BYTES && section.compressed > 0,
-                "compact decoded size limit"
-            );
+            ensure!(section.compressed > 0, "compact decoded size limit");
             let frame = input.take(section.compressed)?;
             ensure!(
                 zstd::zstd_safe::find_frame_compressed_size(frame)
                     .map_err(|e| anyhow::anyhow!("invalid zstd frame: {e:?}"))?
                     == frame.len(),
                 "extra compact frame bytes"
+            );
+            ensure!(
+                zstd::zstd_safe::get_frame_content_size(frame)
+                    .map_err(|e| anyhow::anyhow!("invalid frame content size: {e:?}"))?
+                    == Some(u64::try_from(section.raw)?),
+                "compact frame content size mismatch"
             );
             sections.push(frame);
         }
@@ -170,10 +173,7 @@ impl<'a> Input<'a> {
 }
 
 pub(crate) fn encode(batch: &RecordBatch) -> Result<Vec<u8>> {
-    ensure!(
-        batch.num_rows() > 0 && batch.num_rows() <= MAX_BLOCKS,
-        "compact row limit"
-    );
+    ensure!(batch.num_rows() > 0, "compact row limit");
     let mut sections = Vec::new();
     let mut frames = Vec::new();
     let mut total = 0usize;
@@ -182,7 +182,6 @@ pub(crate) fn encode(batch: &RecordBatch) -> Result<Vec<u8>> {
         total = total
             .checked_add(raw.len())
             .context("compact raw size overflow")?;
-        crate::capacity(total <= MAX_METADATA_BYTES, "compact raw size limit")?;
         let frame = zstd::bulk::compress(&raw, 1)?;
         sections.push(Section {
             raw: raw.len(),
@@ -197,7 +196,6 @@ pub(crate) fn encode(batch: &RecordBatch) -> Result<Vec<u8>> {
     })?;
     header.sort_all_objects();
     let header = serde_json::to_vec(&header)?;
-    crate::capacity(header.len() <= MAX_HEADER, "compact header limit")?;
     let mut output = Vec::new();
     output.extend_from_slice(MAGIC);
     output.extend_from_slice(&u32::try_from(header.len())?.to_le_bytes());
@@ -205,10 +203,6 @@ pub(crate) fn encode(batch: &RecordBatch) -> Result<Vec<u8>> {
     for frame in frames {
         output.extend_from_slice(&frame);
     }
-    crate::capacity(
-        output.len() <= MAX_METADATA_BYTES,
-        "compact output size limit",
-    )?;
     Ok(output)
 }
 
@@ -299,7 +293,6 @@ fn charge(total: &mut usize, bytes: usize) -> Result<()> {
     *total = total
         .checked_add(bytes)
         .context("compact expansion overflow")?;
-    ensure!(*total <= MAX_METADATA_BYTES, "compact expansion limit");
     Ok(())
 }
 

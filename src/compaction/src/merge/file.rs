@@ -514,7 +514,11 @@ mod tests {
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("value", DataType::Float64, true),
             Field::new(
-                if kind == "legacy" { "trace_id" } else { "tag" },
+                if kind == "unsupported" {
+                    "trace_id"
+                } else {
+                    "tag"
+                },
                 DataType::Utf8,
                 true,
             ),
@@ -566,7 +570,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn mindex_size_matches_full_published_object_for_every_output_kind() {
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
-            for kind in ["block", "legacy", "fallback", "none"] {
+            for kind in ["block", "unsupported", "fallback", "none"] {
                 let mut file = produced_metrics_output(format, kind).await;
                 let meta = match &mut file {
                     MergedFile::MetricsIndexed { meta, .. }
@@ -593,7 +597,7 @@ mod tests {
                 let indexes = storage::list(&account, "files/publish/midx/")
                     .await
                     .unwrap();
-                assert_eq!(indexes.len(), usize::from(kind != "none"));
+                assert_eq!(indexes.len(), usize::from(kind == "block"));
                 let index = if let Some(path) = indexes.first() {
                     Some(storage::get_bytes(&account, path).await.unwrap())
                 } else {
@@ -606,7 +610,7 @@ mod tests {
                     index.as_ref().map_or(0, |bytes| bytes.len() as i64)
                 );
                 if let Some(bytes) = index {
-                    assert_eq!(bytes.starts_with(b"ARROW1"), kind != "block");
+                    assert!(!bytes.starts_with(b"ARROW1"));
                 }
             }
         }
