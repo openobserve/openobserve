@@ -119,7 +119,7 @@ impl PointLabels {
 /// A metric's data, as JSON records or as number data points not yet turned into records.
 enum MetricRecords<'a> {
     Json(Vec<json::Value>),
-    NumberPoints(&'a [NumberDataPoint]),
+    NumberPoints(Vec<&'a NumberDataPoint>),
 }
 
 impl MetricRecords<'_> {
@@ -131,6 +131,29 @@ impl MetricRecords<'_> {
                 .iter()
                 .any(|point| number_point_value(point).is_some()),
         }
+    }
+}
+
+/// What a metric's admission needs from the request: pipelines decide where a record lands.
+struct Admission<'a> {
+    org_id: &'a str,
+    metric_name: &'a str,
+    pipelines: &'a mut HashMap<String, Vec<ExecutablePipeline>>,
+    policies: &'a mut ingest::StreamPolicies,
+    partial_success: &'a mut ExportMetricsPartialSuccess,
+}
+
+impl Admission<'_> {
+    /// Loads a stream's pipelines on first sight, exactly as the record loop does.
+    async fn stream_has_pipeline(&mut self, stream_name: &str) -> bool {
+        if !self.pipelines.contains_key(stream_name) {
+            let stream_param = StreamParams::new(self.org_id, stream_name, StreamType::Metrics);
+            let found = crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
+            self.pipelines.insert(stream_name.to_string(), found);
+        }
+        self.pipelines
+            .get(stream_name)
+            .is_some_and(|v| !v.is_empty())
     }
 }
 
@@ -258,11 +281,17 @@ pub async fn handle_otlp_request(
             for metric in &scope_metric.metrics {
                 let metric_name = format_stream_name(metric.name.to_string());
 
-                let policy = policies.get(&metric_name).await;
-                if policy.deleting {
+                if policies.get(&metric_name).await.deleting {
                     skipped_records += 1;
                     continue;
                 }
+                let mut admission = Admission {
+                    org_id,
+                    metric_name: &metric_name,
+                    pipelines: &mut stream_executable_pipelines,
+                    policies: &mut policies,
+                    partial_success: &mut partial_success,
+                };
 
                 let mut rec = json::json!({});
                 if let Some(res) = &resource_metric.resource {
@@ -284,32 +313,42 @@ pub async fn handle_otlp_request(
                     Some(data) => match data {
                         Data::Gauge(gauge) => {
                             prepare_gauge(metadata, &mut prom_meta);
-                            MetricRecords::NumberPoints(&gauge.data_points)
+                            MetricRecords::NumberPoints(
+                                admit_number_points(&gauge.data_points, &mut admission).await,
+                            )
                         }
                         Data::Sum(sum) => {
                             prepare_sum(&mut rec, sum, metadata, &mut prom_meta);
-                            MetricRecords::NumberPoints(&sum.data_points)
+                            MetricRecords::NumberPoints(
+                                admit_number_points(&sum.data_points, &mut admission).await,
+                            )
                         }
-                        Data::Histogram(hist) => MetricRecords::Json(process_histogram(
-                            &mut rec,
-                            hist,
-                            metadata,
-                            &mut prom_meta,
-                        )),
-                        Data::ExponentialHistogram(exp_hist) => {
-                            MetricRecords::Json(process_exponential_histogram(
-                                &mut rec,
-                                exp_hist,
-                                metadata,
-                                &mut prom_meta,
-                            ))
-                        }
-                        Data::Summary(summary) => MetricRecords::Json(process_summary(
-                            &rec,
-                            summary,
-                            metadata,
-                            &mut prom_meta,
-                        )),
+                        Data::Histogram(hist) => MetricRecords::Json(
+                            admit_record_groups(
+                                process_histogram(&mut rec, hist, metadata, &mut prom_meta),
+                                &mut admission,
+                            )
+                            .await,
+                        ),
+                        Data::ExponentialHistogram(exp_hist) => MetricRecords::Json(
+                            admit_record_groups(
+                                process_exponential_histogram(
+                                    &mut rec,
+                                    exp_hist,
+                                    metadata,
+                                    &mut prom_meta,
+                                ),
+                                &mut admission,
+                            )
+                            .await,
+                        ),
+                        Data::Summary(summary) => MetricRecords::Json(
+                            admit_record_groups(
+                                process_summary(&rec, summary, metadata, &mut prom_meta),
+                                &mut admission,
+                            )
+                            .await,
+                        ),
                     },
                     None => {
                         // a flattened oneof that fails to deserialize turns into
@@ -399,14 +438,6 @@ pub async fn handle_otlp_request(
                 let records = match records {
                     MetricRecords::Json(records) => records,
                     MetricRecords::NumberPoints(points) => {
-                        if !stream_executable_pipelines.contains_key(&metric_name) {
-                            let stream_param =
-                                StreamParams::new(org_id, &metric_name, StreamType::Metrics);
-                            let pipelines =
-                                crate::ingestion::get_stream_executable_pipelines(&stream_param)
-                                    .await;
-                            stream_executable_pipelines.insert(metric_name.clone(), pipelines);
-                        }
                         let columnar =
                             columnar_streams
                                 .entry(metric_name.clone())
@@ -421,23 +452,11 @@ pub async fn handle_otlp_request(
                                         &stream_partitioning_map,
                                     )
                                 });
-                        let admitted = points.iter().filter(|point| {
-                            match policy.bounds.check(point_timestamp(point.time_unix_nano)) {
-                                Ok(()) => true,
-                                Err(reason) => {
-                                    reject_point(
-                                        &mut partial_success,
-                                        org_id,
-                                        &metric_name,
-                                        reason,
-                                    );
-                                    false
-                                }
-                            }
-                        });
                         match columnar {
-                            Some(columnar) => append_number_points(columnar, &rec, admitted),
-                            None => number_point_records(&rec, admitted),
+                            Some(columnar) => {
+                                append_number_points(columnar, &rec, points.iter().copied())
+                            }
+                            None => number_point_records(&rec, points.iter().copied()),
                         }
                     }
                 };
@@ -449,17 +468,6 @@ pub async fn handle_otlp_request(
                     let local_metric_name = format_stream_name(
                         rec.get(NAME_LABEL).unwrap().as_str().unwrap().to_string(),
                     );
-
-                    // a nanosecond stamp past i64 micros is as far in the future as it gets
-                    let timestamp = rec
-                        .get(TIMESTAMP_COL_NAME)
-                        .and_then(json::Value::as_i64)
-                        .unwrap_or(i64::MAX);
-                    let stream_bounds = policies.get(&local_metric_name).await.bounds;
-                    if let Err(reason) = stream_bounds.check(timestamp) {
-                        reject_point(&mut partial_success, org_id, &local_metric_name, reason);
-                        continue;
-                    }
 
                     if local_metric_name != metric_name {
                         // check for schema
@@ -549,7 +557,7 @@ pub async fn handle_otlp_request(
         log::warn!("[METRICS:OTLP] Skipped {skipped_records} records due to streams being deleted");
     }
 
-    let (pipeline_outputs, failures) = ingest::run_pipelines(
+    let (mut pipeline_outputs, failures) = ingest::run_pipelines(
         org_id,
         &stream_executable_pipelines,
         stream_pipeline_inputs,
@@ -570,6 +578,10 @@ pub async fn handle_otlp_request(
             }
         }
     }
+    ingest::admit_pipeline_outputs(&mut pipeline_outputs, &mut policies, |stream, reason| {
+        reject_point(&mut partial_success, org_id, stream, reason)
+    })
+    .await;
     for (stream_name, records) in pipeline_outputs {
         json_data_by_stream
             .entry(stream_name)
@@ -835,9 +847,70 @@ fn append_number_point(
     true
 }
 
-/// A point's time in micros; one past i64 saturates, which the bounds check refuses as future.
-fn point_timestamp(time_unix_nano: u64) -> i64 {
-    i64::try_from(time_unix_nano / 1000).unwrap_or(i64::MAX)
+/// The points the metric's own stream takes; all of them when a pipeline decides the destination.
+async fn admit_number_points<'a>(
+    points: &'a [NumberDataPoint],
+    admission: &mut Admission<'_>,
+) -> Vec<&'a NumberDataPoint> {
+    if admission.stream_has_pipeline(admission.metric_name).await {
+        return points.iter().collect();
+    }
+    let bounds = admission.policies.get(admission.metric_name).await.bounds;
+    points
+        .iter()
+        .filter(
+            |point| match bounds.check((point.time_unix_nano / 1000) as i64) {
+                Ok(()) => true,
+                Err(reason) => {
+                    reject_point(
+                        admission.partial_success,
+                        admission.org_id,
+                        admission.metric_name,
+                        reason,
+                    );
+                    false
+                }
+            },
+        )
+        .collect()
+}
+
+/// Keeps the records their destinations take; a data point with any record refused counts once.
+async fn admit_record_groups(
+    groups: Vec<Vec<json::Value>>,
+    admission: &mut Admission<'_>,
+) -> Vec<json::Value> {
+    let mut admitted = Vec::new();
+    for group in groups {
+        let mut refused = None;
+        for record in group {
+            let stream_name = format_stream_name(
+                record
+                    .get(NAME_LABEL)
+                    .and_then(json::Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+            );
+            if admission.stream_has_pipeline(&stream_name).await {
+                admitted.push(record);
+                continue;
+            }
+            let timestamp = record.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64);
+            let bounds = admission.policies.get(&stream_name).await.bounds;
+            match timestamp.map(|ts| bounds.check(ts)) {
+                Some(Err(reason)) => {
+                    reason.count(admission.org_id, &stream_name);
+                    refused = Some(reason);
+                }
+                _ => admitted.push(record),
+            }
+        }
+        if let Some(reason) = refused {
+            admission.partial_success.rejected_data_points += 1;
+            admission.partial_success.error_message = reason.message();
+        }
+    }
+    admitted
 }
 
 fn reject_point(
@@ -864,7 +937,7 @@ fn process_histogram(
     hist: &Histogram,
     mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
-) -> Vec<serde_json::Value> {
+) -> Vec<Vec<serde_json::Value>> {
     // set metadata
     metadata.metric_type = MetricType::Histogram;
     prom_meta.insert(
@@ -876,11 +949,15 @@ fn process_histogram(
     process_aggregation_temporality(rec, hist.aggregation_temporality);
     for data_point in &hist.data_points {
         let mut dp_rec = rec.clone();
+        let mut group = vec![];
         for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
-            records.push(bucket_rec);
+            group.push(bucket_rec);
+        }
+        if !group.is_empty() {
+            records.push(group);
         }
     }
     records
@@ -891,7 +968,7 @@ fn process_exponential_histogram(
     hist: &ExponentialHistogram,
     mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
-) -> Vec<serde_json::Value> {
+) -> Vec<Vec<serde_json::Value>> {
     // set metadata
     metadata.metric_type = MetricType::ExponentialHistogram;
     prom_meta.insert(
@@ -903,11 +980,15 @@ fn process_exponential_histogram(
     let limits = native_histogram::ExpansionLimits::from_config(&config::get_config());
     for data_point in &hist.data_points {
         let mut dp_rec = rec.clone();
+        let mut group = vec![];
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point, limits) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
-            records.push(bucket_rec);
+            group.push(bucket_rec);
+        }
+        if !group.is_empty() {
+            records.push(group);
         }
     }
     records
@@ -918,7 +999,7 @@ fn process_summary(
     summary: &Summary,
     mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
-) -> Vec<serde_json::Value> {
+) -> Vec<Vec<serde_json::Value>> {
     // set metadata
     metadata.metric_type = MetricType::Summary;
     prom_meta.insert(
@@ -929,11 +1010,15 @@ fn process_summary(
     let mut records = vec![];
     for data_point in &summary.data_points {
         let mut dp_rec = rec.clone();
+        let mut group = vec![];
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
-            records.push(bucket_rec);
+            group.push(bucket_rec);
+        }
+        if !group.is_empty() {
+            records.push(group);
         }
     }
     records
@@ -1515,7 +1600,7 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Histogram(hist)) = &metric.data {
-            let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
+            let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta).concat();
 
             // Verify the processed data
             assert!(!result.is_empty());
@@ -1548,7 +1633,8 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::ExponentialHistogram(hist)) = &metric.data {
-            let result = process_exponential_histogram(&mut rec, hist, metadata, &mut prom_meta);
+            let result =
+                process_exponential_histogram(&mut rec, hist, metadata, &mut prom_meta).concat();
 
             // Verify the processed data
             assert!(!result.is_empty());
@@ -1578,7 +1664,7 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Summary(summary)) = &metric.data {
-            let result = process_summary(&rec, summary, metadata, &mut prom_meta);
+            let result = process_summary(&rec, summary, metadata, &mut prom_meta).concat();
 
             // Verify the processed data
             assert!(!result.is_empty());
@@ -2365,7 +2451,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
+                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta).concat();
                 // Should still have count, sum, min, max records
                 assert!(result.len() >= 4);
             }
@@ -2384,7 +2470,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
+                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta).concat();
                 // Should have count, sum, min, max, and 1 bucket
                 assert_eq!(result.len(), 5);
 
@@ -2411,7 +2497,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
+                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta).concat();
                 // Should have count, sum, min, max, and 5 buckets
                 assert_eq!(result.len(), 9);
             }

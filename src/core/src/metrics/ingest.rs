@@ -21,7 +21,7 @@ use std::{
 
 use chrono::{DateTime, Days};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert,
         pipeline::PipelineKind,
@@ -150,7 +150,6 @@ impl OutOfBounds {
     }
 }
 
-/// Whether a stream takes records at all, and which timestamps it takes.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct StreamPolicy {
     pub deleting: bool,
@@ -279,6 +278,31 @@ pub(super) async fn run_pipelines<T: Clone>(
         }
     }
     (outputs, failures)
+}
+
+/// Drops pipeline output its destination refuses; a record without `_timestamp` is written as now.
+pub(super) async fn admit_pipeline_outputs<T>(
+    outputs: &mut RecordsByStream<T>,
+    policies: &mut StreamPolicies,
+    mut on_reject: impl FnMut(&str, OutOfBounds),
+) {
+    for (stream_name, records) in outputs.iter_mut() {
+        let bounds = policies.get(stream_name).await.bounds;
+        records.retain(|(record, _)| {
+            let Some(timestamp) = record.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64)
+            else {
+                return true;
+            };
+            match bounds.check(timestamp) {
+                Ok(()) => true,
+                Err(reason) => {
+                    on_reject(stream_name, reason);
+                    false
+                }
+            }
+        });
+    }
+    outputs.retain(|_, records| !records.is_empty());
 }
 
 /// The stream's schema once `records` are in it, as the write path keys and partitions by it.

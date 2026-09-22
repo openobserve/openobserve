@@ -195,14 +195,13 @@ async fn buffer_record(
             return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
         }
     };
-    // checked before the stream is created, so a rejected record leaves nothing behind
-    if let Err(reason) = policy.bounds.check(timestamp) {
-        let status = stream_status_map
-            .entry(stream_name.clone())
-            .or_insert_with(|| StreamStatus::new(&stream_name));
-        status.status.failed += 1;
-        status.status.error = reason.message();
-        reason.count(org_id, &stream_name);
+    let has_pipeline = lookups
+        .pipelines
+        .get(&stream_name)
+        .is_some_and(|v| !v.is_empty());
+    // a pipeline picks the destination, whose bounds apply to its output instead
+    if !has_pipeline && let Err(reason) = policy.bounds.check(timestamp) {
+        refuse_record(stream_status_map, org_id, &stream_name, reason);
         return Ok(true);
     }
     record.insert(
@@ -229,11 +228,7 @@ async fn buffer_record(
             .insert(stream_name.clone(), SchemaCache::new(schema));
     }
 
-    if lookups
-        .pipelines
-        .get(&stream_name)
-        .is_some_and(|v| !v.is_empty())
-    {
+    if has_pipeline {
         pipeline_inputs
             .entry(stream_name)
             .or_default()
@@ -247,6 +242,20 @@ async fn buffer_record(
             .push((record, metric_type));
     }
     Ok(true)
+}
+
+fn refuse_record(
+    stream_status_map: &mut HashMap<String, StreamStatus>,
+    org_id: &str,
+    stream_name: &str,
+    reason: ingest::OutOfBounds,
+) {
+    let status = stream_status_map
+        .entry(stream_name.to_string())
+        .or_insert_with(|| StreamStatus::new(stream_name));
+    status.status.failed += 1;
+    status.status.error = reason.message();
+    reason.count(org_id, stream_name);
 }
 
 /// One stream's rows, each with a checked value, `__hash__` and string labels, and its first type.
@@ -461,7 +470,7 @@ pub async fn ingest(
         log::warn!("[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted");
     }
 
-    let (pipeline_outputs, failures) = ingest::run_pipelines(
+    let (mut pipeline_outputs, failures) = ingest::run_pipelines(
         org_id,
         &lookups.pipelines,
         pipeline_inputs,
@@ -483,6 +492,12 @@ pub async fn ingest(
             stream_status.status.error = message;
         }
     }
+    ingest::admit_pipeline_outputs(
+        &mut pipeline_outputs,
+        &mut lookups.policies,
+        |stream, reason| refuse_record(&mut stream_status_map, org_id, stream, reason),
+    )
+    .await;
     for (stream_name, records) in pipeline_outputs {
         records_by_stream
             .entry(stream_name)

@@ -21,13 +21,7 @@ const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
-/**
- * How far back the seeded history goes. It has to sit OUTSIDE the window the
- * explorer opens on (its default, "Past 15 Minutes") so the first card query is
- * legitimately empty. Metrics ingestion has no `ZO_INGEST_ALLOWED_UPTO` window;
- * it only refuses points older than the stream's data retention, which this
- * offset is nowhere near.
- */
+// outside the explorer's default "Past 15 Minutes" so the first card query is legitimately empty
 const HISTORY_MINUTES_AGO = 26;
 
 const org = () => getOrgIdentifier() || 'default';

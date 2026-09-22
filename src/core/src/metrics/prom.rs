@@ -123,12 +123,16 @@ impl Admission {
         match bounds.check(timestamp) {
             Ok(()) => true,
             Err(reason) => {
-                self.rejected += 1;
-                self.last_rejection = Some(reason);
-                reason.count(&self.policies.org_id, stream_name);
+                self.reject(stream_name, reason);
                 false
             }
         }
+    }
+
+    fn reject(&mut self, stream_name: &str, reason: ingest::OutOfBounds) {
+        self.rejected += 1;
+        self.last_rejection = Some(reason);
+        reason.count(&self.policies.org_id, stream_name);
     }
 }
 
@@ -414,10 +418,13 @@ pub async fn remote_write(
         {
             sample_count += event.samples.len();
             // no iterator may live across this await, or the handler loses axum's `Handler` bound
-            let has_writable = event
-                .samples
-                .iter()
-                .any(|s| super::sanitize_metric_value(s.value).is_some());
+            let has_writable = event.samples.iter().any(|s| {
+                super::sanitize_metric_value(s.value).is_some()
+                    && policy
+                        .bounds
+                        .check(parse_i64_to_timestamp_micros(s.timestamp))
+                        .is_ok()
+            });
             if has_writable && !gate.admit().await {
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
                 return Ok(());
@@ -439,10 +446,11 @@ pub async fn remote_write(
         for (name, value) in label_pairs {
             labels.insert(name.into_owned(), json::Value::String(value.into_owned()));
         }
-        // a pipeline rewrites the labels the identity derives from, UDS trimming drops some of them
-        let known_hash = (!stream_executable_pipelines
+        let has_pipeline = stream_executable_pipelines
             .get(&metric_name)
-            .is_some_and(|v| !v.is_empty())
+            .is_some_and(|v| !v.is_empty());
+        // a pipeline rewrites the labels the identity derives from, UDS trimming drops some of them
+        let known_hash = (!has_pipeline
             && !matches!(user_defined_schema_map.get(&metric_name), Some(Some(_))))
         .then_some(series_hash);
 
@@ -456,16 +464,16 @@ pub async fn remote_write(
             let Some(sample_val) = super::sanitize_metric_value(sample.value) else {
                 continue;
             };
+            // refused before the election, so a replica with nothing to write cannot lead
+            let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
+            if !has_pipeline && !admission.admit(&metric_name, policy.bounds, timestamp) {
+                continue;
+            }
 
             if !gate.admit().await {
                 // do not accept any entries for this request
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
                 return Ok(());
-            }
-
-            let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
-            if !admission.admit(&metric_name, policy.bounds, timestamp) {
-                continue;
             }
             // the last sample owns the label set outright; nothing reads it afterwards
             let value = if can_move_labels && sample_idx + 1 == sample_total {
@@ -537,13 +545,24 @@ pub async fn remote_write(
         );
     }
 
-    let (pipeline_outputs, _) = ingest::run_pipelines(
+    let (mut pipeline_outputs, _) = ingest::run_pipelines(
         org_id,
         &stream_executable_pipelines,
         stream_pipeline_inputs,
         &user_defined_schema_map,
         &mut stream_partitioning_map,
     )
+    .await;
+    let Admission {
+        policies,
+        rejected,
+        last_rejection,
+    } = &mut admission;
+    ingest::admit_pipeline_outputs(&mut pipeline_outputs, policies, |stream, reason| {
+        *rejected += 1;
+        *last_rejection = Some(reason);
+        reason.count(org_id, stream);
+    })
     .await;
     for (stream_name, records) in pipeline_outputs {
         // a pipeline rewrote the labels, so the series hash is recomputed from its output
@@ -1166,16 +1185,9 @@ async fn buffer_native_histograms(
     let mut counted = 0;
     for hp in histograms {
         counted += 1;
-        let records = expand_native_histogram(hp, limits);
-        if records.is_empty() {
-            // unsupported schema or stale marker: nothing will be written
-            continue;
-        }
-        if !gate.admit().await {
-            return None;
-        }
         let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
-        for (suffix, le, value) in records {
+        let mut admitted = Vec::new();
+        for (suffix, le, value) in expand_native_histogram(hp, limits) {
             let Some(value) = super::sanitize_metric_value(value) else {
                 continue;
             };
@@ -1183,11 +1195,28 @@ async fn buffer_native_histograms(
                 .iter()
                 .position(|s| *s == suffix)
                 .unwrap();
-            let (stream_name, hist_labels) = &mut derived_streams[idx];
-            let bounds = admission.policies.get(stream_name).await.bounds;
-            if !admission.admit(stream_name, bounds, timestamp) {
-                continue;
+            let stream_name = &derived_streams[idx].0;
+            let has_pipeline = sink
+                .pipelines
+                .get(stream_name)
+                .is_some_and(|v| !v.is_empty());
+            if !has_pipeline {
+                let bounds = admission.policies.get(stream_name).await.bounds;
+                if !admission.admit(stream_name, bounds, timestamp) {
+                    continue;
+                }
             }
+            admitted.push((idx, le, value));
+        }
+        if admitted.is_empty() {
+            // unsupported schema, stale marker or refused timestamps: nothing will be written
+            continue;
+        }
+        if !gate.admit().await {
+            return None;
+        }
+        for (idx, le, value) in admitted {
+            let (stream_name, hist_labels) = &mut derived_streams[idx];
             if let Some(le) = le {
                 hist_labels.insert(BUCKET_LABEL.to_string(), json::Value::String(le));
             }
