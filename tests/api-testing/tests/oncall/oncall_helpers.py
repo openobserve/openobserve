@@ -135,14 +135,24 @@ def oncall_enabled(client: OpenObserveClient, org: str) -> bool:
     An earlier version read `config.oncall_enabled`, which is what the issue
     report quoted — but a current enterprise build does not publish that key at
     all, so the gate skipped all 104 tests against a server that was serving
-    on-call perfectly well. A 200 (or a 403, which is still the route answering)
-    means the feature is there; a 404 means this build does not carry it.
+    on-call perfectly well.
+
+    A 200 (or a 403, which is still the route answering) means the feature is
+    there; a 404 means this build does not carry it. ANYTHING ELSE RAISES, and
+    deliberately so: this gate is autouse and session-scoped, so returning False
+    for a 500 would skip every on-call test and report a green run against a
+    broken server. A deployment that cannot answer is not a deployment without
+    the feature, and the two must not collapse into the same silent skip.
     """
-    try:
-        resp = client.get("oncall/teams", org=org)
-    except requests.RequestException:
+    resp = client.get("oncall/teams", org=org)
+    if resp.status_code in (200, 403):
+        return True
+    if resp.status_code == 404:
         return False
-    return resp.status_code in (200, 403)
+    raise AssertionError(
+        f"on-call probe failed: HTTP {resp.status_code} on {org}/oncall/teams — "
+        f"{resp.text[:200]}"
+    )
 
 
 def shift_rule(name: str, members: list[str], *, priority: int = 0,

@@ -272,10 +272,18 @@ test.describe('On-call covers, swaps and absences', {
 
     const holderA = (await holdersAt(page, team.id, midA)).Primary;
     const holderB = (await holdersAt(page, team.id, midB)).Primary;
-    test.skip(
-      !holderA || !holderB || holderA === holderB,
-      'a swap needs two windows held by different people; this roster produced one holder',
-    );
+    // An ASSERTION, not a skip. The two windows are chosen to land in CONSECUTIVE
+    // shifts: `stageTeam` anchors a 7-day rotation half a shift back, so the
+    // boundary sits at t0+3.5d and midA (t0+2.5d) and midB (t0+5.5d) fall either
+    // side of it. With a three-person roster they are different people every
+    // time. Same holder means shift resolution has regressed, and skipping would
+    // retire the swap case precisely then.
+    expect(holderA, 'the first window must resolve to a holder').toBeTruthy();
+    expect(holderB, 'the second window must resolve to a holder').toBeTruthy();
+    expect(
+      holderA,
+      'the two windows straddle a shift boundary, so they must be held by different people',
+    ).not.toBe(holderB);
 
     // The swap, written the way the dialog writes it: crosswise, with
     // `covering_for` naming whose hours each person is standing in.

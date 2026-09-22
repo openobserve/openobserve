@@ -326,7 +326,7 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     await pm.oncallTeamsPage.search(name);
     const row = pm.oncallTeamsPage.getRows();
     await expect(row, 'the team must exist').toHaveCount(1);
-    const teamId = (await row.first().getAttribute('data-test')).replace('oncall-team-edit-', '');
+    const teamId = await pm.oncallTeamsPage.readFirstRowTeamId();
 
     // ANCHOR FIRST. Both assertions below are about something NOT being there,
     // and an empty list is what a failed read looks like too. So establish that

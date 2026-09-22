@@ -205,6 +205,11 @@ export class OnCallRoutingPage {
    */
   getConfirmDialogProvider() { return this.page.locator(this.locators.confirmDialogProvider); }
 
+  /** A dialog's confirm button. ODialog names it `o-dialog-primary-btn`; scope it to the panel, since several dialogs can be mounted at once. */
+  getDialogPrimary(dialogSelector) {
+    return this.page.locator(`${dialogSelector} [data-test="o-dialog-primary-btn"]`).first();
+  }
+
   // ---------------------------------------------------------------- navigation
 
   /** @param {string} orgId the org **identifier** (ksuid), never the display name. */

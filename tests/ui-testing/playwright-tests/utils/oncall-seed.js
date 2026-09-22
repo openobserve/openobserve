@@ -190,7 +190,15 @@ async function isOnCallAvailable(page) {
         : `on-call is not available here (HTTP ${res.status()}) — OSS build or O2_ONCALL_ENABLED unset`,
     };
   }
-  return { available: false, reason: `on-call probe failed: HTTP ${res.status()} — ${body.slice(0, 200)}` };
+  // A THROW, not another `available: false`. Every spec calls this in
+  // `beforeEach` and skips on a false, so returning one here turns any backend
+  // fault into a silent pass: a 500 on this one route would skip all 106 tests
+  // and report both shards green. Only 404 and 403 "Not Supported" say the
+  // feature is absent; a 500, 502 or 401 says the deployment is broken, and a
+  // broken deployment must fail the suite rather than excuse it.
+  throw new Error(
+    `on-call probe failed: HTTP ${res.status()} on /oncall/teams — ${body.slice(0, 200)}`,
+  );
 }
 
 // -------------------------------------------------------------------- teams

@@ -33,6 +33,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { OnCallAckPage } = require('../../pages/oncallPages/oncallAckPage.js');
 const {
   isOnCallAvailable,
   createTeam,
@@ -494,15 +495,16 @@ test.describe('On-call onboarding', {
 
     // It must declare a viewport, or a phone renders it at desktop width and
     // zooms out until the button is unhittable.
-    const viewportMeta = await small.locator('meta[name="viewport"]').getAttribute('content');
+    const ackPage = new OnCallAckPage(small);
+    const viewportMeta = await ackPage.readViewportMeta();
     expect(viewportMeta, 'a page opened on a phone must declare a viewport').toBeTruthy();
     expect(viewportMeta, 'and must scale to the device rather than assume a desktop width')
       .toMatch(/width=device-width/);
 
     // The two things the page exists for.
-    const button = small.locator('form button[type="submit"]').first();
+    const button = ackPage.getAcknowledgeButton();
     await expect(button, 'the acknowledge button must be on screen').toBeVisible({ timeout: 20000 });
-    await expect(small.locator('form input[name="token"]'),
+    await expect(ackPage.getTokenField(),
       'and the form must carry the token that identifies the page')
       .toHaveCount(1);
 

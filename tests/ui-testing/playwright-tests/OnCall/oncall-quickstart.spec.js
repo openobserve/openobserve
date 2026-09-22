@@ -284,10 +284,16 @@ test.describe('On-call Quick start', {
     await addTeamMembers(page, team.id, [memberEmail]);
 
     const stored = await getTeamSchedule(page, team.id);
-    test.skip(
-      (stored?.rotations ?? []).length === 0,
-      'this team has no rotations, so there is nothing for the replace guard to confirm',
-    );
+    // An ASSERTION, not a skip: putting the FIRST member on a team with no
+    // schedule auto-provisions a `source: "default"` rotation — verified against
+    // this build, where the team goes 0 -> 1 rotations on that write. So an empty
+    // schedule here is that auto-provisioning having regressed, which is the
+    // precondition Quick start's replace guard exists for; skipping would retire
+    // the case exactly when it started mattering.
+    expect(
+      (stored?.rotations ?? []).length,
+      'adding the first member must auto-provision a rotation for Quick start to replace',
+    ).toBeGreaterThan(0);
 
     await openQuickStartOn(team.id);
     await pm.oncallTeamDetailPage.applyQuickStart();

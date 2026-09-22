@@ -10,11 +10,13 @@
  * SHADOWING IS THE SERVER'S VERDICT. Deciding that rule A is shadowed means
  * comparing every rule against every other, including rules a team-scoped
  * screen never fetched, so `health` comes from `ownership/stats` and is READ
- * here, never recomputed. That is also why these tests ask the server which
- * rule it considers shadowed instead of assuming the overlapping pair they seed
- * produces one: if the analysis does not call either rule shadowed, there is
- * nothing for the UI to surface and the test skips with that as the reason
- * rather than failing the screen for the engine's judgement.
+ * here, never recomputed. These tests therefore ask the server which rule it
+ * considers shadowed rather than recomputing it — but they ASSERT that it named
+ * one, they do not skip. `seedOverlappingRules` writes `{service}` and
+ * `{service, namespace}` deliberately, and the narrower rule shadows the
+ * broader one; verified against this build, which returns `health: "shadowed"`
+ * on the broad rule. "Neither is shadowed" is a regression in the analysis, and
+ * skipping on it would quietly retire every case below.
  *
  * WHERE MAIN DIVERGES FROM THE PLAN. §11.4 asks for the finding ABOVE the
  * table. On main it is not there, and cannot be: the org routing screen renders
@@ -180,10 +182,16 @@ test.describe('On-call routing rules', {
     const { broad, narrow } = await seedOverlappingRules(page, testInfo);
 
     const shadowed = await findShadowedRule(page, [broad.id, narrow.id]);
-    test.skip(
-      !shadowed,
-      'the server\'s shadowing analysis calls neither seeded rule shadowed, so there is no verdict for the screen to surface',
-    );
+    // An ASSERTION, not a skip. `seedOverlappingRules` writes `{service}` and
+    // `{service, namespace}` on purpose, and the more specific rule shadows the
+    // broader one — verified against this build, which reports the broad rule
+    // `health: "shadowed"`. So "neither is shadowed" is never an environment
+    // fact here, it is the shadowing analysis having regressed, and skipping on
+    // it would retire the only coverage of the thing this case exists for.
+    expect(
+      shadowed,
+      'the server called neither seeded rule shadowed — the narrower rule must shadow the broader one',
+    ).toBeTruthy();
 
     await pm.oncallRoutingPage.goto(ORG);
     await pm.oncallRoutingPage.selectTab('rules');
@@ -226,10 +234,16 @@ test.describe('On-call routing rules', {
     const { broad, narrow } = await seedOverlappingRules(page, testInfo);
 
     const shadowed = await findShadowedRule(page, [broad.id, narrow.id]);
-    test.skip(
-      !shadowed,
-      'the server\'s shadowing analysis calls neither seeded rule shadowed, so there is no verdict for the screen to surface',
-    );
+    // An ASSERTION, not a skip. `seedOverlappingRules` writes `{service}` and
+    // `{service, namespace}` on purpose, and the more specific rule shadows the
+    // broader one — verified against this build, which reports the broad rule
+    // `health: "shadowed"`. So "neither is shadowed" is never an environment
+    // fact here, it is the shadowing analysis having regressed, and skipping on
+    // it would retire the only coverage of the thing this case exists for.
+    expect(
+      shadowed,
+      'the server called neither seeded rule shadowed — the narrower rule must shadow the broader one',
+    ).toBeTruthy();
     const ruleId = shadowed.rule_id ?? shadowed.id;
     const owningTeamId = shadowed.team_id;
 
@@ -410,7 +424,10 @@ test.describe('On-call routing rules', {
   }, async ({ page }, testInfo) => {
     const { broad, narrow } = await seedOverlappingRules(page, testInfo);
     const shadowed = await findShadowedRule(page, [broad.id, narrow.id]);
-    test.skip(!shadowed, 'no shadowed rule to read a verdict from');
+    expect(
+      shadowed,
+      'the server called neither seeded rule shadowed — the narrower rule must shadow the broader one',
+    ).toBeTruthy();
 
     await pm.oncallRoutingPage.goto(ORG);
     await pm.oncallRoutingPage.selectTab('rules');
@@ -783,8 +800,8 @@ test.describe('On-call routing rules', {
       await pm.oncallRoutingPage.selectOption(
         pm.oncallRoutingPage.locators.defaultTeamSelect, team.id, name,
       );
-      await page
-        .locator(`${pm.oncallRoutingPage.locators.defaultTeamDialog} [data-test="o-dialog-primary-btn"]`)
+      await pm.oncallRoutingPage
+        .getDialogPrimary(pm.oncallRoutingPage.locators.defaultTeamDialog)
         .click();
 
       // The unstaffed warning: a second dialog, naming the team and what it
@@ -807,7 +824,9 @@ test.describe('On-call routing rules', {
         'and say plainly that pages to it will reach nobody',
       ).toContainText(/nobody|no one/i);
 
-      await warning.locator('[data-test="o-dialog-primary-btn"]').first().click();
+      await pm.oncallRoutingPage
+        .getDialogPrimary(pm.oncallRoutingPage.locators.confirmDialogProvider)
+        .click();
       await expect(warning, 'confirming must close the warning').toBeHidden({ timeout: 20000 });
 
       await expect

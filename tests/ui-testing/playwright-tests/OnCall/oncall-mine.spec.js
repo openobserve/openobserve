@@ -477,7 +477,12 @@ test.describe('On-call — my duty, my inbox, my history', {
     // SECOND record; inside it the re-firing lands on the record just closed.
     // Waited explicitly rather than hidden inside a long poll, so the reason a
     // reader sees in the log is the real one.
-    const FLAP_DAMPENING_MS = 300_000;
+    // Read from the environment, not assumed. The window is
+    // `O2_ONCALL_FLAP_DAMPENING_SECS` (o2_enterprise common/config.rs, default
+    // 300) — an env var a deployment can override, so a hardcoded 300s would
+    // under-wait on a longer one and fail for a reason that reads as flake.
+    const FLAP_DAMPENING_MS =
+      Number(process.env.O2_ONCALL_FLAP_DAMPENING_SECS || 300) * 1000;
     testLogger.info('TS-20.01 waiting out the flap-dampening window before re-firing', {
       seconds: FLAP_DAMPENING_MS / 1000,
     });
@@ -492,7 +497,10 @@ test.describe('On-call — my duty, my inbox, my history', {
       }, {
         timeout: 240000,
         intervals: [3000],
-        message: 'the rule never fired a second time, so there is no "next firing" to read history on',
+        message: 'the rule never fired a second time, so there is no "next firing" to read history on '
+          + `— if this deployment runs a dampening window longer than ${FLAP_DAMPENING_MS / 1000}s, `
+          + 'the re-firing landed on the record just closed instead of opening a new one; set '
+          + 'O2_ONCALL_FLAP_DAMPENING_SECS to match',
       })
       .toBe(true);
     const all = await listResponses(page, { teamId: team.id, includeResolved: true });

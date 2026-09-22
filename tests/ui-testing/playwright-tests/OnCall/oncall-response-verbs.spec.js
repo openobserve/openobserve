@@ -645,10 +645,11 @@ test.describe('On-call response verbs', {
       .toBeGreaterThan(0);
 
     const promoted = await promoteResponse(page, id, { title: `${f.prefix} promoted` });
-    test.skip(
-      promoted.status === 404 || promoted.status === 501,
-      `promotion is not available on this deployment — HTTP ${promoted.status}`,
-    );
+    // No availability skip here. `id` was just read successfully two calls above,
+    // so a 404 cannot mean "no such record" — it can only mean the promote route
+    // is gone, which is a regression this suite exists to catch rather than
+    // excuse. The 501 half never fired either: nothing in the on-call module
+    // returns Not Implemented, and the route is registered wherever on-call is.
     expect(promoted.status, 'promoting an open page must be accepted').toBe(200);
 
     const after = await listResponses(page, { teamId: f.team.id, includeResolved: true });
@@ -700,8 +701,18 @@ test.describe('On-call response verbs', {
     await pm.oncallPagesListPage.goto(ORG);
     await pm.oncallPagesListPage.filterByTeam(f.team.id);
 
+    // WAIT, do not skip. `seedOpenPage` fired a real page for this very team, so
+    // an empty list is the page failing to reach the screen, not an environment
+    // without rows — and skipping on it retires the bulk-acknowledge case exactly
+    // when the list stops showing what was paged.
+    await expect
+      .poll(async () => (await pm.oncallPagesListPage.readRowKeys()).length, {
+        timeout: 60000,
+        intervals: [1000],
+        message: 'the page this test fired never reached the list for its own team',
+      })
+      .toBeGreaterThan(0);
     const keys = await pm.oncallPagesListPage.readRowKeys();
-    test.skip(keys.length === 0, 'no rows for this team reached the list to act on in bulk');
 
     // Select everything on the page and acknowledge it in one go.
     await pm.oncallPagesListPage.getSelectAll().click();

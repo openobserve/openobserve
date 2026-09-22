@@ -93,11 +93,16 @@ def ladders(oncall: OnCallClient, responders: list[str]) -> dict[str, dict]:
 
     both = [user_target(e) for e in responders]
     one = [user_target(responders[0])]
-    # Email is listed first so a deployment WITH SMTP exercises the
-    # person-addressed chain too; the webhook rung is what makes it land
-    # without one. The invariant under test does not depend on which took it.
+    # WEBHOOK FIRST, and the order is load-bearing. The engine takes the first
+    # channel a rung names and stops, so listing email first meant the hermetic
+    # webhook never fired at all: in a lane with no mail sink the only ledger row
+    # was `email ... failed: Connection refused`, nothing landed, and the two
+    # assertions below reported the delivery pipeline broken when what was
+    # missing was SMTP. The invariant under test does not depend on which
+    # channel carried it, so it takes the one that needs nothing outside the
+    # instance. `SINK_DEST` posts to this instance's own ingest endpoint.
     assert oncall.set_policy(
-        delivers, [ladder(both, channels=["email", "webhook"])],
+        delivers, [ladder(both, channels=["webhook", "email"])],
         destinations=[SINK_DEST]).status_code == 200
     assert oncall.set_policy(
         dead, [ladder(one, channels=["webhook"])],
