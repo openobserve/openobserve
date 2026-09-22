@@ -15,6 +15,8 @@
 
 // refer: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/fmt/trait.FormatEvent.html#examples
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use chrono::{Local, Utc};
 use tracing::{Event, Subscriber};
 use tracing_log::NormalizeEvent;
@@ -26,6 +28,11 @@ use tracing_subscriber::{
     },
     registry::LookupSpan,
 };
+
+/// Tracing target of the tower OpenTelemetry middleware spans.
+pub const OTEL_MIDDLEWARE_TARGET: &str = "otel::tracing";
+
+static OTEL_LAYER_INSTALLED: AtomicBool = AtomicBool::new(false);
 
 pub struct CustomTimeFormat;
 
@@ -82,6 +89,25 @@ where
     }
 }
 
+/// Records that the global subscriber carries an OpenTelemetry layer.
+pub fn mark_otel_layer_installed() {
+    OTEL_LAYER_INSTALLED.store(true, Ordering::Relaxed);
+}
+
+/// Server middleware filter; without an OTel layer `set_parent` WARNs on every request.
+pub fn otel_middleware_enabled(_path: &str) -> bool {
+    middleware_span_wanted(OTEL_LAYER_INSTALLED.load(Ordering::Relaxed))
+}
+
+fn middleware_span_wanted(otel_layer_installed: bool) -> bool {
+    otel_layer_installed
+        && tracing::enabled!(
+            kind: tracing::metadata::Kind::SPAN,
+            target: OTEL_MIDDLEWARE_TARGET,
+            tracing::Level::TRACE
+        )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,5 +158,27 @@ mod tests {
 
         // Buffer should contain some output
         assert!(!buffer.is_empty());
+    }
+
+    #[test]
+    fn test_otel_middleware_enabled_needs_otel_layer_and_target() {
+        use tracing_subscriber::{filter::Targets, prelude::*};
+
+        let _second = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+        let info_only = tracing_subscriber::registry()
+            .with(Targets::new().with_default(tracing_subscriber::filter::LevelFilter::INFO));
+        tracing::subscriber::with_default(info_only, || {
+            assert!(!middleware_span_wanted(true));
+            assert!(!middleware_span_wanted(false));
+        });
+        let otel = tracing_subscriber::registry().with(Targets::new().with_target(
+            OTEL_MIDDLEWARE_TARGET,
+            tracing_subscriber::filter::LevelFilter::TRACE,
+        ));
+        tracing::subscriber::with_default(otel, || {
+            assert!(middleware_span_wanted(true));
+            assert!(!middleware_span_wanted(false));
+            assert!(!otel_middleware_enabled("/"));
+        });
     }
 }
