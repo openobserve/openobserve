@@ -1,0 +1,26 @@
+{
+  "feature_slug": "splunk-hec-endpoint",
+  "feature_title": "Splunk HEC Ingestion Endpoint",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "splunk-hec.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/splunk-hec.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/ingestion/logs/SplunkHec.vue",
+    "web/src/components/ingestion/logs/SplunkHec.spec.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Both changed paths live under web/src/components/ingestion/logs/ (SplunkHec.vue and SplunkHec.spec.ts), which is open-source frontend. No enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/) and no enterprise keywords (SAML/SSO/RBAC/SDR/etc.) in the paths or symbols, so edition is oss.",
+    "skip": "Not skipped. The trigger comment and feature hint are empty (no tests-added label or explicit skip marker), and the change is user-facing: SplunkHec.vue alters what the ingestion card displays. It is a real UI/behavior change, not docs-only or CI-only.",
+    "e2e": "E2E is warranted. SplunkHec.vue now builds the collector base from getEndPoint(getIngestionURL()).url instead of window.location.origin, which changes the user-visible endpoint URL, the curl example, and the health-probe URL shown in the Splunk HEC ingestion card, and it changes ZO_BASE_URI handling. This is a user-facing UI flow that needs verification.",
+    "area": "The change lives in web/src/components/ingestion/logs/ (the Splunk HEC ingestion card), and the closest existing sibling spec is ingestion-config.spec.js, which the ci_matrix files place under the GeneralTests folder/group. Ingestion configuration is a shared/general UI, not the logs search page, so GeneralTests is the right area.",
+    "group": "The GeneralTests group in ci_matrix already owns ingestion-config.spec.js, the direct sibling covering ingestion configuration, so the new Splunk HEC spec belongs in the same shard.",
+    "existing_tests": "No E2E specs in the diff — the only test file changed is web/src/components/ingestion/logs/SplunkHec.spec.ts, a Vitest unit test, not a Playwright spec under tests/ui-testing/playwright-tests/. It does not constitute E2E coverage and does not set existing_tests_in_diff."
+  }
+}

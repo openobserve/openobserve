@@ -1,0 +1,9 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/splunk-hec-ingestion-window.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/splunk-hec-ingestion-window.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "splunk-hec-ingestion-window.spec.js already covers 5 of 6 workflows (window banner role=alert + both keys, tokens-link navigation, all three banners, copy-all-four + toast, live fractional payload time + curl time-omission). Three WIRED behaviors remain uncovered by E2E: (1) the auth header snippet 'Authorization: Splunk <token>' (SplunkHec.vue:184), (2) the unauthenticated health probe '/services/collector/health' (SplunkHec.vue:218), and (3) the curl example's collector URL + 'Authorization: Splunk [SPLUNK_HEC_TOKEN]' line. These are new test() cases appended to the existing spec. Also flagged as an EXTEND (in-plan): the existing endpoint test asserts endpoint === window.location.origin, which is the pre-change behavior the feature removed (endpoint is now getEndPoint(getIngestionURL()).url); that assertion must be revised to track the configured ingest host, not the browser origin. No new spec/registration needed — the file is already in ci_matrix.json under GeneralTests."
+}
