@@ -1,0 +1,26 @@
+{
+  "feature_slug": "shortcut-cheatsheet-gating",
+  "feature_title": "Keyboard Shortcut Cheatsheet Entry Gating (AI Chat)",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "shortcut-cheatsheet-gating.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/shortcut-cheatsheet-gating.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/lib/vue-shortcut-manager/ShortcutCheatsheet.vue",
+    "web/src/lib/vue-shortcut-manager/shortcutRegistry.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path in changed_files.txt lives under web/src/** (lib/vue-shortcut-manager, locales/languages) and scripts/translations/** — none are in enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/). The diff references enterprise config flags (ai_enabled, isEnterprise, rbac_enabled) but only as capability gates inside OSS shared code (web/src/lib/vue-shortcut-manager/), so the change itself is OSS.",
+    "skip": "Not skipped. No explicit opt-out: trigger_comment.txt and feature_hint.txt are empty and no tests-added label was passed in context. The change is user-facing — it alters ShortcutCheatsheet.vue to filter shortcut entries by capability gates — so it is not docs-only/CI-only/comment-only.",
+    "e2e": "E2E is warranted. The keyboard shortcut cheatsheet dialog now conditionally renders entries: the AI chat shortcut is hidden on OSS and cloud, and shown only on enterprise with ai_enabled enabled. This is a new capability-gated UI state that a Playwright spec can verify by opening the cheatsheet and asserting the AI chat entry's presence/absence across editions/config.",
+    "area": "The bulk of the UI change is in web/src/lib/vue-shortcut-manager/ShortcutCheatsheet.vue — a global, app-level component (keyboard shortcut cheatsheet) rather than a Logs/Metrics/Traces/Dashboards surface. Sibling app-level specs (sanity, theme-management, landingPage, languageTranslation) live under the GeneralTests folder, so GeneralTests is the closest fit.",
+    "group": "GeneralTests is an existing shard in the ci-matrix (the enterprise overlay's append.GeneralTests already adds cipherKeys/logoManagement/model-pricing), so the new spec should join the GeneralTests run_files group.",
+    "existing_tests": "No E2E specs in the diff. The only test file changed is web/src/lib/vue-shortcut-manager/__tests__/shortcutRegistry.spec.ts, a Vitest unit test — not Playwright E2E coverage — so no E2E specs in the diff."
+  }
+}
