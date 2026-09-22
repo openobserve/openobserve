@@ -44,7 +44,10 @@ use db::{self, alerts::alert::cache_stream_key};
 use infra::schema::SchemaCache;
 use ingestion_common::{IngestionResponse, StreamStatus};
 
-use super::ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream};
+use super::{
+    admission,
+    ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream},
+};
 use crate::{
     common::meta::{authz::Authz, stream::SchemaRecords},
     ingestion::{TriggerAlertData, check_ingestion_allowed},
@@ -67,7 +70,7 @@ struct StreamLookups {
     need_all_values: HashMap<String, bool>,
     partitions: HashMap<String, Vec<StreamPartition>>,
     alerts: HashMap<String, Vec<Alert>>,
-    policies: ingest::StreamPolicies,
+    policies: admission::StreamPolicies,
 }
 
 impl StreamLookups {
@@ -80,7 +83,7 @@ impl StreamLookups {
             need_all_values: HashMap::new(),
             partitions: HashMap::new(),
             alerts: HashMap::new(),
-            policies: ingest::StreamPolicies::new(org_id, now),
+            policies: admission::StreamPolicies::new(org_id, now),
         }
     }
 }
@@ -248,7 +251,7 @@ fn refuse_record(
     stream_status_map: &mut HashMap<String, StreamStatus>,
     org_id: &str,
     stream_name: &str,
-    reason: ingest::OutOfBounds,
+    reason: admission::OutOfBounds,
 ) {
     let status = stream_status_map
         .entry(stream_name.to_string())
@@ -492,7 +495,7 @@ pub async fn ingest(
             stream_status.status.error = message;
         }
     }
-    ingest::admit_pipeline_outputs(
+    admission::admit_pipeline_outputs(
         &mut pipeline_outputs,
         &mut lookups.policies,
         |stream, reason| refuse_record(&mut stream_status_map, org_id, stream, reason),

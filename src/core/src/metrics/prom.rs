@@ -52,7 +52,7 @@ use schema::stream_schema_exists;
 use search_service;
 
 use super::{
-    columnar, ingest,
+    admission, columnar, ingest,
     native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, ExpansionLimits, expand_native_histogram},
     prom_decode,
 };
@@ -99,15 +99,15 @@ impl HaGate<'_> {
 
 /// The per-stream policies plus the samples they refused; remote-write can only log those.
 struct Admission {
-    policies: ingest::StreamPolicies,
+    policies: admission::StreamPolicies,
     rejected: usize,
-    last_rejection: Option<ingest::OutOfBounds>,
+    last_rejection: Option<admission::OutOfBounds>,
 }
 
 impl Admission {
     fn new(org_id: &str, now: i64) -> Self {
         Self {
-            policies: ingest::StreamPolicies::new(org_id, now),
+            policies: admission::StreamPolicies::new(org_id, now),
             rejected: 0,
             last_rejection: None,
         }
@@ -117,7 +117,7 @@ impl Admission {
     fn admit(
         &mut self,
         stream_name: &str,
-        bounds: ingest::TimestampBounds,
+        bounds: admission::TimestampBounds,
         timestamp: i64,
     ) -> bool {
         match bounds.check(timestamp) {
@@ -129,7 +129,7 @@ impl Admission {
         }
     }
 
-    fn reject(&mut self, stream_name: &str, reason: ingest::OutOfBounds) {
+    fn reject(&mut self, stream_name: &str, reason: admission::OutOfBounds) {
         self.rejected += 1;
         self.last_rejection = Some(reason);
         reason.count(&self.policies.org_id, stream_name);

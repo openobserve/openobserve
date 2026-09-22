@@ -55,6 +55,7 @@ use prost::Message;
 use schema::stream_schema_exists;
 
 use super::{
+    admission,
     columnar::{self, ColumnarStream},
     ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream},
     native_histogram,
@@ -139,7 +140,7 @@ struct Admission<'a> {
     org_id: &'a str,
     metric_name: &'a str,
     pipelines: &'a mut HashMap<String, Vec<ExecutablePipeline>>,
-    policies: &'a mut ingest::StreamPolicies,
+    policies: &'a mut admission::StreamPolicies,
     partial_success: &'a mut ExportMetricsPartialSuccess,
 }
 
@@ -244,7 +245,7 @@ pub async fn handle_otlp_request(
 
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let mut policies = ingest::StreamPolicies::new(org_id, started_at);
+    let mut policies = admission::StreamPolicies::new(org_id, started_at);
 
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
@@ -577,7 +578,7 @@ pub async fn handle_otlp_request(
             }
         }
     }
-    ingest::admit_pipeline_outputs(&mut pipeline_outputs, &mut policies, |stream, reason| {
+    admission::admit_pipeline_outputs(&mut pipeline_outputs, &mut policies, |stream, reason| {
         reject_point(&mut partial_success, org_id, stream, reason)
     })
     .await;
@@ -916,7 +917,7 @@ fn reject_point(
     partial_success: &mut ExportMetricsPartialSuccess,
     org_id: &str,
     stream_name: &str,
-    reason: ingest::OutOfBounds,
+    reason: admission::OutOfBounds,
 ) {
     partial_success.rejected_data_points += 1;
     partial_success.error_message = reason.message();
