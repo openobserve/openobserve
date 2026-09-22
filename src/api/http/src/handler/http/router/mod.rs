@@ -23,7 +23,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
-use config::get_config;
+use config::{get_config, meta::user::UserRole};
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
@@ -269,27 +269,33 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     };
 
     // Validate authentication using extracted data
-    match oo_validator(&req_data, &auth_info).await {
-        Ok(result) => {
-            // Insert user_id into request headers for downstream handlers
-            parts.headers.insert(
-                header::HeaderName::from_static("user_id"),
-                header::HeaderValue::from_str(&result.user_email)
-                    .unwrap_or_else(|_| header::HeaderValue::from_static("")),
-            );
+    let result = match oo_validator(&req_data, &auth_info).await {
+        Ok(result) => result,
+        Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+    };
 
-            // Handle Prometheus POST hack - add content-type if missing
-            if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
-                parts.headers.insert(
-                    header::CONTENT_TYPE,
-                    header::HeaderValue::from_static("application/x-www-form-urlencoded"),
-                );
-            }
+    // Insert user_id into request headers for downstream handlers
+    parts.headers.insert(
+        header::HeaderName::from_static("user_id"),
+        header::HeaderValue::from_str(&result.user_email)
+            .unwrap_or_else(|_| header::HeaderValue::from_static("")),
+    );
+    let role = result.user_role.unwrap_or(UserRole::User);
+    parts.headers.insert(
+        header::HeaderName::from_static("user_role"),
+        header::HeaderValue::from_str(&role.to_string())
+            .unwrap_or_else(|_| header::HeaderValue::from_static("")),
+    );
 
-            next.run(Request::from_parts(parts, body)).await
-        }
-        Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+    // Handle Prometheus POST hack - add content-type if missing
+    if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
+        parts.headers.insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_static("application/x-www-form-urlencoded"),
+        );
     }
+
+    next.run(Request::from_parts(parts, body)).await
 }
 
 /// Authentication middleware for AWS routes
