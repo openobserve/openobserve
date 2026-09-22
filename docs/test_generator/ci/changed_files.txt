@@ -1,3 +1,0 @@
-web/src/lib/core/Table/OTable.spec.ts
-web/src/lib/core/Table/sub-components/OTableBodyRow.vue
-web/src/lib/core/Table/sub-components/OTableHeader.vue

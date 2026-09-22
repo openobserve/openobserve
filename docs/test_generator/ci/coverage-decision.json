@@ -1,9 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/otableSelectCell.spec.js",
-  "existing_tests_considered": [
-    "tests/ui-testing/playwright-tests/GeneralTests/model-pricing.spec.js"
-  ],
-  "needs_registration": true,
-  "rationale": "The feature (OTable selection-cell PADDING click) is a reusable-component interaction, not a model-pricing business journey. The only nearby spec, model-pricing.spec.js, is a 1070-line CRUD suite whose 'Bulk Actions' test clicks the CHECKBOX (button[role=checkbox] via checkRowByName) — it never exercises the select-cell padding, which is the actual behavior under test. The run-context assigns a dedicated spec path (otableSelectCell.spec.js), and the feature is clearly its own area, so a new GeneralTests spec keeps 'one spec = one feature area' without bloating model-pricing.spec.js. No existing spec in the repo touches td[data-test=o2-table-select-cell] or th[data-test=o2-table-th-select] (verified: only the OTable source + feature doc reference them)."
-}

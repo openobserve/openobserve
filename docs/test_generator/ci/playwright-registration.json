@@ -1,6 +1,0 @@
-{
-  "group": "GeneralTests",
-  "spec_filename": "otableSelectCell.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
