@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Degrades Prometheus native (sparse) histograms into their classic representation:
-//! `_count`, `_sum` and cumulative `le` `_bucket` records, so existing PromQL
-//! (`histogram_quantile` etc.) works on them unchanged.
+//! Degrades exponential-bucket histograms (Prometheus native, OTLP exponential) into
+//! their classic representation: `_count`, `_sum` and cumulative `le` `_bucket` records,
+//! so existing PromQL (`histogram_quantile` etc.) works on them unchanged.
 //!
 //! Known limitations, inherited from classic semantics:
 //! - `sum by (le)` is only sound across series sharing a bucket layout. Each native series carries
@@ -49,10 +49,94 @@ pub type ClassicHistogramRecord = (&'static str, Option<String>, f64);
 /// Prometheus's stale-marker bit pattern in `sum`; an ordinary NaN is NOT stale.
 const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
 
-/// Degrades one native histogram sample into classic records: cumulative `le` buckets
-/// closed by `le="inf"`. Empty for unsupported schemas and stale markers. A sample
-/// expanding to more than `max_buckets` `le` labels is downscaled (adjacent buckets
-/// merged) until it fits.
+/// Exponential-bucket histogram decoded to `(bucket index, count)` pairs, where bucket
+/// `idx` covers `(base^(idx-1), base^idx]` with `base = 2^(2^-schema)`, mirrored on the
+/// negative side. Both Prometheus native and OTLP exponential histograms reduce to this.
+pub struct ExponentialHistogram {
+    pub schema: i32,
+    pub count: f64,
+    /// `None` emits no `_sum` record (OTLP marks `sum` optional).
+    pub sum: Option<f64>,
+    pub zero_count: f64,
+    pub zero_threshold: f64,
+    pub positive: Vec<(i64, f64)>,
+    pub negative: Vec<(i64, f64)>,
+}
+
+impl ExponentialHistogram {
+    /// Degrades the sample into classic records: cumulative `le` buckets closed by
+    /// `le="inf"`. A sample expanding to more than `max_buckets` `le` labels, or finer
+    /// than schema 8, is downscaled (adjacent buckets merged) until it fits.
+    pub fn expand(self, max_buckets: usize) -> Vec<ClassicHistogramRecord> {
+        let Self {
+            mut schema,
+            count,
+            sum,
+            zero_count,
+            zero_threshold,
+            mut positive,
+            mut negative,
+        } = self;
+
+        // every emitted `le` label becomes a series, so merge adjacent buckets (halving
+        // resolution) until the sample's le count fits the cardinality budget
+        while (schema > *SCHEMA_RANGE.end()
+            || le_estimate(&positive, &negative, zero_count) > max_buckets.max(3))
+            && schema > MIN_DOWNSCALE_SCHEMA
+        {
+            schema -= 1;
+            positive = downscale(positive);
+            negative = downscale(negative);
+        }
+
+        let mut buckets: Vec<(f64, f64, f64)> = Vec::new(); // (lower, upper, count)
+        for &(idx, c) in &positive {
+            buckets.push((bucket_bound(schema, idx - 1), bucket_bound(schema, idx), c));
+        }
+        for &(idx, c) in &negative {
+            buckets.push((
+                -bucket_bound(schema, idx),
+                -bucket_bound(schema, idx - 1),
+                c,
+            ));
+        }
+        if zero_count > 0.0 {
+            buckets.push((-zero_threshold, zero_threshold, zero_count));
+        }
+
+        // classic buckets are cumulative in `le` order
+        buckets.sort_by(|a, b| a.1.total_cmp(&b.1));
+
+        let mut recs = Vec::with_capacity(2 * buckets.len() + 3);
+        recs.push(("_count", None, count));
+        if let Some(sum) = sum {
+            recs.push(("_sum", None, sum));
+        }
+
+        let mut points: Vec<(String, f64)> = Vec::with_capacity(2 * buckets.len() + 1);
+        let mut cumulative = 0.0;
+        let mut prev_upper = f64::NEG_INFINITY;
+        for (lower, upper, c) in buckets {
+            // a zero-increment record at the lower bound of each bucket run pins sparse
+            // gaps, so quantile interpolation cannot smear counts across them.
+            // `lower < upper` skips the marker when clamping collapsed both bounds.
+            if lower > prev_upper && lower < upper {
+                push_le_point(&mut points, format_le(lower), cumulative);
+            }
+            cumulative += c;
+            push_le_point(&mut points, format_le(upper), cumulative);
+            prev_upper = upper;
+        }
+        // `le="inf"` must equal `_count`; `max` also repairs a short count field
+        push_le_point(&mut points, format_le(f64::INFINITY), count.max(cumulative));
+
+        recs.extend(points.into_iter().map(|(le, v)| ("_bucket", Some(le), v)));
+        recs
+    }
+}
+
+/// Degrades one native histogram sample into classic records. Empty for unsupported
+/// schemas and stale markers.
 pub fn expand_native_histogram(
     hp: &prometheus_rpc::Histogram,
     max_buckets: usize,
@@ -82,61 +166,16 @@ pub fn expand_native_histogram(
         None => 0.0,
     };
 
-    let mut pos = span_buckets(&hp.positive_spans, &hp.positive_deltas, &hp.positive_counts);
-    let mut neg = span_buckets(&hp.negative_spans, &hp.negative_deltas, &hp.negative_counts);
-
-    // every emitted `le` label becomes a series, so merge adjacent buckets (halving
-    // resolution) until the sample's le count fits the cardinality budget
-    let mut schema = hp.schema;
-    while le_estimate(&pos, &neg, zero_count) > max_buckets.max(3) && schema > MIN_DOWNSCALE_SCHEMA
-    {
-        schema -= 1;
-        pos = downscale(pos);
-        neg = downscale(neg);
+    ExponentialHistogram {
+        schema: hp.schema,
+        count,
+        sum: Some(hp.sum),
+        zero_count,
+        zero_threshold: hp.zero_threshold,
+        positive: span_buckets(&hp.positive_spans, &hp.positive_deltas, &hp.positive_counts),
+        negative: span_buckets(&hp.negative_spans, &hp.negative_deltas, &hp.negative_counts),
     }
-
-    // bucket `idx` covers `(base^(idx-1), base^idx]`, mirrored on the negative side
-    let mut buckets: Vec<(f64, f64, f64)> = Vec::new(); // (lower, upper, count)
-    for &(idx, c) in &pos {
-        buckets.push((bucket_bound(schema, idx - 1), bucket_bound(schema, idx), c));
-    }
-    for &(idx, c) in &neg {
-        buckets.push((
-            -bucket_bound(schema, idx),
-            -bucket_bound(schema, idx - 1),
-            c,
-        ));
-    }
-    if zero_count > 0.0 {
-        buckets.push((-hp.zero_threshold, hp.zero_threshold, zero_count));
-    }
-
-    // classic buckets are cumulative in `le` order
-    buckets.sort_by(|a, b| a.1.total_cmp(&b.1));
-
-    let mut recs = Vec::with_capacity(2 * buckets.len() + 3);
-    recs.push(("_count", None, count));
-    recs.push(("_sum", None, hp.sum));
-
-    let mut points: Vec<(String, f64)> = Vec::with_capacity(2 * buckets.len() + 1);
-    let mut cumulative = 0.0;
-    let mut prev_upper = f64::NEG_INFINITY;
-    for (lower, upper, c) in buckets {
-        // a zero-increment record at the lower bound of each bucket run pins sparse
-        // gaps, so quantile interpolation cannot smear counts across them.
-        // `lower < upper` skips the marker when clamping collapsed both bounds.
-        if lower > prev_upper && lower < upper {
-            push_le_point(&mut points, format_le(lower), cumulative);
-        }
-        cumulative += c;
-        push_le_point(&mut points, format_le(upper), cumulative);
-        prev_upper = upper;
-    }
-    // `le="inf"` must equal `_count`; `max` also repairs a short count field
-    push_le_point(&mut points, format_le(f64::INFINITY), count.max(cumulative));
-
-    recs.extend(points.into_iter().map(|(le, v)| ("_bucket", Some(le), v)));
-    recs
+    .expand(max_buckets)
 }
 
 /// `le` label: 4 significant digits, shortest decimal ("0.5946", "8"). Cannot collide
