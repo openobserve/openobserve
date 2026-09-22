@@ -58,6 +58,13 @@ export class ModelPricingPage {
         this.deleteSelectedBtn  = page.locator('[data-test="model-pricing-delete-selected-btn"]');
 
         // ============================================================
+        // List page — selection gutter (OTable select cell / select-all)
+        // ============================================================
+        this.selectCell        = this.listTable.locator('tbody td[data-test="o2-table-select-cell"]');
+        this.selectAllCell     = this.listTable.locator('th[data-test="o2-table-th-select"]');
+        this.selectAllCheckbox = this.listTable.locator('[data-test="o2-table-select-all"] button[role="checkbox"]');
+
+        // ============================================================
         // Editor page
         // ============================================================
         this.editorBackBtn      = page.locator('[data-test="model-pricing-editor-back-btn"]');
@@ -229,6 +236,72 @@ export class ModelPricingPage {
         // OCheckbox renders as button[role="checkbox"] — data-test="o2-table-select-{id}"
         const checkbox = row.locator('button[role="checkbox"]').first();
         await checkbox.click();
+    }
+
+    // ----------------------------------------------------------------
+    // Selection gutter (OTable select cell / select-all)
+    // ----------------------------------------------------------------
+
+    async waitForFirstRowSelectCell() {
+        await expect(this.selectCell.first()).toBeVisible({ timeout: 15000 });
+    }
+
+    async clickFirstRowCheckbox() {
+        await this.selectCell.first().locator('button[role="checkbox"]').click();
+    }
+
+    async clickFirstRowSelectCellPadding() {
+        // Click near the right edge so the point lands on the empty padding, not
+        // the checkbox label (~x∈[14,28] of the 44px cell) — the feature under test.
+        const cell = this.selectCell.first();
+        const box = await cell.boundingBox();
+        await cell.click({
+            position: { x: box ? box.width - 4 : 40, y: box ? box.height / 2 : 15 },
+        });
+    }
+
+    async clickSelectAllCellPadding() {
+        const cell = this.selectAllCell;
+        const box = await cell.boundingBox();
+        await cell.click({
+            position: { x: box ? box.width - 4 : 40, y: box ? box.height / 2 : 15 },
+        });
+    }
+
+    async expectFirstRowCheckboxChecked() {
+        await expect(
+            this.selectCell.first().locator('button[role="checkbox"]')
+        ).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
+    }
+
+    async expectFirstRowCheckboxUnchecked() {
+        await expect(
+            this.selectCell.first().locator('button[role="checkbox"]')
+        ).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
+    }
+
+    async expectSelectAllCheckboxChecked() {
+        await expect(this.selectAllCheckbox).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
+    }
+
+    async expectSelectAllCheckboxUnchecked() {
+        await expect(this.selectAllCheckbox).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
+    }
+
+    async expectExportSelectedBtnVisible() {
+        await expect(this.exportSelectedBtn).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectExportSelectedBtnHidden() {
+        await expect(this.exportSelectedBtn).toBeHidden({ timeout: 10000 });
+    }
+
+    async expectAllVisibleRowsSelected() {
+        const rowCount = await this.listTable.locator('tbody tr[data-test^="o2-table-row-"]').count();
+        const checkedCount = await this.listTable
+            .locator('tbody button[role="checkbox"][data-state="checked"]')
+            .count();
+        await expect(checkedCount).toBe(rowCount);
     }
 
     async verifyModelInList(name) {
