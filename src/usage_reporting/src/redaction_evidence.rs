@@ -78,7 +78,8 @@ fn enqueue_rows(scope: &EvidenceScope, rows: Vec<RedactionEvidence>) {
     }
 }
 
-fn count_regions(scope: &EvidenceScope, row: &RedactionEvidence) {
+/// The enterprise engine enqueues its own rows, so it has to bump this counter itself.
+pub fn count_regions(scope: &EvidenceScope, row: &RedactionEvidence) {
     if row.redacted_regions == 0 {
         return;
     }
