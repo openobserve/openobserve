@@ -2046,6 +2046,9 @@
         "placeholder": "e.g. ingest-bot",
         "help": "Lowercase letters, numbers and hyphens. Saved as name{suffix}"
       },
+      "identifier": {
+        "label": "Identifier"
+      },
       "roles": {
         "label": "Assign roles",
         "create": "New role",

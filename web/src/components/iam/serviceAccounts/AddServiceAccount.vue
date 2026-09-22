@@ -45,6 +45,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop mt-2"
         />
 
+        <!-- The identifier is immutable after creation (it's the Basic-auth
+             username), so update mode shows it read-only instead of an
+             editable field — previously it wasn't shown at all here, leaving
+             no way to see what account you were editing. -->
+        <div v-if="beingUpdated" class="mt-2">
+          <label class="text-text-secondary mb-1 block text-xs font-medium">
+            {{ t("serviceAccounts.form.identifier.label") }}
+          </label>
+          <div
+            data-test="iam-add-service-account-identifier-display"
+            class="border-border-default bg-surface-subtle text-text-secondary rounded-default border px-3 py-2 text-sm"
+          >
+            {{ modelValue?.email }}
+          </div>
+        </div>
+
         <OFormInput
           name="first_name"
           :label="t('user.description')"
