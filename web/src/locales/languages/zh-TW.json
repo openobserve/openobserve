@@ -1954,6 +1954,7 @@
     "ok": "確定",
     "sendInvite": "傳送邀請",
     "inviteByEmail": "透過電子郵件邀請。多個電子郵件請以分號 (;) 或逗號 (,) 分隔。",
+    "inviteByEmailPlaceholder": "透過電子郵件邀請",
     "changePassword": "變更密碼",
     "oldPassword": "舊密碼",
     "newPassword": "新密碼",
@@ -5383,6 +5384,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "重新整理以套用最新變數變更",
       "refresh": "重新整理",
+      "refreshCacheReload": "重新整理快取並重新載入",
+      "moreRefreshOptions": "更多重新整理選項",
       "dashboard": "儀表板",
       "dashboardNotFound": "找不到儀表板或已被刪除。正在重新導向至儀表板清單。",
       "failedToLoadDashboard": "載入儀表板失敗。正在重新導向至儀表板清單。",

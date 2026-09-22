@@ -1954,6 +1954,7 @@
     "ok": "确定",
     "sendInvite": "发送邀请",
     "inviteByEmail": "通过电子邮件邀请。以分号 (;) 或逗号 (,) 分隔的多封电子邮件",
+    "inviteByEmailPlaceholder": "通过邮箱邀请",
     "changePassword": "更改密码",
     "oldPassword": "旧密码",
     "newPassword": "新密码",
@@ -5388,6 +5389,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "刷新以应用最新的变量更改",
       "refresh": "刷新",
+      "refreshCacheReload": "刷新缓存并重新加载",
+      "moreRefreshOptions": "更多刷新选项",
       "dashboard": "仪表盘",
       "dashboardNotFound": "未找到仪表盘或已被删除。正在重定向到仪表盘列表。",
       "failedToLoadDashboard": "加载仪表盘失败。正在重定向到仪表盘列表。",

@@ -20,3 +20,4 @@ pub mod result_order;
 pub(crate) mod rewrite;
 pub(crate) mod selector_visitor;
 pub mod selector_window;
+pub mod visitor;
