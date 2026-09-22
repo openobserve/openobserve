@@ -3126,7 +3126,6 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column("file_list_jobs", "dumped", "BOOLEAN default false not null").await?;
     add_column("stream_stats", "index_size", "BIGINT default 0 not null").await?;
     add_column("stream_stats", "mindex_size", "BIGINT DEFAULT 0 NOT NULL").await?;
-    add_column("steram", "mindex_size", "BIGINT DEFAULT 0 NOT NULL").await?;
     add_column(
         "stream_stats",
         "is_recent",
