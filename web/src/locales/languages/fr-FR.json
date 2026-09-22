@@ -13041,10 +13041,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Entrée provenant du span racine de la trace."
+              "trace": "Entrée provenant du span de chat racine de la trace.",
+              "session": "La question d'ouverture : entrée provenant du span de chat racine de la première trace."
             },
             "output": {
-              "trace": "Sortie provenant du span racine de la trace."
+              "trace": "Sortie provenant du span de chat racine de la trace.",
+              "session": "La réponse finale : sortie provenant du span de chat racine de la dernière trace."
             },
             "statistics": {
               "trace": "Métriques de trace : nombre de spans, durée, appels LLM et d'outils, erreurs, tokens et coût.",
@@ -13056,6 +13058,10 @@
             "steps": {
               "trace": "Spans dans l'ordre chronologique ; le milieu est replié lorsque la trace est très longue.",
               "session": "Traces dans l'ordre chronologique, représentées comme des tours de conversation."
+            },
+            "tool_calls": {
+              "trace": "Chaque appel d'outil dans la trace, par ordre chronologique, avec son nom, son entrée, sa sortie et son statut.",
+              "session": "Chaque appel d'outil dans les traces de la session, par ordre chronologique, avec son nom, son entrée, sa sortie et son statut."
             }
           }
         }
