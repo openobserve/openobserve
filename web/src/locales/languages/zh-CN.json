@@ -1954,6 +1954,7 @@
     "ok": "确定",
     "sendInvite": "发送邀请",
     "inviteByEmail": "通过电子邮件邀请。以分号 (;) 或逗号 (,) 分隔的多封电子邮件",
+    "inviteByEmailPlaceholder": "通过邮箱邀请",
     "changePassword": "更改密码",
     "oldPassword": "旧密码",
     "newPassword": "新密码",

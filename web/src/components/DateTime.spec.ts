@@ -604,7 +604,7 @@ describe("DateTime Component", () => {
       wrapper.vm.relativePeriod = "h";
       wrapper.vm.relativeValue = 1;
 
-      wrapper.vm.shiftTimeRange("next");
+      wrapper.vm.shiftTimeRange("prev");
 
       // A relative picker carries no concrete window, so shifting must resolve it
       // to an explicit absolute range instead of silently keeping Relative active.
@@ -632,6 +632,87 @@ describe("DateTime Component", () => {
       expect(events).toBeTruthy();
       const lastPayload = events[events.length - 1][0];
       expect(lastPayload.userChangedValue).toBe(true);
+    });
+
+    describe("forward shift never enters the future", () => {
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("should cap a forward shift at now and keep the window duration", () => {
+        wrapper = createWrapper();
+        store.state.savedViewFlag = false;
+
+        wrapper.vm.selectedType = "absolute";
+        wrapper.vm.selectedDate = { from: "2026/09/10", to: "2026/09/10" };
+        wrapper.vm.selectedTime = { startTime: "10:30:00", endTime: "11:30:00" };
+
+        wrapper.vm.shiftTimeRange("next");
+
+        expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/10", to: "2026/09/10" });
+        expect(wrapper.vm.selectedTime).toEqual({ startTime: "11:00:00", endTime: "12:00:00" });
+      });
+
+      it("should not shift a relative window forward", () => {
+        wrapper = createWrapper();
+        store.state.savedViewFlag = false;
+
+        wrapper.vm.selectedType = "relative";
+        wrapper.vm.relativePeriod = "h";
+        wrapper.vm.relativeValue = 1;
+
+        wrapper.vm.shiftTimeRange("next");
+
+        expect(wrapper.vm.selectedType).toBe("relative");
+        expect(wrapper.vm.isNextShiftDisabled()).toBe(true);
+      });
+
+      it("should not shift an absolute window that already ends at now", () => {
+        wrapper = createWrapper();
+        store.state.savedViewFlag = false;
+
+        wrapper.vm.selectedType = "absolute";
+        wrapper.vm.selectedDate = { from: "2026/09/10", to: "2026/09/10" };
+        wrapper.vm.selectedTime = { startTime: "11:00:00", endTime: "12:00:00" };
+
+        wrapper.vm.shiftTimeRange("next");
+
+        expect(wrapper.vm.selectedTime).toEqual({ startTime: "11:00:00", endTime: "12:00:00" });
+        expect(wrapper.vm.isNextShiftDisabled()).toBe(true);
+      });
+
+      it("should keep the next button enabled while the window ends in the past", async () => {
+        wrapper = createWrapper();
+        store.state.savedViewFlag = false;
+
+        wrapper.vm.selectedType = "absolute";
+        wrapper.vm.selectedDate = { from: "2026/09/09", to: "2026/09/09" };
+        wrapper.vm.selectedTime = { startTime: "10:00:00", endTime: "11:00:00" };
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.isNextShiftDisabled()).toBe(false);
+        expect(
+          wrapper.find('[data-test="date-time-next-btn"]').attributes("disabled"),
+        ).toBeUndefined();
+      });
+
+      it("should still shift backward from a window that ends at now", () => {
+        wrapper = createWrapper();
+        store.state.savedViewFlag = false;
+
+        wrapper.vm.selectedType = "absolute";
+        wrapper.vm.selectedDate = { from: "2026/09/10", to: "2026/09/10" };
+        wrapper.vm.selectedTime = { startTime: "11:00:00", endTime: "12:00:00" };
+
+        wrapper.vm.shiftTimeRange("prev");
+
+        expect(wrapper.vm.selectedTime).toEqual({ startTime: "10:00:00", endTime: "11:00:00" });
+      });
     });
   });
 
