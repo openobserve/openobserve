@@ -669,6 +669,8 @@ const emit = defineEmits<{
       label: I18nText;
       url: string;
       timestamp: string;
+      /** Absent on the protocol summary's forwarded payload. */
+      environment?: string;
     },
   ): void;
 }>();
@@ -1485,6 +1487,7 @@ watch(
           : t("synthetics.results.passed"),
       url: currentRun.value.url,
       timestamp: currentRun.value.timestamp,
+      environment: synthetics.runDetail.value?.environment ?? "",
     });
   },
   { immediate: true },

@@ -97,6 +97,12 @@ describe("makeBrowserCheckSaveSchema monitor fields", () => {
     expect(issuePaths(result)).toEqual([]);
   });
 
+  it("should accept a templated URL, as the gate does", () => {
+    const result = schema.safeParse({ ...valid, url: "{{BASE_URL}}/login" });
+
+    expect(issuePaths(result)).not.toContain("url");
+  });
+
   // A check with no location is never scheduled anywhere, so it can never run.
   it("should reject a check with no locations", () => {
     const result = schema.safeParse({ ...valid, locations: [], journey: [] });
@@ -141,6 +147,36 @@ describe("makeBrowserCheckGateSchema", () => {
     const result = schema.safeParse({ name: "Checkout", url: "https://app.test" });
 
     expect(issuePaths(result)).toEqual([]);
+  });
+
+  it("should accept a URL whose scheme lives inside a placeholder", () => {
+    const result = schema.safeParse({ name: "Checkout", url: "{{BASE_URL}}/login" });
+
+    expect(issuePaths(result)).toEqual([]);
+  });
+
+  it("should accept a bare placeholder as the whole URL", () => {
+    const result = schema.safeParse({ name: "Checkout", url: "{{BASE_URL}}" });
+
+    expect(issuePaths(result)).toEqual([]);
+  });
+
+  it("should accept a placeholder inside a host that already has a scheme", () => {
+    const result = schema.safeParse({ name: "Checkout", url: "https://{{HOST}}.example.com" });
+
+    expect(issuePaths(result)).toEqual([]);
+  });
+
+  it("should still reject a templated URL with whitespace", () => {
+    const result = schema.safeParse({ name: "Checkout", url: "{{BASE_URL}} /x" });
+
+    expect(issueMessage(result, "url")).toBe("synthetics.validation.urlInvalid");
+  });
+
+  it("should still reject a placeholder that never closes", () => {
+    const result = schema.safeParse({ name: "Checkout", url: "{{BASE_URL/x" });
+
+    expect(issuePaths(result)).toContain("url");
   });
 });
 
@@ -539,6 +575,46 @@ describe("makeBrowserCheckSaveSchema field-level step rules", () => {
 
     expect(result.success).toBe(false);
     expect(issuePaths(result)).toContain("journey.0.value");
+  });
+
+  // The resolved variable carries the scheme, so the client cannot check it.
+  it("should accept a navigate step whose URL starts with a placeholder", () => {
+    const result = schema.safeParse(
+      form([{ id: "1", action: "navigate", value: "{{BASE_URL}}/web/" }]),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept a navigate step that is a bare placeholder", () => {
+    const result = schema.safeParse(form([{ id: "1", action: "navigate", value: "{{BASE_URL}}" }]));
+
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept a navigate step with a placeholder inside the host, as the server does", () => {
+    const result = schema.safeParse(
+      form([{ id: "1", action: "navigate", value: "app-{{ENV}}.example.com/login" }]),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject a templated navigate step with a non-http scheme", () => {
+    const result = schema.safeParse(
+      form([{ id: "1", action: "navigate", value: "ftp://{{HOST}}/x" }]),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject a navigate step whose placeholder has an invalid name", () => {
+    for (const value of ["{{BASE URL}}/web/", "{{}}/web/", "{{BASE_URL}} /web/"]) {
+      const result = schema.safeParse(form([{ id: "1", action: "navigate", value }]));
+
+      expect(result.success).toBe(false);
+      expect(issuePaths(result)).toContain("journey.0.value");
+    }
   });
 });
 

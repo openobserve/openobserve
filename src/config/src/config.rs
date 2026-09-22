@@ -82,7 +82,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 83: add folder_id to workflows.
 // 84: add folder_id to workflow_drafts.
 // 85: create llm_experiment_slot_retries.
-pub const DB_SCHEMA_VERSION: u64 = 85;
+// 86: create synthetics shared variables tables; add env to synthetics_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 86;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
