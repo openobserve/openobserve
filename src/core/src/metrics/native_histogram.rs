@@ -227,7 +227,12 @@ fn push_le_point(points: &mut Vec<(String, f64)>, le: String, cumulative: f64) {
 /// surviving `le`s in the same series). Clamped finite so the last representable
 /// bucket cannot collide with `le="inf"`; subnormal bounds are kept as is.
 fn bucket_bound(schema: i32, idx: i64) -> f64 {
-    ((idx as f64) * 2f64.powi(-schema)).exp2().min(f64::MAX)
+    if idx == 0 {
+        return 1.0;
+    }
+    // widened so `-i32::MIN` cannot overflow; past ±1100 the factor is already 0 or inf
+    let factor = 2f64.powi((-(schema as i64)).clamp(-1100, 1100) as i32);
+    ((idx as f64) * factor).exp2().min(f64::MAX)
 }
 
 /// Upper bound on the `le` labels a sample will emit: each populated bucket gets an
@@ -765,6 +770,26 @@ mod tests {
                 (f64::INFINITY, 3.0),
             ]
         );
+    }
+
+    /// The coarsest schema does not overflow on negation: bucket 1 spans all of f64
+    /// and bucket -1 collapses to zero.
+    #[test]
+    fn test_bucket_bound_extreme_negative_schema() {
+        assert_eq!(bucket_bound(i32::MIN, 0), 1.0);
+        assert_eq!(bucket_bound(i32::MIN, 1), f64::MAX);
+        assert_eq!(bucket_bound(i32::MIN, -1), 0.0);
+        let recs = ExponentialHistogram {
+            schema: i32::MIN,
+            count: 2.0,
+            sum: None,
+            zero_count: 0.0,
+            zero_threshold: 0.0,
+            positive: vec![(1, 1.0)],
+            negative: vec![(1, 1.0)],
+        }
+        .expand(16);
+        assert_bucket_invariants(&recs);
     }
 
     /// Subnormal bounds stay representable instead of collapsing onto

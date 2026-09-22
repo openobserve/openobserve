@@ -68,9 +68,6 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
-/// The OTLP spec's `scale` range for exponential histograms.
-const OTLP_EXP_HISTOGRAM_SCALE_RANGE: std::ops::RangeInclusive<i32> = -10..=20;
-
 /// A number point's labels, rebuilt per point on top of its metric's base labels.
 struct PointLabels {
     /// Slots past `len` are spare; their strings keep their capacity for the next point.
@@ -1003,15 +1000,6 @@ fn process_exp_hist_data_point(
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = data_point_flag(data_point.flags).into();
     process_exemplars(rec, &data_point.exemplars);
-
-    // an out-of-spec scale is a malformed point, not something to downscale into shape
-    if !OTLP_EXP_HISTOGRAM_SCALE_RANGE.contains(&data_point.scale) {
-        log::warn!(
-            "[METRICS:OTLP] dropping exponential histogram point with unsupported scale {}",
-            data_point.scale
-        );
-        return bucket_recs;
-    }
 
     // OTLP bucket `i` covers `(base^i, base^(i+1)]`, the native layout's bucket `i+1`
     let otlp_buckets = |b: &Option<exponential_histogram_data_point::Buckets>| -> Vec<(i64, f64)> {
@@ -2728,9 +2716,10 @@ mod tests {
             assert_eq!(exp_hist_buckets(&result), expected);
         }
 
-        /// A scale outside the OTLP spec range is a malformed point and is dropped.
+        /// The protocol does not bound `scale`, so extreme values still expand: fine
+        /// ones merge down to schema 8, coarse ones get one bucket spanning all of f64.
         #[test]
-        fn test_exponential_histogram_drops_out_of_spec_scale() {
+        fn test_exponential_histogram_extreme_scales_still_expand() {
             for scale in [i32::MAX, 21, -11, i32::MIN] {
                 let mut rec = json!({"__name__": "h"});
                 let data_point = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
@@ -2752,7 +2741,22 @@ mod tests {
                     }),
                     negative: None,
                 };
-                assert!(process_exp_hist_data_point(&mut rec, &data_point, 16).is_empty());
+                let result = process_exp_hist_data_point(&mut rec, &data_point, 16);
+                assert_eq!(result[0]["__name__"], "h_count", "scale {scale}");
+                assert_eq!(result[1]["__name__"], "h_sum", "scale {scale}");
+                let buckets = exp_hist_buckets(&result);
+                assert_eq!(
+                    buckets.last().unwrap(),
+                    &("inf".to_string(), 1.0),
+                    "scale {scale}"
+                );
+                for w in buckets.windows(2) {
+                    let (a, b) = (
+                        w[0].0.parse::<f64>().unwrap(),
+                        w[1].0.parse::<f64>().unwrap(),
+                    );
+                    assert!(a < b && w[0].1 <= w[1].1, "scale {scale}: {buckets:?}");
+                }
             }
         }
 
