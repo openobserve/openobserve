@@ -921,6 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { alertDetailQuery } from "@/services/alerts.queries";
 import { alertsListQuery } from "@/services/alerts.queries";
 import { alertKeys } from "@/services/alerts.querykeys";
@@ -1752,7 +1753,12 @@ export default defineComponent({
 
     const destinations = ref([0]);
     const templates = ref([0]);
-    const selectedAlertIds = ref<string[]>([]);
+    const { selectedIds: selectedAlertIds } = usePersistedSelection<any>({
+      tableId: "alerts-alert-list",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: filteredResults,
+      getRowId: (row) => row.alert_id,
+    });
     const selectedAlerts = computed({
       get: () =>
         filteredResults.value.filter(
@@ -1876,6 +1882,8 @@ export default defineComponent({
 
     // ---------------------------------------------------------------------------
 
+    let lastAlertsLoadKey: string | null = null;
+
     // The folder is part of the query key, so a revisit inside the tier's
     // staleTime resolves from cache with no request and no special loading path.
     const getAlertsByFolderId = async (store: any, folderId: any) => {
@@ -1899,8 +1907,13 @@ export default defineComponent({
       //and if the flag is true then we are assigning the alerts to the filteredResults
       //and also we are not filtering the alerts by the activeTab if the flag is false because we dont need to show the alerts in the table
       //for a moment also so we are not filtering the alerts by the activeTab
-      selectedAlerts.value = [];
-      allSelectedAlerts.value = false;
+      // Mount fetches the same folder twice, so only a fetch for different rows drops the selection.
+      const loadKey = `${folderId}|${query}|${alertType}`;
+      if (loadKey !== lastAlertsLoadKey) {
+        selectedAlerts.value = [];
+        allSelectedAlerts.value = false;
+      }
+      lastAlertsLoadKey = loadKey;
       // The alerts list is refreshed after every alert mutation — drop the shared
       // dependency-graph cache so the destination/template impact dialogs reflect
       // the change on next open.
@@ -3121,7 +3134,12 @@ export default defineComponent({
       }
     };
 
+    let folderRailAnnounced = false;
+
     const updateActiveFolderId = async (newVal: any) => {
+      // The folder rail announces the active folder once on mount, which must not drop a restored selection.
+      const isInitialFolderEmit = !folderRailAnnounced;
+      folderRailAnnounced = true;
       //this is the condition we kept because when we we click on the any folder that is there in the the row when we do search across folders
       //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only
       //so we are fetching the alerts by the folderId and then filtering the alerts by the activeTab this is done explicitly on only if users clicks on same folder
@@ -3161,7 +3179,7 @@ export default defineComponent({
       if (filterQuery.value) filterQuery.value = "";
       if (searchAcrossFolders.value) searchAcrossFolders.value = false;
       if (allSelectedAlerts.value) allSelectedAlerts.value = false;
-      if (selectedAlerts.value) selectedAlerts.value = [];
+      if (!isInitialFolderEmit && selectedAlerts.value) selectedAlerts.value = [];
       activeFolderId.value = newVal;
       //here we are resetting the selected alerts
       //this is done because we need to reset the selected alerts when the user is changing the folder
