@@ -62,6 +62,28 @@ impl std::io::Write for FailureWriter {
     }
 }
 
+fn build_from_parquet(
+    bytes: bytes::Bytes,
+    parent: crate::ParentMetadata,
+) -> anyhow::Result<Vec<u8>> {
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    anyhow::ensure!(
+        bytes.len() as u64 == parent.compressed_size,
+        "source size mismatch"
+    );
+    let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)?;
+    let schema = builder.schema().clone();
+    let metadata = builder.metadata().as_ref().clone();
+    let mut writer =
+        crate::BlockWriter::new_pending(Vec::new(), schema.clone(), crate::MAX_BLOCK_ROWS)?;
+    for batch in builder.with_batch_size(crate::MAX_BLOCK_ROWS).build()? {
+        let batch = batch?;
+        let batch = RecordBatch::try_new(schema.clone(), batch.columns().to_vec())?;
+        writer.write(&batch)?;
+    }
+    writer.finish_for_parquet(parent, metadata)
+}
+
 fn schema() -> SchemaRef {
     Arc::new(Schema::new_with_metadata(
         vec![
@@ -237,13 +259,23 @@ fn numeric_parent_version_bounds_and_decoder_claims_are_checked() {
     assert!(decode_block(payload, &claim).is_err());
 }
 
+fn expanded_metadata_batch(encoded: &crate::compact::CompactMetadata<'_>) -> Result<RecordBatch> {
+    let schema = encoded.schema();
+    let batch = encoded.compact_batch(&(0..schema.fields().len()).collect::<Vec<_>>())?;
+    let columns = batch
+        .columns()
+        .iter()
+        .zip(schema.fields())
+        .map(|(column, field)| arrow::compute::cast(column, field.data_type()))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(RecordBatch::try_new(schema, columns)?)
+}
+
 fn replace_column(blob: &[u8], column: usize, value: ArrayRef) -> Vec<u8> {
     let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
     let raw = &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize];
     let encoded = crate::compact::CompactMetadata::parse(raw).unwrap();
-    let old = encoded
-        .batch(&(0..encoded.schema().fields().len()).collect::<Vec<_>>())
-        .unwrap();
+    let old = expanded_metadata_batch(&encoded).unwrap();
     let mut columns = old.columns().to_vec();
     columns[column] = value;
     let batch = RecordBatch::try_new(old.schema(), columns).unwrap();
@@ -602,9 +634,7 @@ fn compact_encoder_classifies_capacity_for_optional_format_fallback() {
         &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
     )
     .unwrap();
-    let original = encoded
-        .batch(&(0..encoded.schema().fields().len()).collect::<Vec<_>>())
-        .unwrap();
+    let original = expanded_metadata_batch(&encoded).unwrap();
     let mut metadata = original.schema().metadata().clone();
     metadata.insert("large".into(), "x".repeat(1024 * 1024));
     let schema = Arc::new(Schema::new_with_metadata(

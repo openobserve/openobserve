@@ -43,75 +43,6 @@ pub(super) const VORTEX_SOURCE_SCHEMA_KEY: &str = "o2_metrics_source_schema";
 static BLOCK_ENCODING_JOBS: LazyLock<Arc<Semaphore>> =
     LazyLock::new(|| Arc::new(Semaphore::new(get_config().limit.cpu_num.clamp(1, 32))));
 
-#[derive(Clone, Debug, Default)]
-pub(super) struct GenerationStats {
-    #[cfg(test)]
-    pub counters: Arc<GenerationCounters>,
-}
-
-impl GenerationStats {
-    pub fn legacy_build(&self) {
-        #[cfg(test)]
-        self.counters
-            .legacy_builds
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    }
-    pub fn block_build(&self) {
-        #[cfg(test)]
-        self.counters
-            .block_builds
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    }
-    pub fn fallback(&self) {
-        #[cfg(test)]
-        self.counters
-            .fallbacks
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    }
-    pub fn temp(&self, path: &std::path::Path) {
-        #[cfg(test)]
-        self.counters.paths.lock().unwrap().push(path.to_path_buf());
-        #[cfg(not(test))]
-        let _ = path;
-    }
-    fn before_block_write(&self) {
-        #[cfg(test)]
-        if let Some((entered, released)) = self.counters.block_gate.lock().unwrap().take() {
-            let _ = entered.send(());
-            let _ = released.recv();
-        }
-    }
-    fn replay(&self, format: FileFormat) {
-        #[cfg(test)]
-        match format {
-            FileFormat::Parquet => &self.counters.parquet_replays,
-            FileFormat::Vortex => &self.counters.vortex_replays,
-        }
-        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        #[cfg(not(test))]
-        let _ = format;
-    }
-}
-
-#[cfg(test)]
-#[derive(Debug, Default)]
-pub(super) struct GenerationCounters {
-    pub legacy_builds: std::sync::atomic::AtomicUsize,
-    pub block_builds: std::sync::atomic::AtomicUsize,
-    pub fallbacks: std::sync::atomic::AtomicUsize,
-    pub parquet_replays: std::sync::atomic::AtomicUsize,
-    pub vortex_replays: std::sync::atomic::AtomicUsize,
-    pub paths: std::sync::Mutex<Vec<std::path::PathBuf>>,
-    pub block_gate: std::sync::Mutex<
-        Option<(
-            tokio::sync::oneshot::Sender<()>,
-            std::sync::mpsc::Receiver<()>,
-        )>,
-    >,
-    pub parquet_readonly: std::sync::atomic::AtomicBool,
-    pub vortex_readonly: std::sync::atomic::AtomicBool,
-}
-
 pub(super) enum SourceMetadata {
     Parquet(ParquetMetaData),
     Vortex(Arc<Schema>),
@@ -144,21 +75,19 @@ pub(super) enum Blocks {
 }
 
 impl Blocks {
-    pub fn try_new(schema: &Arc<Schema>, stats: &GenerationStats) -> anyhow::Result<Self> {
-        let (file, path) = new_file(stats)?;
+    pub fn try_new(schema: &Arc<Schema>) -> anyhow::Result<Self> {
+        let (file, path) = new_file()?;
         let writer =
             BlockWriter::new_pending(file, Arc::clone(schema), metrics_block::MAX_BLOCK_ROWS)?;
-        stats.block_build();
+
         Ok(Self::Active(Box::new(BlockFile { writer, path })))
     }
 
-    pub async fn write(self, batch: RecordBatch, stats: &GenerationStats) -> Result<Self> {
+    pub async fn write(self, batch: RecordBatch) -> Result<Self> {
         let Self::Active(mut active) = self else {
             return Ok(self);
         };
-        let progress = stats.clone();
         match EncodingJob::run(move || {
-            progress.before_block_write();
             active.writer.write(&batch)?;
             Ok(active)
         })
@@ -166,7 +95,6 @@ impl Blocks {
         {
             Ok(active) => Ok(Self::Active(active)),
             Err(error) => {
-                stats.fallback();
                 log::warn!(
                     "metrics block write unavailable; retaining completed source for legacy-index replay: {error}"
                 );
@@ -180,7 +108,6 @@ impl Blocks {
         data_path: tempfile::TempPath,
         meta: FileMeta,
         source_metadata: SourceMetadata,
-        stats: GenerationStats,
     ) -> Result<MergedFile> {
         EncodingJob::run(move || {
             let format = source_metadata.format();
@@ -191,7 +118,7 @@ impl Blocks {
                     match source_metadata.finish(writer, parent) {
                         Ok(file) => { drop(file); Some(path) }
                         Err(error) => {
-                            stats.fallback();
+
                             log::warn!("metrics block finalization unavailable; rebuilding legacy index from completed source: {error}");
                             drop(path);
                             None
@@ -203,7 +130,7 @@ impl Blocks {
             };
             let metrics_index_path = match block_path {
                 Some(path) => path,
-                None => replay_legacy(&data_path, &meta, format, &stats)?,
+                None => replay_legacy(&data_path, &meta, format)?,
             };
             Ok(MergedFile::MetricsIndexed { data_path, metrics_index_path, meta })
         }).await?.map_err(|error| DataFusionError::External(error.into()))
@@ -280,18 +207,17 @@ pub(super) async fn verify_vortex_source(
     Ok(Arc::new(schema))
 }
 
-fn new_file(stats: &GenerationStats) -> anyhow::Result<(std::fs::File, tempfile::TempPath)> {
+fn new_file() -> anyhow::Result<(std::fs::File, tempfile::TempPath)> {
     let tmp_dir = &get_config().common.data_tmp_dir;
     std::fs::create_dir_all(tmp_dir)?;
     let (file, path) = tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts();
-    stats.temp(&path);
+
     Ok((file, path))
 }
 
 fn replay_parquet(
     data_path: &std::path::Path,
     meta: &FileMeta,
-    stats: &GenerationStats,
 ) -> anyhow::Result<tempfile::TempPath> {
     let file = std::fs::File::open(data_path)?;
     anyhow::ensure!(
@@ -303,9 +229,9 @@ fn replay_parquet(
         builder.metadata().file_metadata().num_rows() == meta.records,
         "completed Parquet row count changed"
     );
-    stats.legacy_build();
+
     let mut index = MetricsIndexWriter::try_new(builder.schema())?;
-    stats.replay(FileFormat::Parquet);
+
     for batch in builder
         .with_batch_size(metrics_block::MAX_BLOCK_ROWS)
         .build()?
@@ -313,7 +239,7 @@ fn replay_parquet(
         index.write_with_label_boundaries(&batch.context("failed to replay completed Parquet")?)?;
     }
     let bytes = index.finish(meta.records, Some(PARQUET_MAX_ROW_GROUP_SIZE))?;
-    let (mut file, path) = new_file(stats)?;
+    let (mut file, path) = new_file()?;
     file.write_all(&bytes)?;
     drop(file);
     Ok(path)
@@ -323,18 +249,16 @@ fn replay_legacy(
     data_path: &std::path::Path,
     meta: &FileMeta,
     format: FileFormat,
-    stats: &GenerationStats,
 ) -> anyhow::Result<tempfile::TempPath> {
     match format {
-        FileFormat::Parquet => replay_parquet(data_path, meta, stats),
-        FileFormat::Vortex => VORTEX_RUNTIME.block_on(replay_vortex(data_path, meta, stats)),
+        FileFormat::Parquet => replay_parquet(data_path, meta),
+        FileFormat::Vortex => VORTEX_RUNTIME.block_on(replay_vortex(data_path, meta)),
     }
 }
 
 async fn replay_vortex(
     data_path: &std::path::Path,
     meta: &FileMeta,
-    stats: &GenerationStats,
 ) -> anyhow::Result<tempfile::TempPath> {
     anyhow::ensure!(
         tokio::fs::metadata(data_path).await?.len() == u64::try_from(meta.compressed_size)?,
@@ -351,9 +275,9 @@ async fn replay_vortex(
     );
     let schema = Arc::new(session.arrow().to_arrow_schema(file.dtype())?);
     let dtype = arrow::datatypes::DataType::Struct(schema.fields().clone());
-    stats.legacy_build();
+
     let mut index = MetricsIndexWriter::try_new(&schema)?;
-    stats.replay(FileFormat::Vortex);
+
     let stream = file
         .scan()?
         .with_split_by(vortex::layout::scan::split_by::SplitBy::RowCount(
@@ -368,8 +292,40 @@ async fn replay_vortex(
         index.write_with_label_boundaries(&batch)?;
     }
     let bytes = index.finish(meta.records, None)?;
-    let (mut file, path) = new_file(stats)?;
+    let (mut file, path) = new_file()?;
     file.write_all(&bytes)?;
     drop(file);
     Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn running_encoding_job_retains_temp_file_until_work_exits() {
+        let (file, path) = new_file().unwrap();
+        let observed = path.to_path_buf();
+        let (entered, ready) = tokio::sync::oneshot::channel();
+        let (release, wait) = std::sync::mpsc::channel();
+        let (done, closed) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(EncodingJob::run(move || {
+            let _ = entered.send(());
+            wait.recv()?;
+            drop(file);
+            drop(path);
+            let _ = done.send(());
+            Ok(())
+        }));
+        ready.await.unwrap();
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        assert!(observed.exists());
+        release.send(()).unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(5), closed)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!observed.exists());
+    }
 }

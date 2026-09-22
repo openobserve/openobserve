@@ -69,7 +69,6 @@ pub async fn merge_parquet_files(
                     file_format: output.file_format,
                     max_file_size: get_config().compact.max_file_size,
                     sink: output.sink,
-                    stats: metrics_blocks::GenerationStats::default(),
                     layout: mode
                         .metrics_file_layout()
                         .expect("metrics merge modes name their layout"),

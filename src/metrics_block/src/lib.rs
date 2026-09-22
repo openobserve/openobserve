@@ -31,7 +31,7 @@ use arrow::{
 pub use directory::{BlockDirectory, BlockIter};
 pub use reader::{BlockDecoder, decode_block, decode_index, read_footer};
 use serde::{Deserialize, Serialize};
-pub use writer::{BlockWriter, build_from_parquet};
+pub use writer::BlockWriter;
 
 pub const VERSION: u32 = 2;
 pub const FOOTER_LEN: usize = 32;

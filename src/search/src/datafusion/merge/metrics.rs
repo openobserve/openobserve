@@ -43,9 +43,7 @@ use vortex::{
 
 use super::{
     MergedFile, append_metadata,
-    metrics_blocks::{
-        Blocks, GenerationStats, SourceMetadata, VORTEX_SOURCE_SCHEMA_KEY, verify_vortex_source,
-    },
+    metrics_blocks::{Blocks, SourceMetadata, VORTEX_SOURCE_SCHEMA_KEY, verify_vortex_source},
     new_temp_file,
 };
 use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
@@ -79,7 +77,6 @@ pub(super) struct MetricsOutput {
     pub max_file_size: usize,
     pub layout: MetricsFileLayout,
     pub sink: CompactMergeOutput,
-    pub stats: GenerationStats,
 }
 
 impl MetricsOutput {
@@ -87,7 +84,7 @@ impl MetricsOutput {
         if !with_index || !metrics_block::is_supported_schema(schema) {
             return Blocks::Disabled;
         }
-        match Blocks::try_new(schema, &self.stats) {
+        match Blocks::try_new(schema) {
             Ok(blocks) => blocks,
             Err(error) => {
                 log::warn!("metrics block initialization unavailable; using legacy index: {error}");
@@ -111,7 +108,6 @@ struct MetricsFileState {
     file_meta: FileMeta,
     timestamp_index: usize,
     row_group_size: Option<usize>,
-    stats: GenerationStats,
 }
 
 impl MetricsFileState {
@@ -120,11 +116,7 @@ impl MetricsFileState {
         timestamp_index: usize,
         row_group_size: Option<usize>,
         with_index: bool,
-        stats: GenerationStats,
     ) -> Result<Self> {
-        if with_index {
-            stats.legacy_build();
-        }
         Ok(Self {
             metrics_index: with_index
                 .then(|| MetricsIndexWriter::try_new(schema))
@@ -132,7 +124,6 @@ impl MetricsFileState {
             file_meta: FileMeta::default(),
             timestamp_index,
             row_group_size,
-            stats,
         })
     }
 
@@ -194,34 +185,23 @@ enum ParquetSink {
 }
 
 impl ParquetSink {
-    fn new(sink: CompactMergeOutput, stats: &GenerationStats) -> Result<Self> {
+    fn new(sink: CompactMergeOutput) -> Result<Self> {
         match sink {
             CompactMergeOutput::Memory => Ok(Self::Memory(Vec::new())),
             CompactMergeOutput::Disk => {
                 let (file, path) = new_temp_file()?;
-                stats.temp(&path);
-                #[cfg(test)]
-                let file = if stats
-                    .counters
-                    .parquet_readonly
-                    .load(std::sync::atomic::Ordering::SeqCst)
-                {
-                    drop(file);
-                    tokio::fs::File::from_std(std::fs::File::open(&path)?)
-                } else {
-                    file
-                };
+
                 Ok(Self::Disk { file, path })
             }
         }
     }
 
-    async fn into_path(self, stats: &GenerationStats) -> Result<(tempfile::TempPath, usize)> {
+    async fn into_path(self) -> Result<(tempfile::TempPath, usize)> {
         match self {
             Self::Memory(data) => {
                 let size = data.len();
                 let path = write_temp_file(data).await?;
-                stats.temp(&path);
+
                 Ok((path, size))
             }
             Self::Disk { mut file, path } => {
@@ -276,7 +256,7 @@ impl ActiveMetricsParquetWriter {
         } else {
             CompactMergeOutput::Disk
         };
-        let sink = ParquetSink::new(sink, &output.stats)?;
+        let sink = ParquetSink::new(sink)?;
         let writer = new_parquet_writer(sink, schema, bloom_filter_fields, metadata, false, None);
         let with_legacy = with_index && matches!(blocks, Blocks::Disabled);
         Ok(Self {
@@ -286,7 +266,6 @@ impl ActiveMetricsParquetWriter {
                 timestamp_index,
                 Some(PARQUET_MAX_ROW_GROUP_SIZE),
                 with_legacy,
-                output.stats.clone(),
             )?,
             blocks,
         })
@@ -296,17 +275,16 @@ impl ActiveMetricsParquetWriter {
         self.writer.write(batch).await?;
         self.state.write(batch)?;
         let blocks = std::mem::replace(&mut self.blocks, Blocks::Disabled);
-        self.blocks = blocks.write(batch.clone(), &self.state.stats).await?;
+        self.blocks = blocks.write(batch.clone()).await?;
         Ok(())
     }
 
     async fn finish(mut self, source_meta: &FileMeta, max_file_size: i64) -> Result<MergedFile> {
-        let stats = self.state.stats.clone();
         let (metrics_index, mut file_meta) = self.state.finish(source_meta, max_file_size)?;
         append_metadata(&mut self.writer, &file_meta)?;
         let parquet_metadata = self.writer.finish().await?;
         let expected_size = self.writer.bytes_written();
-        let (data_path, size) = self.writer.into_inner().into_path(&stats).await?;
+        let (data_path, size) = self.writer.into_inner().into_path().await?;
         if size == 0
             || size != expected_size
             || parquet_metadata.file_metadata().num_rows() != file_meta.records
@@ -318,21 +296,13 @@ impl ActiveMetricsParquetWriter {
         file_meta.compressed_size =
             i64::try_from(size).map_err(|e| DataFusionError::External(Box::new(e)))?;
         if matches!(self.blocks, Blocks::Disabled) {
-            let mut output = merged_file(data_path, metrics_index, file_meta).await?;
-            if let MergedFile::MetricsIndexed {
-                metrics_index_path, ..
-            } = &mut output
-            {
-                stats.temp(metrics_index_path);
-            }
-            Ok(output)
+            merged_file(data_path, metrics_index, file_meta).await
         } else {
             self.blocks
                 .finish(
                     data_path,
                     file_meta,
                     SourceMetadata::Parquet(parquet_metadata),
-                    stats,
                 )
                 .await
         }
@@ -359,19 +329,7 @@ impl ActiveMetricsVortexWriter {
         let blocks = output.prepare_blocks(schema, with_index);
         let with_legacy = with_index && matches!(blocks, Blocks::Disabled);
         let (file, data_path) = new_temp_file()?;
-        output.stats.temp(&data_path);
-        #[cfg(test)]
-        let file = if output
-            .stats
-            .counters
-            .vortex_readonly
-            .load(std::sync::atomic::Ordering::SeqCst)
-        {
-            drop(file);
-            tokio::fs::File::from_std(std::fs::File::open(&data_path)?)
-        } else {
-            file
-        };
+
         let write_options = write_options.with_metadata_segment(
             VORTEX_SOURCE_SCHEMA_KEY,
             serde_json::to_vec(schema.as_ref())
@@ -380,13 +338,7 @@ impl ActiveMetricsVortexWriter {
         Ok(Self {
             writer: write_options.writer(file, dtype),
             data_path,
-            state: MetricsFileState::try_new(
-                schema,
-                timestamp_index,
-                None,
-                with_legacy,
-                output.stats.clone(),
-            )?,
+            state: MetricsFileState::try_new(schema, timestamp_index, None, with_legacy)?,
             blocks,
             schema: Arc::clone(schema),
         })
@@ -399,7 +351,7 @@ impl ActiveMetricsVortexWriter {
         self.writer.push(array).await?;
         self.state.write(&batch)?;
         let blocks = std::mem::replace(&mut self.blocks, Blocks::Disabled);
-        self.blocks = blocks.write(batch, &self.state.stats).await?;
+        self.blocks = blocks.write(batch).await?;
         Ok(())
     }
 
@@ -409,7 +361,6 @@ impl ActiveMetricsVortexWriter {
         max_file_size: i64,
         session: &VortexSession,
     ) -> anyhow::Result<MergedFile> {
-        let stats = self.state.stats.clone();
         let (metrics_index, mut file_meta) = self.state.finish(source_meta, max_file_size)?;
         let summary = self.writer.finish().await?;
         let size = tokio::fs::metadata(&self.data_path).await?.len();
@@ -425,23 +376,11 @@ impl ActiveMetricsVortexWriter {
         let schema =
             verify_vortex_source(&self.data_path, &file_meta, &self.schema, session).await?;
         if matches!(self.blocks, Blocks::Disabled) {
-            let mut result = merged_file(self.data_path, metrics_index, file_meta).await?;
-            if let MergedFile::MetricsIndexed {
-                metrics_index_path, ..
-            } = &mut result
-            {
-                stats.temp(metrics_index_path);
-            }
-            Ok(result)
+            Ok(merged_file(self.data_path, metrics_index, file_meta).await?)
         } else {
             Ok(self
                 .blocks
-                .finish(
-                    self.data_path,
-                    file_meta,
-                    SourceMetadata::Vortex(schema),
-                    stats,
-                )
+                .finish(self.data_path, file_meta, SourceMetadata::Vortex(schema))
                 .await?)
         }
     }
@@ -709,13 +648,40 @@ mod tests {
         RecordBatch::try_new(Arc::clone(schema), columns).unwrap()
     }
 
-    fn block_output(sink: CompactMergeOutput, stats: GenerationStats) -> MetricsOutput {
+    fn build_from_parquet(
+        bytes: bytes::Bytes,
+        parent: metrics_block::ParentMetadata,
+    ) -> anyhow::Result<Vec<u8>> {
+        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+        anyhow::ensure!(
+            bytes.len() as u64 == parent.compressed_size,
+            "source size mismatch"
+        );
+        let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)?;
+        let schema = builder.schema().clone();
+        let metadata = builder.metadata().as_ref().clone();
+        let mut writer = metrics_block::BlockWriter::new_pending(
+            Vec::new(),
+            schema.clone(),
+            metrics_block::MAX_BLOCK_ROWS,
+        )?;
+        for batch in builder
+            .with_batch_size(metrics_block::MAX_BLOCK_ROWS)
+            .build()?
+        {
+            let batch = batch?;
+            let batch = RecordBatch::try_new(schema.clone(), batch.columns().to_vec())?;
+            writer.write(&batch)?;
+        }
+        writer.finish_for_parquet(parent, metadata)
+    }
+
+    fn block_output(sink: CompactMergeOutput) -> MetricsOutput {
         MetricsOutput {
             file_format: FileFormat::Parquet,
             max_file_size: 1024 * 1024 * 1024,
             layout: MetricsFileLayout::Indexed,
             sink,
-            stats,
         }
     }
 
@@ -817,13 +783,7 @@ mod tests {
             .collect()
     }
 
-    async fn check_block_files(
-        files: Vec<MergedFile>,
-        expected: &[SourceRow],
-        stats: &GenerationStats,
-    ) {
-        use std::sync::atomic::Ordering;
-        let count = files.len();
+    async fn check_block_files(files: Vec<MergedFile>, expected: &[SourceRow]) {
         let mut actual = Vec::new();
         for (position, file) in files.into_iter().enumerate() {
             let (data, meta, path) = file.into_upload_parts().await.unwrap();
@@ -833,8 +793,7 @@ mod tests {
                 rows: meta.records as u64,
                 compressed_size: data.len() as u64,
             };
-            let reference =
-                metrics_block::build_from_parquet(data.clone(), parent.clone()).unwrap();
+            let reference = build_from_parquet(data.clone(), parent.clone()).unwrap();
             assert_eq!(encoded, reference, "file {position}");
             let footer = metrics_block::read_footer(
                 &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
@@ -877,19 +836,6 @@ mod tests {
             actual.extend(parquet);
         }
         assert_eq!(actual, expected);
-        assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), count);
-        assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 0);
-        assert_eq!(stats.counters.parquet_replays.load(Ordering::SeqCst), 0);
-        assert_eq!(stats.counters.fallbacks.load(Ordering::SeqCst), 0);
-        assert!(
-            stats
-                .counters
-                .paths
-                .lock()
-                .unwrap()
-                .iter()
-                .all(|path| !path.exists())
-        );
     }
 
     async fn legacy_query_ranges(index: &[u8], predicate: &str) -> Vec<std::ops::Range<usize>> {
@@ -952,7 +898,6 @@ mod tests {
 
     #[tokio::test]
     async fn single_pass_replay_preserves_same_hash_label_changes_across_input_batches() {
-        use std::sync::atomic::Ordering;
         let mut fields = block_schema(None, false).fields().to_vec();
         fields.push(Arc::new(Field::new("zone", DataType::Utf8, false)));
         let schema = Arc::new(Schema::new(fields));
@@ -978,8 +923,7 @@ mod tests {
                 [CompactMergeOutput::Memory, CompactMergeOutput::Disk].map(|sink| (format, sink))
             })
         {
-            let stats = GenerationStats::default();
-            let mut output = block_output(sink, stats.clone());
+            let mut output = block_output(sink);
             output.file_format = format;
             let file = produce(&schema, vec![batch.slice(0, 1), batch.slice(1, 5)], output)
                 .await
@@ -1008,31 +952,11 @@ mod tests {
             );
             assert_eq!(legacy_query_ranges(&index, "tag IS NULL").await, vec![3..4]);
             assert_eq!(legacy_query_ranges(&index, "tag = ''").await, vec![4..5]);
-            assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), 1);
-            assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 1);
-            assert_eq!(
-                stats.counters.parquet_replays.load(Ordering::SeqCst),
-                usize::from(format == FileFormat::Parquet)
-            );
-            assert_eq!(
-                stats.counters.vortex_replays.load(Ordering::SeqCst),
-                usize::from(format == FileFormat::Vortex)
-            );
-            assert_eq!(stats.counters.fallbacks.load(Ordering::SeqCst), 1);
-            assert!(
-                stats
-                    .counters
-                    .paths
-                    .lock()
-                    .unwrap()
-                    .iter()
-                    .all(|path| !path.exists())
-            );
         }
     }
 
     #[tokio::test]
-    async fn single_pass_rotation_preserves_bits_and_fragments_without_legacy_or_replay() {
+    async fn rotation_preserves_bits_and_fragments_for_both_sinks() {
         let schema = block_schema(Some("preserved".into()), false);
         let rows = vec![
             (1, i64::MIN, Some((-0f64).to_bits())),
@@ -1045,8 +969,7 @@ mod tests {
             (3, i64::MAX, Some(1)),
         ];
         for sink in [CompactMergeOutput::Memory, CompactMergeOutput::Disk] {
-            let stats = GenerationStats::default();
-            let mut output = block_output(sink, stats.clone());
+            let mut output = block_output(sink);
             output.max_file_size = 129;
             let files = produce(
                 &schema,
@@ -1060,7 +983,7 @@ mod tests {
             .await
             .unwrap();
             assert_eq!(files.len(), 3);
-            check_block_files(files, &rows, &stats).await;
+            check_block_files(files, &rows).await;
         }
     }
 
@@ -1071,16 +994,13 @@ mod tests {
             .map(|i| (1, i as i64, Some((i as f64).to_bits())))
             .collect::<Vec<_>>();
         for sink in [CompactMergeOutput::Memory, CompactMergeOutput::Disk] {
-            let stats = GenerationStats::default();
             let batches = rows
                 .chunks(8192)
                 .map(|rows| block_batch(&schema, rows))
                 .collect();
-            let files = produce(&schema, batches, block_output(sink, stats.clone()))
-                .await
-                .unwrap();
+            let files = produce(&schema, batches, block_output(sink)).await.unwrap();
             assert_eq!(files.len(), 1);
-            check_block_files(files, &rows, &stats).await;
+            check_block_files(files, &rows).await;
         }
     }
 
@@ -1187,15 +1107,13 @@ mod tests {
 
     #[tokio::test]
     async fn open_hour_and_ingester_outputs_do_not_generate_blocks() {
-        use std::sync::atomic::Ordering;
         let schema = block_schema(None, false);
         let rows = [(1, 10, Some(1f64.to_bits()))];
         let ingester =
             super::super::MergeOutput::for_ingester(config::meta::stream::StreamType::Metrics);
         assert_eq!(ingester.file_format, FileFormat::Parquet);
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
-            let stats = GenerationStats::default();
-            let mut output = block_output(CompactMergeOutput::Disk, stats.clone());
+            let mut output = block_output(CompactMergeOutput::Disk);
             output.file_format = format;
             output.layout = MetricsFileLayout::HashMerged;
             let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
@@ -1208,19 +1126,16 @@ mod tests {
                 sample_rows_for(format, bytes::Bytes::from(bytes)).await,
                 rows
             );
-            assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), 0);
-            assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 0);
         }
     }
 
     #[tokio::test]
     async fn single_pass_selects_legacy_directly_when_schema_unsupported() {
-        use std::sync::atomic::Ordering;
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let schema = block_schema(None, true);
             let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
-            let stats = GenerationStats::default();
-            let mut output = block_output(CompactMergeOutput::Disk, stats.clone());
+
+            let mut output = block_output(CompactMergeOutput::Disk);
             output.file_format = format;
             let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
                 .await
@@ -1238,15 +1153,11 @@ mod tests {
                 rows
             );
             assert_eq!(meta.records, 2);
-            assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 1);
-            assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), 0);
-            assert_eq!(stats.counters.parquet_replays.load(Ordering::SeqCst), 0);
         }
     }
 
     #[tokio::test]
-    async fn single_pass_replays_only_after_midstream_or_finish_capacity_failure() {
-        use std::sync::atomic::Ordering;
+    async fn capacity_failure_falls_back_to_lossless_legacy_indexes() {
         for finish_failure in [false, true] {
             let schema = block_schema(finish_failure.then(|| "x".repeat(1024 * 1024 + 128)), false);
             let rows = [
@@ -1269,8 +1180,7 @@ mod tests {
                         .map(|sink| (format, sink))
                 })
             {
-                let stats = GenerationStats::default();
-                let mut output = block_output(sink, stats.clone());
+                let mut output = block_output(sink);
                 output.file_format = format;
                 let file = produce(
                     &schema,
@@ -1308,34 +1218,12 @@ mod tests {
                     sample_rows_for(format, bytes::Bytes::from(data)).await,
                     rows
                 );
-                assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), 1);
-                assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 1);
-                assert_eq!(
-                    stats.counters.parquet_replays.load(Ordering::SeqCst),
-                    usize::from(format == FileFormat::Parquet)
-                );
-                assert_eq!(
-                    stats.counters.vortex_replays.load(Ordering::SeqCst),
-                    usize::from(format == FileFormat::Vortex)
-                );
-                assert_eq!(stats.counters.fallbacks.load(Ordering::SeqCst), 1);
-                assert!(
-                    stats
-                        .counters
-                        .paths
-                        .lock()
-                        .unwrap()
-                        .iter()
-                        .all(|path| !path.exists())
-                );
             }
         }
     }
 
     #[tokio::test]
     async fn single_pass_vortex_blocks_preserve_bits_and_schema() {
-        use std::sync::atomic::Ordering;
-
         let schema = block_schema(Some("preserved semantic metadata".into()), false);
         let rows = vec![
             (1, 10, Some(0f64.to_bits())),
@@ -1346,8 +1234,7 @@ mod tests {
             (2, 30, Some(f64::NEG_INFINITY.to_bits())),
         ];
         for sink in [CompactMergeOutput::Memory, CompactMergeOutput::Disk] {
-            let stats = GenerationStats::default();
-            let mut output = block_output(sink, stats.clone());
+            let mut output = block_output(sink);
             output.file_format = FileFormat::Vortex;
             let file = produce(
                 &schema,
@@ -1435,53 +1322,17 @@ mod tests {
                 }));
             }
             assert_eq!(stored_rows, rows);
-            assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), 1);
-            assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 0);
-            assert_eq!(stats.counters.vortex_replays.load(Ordering::SeqCst), 0);
-            assert_eq!(stats.counters.parquet_replays.load(Ordering::SeqCst), 0);
         }
     }
 
     #[tokio::test]
-    async fn single_pass_vortex_data_failure_never_publishes_or_replays() {
-        use std::sync::atomic::Ordering;
-        let schema = block_schema(None, false);
-        let stats = GenerationStats::default();
-        stats.counters.vortex_readonly.store(true, Ordering::SeqCst);
-        let mut output = block_output(CompactMergeOutput::Disk, stats.clone());
-        output.file_format = FileFormat::Vortex;
-        let result = produce(
-            &schema,
-            vec![block_batch(&schema, &[(1, 10, Some(1f64.to_bits()))])],
-            output,
-        )
-        .await;
-        assert!(result.is_err());
-        assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), 1);
-        assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 0);
-        assert_eq!(stats.counters.vortex_replays.load(Ordering::SeqCst), 0);
-        assert_eq!(stats.counters.fallbacks.load(Ordering::SeqCst), 0);
-        assert!(
-            stats
-                .counters
-                .paths
-                .lock()
-                .unwrap()
-                .iter()
-                .all(|path| !path.exists())
-        );
-    }
-
-    #[tokio::test]
     async fn single_pass_vortex_splits_data_and_native_indexes_at_batch_boundaries() {
-        use std::sync::atomic::Ordering;
         let schema = block_schema(None, false);
         let rows = (0..20)
             .map(|i| ((i / 5) as u64, i, Some((i as f64).to_bits())))
             .collect::<Vec<_>>();
         for sink in [CompactMergeOutput::Memory, CompactMergeOutput::Disk] {
-            let stats = GenerationStats::default();
-            let mut output = block_output(sink, stats.clone());
+            let mut output = block_output(sink);
             output.file_format = FileFormat::Vortex;
             output.max_file_size = 129;
             let files = produce(
@@ -1538,114 +1389,9 @@ mod tests {
                 actual.extend(stored);
             }
             assert_eq!(actual, rows);
-            assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), 3);
-            assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 0);
-            assert_eq!(stats.counters.vortex_replays.load(Ordering::SeqCst), 0);
         }
     }
 
-    #[tokio::test]
-    async fn single_pass_parquet_io_failure_does_not_trigger_successful_fallback() {
-        use std::sync::atomic::Ordering;
-        let schema = block_schema(None, false);
-        let stats = GenerationStats::default();
-        stats
-            .counters
-            .parquet_readonly
-            .store(true, Ordering::SeqCst);
-        let result = produce(
-            &schema,
-            vec![block_batch(&schema, &[(1, 10, Some(1f64.to_bits()))])],
-            block_output(CompactMergeOutput::Disk, stats.clone()),
-        )
-        .await;
-        assert!(result.is_err());
-        assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), 1);
-        assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 0);
-        assert_eq!(stats.counters.parquet_replays.load(Ordering::SeqCst), 0);
-        assert_eq!(stats.counters.fallbacks.load(Ordering::SeqCst), 0);
-        assert!(
-            stats
-                .counters
-                .paths
-                .lock()
-                .unwrap()
-                .iter()
-                .all(|path| !path.exists())
-        );
-    }
-
-    #[tokio::test]
-    async fn single_pass_cancellation_keeps_running_block_job_paths_owned_until_exit() {
-        struct ReaderDropped(Option<tokio::sync::oneshot::Sender<()>>);
-        impl Drop for ReaderDropped {
-            fn drop(&mut self) {
-                if let Some(tx) = self.0.take() {
-                    let _ = tx.send(());
-                }
-            }
-        }
-        for (format, sink) in [FileFormat::Parquet, FileFormat::Vortex]
-            .into_iter()
-            .flat_map(|format| {
-                [CompactMergeOutput::Memory, CompactMergeOutput::Disk].map(|sink| (format, sink))
-            })
-        {
-            let schema = block_schema(None, false);
-            let stats = GenerationStats::default();
-            let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
-            let (release_tx, release_rx) = std::sync::mpsc::channel();
-            *stats.counters.block_gate.lock().unwrap() = Some((entered_tx, release_rx));
-            let (reader_tx, reader_rx) = tokio::sync::oneshot::channel();
-            let (tx, rx) = tokio::sync::mpsc::channel(2);
-            let batch = block_batch(
-                &schema,
-                &[(1, 10, Some(1f64.to_bits())), (2, 10, Some(2f64.to_bits()))],
-            );
-            let read_task = tokio::spawn(async move {
-                let _dropped = ReaderDropped(Some(reader_tx));
-                tx.send(batch).await.unwrap();
-                std::future::pending::<()>().await;
-                Ok(())
-            });
-            let mut output = block_output(sink, stats.clone());
-            output.file_format = format;
-            let producer = tokio::spawn(async move {
-                write_files(
-                    &schema,
-                    &[],
-                    &FileMeta {
-                        records: 2,
-                        original_size: 128,
-                        ..Default::default()
-                    },
-                    output,
-                    rx,
-                    read_task,
-                )
-                .await
-            });
-            entered_rx.await.unwrap();
-            producer.abort();
-            assert!(matches!(producer.await,Err(error) if error.is_cancelled()));
-            tokio::time::timeout(std::time::Duration::from_secs(5), reader_rx)
-                .await
-                .unwrap()
-                .unwrap();
-            let paths = stats.counters.paths.lock().unwrap().clone();
-            assert!(paths[0].exists());
-            release_tx.send(()).unwrap();
-            tokio::time::timeout(std::time::Duration::from_secs(5), async {
-                while paths.iter().any(|path| path.exists()) {
-                    tokio::task::yield_now().await;
-                }
-            })
-            .await
-            .unwrap();
-        }
-    }
-
-    /// An open-hour round writes the same size-split, hash-ordered files without a `.midx`.
     #[tokio::test]
     async fn test_size_split_hash_merged_files_carry_no_index() {
         let schema = Arc::new(Schema::new(vec![
@@ -1685,7 +1431,6 @@ mod tests {
                 max_file_size: 200,
                 layout: MetricsFileLayout::HashMerged,
                 sink: CompactMergeOutput::Disk,
-                stats: GenerationStats::default(),
             },
             rx,
             tokio::spawn(async { Ok(()) }),
@@ -1781,7 +1526,6 @@ mod tests {
                 max_file_size,
                 layout: MetricsFileLayout::Indexed,
                 sink: CompactMergeOutput::Disk,
-                stats: GenerationStats::default(),
             },
             rx,
             tokio::spawn(async { Ok(()) }),
@@ -1912,5 +1656,76 @@ mod tests {
         }
         assert_eq!(file_hashes, vec![vec![1, 1], vec![1, 2, 2], vec![3]]);
         assert!(file_hashes[0].contains(&1) && file_hashes[1].contains(&1));
+    }
+    #[tokio::test]
+    async fn parquet_sink_reports_read_only_write_error_and_cleans_up() {
+        let (file, path) = new_temp_file().unwrap();
+        let observed = path.to_path_buf();
+        drop(file);
+        let file = tokio::fs::File::from_std(std::fs::File::open(&path).unwrap());
+        let mut sink = ParquetSink::Disk { file, path };
+        let result = async {
+            AsyncFileWriter::write(&mut sink, bytes::Bytes::from_static(b"data")).await?;
+            AsyncFileWriter::complete(&mut sink).await
+        }
+        .await;
+        assert!(result.is_err());
+        drop(sink);
+        assert!(!observed.exists());
+    }
+
+    #[tokio::test]
+    async fn vortex_writer_reports_read_only_output_error() {
+        let (file, path) = new_temp_file().unwrap();
+        let observed = path.to_path_buf();
+        drop(file);
+        let schema = block_schema(None, false);
+        let session = VortexSession::default().with_tokio();
+        let dtype = session.arrow().from_arrow_schema(schema.as_ref()).unwrap();
+        let file = tokio::fs::File::from_std(std::fs::File::open(&path).unwrap());
+        let mut writer = VortexWriteOptions::new(session.clone())
+            .with_strategy(vortex_write_strategy(&session))
+            .writer(file, dtype);
+        let batch = block_batch(&schema, &[(1, 10, Some(1f64.to_bits()))]);
+        let array = session
+            .arrow()
+            .from_arrow_record_batch(batch, schema.as_ref())
+            .unwrap();
+        let result = async move {
+            writer.push(array).await?;
+            writer.finish().await
+        }
+        .await;
+        assert!(result.is_err());
+        drop(path);
+        assert!(!observed.exists());
+    }
+
+    #[tokio::test]
+    async fn read_task_drop_aborts_its_upstream() {
+        struct Dropped(Option<tokio::sync::oneshot::Sender<()>>);
+        impl Drop for Dropped {
+            fn drop(&mut self) {
+                if let Some(tx) = self.0.take() {
+                    let _ = tx.send(());
+                }
+            }
+        }
+        let (entered, ready) = tokio::sync::oneshot::channel();
+        let (done, closed) = tokio::sync::oneshot::channel();
+        let task = ReadTask {
+            handle: tokio::spawn(async move {
+                let _owned = Dropped(Some(done));
+                let _ = entered.send(());
+                std::future::pending::<()>().await;
+                Ok(())
+            }),
+        };
+        ready.await.unwrap();
+        drop(task);
+        tokio::time::timeout(std::time::Duration::from_secs(5), closed)
+            .await
+            .unwrap()
+            .unwrap();
     }
 }

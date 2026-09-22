@@ -99,16 +99,7 @@ impl<'a> CompactMetadata<'a> {
         Arc::new(self.header.schema.clone())
     }
 
-    #[cfg(test)]
-    pub(crate) fn batch(&self, projection: &[usize]) -> Result<RecordBatch> {
-        self.batch_inner(projection, false)
-    }
-
     pub(crate) fn compact_batch(&self, projection: &[usize]) -> Result<RecordBatch> {
-        self.batch_inner(projection, true)
-    }
-
-    fn batch_inner(&self, projection: &[usize], compact_labels: bool) -> Result<RecordBatch> {
         let mut fields = Vec::with_capacity(projection.len());
         let mut columns = Vec::with_capacity(projection.len());
         let mut expanded = 0usize;
@@ -126,7 +117,7 @@ impl<'a> CompactMetadata<'a> {
                 "compact decompressed size mismatch"
             );
             let field = self.header.schema.field(i);
-            let col = if compact_labels && crate::is_label_type(field.data_type()) {
+            let col = if crate::is_label_type(field.data_type()) {
                 decode_labels_compact(&raw, field.data_type(), self.header.rows, &mut expanded)?
             } else {
                 decode_column(&raw, field.data_type(), self.header.rows, &mut expanded)?

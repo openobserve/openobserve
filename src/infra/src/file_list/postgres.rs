@@ -2470,7 +2470,11 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
 
     // Execute migration in a transaction
     let mut tx = pool.begin().await?;
-    add_mindex_size_column(&mut *tx, table).await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
 
     // 1. Ensure all columns exist
     sqlx::query(&format!(
@@ -2666,7 +2670,11 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     log::info!("[POSTGRES] Table {table} start checking columns.");
 
     let mut tx = pool.begin().await?;
-    add_mindex_size_column(&mut *tx, table).await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
 
     // 1. Widen file column
     sqlx::query(&format!(
@@ -2865,7 +2873,12 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     for table in &tables {
         let relkind = get_table_relkind(pool, table).await?;
         if matches!(relkind.as_deref(), Some("p" | "r")) {
-            add_mindex_size_column(pool, table).await?;
+            // The supplied pool can target a different schema than the global DDL pool.
+            sqlx::query(&format!(
+                "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
+            ))
+            .execute(pool)
+            .await?;
         }
         match relkind.as_deref() {
             None => {
@@ -3114,7 +3127,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column("file_list_jobs", "started_at", "BIGINT default 0 not null").await?;
     add_column("file_list_jobs", "dumped", "BOOLEAN default false not null").await?;
     add_column("stream_stats", "index_size", "BIGINT default 0 not null").await?;
-    add_mindex_size_column(&pool, "stream_stats").await?;
+    add_column("stream_stats", "mindex_size", "BIGINT DEFAULT 0 NOT NULL").await?;
     add_column(
         "stream_stats",
         "is_recent",
@@ -3264,18 +3277,6 @@ const MAINTENANCE_LAST_RUN_KEY: &str = "/file_list/maintenance/last_run";
 /// Max retries within a cycle when a run fails, and the wait between them.
 const MAINTENANCE_MAX_RETRIES: u32 = 3;
 const MAINTENANCE_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_secs(600);
-
-async fn add_mindex_size_column<'e>(
-    executor: impl Executor<'e, Database = Postgres>,
-    table: &str,
-) -> Result<()> {
-    sqlx::query(&format!(
-        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
-    ))
-    .execute(executor)
-    .await?;
-    Ok(())
-}
 
 /// Return the std::time::Duration until the next occurrence of `hour` (UTC).
 fn duration_until_next_utc_hour(hour: u32) -> std::time::Duration {
@@ -5491,6 +5492,56 @@ mod tests {
     #[tokio::test]
     #[ignore = "Requires an isolated SQL database configured for this backend"]
     async fn test_mindex_size_postgres_persistence_and_stats() {
+        // Global pools must remain in the same Tokio runtime as the production API checks.
+        let pool = CLIENT_DDL.clone();
+        let table = unique_partitioned_test_table_name();
+        sqlx::query(&format!(
+            "CREATE TABLE {table} (id INTEGER PRIMARY KEY, index_size BIGINT NOT NULL)"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(&format!(
+            "INSERT INTO {table} (id, index_size) VALUES (1, 53)"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+        add_column(&table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL")
+            .await
+            .unwrap();
+        let old: (i64, i64) =
+            sqlx::query_as(&format!("SELECT index_size, mindex_size FROM {table}"))
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(old, (53, 0));
+        sqlx::query(&format!(
+            "UPDATE {table} SET mindex_size = 811 WHERE id = 1"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+        add_column(&table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL")
+            .await
+            .unwrap();
+        sqlx::query(&format!(
+            "INSERT INTO {table} (id, index_size) VALUES (2, 59)"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+        let values: Vec<(i64, i64)> = sqlx::query_as(&format!(
+            "SELECT index_size, mindex_size FROM {table} ORDER BY id"
+        ))
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(values, [(53, 811), (59, 0)]);
+        sqlx::query(&format!("DROP TABLE {table}"))
+            .execute(&pool)
+            .await
+            .unwrap();
         let list = PostgresFileList::new();
         list.create_table().await.unwrap();
         list.create_table_index().await.unwrap();
@@ -5761,9 +5812,12 @@ mod tests {
                 .unwrap();
             insert_legacy_mindex_row(&pool, table, "old.parquet").await;
         }
-        add_mindex_size_column(&pool, "file_list_history")
-            .await
-            .unwrap();
+        sqlx::query(
+            "ALTER TABLE file_list_history ADD COLUMN mindex_size BIGINT DEFAULT 0 NOT NULL",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         sqlx::query("UPDATE file_list_history SET mindex_size = 701")
             .execute(&pool)
             .await
@@ -5773,33 +5827,6 @@ mod tests {
             .await
             .unwrap();
         migrate_dump_stats_table(&pool).await.unwrap();
-        sqlx::query(
-            "CREATE TABLE stream_stats (id INTEGER PRIMARY KEY, index_size BIGINT NOT NULL)",
-        )
-        .execute(&pool)
-        .await
-        .unwrap();
-        sqlx::query("INSERT INTO stream_stats (id, index_size) VALUES (1, 53)")
-            .execute(&pool)
-            .await
-            .unwrap();
-        add_mindex_size_column(&pool, "stream_stats").await.unwrap();
-        let old_stats: (i64, i64) =
-            sqlx::query_as("SELECT index_size, mindex_size FROM stream_stats")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(old_stats, (53, 0));
-        sqlx::query("UPDATE stream_stats SET mindex_size = 811")
-            .execute(&pool)
-            .await
-            .unwrap();
-        add_mindex_size_column(&pool, "stream_stats").await.unwrap();
-        let value: i64 = sqlx::query_scalar("SELECT mindex_size FROM stream_stats")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-        assert_eq!(value, 811);
         handle_partitioned_tables(&pool).await.unwrap();
         handle_partitioned_tables(&pool).await.unwrap();
         for (table, expected) in [
@@ -5900,6 +5927,52 @@ mod tests {
             .await
             .unwrap();
             assert_eq!(zero, 0);
+        }
+        pool.close().await;
+        sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+            .execute(&admin)
+            .await
+            .unwrap();
+        admin.close().await;
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires an isolated PostgreSQL database with schema creation permission"]
+    async fn test_mindex_size_postgres_upgrade_rollback() {
+        let (admin, pool, schema) = mindex_test_schema().await;
+        for table in ["file_list", "file_list_history", "file_list_dump_stats"] {
+            sqlx::query(&legacy_mindex_ddl(table, false))
+                .execute(&pool)
+                .await
+                .unwrap();
+            insert_legacy_mindex_row(&pool, table, "old.parquet").await;
+            sqlx::query(&format!("CREATE TABLE {table}_default (id INTEGER)"))
+                .execute(&pool)
+                .await
+                .unwrap();
+            let result = if table == "file_list_dump_stats" {
+                migrate_dump_stats_table(&pool).await
+            } else {
+                migrate_file_list_table(&pool, table).await
+            };
+            assert!(result.is_err());
+            assert_eq!(
+                get_table_relkind(&pool, table).await.unwrap().as_deref(),
+                Some("r")
+            );
+            let columns: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND column_name = 'mindex_size'")
+                .bind(table).fetch_one(&pool).await.unwrap();
+            assert_eq!(
+                columns, 0,
+                "failed migration must roll back the column addition"
+            );
+            let rows: (i64, i64) = sqlx::query_as(&format!(
+                "SELECT COUNT(*), SUM(index_size)::BIGINT FROM {table}"
+            ))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(rows, (1, 13));
         }
         pool.close().await;
         sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))

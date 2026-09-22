@@ -293,18 +293,9 @@ pub async fn merge_files(
         let cache_locally = cfg.cache_latest_files.enabled
             && cfg.cache_latest_files.cache_parquet
             && cfg.cache_latest_files.download_from_node;
-        let account_ref = &account;
-        let (buf, mut new_file_meta) = publish_merged_output(
-            file,
-            &new_file_key,
-            cache_locally,
-            |key, bytes| async move {
-                storage::put_with_tier(account_ref, &key, bytes, storage_tier)
-                    .await
-                    .map_err(anyhow::Error::from)
-            },
-        )
-        .await?;
+        let (buf, mut new_file_meta) =
+            publish_merged_output(file, &account, &new_file_key, cache_locally, storage_tier)
+                .await?;
 
         if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
             generate_inverted_index(
@@ -462,15 +453,13 @@ fn settle_download(
     }
 }
 
-async fn publish_merged_output<F>(
+async fn publish_merged_output(
     file: MergedFile,
+    account: &str,
     key: &str,
     cache_locally: bool,
-    put: impl Fn(String, Bytes) -> F,
-) -> anyhow::Result<(Bytes, FileMeta)>
-where
-    F: Future<Output = anyhow::Result<()>>,
-{
+    storage_tier: storage::StorageTier,
+) -> anyhow::Result<(Bytes, FileMeta)> {
     let (data, mut meta, index_path) = file.into_upload_parts().await?;
     let bytes = Bytes::from(data);
     meta.compressed_size = i64::try_from(bytes.len())?;
@@ -493,9 +482,9 @@ where
     if cache_locally {
         infra::cache::file_data::disk::set(key, bytes.clone()).await?;
     }
-    put(key.to_string(), bytes.clone()).await?;
+    storage::put_with_tier(account, key, bytes.clone(), storage_tier).await?;
     if let Some((key, index)) = index {
-        put(key, index).await?;
+        storage::put_with_tier(account, &key, index, storage_tier).await?;
     }
     Ok((bytes, meta))
 }
@@ -568,6 +557,12 @@ mod tests {
         .remove(0)
     }
 
+    async fn memory_storage_account() -> String {
+        let id = ider::uuid();
+        storage::add_account(&id, Box::new(object_store::memory::InMemory::new())).await;
+        format!("{id}:default")
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn mindex_size_matches_full_published_object_for_every_output_kind() {
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
@@ -584,27 +579,33 @@ mod tests {
                     "files/publish/metrics/m/2026/09/20/00/{}",
                     file.file_name("unused", format)
                 );
-                let uploads = Arc::new(std::sync::Mutex::new(Vec::new()));
-                let sink = Arc::clone(&uploads);
-                let (data, meta) = publish_merged_output(file, &key, false, move |key, bytes| {
-                    let sink = Arc::clone(&sink);
-                    async move {
-                        sink.lock().unwrap().push((key, bytes));
-                        Ok(())
-                    }
-                })
+                let account = memory_storage_account().await;
+                let (data, meta) = publish_merged_output(
+                    file,
+                    &account,
+                    &key,
+                    false,
+                    storage::StorageTier::Default,
+                )
                 .await
                 .unwrap();
-                let uploads = uploads.lock().unwrap();
-                let index = uploads.iter().find(|(key, _)| key.ends_with(".midx"));
+                assert_eq!(storage::get_bytes(&account, &key).await.unwrap(), data);
+                let indexes = storage::list(&account, "files/publish/midx/")
+                    .await
+                    .unwrap();
+                assert_eq!(indexes.len(), usize::from(kind != "none"));
+                let index = if let Some(path) = indexes.first() {
+                    Some(storage::get_bytes(&account, path).await.unwrap())
+                } else {
+                    None
+                };
                 assert_eq!(meta.index_size, 79);
                 assert_eq!(meta.compressed_size, data.len() as i64);
                 assert_eq!(
                     meta.mindex_size,
-                    index.map_or(0, |(_, bytes)| bytes.len() as i64)
+                    index.as_ref().map_or(0, |bytes| bytes.len() as i64)
                 );
-                assert_eq!(index.is_none(), kind == "none");
-                if let Some((_, bytes)) = index {
+                if let Some(bytes) = index {
                     assert_eq!(bytes.starts_with(b"ARROW1"), kind != "block");
                 }
             }
@@ -612,11 +613,8 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn single_pass_publication_returns_only_after_data_and_index_uploads() {
-        for (format, fail_at) in [FileFormat::Parquet, FileFormat::Vortex]
-            .into_iter()
-            .flat_map(|format| [None, Some(0usize), Some(1)].map(|failure| (format, failure)))
-        {
+    async fn publication_stores_source_and_index_and_cleans_temp_files() {
+        for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let file = produced_indexed_output(format).await;
             let key = format!(
                 "files/publish/metrics/m/2026/09/20/00/{}",
@@ -630,33 +628,25 @@ mod tests {
                 } => vec![data_path.to_path_buf(), metrics_index_path.to_path_buf()],
                 _ => panic!("indexed output expected"),
             };
-            let puts = Arc::new(std::sync::Mutex::new(Vec::new()));
-            let received = Arc::clone(&puts);
-            let result = publish_merged_output(file, &key, false, move |name, bytes| {
-                let received = Arc::clone(&received);
-                async move {
-                    let mut entries = received.lock().unwrap();
-                    let position = entries.len();
-                    entries.push((name, bytes));
-                    anyhow::ensure!(fail_at != Some(position), "injected publication failure");
-                    Ok(())
-                }
-            })
-            .await;
-            assert_eq!(result.is_ok(), fail_at.is_none());
-            let puts = puts.lock().unwrap();
-            assert_eq!(puts.len(), if fail_at == Some(0) { 1 } else { 2 });
-            assert!(puts[0].0.ends_with(format.extension()));
-            if puts.len() == 2 {
-                assert!(puts[1].0.ends_with(".midx"));
-                assert!(!puts[1].1.starts_with(b"ARROW1"));
-            }
-            assert!(paths.iter().all(|path| !path.exists()));
+            let account = memory_storage_account().await;
+            publish_merged_output(file, &account, &key, false, storage::StorageTier::Default)
+                .await
+                .unwrap();
+            assert_eq!(storage::list(&account, "files/").await.unwrap().len(), 2);
+            assert!(!storage::get_bytes(&account, &key).await.unwrap().is_empty());
+            let index_key = MetricsFileLayout::metrics_index_path(&key).unwrap();
+            assert!(
+                !storage::get_bytes(&account, &index_key)
+                    .await
+                    .unwrap()
+                    .starts_with(b"ARROW1")
+            );
+            assert!(paths.iter().all(|p| !p.exists()));
         }
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn single_pass_materialization_failure_precedes_all_publication() {
+    async fn materialization_failure_leaves_storage_empty() {
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let file = produced_indexed_output(format).await;
             let key = format!(
@@ -669,15 +659,13 @@ mod tests {
             {
                 std::fs::remove_file(metrics_index_path).unwrap();
             }
-            let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-            let calls = Arc::clone(&count);
-            let result = publish_merged_output(file, &key, false, move |_, _| {
-                calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                async { Ok(()) }
-            })
-            .await;
-            assert!(result.is_err());
-            assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 0);
+            let account = memory_storage_account().await;
+            assert!(
+                publish_merged_output(file, &account, &key, false, storage::StorageTier::Default)
+                    .await
+                    .is_err()
+            );
+            assert!(storage::list(&account, "files/").await.unwrap().is_empty());
         }
     }
 
