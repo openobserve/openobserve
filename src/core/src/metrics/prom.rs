@@ -406,7 +406,6 @@ pub async fn remote_write(
 
         // every sample of a series shares its labels, so the identity is loop-invariant
         let series_hash = super::signature_of_series_labels(&label_pairs);
-        let stream_bounds = policy.bounds;
 
         // a label the schema has not seen goes down the JSON path, which evolves the schema
         if event.histograms.is_empty()
@@ -426,7 +425,7 @@ pub async fn remote_write(
             for sample in &event.samples {
                 if let Some(value) = super::sanitize_metric_value(sample.value) {
                     let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
-                    if !admission.admit(&metric_name, stream_bounds, timestamp) {
+                    if !admission.admit(&metric_name, policy.bounds, timestamp) {
                         continue;
                     }
                     columnar.append(&label_pairs, label_bytes, value, timestamp, series_hash);
@@ -465,7 +464,7 @@ pub async fn remote_write(
             }
 
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
-            if !admission.admit(&metric_name, stream_bounds, timestamp) {
+            if !admission.admit(&metric_name, policy.bounds, timestamp) {
                 continue;
             }
             // the last sample owns the label set outright; nothing reads it afterwards

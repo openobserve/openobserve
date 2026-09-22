@@ -52,6 +52,9 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
+/// The `error_type` label a point rejected for its timestamp is counted under.
+pub(super) const TS_OUT_OF_BOUNDS: &str = "timestamp_out_of_bounds";
+
 /// Stands in for the partition keys of a stream that has none.
 static NO_PARTITION_KEYS: Vec<StreamPartition> = Vec::new();
 
@@ -82,9 +85,6 @@ pub(super) struct WriteTimings {
     pub write_micros: u128,
     pub report_stats_micros: u128,
 }
-
-/// The `error_type` label a point rejected for its timestamp is counted under.
-pub(super) const TS_OUT_OF_BOUNDS: &str = "timestamp_out_of_bounds";
 
 /// The timestamps one metrics stream accepts, resolved once per request.
 #[derive(Clone, Copy, Debug)]

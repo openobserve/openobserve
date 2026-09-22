@@ -112,7 +112,7 @@ fn parse_metric_value(value: &json::Value) -> Result<json::Value, anyhow::Error>
     super::metric_value(raw).ok_or_else(|| anyhow!("invalid value, not a number"))
 }
 
-/// Queues a validated record for its pipelines or its write; `false` if its stream is deleting.
+/// Queues a record for its pipelines or write, or records why it was refused; `false` if deleting.
 async fn buffer_record(
     org_id: &str,
     stream_name: Option<&str>,
