@@ -517,13 +517,6 @@ pub async fn remote_write(
     if skipped_records > 0 {
         log::warn!("[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted");
     }
-    if let Some(reason) = admission.last_rejection {
-        log::warn!(
-            "[METRICS:PROM] org: {org_id}, rejected {} samples: {}",
-            admission.rejected,
-            reason.message()
-        );
-    }
 
     let parse_timeseries_ms = step_start.elapsed().as_millis();
 
@@ -545,7 +538,7 @@ pub async fn remote_write(
         );
     }
 
-    let (mut pipeline_outputs, _) = ingest::run_pipelines(
+    let (pipeline_outputs, _) = ingest::run_pipelines(
         org_id,
         &stream_executable_pipelines,
         stream_pipeline_inputs,
@@ -553,23 +546,26 @@ pub async fn remote_write(
         &mut stream_partitioning_map,
     )
     .await;
-    let Admission {
-        policies,
-        rejected,
-        last_rejection,
-    } = &mut admission;
-    ingest::admit_pipeline_outputs(&mut pipeline_outputs, policies, |stream, reason| {
-        *rejected += 1;
-        *last_rejection = Some(reason);
-        reason.count(org_id, stream);
-    })
-    .await;
     for (stream_name, records) in pipeline_outputs {
-        // a pipeline rewrote the labels, so the series hash is recomputed from its output
-        json_data_by_stream.entry(stream_name).or_default().extend(
-            records
-                .into_iter()
-                .map(|(record, timestamp)| (record, timestamp, None)),
+        // this path writes the timestamp carried beside the record, so that is the one admitted
+        let bounds = admission.policies.get(&stream_name).await.bounds;
+        let admitted = records.into_iter().filter_map(|(record, timestamp)| {
+            admission
+                .admit(&stream_name, bounds, timestamp)
+                // a pipeline rewrote the labels, so the series hash is recomputed from its output
+                .then_some((record, timestamp, None))
+        });
+        let buffered = json_data_by_stream.entry(stream_name.clone()).or_default();
+        buffered.extend(admitted);
+        if buffered.is_empty() {
+            json_data_by_stream.remove(&stream_name);
+        }
+    }
+    if let Some(reason) = admission.last_rejection {
+        log::warn!(
+            "[METRICS:PROM] org: {org_id}, rejected {} samples: {}",
+            admission.rejected,
+            reason.message()
         );
     }
 

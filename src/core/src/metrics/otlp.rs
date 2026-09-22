@@ -144,7 +144,6 @@ struct Admission<'a> {
 }
 
 impl Admission<'_> {
-    /// Loads a stream's pipelines on first sight, exactly as the record loop does.
     async fn stream_has_pipeline(&mut self, stream_name: &str) -> bool {
         if !self.pipelines.contains_key(stream_name) {
             let stream_param = StreamParams::new(self.org_id, stream_name, StreamType::Metrics);
