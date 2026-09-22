@@ -97,6 +97,41 @@ impl HaGate<'_> {
     }
 }
 
+/// The timestamp policy plus the samples it refused; remote-write can only log those.
+struct Admission {
+    bounds: ingest::BoundsCache,
+    rejected: usize,
+    last_rejection: Option<ingest::OutOfBounds>,
+}
+
+impl Admission {
+    fn new(org_id: &str, now: i64) -> Self {
+        Self {
+            bounds: ingest::BoundsCache::new(org_id, now),
+            rejected: 0,
+            last_rejection: None,
+        }
+    }
+
+    /// `false` for a sample that must not be written, already counted against its stream.
+    fn admit(
+        &mut self,
+        stream_name: &str,
+        bounds: ingest::TimestampBounds,
+        timestamp: i64,
+    ) -> bool {
+        match bounds.check(timestamp) {
+            Ok(()) => true,
+            Err(reason) => {
+                self.rejected += 1;
+                self.last_rejection = Some(reason);
+                reason.count(&self.bounds.org_id, stream_name);
+                false
+            }
+        }
+    }
+}
+
 pub async fn remote_write(
     org_id: &str,
     body: Bytes,
@@ -112,6 +147,7 @@ pub async fn remote_write(
     let dedup_enabled = cfg.prom.dedup_enabled;
     let election_interval = cfg.prom.leader_election_interval * 1000000;
     let mut cluster_name = String::new();
+    let mut admission = Admission::new(org_id, started_at);
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
@@ -284,6 +320,10 @@ pub async fn remote_write(
         let t = std::time::Instant::now();
         crate::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
         preload_alerts_time = t.elapsed().as_micros();
+
+        for stream in &streams {
+            admission.bounds.get(&stream.stream_name).await;
+        }
     }
     let total_preload_time = preload_start.elapsed().as_micros();
 
@@ -382,6 +422,7 @@ pub async fn remote_write(
 
         // every sample of a series shares its labels, so the identity is loop-invariant
         let series_hash = super::signature_of_series_labels(&label_pairs);
+        let stream_bounds = admission.bounds.get(&metric_name).await;
 
         // a label the schema has not seen goes down the JSON path, which evolves the schema
         if event.histograms.is_empty()
@@ -401,6 +442,9 @@ pub async fn remote_write(
             for sample in &event.samples {
                 if let Some(value) = super::sanitize_metric_value(sample.value) {
                     let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
+                    if !admission.admit(&metric_name, stream_bounds, timestamp) {
+                        continue;
+                    }
                     columnar.append(&label_pairs, label_bytes, value, timestamp, series_hash);
                 }
             }
@@ -437,6 +481,9 @@ pub async fn remote_write(
             }
 
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
+            if !admission.admit(&metric_name, stream_bounds, timestamp) {
+                continue;
+            }
             // the last sample owns the label set outright; nothing reads it afterwards
             let value = if can_move_labels && sample_idx + 1 == sample_total {
                 build_metric_record(std::mem::take(&mut labels), sample_val, timestamp)
@@ -462,6 +509,7 @@ pub async fn remote_write(
                 ExpansionLimits::from_config(&cfg),
                 &mut gate,
                 &mut sink,
+                &mut admission,
             )
             .await
             {
@@ -477,6 +525,13 @@ pub async fn remote_write(
     // warn if any records were skipped due to streams being deleted
     if skipped_records > 0 {
         log::warn!("[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted");
+    }
+    if let Some(reason) = admission.last_rejection {
+        log::warn!(
+            "[METRICS:PROM] org: {org_id}, rejected {} samples: {}",
+            admission.rejected,
+            reason.message()
+        );
     }
 
     let parse_timeseries_ms = step_start.elapsed().as_millis();
@@ -1115,6 +1170,7 @@ async fn buffer_native_histograms(
     limits: ExpansionLimits,
     gate: &mut HaGate<'_>,
     sink: &mut RecordSink<'_>,
+    admission: &mut Admission,
 ) -> Option<usize> {
     // one stream name + label template per derived stream, not one per record
     let mut derived_streams = CLASSIC_HISTOGRAM_SUFFIXES.map(|suffix| {
@@ -1145,6 +1201,10 @@ async fn buffer_native_histograms(
                 .position(|s| *s == suffix)
                 .unwrap();
             let (stream_name, hist_labels) = &mut derived_streams[idx];
+            let bounds = admission.bounds.get(stream_name).await;
+            if !admission.admit(stream_name, bounds, timestamp) {
+                continue;
+            }
             if let Some(le) = le {
                 hist_labels.insert(BUCKET_LABEL.to_string(), json::Value::String(le));
             }

@@ -222,6 +222,7 @@ pub async fn handle_otlp_request(
 
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+    let mut bounds = ingest::BoundsCache::new(org_id, started_at);
 
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
@@ -436,9 +437,24 @@ pub async fn handle_otlp_request(
                                         &stream_partitioning_map,
                                     )
                                 });
+                        let stream_bounds = bounds.get(&metric_name).await;
+                        let admitted = points.iter().filter(|point| {
+                            match stream_bounds.check(point_timestamp(point.time_unix_nano)) {
+                                Ok(()) => true,
+                                Err(reason) => {
+                                    reject_point(
+                                        &mut partial_success,
+                                        org_id,
+                                        &metric_name,
+                                        reason,
+                                    );
+                                    false
+                                }
+                            }
+                        });
                         match columnar {
-                            Some(columnar) => append_number_points(columnar, &rec, points),
-                            None => number_point_records(&rec, points),
+                            Some(columnar) => append_number_points(columnar, &rec, admitted),
+                            None => number_point_records(&rec, admitted),
                         }
                     }
                 };
@@ -450,6 +466,17 @@ pub async fn handle_otlp_request(
                     let local_metric_name = format_stream_name(
                         rec.get(NAME_LABEL).unwrap().as_str().unwrap().to_string(),
                     );
+
+                    // a nanosecond stamp past i64 micros is as far in the future as it gets
+                    let timestamp = rec
+                        .get(TIMESTAMP_COL_NAME)
+                        .and_then(json::Value::as_i64)
+                        .unwrap_or(i64::MAX);
+                    let stream_bounds = bounds.get(&local_metric_name).await;
+                    if let Err(reason) = stream_bounds.check(timestamp) {
+                        reject_point(&mut partial_success, org_id, &local_metric_name, reason);
+                        continue;
+                    }
 
                     if local_metric_name != metric_name {
                         // check for schema
@@ -738,10 +765,10 @@ fn number_point_records<'a>(
 }
 
 /// Writes number data points straight to arrow, returning JSON records for those it cannot take.
-fn append_number_points(
+fn append_number_points<'a>(
     columnar: &mut ColumnarStream,
     rec: &json::Value,
-    data_points: &[NumberDataPoint],
+    data_points: impl IntoIterator<Item = &'a NumberDataPoint>,
 ) -> Vec<serde_json::Value> {
     let Some(base_labels) = columnar_base_labels(rec) else {
         return number_point_records(rec, data_points);
@@ -753,7 +780,7 @@ fn append_number_points(
         base_overwritten: false,
     };
     let rejected: Vec<&NumberDataPoint> = data_points
-        .iter()
+        .into_iter()
         .filter(|point| !append_number_point(columnar, &base_labels, point, &mut scratch))
         .collect();
     number_point_records(rec, rejected)
@@ -823,6 +850,22 @@ fn append_number_point(
     let hash = super::signature_of_label_pairs(labels, METRICS_HASH_EXCLUDED_LABELS);
     columnar.append(labels, label_bytes, value, timestamp, hash);
     true
+}
+
+/// A point's time in micros; one past i64 saturates, which the bounds check refuses as future.
+fn point_timestamp(time_unix_nano: u64) -> i64 {
+    i64::try_from(time_unix_nano / 1000).unwrap_or(i64::MAX)
+}
+
+fn reject_point(
+    partial_success: &mut ExportMetricsPartialSuccess,
+    org_id: &str,
+    stream_name: &str,
+    reason: ingest::OutOfBounds,
+) {
+    partial_success.rejected_data_points += 1;
+    partial_success.error_message = reason.message();
+    reason.count(org_id, stream_name);
 }
 
 /// A gauge or sum point's value under the shared policy, `None` for one that writes no record.

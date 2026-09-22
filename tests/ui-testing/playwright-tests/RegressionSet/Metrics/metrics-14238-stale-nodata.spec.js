@@ -24,8 +24,9 @@ const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js'
 /**
  * How far back the seeded history goes. It has to sit OUTSIDE the window the
  * explorer opens on (its default, "Past 15 Minutes") so the first card query is
- * legitimately empty, and INSIDE `ZO_INGEST_ALLOWED_UPTO` (5 hours in the
- * regression workflow) so the rows are not dropped on the way in.
+ * legitimately empty. Metrics ingestion has no `ZO_INGEST_ALLOWED_UPTO` window;
+ * it only refuses points older than the stream's data retention, which this
+ * offset is nowhere near.
  */
 const HISTORY_MINUTES_AGO = 26;
 
