@@ -1,9 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/communitySlackInvite.spec.js",
-  "existing_tests_considered": [
-    "tests/ui-testing/playwright-tests/GeneralTests/connectDataSourcePopup.spec.js"
-  ],
-  "needs_registration": true,
-  "rationale": "The sibling connectDataSourcePopup.spec.js already asserts [data-test=\"community-slack-invite-dialog\"] count 0, but only as a secondary line inside expectBothDialogsAbsent() coupled to the ConnectDataSourcePopup. The run-context (needs_e2e: true, spec_filename communitySlackInvite.spec.js) and the feature doc both call for a dedicated spec for this distinct component's dismiss/snooze change. The new spec stays focused on the Slack invite only (slack-only assertion, not the connect popup) and is the documented home for the Cloud snooze tests that cannot run on OSS. It needs registration in ci_matrix.json GeneralTests.run_files."
-}
