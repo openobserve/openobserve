@@ -130,10 +130,10 @@ export default defineComponent({
           query: { org_identifier: store.state.selectedOrganization?.identifier },
         });
       };
-      // Nodes and License are enterprise-only meta-org pages.
+      // Nodes, License and Query Management are enterprise-only meta-org pages.
       const notMeta =
         store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
-      if ((name === "nodes" || name === "license") && notMeta) {
+      if ((name === "nodes" || name === "license" || name === "query_management") && notMeta) {
         toGeneral();
         return;
       }
