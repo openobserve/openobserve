@@ -996,15 +996,15 @@ describe("FunctionList", () => {
       vi.useFakeTimers();
       const vm = wrapper.vm as any;
       vm.currentPage = 3;
-      const setPageIndex = vi.fn();
-      vm.oTableRef = { table: { setPageIndex } };
+      const restorePage = vi.fn();
+      vm.oTableRef = { restorePage };
 
       vm.restorePageIndex();
-      expect(setPageIndex).not.toHaveBeenCalled();
+      expect(restorePage).not.toHaveBeenCalled();
 
       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
       vi.runOnlyPendingTimers();
-      expect(setPageIndex).toHaveBeenCalledWith(2);
+      expect(restorePage).toHaveBeenCalledWith(3);
     });
 
     it("keeps the page after Cancel unmounts and remounts OTable via the AddFunction v-if swap", async () => {

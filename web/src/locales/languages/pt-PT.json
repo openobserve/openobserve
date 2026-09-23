@@ -1474,6 +1474,8 @@
     "sessionReplay": "Repetição da sessão",
     "viewSessionReplay": "Exibir repetição da sessão",
     "playSessionReplay": "Reproduzir repetição da sessão",
+    "noReplayRecordedTitle": "Nenhuma reprodução foi gravada para esta sessão",
+    "noReplayRecordedMessage": "A sessão {id} não tem segmentos de reprodução para exibir.",
     "discoverSessionTitle": "Descubra o Session Replay para entender detalhadamente as interações do usuário",
     "discoverSessionMessage": "O Session Replay captura e reproduz as interações do usuário em seu site ou aplicativo. Isso permite que você analise visualmente como os usuários navegam, onde clicam, o que digitam e como interagem com seu conteúdo.",
     "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
@@ -13041,10 +13043,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Entrada do span raiz do trace."
+              "trace": "Entrada do span de chat raiz do rastro.",
+              "session": "A pergunta inicial: entrada do span de chat raiz do primeiro rastro."
             },
             "output": {
-              "trace": "Saída do span raiz do trace."
+              "trace": "Saída do span de chat raiz do rastro.",
+              "session": "A resposta final: saída do span de chat raiz do último rastro."
             },
             "statistics": {
               "trace": "Métricas do trace: contagem de spans, duração, chamadas de LLM e ferramentas, erros, tokens e custo.",
@@ -13056,6 +13060,10 @@
             "steps": {
               "trace": "Spans em ordem de tempo; o meio é recolhido quando o trace é muito longo.",
               "session": "Traces em ordem de tempo, representados como turnos de conversa."
+            },
+            "tool_calls": {
+              "trace": "Todas as chamadas de ferramenta no rastro, em ordem cronológica, com seu nome, entrada, saída e status.",
+              "session": "Todas as chamadas de ferramenta nos rastros da sessão, em ordem cronológica, com seu nome, entrada, saída e status."
             }
           }
         }

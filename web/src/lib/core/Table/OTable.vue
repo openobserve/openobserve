@@ -1194,6 +1194,7 @@ watch(
  */
 defineExpose({
   table,
+  restorePage: pagination.restorePage,
   toggleAllRows: selection.toggleAllRows,
   clearSelection: selection.clearSelection,
   // Callers that render their own OTableColumnToggle (outside the built-in

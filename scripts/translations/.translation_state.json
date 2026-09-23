@@ -12397,10 +12397,12 @@
           "title": "5a6743f87ca1085c",
           "variables": {
             "input": {
-              "trace": "b6bec50de2750e82"
+              "session": "4a9571b392344252",
+              "trace": "1989045c93127363"
             },
             "output": {
-              "trace": "078f80923419eb8e"
+              "session": "b3b25c889e3814e2",
+              "trace": "c4ae6bff9a4cc3d1"
             },
             "spans": {
               "trace": "c3d361441ab0db75"
@@ -12412,6 +12414,10 @@
             "steps": {
               "session": "6d11de0abbce4788",
               "trace": "d59a422557bbb94c"
+            },
+            "tool_calls": {
+              "session": "cd0eae8459084422",
+              "trace": "88b26a078466ba1e"
             }
           }
         },
@@ -14360,6 +14366,8 @@
     "noCorrelatedTraces": "e4e73d4f296f896b",
     "noErrorsInWindow": "38acc7913f59dc7e",
     "noMatchingSessions": "0a351a7cccc1397c",
+    "noReplayRecordedMessage": "87d6635ebe531ad0",
+    "noReplayRecordedTitle": "f89a778ebefa2ed3",
     "noSessionReplay": "a9378d6297019298",
     "ofActiveUsers": "11eca08aa22daa55",
     "ofTotal": "de344ba2ec6092cb",
