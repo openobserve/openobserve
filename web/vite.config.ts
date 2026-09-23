@@ -259,7 +259,7 @@ export default defineConfig(({ mode }) => {
           manualChunks: (() => {
             const byPackage: Record<string, string[]> = {
               "o2cs-analytics": ["@rudderstack/analytics-js"],
-              "o2cs-oo-rum": ["@openobserve/browser-logs", "@openobserve/browser-rum"],
+              "o2cs-o2-rum": ["@openobserve/browser-logs", "@openobserve/browser-rum"],
               "o2cs-date-fns": ["date-fns", "date-fns-tz"],
               moment: ["moment", "moment-timezone"],
               lodash: ["lodash-es"],
