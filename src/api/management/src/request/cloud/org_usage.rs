@@ -64,7 +64,9 @@ pub async fn get_org_usage(
             && b.provider == MeteringProvider::Stripe
             && let Some(id) = &b.customer_id
         {
-            match o2_enterprise::enterprise::cloud::billings::get_metering_details(id).await {
+            match o2_enterprise::enterprise::cloud::billings::get_metering_details(&org_id, id)
+                .await
+            {
                 Ok(v) => {
                     return MetaHttpResponse::json(serde_json::json!({
                         "price_details":v
