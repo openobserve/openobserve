@@ -182,6 +182,7 @@ use crate::{
         openobserve_api_management::request::alerts::destinations::save_destination,
         openobserve_api_management::request::alerts::destinations::update_destination,
         openobserve_api_management::request::alerts::destinations::delete_destination,
+        openobserve_api_management::request::alerts::destinations::get_destinations_usage,
         kv::get,
         kv::set,
         kv::delete,
@@ -378,6 +379,8 @@ use crate::{
             openobserve_api_management::models::destinations::Destination,
             openobserve_api_management::models::destinations::DestinationType,
             openobserve_api_management::models::destinations::Template,
+            openobserve_api_management::models::destinations::DestinationUseResponse,
+            openobserve_api_management::models::destinations::DestinationConsumerKind,
             // Alerts
             openobserve_api_management::models::alerts::requests::CreateAlertRequestBody,
             openobserve_api_management::models::alerts::requests::UpdateAlertRequestBody,

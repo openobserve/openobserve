@@ -227,6 +227,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </section>
         </div>
+
+        <!-- The other blockers a delete would name (409 body), so this dialog previews it. -->
+        <div
+          v-if="otherBlockers.length"
+          class="border-border-default mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3"
+          data-test="dependency-impact-other-blockers"
+        >
+          <span class="text-text-secondary text-2xs font-semibold">
+            {{ t("alert_dependencies.sectionOtherConsumers") }}
+          </span>
+          <OTag
+            v-for="b in otherBlockers"
+            :key="b.kind"
+            type="countChip"
+            value="neutral"
+            :data-test="`dependency-impact-blocker-${b.kind}`"
+          >
+            <OIcon :name="depKindIcon(b.kind)" size="xs" class="me-0.5 text-text-secondary" />
+            {{ b.label }}
+          </OTag>
+        </div>
       </template>
     </div>
 
@@ -281,6 +302,7 @@ import useDependencyGraph, {
   applyDependencyDeletion,
   depKindIcon,
   depKindColor,
+  consumerBadges,
 } from "@/composables/alerts/useDependencyGraph";
 import type { DepFocus, DepNode, DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 
@@ -337,6 +359,14 @@ const impactLabel = computed(() => {
   );
   return t("alert_dependencies.impactTemplate", { destinations, alerts });
 });
+
+// Non-alert consumers of the focused destination — the same blockers `delete` names in its 409.
+const otherBlockers = computed(() =>
+  consumerBadges(focusNode.value).map((b) => ({
+    kind: b.kind,
+    label: t(b.labelKey, { count: b.count }, b.count),
+  })),
+);
 
 const nameMatches = (name: string) => {
   const term = search.value.trim().toLowerCase();

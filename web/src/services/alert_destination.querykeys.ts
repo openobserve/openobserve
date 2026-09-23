@@ -29,4 +29,5 @@ export const destinationKeys = {
   all: (org: string) => orgKey(org, "alerts", "destinations"),
   list: (org: string, module?: DestinationModule) =>
     orgKey(org, "alerts", "destinations", module ?? "all"),
+  usage: (org: string) => orgKey(org, "alerts", "destinations", "usage"),
 };

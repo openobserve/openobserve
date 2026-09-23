@@ -327,25 +327,22 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     Ok(out)
 }
 
-/// Synthetics whose `destinations` array contains the given name; fails closed, unlike `list`.
-pub async fn list_referencing_destination<C: ConnectionTrait>(
+/// Every synthetic in an org, fully decoded; fails closed on a bad row, unlike `list`.
+pub async fn list_fully_decoded<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
-    destination_name: &str,
 ) -> Result<Vec<Synthetic>, errors::Error> {
     let models = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .all(conn)
         .await?;
-    let mut out = Vec::new();
+    let mut out = Vec::with_capacity(models.len());
     for m in models {
         let id = m.id.clone();
         let s = Synthetic::try_from(m).map_err(|e| {
             errors::Error::Message(format!("synthetic check {id} is unreadable: {e}"))
         })?;
-        if s.destinations.iter().any(|d| d == destination_name) {
-            out.push(s);
-        }
+        out.push(s);
     }
     Ok(out)
 }

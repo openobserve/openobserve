@@ -21,6 +21,7 @@ use std::fmt;
 use config::meta::destinations as meta_dest;
 use db::alerts::destinations::DestinationError;
 use hashbrown::HashMap;
+use openobserve_core::alerts::destination_usage;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -315,6 +316,65 @@ pub struct Template {
     /// stored kind (sticky-kind rule, design §6.2).
     #[serde(default)]
     pub kind: Option<String>,
+}
+
+/// Wire form of `DestinationConsumer`; no wildcard arm, so a new consumer must compile here too.
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DestinationConsumerKind {
+    Alert,
+    CompositeAlert,
+    Pipeline,
+    SyntheticCheck,
+    OncallPolicy,
+    OncallTeamChannel,
+    #[cfg(feature = "enterprise")]
+    Workflow,
+    #[cfg(feature = "enterprise")]
+    AnomalyDetection,
+    #[cfg(feature = "enterprise")]
+    IncidentIntegration,
+}
+
+impl From<destination_usage::DestinationConsumer> for DestinationConsumerKind {
+    fn from(value: destination_usage::DestinationConsumer) -> Self {
+        match value {
+            destination_usage::DestinationConsumer::Alert => Self::Alert,
+            destination_usage::DestinationConsumer::CompositeAlert => Self::CompositeAlert,
+            destination_usage::DestinationConsumer::Pipeline => Self::Pipeline,
+            destination_usage::DestinationConsumer::SyntheticCheck => Self::SyntheticCheck,
+            destination_usage::DestinationConsumer::OncallPolicy => Self::OncallPolicy,
+            destination_usage::DestinationConsumer::OncallTeamChannel => Self::OncallTeamChannel,
+            #[cfg(feature = "enterprise")]
+            destination_usage::DestinationConsumer::Workflow => Self::Workflow,
+            #[cfg(feature = "enterprise")]
+            destination_usage::DestinationConsumer::AnomalyDetection => Self::AnomalyDetection,
+            #[cfg(feature = "enterprise")]
+            destination_usage::DestinationConsumer::IncidentIntegration => {
+                Self::IncidentIntegration
+            }
+        }
+    }
+}
+
+/// One consumer's reference to a destination, as returned by `GET .../destinations/usage`.
+#[derive(Serialize, Debug, Clone, ToSchema)]
+pub struct DestinationUseResponse {
+    pub consumer: DestinationConsumerKind,
+    pub id: String,
+    pub name: String,
+    pub folder_id: Option<String>,
+}
+
+impl From<destination_usage::DestinationUse> for DestinationUseResponse {
+    fn from(value: destination_usage::DestinationUse) -> Self {
+        Self {
+            consumer: value.consumer.into(),
+            id: value.id,
+            name: value.name,
+            folder_id: value.folder_id,
+        }
+    }
 }
 
 #[cfg(test)]

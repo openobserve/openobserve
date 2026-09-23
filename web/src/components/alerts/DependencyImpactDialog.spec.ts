@@ -26,7 +26,7 @@ import {
 
 const { buildGraph } = realUseDependencyGraph();
 
-// slack: used by 3 alerts (one paused), uses tpl-http.
+// slack: used by 3 alerts (one paused) and a pipeline, uses tpl-http.
 const graph: DepGraph = buildGraph(
   [
     { alert_id: "a1", name: "cpu", destinations: ["slack"], enabled: true },
@@ -35,6 +35,7 @@ const graph: DepGraph = buildGraph(
   ],
   [{ name: "slack", type: "http", template: "tpl-http" }],
   [{ name: "tpl-http", type: "http" }],
+  { slack: [{ consumer: "pipeline", id: "p1", name: "ingest-pipe" }] },
 );
 
 const loadGraph = vi.fn();
@@ -106,6 +107,13 @@ describe("DependencyImpactDialog", () => {
         "dependency-impact-row-disk",
       ]),
     );
+  });
+
+  it("destination focus: lists the non-alert consumers the delete guard would name", async () => {
+    mountDialog({ kind: "destination", name: "slack" });
+    await flushPromises();
+    const other = document.querySelector('[data-test="dependency-impact-blocker-pipeline"]');
+    expect(other?.textContent).toContain("1");
   });
 
   it("template focus: destinations → alerts grouped by destination (no template lane)", async () => {

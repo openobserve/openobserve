@@ -64,6 +64,10 @@ const destination = {
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/alerts/destinations/bulk`, { data });
   },
+  // Who uses each destination, across every consumer the delete guard checks.
+  usage: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/alerts/destinations/usage`);
+  },
   test: ({ org_identifier, data }: any) => {
     return http().post(`/api/${org_identifier}/alerts/destinations/test`, data);
   },

@@ -42,6 +42,14 @@ export const destinationsQuery = (org: string, module?: DestinationModule) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** Every consumer's references to every destination in the org, for the dependency graph. */
+export const destinationUsageQuery = (org: string) =>
+  queryOptions({
+    queryKey: destinationKeys.usage(org),
+    queryFn: async (): Promise<Record<string, any[]>> => (await destination.usage(org)).data ?? {},
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 export const saveDestinationMutation = (org: string, isUpdate: () => boolean) =>

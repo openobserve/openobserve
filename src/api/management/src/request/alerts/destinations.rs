@@ -37,7 +37,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::ssrf_guard::SsrfGuard},
-    models::destinations::{Destination, DestinationType},
+    models::destinations::{Destination, DestinationType, DestinationUseResponse},
     request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
@@ -456,6 +456,87 @@ pub async fn list_destinations(
     match destinations::list(&org_id, module, _permitted).await {
         Ok(data) => {
             MetaHttpResponse::json(data.into_iter().map(Destination::from).collect::<Vec<_>>())
+        }
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// GetDestinationsUsage
+#[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/destinations/usage",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "GetDestinationsUsage",
+    summary = "Get alert destination usage",
+    description = "Returns, for every destination name referenced anywhere in the organization, the consumers that \
+                   reference it — alerts, pipelines, synthetic checks, escalation policies, team channels, composite \
+                   alerts and, on enterprise builds, workflows, anomaly detection configs and incident integrations. \
+                   One call answers the same question the delete guard checks, for a whole page at once.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn get_destinations_usage(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let mut _permitted: Option<Vec<String>> = None;
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = &user_email.user_id;
+        match openobserve_api_common::auth::validator::list_objects_for_user(
+            &org_id,
+            user_id,
+            "GET",
+            "destination",
+        )
+        .await
+        {
+            Ok(list) => {
+                _permitted = list;
+            }
+            Err(e) => {
+                return common::meta::http::HttpResponse::forbidden(e.to_string());
+            }
+        }
+    }
+
+    match destinations::all_usage(&org_id).await {
+        Ok(by_destination) => {
+            let permitted = |name: &str| {
+                _permitted.is_none()
+                    || _permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("destination:{name}"))
+                    || _permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("destination:_all_{org_id}"))
+            };
+            let response: HashMap<String, Vec<DestinationUseResponse>> = by_destination
+                .into_iter()
+                .filter(|(name, _)| permitted(name))
+                .map(|(name, uses)| {
+                    (
+                        name,
+                        uses.into_iter().map(DestinationUseResponse::from).collect(),
+                    )
+                })
+                .collect();
+            MetaHttpResponse::json(response)
         }
         Err(e) => MetaHttpResponse::bad_request(e),
     }

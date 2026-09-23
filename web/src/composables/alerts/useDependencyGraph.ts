@@ -29,19 +29,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
 import { alertDependenciesQuery } from "@/services/alerts.queries";
-import { destinationsQuery } from "@/services/alert_destination.queries";
+import {
+  destinationsQuery,
+  destinationUsageQuery,
+} from "@/services/alert_destination.queries";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import { queryClient } from "@/composables/query/queryClient";
+import type { I18nKey } from "@/types/i18n";
 
-export type DepNodeKind = "template" | "destination" | "alert";
+/** `template`/`destination` are graph-native; the rest are consumers the P0 delete guard checks. */
+export type DepNodeKind =
+  | "template"
+  | "destination"
+  | "alert"
+  | "composite_alert"
+  | "pipeline"
+  | "synthetic_check"
+  | "oncall_policy"
+  | "oncall_team_channel"
+  | "workflow"
+  | "anomaly_detection"
+  | "incident_integration";
+
+/** A destination's non-alert consumer kinds, in the order badges render. */
+export type DepConsumerKind = Exclude<DepNodeKind, "template" | "destination" | "alert">;
+
+/** Every non-alert consumer kind — the one place this list is spelled out. */
+export const DEP_CONSUMER_KINDS: DepConsumerKind[] = [
+  "composite_alert",
+  "pipeline",
+  "synthetic_check",
+  "oncall_policy",
+  "oncall_team_channel",
+  "workflow",
+  "anomaly_detection",
+  "incident_integration",
+];
+
+/** One `GET .../destinations/usage` row — matches `DestinationUseResponse` on the backend. */
+export interface UsageRow {
+  consumer: DepConsumerKind | "alert";
+  id: string;
+  name: string;
+  folder_id?: string | null;
+}
+
+/** The whole usage endpoint response: destination name → its consumers. */
+export type UsageResponse = Record<string, UsageRow[]>;
 
 /** One entity to focus the graph on (its dependency chain), used by the popup. */
 export type DepFocus = { kind: DepNodeKind; name?: string; alertId?: string };
 
 export type DepRelation = "usage" | "template" | "override";
 
-/** The three lists the graph is built from. */
-export type GraphInput = "alerts" | "destinations" | "templates";
+/** The inputs the graph is built from. */
+export type GraphInput = "alerts" | "destinations" | "templates" | "usage";
 
 export interface DepNode {
   /** `${kind}:${name}` — stable across rebuilds; alerts key on their id. */
@@ -51,8 +93,10 @@ export interface DepNode {
   name: string;
   /** Destination/template transport kind (http | email | sns | action). */
   transport?: string;
-  /** Destinations: how many alerts deliver to it. Templates: dest + override refs. */
+  /** Total uses across every consumer kind (destinations), or refs (templates). */
   usageCount: number;
+  /** Destination-only: per-kind breakdown behind `usageCount`, from the usage endpoint. */
+  consumerCounts?: Partial<Record<DepConsumerKind, number>>;
   /** A destination with no alerts, or a template referenced by nothing. */
   orphan: boolean;
   /**
@@ -238,6 +282,37 @@ export const depKindColor = (node: Pick<DepNode, "kind" | "orphan" | "missing">)
       : "text-text-secondary";
 };
 
+// The one place a consumer kind maps to its count-badge i18n key.
+const CONSUMER_LABEL_KEYS: Record<DepConsumerKind, I18nKey> = {
+  composite_alert: "alert_dependencies.countCompositeAlert",
+  pipeline: "alert_dependencies.countPipeline",
+  synthetic_check: "alert_dependencies.countSyntheticCheck",
+  oncall_policy: "alert_dependencies.countOncallPolicy",
+  oncall_team_channel: "alert_dependencies.countOncallTeamChannel",
+  workflow: "alert_dependencies.countWorkflow",
+  anomaly_detection: "alert_dependencies.countAnomalyDetection",
+  incident_integration: "alert_dependencies.countIncidentIntegration",
+};
+
+export const depConsumerLabelKey = (kind: DepConsumerKind): I18nKey => CONSUMER_LABEL_KEYS[kind];
+
+export interface ConsumerBadge {
+  kind: DepConsumerKind;
+  count: number;
+  labelKey: I18nKey;
+}
+
+// Shared by the cell and the impact dialog, so they can never list different blockers.
+export function consumerBadges(node: DepNode | null | undefined): ConsumerBadge[] {
+  const counts = node?.consumerCounts ?? {};
+  const out: ConsumerBadge[] = [];
+  for (const kind of DEP_CONSUMER_KINDS) {
+    const count = counts[kind];
+    if (count) out.push({ kind, count, labelKey: depConsumerLabelKey(kind) });
+  }
+  return out;
+}
+
 /** The focus entity's node plus its chain-neighbour counts, in one pass. */
 export interface FocusSummary {
   node: DepNode | null;
@@ -279,7 +354,8 @@ export function removeNodeFromGraph(graph: DepGraph, nodeId: string): DepGraph {
 
   const edges = graph.edges.filter((e) => !ownedByDeletedRow(e));
 
-  // usageCount is one per outgoing edge, so the surviving edges re-derive it.
+  // usageCount is one per outgoing edge, plus the non-alert consumers folded onto
+  // a destination directly (no edge exists for those — see buildGraph).
   const outgoing = new Map<string, number>();
   const referenced = new Set<string>();
   for (const e of edges) {
@@ -287,6 +363,9 @@ export function removeNodeFromGraph(graph: DepGraph, nodeId: string): DepGraph {
     referenced.add(e.source);
     referenced.add(e.target);
   }
+  const otherConsumerCount = (n: DepNode) =>
+    Object.values(n.consumerCounts ?? {}).reduce((a, b) => a + b, 0);
+  for (const n of graph.nodes) if (otherConsumerCount(n)) referenced.add(n.id);
 
   // A dangling node exists only because something pointed at it, so it leaves with
   // the last reference — a rebuild would never invent it again.
@@ -295,7 +374,7 @@ export function removeNodeFromGraph(graph: DepGraph, nodeId: string): DepGraph {
       n.id === nodeId || (n.missing && n.kind !== "alert") ? referenced.has(n.id) : true,
     )
     .map((n) => {
-      const usageCount = outgoing.get(n.id) ?? 0;
+      const usageCount = (outgoing.get(n.id) ?? 0) + otherConsumerCount(n);
       const missing = n.id === nodeId ? true : n.missing;
       const orphan = n.kind !== "alert" && !missing && usageCount === 0;
       return n.id === nodeId
@@ -376,6 +455,7 @@ export function useDependencyGraph() {
     alerts: AlertRow[],
     destinations: DestinationRow[],
     templates: TemplateRow[],
+    usage: UsageResponse = {},
   ): DepGraph => {
     const nodes = new Map<string, DepNode>();
     const edges: DepEdge[] = [];
@@ -464,6 +544,19 @@ export function useDependencyGraph() {
       }
     }
 
+    // The other eight consumers, from the usage endpoint. "alert" rows are skipped —
+    // the alerts list above already counts them with richer data (enabled, folder).
+    for (const [destName, rows] of Object.entries(usage)) {
+      const dst = destinationNode(destName);
+      const counts: Partial<Record<DepConsumerKind, number>> = { ...dst.consumerCounts };
+      for (const row of rows) {
+        if (row.consumer === "alert") continue;
+        counts[row.consumer] = (counts[row.consumer] ?? 0) + 1;
+        dst.usageCount += 1;
+      }
+      if (Object.keys(counts).length) dst.consumerCounts = counts;
+    }
+
     // Derive the flag states now that every reference has been counted.
     let orphanDestinations = 0;
     let danglingReferences = 0;
@@ -510,7 +603,7 @@ export function useDependencyGraph() {
     loading.value = true;
     error.value = null;
     try {
-      // All three reads go through the query cache, so the graph reuses whatever
+      // All four reads go through the query cache, so the graph reuses whatever
       // the page it was opened from already fetched. Calling the destination
       // service directly here used to download the destination list a second
       // time on the destinations page's own refresh.
@@ -518,6 +611,7 @@ export function useDependencyGraph() {
         alerts: alertDependenciesQuery(org),
         destinations: destinationsQuery(org, "alert"),
         templates: templatesQuery(org),
+        usage: destinationUsageQuery(org),
       };
       for (const name of refetch) {
         await queryClient.invalidateQueries({
@@ -526,13 +620,14 @@ export function useDependencyGraph() {
           refetchType: "none",
         });
       }
-      const [alerts, destinations, templates] = await Promise.all([
+      const [alerts, destinations, templates, usage] = await Promise.all([
         queryClient.fetchQuery(inputs.alerts),
         queryClient.fetchQuery(inputs.destinations),
         queryClient.fetchQuery(inputs.templates),
+        queryClient.fetchQuery(inputs.usage),
       ]);
 
-      graph.value = buildGraph(alerts, destinations, templates);
+      graph.value = buildGraph(alerts, destinations, templates, usage);
       graphCache = { org, graph: graph.value, at: Date.now() };
     } catch (err: any) {
       error.value = err?.response?.data?.message || err?.message || "unknown";

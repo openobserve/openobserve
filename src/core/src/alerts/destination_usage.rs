@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use config::meta::alerts::alert::ListAlertsParams;
 use db::alerts::destinations::DestinationError;
 use infra::db::get_orm_client_ro;
@@ -59,13 +61,14 @@ impl DestinationConsumer {
     }
 }
 
-/// One consumer's reference to a destination, found by [`destination_usage`].
+/// One consumer's reference to one destination, found by [`destination_usage`] or [`all_usage`].
 #[derive(Debug)]
 pub struct DestinationUse {
     pub consumer: DestinationConsumer,
     pub id: String,
     pub name: String,
     pub folder_id: Option<String>,
+    pub destination_name: String,
 }
 
 /// Every reference to `name`, across every consumer — the full breakdown, for the display path.
@@ -75,7 +78,12 @@ pub async fn destination_usage(
 ) -> Result<Vec<DestinationUse>, DestinationError> {
     let mut uses = Vec::new();
     for consumer in DestinationConsumer::iter() {
-        uses.extend(usage_for(consumer, org_id, name).await?);
+        uses.extend(
+            usage_for(consumer, org_id)
+                .await?
+                .into_iter()
+                .filter(|u| u.destination_name == name),
+        );
     }
     Ok(uses)
 }
@@ -83,12 +91,32 @@ pub async fn destination_usage(
 /// For the delete path: stops at the first match, so bulk delete avoids hundreds of full scans.
 pub async fn first_use(org_id: &str, name: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     for consumer in DestinationConsumer::iter() {
-        let found = usage_for(consumer, org_id, name).await?;
+        let found: Vec<DestinationUse> = usage_for(consumer, org_id)
+            .await?
+            .into_iter()
+            .filter(|u| u.destination_name == name)
+            .collect();
         if !found.is_empty() {
             return Ok(found);
         }
     }
     Ok(Vec::new())
+}
+
+/// Every reference to every destination, grouped by name — the usage endpoint's page-wide read.
+pub async fn all_usage(
+    org_id: &str,
+) -> Result<HashMap<String, Vec<DestinationUse>>, DestinationError> {
+    let mut by_destination: HashMap<String, Vec<DestinationUse>> = HashMap::new();
+    for consumer in DestinationConsumer::iter() {
+        for u in usage_for(consumer, org_id).await? {
+            by_destination
+                .entry(u.destination_name.clone())
+                .or_default()
+                .push(u);
+        }
+    }
+    Ok(by_destination)
 }
 
 /// The `delete` refusal message: per-kind counts and names, e.g. `'x' is used by 1 alert (a)`.
@@ -143,49 +171,58 @@ fn decode_err(context: &str, e: serde_json::Error) -> DestinationError {
     DestinationError::InfraError(infra::errors::Error::Message(format!("{context}: {e}")))
 }
 
+/// Dedupes a row's destination names — a name listed twice on one row must not count as two uses.
+fn unique_names(names: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    names
+        .into_iter()
+        .filter(|n| seen.insert(n.clone()))
+        .collect()
+}
+
 /// No wildcard arm plus `EnumIter`-derived iteration: a missed consumer can't compile silently.
 async fn usage_for(
     consumer: DestinationConsumer,
     org_id: &str,
-    name: &str,
 ) -> Result<Vec<DestinationUse>, DestinationError> {
     match consumer {
-        DestinationConsumer::Alert => alert_usage(org_id, name).await,
-        DestinationConsumer::CompositeAlert => composite_alert_usage(org_id, name).await,
-        DestinationConsumer::Pipeline => pipeline_usage(org_id, name).await,
-        DestinationConsumer::SyntheticCheck => synthetic_check_usage(org_id, name).await,
-        DestinationConsumer::OncallPolicy => oncall_policy_usage(org_id, name).await,
-        DestinationConsumer::OncallTeamChannel => oncall_team_channel_usage(org_id, name).await,
+        DestinationConsumer::Alert => alert_usage(org_id).await,
+        DestinationConsumer::CompositeAlert => composite_alert_usage(org_id).await,
+        DestinationConsumer::Pipeline => pipeline_usage(org_id).await,
+        DestinationConsumer::SyntheticCheck => synthetic_check_usage(org_id).await,
+        DestinationConsumer::OncallPolicy => oncall_policy_usage(org_id).await,
+        DestinationConsumer::OncallTeamChannel => oncall_team_channel_usage(org_id).await,
         #[cfg(feature = "enterprise")]
-        DestinationConsumer::Workflow => workflow_usage(org_id, name).await,
+        DestinationConsumer::Workflow => workflow_usage(org_id).await,
         #[cfg(feature = "enterprise")]
-        DestinationConsumer::AnomalyDetection => anomaly_detection_usage(org_id, name).await,
+        DestinationConsumer::AnomalyDetection => anomaly_detection_usage(org_id).await,
         #[cfg(feature = "enterprise")]
-        DestinationConsumer::IncidentIntegration => incident_integration_usage(org_id, name).await,
+        DestinationConsumer::IncidentIntegration => incident_integration_usage(org_id).await,
     }
 }
 
 /// Reads the database directly; the `ALERTS` cache cannot answer "used" while cold.
-async fn alert_usage(org_id: &str, name: &str) -> Result<Vec<DestinationUse>, DestinationError> {
+async fn alert_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let conn = get_orm_client_ro().await;
     let alerts = db::alerts::alert::list_with_folders(conn, ListAlertsParams::new(org_id)).await?;
-    Ok(alerts
-        .into_iter()
-        .filter(|(_, alert)| alert.destinations.iter().any(|d| d == name))
-        .map(|(folder, alert)| DestinationUse {
-            consumer: DestinationConsumer::Alert,
-            id: alert.id.map(|id| id.to_string()).unwrap_or_default(),
-            name: alert.name,
-            folder_id: Some(folder.folder_id),
-        })
-        .collect())
+    let mut uses = Vec::new();
+    for (folder, alert) in alerts {
+        let id = alert.id.map(|id| id.to_string()).unwrap_or_default();
+        for destination_name in unique_names(alert.destinations) {
+            uses.push(DestinationUse {
+                consumer: DestinationConsumer::Alert,
+                id: id.clone(),
+                name: alert.name.clone(),
+                folder_id: Some(folder.folder_id.clone()),
+                destination_name,
+            });
+        }
+    }
+    Ok(uses)
 }
 
 /// Composites live outside the `alerts` table, so `alert_usage` alone cannot see them.
-async fn composite_alert_usage(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<DestinationUse>, DestinationError> {
+async fn composite_alert_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let conn = get_orm_client_ro().await;
     let composites = infra::table::alert_composites::list_by_org(conn, org_id)
         .await
@@ -196,123 +233,129 @@ async fn composite_alert_usage(
             serde_json::from_value(composite.destinations.clone()).map_err(|e| {
                 decode_err(&format!("composite alert {} destinations", composite.id), e)
             })?;
-        if dests.iter().any(|d| d == name) {
+        for destination_name in unique_names(dests) {
             uses.push(DestinationUse {
                 consumer: DestinationConsumer::CompositeAlert,
                 id: composite.id.clone(),
                 name: composite.name.clone(),
                 folder_id: Some(composite.folder_id.clone()),
+                destination_name,
             });
         }
     }
     Ok(uses)
 }
 
-async fn pipeline_usage(org_id: &str, name: &str) -> Result<Vec<DestinationUse>, DestinationError> {
+async fn pipeline_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let pipelines = infra::pipeline::list_by_org(org_id).await?;
-    Ok(pipelines
-        .into_iter()
-        .filter(|pl| pl.contains_remote_destination(name))
-        .map(|pl| DestinationUse {
-            consumer: DestinationConsumer::Pipeline,
-            id: pl.id,
-            name: pl.name,
-            folder_id: None,
-        })
-        .collect())
+    let mut uses = Vec::new();
+    for pl in pipelines {
+        let names = pl.nodes.iter().filter_map(|node| {
+            if let config::meta::pipeline::components::NodeData::RemoteStream(dest) = &node.data {
+                Some(dest.destination_name.to_string())
+            } else {
+                None
+            }
+        });
+        for destination_name in unique_names(names.collect()) {
+            uses.push(DestinationUse {
+                consumer: DestinationConsumer::Pipeline,
+                id: pl.id.clone(),
+                name: pl.name.clone(),
+                folder_id: None,
+                destination_name,
+            });
+        }
+    }
+    Ok(uses)
 }
 
-/// Uses `list_referencing_destination`, which fails closed, not `list`, which skips a bad row.
-async fn synthetic_check_usage(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<DestinationUse>, DestinationError> {
+/// Uses `list_fully_decoded`, which fails closed, unlike `list`, which skips a bad row.
+async fn synthetic_check_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let conn = get_orm_client_ro().await;
-    let checks =
-        infra::table::synthetics_checks::list_referencing_destination(conn, org_id, name).await?;
-    Ok(checks
-        .into_iter()
-        .map(|check| DestinationUse {
-            consumer: DestinationConsumer::SyntheticCheck,
-            id: check.id,
-            name: check.name,
-            folder_id: Some(check.folder_id),
-        })
-        .collect())
+    let checks = infra::table::synthetics_checks::list_fully_decoded(conn, org_id).await?;
+    let mut uses = Vec::new();
+    for check in checks {
+        for destination_name in unique_names(check.destinations) {
+            uses.push(DestinationUse {
+                consumer: DestinationConsumer::SyntheticCheck,
+                id: check.id.clone(),
+                name: check.name.clone(),
+                folder_id: Some(check.folder_id.clone()),
+                destination_name,
+            });
+        }
+    }
+    Ok(uses)
 }
 
 /// Fails open on a corrupt row: `to_policy` swallows bad JSON, unlike this module's other arms.
-async fn oncall_policy_usage(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<DestinationUse>, DestinationError> {
+async fn oncall_policy_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let policies = infra::table::oncall_policies::list(org_id).await?;
-    Ok(policies
-        .into_iter()
-        .filter(|policy| policy.destinations.iter().any(|d| d == name))
-        .map(|policy| DestinationUse {
-            consumer: DestinationConsumer::OncallPolicy,
-            id: policy.id,
-            name: policy.team_id,
-            folder_id: None,
-        })
-        .collect())
+    let mut uses = Vec::new();
+    for policy in policies {
+        for destination_name in unique_names(policy.destinations) {
+            uses.push(DestinationUse {
+                consumer: DestinationConsumer::OncallPolicy,
+                id: policy.id.clone(),
+                name: policy.team_id.clone(),
+                folder_id: None,
+                destination_name,
+            });
+        }
+    }
+    Ok(uses)
 }
 
 /// Fails open on a corrupt row: `to_channel` swallows bad JSON, unlike this module's other arms.
-async fn oncall_team_channel_usage(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<DestinationUse>, DestinationError> {
+async fn oncall_team_channel_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let teams = infra::table::oncall_teams::list(org_id).await?;
-    Ok(teams
-        .into_iter()
-        .filter(|team| {
-            team.channel_destinations
-                .as_ref()
-                .is_some_and(|dests| dests.iter().any(|d| d == name))
-        })
-        .map(|team| DestinationUse {
-            consumer: DestinationConsumer::OncallTeamChannel,
-            id: team.id,
-            name: team.name,
-            folder_id: None,
-        })
-        .collect())
+    let mut uses = Vec::new();
+    for team in teams {
+        for destination_name in unique_names(team.channel_destinations.unwrap_or_default()) {
+            uses.push(DestinationUse {
+                consumer: DestinationConsumer::OncallTeamChannel,
+                id: team.id.clone(),
+                name: team.name.clone(),
+                folder_id: None,
+                destination_name,
+            });
+        }
+    }
+    Ok(uses)
 }
 
-/// Folder-blind like the alerts arm: any workflow node naming this destination blocks the delete.
+/// Folder-blind like the alerts arm: a workflow node can name a destination in any folder.
 #[cfg(feature = "enterprise")]
-async fn workflow_usage(org_id: &str, name: &str) -> Result<Vec<DestinationUse>, DestinationError> {
+async fn workflow_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let workflows = crate::workflows::list_workflows(org_id, None, None, None)
         .await
         .map_err(|e| DestinationError::InfraError(infra::errors::Error::Message(e.to_string())))?;
-    Ok(workflows
-        .into_iter()
-        .filter(|w| {
-            w.nodes.iter().any(|node| {
-                matches!(
-                    &node.data,
-                    config::meta::pipeline::components::NodeData::Destination(dest)
-                        if dest.destination_id == name
-                )
-            })
-        })
-        .map(|w| DestinationUse {
-            consumer: DestinationConsumer::Workflow,
-            id: w.id,
-            name: w.name,
-            folder_id: Some(w.folder_id),
-        })
-        .collect())
+    let mut uses = Vec::new();
+    for w in workflows {
+        let names = w.nodes.iter().filter_map(|node| {
+            if let config::meta::pipeline::components::NodeData::Destination(dest) = &node.data {
+                Some(dest.destination_id.clone())
+            } else {
+                None
+            }
+        });
+        for destination_name in unique_names(names.collect()) {
+            uses.push(DestinationUse {
+                consumer: DestinationConsumer::Workflow,
+                id: w.id.clone(),
+                name: w.name.clone(),
+                folder_id: Some(w.folder_id.clone()),
+                destination_name,
+            });
+        }
+    }
+    Ok(uses)
 }
 
 /// Fails closed on an unreadable `alert_destinations` value instead of `.ok()`-swallowing it.
 #[cfg(feature = "enterprise")]
-async fn anomaly_detection_usage(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<DestinationUse>, DestinationError> {
+async fn anomaly_detection_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let conn = get_orm_client_ro().await;
     let configs = infra::table::anomaly_detection::config::list_by_org(conn, org_id).await?;
     let mut uses = Vec::new();
@@ -326,12 +369,13 @@ async fn anomaly_detection_usage(
             })?,
             None => Vec::new(),
         };
-        if dests.iter().any(|d| d == name) {
+        for destination_name in unique_names(dests) {
             uses.push(DestinationUse {
                 consumer: DestinationConsumer::AnomalyDetection,
                 id: config.anomaly_id.clone(),
                 name: config.name.clone(),
                 folder_id: Some(config.folder_id.clone()),
+                destination_name,
             });
         }
     }
@@ -340,21 +384,21 @@ async fn anomaly_detection_usage(
 
 /// Read at notify time as `base_destinations`; deleting one silently un-notifies future incidents.
 #[cfg(feature = "enterprise")]
-async fn incident_integration_usage(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<DestinationUse>, DestinationError> {
+async fn incident_integration_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let integrations = infra::table::incident_integrations::list_by_org(org_id).await?;
-    Ok(integrations
-        .into_iter()
-        .filter(|i| i.destinations.iter().any(|d| d == name))
-        .map(|i| DestinationUse {
-            consumer: DestinationConsumer::IncidentIntegration,
-            id: i.id,
-            name: i.name,
-            folder_id: None,
-        })
-        .collect())
+    let mut uses = Vec::new();
+    for i in integrations {
+        for destination_name in unique_names(i.destinations) {
+            uses.push(DestinationUse {
+                consumer: DestinationConsumer::IncidentIntegration,
+                id: i.id.clone(),
+                name: i.name.clone(),
+                folder_id: None,
+                destination_name,
+            });
+        }
+    }
+    Ok(uses)
 }
 
 #[cfg(test)]
@@ -654,6 +698,43 @@ mod tests {
         assert_eq!(first[0].consumer, DestinationConsumer::Alert);
     }
 
+    /// `all_usage` groups by destination name in one pass, the read the P1 usage endpoint needs.
+    #[tokio::test]
+    #[ignore] // requires the local sqlite infra to be initialized
+    async fn test_all_usage_groups_by_destination_across_consumers() {
+        let org_id = "test_org_du_allusage";
+        ensure_default_folder(org_id).await;
+        let alert_conn = get_orm_client_rw().await;
+        let alert = test_alert("du-allusage-alert", "du-dest-a");
+        infra::table::alerts::create(alert_conn, org_id, "default", alert, false)
+            .await
+            .unwrap();
+
+        let check_conn = get_orm_client_rw().await;
+        let check = Synthetic {
+            name: "du-allusage-check".to_string(),
+            check_type: SyntheticType::Http,
+            target: "https://example.com".to_string(),
+            destinations: vec!["du-dest-b".to_string()],
+            ..Default::default()
+        };
+        infra::table::synthetics_checks::create(check_conn, org_id, check, false)
+            .await
+            .unwrap();
+
+        let by_destination = all_usage(org_id).await.unwrap();
+        assert_eq!(by_destination.get("du-dest-a").map(Vec::len), Some(1));
+        assert_eq!(
+            by_destination["du-dest-a"][0].consumer,
+            DestinationConsumer::Alert
+        );
+        assert_eq!(by_destination.get("du-dest-b").map(Vec::len), Some(1));
+        assert_eq!(
+            by_destination["du-dest-b"][0].consumer,
+            DestinationConsumer::SyntheticCheck
+        );
+    }
+
     /// Seeds a real `NodeData::Destination` node so this exercises `workflow_usage`'s match, not an
     /// empty org.
     #[cfg(feature = "enterprise")]
@@ -688,9 +769,10 @@ mod tests {
             .await
             .unwrap();
 
-        let uses = workflow_usage(org_id, name).await.unwrap();
+        let uses = workflow_usage(org_id).await.unwrap();
         assert_eq!(uses.len(), 1);
         assert_eq!(uses[0].consumer, DestinationConsumer::Workflow);
+        assert_eq!(uses[0].destination_name, name);
     }
 
     /// Seeds a config with a real `alert_destinations` entry, exercising the decode path, not an
@@ -751,9 +833,10 @@ mod tests {
             .await
             .unwrap();
 
-        let uses = anomaly_detection_usage(org_id, name).await.unwrap();
+        let uses = anomaly_detection_usage(org_id).await.unwrap();
         assert_eq!(uses.len(), 1);
         assert_eq!(uses[0].consumer, DestinationConsumer::AnomalyDetection);
+        assert_eq!(uses[0].destination_name, name);
     }
 
     /// The ninth consumer: incident integrations page nobody once the destination is gone.
@@ -781,9 +864,16 @@ mod tests {
             .await
             .unwrap();
 
-        let uses = incident_integration_usage(org_id, name).await.unwrap();
+        let uses = incident_integration_usage(org_id).await.unwrap();
         assert_eq!(uses.len(), 1);
         assert_eq!(uses[0].consumer, DestinationConsumer::IncidentIntegration);
+        assert_eq!(uses[0].destination_name, name);
+    }
+
+    #[test]
+    fn test_unique_names_drops_a_duplicate_on_one_row() {
+        let names = vec!["a".to_string(), "b".to_string(), "a".to_string()];
+        assert_eq!(unique_names(names), vec!["a".to_string(), "b".to_string()]);
     }
 
     #[test]
@@ -794,24 +884,28 @@ mod tests {
                 id: "s1".to_string(),
                 name: "s1".to_string(),
                 folder_id: None,
+                destination_name: "pagerduty-prod".to_string(),
             },
             DestinationUse {
                 consumer: DestinationConsumer::SyntheticCheck,
                 id: "s2".to_string(),
                 name: "s2".to_string(),
                 folder_id: None,
+                destination_name: "pagerduty-prod".to_string(),
             },
             DestinationUse {
                 consumer: DestinationConsumer::OncallPolicy,
                 id: "p1".to_string(),
                 name: "team1".to_string(),
                 folder_id: None,
+                destination_name: "pagerduty-prod".to_string(),
             },
             DestinationUse {
                 consumer: DestinationConsumer::Alert,
                 id: "a1".to_string(),
                 name: "a1".to_string(),
                 folder_id: Some("default".to_string()),
+                destination_name: "pagerduty-prod".to_string(),
             },
         ];
         assert_eq!(
@@ -828,6 +922,7 @@ mod tests {
                 id: format!("a{i}"),
                 name: format!("a{i}"),
                 folder_id: None,
+                destination_name: "x".to_string(),
             })
             .collect();
         assert_eq!(
@@ -843,6 +938,7 @@ mod tests {
             id: "p1".to_string(),
             name: "p1".to_string(),
             folder_id: None,
+            destination_name: "x".to_string(),
         }];
         assert_eq!(usage_message("x", &uses), "'x' is used by 1 pipeline (p1)");
     }
@@ -855,12 +951,14 @@ mod tests {
                 id: "c1".to_string(),
                 name: "comp1".to_string(),
                 folder_id: Some("default".to_string()),
+                destination_name: "x".to_string(),
             },
             DestinationUse {
                 consumer: DestinationConsumer::OncallTeamChannel,
                 id: "t1".to_string(),
                 name: "team-chat".to_string(),
                 folder_id: None,
+                destination_name: "x".to_string(),
             },
         ];
         assert_eq!(

@@ -378,6 +378,16 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     Ok(())
 }
 
+/// Every consumer's references to every destination in the org — the usage endpoint's data.
+pub async fn all_usage(
+    org_id: &str,
+) -> Result<
+    std::collections::HashMap<String, Vec<super::destination_usage::DestinationUse>>,
+    DestinationError,
+> {
+    super::destination_usage::all_usage(org_id).await
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::destinations::{DestinationType, Endpoint, HTTPType, Module};
