@@ -45,26 +45,15 @@ pub(super) fn metrics_index_merge_scope(
     files: &[FileKey],
     max_file_size: usize,
 ) -> MetricsIndexMergeScope {
-    let finalized_files = files
+    let indexed_files = files
         .iter()
-        .filter(|f| {
-            matches!(
-                MetricsFileLayout::of(&f.key),
-                Some(MetricsFileLayout::Indexed | MetricsFileLayout::FinalUnindexed)
-            )
-        })
+        .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::Indexed))
         .count();
     let total_original_size: i64 = files.iter().map(|f| f.meta.original_size.max(0)).sum();
     let ideal_file_count = (total_original_size as usize).div_ceil(max_file_size.max(1));
-    if finalized_files == files.len()
-        && files
-            .iter()
-            .any(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::FinalUnindexed))
-    {
-        MetricsIndexMergeScope::Skip
-    } else if finalized_files > ideal_file_count + METRICS_INDEX_REWRITE_SLACK {
+    if indexed_files > ideal_file_count + METRICS_INDEX_REWRITE_SLACK {
         MetricsIndexMergeScope::WholeHour
-    } else if finalized_files == files.len() {
+    } else if indexed_files == files.len() {
         MetricsIndexMergeScope::Skip
     } else {
         MetricsIndexMergeScope::LateFilesOnly
@@ -93,21 +82,12 @@ mod tests {
     fn test_metrics_index_merge_scope() {
         let max_file_size = 100_usize;
         let indexed = |id: usize| file_key(&format!("indexed-v1-{id}.parquet"), 10);
-        let final_unindexed = |id: usize| file_key(&format!("final-unindexed-v1-{id}.parquet"), 10);
         let late = |id: usize| file_key(&format!("hash-sorted-v1-{id}.parquet"), 10);
 
         // every file indexed and acceptably sized: the hour is left alone
         assert_eq!(
             metrics_index_merge_scope(&[indexed(1), indexed(2)], max_file_size),
             MetricsIndexMergeScope::Skip
-        );
-        assert_eq!(
-            metrics_index_merge_scope(&[indexed(1), final_unindexed(2)], max_file_size),
-            MetricsIndexMergeScope::Skip
-        );
-        assert_eq!(
-            metrics_index_merge_scope(&[final_unindexed(1), late(2)], max_file_size),
-            MetricsIndexMergeScope::LateFilesOnly
         );
         // max_file_size raised (files written at a smaller target): a fully indexed
         // hour above the cap is rewritten to the new size, no late data needed
@@ -141,12 +121,6 @@ mod tests {
         assert_eq!(
             metrics_index_merge_scope(&fragmented, max_file_size),
             MetricsIndexMergeScope::WholeHour
-        );
-        fragmented.pop();
-        fragmented[0] = final_unindexed(1);
-        assert_eq!(
-            metrics_index_merge_scope(&fragmented, max_file_size),
-            MetricsIndexMergeScope::Skip
         );
         // same file count but a large hour (ideal 9): still a late-only merge
         let mut large: Vec<FileKey> = (1..=8)

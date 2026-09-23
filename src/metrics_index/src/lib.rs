@@ -33,17 +33,38 @@ mod tests {
         array::{Array, RecordBatch, StringViewArray, UInt32Array},
         datatypes::{DataType, Field, Schema},
     };
-    use config::{TIMESTAMP_COL_NAME, meta::promql::VALUE_LABEL};
+    use config::{
+        TIMESTAMP_COL_NAME,
+        meta::{promql::VALUE_LABEL, stream::FileKey},
+    };
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 
     use super::{
         METRICS_INDEX_ROW_COUNT,
         pruner::{
-            create_physical_filter, metrics_index_labels, residual_matchers_covered,
+            create_physical_filter, metrics_index_labels, residual_matchers_covered, search,
             selection_cache_key, sidecar_covers_labels,
         },
         reader::{MetricsIndexData, evaluate_metrics_index, load_metrics_index_file},
     };
+
+    #[tokio::test]
+    async fn indexed_file_without_midx_skips_sidecar_lookup() {
+        let schema = Schema::new(vec![Field::new("path", DataType::Utf8, true)]);
+        let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "/api/bar")]);
+        let file = FileKey::from_file_name(
+            "files/default/metrics/cpu/2026/09/23/00/indexed-v1-no-index.parquet",
+        );
+        let mut files = vec![file];
+        assert!(
+            search("test", &mut files, &schema, &matchers, 1)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(files.len(), 1);
+        assert!(files[0].selection.is_none());
+    }
 
     #[test]
     fn cache_key_changes_with_the_schema_derived_label_set() {

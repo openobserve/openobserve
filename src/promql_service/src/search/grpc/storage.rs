@@ -263,6 +263,7 @@ pub(crate) async fn create_context(
 async fn cache_metrics_index_files(trace_id: &str, org_id: &str, files: &[FileKey]) {
     let sidecars = files
         .iter()
+        .filter(|f| f.meta.mindex_size > 0)
         .filter_map(|f| MetricsFileLayout::metrics_index_path(&f.key).map(|path| (f, path)))
         .collect_vec();
     if sidecars.is_empty() {

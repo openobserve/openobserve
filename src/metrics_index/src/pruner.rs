@@ -74,9 +74,10 @@ pub async fn search(
     let selection_cache_enabled = get_config().search.metrics_index_selection_cache_enabled;
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
-        // only indexed metrics files own a sidecar; other layouts stay as they are
+        // Zero size means this finalized file was published without a sidecar.
         if index_files.contains_key(&file.key)
             || MetricsFileLayout::of(&file.key) != Some(MetricsFileLayout::Indexed)
+            || file.meta.mindex_size <= 0
         {
             continue;
         }

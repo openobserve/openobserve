@@ -49,7 +49,7 @@ impl SourceMetadata {
 
 pub(super) enum Blocks {
     NotRequested,
-    Disabled,
+    SkippedUnsupported,
     Active(Box<BlockFile>),
 }
 
@@ -66,18 +66,13 @@ impl Blocks {
         let Self::Active(mut active) = self else {
             return Ok(self);
         };
-        match EncodingJob::run(move || {
+        let active = EncodingJob::run(move || {
             active.writer.write(&batch)?;
             Ok(active)
         })
         .await?
-        {
-            Ok(active) => Ok(Self::Active(active)),
-            Err(error) => {
-                log::warn!("metrics block write unavailable; skipping metrics index: {error}");
-                Ok(Self::Disabled)
-            }
-        }
+        .map_err(|error| DataFusionError::External(error.into()))?;
+        Ok(Self::Active(active))
     }
 
     pub async fn finish(
@@ -89,7 +84,9 @@ impl Blocks {
         EncodingJob::run(move || {
             let Self::Active(active) = self else {
                 return match self {
-                    Self::Disabled => Ok(MergedFile::MetricsFinalUnindexed { data_path, meta }),
+                    Self::SkippedUnsupported => {
+                        Ok(MergedFile::MetricsIndexedNoIndex { data_path, meta })
+                    }
                     Self::NotRequested => anyhow::bail!("block finalization was not requested"),
                     Self::Active(_) => unreachable!(),
                 };
@@ -99,20 +96,13 @@ impl Blocks {
                 compressed_size: u64::try_from(meta.compressed_size)?,
             };
             let BlockFile { writer, path } = *active;
-            match source_metadata.finish(writer, parent) {
-                Ok(file) => {
-                    drop(file);
-                    Ok(MergedFile::MetricsIndexed {
-                        data_path,
-                        metrics_index_path: path,
-                        meta,
-                    })
-                }
-                Err(error) => {
-                    log::warn!("metrics index finalization failed; skipping index: {error}");
-                    Ok(MergedFile::MetricsFinalUnindexed { data_path, meta })
-                }
-            }
+            let file = source_metadata.finish(writer, parent)?;
+            drop(file);
+            Ok(MergedFile::MetricsIndexed {
+                data_path,
+                metrics_index_path: path,
+                meta,
+            })
         })
         .await?
         .map_err(|error| DataFusionError::External(error.into()))
@@ -192,7 +182,35 @@ fn new_file() -> anyhow::Result<(std::fs::File, tempfile::TempPath)> {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field};
+
     use super::*;
+
+    #[tokio::test]
+    async fn failed_index_finalization_returns_merge_error() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("value", DataType::Float64, false),
+        ]));
+        let blocks = Blocks::try_new(&schema).unwrap();
+        let source = tempfile::NamedTempFile::new().unwrap().into_temp_path();
+        let meta = FileMeta {
+            records: 1,
+            compressed_size: 1,
+            ..Default::default()
+        };
+        let error = blocks
+            .finish(source, meta, SourceMetadata::Vortex(schema))
+            .await
+            .err()
+            .expect("failed finalization must abort the merge");
+        assert!(
+            error
+                .to_string()
+                .contains("source/parent row count mismatch")
+        );
+    }
 
     #[tokio::test]
     async fn running_encoding_job_retains_temp_file_until_work_exits() {

@@ -82,22 +82,15 @@ pub(super) struct MetricsOutput {
 }
 
 impl MetricsOutput {
-    fn prepare_blocks(&self, schema: &Arc<Schema>, with_index: bool) -> Blocks {
+    fn prepare_blocks(&self, schema: &Arc<Schema>, with_index: bool) -> Result<Blocks> {
         if !with_index {
-            return Blocks::NotRequested;
+            return Ok(Blocks::NotRequested);
         }
-        if !metrics_block::is_supported_schema(schema) {
-            return Blocks::Disabled;
+        if let Err(error) = metrics_block::identity_label_columns(schema) {
+            log::warn!("metrics schema cannot be indexed: {error}");
+            return Ok(Blocks::SkippedUnsupported);
         }
-        match Blocks::try_new(schema) {
-            Ok(blocks) => blocks,
-            Err(error) => {
-                log::warn!(
-                    "metrics block initialization unavailable; skipping metrics index: {error}"
-                );
-                Blocks::Disabled
-            }
-        }
+        Blocks::try_new(schema).map_err(|error| DataFusionError::External(error.into()))
     }
 }
 
@@ -106,7 +99,7 @@ impl MetricsOutput {
 struct FileSplit {
     max_file_size: i64,
     timestamp_index: usize,
-    /// Indexed files carry a `.midx`; hash-merged files do not.
+    /// Closed-hour outputs attempt MIDX generation; open-hour outputs do not.
     with_index: bool,
 }
 
@@ -277,7 +270,7 @@ impl ActiveMetricsParquetWriter {
         with_index: bool,
         output: &MetricsOutput,
     ) -> Result<Self> {
-        let blocks = output.prepare_blocks(schema, with_index);
+        let blocks = output.prepare_blocks(schema, with_index)?;
         let sink = if with_index {
             output.sink
         } else {
@@ -295,7 +288,7 @@ impl ActiveMetricsParquetWriter {
     async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
         self.writer.write(batch).await?;
         self.state.write(batch)?;
-        let blocks = std::mem::replace(&mut self.blocks, Blocks::Disabled);
+        let blocks = std::mem::replace(&mut self.blocks, Blocks::NotRequested);
         self.blocks = blocks.write(batch.clone()).await?;
         Ok(())
     }
@@ -321,7 +314,7 @@ impl ActiveMetricsParquetWriter {
                 data_path,
                 meta: file_meta,
             }),
-            Blocks::Disabled => Ok(MergedFile::MetricsFinalUnindexed {
+            Blocks::SkippedUnsupported => Ok(MergedFile::MetricsIndexedNoIndex {
                 data_path,
                 meta: file_meta,
             }),
@@ -355,7 +348,7 @@ impl ActiveMetricsVortexWriter {
         dtype: DType,
         output: &MetricsOutput,
     ) -> Result<Self> {
-        let blocks = output.prepare_blocks(schema, with_index);
+        let blocks = output.prepare_blocks(schema, with_index)?;
         let (file, data_path) = new_temp_file()?;
 
         let write_options = write_options.with_metadata_segment(
@@ -378,7 +371,7 @@ impl ActiveMetricsVortexWriter {
             .from_arrow_record_batch(batch.clone(), self.schema.as_ref())?;
         self.writer.push(array).await?;
         self.state.write(&batch)?;
-        let blocks = std::mem::replace(&mut self.blocks, Blocks::Disabled);
+        let blocks = std::mem::replace(&mut self.blocks, Blocks::NotRequested);
         self.blocks = blocks.write(batch).await?;
         Ok(())
     }
@@ -408,7 +401,7 @@ impl ActiveMetricsVortexWriter {
                 data_path: self.data_path,
                 meta: file_meta,
             }),
-            Blocks::Disabled => Ok(MergedFile::MetricsFinalUnindexed {
+            Blocks::SkippedUnsupported => Ok(MergedFile::MetricsIndexedNoIndex {
                 data_path: self.data_path,
                 meta: file_meta,
             }),
@@ -887,7 +880,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalid_series_identity_keeps_source_without_index() {
+    async fn invalid_series_identity_fails_merge() {
         let mut fields = block_schema(None, false).fields().to_vec();
         fields.push(Arc::new(Field::new("zone", DataType::Utf8, false)));
         let schema = Arc::new(Schema::new(fields));
@@ -915,17 +908,11 @@ mod tests {
         {
             let mut output = block_output(sink);
             output.file_format = format;
-            let file = produce(&schema, vec![batch.slice(0, 1), batch.slice(1, 5)], output)
+            let error = produce(&schema, vec![batch.slice(0, 1), batch.slice(1, 5)], output)
                 .await
-                .unwrap()
-                .remove(0);
-            let (data, meta, index) = file.into_upload_parts().await.unwrap();
-            assert!(index.is_none());
-            assert_eq!(
-                sample_rows_for(format, bytes::Bytes::from(data)).await,
-                rows
-            );
-            assert_eq!(meta.records, 6);
+                .err()
+                .expect("invalid series identity must fail the merge");
+            assert!(error.to_string().contains("identity label changes"));
         }
     }
 
@@ -1115,6 +1102,8 @@ mod tests {
                 .await
                 .unwrap()
                 .remove(0);
+            assert!(matches!(file, MergedFile::MetricsIndexedNoIndex { .. }));
+            assert!(file.file_name("example", format).starts_with("indexed-v1-"));
             let (data, meta, path) = file.into_upload_parts().await.unwrap();
             assert!(path.is_none());
             assert_eq!(
@@ -1143,22 +1132,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalid_samples_keep_source_without_index() {
+    async fn invalid_samples_fail_merge() {
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let schema = block_schema(None, false);
             let rows = [(1, 10, Some(1f64.to_bits())), (2, 20, None)];
             let mut output = block_output(CompactMergeOutput::Disk);
             output.file_format = format;
-            let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
+            let error = produce(&schema, vec![block_batch(&schema, &rows)], output)
                 .await
-                .unwrap()
-                .remove(0);
-            let (data, _, path) = file.into_upload_parts().await.unwrap();
-            assert!(path.is_none());
-            assert_eq!(
-                sample_rows_for(format, bytes::Bytes::from(data)).await,
-                rows
-            );
+                .err()
+                .expect("invalid samples must fail the merge");
+            assert!(error.to_string().contains("nullable samples unsupported"));
         }
     }
 

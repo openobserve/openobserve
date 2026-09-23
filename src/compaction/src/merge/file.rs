@@ -460,7 +460,7 @@ async fn publish_merged_output(
     cache_locally: bool,
     storage_tier: storage::StorageTier,
 ) -> anyhow::Result<(Bytes, FileMeta)> {
-    let final_unindexed = matches!(&file, MergedFile::MetricsFinalUnindexed { .. });
+    let indexed_without_index = matches!(&file, MergedFile::MetricsIndexedNoIndex { .. });
     let (data, mut meta, index_path) = file.into_upload_parts().await?;
     let bytes = Bytes::from(data);
     meta.compressed_size = i64::try_from(bytes.len())?;
@@ -487,8 +487,8 @@ async fn publish_merged_output(
     if let Some((key, index)) = index {
         storage::put_with_tier(account, &key, index, storage_tier).await?;
     }
-    if final_unindexed {
-        log::warn!("[COMPACT] finalized metrics file {key} has no MIDX");
+    if indexed_without_index {
+        log::warn!("[COMPACT] indexed metrics file {key} has no MIDX: unsupported schema");
     }
     Ok((bytes, meta))
 }
@@ -532,10 +532,7 @@ mod tests {
             vec![
                 Arc::new(UInt64Array::from(vec![1, 1])),
                 Arc::new(Int64Array::from(vec![10, 20])),
-                Arc::new(Float64Array::from(vec![
-                    Some(1.),
-                    if kind == "fallback" { None } else { Some(2.) },
-                ])),
+                Arc::new(Float64Array::from(vec![Some(1.), Some(2.)])),
                 Arc::new(StringArray::from(vec!["x", "x"])),
             ],
         )
@@ -574,12 +571,12 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn mindex_size_matches_full_published_object_for_every_output_kind() {
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
-            for kind in ["block", "unsupported", "fallback", "none"] {
+            for kind in ["block", "unsupported", "none"] {
                 let mut file = produced_metrics_output(format, kind).await;
                 let meta = match &mut file {
                     MergedFile::MetricsIndexed { meta, .. }
                     | MergedFile::MetricsHashMerged { meta, .. }
-                    | MergedFile::MetricsFinalUnindexed { meta, .. } => meta,
+                    | MergedFile::MetricsIndexedNoIndex { meta, .. } => meta,
                     _ => panic!("metrics output expected"),
                 };
                 meta.index_size = 79;
@@ -592,9 +589,8 @@ mod tests {
                 assert_eq!(
                     layout,
                     Some(match kind {
-                        "block" => MetricsFileLayout::Indexed,
                         "none" => MetricsFileLayout::HashMerged,
-                        _ => MetricsFileLayout::FinalUnindexed,
+                        _ => MetricsFileLayout::Indexed,
                     })
                 );
                 let account = memory_storage_account().await;

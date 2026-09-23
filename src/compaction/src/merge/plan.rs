@@ -97,12 +97,7 @@ fn indexed_hour_scope(
     match metrics_index_merge_scope(&files, max_file_size) {
         MetricsIndexMergeScope::Skip => Vec::new(),
         MetricsIndexMergeScope::LateFilesOnly => {
-            files.retain(|f| {
-                !matches!(
-                    MetricsFileLayout::of(&f.key),
-                    Some(MetricsFileLayout::Indexed | MetricsFileLayout::FinalUnindexed)
-                )
-            });
+            files.retain(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed));
             log::debug!(
                 "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed late merge of {} files, indexed files untouched",
                 files.len()
@@ -303,7 +298,7 @@ mod tests {
         let files = vec![
             metrics_file("indexed-v1-1.parquet", 300),
             metrics_file("indexed-v1-2.parquet", 300),
-            metrics_file("final-unindexed-v1-3.parquet", 300),
+            metrics_file("indexed-v1-3.parquet", 300),
             metrics_file("7.parquet", 300),
             metrics_file("8.parquet", 300),
         ];
@@ -320,9 +315,9 @@ mod tests {
     }
 
     #[test]
-    fn test_plan_batches_final_unindexed_file_is_not_rewritten() {
+    fn test_plan_batches_indexed_file_is_not_rewritten() {
         let files = vec![
-            metrics_file("final-unindexed-v1-1.parquet", 300),
+            metrics_file("indexed-v1-1.parquet", 300),
             metrics_file("hash-sorted-v1-2.parquet", 300),
         ];
         let batches = plan_batches(
