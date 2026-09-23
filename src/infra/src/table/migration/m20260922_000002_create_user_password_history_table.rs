@@ -80,8 +80,7 @@ fn create_table_statement() -> TableCreateStatement {
         .if_not_exists()
         .col(
             ColumnDef::new(UserPasswordHistory::Id)
-                .big_integer()
-                .auto_increment()
+                .char_len(27)
                 .primary_key()
                 .not_null(),
         )

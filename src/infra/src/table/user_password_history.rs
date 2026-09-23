@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::ider;
 use sea_orm::{
-    ColumnTrait, EntityTrait, NotSet, Order, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
     entity::prelude::*,
     sea_query::{Func, SimpleExpr},
 };
@@ -45,7 +46,7 @@ pub async fn create_table() -> Result<(), errors::Error> {
 
 pub async fn add(email: &str, password_hash: &str) -> Result<(), errors::Error> {
     let record = ActiveModel {
-        id: NotSet,
+        id: Set(ider::uuid()),
         email: Set(email.to_lowercase()),
         password_hash: Set(password_hash.to_string()),
         created_at: Set(chrono::Utc::now().timestamp_micros()),
@@ -69,7 +70,6 @@ pub async fn list_recent(email: &str, limit: u64) -> Result<Vec<Model>, errors::
     Entity::find()
         .filter(email_eq(email))
         .order_by(Column::CreatedAt, Order::Desc)
-        .order_by(Column::Id, Order::Desc)
         .limit(limit)
         .all(client)
         .await
@@ -90,7 +90,7 @@ pub async fn prune(email: &str, retain: u64) -> Result<u64, errors::Error> {
     let client = get_orm_client_rw().await;
     let result = Entity::delete_many()
         .filter(email_eq(email))
-        .filter(Column::Id.lt(oldest_kept.id))
+        .filter(Column::CreatedAt.lt(oldest_kept.created_at))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
