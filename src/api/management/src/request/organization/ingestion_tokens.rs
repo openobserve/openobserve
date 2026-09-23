@@ -172,7 +172,6 @@ pub async fn enable_disable_ingestion_token(
 ) -> Response {
     let user_id = user_email.user_id.as_str();
 
-    // the route table maps this PATCH to the PUT permission; model.fga has no PATCH relation
     if let Err(resp) = super::require_credential_access(
         &org_id,
         user_id,
