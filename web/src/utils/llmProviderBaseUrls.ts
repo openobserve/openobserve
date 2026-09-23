@@ -22,7 +22,7 @@ export const DEFAULT_PROVIDER_BASE_URLS: Record<string, string> = {
   ollama: "http://localhost:11434",
 };
 
-/** Providers with no working default: an example shape to guide the user, not a usable value. */
+/** Providers with no default: a placeholder to guide the user; the field must still be filled in. */
 export const SUGGESTED_PROVIDER_BASE_URLS: Record<string, string> = {
   openai_compatible: "https://your-host/v1",
   // Served at `/v1/systemone` on TypeSafe and OpenRouter; `/alpha/decisions` also works as a full URL.
