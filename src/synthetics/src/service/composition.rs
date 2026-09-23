@@ -25,7 +25,9 @@ use config::meta::{
 };
 use infra::table::{
     synthetics_checks,
+    synthetics_environments::{self, SyntheticsEnvironmentRecord},
     synthetics_refs::{self, ParentRef},
+    synthetics_variables::{self, SyntheticsVariableRecord},
 };
 use sea_orm::ConnectionTrait;
 
@@ -41,6 +43,46 @@ pub enum CompositionError {
     ReferencedCannotHoldSubtest(Vec<ParentRef>),
     #[error("composition lock unavailable: {0}")]
     Lock(String),
+}
+
+/// The org's shared variable tier as the save gate and the used-by surface read it.
+#[derive(Debug, Default)]
+pub struct SharedTier {
+    global: HashSet<String>,
+    by_env: HashMap<String, (String, HashSet<String>)>,
+}
+
+impl SharedTier {
+    /// Secret rows never widen the gate: an env-scoped secret stays an explicit declaration (P3).
+    pub fn new(
+        org_id: &str,
+        variables: &[SyntheticsVariableRecord],
+        environments: &[SyntheticsEnvironmentRecord],
+    ) -> Self {
+        let global_id = synthetics_environments::global_environment_id(org_id);
+        let mut tier = Self {
+            global: HashSet::new(),
+            by_env: environments
+                .iter()
+                .map(|e| (e.id.clone(), (e.name.clone(), HashSet::new())))
+                .collect(),
+        };
+        for row in variables.iter().filter(|v| !v.is_secret()) {
+            if row.env == global_id {
+                tier.global.insert(row.name.clone());
+            } else if let Some((_, names)) = tier.by_env.get_mut(&row.env) {
+                names.insert(row.name.clone());
+            }
+        }
+        tier
+    }
+}
+
+/// One bound environment's shared names; `environment` is empty for a check bound to none.
+#[derive(Debug, Clone)]
+struct SharedScope {
+    environment: String,
+    names: HashSet<String>,
 }
 
 /// The write gate (§5.9): refuses a new reference while the flag is off.
@@ -99,8 +141,13 @@ pub(crate) async fn validate_for_save<C: ConnectionTrait>(
             );
         }
     }
+    let shared = if refs.is_empty() {
+        SharedTier::default()
+    } else {
+        load_shared_tier(conn, org_id).await?
+    };
     // The blocker list leaves the service as public slugs, like every other folder id.
-    match check_rules(own_id, body, &children, &parents) {
+    match check_rules(own_id, body, &children, &parents, &shared) {
         Err(CompositionError::ReferencedCannotHoldSubtest(p)) => Err(
             CompositionError::ReferencedCannotHoldSubtest(to_public_refs(p).await),
         ),
@@ -147,6 +194,20 @@ pub async fn to_public_refs(mut parents: Vec<ParentRef>) -> Vec<ParentRef> {
     parents
 }
 
+/// One cached read of the shared tier; a row created within the TTL can still fail a save.
+pub async fn load_shared_tier<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<SharedTier, CompositionError> {
+    let variables = synthetics_variables::list_cached(conn, org_id)
+        .await
+        .map_err(|e| CompositionError::Invalid(e.to_string()))?;
+    let environments = synthetics_environments::list(conn, org_id)
+        .await
+        .map_err(|e| CompositionError::Invalid(e.to_string()))?;
+    Ok(SharedTier::new(org_id, &variables, &environments))
+}
+
 /// Every name a check resolves on its own: its declared variables plus its journey secret slots.
 pub fn defined_names(check: &Synthetic) -> HashSet<String> {
     let mut names: HashSet<String> = check.variables.iter().map(|v| v.name.clone()).collect();
@@ -174,6 +235,7 @@ fn check_rules(
     body: &Synthetic,
     children: &HashMap<String, ChildJourney>,
     parents: &[ParentRef],
+    shared: &SharedTier,
 ) -> Result<(), CompositionError> {
     if body.check_type != SyntheticType::Browser {
         return Ok(());
@@ -235,17 +297,66 @@ fn check_rules(
             )));
         }
     }
-    // Secret names count as defined: resolve injects their decrypted values into env_inject.
-    let defined = defined_names(body);
-    for child_id in &refs {
-        let child = &children[child_id];
-        if let Some(var) = undefined_among(&placeholders_in(&child.steps), &defined).first() {
-            return Err(CompositionError::Invalid(format!(
-                "variables: '{child_id}' uses {{{{{var}}}}}, which this test does not define"
-            )));
+    // Per bound environment, never as a union: a name absent from one of them is silent at run
+    // time and the literal `{{X}}` reaches the probe.
+    for (environment, defined) in scoped_defined_names(body, &shared_scopes(body, shared)) {
+        for child_id in &refs {
+            let child = &children[child_id];
+            if let Some(var) = undefined_among(&placeholders_in(&child.steps), &defined).first() {
+                let scope = if environment.is_empty() {
+                    String::new()
+                } else {
+                    format!(" in environment '{environment}'")
+                };
+                return Err(CompositionError::Invalid(format!(
+                    "variables: '{child_id}' uses {{{{{var}}}}}, which this test does not define{scope}"
+                )));
+            }
         }
     }
     Ok(())
+}
+
+/// The shared names applicable per bound environment, one scope each.
+fn shared_scopes(check: &Synthetic, shared: &SharedTier) -> Vec<SharedScope> {
+    // `applies_to` is global-or-exact-env, so a check bound to nothing sees global rows only.
+    if check.environments.is_empty() {
+        return vec![SharedScope {
+            environment: String::new(),
+            names: shared.global.clone(),
+        }];
+    }
+    check
+        .environments
+        .iter()
+        .map(|env_id| {
+            let mut names = shared.global.clone();
+            let environment = match shared.by_env.get(env_id) {
+                Some((name, env_names)) => {
+                    names.extend(env_names.iter().cloned());
+                    name.clone()
+                }
+                None => env_id.clone(),
+            };
+            SharedScope { environment, names }
+        })
+        .collect()
+}
+
+/// The parent's own names widened by each environment's shared rows, one set per environment.
+fn scoped_defined_names(
+    check: &Synthetic,
+    scopes: &[SharedScope],
+) -> Vec<(String, HashSet<String>)> {
+    let own = defined_names(check);
+    scopes
+        .iter()
+        .map(|scope| {
+            let mut defined = own.clone();
+            defined.extend(scope.names.iter().cloned());
+            (scope.environment.clone(), defined)
+        })
+        .collect()
 }
 
 fn blockers_outside(
@@ -319,7 +430,14 @@ pub(crate) mod tests {
     #[test]
     fn a_parent_may_not_reference_itself() {
         let body = parent_with(&["p"], 0);
-        let err = check_rules(Some("p"), &body, &HashMap::new(), &[]).unwrap_err();
+        let err = check_rules(
+            Some("p"),
+            &body,
+            &HashMap::new(),
+            &[],
+            &SharedTier::default(),
+        )
+        .unwrap_err();
         assert!(matches!(err, CompositionError::Invalid(m) if m.contains("itself")));
     }
 
@@ -327,9 +445,10 @@ pub(crate) mod tests {
     fn the_cap_applies_to_the_expanded_journey() {
         let children = HashMap::from([("login".to_string(), login(30))]);
         let ok = parent_with(&["login"], 18);
-        check_rules(Some("p"), &ok, &children, &[]).unwrap();
+        check_rules(Some("p"), &ok, &children, &[], &SharedTier::default()).unwrap();
         let over = parent_with(&["login"], 21);
-        let err = check_rules(Some("p"), &over, &children, &[]).unwrap_err();
+        let err =
+            check_rules(Some("p"), &over, &children, &[], &SharedTier::default()).unwrap_err();
         assert!(
             matches!(err, CompositionError::Invalid(m) if m.contains("52 steps") && m.contains("30 from 1 subtest"))
         );
@@ -341,7 +460,8 @@ pub(crate) mod tests {
         child.steps[1]["value"] = json!("{{PASSWORD}}");
         let children = HashMap::from([("login".to_string(), child)]);
         let mut body = parent_with(&["login"], 0);
-        let err = check_rules(Some("p"), &body, &children, &[]).unwrap_err();
+        let err =
+            check_rules(Some("p"), &body, &children, &[], &SharedTier::default()).unwrap_err();
         assert!(
             matches!(err, CompositionError::Invalid(m) if m.contains("PASSWORD") && m.contains("'login'") && !m.contains("Login"))
         );
@@ -349,7 +469,7 @@ pub(crate) mod tests {
             name: "PASSWORD".into(),
             ..Default::default()
         }];
-        check_rules(Some("p"), &body, &children, &[]).unwrap();
+        check_rules(Some("p"), &body, &children, &[], &SharedTier::default()).unwrap();
     }
 
     // Resolve injects decrypted secret values into env_inject, so a secret name defines the token.
@@ -360,7 +480,120 @@ pub(crate) mod tests {
         let children = HashMap::from([("login".to_string(), child)]);
         let mut body = parent_with(&["login"], 0);
         body.config["secrets"] = json!([{ "name": "PASSWORD", "value": "AESenc:x" }]);
-        check_rules(Some("p"), &body, &children, &[]).unwrap();
+        check_rules(Some("p"), &body, &children, &[], &SharedTier::default()).unwrap();
+    }
+
+    fn child_using(name: &str) -> HashMap<String, ChildJourney> {
+        let mut child = login(2);
+        child.steps[1]["value"] = json!(format!("{{{{{name}}}}}"));
+        HashMap::from([("login".to_string(), child)])
+    }
+
+    fn shared_row(env: &str, name: &str, kind: &str) -> SyntheticsVariableRecord {
+        SyntheticsVariableRecord {
+            id: format!("{env}-{name}"),
+            org_id: String::new(),
+            env: env.into(),
+            name: name.into(),
+            value: "v".into(),
+            kind: kind.into(),
+            description: String::new(),
+            example: String::new(),
+            tags: Vec::new(),
+            owner: None,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    fn shared_env(id: &str, name: &str) -> SyntheticsEnvironmentRecord {
+        SyntheticsEnvironmentRecord {
+            id: id.into(),
+            org_id: String::new(),
+            name: name.into(),
+            description: String::new(),
+            owner: None,
+            is_global: false,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    #[test]
+    fn a_shared_global_variable_defines_a_child_placeholder() {
+        let children = child_using("REGION");
+        let body = parent_with(&["login"], 0);
+        let shared = SharedTier::new(
+            "",
+            &[shared_row(
+                &synthetics_environments::global_environment_id(""),
+                "REGION",
+                infra::table::synthetics_variables::KIND_PLAIN,
+            )],
+            &[],
+        );
+        check_rules(Some("p"), &body, &children, &[], &shared).unwrap();
+    }
+
+    /// P3 on #2701: an environment-scoped secret still needs an explicit parent declaration.
+    #[test]
+    fn an_env_scoped_secret_does_not_satisfy_the_save_gate() {
+        let children = child_using("SMTP_TOKEN");
+        let mut body = parent_with(&["login"], 0);
+        body.environments = vec!["env-staging".into()];
+        let shared = SharedTier::new(
+            "",
+            &[shared_row(
+                "env-staging",
+                "SMTP_TOKEN",
+                infra::table::synthetics_variables::KIND_SECRET,
+            )],
+            &[shared_env("env-staging", "staging")],
+        );
+        let err = check_rules(Some("p"), &body, &children, &[], &shared).unwrap_err();
+        assert!(matches!(err, CompositionError::Invalid(m) if m.contains("SMTP_TOKEN")));
+    }
+
+    /// A union across environments would pass this; only the env that lacks the name may fail.
+    #[test]
+    fn a_name_missing_from_one_bound_environment_is_refused_by_environment() {
+        let children = child_using("REGION");
+        let mut body = parent_with(&["login"], 0);
+        body.environments = vec!["env-staging".into(), "env-prod".into()];
+        let shared = SharedTier::new(
+            "",
+            &[shared_row(
+                "env-staging",
+                "REGION",
+                infra::table::synthetics_variables::KIND_PLAIN,
+            )],
+            &[
+                shared_env("env-staging", "staging"),
+                shared_env("env-prod", "prod"),
+            ],
+        );
+        let err = check_rules(Some("p"), &body, &children, &[], &shared).unwrap_err();
+        assert!(
+            matches!(err, CompositionError::Invalid(m) if m.contains("REGION") && m.contains("prod") && !m.contains("staging"))
+        );
+    }
+
+    /// An unbound check sees global rows only, so an environment row cannot satisfy its gate.
+    #[test]
+    fn an_environment_row_does_not_reach_an_unbound_check() {
+        let children = child_using("REGION");
+        let body = parent_with(&["login"], 0);
+        let shared = SharedTier::new(
+            "",
+            &[shared_row(
+                "env-staging",
+                "REGION",
+                infra::table::synthetics_variables::KIND_PLAIN,
+            )],
+            &[shared_env("env-staging", "staging")],
+        );
+        let err = check_rules(Some("p"), &body, &children, &[], &shared).unwrap_err();
+        assert!(matches!(err, CompositionError::Invalid(m) if m.contains("REGION")));
     }
 
     #[test]
@@ -372,7 +605,14 @@ pub(crate) mod tests {
             name: "checkout".into(),
             folder_id: "f".into(),
         }];
-        let err = check_rules(Some("p"), &body, &children, &parents).unwrap_err();
+        let err = check_rules(
+            Some("p"),
+            &body,
+            &children,
+            &parents,
+            &SharedTier::default(),
+        )
+        .unwrap_err();
         assert!(matches!(err, CompositionError::ReferencedCannotHoldSubtest(p) if p.len() == 1));
     }
 
@@ -387,14 +627,28 @@ pub(crate) mod tests {
             name: "checkout".into(),
             folder_id: "f".into(),
         }];
-        check_rules(Some("p"), &body, &HashMap::new(), &parents).unwrap();
+        check_rules(
+            Some("p"),
+            &body,
+            &HashMap::new(),
+            &parents,
+            &SharedTier::default(),
+        )
+        .unwrap();
     }
 
     #[test]
     fn a_child_that_is_not_a_browser_check_is_rejected() {
         let mut body = parent_with(&["http-1"], 0);
         body.variables.clear();
-        let err = check_rules(Some("p"), &body, &HashMap::new(), &[]).unwrap_err();
+        let err = check_rules(
+            Some("p"),
+            &body,
+            &HashMap::new(),
+            &[],
+            &SharedTier::default(),
+        )
+        .unwrap_err();
         assert!(matches!(err, CompositionError::Invalid(m) if m.contains("http-1")));
     }
 
@@ -507,11 +761,14 @@ pub(crate) mod tests {
         .unwrap();
         let backend = db.get_database_backend();
         let schema = Schema::new(backend);
-        db.execute(backend.build(
-            &schema.create_table_from_entity(infra::table::entity::synthetics_refs::Entity),
-        ))
-        .await
-        .unwrap();
+        // `validate_for_save` reads the shared tier, so those tables must exist even when empty.
+        for statement in [
+            schema.create_table_from_entity(infra::table::entity::synthetics_refs::Entity),
+            schema.create_table_from_entity(infra::table::entity::synthetics_variables::Entity),
+            schema.create_table_from_entity(infra::table::entity::synthetics_environments::Entity),
+        ] {
+            db.execute(backend.build(&statement)).await.unwrap();
+        }
         db
     }
 
@@ -575,7 +832,14 @@ pub(crate) mod tests {
             name: "checkout".into(),
             folder_id: "f".into(),
         }];
-        let err = check_rules(Some("p"), &body, &HashMap::new(), &parents).unwrap_err();
+        let err = check_rules(
+            Some("p"),
+            &body,
+            &HashMap::new(),
+            &parents,
+            &SharedTier::default(),
+        )
+        .unwrap_err();
         assert!(matches!(err, CompositionError::Invalid(m) if m.contains("itself")));
     }
 
@@ -586,7 +850,14 @@ pub(crate) mod tests {
             .steps
             .push(json!({ "id": "cx", "action": "subtest", "subtest": { "id": "other" } }));
         let children = HashMap::from([("login".to_string(), child)]);
-        let err = check_rules(Some("p"), &parent_with(&["login"], 0), &children, &[]).unwrap_err();
+        let err = check_rules(
+            Some("p"),
+            &parent_with(&["login"], 0),
+            &children,
+            &[],
+            &SharedTier::default(),
+        )
+        .unwrap_err();
         assert!(
             matches!(err, CompositionError::Invalid(m) if m.contains("'login'") && !m.contains("Login"))
         );

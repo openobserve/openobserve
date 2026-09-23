@@ -1077,6 +1077,13 @@ impl std::fmt::Display for ConfigError {
 
 impl std::error::Error for ConfigError {}
 
+/// What the deferred child-placeholder guard needs after `env_inject` is complete.
+#[derive(Debug)]
+struct ComposedJourney {
+    parent_steps: Vec<serde_json::Value>,
+    children: HashMap<String, config::meta::synthetics_composition::ChildJourney>,
+}
+
 // ── Service functions (called by OSS handlers) ────────────────────────────────
 
 /// Returns full synthetic config for a pending check so the probe knows what to execute.
@@ -1117,17 +1124,22 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
     let env_id = check.env.clone();
     let has_shared_variables = crate::service::org_has_shared_variables(&check.org_id).await;
     let mut env_inject = HashMap::new();
+    let dek = if needs_dek(&synthetic, has_encrypted_config, has_shared_variables) {
+        Some(crate::service::synthetics_dek(&check.org_id).await?)
+    } else {
+        None
+    };
 
-    if needs_dek(&synthetic, has_encrypted_config, has_shared_variables) {
-        let dek = crate::service::synthetics_dek(&check.org_id).await?;
+    // Before the shared tier: a `{{NAME}}` in a header only exists once its slot is restored.
+    if has_encrypted_config && let Some(dek) = dek.as_deref() {
+        crate::service::rehydrate_config_secrets(&mut synthetic, dek)?;
+    }
+    // Before the shared tier too: a child's `{{NAME}}` is invisible until its steps are spliced in.
+    let composed = expand_for_resolve(conn, &mut synthetic).await?;
 
-        // Before the shared tier: a `{{NAME}}` in a header only exists once its slot is restored.
-        if has_encrypted_config {
-            crate::service::rehydrate_config_secrets(&mut synthetic, &dek)?;
-        }
-
+    if let Some(dek) = dek.as_deref() {
         if let Some(ref auth) = synthetic.auth {
-            env_inject.extend(build_env_map(auth, &dek)?);
+            env_inject.extend(build_env_map(auth, dek)?);
         }
 
         let shared = if has_shared_variables {
@@ -1135,7 +1147,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
                 &check.org_id,
                 env_id.as_deref(),
                 &synthetic,
-                &dek,
+                dek,
             )
             .await?
         } else {
@@ -1144,7 +1156,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         env_inject.extend(merge_variable_tiers(
             shared,
             &synthetic.variables,
-            &dek,
+            dek,
             &check.synthetics_id,
         )?);
 
@@ -1159,7 +1171,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
                     let value = if c.value.is_empty() {
                         Ok(String::new())
                     } else {
-                        crate::service::decrypt_secret(&dek, &c.value)
+                        crate::service::decrypt_secret(dek, &c.value)
                     }?;
                     Ok(serde_json::json!({
                         "name":     c.name,
@@ -1184,7 +1196,12 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         &synthetic.check_type,
         &substitute_placeholders(&synthetic.target, &env_inject),
     )?;
-    expand_for_resolve(conn, &mut synthetic).await?;
+    // Deferred to here: env_inject is the whole set of names the probe can substitute.
+    if let Some(composed) = composed {
+        let defined: HashSet<String> = env_inject.keys().cloned().collect();
+        validate_child_placeholders(&composed.parent_steps, &composed.children, &defined)
+            .map_err(anyhow::Error::new)?;
+    }
 
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);
@@ -1370,19 +1387,6 @@ fn redact_auth(auth: SyntheticAuth) -> SyntheticAuth {
     }
 }
 
-/// The names substitution can resolve, by NAME never value: variables plus browser secret names.
-fn resolvable_names(synthetic: &config::meta::synthetics::Synthetic) -> HashSet<String> {
-    let mut names: HashSet<String> = synthetic.variables.iter().map(|v| v.name.clone()).collect();
-    if let Some(secrets) = synthetic.config.get("secrets").and_then(|s| s.as_array()) {
-        names.extend(
-            secrets
-                .iter()
-                .filter_map(|s| s.get("name").and_then(|n| n.as_str()).map(str::to_owned)),
-        );
-    }
-    names
-}
-
 // The probe fills {{NAME}} only from env_inject, so a journey with or without subtests needs its
 // secrets there.
 fn inject_journey_secrets(
@@ -1412,13 +1416,12 @@ fn inject_browser_secrets(config: &serde_json::Value, env_inject: &mut HashMap<S
 fn expand_journey(
     parent_steps: &[serde_json::Value],
     children: &HashMap<String, config::meta::synthetics_composition::ChildJourney>,
-    defined: &HashSet<String>,
     parent_updated_at: i64,
     super_cluster: bool,
 ) -> Result<Vec<serde_json::Value>, ConfigError> {
     use config::meta::{
         synthetics::is_composition_action,
-        synthetics_composition::{ExpansionError, expand_steps, placeholders_in, subtest_refs},
+        synthetics_composition::{ExpansionError, expand_steps},
     };
     // Keyed on the action: a `subtest` step with no id yields no ref and would reach the probe.
     let mut has_reference = false;
@@ -1483,7 +1486,18 @@ fn expand_journey(
             guard_failure: false,
         });
     }
-    // Saving a child never re-validates its parents, so the parent-save guard is not enough.
+    Ok(expanded)
+}
+
+/// Saving a child never re-validates its parents, so the parent-save guard is not enough.
+fn validate_child_placeholders(
+    parent_steps: &[serde_json::Value],
+    children: &HashMap<String, config::meta::synthetics_composition::ChildJourney>,
+    defined: &HashSet<String>,
+) -> Result<(), ConfigError> {
+    use config::meta::synthetics_composition::{placeholders_in, subtest_refs};
+    // Keyed on the child map, not the expanded array: the message needs the child's identity, and
+    // the parent's own steps are never validated here.
     for child_id in subtest_refs(parent_steps) {
         let Some(child) = children.get(&child_id) else {
             continue;
@@ -1502,7 +1516,7 @@ fn expand_journey(
             });
         }
     }
-    Ok(expanded)
+    Ok(())
 }
 
 fn within_replication_grace(parent_updated_at: i64) -> bool {
@@ -1519,13 +1533,13 @@ fn within_replication_grace(parent_updated_at: i64) -> bool {
 async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
     conn: &C,
     synthetic: &mut config::meta::synthetics::Synthetic,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Option<ComposedJourney>> {
     use config::meta::{
         synthetics::{BrowserConfig, is_composition_action},
         synthetics_composition::{ChildJourney, subtest_refs},
     };
     if synthetic.check_type != SyntheticType::Browser {
-        return Ok(());
+        return Ok(None);
     }
     let steps = synthetic
         .config
@@ -1539,7 +1553,7 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
             .and_then(|a| a.as_str())
             .is_some_and(is_composition_action)
     }) {
-        return Ok(());
+        return Ok(None);
     }
     let refs = subtest_refs(&steps);
     let mut children = HashMap::new();
@@ -1577,21 +1591,18 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
         .enabled;
     #[cfg(not(feature = "enterprise"))]
     let super_cluster = false;
-    let expanded = expand_journey(
-        &steps,
-        &children,
-        &resolvable_names(synthetic),
-        synthetic.updated_at,
-        super_cluster,
-    )
-    .map_err(|e| {
-        if e.guard_failure {
-            config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
-        }
-        anyhow::Error::new(e)
-    })?;
+    let expanded =
+        expand_journey(&steps, &children, synthetic.updated_at, super_cluster).map_err(|e| {
+            if e.guard_failure {
+                config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
+            }
+            anyhow::Error::new(e)
+        })?;
     synthetic.config["steps"] = serde_json::Value::Array(expanded);
-    Ok(())
+    Ok(Some(ComposedJourney {
+        parent_steps: steps,
+        children,
+    }))
 }
 
 /// The 200 an ack that did not apply gets: a duplicate, or a late one from a
@@ -3312,7 +3323,7 @@ mod tests {
         fn a_plain_journey_passes_through_untouched() {
             let steps = parent(&[], 3);
             assert_eq!(
-                expand_journey(&steps, &HashMap::new(), &HashSet::new(), 0, false).unwrap(),
+                expand_journey(&steps, &HashMap::new(), 0, false).unwrap(),
                 steps
             );
         }
@@ -3321,8 +3332,7 @@ mod tests {
         fn over_the_cap_is_a_customer_fixable_config_error() {
             let children = HashMap::from([("big".to_string(), child("big", 40))]);
             // `own` excludes the appended reference: 11 + 40 = 51 executed, one over the cap.
-            let err = expand_journey(&parent(&["big"], 11), &children, &HashSet::new(), 0, false)
-                .unwrap_err();
+            let err = expand_journey(&parent(&["big"], 11), &children, 0, false).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_STEPS_EXCEEDED);
             assert!(!err.guard_failure);
             assert!(err.message.contains("51"), "{}", err.message);
@@ -3332,22 +3342,14 @@ mod tests {
         fn a_malformed_reference_never_reaches_a_browser() {
             // No `subtest.id`, so it yields no ref — the early return must still catch it.
             let steps = vec![nav("s0"), json!({ "id": "r0", "action": "subtest" })];
-            let err =
-                expand_journey(&steps, &HashMap::new(), &HashSet::new(), 0, false).unwrap_err();
+            let err = expand_journey(&steps, &HashMap::new(), 0, false).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
             assert!(err.guard_failure);
         }
 
         #[test]
         fn a_missing_child_is_our_guard_failure() {
-            let err = expand_journey(
-                &parent(&["gone"], 1),
-                &HashMap::new(),
-                &HashSet::new(),
-                0,
-                false,
-            )
-            .unwrap_err();
+            let err = expand_journey(&parent(&["gone"], 1), &HashMap::new(), 0, false).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
             assert!(err.guard_failure);
         }
@@ -3355,14 +3357,8 @@ mod tests {
         #[test]
         fn a_fresh_super_cluster_parent_waits_for_its_child_to_replicate() {
             let now = config::utils::time::now_micros();
-            let err = expand_journey(
-                &parent(&["gone"], 1),
-                &HashMap::new(),
-                &HashSet::new(),
-                now,
-                true,
-            )
-            .unwrap_err();
+            let err =
+                expand_journey(&parent(&["gone"], 1), &HashMap::new(), now, true).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_PENDING);
             assert!(!err.guard_failure);
         }
@@ -3377,14 +3373,8 @@ mod tests {
             .unwrap()
                 * 1_000_000;
             let stale = config::utils::time::now_micros() - grace_us - 1_000_000;
-            let err = expand_journey(
-                &parent(&["gone"], 1),
-                &HashMap::new(),
-                &HashSet::new(),
-                stale,
-                true,
-            )
-            .unwrap_err();
+            let err =
+                expand_journey(&parent(&["gone"], 1), &HashMap::new(), stale, true).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
             assert!(err.guard_failure);
         }
@@ -3392,14 +3382,8 @@ mod tests {
         #[test]
         fn a_fresh_parent_without_super_cluster_reports_the_child_missing() {
             let now = config::utils::time::now_micros();
-            let err = expand_journey(
-                &parent(&["gone"], 1),
-                &HashMap::new(),
-                &HashSet::new(),
-                now,
-                false,
-            )
-            .unwrap_err();
+            let err =
+                expand_journey(&parent(&["gone"], 1), &HashMap::new(), now, false).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
         }
 
@@ -3409,33 +3393,13 @@ mod tests {
 
         #[test]
         fn a_variable_is_matched_by_name_never_by_value() {
-            // A name/value swap in `resolvable_names` compiles and fails every composed check.
-            let synthetic = config::meta::synthetics::Synthetic {
-                variables: vec![config::meta::synthetics::SyntheticVariable {
-                    name: "TOKEN".into(),
-                    value: "sekret".into(),
-                    ..Default::default()
-                }],
-                ..Default::default()
-            };
-            let names = resolvable_names(&synthetic);
-            assert!(names.contains("TOKEN"));
-            assert!(!names.contains("sekret"));
-
+            // A name/value swap in what feeds `defined` compiles and fails every composed check.
             let mut c = child("login", 1);
             c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
             let children = HashMap::from([("login".to_string(), c)]);
-            assert!(expand_journey(&parent(&["login"], 1), &children, &names, 0, false).is_ok());
-            assert!(
-                expand_journey(
-                    &parent(&["login"], 1),
-                    &children,
-                    &defined("sekret"),
-                    0,
-                    false
-                )
-                .is_err()
-            );
+            let steps = parent(&["login"], 1);
+            validate_child_placeholders(&steps, &children, &defined("TOKEN")).unwrap();
+            assert!(validate_child_placeholders(&steps, &children, &defined("sekret")).is_err());
         }
 
         // A {{NAME}} defined only as a browser secret passes the guard and reaches env_inject.
@@ -3448,13 +3412,9 @@ mod tests {
                 }),
                 ..Default::default()
             };
-            let names = resolvable_names(&synthetic);
-            assert!(names.contains("PASSWORD"));
-
             let mut c = child("login", 1);
             c.steps[0]["url"] = json!("https://x/{{PASSWORD}}");
             let children = HashMap::from([("login".to_string(), c)]);
-            assert!(expand_journey(&parent(&["login"], 1), &children, &names, 0, false).is_ok());
 
             let mut env_inject = HashMap::new();
             inject_browser_secrets(&synthetic.config, &mut env_inject);
@@ -3462,16 +3422,46 @@ mod tests {
                 env_inject.get("PASSWORD").map(String::as_str),
                 Some("hunter2")
             );
+            let steps = parent(&["login"], 1);
+            let names: HashSet<String> = env_inject.keys().cloned().collect();
+            validate_child_placeholders(&steps, &children, &names).unwrap();
 
             let mut expanded_config = synthetic.config.clone();
-            expanded_config["steps"] =
-                json!(expand_journey(&parent(&["login"], 1), &children, &names, 0, false).unwrap());
+            expanded_config["steps"] = json!(expand_journey(&steps, &children, 0, false).unwrap());
             let mut env_inject = HashMap::new();
             inject_browser_secrets(&expanded_config, &mut env_inject);
             assert_eq!(
                 env_inject.get("PASSWORD").map(String::as_str),
                 Some("hunter2")
             );
+        }
+
+        /// The shared tier reads placeholders off `config`, so expansion must already have run.
+        #[test]
+        fn an_expanded_journey_exposes_a_child_placeholder_to_the_shared_tier() {
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{REGION}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+            let steps = parent(&["login"], 1);
+            let mut synthetic = config::meta::synthetics::Synthetic {
+                check_type: SyntheticType::Browser,
+                config: json!({ "steps": steps }),
+                ..Default::default()
+            };
+            assert!(!crate::service::check_placeholder_text(&synthetic).contains("REGION"));
+            synthetic.config["steps"] = json!(expand_journey(&steps, &children, 0, false).unwrap());
+            assert!(crate::service::check_placeholder_text(&synthetic).contains("REGION"));
+        }
+
+        /// A shared row resolves into env_inject, which is the whole of what the guard accepts.
+        #[test]
+        fn a_shared_variable_in_env_inject_defines_a_child_placeholder() {
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{REGION}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+            let env_inject = HashMap::from([("REGION".to_string(), "eu-west".to_string())]);
+            let names: HashSet<String> = env_inject.keys().cloned().collect();
+            validate_child_placeholders(&parent(&["login"], 1), &children, &names).unwrap();
         }
 
         #[test]
@@ -3481,14 +3471,9 @@ mod tests {
             let mut b = child("b", 1);
             b.steps[0]["url"] = json!("https://x/{{BBB}}");
             let children = HashMap::from([("a".to_string(), a), ("b".to_string(), b)]);
-            let err = expand_journey(
-                &parent(&["a", "b"], 1),
-                &children,
-                &HashSet::new(),
-                0,
-                false,
-            )
-            .unwrap_err();
+            let err =
+                validate_child_placeholders(&parent(&["a", "b"], 1), &children, &HashSet::new())
+                    .unwrap_err();
             assert!(err.message.contains("AAA"), "{}", err.message);
         }
 
@@ -3497,8 +3482,9 @@ mod tests {
             let mut c = child("login", 1);
             c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
             let children = HashMap::from([("login".to_string(), c)]);
-            let err = expand_journey(&parent(&["login"], 1), &children, &HashSet::new(), 0, false)
-                .unwrap_err();
+            let err =
+                validate_child_placeholders(&parent(&["login"], 1), &children, &HashSet::new())
+                    .unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_VARIABLE_UNDEFINED);
             // Customer-fixable, so it must not be counted as one of our guards failing.
             assert!(!err.guard_failure);
@@ -3510,14 +3496,9 @@ mod tests {
             let mut c = child("login", 1);
             c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
             let children = HashMap::from([("login".to_string(), c)]);
-            let out = expand_journey(
-                &parent(&["login"], 1),
-                &children,
-                &defined("TOKEN"),
-                0,
-                false,
-            )
-            .unwrap();
+            let steps = parent(&["login"], 1);
+            validate_child_placeholders(&steps, &children, &defined("TOKEN")).unwrap();
+            let out = expand_journey(&steps, &children, 0, false).unwrap();
             assert_eq!(out.len(), 2);
         }
 
@@ -3535,16 +3516,14 @@ mod tests {
                 ("a".to_string(), holding("a", "b")),
                 ("b".to_string(), holding("b", "a")),
             ]);
-            let err = expand_journey(&parent(&["b"], 1), &children, &HashSet::new(), 0, false)
-                .unwrap_err();
+            let err = expand_journey(&parent(&["b"], 1), &children, 0, false).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
         }
 
         #[test]
         fn a_self_cycle_ends_as_an_invalid_reference() {
             let children = HashMap::from([("a".to_string(), holding("a", "a"))]);
-            let err = expand_journey(&parent(&["a"], 1), &children, &HashSet::new(), 0, false)
-                .unwrap_err();
+            let err = expand_journey(&parent(&["a"], 1), &children, 0, false).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
         }
 
@@ -3555,14 +3534,7 @@ mod tests {
                 .steps
                 .push(json!({ "id": "z", "action": "subtest", "subtest": { "id": "other" } }));
             let children = HashMap::from([("nested".to_string(), nested)]);
-            let err = expand_journey(
-                &parent(&["nested"], 1),
-                &children,
-                &HashSet::new(),
-                0,
-                false,
-            )
-            .unwrap_err();
+            let err = expand_journey(&parent(&["nested"], 1), &children, 0, false).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
             assert!(err.guard_failure);
         }
