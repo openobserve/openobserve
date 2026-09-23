@@ -55,6 +55,11 @@ pub enum MergedFile {
         data_path: tempfile::TempPath,
         meta: FileMeta,
     },
+    /// Closed-hour output whose schema cannot be indexed.
+    MetricsIndexedNoIndex {
+        data_path: tempfile::TempPath,
+        meta: FileMeta,
+    },
     /// Finalized indexed metrics output spooled to local disk.
     MetricsIndexed {
         data_path: tempfile::TempPath,
@@ -69,6 +74,7 @@ impl MergedFile {
             Self::Standard { .. } | Self::StandardFile { .. } => None,
             Self::MetricsHashSorted { .. } => Some(MetricsFileLayout::HashSorted),
             Self::MetricsHashMerged { .. } => Some(MetricsFileLayout::HashMerged),
+            Self::MetricsIndexedNoIndex { .. } => Some(MetricsFileLayout::Indexed),
             Self::MetricsIndexed { .. } => Some(MetricsFileLayout::Indexed),
         }
     }
@@ -97,6 +103,7 @@ impl MergedFile {
             }
             Self::StandardFile { .. }
             | Self::MetricsHashMerged { .. }
+            | Self::MetricsIndexedNoIndex { .. }
             | Self::MetricsIndexed { .. } => Err(DataFusionError::Execution(
                 "ingester cannot consume compactor spooled output".to_string(),
             )),
@@ -112,18 +119,23 @@ impl MergedFile {
                 Ok((data, meta, None))
             }
             Self::StandardFile { data_path, meta }
-            | Self::MetricsHashMerged { data_path, meta } => {
+            | Self::MetricsHashMerged { data_path, meta }
+            | Self::MetricsIndexedNoIndex { data_path, meta } => {
                 Ok((tokio::fs::read(&data_path).await?, meta, None))
             }
             Self::MetricsIndexed {
                 data_path,
                 metrics_index_path,
                 meta,
-            } => Ok((
-                tokio::fs::read(&data_path).await?,
-                meta,
-                Some(metrics_index_path),
-            )),
+            } => {
+                let data = tokio::fs::read(&data_path).await?;
+                if meta.compressed_size <= 0 || meta.compressed_size as usize != data.len() {
+                    return Err(DataFusionError::Execution(
+                        "completed source size changed before upload".into(),
+                    ));
+                }
+                Ok((data, meta, Some(metrics_index_path)))
+            }
         }
     }
 }

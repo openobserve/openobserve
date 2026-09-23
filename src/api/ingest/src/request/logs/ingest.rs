@@ -38,7 +38,10 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
 use crate::{
-    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+    common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+        otlp::otlp_error_response,
+    },
     service::{
         ingestion::get_thread_id,
         logs::{self, otlp::handle_request},
@@ -506,14 +509,12 @@ pub async fn otlp_logs_write(
             Ok(req) => (req, OtlpRequestType::HttpProtobuf),
             Err(e) => {
                 log::error!("[LOGS:OTLP] Invalid proto: org_id: {org_id} {e}");
-                return (
+                return otlp_error_response(
+                    OtlpRequestType::HttpProtobuf,
                     StatusCode::BAD_REQUEST,
-                    Json(MetaHttpResponse::error(
-                        StatusCode::BAD_REQUEST,
-                        format!("Invalid proto: {e}"),
-                    )),
-                )
-                    .into_response();
+                    3, // INVALID_ARGUMENT
+                    format!("Invalid proto: {e}"),
+                );
             }
         },
         Some(OtlpRequestType::HttpJson) => {

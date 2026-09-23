@@ -2031,11 +2031,11 @@
       "addToGroup": "Agregar a un grupo de usuarios",
       "addToRole": "Asignar un rol",
       "step1Title": "Copia tu token",
-      "copyHint": "Copia este token ahora; no podrás volver a verlo.",
+      "copyHint": "Esta es la única vez que verás este token. Cópialo o descárgalo ahora, no se puede recuperar de nuevo.",
       "done": "Hecho",
       "applying": "Aplicando permisos de acceso...",
-      "grantedRoles": "Roles asignados: {roles}",
-      "grantedGroups": "Añadido a grupos de usuarios: {groups}",
+      "rolesAssignedLabel": "Roles asignados",
+      "groupsAssignedLabel": "Añadido a grupos de usuarios",
       "failedRoles": "No se pudieron asignar roles: {roles}",
       "failedGroups": "No se pudo añadir a grupos de usuarios: {groups}",
       "failedHint": "Puedes concederlos más tarde desde las páginas de Roles y Grupos de usuarios."
@@ -2045,6 +2045,9 @@
         "label": "Nombre de la cuenta de servicio",
         "placeholder": "ej. ingest-bot",
         "help": "Letras minúsculas, números y guiones. Guardado como name{suffix}"
+      },
+      "identifier": {
+        "label": "Identificador"
       },
       "roles": {
         "label": "Asignar roles",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Identificador",
+        "roles": "Roles",
         "token": "Símbolo",
         "created": "Creado"
       }
@@ -2186,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Los usuarios y las cuentas de servicio vinculados a estas funciones perderán el acceso."
-      }
+      },
+      "assignColumn": "Asignar",
+      "assignBtn": "Añadir",
+      "assignedBadge": "Asignado",
+      "assignBannerText": "Añade {member} a un rol: haz clic en Añadir junto a un rol a continuación.",
+      "assignBannerDone": "Listo",
+      "assignSuccess": "Se añadió {member} al rol \"{role}\".",
+      "assignError": "No se pudo añadir la cuenta a ese rol. Inténtalo de nuevo."
     },
     "group": {
       "name": {
@@ -2217,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Los miembros de estos grupos perderán las funciones que les hayan otorgado."
-      }
+      },
+      "assignColumn": "Asignar",
+      "assignBtn": "Añadir",
+      "assignedBadge": "Asignado",
+      "assignBannerText": "Añade {member} a un grupo de usuarios: haz clic en Añadir junto a un grupo a continuación.",
+      "assignBannerDone": "Listo",
+      "assignSuccess": "Se añadió {member} al grupo \"{group}\".",
+      "assignError": "No se pudo añadir la cuenta a ese grupo. Inténtalo de nuevo."
     },
     "appGroups": {
       "deleteGroupTitle": "Eliminar grupo",
@@ -13383,6 +13401,7 @@
       "searchHistoryNotEnabled": "El historial de búsqueda no está habilitado.",
       "enableUsageReporting": "Establezca ZO_USAGE_REPORTING_ENABLED en true para habilitar el reporte de uso.",
       "selectStreamToExtractPatterns": "Seleccione un stream para extraer patrones",
+      "patternsUnavailableForMultiStream": "Los patrones no están disponibles cuando se seleccionan varios streams. Seleccione un único stream.",
       "errorExtractingPatterns": "Error al extraer patrones. Intente nuevamente.",
       "nameOfPanelRequired": "El nombre del panel es obligatorio",
       "errorsFixAndTryAgain": "Hay algunos errores, corríjalos e intente nuevamente",

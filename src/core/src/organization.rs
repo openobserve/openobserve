@@ -130,6 +130,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             stream_summary.total_storage_size += stream.stats.storage_size;
             stream_summary.total_compressed_size += stream.stats.compressed_size;
             stream_summary.total_index_size += stream.stats.index_size;
+            stream_summary.total_mindex_size += stream.stats.mindex_size;
         }
     }
 
