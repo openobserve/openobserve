@@ -323,18 +323,38 @@ const filteredPrompts = computed(() => {
   });
 });
 
-const statusOptions = [
-  { label: raw("Active"), value: "active" },
-  { label: raw("Archived"), value: "archived" },
-  { label: raw("All statuses"), value: "all" },
-];
+const statusOptions = computed(() => [
+  { label: t("aiObservability.promptManagement.active"), value: "active" },
+  { label: t("aiObservability.promptManagement.archived"), value: "archived" },
+  { label: t("aiObservability.promptManagement.allStatuses"), value: "all" },
+]);
 const columns: OTableColumnDef[] = [
-  { id: "name", header: raw("Name"), accessorKey: "name", sortable: true },
-  { id: "tags", header: raw("Tags"), accessorKey: "tags" },
-  { id: "labels", header: raw("Labels"), accessorKey: "labels" },
-  { id: "latestVersion", header: raw("Latest"), accessorKey: "latestVersion", sortable: true },
-  { id: "status", header: raw("Status"), accessorKey: "status", sortable: true },
-  { id: "updatedAt", header: raw("Updated"), accessorKey: "updatedAt", sortable: true },
+  {
+    id: "name",
+    header: t("aiObservability.promptManagement.name"),
+    accessorKey: "name",
+    sortable: true,
+  },
+  { id: "tags", header: t("aiObservability.promptManagement.tags"), accessorKey: "tags" },
+  { id: "labels", header: t("aiObservability.promptManagement.labels"), accessorKey: "labels" },
+  {
+    id: "latestVersion",
+    header: t("aiObservability.promptManagement.latest"),
+    accessorKey: "latestVersion",
+    sortable: true,
+  },
+  {
+    id: "status",
+    header: t("aiObservability.promptManagement.status"),
+    accessorKey: "status",
+    sortable: true,
+  },
+  {
+    id: "updatedAt",
+    header: t("aiObservability.promptManagement.updated"),
+    accessorKey: "updatedAt",
+    sortable: true,
+  },
   { id: "actions", header: raw(""), accessorKey: "entityId", size: 48 },
 ];
 
@@ -379,7 +399,10 @@ async function loadPrompts() {
       drawerOpen.value = true;
     }
   } catch (error: unknown) {
-    toast({ variant: "error", message: raw(errorText(error, "Failed to load prompts.")) });
+    toast({
+      variant: "error",
+      message: raw(errorText(error, t("aiObservability.promptManagement.loadError"))),
+    });
   } finally {
     loading.value = false;
   }
@@ -392,7 +415,7 @@ async function loadSettings() {
     if (errorStatus(error) !== 403) {
       toast({
         variant: "error",
-        message: raw(errorText(error, "Failed to load prompt settings.")),
+        message: raw(errorText(error, t("aiObservability.promptManagement.settingsLoadError"))),
       });
     }
   }
@@ -451,7 +474,10 @@ async function openEdit(prompt: Prompt) {
     );
     editorOpen.value = true;
   } catch (error: unknown) {
-    toast({ variant: "error", message: raw(errorText(error, "Failed to load prompt version.")) });
+    toast({
+      variant: "error",
+      message: raw(errorText(error, t("aiObservability.promptManagement.versionLoadError"))),
+    });
   }
 }
 
@@ -492,10 +518,13 @@ async function movePrompt() {
     moveOpen.value = false;
     toast({
       variant: "success",
-      message: raw(`Prompt moved. ${versionCount} versions unchanged.`),
+      message: t("aiObservability.promptManagement.moveSuccess", { count: versionCount }),
     });
   } catch (error: unknown) {
-    toast({ variant: "error", message: raw(errorText(error, "Failed to move prompt.")) });
+    toast({
+      variant: "error",
+      message: raw(errorText(error, t("aiObservability.promptManagement.moveError"))),
+    });
   }
 }
 
@@ -513,9 +542,12 @@ async function archive(prompt: Prompt) {
   try {
     const updated = await llmPromptsService.archive(orgId.value, prompt.entityId);
     replacePrompt(updated);
-    toast({ variant: "success", message: raw("Prompt archived.") });
+    toast({ variant: "success", message: t("aiObservability.promptManagement.archiveSuccess") });
   } catch (error: unknown) {
-    toast({ variant: "error", message: raw(errorText(error, "Failed to archive prompt.")) });
+    toast({
+      variant: "error",
+      message: raw(errorText(error, t("aiObservability.promptManagement.archiveError"))),
+    });
   }
 }
 
@@ -527,7 +559,10 @@ function openPlayground(version: PromptVersion, draftName = "") {
       : persistedPrompt;
   if (!prompt) return;
   if (!router.hasRoute("aiPlayground")) {
-    toast({ variant: "info", message: raw("Playground is available in the Enterprise edition.") });
+    toast({
+      variant: "info",
+      message: t("aiObservability.promptManagement.enterprisePlaygroundOnly"),
+    });
     return;
   }
   storePromptPlaygroundHandoff({
