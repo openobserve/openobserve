@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "复制内容时出错",
+    "passcodeForbiddenMessage": "查看数据摄取令牌需要管理员或 Root 角色。请向管理员索取设置命令，或获取在此处查看它所需的角色。",
     "updateRUMTokenMessage": "确定要更新此组织的 RUM 令牌吗？",
     "completeAwsIntegration": "完成 AWS 集成",
     "deployAwsServicesOneClick": "使用单个 CloudFormation 堆栈一键部署所有选定的 AWS 服务。",
@@ -15803,7 +15804,8 @@
         "destinations": "目标",
         "templates": "模板",
         "reports": "报表",
-        "llmModelPricing": "LLM 模型定价"
+        "llmModelPricing": "LLM 模型定价",
+        "passcode": "数据摄取令牌"
       },
       "noPermissionToChangeFavorites": "您没有权限更改收藏",
       "couldNotUpdateFavoriteDashboards": "无法更新收藏的仪表盘"

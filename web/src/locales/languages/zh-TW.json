@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "複製內容時發生錯誤。",
+    "passcodeForbiddenMessage": "需要 Admin 或 Root 角色才能檢視資料擷取權杖。請向管理員索取設定指令，或詢問需要何種角色才能在此檢視。",
     "updateRUMTokenMessage": "您確定要更新此組織的 RUM Token 嗎？",
     "completeAwsIntegration": "完成 AWS 整合",
     "deployAwsServicesOneClick": "使用單一 CloudFormation 堆疊，一鍵部署所有選取的 AWS 服務。",
@@ -15798,7 +15799,8 @@
         "destinations": "目標",
         "templates": "範本",
         "reports": "報表",
-        "llmModelPricing": "LLM 模型定價"
+        "llmModelPricing": "LLM 模型定價",
+        "passcode": "資料擷取權杖"
       },
       "noPermissionToChangeFavorites": "您沒有權限變更我的最愛",
       "couldNotUpdateFavoriteDashboards": "無法更新我的最愛儀表板"

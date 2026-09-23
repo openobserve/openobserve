@@ -34,6 +34,9 @@ const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
   destinations: "toastMessages.composables.resources.destinations",
   templates: "toastMessages.composables.resources.templates",
   reports: "toastMessages.composables.resources.reports",
+  // both paths expose the same org-wide ingestion token
+  passcode: "toastMessages.composables.resources.passcode",
+  "ingestion-tokens": "toastMessages.composables.resources.passcode",
   "llm/models": "toastMessages.composables.resources.llmModelPricing",
   "llm/models/built-in": "toastMessages.composables.resources.llmModelPricing",
   "llm/models/refresh-built-in": "toastMessages.composables.resources.llmModelPricing",

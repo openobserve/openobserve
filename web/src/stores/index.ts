@@ -39,6 +39,8 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
 const organizationObj = {
   organizationPasscode: "",
   organizationPasscodeUser: "",
+  // distinct from an empty passcode, which renders as a valid-looking but dead credential
+  organizationPasscodeForbidden: false,
   allDashboardList: {},
   allDashboardData: {},
   allAlertsListByFolderId: {},
@@ -205,6 +207,9 @@ export default createStore({
     },
     setOrganizationPasscodeUser(state, payload) {
       state.organizationData.organizationPasscodeUser = payload;
+    },
+    setOrganizationPasscodeForbidden(state, payload) {
+      state.organizationData.organizationPasscodeForbidden = payload;
     },
     resetOrganizationData(state) {
       state.organizationData = JSON.parse(JSON.stringify(organizationObj));
@@ -470,6 +475,9 @@ export default createStore({
     },
     setOrganizationPasscodeUser(context, payload) {
       context.commit("setOrganizationPasscodeUser", payload);
+    },
+    setOrganizationPasscodeForbidden(context, payload) {
+      context.commit("setOrganizationPasscodeForbidden", payload);
     },
     resetOrganizationData(context, payload) {
       context.commit("resetOrganizationData", payload);
