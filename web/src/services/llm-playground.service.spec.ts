@@ -7,6 +7,7 @@ vi.mock("@/services/http", () => ({ attemptTokenRefresh: vi.fn() }));
 
 import {
   PlaygroundRunError,
+  chatProviders,
   dropsResponseSchema,
   providerDropsResponseSchema,
   responseSchemaSupport,
@@ -389,6 +390,17 @@ describe("runPlayground — live adapter", () => {
     expect(responseSchemaSupport("DeepSeek")).toBe("approximated");
     expect(responseSchemaSupport(" deepseek ")).toBe("approximated");
     expect(responseSchemaSupport("anthropic")).toBe("dropped");
+  });
+
+  // System One answers typed decisions only; the server refuses it any chat call.
+  it("keeps decision-only providers out of chat pickers", () => {
+    const kept = chatProviders([
+      { id: "a", providerType: "openai" },
+      { id: "b", providerType: "systemone" },
+      { id: "c", provider_type: "SystemOne" },
+      { id: "d" },
+    ]);
+    expect(kept.map((p) => p.id)).toEqual(["a", "d"]);
   });
 
   // The server owns the DeepSeek downgrade; only Anthropic is shaped away client-side.
