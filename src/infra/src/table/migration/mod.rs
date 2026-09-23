@@ -529,7 +529,7 @@ mod tests {
             87,
             "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
         ),
-        (88, "m20260922_000001_add_password_policy_columns_to_users"),
+        (88, "m20260922_000003_create_user_auth_state_table"),
     ];
 
     #[test]
