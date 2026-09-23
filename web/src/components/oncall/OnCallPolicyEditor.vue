@@ -584,7 +584,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import destinationService from "@/services/alert_destination";
+import { destinationsQuery } from "@/services/alert_destination.queries";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import { queryClient } from "@/composables/query/queryClient";
 import oncallService from "@/services/oncall";
@@ -1065,17 +1065,8 @@ function openMembers() {
 // rest of the policy is still worth editing.
 async function fetchDestinations() {
   try {
-    const res = await destinationService.list({
-      org_identifier: orgId.value,
-      page_num: 1,
-      page_size: 1000,
-      sort_by: "name",
-      desc: false,
-      module: "alert",
-    });
-    availableDestinations.value = (res.data ?? [])
-      .map((d: { name: string }) => d.name)
-      .filter(Boolean);
+    const list = await queryClient.fetchQuery(destinationsQuery(orgId.value, "alert"));
+    availableDestinations.value = list.map((d: { name: string }) => d.name).filter(Boolean);
   } catch {
     availableDestinations.value = [];
   }

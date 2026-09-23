@@ -17,8 +17,10 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
+import { userKeys } from "@/services/users.querykeys";
 import store from "@/test/unit/helpers/store";
 import OnCallTeams from "@/views/OnCall/OnCallTeams.vue";
 
@@ -485,5 +487,26 @@ describe("OnCallTeams", () => {
     await wrapper.find('[data-test="oncall-teams-error"] button').trigger("click");
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(false);
+  });
+
+  // The New team drawer's member picker belongs to this page, so the page's refresh must expire it too.
+  it("expires the users entry on a refresh, and leaves it alone on mount", async () => {
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const usersExpiry = {
+      queryKey: userKeys.users("default"),
+      exact: true,
+      refetchType: "none",
+    };
+    service.listTeams.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+    const wrapper = render();
+    await flushPromises();
+    expect(spy).not.toHaveBeenCalledWith(usersExpiry);
+
+    // Retry and the toolbar's Refresh are the same `refreshTeams` handler.
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    await wrapper.find('[data-test="oncall-teams-error"] button').trigger("click");
+    await flushPromises();
+    expect(spy).toHaveBeenCalledWith(usersExpiry);
+    spy.mockRestore();
   });
 });

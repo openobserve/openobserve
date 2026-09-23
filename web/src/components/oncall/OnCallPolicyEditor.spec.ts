@@ -528,6 +528,21 @@ describe("re-opening the drawer", () => {
     } as any);
     service.listMembers.mockResolvedValue({ data: [{ user_email: "ana@o2.ai" }] } as any);
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    destinations.list.mockResolvedValue({ data: [{ name: "slack-eng" }] } as any);
+  });
+
+  // The picker reads the alert destinations list the alert form already caches.
+  it("serves the destination picker from the cache on a re-open", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(destinations.list).toHaveBeenCalledTimes(1);
+
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(destinations.list).toHaveBeenCalledTimes(1);
+    expect(destinations.list).toHaveBeenCalledWith(expect.objectContaining({ module: "alert" }));
   });
 
   it("serves the roster from the cache and still re-reads the team channel", async () => {

@@ -109,6 +109,8 @@ import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsCo
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
@@ -291,6 +293,8 @@ export default defineComponent({
         const orgId = store.state.selectedOrganization.identifier;
         const groups = draftSemanticGroups.value;
         await serviceStreamsService.updateSemanticGroups(orgId, groups);
+        // The groups are cached, and dimension analytics is computed from them.
+        void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(orgId) });
         semanticGroups.value = groups;
         draftSemanticGroups.value = cloneGroups(groups);
         toast({ variant: "success", message: t("settings.correlation.fieldAliasesSaved") });

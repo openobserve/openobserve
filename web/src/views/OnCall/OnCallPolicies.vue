@@ -72,16 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #toolbar-trailing>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="lastUpdatedAt"
           :loading="loading"
           data-test="oncall-policies-refresh"
           @click="refreshAll"
-        >
-          <OTooltip side="bottom" :content="t('oncall.refresh')" />
-        </OButton>
+        />
       </template>
 
       <template #cell-on_call="{ row }">
@@ -141,9 +139,9 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -151,7 +149,6 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { oncallTeamsQuery, teamPolicyQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
 import type { OnCallPolicy, OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
@@ -177,6 +174,7 @@ const ABSENT = raw("—");
 
 const allRows = ref<PolicyRow[]>([]);
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 const search = ref("");
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
@@ -303,6 +301,13 @@ async function fetchAll(force = false) {
     const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force);
     const settled = await Promise.all(teams.map((team) => fetchTeamRow(team, force)));
     allRows.value = settled.filter((row): row is PolicyRow => row !== null);
+    // The oldest of the reads the rows are built from, so the age never claims the table is fresher than it is.
+    lastUpdatedAt.value = Math.min(
+      ...[
+        oncallTeamsQuery(orgId.value),
+        ...teams.map((team) => teamPolicyQuery(orgId.value, team.id)),
+      ].map((options) => queryClient.getQueryState(options.queryKey)?.dataUpdatedAt || Date.now()),
+    );
   } catch (err: any) {
     toast({
       variant: "error",

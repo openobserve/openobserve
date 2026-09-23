@@ -181,7 +181,8 @@ import {
   updateTeamMutation,
 } from "@/services/oncall.queries";
 import { useMutation } from "@tanstack/vue-query";
-import usersService from "@/services/users";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgUsersQuery } from "@/services/users.queries";
 import type { OnCallTeam, Rotation } from "@/ts/interfaces/oncall";
 import {
   BASE_SHIFT_RULE_NAME,
@@ -290,8 +291,7 @@ function addEveryone() {
 async function fetchOrgUsers() {
   loadingUsers.value = true;
   try {
-    const res = await usersService.orgUsers(orgId.value);
-    orgUsers.value = res.data?.data ?? [];
+    orgUsers.value = await queryClient.fetchQuery(orgUsersQuery(orgId.value));
   } catch {
     // The picker degrades to empty and the team is still creatable; people can
     // be added on the Members tab straight afterwards.

@@ -306,6 +306,17 @@ describe("OnCallMembers", () => {
     vi.useRealTimers();
   });
 
+  // The org's users are the IAM list's own cache entry, so a revisit of this tab costs nothing.
+  it("serves the org's users to a remount from the cache", async () => {
+    render([]).unmount();
+    await flushPromises();
+    const second = render([]);
+    await flushPromises();
+
+    expect(users.orgUsers).toHaveBeenCalledTimes(1);
+    expect(second.find('[data-test="oncall-members-user-select"]').text()).toContain("Ana Sharma");
+  });
+
   /// C5/C6: the rota already SKIPS an away member; the table says so where
   /// the people are listed, before somebody asks why the order changed.
   describe("absences", () => {

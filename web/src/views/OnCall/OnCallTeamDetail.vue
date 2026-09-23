@@ -41,6 +41,13 @@
     </template>
 
     <template #actions>
+      <ORefreshButton
+        v-if="loaded"
+        :last-run-at="lastFetchedAt"
+        :loading="refreshing"
+        data-test="oncall-team-refresh"
+        @click="refreshPage"
+      />
       <!-- A cover is a shift handed to a person, so it needs a roster to hand
            it to: on a team with nobody in it this would open on an empty
            picker, which is a dead end rather than an action. -->
@@ -86,7 +93,7 @@
         :description="raw(loadError)"
         :action-label="t('oncall.retry')"
         data-test="oncall-team-detail-error"
-        @action="refreshAll"
+        @action="refreshPage"
       />
     </OContent>
 
@@ -165,7 +172,7 @@
 
       <!-- `scroll` defaults to overflow-hidden, which silently clipped the
            escalation policy so its lower priorities were unreachable. -->
-      <OTabPanels v-model="activeTab" grow scroll="y">
+      <OTabPanels :key="tabsKey" v-model="activeTab" grow scroll="y">
         <OTabPanel name="overview">
           <!-- Two blocks in one column. The demo read as a wall: five sortable
                columns of history beside a rail restating reach and readiness that
@@ -424,8 +431,13 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { oncallKeys } from "@/services/oncall.querykeys";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { userKeys } from "@/services/users.querykeys";
 import {
   createOverrideMutation,
   deleteOverrideMutation,
@@ -554,6 +566,7 @@ const ruleCount = ref(0);
 // because that is the question the page exists to answer.
 const activeTab = ref("members");
 const loaded = ref(false);
+const lastFetchedAt = ref<number | null>(null);
 const loadError = ref<string | null>(null);
 const oncallUnavailable = ref(false);
 const editOpen = ref(false);
@@ -691,6 +704,17 @@ async function fetchAll(force = false) {
     schedule.value = scheduleRes;
     policy.value = policyRes;
     onCallNow.value = onCallRes;
+    // The oldest, so the age never claims the page is fresher than the stalest thing on it.
+    lastFetchedAt.value = Math.min(
+      ...[
+        oncallTeamQuery(org, id),
+        teamMembersQuery(org, id),
+        teamScheduleQuery(org, id),
+        teamPolicyQuery(org, id),
+        whoIsOnCallQuery(org, id),
+        oncallTeamsQuery(org),
+      ].map((options) => queryClient.getQueryState(options.queryKey)?.dataUpdatedAt || Date.now()),
+    );
     // Only on success, so a failed load never renders a team as uncovered.
     if (!loaded.value) {
       activeTab.value = routeTab.value ?? (members.value.length ? "overview" : "members");
@@ -1158,11 +1182,37 @@ async function onScheduleSaved() {
   await fetchSegments();
 }
 
+/// Sends nothing: the tabs and drawers read these only when they mount or open, so expiring is enough.
+function expirePageReads() {
+  const org = orgId.value;
+  const expire = (queryKey: readonly unknown[], exact: boolean) =>
+    queryClient.invalidateQueries({ queryKey, exact, refetchType: "none" });
+  void expire(oncallKeys.all(org), false);
+  void expire(userKeys.users(org), true);
+  void expire(destinationKeys.list(org, "alert"), true);
+  void expire(serviceStreamKeys.all(org), false);
+}
+
+const refreshing = ref(false);
+// Bumped by Refresh: the tabs read only on mount, so the open one is remounted to read again.
+const tabsKey = ref(0);
+
+/// Refresh and the error state's Retry. The expiry runs first: clearing `loadError` can re-render the tabs.
+async function refreshPage() {
+  refreshing.value = true;
+  try {
+    expirePageReads();
+    await fetchAll(true);
+    tabsKey.value += 1;
+  } finally {
+    refreshing.value = false;
+  }
+}
+
 /// Named rather than bound straight to the template: an event handler receives
 /// the event as its first argument, and `force` would take it as a yes. A
 /// child's `changed` is already covered by that write's own invalidation, so
-/// these two stay unforced and only the reader's own Retry and Recheck force.
-const refreshAll = () => fetchAll(true);
+/// these two stay unforced and only the reader's own Refresh, Retry and Recheck force.
 const recheckInsights = () => fetchInsights(true);
 const onMembersChanged = () => fetchAll();
 const onCoversChanged = () => fetchSegments();

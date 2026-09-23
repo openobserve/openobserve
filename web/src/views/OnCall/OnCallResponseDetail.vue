@@ -76,6 +76,13 @@
     </template>
 
     <template #actions>
+      <ORefreshButton
+        v-if="response"
+        :last-run-at="lastFetchedAt"
+        :loading="refreshing"
+        data-test="oncall-response-refresh"
+        @click="refreshPage"
+      />
       <template v-if="response && isOpenState">
         <!-- Exactly one primary, and it moves: claiming the page matters most
              until somebody has, and closing it matters most after. -->
@@ -567,6 +574,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
@@ -628,6 +636,7 @@ import {
   teamReachabilityQuery,
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
+import { oncallKeys } from "@/services/oncall.querykeys";
 import type {
   DeliveryLedger,
   DeliveryRecord,
@@ -1044,6 +1053,9 @@ async function fetchResponse(force = false) {
     } | null>(responseQuery(orgId.value, responseId.value), force);
     response.value = data?.response ?? null;
     events.value = data?.events ?? [];
+    lastFetchedAt.value =
+      queryClient.getQueryState(responseQuery(orgId.value, responseId.value).queryKey)
+        ?.dataUpdatedAt ?? null;
     // Flip before the awaits below so the card skeletons instead of reading an empty roster as "nobody on call".
     onCallPositionsLoading.value = true;
     await fetchTeamName();
@@ -1060,6 +1072,23 @@ async function fetchResponse(force = false) {
     });
   } finally {
     loading.value = false;
+  }
+}
+
+const refreshing = ref(false);
+const lastFetchedAt = ref<number | null>(null);
+
+/// Expires every read first, because `fetchResponse`'s own force reaches the record alone.
+async function refreshPage() {
+  refreshing.value = true;
+  try {
+    await queryClient.invalidateQueries({
+      queryKey: oncallKeys.all(orgId.value),
+      refetchType: "none",
+    });
+    await fetchResponse();
+  } finally {
+    refreshing.value = false;
   }
 }
 
@@ -1205,6 +1234,7 @@ async function fetchHandoffTargets() {
 /// Only alerts have a rule to fetch, and a page whose alert has since been
 /// deleted must still render — the record is the authority on what happened,
 /// the alert only decorates it.
+// Uncached: the page links to the alert editor, which seeds its form from the cached alert entry.
 async function fetchSubjectAlert() {
   subjectAlert.value = null;
   if (response.value?.subject.subject_type !== "alert") return;

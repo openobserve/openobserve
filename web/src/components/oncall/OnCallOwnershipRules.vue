@@ -50,10 +50,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="rule_id"
       :frame="false"
       :loading="loading"
+      :global-filter="search"
       :show-global-filter="false"
       table-id="oncall-ownership-rules"
+      :persist-columns="true"
+      :enable-column-resize="true"
       data-test="oncall-ownership-table"
     >
+      <template v-if="$slots.toolbar" #toolbar><slot name="toolbar" /></template>
+      <template v-if="$slots['toolbar-trailing']" #toolbar-trailing>
+        <slot name="toolbar-trailing" />
+      </template>
+
       <!-- The rule as the engine reads it, spaced to be read by a person. -->
       <template #cell-match="{ row }">
         <code class="text-text-body text-compact">{{ raw(sentenceOf(row)) }}</code>
@@ -163,6 +171,8 @@ const props = withDefaults(
     /** Hosts that already name the section — a tab strip, a page header — turn
      *  the title row off rather than repeat themselves. */
     showHeader?: boolean;
+    /** Filters the rows in the table, so each row keeps its precedence number from the full list. */
+    search?: string;
   }>(),
   {
     rules: () => [],
@@ -170,6 +180,7 @@ const props = withDefaults(
     loading: false,
     showTeam: false,
     showHeader: true,
+    search: "",
   },
 );
 
@@ -223,6 +234,7 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     header: t("oncall.ruleSpecificity"),
     size: 150,
     sortable: false,
+    hideable: true,
     accessorFn: (row: OwnershipRuleStats) => dimensionNames(row).join(", "),
   },
   {
@@ -230,6 +242,7 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     header: t("oncall.rulePagesCaughtHeader"),
     size: 150,
     sortable: true,
+    hideable: true,
     accessorFn: (row: OwnershipRuleStats) => row.pages_caught,
   },
   {
@@ -237,6 +250,7 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     header: t("oncall.ruleLastMatched"),
     size: 150,
     sortable: true,
+    hideable: true,
     accessorFn: (row: OwnershipRuleStats) => row.last_matched_at ?? 0,
   },
   {
@@ -244,7 +258,9 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     header: t("oncall.ruleHealth"),
     size: 180,
     sortable: false,
-    accessorFn: (row: OwnershipRuleStats) => row.health,
+    hideable: true,
+    // The label, not the enum: search has to match what the cell shows.
+    accessorFn: (row: OwnershipRuleStats) => String(healthLabel(row)),
   },
   {
     id: "actions",

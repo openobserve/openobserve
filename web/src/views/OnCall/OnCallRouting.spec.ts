@@ -22,8 +22,14 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallRouting from "@/views/OnCall/OnCallRouting.vue";
 
-vi.mock("@/services/alerts", () => ({
-  default: { getSemanticGroups: vi.fn() },
+// The queries call these through the default export, so that is what is mocked.
+vi.mock("@/services/service_streams", () => ({
+  default: {
+    getSemanticGroups: vi.fn(),
+    getServicesList: vi.fn(),
+    getIdentityConfig: vi.fn(),
+    getDimensionAnalytics: vi.fn(),
+  },
 }));
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -48,10 +54,18 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push }),
 }));
 
-import alertsService from "@/services/alerts";
+import { queryClient } from "@/composables/query/queryClient";
+import { oncallKeys } from "@/services/oncall.querykeys";
+import serviceStreamsService from "@/services/service_streams";
 
 const service = vi.mocked(oncallService);
-const alerts = vi.mocked(alertsService);
+const correlation = vi.mocked(serviceStreamsService);
+const correlationReads = () => [
+  correlation.getSemanticGroups,
+  correlation.getServicesList,
+  correlation.getIdentityConfig,
+  correlation.getDimensionAnalytics,
+];
 const ORG = store.state.selectedOrganization.identifier;
 
 /// The sections are stubbed so this file is about the WIRING between them and
@@ -66,10 +80,11 @@ const stubs = {
     props: ["preview", "teams", "aliases", "loading", "sending"],
     template: "<div />",
   },
+  // Both tables render the host's toolbar, which carries the tabs, search and refresh.
   OnCallOwnershipRules: {
     name: "OnCallOwnershipRules",
-    props: ["rules", "aliases", "loading", "showTeam"],
-    template: "<div />",
+    props: ["rules", "aliases", "loading", "showTeam", "search"],
+    template: "<div><slot name='toolbar' /><slot name='toolbar-trailing' /></div>",
   },
   OnCallRuleEditor: {
     name: "OnCallRuleEditor",
@@ -90,8 +105,8 @@ const stubs = {
   },
   OnCallUnroutedQueue: {
     name: "OnCallUnroutedQueue",
-    props: ["signals", "loading", "teams"],
-    template: "<div />",
+    props: ["signals", "loading", "teams", "search", "error"],
+    template: "<div><slot name='toolbar' /><slot name='toolbar-trailing' /></div>",
   },
   OnCallDefaultTeamCard: {
     name: "OnCallDefaultTeamCard",
@@ -203,7 +218,11 @@ describe("OnCallRouting", () => {
     service.createOwnershipRule.mockResolvedValue({ data: {} } as any);
     service.updateOwnershipRule.mockResolvedValue({ data: {} } as any);
     service.teamOverview.mockResolvedValue({ data: { rungs: [] } } as any);
-    alerts.getSemanticGroups.mockResolvedValue({ data: [] } as any);
+    // Defined data, or nothing is cached and a remount re-reads anyway.
+    correlation.getSemanticGroups.mockResolvedValue({ data: [] } as any);
+    correlation.getServicesList.mockResolvedValue({ data: [] } as any);
+    correlation.getIdentityConfig.mockResolvedValue({ data: { sets: [] } } as any);
+    correlation.getDimensionAnalytics.mockResolvedValue({ data: { dimensions: [] } } as any);
   });
 
   /// The whole point of the org screen: no team_id, so shadowing is computed
@@ -401,12 +420,15 @@ describe("OnCallRouting", () => {
     expect(service.ownershipStats).toHaveBeenCalledTimes(1);
     expect(service.unroutedSignals).toHaveBeenCalledTimes(1);
 
-    // Forced, so the two reads that SUCCEEDED are asked again rather than served.
+    for (const read of correlationReads()) expect(read).toHaveBeenCalledTimes(1);
+
+    // Forced, so the reads that SUCCEEDED are asked again rather than served.
     first.findComponent('[data-test="oncall-routing-error"]').vm.$emit("action");
     await flushPromises();
     expect(service.listTeams).toHaveBeenCalledTimes(2);
     expect(service.ownershipStats).toHaveBeenCalledTimes(2);
     expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+    for (const read of correlationReads()) expect(read).toHaveBeenCalledTimes(2);
     first.unmount();
 
     const second = render();
@@ -415,6 +437,26 @@ describe("OnCallRouting", () => {
     expect(service.listTeams).toHaveBeenCalledTimes(2);
     expect(service.ownershipStats).toHaveBeenCalledTimes(2);
     expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+    for (const read of correlationReads()) expect(read).toHaveBeenCalledTimes(2);
+  });
+
+  // The page's Refresh reaches the server for everything it shows, including the header card's own read.
+  it("forces every read on Refresh and remounts the default-team card", async () => {
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const wrapper = render();
+    await flushPromises();
+    const cardBefore = wrapper.findComponent({ name: "OnCallDefaultTeamCard" }).vm;
+
+    await wrapper.find('[data-test="oncall-routing-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: oncallKeys.all(ORG), refetchType: "none" });
+    expect(service.listTeams).toHaveBeenCalledTimes(2);
+    expect(service.ownershipStats).toHaveBeenCalledTimes(2);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+    for (const read of correlationReads()) expect(read).toHaveBeenCalledTimes(2);
+    expect(wrapper.findComponent({ name: "OnCallDefaultTeamCard" }).vm).not.toBe(cardBefore);
+    spy.mockRestore();
   });
 
   /// The queue's failure must not read as "everything is routed" — that is
@@ -427,8 +469,30 @@ describe("OnCallRouting", () => {
     expect(rulesPanel(wrapper).exists()).toBe(true);
 
     await showSignals(wrapper);
-    expect(wrapper.find('[data-test="oncall-unrouted-error"]').exists()).toBe(true);
-    expect(unrouted(wrapper).exists()).toBe(false);
+    // Inside the queue, so its toolbar — and the way back to the rules — stays up.
+    expect(unrouted(wrapper).props("error")).toBeTruthy();
+    expect(wrapper.find('[data-test="oncall-routing-tabs"]').exists()).toBe(true);
+
+    service.unroutedSignals.mockResolvedValue({ data: [] } as any);
+    const before = service.unroutedSignals.mock.calls.length;
+    unrouted(wrapper).vm.$emit("retry");
+    await flushPromises();
+    expect(service.unroutedSignals.mock.calls.length).toBe(before + 1);
+    expect(unrouted(wrapper).props("error")).toBeFalsy();
+  });
+
+  // Every other table has these; the search reaches the table so filtering keeps the rules' precedence numbers.
+  it("hands the toolbar search to the open table, and clears it when the tab changes", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    const search = wrapper.findComponent({ name: "OSearchInput" });
+    expect(search.exists()).toBe(true);
+    await search.vm.$emit("update:modelValue", "payments");
+    expect(rulesPanel(wrapper).props("search")).toBe("payments");
+
+    await showSignals(wrapper);
+    expect(unrouted(wrapper).props("search")).toBe("");
   });
 
   /// §G.8.1: 404 = feature flag off, 403 "Not Supported" = OSS build. Both are

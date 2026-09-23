@@ -46,6 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     scroll
   >
     <template #actions>
+      <ORefreshButton
+        v-if="loaded && !unavailable"
+        :last-run-at="lastFetchedAt"
+        :loading="refreshing"
+        data-test="oncall-mine-refresh"
+        @click="refreshPage"
+      />
       <OButton
         variant="outline"
         size="sm-action"
@@ -148,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
       </div>
 
-      <OnCallMyDeliveries :team-names="teamNames" />
+      <OnCallMyDeliveries ref="deliveriesRef" :team-names="teamNames" />
     </OContent>
   </OPageLayout>
 </template>
@@ -165,6 +172,7 @@ import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { myOnCallQuery } from "@/services/oncall.queries";
 import type { MyOnCall } from "@/ts/interfaces/oncall";
@@ -178,6 +186,7 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const mine = ref<MyOnCall | null>(null);
 const loaded = ref(false);
+const lastFetchedAt = ref<number | null>(null);
 const unavailable = ref(false);
 
 const teamNames = computed(() =>
@@ -188,9 +197,18 @@ const teamNames = computed(() =>
 /// for it. The triage list derives a narrower version of this from one
 /// `/on-call` call per team, which is the right trade there — it needs the
 /// rotation name and the handover instant, which this does not carry.
-async function fetchMine() {
+async function fetchMine(force = false) {
   try {
-    mine.value = await queryClient.fetchQuery(myOnCallQuery(orgId.value));
+    const options = myOnCallQuery(orgId.value);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    mine.value = await queryClient.fetchQuery(options);
+    lastFetchedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
   } catch (err) {
     if (isOnCallUnavailable(err)) unavailable.value = true;
     mine.value = null;
@@ -214,5 +232,19 @@ function openTeam(teamId: string) {
   });
 }
 
-onMounted(fetchMine);
+const refreshing = ref(false);
+const deliveriesRef = ref<{ refresh: () => Promise<void> } | null>(null);
+
+/// Named, so the click event cannot land on `force`.
+async function refreshPage() {
+  refreshing.value = true;
+  try {
+    await Promise.all([fetchMine(true), deliveriesRef.value?.refresh()]);
+  } finally {
+    refreshing.value = false;
+  }
+}
+
+// Wrapped, so nothing can ever pass `force` in.
+onMounted(() => fetchMine());
 </script>

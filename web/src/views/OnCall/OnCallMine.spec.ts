@@ -27,6 +27,9 @@ vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const service = vi.mocked(oncallService);
 
+// The page's Refresh calls this through a template ref; the stub has to expose it or that call throws.
+const deliveriesRefresh = vi.fn().mockResolvedValue(undefined);
+
 const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
   OContent: { name: "OContent", template: "<div><slot /></div>" },
@@ -36,7 +39,11 @@ const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
   // Stubbed out: it reads its own endpoint, which this spec's service mock does
   // not carry, and its fetch would throw into its own catch for the wrong reason.
-  OnCallMyDeliveries: { name: "OnCallMyDeliveries", template: "<div />" },
+  OnCallMyDeliveries: {
+    name: "OnCallMyDeliveries",
+    template: "<div />",
+    methods: { refresh: deliveriesRefresh },
+  },
 };
 
 const MINE = {
@@ -63,6 +70,18 @@ describe("OnCallMine", () => {
 
     expect(service.myOnCall).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-test="oncall-mine-team-team_1"]').text()).toContain("Payments");
+  });
+
+  it("forces both of its reads on Refresh", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(service.myOnCall).toHaveBeenCalledTimes(1);
+
+    await wrapper.find('[data-test="oncall-mine-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(service.myOnCall).toHaveBeenCalledTimes(2);
+    expect(deliveriesRefresh).toHaveBeenCalledTimes(1);
   });
 
   /// The entry fetch is the capability probe, so the cache layer has to hand the

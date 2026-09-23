@@ -63,16 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #toolbar-trailing>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="lastUpdatedAt"
           :loading="loading"
           data-test="oncall-teams-refresh"
           @click="refreshTeams"
-        >
-          <OTooltip side="bottom" :content="t('oncall.refresh')" />
-        </OButton>
+        />
       </template>
 
       <!-- The routing screen is the only place this fact lived, so a reader
@@ -243,6 +241,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -263,6 +262,7 @@ import {
   setRoutingConfigMutation,
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
+import { userKeys } from "@/services/users.querykeys";
 import { useMutation } from "@tanstack/vue-query";
 import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -279,6 +279,7 @@ const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfi
 
 const teams = ref<OnCallTeam[]>([]);
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 const loadError = ref<string | null>(null);
 const notAvailable = ref(false);
 const search = ref("");
@@ -423,8 +424,15 @@ async function fetchTeams(force = false) {
         exact: true,
         refetchType: "none",
       });
+      // The New team drawer's member picker is this page's too; expired, its next open reads the server.
+      await queryClient.invalidateQueries({
+        queryKey: userKeys.users(orgId.value),
+        exact: true,
+        refetchType: "none",
+      });
     }
     teams.value = await queryClient.fetchQuery(options);
+    lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
     await fetchOnCallNow(force);
     loadError.value = null;
     notAvailable.value = false;

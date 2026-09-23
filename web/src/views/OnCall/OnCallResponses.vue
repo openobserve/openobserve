@@ -281,16 +281,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #toolbar-trailing>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="lastUpdatedAt"
           :loading="loading"
+          shortcut-id="oncallRefresh"
           data-test="oncall-responses-refresh"
           @click="refreshAll"
-        >
-          <OTooltip side="bottom" :content="t('oncall.refresh')" shortcut-id="oncallRefresh" />
-        </OButton>
+        />
       </template>
 
       <!-- What each run of rows IS, in the words somebody would use out loud, so
@@ -794,6 +793,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -831,8 +831,9 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import destinationService from "@/services/alert_destination";
-import incidentsService from "@/services/incidents";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import type { IncidentWithAlerts } from "@/services/incidents";
+import { incidentQuery } from "@/services/incidents.queries";
 import type {
   Channel,
   CoverageGaps,
@@ -927,6 +928,7 @@ const expandedSystemActivityCount = computed(
 const teamsAvailable = ref(true);
 const truncated = ref(false);
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 /// Set only while a tab switch is quietly fetching resolved pages the reader
 /// cannot see are missing. Drives `OTable`'s `streaming` bar rather than
 /// `loading` so the rows already on screen never disappear behind a skeleton
@@ -1679,11 +1681,10 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
   const busy = opts.background ? backgroundLoading : loading;
   busy.value = true;
   try {
-    const walk = await read<{ rows: OnCallResponse[]; truncated: boolean }>(
-      pagedResponsesQuery(orgId.value, responseFilters()),
-      !!opts.force,
-    );
+    const options = pagedResponsesQuery(orgId.value, responseFilters());
+    const walk = await read<{ rows: OnCallResponse[]; truncated: boolean }>(options, !!opts.force);
     responses.value = walk.rows;
+    lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
     // From the payload, cache hit included: the cap describes these rows, not this request.
     truncated.value = walk.truncated;
     loadError.value = null;
@@ -1693,7 +1694,7 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
     loaded.value = true;
     // Fire-and-forget: the list is already usable with ids as the fallback,
     // so titles fill in behind it rather than holding up the table.
-    void fetchIncidentTitles();
+    void fetchIncidentTitles(!!opts.force);
   } catch (err) {
     // §G.8.1: the probe said "not here". Leaving `loaded` false keeps the
     // setup checklist away too — a build that cannot page must not be told
@@ -1710,23 +1711,25 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
 
 /// One request per incident id — there is no bulk "get these incidents"
 /// endpoint (see `fetchTeamContext` for the same constraint on team data).
-/// Already-resolved ids are skipped so a background refresh doesn't re-fetch
-/// titles the list already has.
-async function fetchIncidentTitles() {
+/// Already-resolved ids are skipped so a background fetch doesn't re-read
+/// titles the list already has; only the reader's Refresh re-reads them all.
+async function fetchIncidentTitles(force = false) {
   const ids = [
     ...new Set(
       responses.value
         .map((response) => response.incident_id)
-        .filter((id): id is string => !!id && !(id in incidentTitleById.value)),
+        .filter((id): id is string => !!id && (force || !(id in incidentTitleById.value))),
     ),
   ];
   if (!ids.length) return;
-  const results = await Promise.allSettled(ids.map((id) => incidentsService.get(orgId.value, id)));
+  const results = await Promise.allSettled(
+    ids.map((id) => read<IncidentWithAlerts>(incidentQuery(orgId.value, id), force)),
+  );
   const next = { ...incidentTitleById.value };
   ids.forEach((id, index) => {
     const result = results[index];
-    if (result.status === "fulfilled" && result.value.data?.title) {
-      next[id] = result.value.data.title;
+    if (result.status === "fulfilled" && result.value?.title) {
+      next[id] = result.value.title;
     }
   });
   incidentTitleById.value = next;
@@ -1739,14 +1742,7 @@ async function fetchContext(force = false) {
     read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force),
     read<CoverageGaps | null>(coverageGapsQuery(orgId.value), force),
     read<OwnershipRule[]>(ownershipRulesQuery(orgId.value), force),
-    destinationService.list({
-      org_identifier: orgId.value,
-      page_num: 1,
-      page_size: 1,
-      sort_by: "name",
-      desc: false,
-      module: "alert",
-    }),
+    read<any[]>(destinationsQuery(orgId.value, "alert"), force),
   ]);
 
   teamsAvailable.value = teamRes.status === "fulfilled";
@@ -1759,7 +1755,7 @@ async function fetchContext(force = false) {
     hasStaffedRotation: await someTeamWouldPage(gapRes, force),
     // An alert bound straight to a team counts: it is routing without a rule.
     hasRouting: rules.length > 0 || responses.value.some((r) => !!r.team_id),
-    hasDestinations: destRes.status === "fulfilled" && (destRes.value.data ?? []).length > 0,
+    hasDestinations: destRes.status === "fulfilled" && destRes.value.length > 0,
   };
   // Set even when a call failed: the screen has to stop waiting either way.
   // Whether the answer is trustworthy is `teamsAvailable`, checked separately.

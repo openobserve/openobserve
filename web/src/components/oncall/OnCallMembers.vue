@@ -281,7 +281,7 @@ import {
   unavailabilityQuery,
 } from "@/services/oncall.queries";
 import { useMutation } from "@tanstack/vue-query";
-import usersService from "@/services/users";
+import { orgUsersQuery } from "@/services/users.queries";
 import type {
   MemberReachability,
   OnCallPosition,
@@ -717,8 +717,7 @@ function nameOf(email: string): string {
 async function fetchOrgUsers() {
   loadingUsers.value = true;
   try {
-    const res = await usersService.orgUsers(orgId.value);
-    orgUsers.value = res.data?.data ?? [];
+    orgUsers.value = await queryClient.fetchQuery(orgUsersQuery(orgId.value));
     userLookupFailed.value = false;
   } catch {
     // Not a toast: the form still works, and an error banner over a

@@ -24,8 +24,16 @@ import store from "@/test/unit/helpers/store";
 const stubs = {
   OTable: {
     name: "OTable",
-    props: ["data", "columns", "loading"],
-    template: `<div><div v-for="row in data" :key="row.rule_id">
+    props: [
+      "data",
+      "columns",
+      "loading",
+      "globalFilter",
+      "enableColumnResize",
+      "persistColumns",
+      "tableId",
+    ],
+    template: `<div><slot name="toolbar" /><slot name="toolbar-trailing" /><div v-for="row in data" :key="row.rule_id">
       <slot name="cell-match" :row="row" />
       <slot name="cell-specificity" :row="row" />
       <slot name="cell-caught" :row="row" />
@@ -202,5 +210,44 @@ describe("OnCallOwnershipRules", () => {
     });
     expect(wrapper.find('[data-test="oncall-ownership-header"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-ownership-add-rule"]').exists()).toBe(false);
+  });
+
+  describe("the toolbar every other table has", () => {
+    // The table filters, not the host, so each row keeps its precedence number from the full list.
+    it("hands the search to the table, with resize and a column manager", () => {
+      const wrapper = mount(OnCallOwnershipRules, {
+        props: { rules: [rule()], search: "payments" },
+        global: { plugins: [i18n, store], stubs },
+      });
+      expect(table(wrapper).props("globalFilter")).toBe("payments");
+      expect(table(wrapper).props("enableColumnResize")).toBe(true);
+      expect(table(wrapper).props("persistColumns")).toBe(true);
+      expect(table(wrapper).props("tableId")).toBeTruthy();
+      for (const id of ["specificity", "caught", "last", "health"]) {
+        expect(column(wrapper, id).hideable).toBe(true);
+      }
+      expect(column(wrapper, "match").hideable).toBeFalsy();
+    });
+
+    it("renders the host's toolbar in the table's own", () => {
+      const wrapper = mount(OnCallOwnershipRules, {
+        props: { rules: [rule()] },
+        slots: {
+          toolbar: '<span data-test="host-toolbar" />',
+          "toolbar-trailing": '<span data-test="host-trailing" />',
+        },
+        global: { plugins: [i18n, store], stubs },
+      });
+      expect(wrapper.find('[data-test="host-toolbar"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="host-trailing"]').exists()).toBe(true);
+    });
+
+    // Search matches what the health cell shows, not the enum behind it.
+    it("searches the health column by its label", () => {
+      const wrapper = render([rule({ health: "never_used" })]);
+      expect(column(wrapper, "health").accessorFn(rows(wrapper)[0])).toBe(
+        String(i18n.global.t("oncall.ruleNeverUsed")),
+      );
+    });
   });
 });

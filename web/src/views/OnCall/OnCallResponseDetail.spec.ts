@@ -21,6 +21,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import alertsService from "@/services/alerts";
 import oncallService from "@/services/oncall";
 import { responseProgressQuery } from "@/services/oncall.queries";
+import { oncallKeys } from "@/services/oncall.querykeys";
 import store from "@/test/unit/helpers/store";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import OnCallResponseDetail from "@/views/OnCall/OnCallResponseDetail.vue";
@@ -284,6 +285,36 @@ describe("OnCallResponseDetail", () => {
     expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("routingReason")).toBe(
       "routed to tm_pay by ownership rule k8s-namespace=payments",
     );
+  });
+
+  // `fetchResponse`'s own force reaches the record alone, so Refresh has to expire the rest first.
+  it("re-reads every read on the page on Refresh, and keeps the page on screen", async () => {
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const wrapper = await renderWith();
+    const reads = [
+      service.getResponse,
+      service.getTeam,
+      service.listMembers,
+      service.listTeams,
+      service.priorCauses,
+      service.responseHistory,
+      service.escalationProgress,
+      service.listDeliveries,
+      service.whoIsOnCall,
+      service.getPolicy,
+      service.teamReachability,
+      service.resolvedSchedule,
+      alerts.get_by_alert_id,
+    ];
+    for (const read of reads) expect(read).toHaveBeenCalledTimes(1);
+
+    await wrapper.find('[data-test="oncall-response-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: oncallKeys.all("default"), refetchType: "none" });
+    for (const read of reads) expect(read).toHaveBeenCalledTimes(2);
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).exists()).toBe(true);
+    spy.mockRestore();
   });
 
   // No decision recorded must leave the row out rather than render an empty one.

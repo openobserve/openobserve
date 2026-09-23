@@ -402,4 +402,15 @@ describe("OnCallTeamForm", () => {
     const form = wrapper.findComponent({ name: "OForm" }).vm.form;
     expect(form.state.values.members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
   });
+
+  // The picker reads the IAM list's own cache entry, so reopening the drawer costs nothing.
+  it("serves the org's users to a reopen from the cache", async () => {
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(users.orgUsers).toHaveBeenCalledTimes(1);
+  });
 });

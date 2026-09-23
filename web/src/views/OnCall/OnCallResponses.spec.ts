@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import destinationService from "@/services/alert_destination";
+import incidentsService from "@/services/incidents";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallResponses from "@/views/OnCall/OnCallResponses.vue";
@@ -51,6 +52,10 @@ vi.mock("@/services/alert_destination", () => ({
   default: { list: vi.fn() },
 }));
 
+vi.mock("@/services/incidents", () => ({
+  default: { get: vi.fn() },
+}));
+
 const push = vi.fn();
 const routeQuery: Record<string, string> = {};
 vi.mock("vue-router", () => ({
@@ -60,6 +65,7 @@ vi.mock("vue-router", () => ({
 
 const service = vi.mocked(oncallService);
 const destinations = vi.mocked(destinationService);
+const incidents = vi.mocked(incidentsService);
 
 // Every `mount()` in this file — across all three top-level `describe`s —
 // stays alive as a real, reactive component instance unless something
@@ -423,6 +429,26 @@ describe("OnCallResponses", () => {
     expect(cachedCalls()).toBe(afterFirst * 2);
     expect(service.listResponses).toHaveBeenCalledTimes(2);
     expect(service.listTeams).toHaveBeenCalledTimes(2);
+  });
+
+  // Incident titles and the destination check are other modules' cache entries; only Refresh forces them.
+  it("serves incident titles and the destination check from the cache, and forces both on refresh", async () => {
+    incidents.get.mockResolvedValue({ data: { title: "Checkout down" } } as any);
+
+    const first = await withPages([page({ incident_id: "inc_1" })]);
+    expect(incidents.get).toHaveBeenCalledTimes(1);
+    expect(destinations.list).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const second = await withPages([page({ incident_id: "inc_1" })]);
+    expect(incidents.get).toHaveBeenCalledTimes(1);
+    expect(destinations.list).toHaveBeenCalledTimes(1);
+    expect(second.text()).toContain("Checkout down");
+
+    await second.find('[data-test="oncall-responses-refresh"]').trigger("click");
+    await flushPromises();
+    expect(incidents.get).toHaveBeenCalledTimes(2);
+    expect(destinations.list).toHaveBeenCalledTimes(2);
   });
 
   describe("the ringing run", () => {

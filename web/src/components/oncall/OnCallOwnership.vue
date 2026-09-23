@@ -79,13 +79,13 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallRoutingList from "@/components/oncall/OnCallRoutingList.vue";
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import alertsService from "@/services/alerts";
-import {
-  getDimensionAnalytics,
-  getIdentityConfig,
-  getServicesList,
-} from "@/services/service_streams";
 import type { IdentitySet } from "@/services/service_streams";
+import {
+  dimensionAnalyticsQuery,
+  identityConfigQuery,
+  semanticGroupsQuery,
+  servicesListQuery,
+} from "@/services/service_streams.queries";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
 import { useMutation } from "@tanstack/vue-query";
@@ -174,8 +174,7 @@ function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) 
 /// every other section here still answers its question without it.
 async function fetchAliases() {
   try {
-    const res = await alertsService.getSemanticGroups(orgId.value);
-    aliases.value = res.data ?? [];
+    aliases.value = (await queryClient.fetchQuery(semanticGroupsQuery(orgId.value))) ?? [];
   } catch {
     aliases.value = [];
   }
@@ -189,10 +188,9 @@ async function fetchAliases() {
 /// choice, not three fields the reader has to reconstruct.
 async function fetchServices() {
   try {
-    const res = await getServicesList(orgId.value);
-    const rows: unknown[] = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    const rows = await queryClient.fetchQuery(servicesListQuery(orgId.value));
     const seen = new Map<string, DiscoveredService>();
-    for (const row of rows as Record<string, any>[]) {
+    for (const row of rows) {
       const name = String(row.service_name ?? "");
       if (!name) continue;
       const identity = (row.disambiguation ?? {}) as Record<string, string>;
@@ -240,8 +238,7 @@ async function previewConflict(dimensions: Record<string, string>) {
 
 async function fetchSets() {
   try {
-    const res = await getIdentityConfig(orgId.value);
-    sets.value = res.data?.sets ?? [];
+    sets.value = (await queryClient.fetchQuery(identityConfigQuery(orgId.value)))?.sets ?? [];
   } catch {
     // No sets means no levels, and the rule editor falls back to the field
     // builder — which is exactly what this screen offered before.
@@ -251,10 +248,10 @@ async function fetchSets() {
 
 async function fetchCatalogue() {
   try {
-    const res = await getDimensionAnalytics(orgId.value);
-    const dims = res.data?.dimensions ?? [];
+    const summary = await queryClient.fetchQuery(dimensionAnalyticsQuery(orgId.value));
+    const dims = summary?.dimensions ?? [];
     catalogue.value = {
-      present: res.data?.recommended_priority_dimensions ?? dims.map((d) => d.dimension_name),
+      present: summary?.recommended_priority_dimensions ?? dims.map((d) => d.dimension_name),
       values: Object.fromEntries(dims.map((d) => [d.dimension_name, d.value_counts ?? {}])),
     };
   } catch {

@@ -19,7 +19,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
 import oncallService from "@/services/oncall";
+import { oncallKeys } from "@/services/oncall.querykeys";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { userKeys } from "@/services/users.querykeys";
 import store from "@/test/unit/helpers/store";
 import OnCallTeamDetail from "@/views/OnCall/OnCallTeamDetail.vue";
 
@@ -877,6 +881,63 @@ describe("OnCallTeamDetail", () => {
 
     expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(true);
     expect(wrapper.findComponent({ name: "OnCallTeamAttention" }).exists()).toBe(false);
+  });
+
+  /// The tabs read only when they mount, so Refresh expires their reads and remounts the open one.
+  describe("Refresh and Retry", () => {
+    const expiries = [
+      { queryKey: oncallKeys.all("default"), exact: false, refetchType: "none" },
+      { queryKey: userKeys.users("default"), exact: true, refetchType: "none" },
+      { queryKey: destinationKeys.list("default", "alert"), exact: true, refetchType: "none" },
+      { queryKey: serviceStreamKeys.all("default"), exact: false, refetchType: "none" },
+    ];
+    const pageReads = () => [
+      service.getTeam,
+      service.listMembers,
+      service.getSchedule,
+      service.getPolicy,
+      service.whoIsOnCall,
+      service.listTeams,
+      service.listOwnershipRules,
+      service.listResponses,
+      service.teamOverview,
+      service.teamReachability,
+      service.teamConfigRisks,
+      service.teamLoad,
+      service.escalationPreview,
+    ];
+
+    it("expires the tabs' reads, forces the page's own, and remounts the open tab", async () => {
+      routeParams.tab = "members";
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      const wrapper = render();
+      await flushPromises();
+      for (const expiry of expiries) expect(spy).not.toHaveBeenCalledWith(expiry);
+      for (const read of pageReads()) expect(read).toHaveBeenCalledTimes(1);
+      const tabBefore = wrapper.findComponent({ name: "OnCallMembers" }).vm;
+
+      await wrapper.find('[data-test="oncall-team-refresh"]').trigger("click");
+      await flushPromises();
+
+      for (const expiry of expiries) expect(spy).toHaveBeenCalledWith(expiry);
+      for (const read of pageReads()) expect(read).toHaveBeenCalledTimes(2);
+      expect(wrapper.findComponent({ name: "OnCallMembers" }).vm).not.toBe(tabBefore);
+      spy.mockRestore();
+    });
+
+    it("runs the same refresh from the error state's Retry", async () => {
+      service.getTeam.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+      const wrapper = render();
+      await flushPromises();
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+
+      wrapper.findComponent('[data-test="oncall-team-detail-error"]').vm.$emit("action");
+      await flushPromises();
+
+      for (const expiry of expiries) expect(spy).toHaveBeenCalledWith(expiry);
+      expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(false);
+      spy.mockRestore();
+    });
   });
   /// `resolved-schedule` answers for ONE slot and defaults to the default one,
   /// so a two-slot team was only ever asked about primary — and the timeline
