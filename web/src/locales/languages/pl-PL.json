@@ -4986,7 +4986,7 @@
     "colorLightToDarkBlue": "Jasny do ciemnoniebieskiego (według wartości)",
     "colorPaletteClassicBySeries": "Paleta-klasyczna (według serii)",
     "drilldown": "Drilldown",
-    "drilldownTooltip": "Przejdź do innego pulpitu lub określonego adresu URL, przenosząc wszystkie bieżące zmienne w celu płynnej eksploracji danych.",
+    "drilldownTooltip": "Przejdź do innego pulpitu lub podanego adresu URL, przenosząc wszystkie bieżące zmienne w celu płynnej eksploracji danych.",
     "colorBySeriesTitle": "Kolorowanie według serii",
     "colorBySeriesTooltip": "Zastosuj kolory do serii, aby lepiej odróżnić je na wykresach. Dostosuj kolory dla każdej serii, aby poprawić wizualizację danych.",
     "editColorBySeries": " Edytuj kolorowanie według serii",

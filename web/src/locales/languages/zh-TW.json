@@ -4981,7 +4981,7 @@
     "colorLightToDarkBlue": "淺藍至深藍 (依值)",
     "colorPaletteClassicBySeries": "經典調色盤 (依系列)",
     "drilldown": "鑽取",
-    "drilldownTooltip": "瀏覽至另一個儀表板或指定 URL，並帶入所有目前變數以進行無縫的資料探索。",
+    "drilldownTooltip": "導覽至另一個儀表板或指定的 URL，並保留所有目前的變數，以進行順暢的資料探索。",
     "colorBySeriesTitle": "依系列著色",
     "colorBySeriesTooltip": "對系列套用色彩以增強圖表中的視覺區分。自訂每個系列的色彩以改善資料視覺化效果。",
     "editColorBySeries": " 編輯依系列著色",

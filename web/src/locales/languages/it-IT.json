@@ -4986,7 +4986,7 @@
     "colorLightToDarkBlue": "Da blu chiaro a blu scuro (in base al valore)",
     "colorPaletteClassicBySeries": "Palette-Classic (per serie)",
     "drilldown": "Drilldown",
-    "drilldownTooltip": "Passa a un'altra dashboard o a un URL specificato, riportando tutte le variabili correnti per un'esplorazione dei dati senza interruzioni.",
+    "drilldownTooltip": "Passa a un'altra dashboard o a un URL specificato, mantenendo tutte le variabili correnti per un'esplorazione dei dati senza interruzioni.",
     "colorBySeriesTitle": "Colore per serie",
     "colorBySeriesTooltip": "Applica colori alle serie per una migliore distinzione visiva nei grafici. Personalizza i colori per ogni serie per migliorare la visualizzazione dei dati.",
     "editColorBySeries": " Modifica colore per serie",

@@ -4986,7 +4986,7 @@
     "colorLightToDarkBlue": "Açık - Koyu Mavi (Değere Göre)",
     "colorPaletteClassicBySeries": "Palette-Classic (Serilere Göre)",
     "drilldown": "Detaya inme",
-    "drilldownTooltip": "Sorunsuz veri araştırması için geçerli tüm değişkenleri taşıyan başka bir panoya veya belirtilen URL'ye gidin.",
+    "drilldownTooltip": "Tüm geçerli değişkenleri taşıyarak başka bir gösterge panosuna veya belirtilen URL'ye gidin, kesintisiz veri keşfi için.",
     "colorBySeriesTitle": "Serilere göre renk",
     "colorBySeriesTooltip": "Grafiklerde daha iyi görsel ayrım için serilere renk uygulayın. Veri görselleştirmesini geliştirmek için her seri için renkleri özelleştirin.",
     "editColorBySeries": " Rengi seriye göre düzenle",

@@ -4986,7 +4986,7 @@
     "colorLightToDarkBlue": "Xanh dương nhạt đến đậm (Theo giá trị)",
     "colorPaletteClassicBySeries": "Bảng màu cổ điển (Theo chuỗi)",
     "drilldown": "Khoan xuống",
-    "drilldownTooltip": "Điều hướng đến một dashboard khác hoặc URL đã chỉ định, mang theo tất cả biến hiện tại để khám phá dữ liệu liền mạch.",
+    "drilldownTooltip": "Điều hướng đến bảng điều khiển khác hoặc URL được chỉ định, mang theo tất cả biến hiện tại để khám phá dữ liệu liền mạch.",
     "colorBySeriesTitle": "Tô màu theo chuỗi",
     "colorBySeriesTooltip": "Áp dụng màu cho các chuỗi để phân biệt trực quan tốt hơn trong biểu đồ. Tùy chỉnh màu cho từng chuỗi để tăng cường trực quan hóa dữ liệu.",
     "editColorBySeries": " Chỉnh sửa màu theo chuỗi",

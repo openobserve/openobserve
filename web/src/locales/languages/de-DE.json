@@ -4986,7 +4986,7 @@
     "colorLightToDarkBlue": "Hell- bis Dunkelblau (nach Wert)",
     "colorPaletteClassicBySeries": "Palette-Classic (nach Serien)",
     "drilldown": "Drilldown",
-    "drilldownTooltip": "Navigiere zu einem anderen Dashboard oder einer angegebenen URL und übertrage alle aktuellen Variablen für eine nahtlose Datenerkundung.",
+    "drilldownTooltip": "Navigieren Sie zu einem anderen Dashboard oder einer angegebenen URL und übernehmen Sie dabei alle aktuellen Variablen für eine nahtlose Datenexploration.",
     "colorBySeriesTitle": "Farbe nach Serie",
     "colorBySeriesTooltip": "Wenden Sie Farben auf Reihen an, um die visuelle Unterscheidung in Diagrammen zu verbessern. Passen Sie die Farben für jede Reihe an, um die Datenvisualisierung zu verbessern.",
     "editColorBySeries": " Farbe nach Serie bearbeiten",

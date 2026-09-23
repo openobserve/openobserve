@@ -4986,7 +4986,7 @@
     "colorLightToDarkBlue": "Azul claro a oscuro (por valor)",
     "colorPaletteClassicBySeries": "Palette-Classic (por serie)",
     "drilldown": "Desglose",
-    "drilldownTooltip": "Navegue a otro Dashboard o a una URL especificada y transfiera todas las variables actuales para una exploración de datos fluida.",
+    "drilldownTooltip": "Navegue a otro dashboard o a una URL especificada, conservando todas las variables actuales para una exploración de datos fluida.",
     "colorBySeriesTitle": "Color por serie",
     "colorBySeriesTooltip": "Aplica colores a las series para lograr una mejor distinción visual en los gráficos. Personalice los colores de cada serie para mejorar la visualización de los datos.",
     "editColorBySeries": " Edición de colores por serie",
