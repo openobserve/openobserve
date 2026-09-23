@@ -18,6 +18,14 @@ vi.mock("@/services/iam", async (importOriginal) => {
       data: { successful: ["Admin", "Viewer"], unsuccessful: [] },
     })),
     getRoleUsers: vi.fn(async () => ({ data: ["user1@o2.ai", "user2@o2.ai"] })),
+    updateRole: vi.fn(async () => ({ data: {} })),
+  });
+});
+
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock((await importOriginal()) as any, {
+    default: { getUserRoles: vi.fn(async () => ({ data: [] })) },
   });
 });
 
@@ -30,7 +38,8 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import AppRoles from "@/components/iam/roles/AppRoles.vue";
-import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
+import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers, updateRole } from "@/services/iam";
+import users from "@/services/users";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app-roles-test");
@@ -552,5 +561,72 @@ describe("AppRoles - ODialog/ODrawer Migration", () => {
 
     expect(getRoles).toHaveBeenCalledTimes(1);
     expect(getRoles).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+  });
+});
+
+// Quick-assign: arriving via the service-account token popup's
+// "Assign a role" link (?member=<email>), which used to just redirect here
+// with no way to actually add the account to a role.
+describe("AppRoles - quick-assign via ?member=", () => {
+  afterEach(() => {
+    router.currentRoute.value.query = {};
+  });
+
+  it("shows the assign banner and passes assignTarget through to RoleTable when ?member= is present", async () => {
+    router.currentRoute.value.query = { member: "svc.o2.ai@sa.internal" };
+    const wrapper = await mountAppRoles();
+
+    expect(wrapper.find('[data-test="iam-roles-assign-banner"]').exists()).toBe(true);
+    const roleTable = wrapper.findComponent({ name: "RoleTable" });
+    expect(roleTable.props("assignTarget")).toBe("svc.o2.ai@sa.internal");
+  });
+
+  it("does not show the assign banner without ?member=", async () => {
+    const wrapper = await mountAppRoles();
+    expect(wrapper.find('[data-test="iam-roles-assign-banner"]').exists()).toBe(false);
+    const roleTable = wrapper.findComponent({ name: "RoleTable" });
+    expect(roleTable.props("assignTarget")).toBe("");
+  });
+
+  it("assignMemberToRole calls updateRole with the member as add_users", async () => {
+    router.currentRoute.value.query = { member: "svc.o2.ai@sa.internal" };
+    const wrapper = await mountAppRoles();
+
+    await (wrapper.vm as any).assignMemberToRole({ role_name: "Admin" });
+    await flushPromises();
+
+    expect(updateRole).toHaveBeenCalledWith({
+      role_id: "Admin",
+      org_identifier: store.state.selectedOrganization.identifier,
+      payload: { add: [], remove: [], add_users: ["svc.o2.ai@sa.internal"], remove_users: [] },
+    });
+  });
+
+  it("marks a role Assigned after a successful assign, and pre-loads existing memberships", async () => {
+    vi.mocked(users.getUserRoles).mockResolvedValueOnce({ data: ["Viewer"] } as any);
+    router.currentRoute.value.query = { member: "svc.o2.ai@sa.internal" };
+    const wrapper = await mountAppRoles();
+    await flushPromises();
+
+    // Pre-existing membership loaded from getUserRoles.
+    expect((wrapper.vm as any).assignedRoleNames).toContain("Viewer");
+
+    await (wrapper.vm as any).assignMemberToRole({ role_name: "Admin" });
+    await flushPromises();
+
+    expect((wrapper.vm as any).assignedRoleNames).toContain("Admin");
+  });
+
+  it("dismissing the banner clears ?member= from the route", async () => {
+    router.currentRoute.value.query = {
+      org_identifier: store.state.selectedOrganization.identifier,
+      member: "svc.o2.ai@sa.internal",
+    };
+    const wrapper = await mountAppRoles();
+
+    await wrapper.find('[data-test="iam-roles-assign-banner-dismiss"]').trigger("click");
+    await flushPromises();
+
+    expect(router.currentRoute.value.query.member).toBeUndefined();
   });
 });
