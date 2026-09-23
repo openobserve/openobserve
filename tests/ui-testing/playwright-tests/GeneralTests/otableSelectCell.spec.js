@@ -9,24 +9,17 @@ test.describe("OTable Select Cell Click Selection testcases", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
     let email;
+    let secondEmail;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        const uniqueName = uniqueSaName();
-        email = pm.iamPage.serviceAccountEmailFor(uniqueName);
+        secondEmail = undefined;
 
         await pm.iamPage.gotoIamPage();
         await pm.iamPage.iamPageServiceAccountsTab();
-        await pm.iamPage.iamPageAddServiceAccount();
-        await pm.iamPage.enterNameServiceAccount(uniqueName);
-        await pm.iamPage.clickSaveServiceAccount();
-        await pm.iamPage.verifySuccessMessage('Service account created successfully.');
-        await pm.iamPage.clickServiceAccountPopUpClosed();
-        await pm.iamPage.reloadServiceAccountPage();
-        await pm.iamPage.waitForSelectCell(email);
+        email = await pm.iamPage.createServiceAccount(uniqueSaName());
         testLogger.info('Test setup completed');
     });
 
@@ -37,6 +30,14 @@ test.describe("OTable Select Cell Click Selection testcases", () => {
             await pm.iamPage.requestServiceAccountOk();
         } catch {
             // Row may already be gone — nothing further to clean up.
+        }
+        if (secondEmail) {
+            try {
+                await pm.iamPage.deletedServiceAccount(secondEmail);
+                await pm.iamPage.requestServiceAccountOk();
+            } catch {
+                // Row may already be gone — nothing further to clean up.
+            }
         }
     });
 
@@ -103,7 +104,7 @@ test.describe("OTable Select Cell Click Selection testcases", () => {
     }, async () => {
         testLogger.info('Create a second selectable service account row');
         const secondName = uniqueSaName();
-        const secondEmail = await pm.iamPage.createServiceAccount(secondName);
+        secondEmail = await pm.iamPage.createServiceAccount(secondName);
         await pm.iamPage.waitForSelectCell(email);
 
         testLogger.info('Assert the header checkbox is initially unchecked');
@@ -117,14 +118,6 @@ test.describe("OTable Select Cell Click Selection testcases", () => {
         testLogger.info('Assert the header checkbox is indeterminate, not checked');
         await pm.iamPage.expectSelectAllCheckboxIndeterminate();
         await pm.iamPage.expectDeleteSelectedBtnVisible();
-
-        testLogger.info('Clean up the second account (best-effort)');
-        try {
-            await pm.iamPage.deletedServiceAccount(secondEmail);
-            await pm.iamPage.requestServiceAccountOk();
-        } catch {
-            // Row may already be gone — nothing further to clean up.
-        }
 
         testLogger.info('Test completed');
     });
