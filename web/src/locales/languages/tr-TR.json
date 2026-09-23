@@ -1474,6 +1474,8 @@
     "sessionReplay": "Oturum Tekrar Oynatma",
     "viewSessionReplay": "Oturum Tekrarını Görüntüle",
     "playSessionReplay": "Oturum Oynatma Oynatma",
+    "noReplayRecordedTitle": "Bu oturum için kayıt oynatımı yapılmadı",
+    "noReplayRecordedMessage": "{id} oturumunun oynatılacak kayıt oynatım bölümü yok.",
     "discoverSessionTitle": "Kullanıcı Etkileşimlerini Ayrıntılı Anlamak için Oturum Tekrarını Keşfedin",
     "discoverSessionMessage": "Session Replay, web sitenizdeki veya uygulamanızdaki kullanıcı etkileşimlerini yakalar ve tekrarlar. Bu, kullanıcıların nasıl gezindiklerini, nereye tıkladıklarını, ne yazdıklarını ve içeriğinizle nasıl etkileşim kurduklarını görsel olarak incelemenizi sağlar.",
     "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",
@@ -13041,10 +13043,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Trace'in kök span'inden girdi."
+              "trace": "İz'in kök sohbet span'inden gelen girdi.",
+              "session": "Açılış sorusu: ilk iz'in kök sohbet span'inden gelen girdi."
             },
             "output": {
-              "trace": "Trace'in kök span'inden çıktı."
+              "trace": "İz'in kök sohbet span'inden gelen çıktı.",
+              "session": "Nihai yanıt: son iz'in kök sohbet span'inden gelen çıktı."
             },
             "statistics": {
               "trace": "Trace metrikleri: span sayısı, süre, LLM ve araç çağrıları, hatalar, token'lar ve maliyet.",
@@ -13056,6 +13060,10 @@
             "steps": {
               "trace": "Zaman sırasına göre span'ler; trace çok uzun olduğunda orta kısım katlanır.",
               "session": "Zaman sırasına göre trace'ler, konuşma turları olarak temsil edilir."
+            },
+            "tool_calls": {
+              "trace": "İz'deki her araç çağrısı, zaman sırasına göre adı, girdisi, çıktısı ve durumuyla birlikte.",
+              "session": "Oturumun izleri genelindeki her araç çağrısı, zaman sırasına göre adı, girdisi, çıktısı ve durumuyla birlikte."
             }
           }
         }
@@ -15164,7 +15172,6 @@
       "syntheticsTokensRefresh": "Belirteç listesini yenile",
       "aiChatToggle": "AI sohbetini aç/kapat",
       "aiChatClose": "AI sohbetini kapat",
-      "aiChatExpand": "AI sohbetini genişlet/daralt",
       "logsSaveView": "Kayıtlı görünüm olarak kaydet",
       "logsExport": "Sonuçları CSV olarak dışa aktarın",
       "tracesCopyUrl": "İz paylaşım URL'sini kopyala",

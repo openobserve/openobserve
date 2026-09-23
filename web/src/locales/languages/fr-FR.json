@@ -1474,6 +1474,8 @@
     "sessionReplay": "Rediffusion de la session",
     "viewSessionReplay": "Afficher la rediffusion de la session",
     "playSessionReplay": "Replay de la session",
+    "noReplayRecordedTitle": "Aucun replay n'a été enregistré pour cette session",
+    "noReplayRecordedMessage": "La session {id} n'a aucun segment de replay à lire.",
     "discoverSessionTitle": "Découvrez Session Replay pour comprendre en détail les interactions des utilisateurs",
     "discoverSessionMessage": "Session Replay capture et rejoue les interactions des utilisateurs sur votre site Web ou votre application. Cela vous permet d'examiner visuellement la façon dont les utilisateurs naviguent, où ils cliquent, ce qu'ils saisissent et comment ils interagissent avec votre contenu",
     "loadingErrorDetails": "Attendez, nous sommes en train de récupérer les détails de l'erreur.",
@@ -13041,10 +13043,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Entrée provenant du span racine de la trace."
+              "trace": "Entrée provenant du span de chat racine de la trace.",
+              "session": "La question d'ouverture : entrée provenant du span de chat racine de la première trace."
             },
             "output": {
-              "trace": "Sortie provenant du span racine de la trace."
+              "trace": "Sortie provenant du span de chat racine de la trace.",
+              "session": "La réponse finale : sortie provenant du span de chat racine de la dernière trace."
             },
             "statistics": {
               "trace": "Métriques de trace : nombre de spans, durée, appels LLM et d'outils, erreurs, tokens et coût.",
@@ -13056,6 +13060,10 @@
             "steps": {
               "trace": "Spans dans l'ordre chronologique ; le milieu est replié lorsque la trace est très longue.",
               "session": "Traces dans l'ordre chronologique, représentées comme des tours de conversation."
+            },
+            "tool_calls": {
+              "trace": "Chaque appel d'outil dans la trace, par ordre chronologique, avec son nom, son entrée, sa sortie et son statut.",
+              "session": "Chaque appel d'outil dans les traces de la session, par ordre chronologique, avec son nom, son entrée, sa sortie et son statut."
             }
           }
         }
@@ -15164,7 +15172,6 @@
       "syntheticsTokensRefresh": "Actualiser la liste des jetons",
       "aiChatToggle": "Activer/désactiver le chat IA",
       "aiChatClose": "Fermer le chat IA",
-      "aiChatExpand": "Développer/réduire le chat IA",
       "logsSaveView": "Enregistrer en tant que vue enregistrée",
       "logsExport": "Exporter les résultats au format CSV",
       "tracesCopyUrl": "Copier l'URL de partage de la trace",

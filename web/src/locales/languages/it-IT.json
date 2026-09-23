@@ -1474,6 +1474,8 @@
     "sessionReplay": "Replay della sessione",
     "viewSessionReplay": "Visualizza il replay della sessione",
     "playSessionReplay": "Riproduci sessione",
+    "noReplayRecordedTitle": "Nessun replay registrato per questa sessione",
+    "noReplayRecordedMessage": "La sessione {id} non ha segmenti di replay da riprodurre.",
     "discoverSessionTitle": "Scopri Session Replay per comprendere in dettaglio le interazioni degli utenti",
     "discoverSessionMessage": "Session Replay acquisisce e riproduce le interazioni degli utenti sul tuo sito web o sulla tua applicazione. Ciò ti consente di esaminare visivamente il modo in cui gli utenti navigano, dove fanno clic, cosa digitano e come interagiscono con i tuoi contenuti",
     "loadingErrorDetails": "Tieni duro, stiamo recuperando i dettagli dell'errore.",
@@ -13041,10 +13043,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Input dallo span radice della traccia."
+              "trace": "Input dallo Span chat radice della traccia.",
+              "session": "La domanda iniziale: input dallo Span chat radice della prima traccia."
             },
             "output": {
-              "trace": "Output dallo span radice della traccia."
+              "trace": "Output dallo Span chat radice della traccia.",
+              "session": "La risposta finale: output dallo Span chat radice dell'ultima traccia."
             },
             "statistics": {
               "trace": "Metriche della traccia: numero di span, durata, chiamate LLM e strumenti, errori, token e costo.",
@@ -13056,6 +13060,10 @@
             "steps": {
               "trace": "Span in ordine temporale; la parte centrale viene compressa quando la traccia è molto lunga.",
               "session": "Tracce in ordine temporale, rappresentate come turni di conversazione."
+            },
+            "tool_calls": {
+              "trace": "Ogni chiamata di strumento nella traccia, in ordine temporale, con nome, input, output e stato.",
+              "session": "Ogni chiamata di strumento nelle tracce della sessione, in ordine temporale, con nome, input, output e stato."
             }
           }
         }
@@ -15164,7 +15172,6 @@
       "syntheticsTokensRefresh": "Aggiorna elenco token",
       "aiChatToggle": "Attiva la chat AI",
       "aiChatClose": "Chiudi chat AI",
-      "aiChatExpand": "Espandi/comprimi chat AI",
       "logsSaveView": "Salva come visualizzazione salvata",
       "logsExport": "Esporta i risultati in formato CSV",
       "tracesCopyUrl": "Copia URL di condivisione della traccia",

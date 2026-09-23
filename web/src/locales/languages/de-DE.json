@@ -1474,6 +1474,8 @@
     "sessionReplay": "Sitzungswiederholung",
     "viewSessionReplay": "Sitzungswiederholung anzeigen",
     "playSessionReplay": "Sitzungswiederholung abspielen",
+    "noReplayRecordedTitle": "Für diese Sitzung wurde keine Wiedergabe aufgezeichnet",
+    "noReplayRecordedMessage": "Sitzung {id} hat keine Wiedergabesegmente zum Abspielen.",
     "discoverSessionTitle": "Entdecken Sie Session Replay, um Benutzerinteraktionen im Detail zu verstehen",
     "discoverSessionMessage": "Session Replay erfasst Benutzerinteraktionen auf Ihrer Website oder Anwendung und spielt sie erneut ab. Auf diese Weise können Sie visuell überprüfen, wie Benutzer navigieren, wohin sie klicken, was sie eingeben und wie sie mit Ihren Inhalten interagieren",
     "loadingErrorDetails": "Halten Sie sich fest, wir rufen Fehlerdetails ab.",
@@ -13041,10 +13043,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Eingabe vom Root-Span des Traces."
+              "trace": "Eingabe aus dem Root-Chat-Span des Traces.",
+              "session": "Die Einstiegsfrage: Eingabe aus dem Root-Chat-Span des ersten Traces."
             },
             "output": {
-              "trace": "Ausgabe vom Root-Span des Traces."
+              "trace": "Ausgabe aus dem Root-Chat-Span des Traces.",
+              "session": "Die abschließende Antwort: Ausgabe aus dem Root-Chat-Span des letzten Traces."
             },
             "statistics": {
               "trace": "Trace-Metriken: Span-Anzahl, Dauer, LLM- und Tool-Aufrufe, Fehler, Token und Kosten.",
@@ -13056,6 +13060,10 @@
             "steps": {
               "trace": "Spans in zeitlicher Reihenfolge; die Mitte wird eingeklappt, wenn der Trace sehr lang ist.",
               "session": "Traces in zeitlicher Reihenfolge, dargestellt als Gesprächsrunden."
+            },
+            "tool_calls": {
+              "trace": "Jeder Tool-Aufruf im Trace, in zeitlicher Reihenfolge, mit Name, Eingabe, Ausgabe und Status.",
+              "session": "Jeder Tool-Aufruf über die Traces der Sitzung hinweg, in zeitlicher Reihenfolge, mit Name, Eingabe, Ausgabe und Status."
             }
           }
         }
@@ -15164,7 +15172,6 @@
       "syntheticsTokensRefresh": "Tokenliste aktualisieren",
       "aiChatToggle": "KI-Chat umschalten",
       "aiChatClose": "KI-Chat schließen",
-      "aiChatExpand": "KI-Chat erweitern/einklappen",
       "logsSaveView": "Als gespeicherte Ansicht speichern",
       "logsExport": "Ergebnisse als CSV exportieren",
       "tracesCopyUrl": "Trace-Share-URL kopieren",

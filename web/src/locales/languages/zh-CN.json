@@ -1474,6 +1474,8 @@
     "sessionReplay": "会话重放",
     "viewSessionReplay": "查看会话重放",
     "playSessionReplay": "播放会话重放",
+    "noReplayRecordedTitle": "此会话未录制回放",
+    "noReplayRecordedMessage": "会话 {id} 没有可播放的回放片段。",
     "discoverSessionTitle": "探索会话回放以详细了解用户互动",
     "discoverSessionMessage": "Session Replay 捕获并重放您的网站或应用程序上的用户互动。这使您可以直观地查看用户的导航方式、点击的位置、键入的内容以及他们如何与您的内容互动",
     "loadingErrorDetails": "等一下，我们正在获取错误细节。",
@@ -13041,10 +13043,12 @@
           },
           "variables": {
             "input": {
-              "trace": "来自追踪根 Span 的输入。"
+              "trace": "来自追踪根聊天 Span 的输入。",
+              "session": "开场问题：来自第一个追踪根聊天 Span 的输入。"
             },
             "output": {
-              "trace": "来自追踪根 Span 的输出。"
+              "trace": "来自追踪根聊天 Span 的输出。",
+              "session": "最终答案：来自最后一个追踪根聊天 Span 的输出。"
             },
             "statistics": {
               "trace": "追踪指标：Span 数量、时长、LLM 与工具调用、错误、Token 数和成本。",
@@ -13056,6 +13060,10 @@
             "steps": {
               "trace": "按时间顺序排列的 Span；当追踪很长时，中间部分会被折叠。",
               "session": "按时间顺序排列的追踪，以对话轮次表示。"
+            },
+            "tool_calls": {
+              "trace": "追踪中的每个工具调用，按时间顺序排列，包含其名称、输入、输出和状态。",
+              "session": "会话的所有追踪中的每个工具调用，按时间顺序排列，包含其名称、输入、输出和状态。"
             }
           }
         }
@@ -15164,7 +15172,6 @@
       "syntheticsTokensRefresh": "刷新令牌列表",
       "aiChatToggle": "切换 AI 聊天",
       "aiChatClose": "关闭 AI 聊天",
-      "aiChatExpand": "展开/折叠 AI 聊天",
       "logsSaveView": "另存为已保存视图",
       "logsExport": "将结果导出为 CSV",
       "tracesCopyUrl": "复制追踪分享链接",

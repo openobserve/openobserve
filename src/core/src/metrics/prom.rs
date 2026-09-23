@@ -53,7 +53,7 @@ use search_service;
 
 use super::{
     columnar, ingest,
-    native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram},
+    native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, ExpansionLimits, expand_native_histogram},
     prom_decode,
 };
 use crate::{
@@ -459,7 +459,7 @@ pub async fn remote_write(
                 &event.histograms,
                 &labels,
                 &metric_name,
-                cfg.prom.native_histogram_max_buckets,
+                ExpansionLimits::from_config(&cfg),
                 &mut gate,
                 &mut sink,
             )
@@ -1112,7 +1112,7 @@ async fn buffer_native_histograms(
     histograms: &[prometheus_rpc::Histogram],
     labels: &json::Map<String, json::Value>,
     metric_name: &str,
-    max_buckets: usize,
+    limits: ExpansionLimits,
     gate: &mut HaGate<'_>,
     sink: &mut RecordSink<'_>,
 ) -> Option<usize> {
@@ -1127,7 +1127,7 @@ async fn buffer_native_histograms(
     let mut counted = 0;
     for hp in histograms {
         counted += 1;
-        let records = expand_native_histogram(hp, max_buckets);
+        let records = expand_native_histogram(hp, limits);
         if records.is_empty() {
             // unsupported schema or stale marker: nothing will be written
             continue;

@@ -34,7 +34,10 @@ use openobserve_core::auth::UserEmail;
 use openobserve_core::ingestion::check_ingestion_allowed;
 
 use crate::{
-    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        otlp::otlp_error_response,
+    },
     service::profiles,
 };
 
@@ -91,11 +94,11 @@ pub async fn otlp_profiles_write(
         } else {
             (StatusCode::SERVICE_UNAVAILABLE, 14) // UNAVAILABLE
         };
-        return profiles::otlp_error_response(req_type, status, rpc_code, e.to_string());
+        return otlp_error_response(req_type, status, rpc_code, e.to_string());
     }
 
     let Some(req_type) = req_type else {
-        return profiles::otlp_error_response(
+        return otlp_error_response(
             OtlpRequestType::HttpJson,
             StatusCode::BAD_REQUEST,
             3, // INVALID_ARGUMENT
@@ -122,7 +125,7 @@ pub async fn otlp_profiles_write(
             resp
         }
         // Defensive: core maps Internal to OTLP Status and should not Err.
-        Err(e) => profiles::otlp_error_response(
+        Err(e) => otlp_error_response(
             req_type,
             StatusCode::INTERNAL_SERVER_ERROR,
             13, // INTERNAL

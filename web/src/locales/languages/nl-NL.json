@@ -1474,6 +1474,8 @@
     "sessionReplay": "Sessie opnieuw afspelen",
     "viewSessionReplay": "Bekijk de herhaling van de sessie",
     "playSessionReplay": "Sessie opnieuw afspelen",
+    "noReplayRecordedTitle": "Geen replay opgenomen voor deze sessie",
+    "noReplayRecordedMessage": "Sessie {id} heeft geen replay-segmenten om af te spelen.",
     "discoverSessionTitle": "Ontdek Session Replay om gebruikersinteracties in detail te begrijpen",
     "discoverSessionMessage": "Session Replay legt gebruikersinteracties op uw website of applicatie vast en herhaalt deze. Zo kun je visueel bekijken hoe gebruikers navigeren, waar ze klikken, wat ze typen en hoe ze met je inhoud omgaan.",
     "loadingErrorDetails": "Wacht even, we halen foutgegevens op.",
@@ -13041,10 +13043,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Invoer van de root-span van de trace."
+              "trace": "Invoer van de root chat-span van de trace.",
+              "session": "De openingsvraag: invoer van de root chat-span van de eerste trace."
             },
             "output": {
-              "trace": "Uitvoer van de root-span van de trace."
+              "trace": "Uitvoer van de root chat-span van de trace.",
+              "session": "Het uiteindelijke antwoord: uitvoer van de root chat-span van de laatste trace."
             },
             "statistics": {
               "trace": "Trace-metrieken: span-aantal, duur, LLM- en toolcalls, fouten, tokens en kosten.",
@@ -13056,6 +13060,10 @@
             "steps": {
               "trace": "Spans in tijdsvolgorde; het midden wordt samengevouwen wanneer de trace erg lang is.",
               "session": "Traces in tijdsvolgorde, weergegeven als gespreksbeurten."
+            },
+            "tool_calls": {
+              "trace": "Elke toolaanroep in de trace, in tijdvolgorde, met de naam, invoer, uitvoer en status.",
+              "session": "Elke toolaanroep in alle traces van de sessie, in tijdvolgorde, met de naam, invoer, uitvoer en status."
             }
           }
         }
@@ -15164,7 +15172,6 @@
       "syntheticsTokensRefresh": "Tokenlijst vernieuwen",
       "aiChatToggle": "AI-chat inschakelen",
       "aiChatClose": "AI-chat sluiten",
-      "aiChatExpand": "AI-chat uitvouwen/invouwen",
       "logsSaveView": "Opslaan als opgeslagen weergave",
       "logsExport": "Exporteer resultaten als CSV",
       "tracesCopyUrl": "Kopieer trace-deel-URL",

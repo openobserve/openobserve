@@ -1474,6 +1474,8 @@
     "sessionReplay": "Phát lại phiên",
     "viewSessionReplay": "Xem phát lại phiên",
     "playSessionReplay": "Phát lại phiên",
+    "noReplayRecordedTitle": "Không có phát lại nào được ghi cho phiên này",
+    "noReplayRecordedMessage": "Phiên {id} không có phân đoạn phát lại nào để phát.",
     "discoverSessionTitle": "Khám phá Phát lại phiên để hiểu chi tiết tương tác người dùng",
     "discoverSessionMessage": "Phát lại phiên ghi lại và phát lại các tương tác của người dùng trên trang web hoặc ứng dụng của bạn. Điều này cho phép bạn xem xét trực quan cách người dùng điều hướng, nơi họ nhấp, nội dung họ gõ và cách họ tương tác với nội dung của bạn",
     "loadingErrorDetails": "Hãy chờ một chút, chúng tôi đang lấy chi tiết lỗi.",
@@ -13041,10 +13043,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Đầu vào từ span gốc của trace."
+              "trace": "Đầu vào từ span chat gốc của trace.",
+              "session": "Câu hỏi mở đầu: đầu vào từ span chat gốc của trace đầu tiên."
             },
             "output": {
-              "trace": "Đầu ra từ span gốc của trace."
+              "trace": "Đầu ra từ span chat gốc của trace.",
+              "session": "Câu trả lời cuối cùng: đầu ra từ span chat gốc của trace cuối cùng."
             },
             "statistics": {
               "trace": "Số liệu trace: số span, thời lượng, số lần gọi LLM và công cụ, lỗi, token và chi phí.",
@@ -13056,6 +13060,10 @@
             "steps": {
               "trace": "Các span theo thứ tự thời gian; phần giữa được thu gọn khi trace rất dài.",
               "session": "Các trace theo thứ tự thời gian, được biểu diễn dưới dạng các lượt hội thoại."
+            },
+            "tool_calls": {
+              "trace": "Mọi lệnh gọi công cụ trong trace, theo thứ tự thời gian, kèm tên, đầu vào, đầu ra và trạng thái.",
+              "session": "Mọi lệnh gọi công cụ trong các trace của phiên, theo thứ tự thời gian, kèm tên, đầu vào, đầu ra và trạng thái."
             }
           }
         }
@@ -15164,7 +15172,6 @@
       "syntheticsTokensRefresh": "Làm mới danh sách token",
       "aiChatToggle": "Bật/tắt trò chuyện AI",
       "aiChatClose": "Đóng trò chuyện AI",
-      "aiChatExpand": "Mở rộng/thu gọn trò chuyện AI",
       "logsSaveView": "Lưu dưới dạng chế độ xem đã lưu",
       "logsExport": "Xuất kết quả dưới dạng CSV",
       "tracesCopyUrl": "Sao chép URL chia sẻ dấu vết",
