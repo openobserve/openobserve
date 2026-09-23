@@ -1,0 +1,26 @@
+{
+  "feature_slug": "community-slack-invite-dismiss",
+  "feature_title": "Community Slack Invite Dismissal Snooze",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "communitySlackInvite.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/communitySlackInvite.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/CommunitySlackInvite.vue",
+    "web/src/utils/slackCommunityInvite.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All changed files live under web/src/ (web/src/components/CommunitySlackInvite.vue, web/src/utils/slackCommunityInvite.ts, web/src/utils/slackCommunityInvite.spec.ts) — open-source frontend paths. No enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/) or enterprise keywords (cipher/SSO/SAML/RBAC/SDR/etc.) appear, so this is an OSS change.",
+    "skip": "Not skipped: no tests-added label or skip comment was passed (trigger_comment.txt is empty), and the change is not docs/CI-only. It alters a user-facing UI behavior — the community Slack invite popup's dismiss path — so it is user-facing.",
+    "e2e": "E2E is warranted: CommunitySlackInvite.vue's dismiss handler now calls markSlackInviteDismissed(), changing the popup from a one-time permanent dismissal into a week-long snooze with a max-prompt cap. This is a visible user interaction (close/overlay/Escape/Maybe-later) whose state machine and re-show behavior should be verified in a real browser session.",
+    "area": "The change is a shared marketing/invite popup component in web/src/components/, not a data-plane feature, so it belongs in GeneralTests alongside sibling specs like logoManagement.spec.js and cipherKeys.spec.js rather than Logs/Metrics/Traces/Dashboards/Alerts.",
+    "group": "GeneralTests is the closest existing shard group: ci_matrix.ent.json references a GeneralTests group holding general UI specs (cipherKeys, logoManagement, model-pricing), matching this component's nature as a general UI popup rather than a product-area feature.",
+    "existing_tests": "No E2E specs in the diff. The only test file changed is web/src/utils/slackCommunityInvite.spec.ts, a Vitest unit test, which is not a Playwright E2E spec (tests/ui-testing/playwright-tests/) and does not count as existing E2E coverage."
+  }
+}

@@ -1,0 +1,229 @@
+===== COMPLETE LIST OF CHANGED FILES (3 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/CommunitySlackInvite.vue
+web/src/utils/slackCommunityInvite.spec.ts
+web/src/utils/slackCommunityInvite.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/CommunitySlackInvite.vue b/web/src/components/CommunitySlackInvite.vue
+index 3927c4edb63..be445540f2f 100644
+--- a/web/src/components/CommunitySlackInvite.vue
++++ b/web/src/components/CommunitySlackInvite.vue
+@@ -25,6 +25,7 @@ import {
+   connectDataPopupSettled,
+   connectDataPromptSessionKey,
+   getCommunitySlackUrl,
++  markSlackInviteDismissed,
+   markSlackInviteResolved,
+   shouldShowStandaloneSlackInvite,
+ } from "@/utils/slackCommunityInvite";
+@@ -122,10 +123,12 @@ const avatarBgClasses = [
+   "bg-avatar-tint-4",
+ ];
+ 
+-// × / overlay / Escape / Maybe later: closes the dialog only. Only joinSlack()
+-// resolves the invite for good — "Maybe later" means the day-2 popup can show
+-// again on a later session.
++// × / overlay / Escape / Maybe later: snoozes the next ask (see
++// markSlackInviteDismissed) instead of leaving it permanently due — without
++// this, shouldShowStandaloneSlackInvite() stays true forever once the day-2
++// delay elapses and the popup would reopen on every refresh.
+ const dismiss = () => {
++  markSlackInviteDismissed(userEmail);
+   track("community_slack_prompt_dismissed");
+   isOpen.value = false;
+ };
+diff --git a/web/src/utils/slackCommunityInvite.spec.ts b/web/src/utils/slackCommunityInvite.spec.ts
+index 0c78494dcb6..94659a555c9 100644
+--- a/web/src/utils/slackCommunityInvite.spec.ts
++++ b/web/src/utils/slackCommunityInvite.spec.ts
+@@ -15,6 +15,7 @@
+ 
+ import { describe, it, expect, beforeEach } from "vitest";
+ import {
++  markSlackInviteDismissed,
+   markSlackInviteOffered,
+   markSlackInviteResolved,
+   shouldOfferSlackInvite,
+@@ -25,6 +26,7 @@ const EMAIL = "example@gmail.com";
+ const STATE_KEY = `slackCommunityInvite:${EMAIL}`;
+ const LEGACY_SEEN_KEY = `communitySlackInviteSeen:${EMAIL}`;
+ const DAY2_DELAY_MS = 24 * 60 * 60 * 1000;
++const SNOOZE_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
+ 
+ describe("slackCommunityInvite", () => {
+   beforeEach(() => {
+@@ -96,4 +98,76 @@ describe("slackCommunityInvite", () => {
+       expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
+     });
+   });
++
++  describe("dismissing the standalone invite (cooldown, not permanent)", () => {
++    it("does not show again immediately after a dismissal, even though the day-2 delay already elapsed", () => {
++      localStorage.setItem(
++        STATE_KEY,
++        JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1 }),
++      );
++
++      markSlackInviteDismissed(EMAIL);
++
++      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
++    });
++
++    it("shows again once the snooze period has elapsed after a dismissal", () => {
++      localStorage.setItem(
++        STATE_KEY,
++        JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1 }),
++      );
++      markSlackInviteDismissed(EMAIL);
++
++      // Fast-forward past the snooze window by rewriting shownAt directly.
++      const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
++      localStorage.setItem(
++        STATE_KEY,
++        JSON.stringify({ ...record, shownAt: Date.now() - SNOOZE_DELAY_MS - 1 }),
++      );
++
++      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(true);
++    });
++
++    it("stops asking for good after the max number of standalone prompts is dismissed", () => {
++      localStorage.setItem(
++        STATE_KEY,
++        JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1 }),
++      );
++
++      // Dismiss 1: snoozes.
++      markSlackInviteDismissed(EMAIL);
++      let record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
++      localStorage.setItem(
++        STATE_KEY,
++        JSON.stringify({ ...record, shownAt: Date.now() - SNOOZE_DELAY_MS - 1 }),
++      );
++
++      // Dismiss 2: snoozes again.
++      markSlackInviteDismissed(EMAIL);
++      record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
++      localStorage.setItem(
++        STATE_KEY,
++        JSON.stringify({ ...record, shownAt: Date.now() - SNOOZE_DELAY_MS - 1 }),
++      );
++
++      // Dismiss 3: the third dismissal hits the cap and resolves for good.
++      markSlackInviteDismissed(EMAIL);
++
++      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
++      record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
++      expect(record.status).toBe("resolved");
++    });
++
++    it("does nothing once the invite is already resolved", () => {
++      localStorage.setItem(
++        STATE_KEY,
++        JSON.stringify({ status: "resolved", shownAt: null, dismissCount: 0 }),
++      );
++
++      markSlackInviteDismissed(EMAIL);
++
++      const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
++      expect(record.status).toBe("resolved");
++    });
++  });
+ });
+diff --git a/web/src/utils/slackCommunityInvite.ts b/web/src/utils/slackCommunityInvite.ts
+index 6837899e447..ea0c4dd560f 100644
+--- a/web/src/utils/slackCommunityInvite.ts
++++ b/web/src/utils/slackCommunityInvite.ts
+@@ -21,11 +21,21 @@ export type SlackInviteStatus = "not_asked" | "pending_day2" | "resolved";
+ interface SlackInviteRecord {
+   status: SlackInviteStatus;
+   shownAt: number | null;
++  // How many times the standalone popup has been dismissed without joining.
++  dismissCount: number;
+ }
+ 
+ // Gives the day-2 dedicated popup a full day to elapse, not a same-session retry.
+ const DAY2_DELAY_MS = 24 * 60 * 60 * 1000;
+ 
++// A dismissal (close/overlay/Escape/"Maybe later") snoozes the next ask by a
++// week rather than leaving it permanently due the moment DAY2_DELAY_MS elapses.
++const SNOOZE_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
++
++// Total times the standalone popup will ask before giving up for good: the
++// initial day-2 ask plus this many snoozed re-asks.
++const MAX_STANDALONE_PROMPTS = 3;
++
+ // Legacy key from the exit-intent invite this replaced — set "true" on that invite's
+ // dismiss or join, both of which were permanent. Migrated below so those users aren't
+ // re-invited under the new state machine.
+@@ -49,15 +59,19 @@ const readRecord = (email: string): SlackInviteRecord => {
+     if (raw) {
+       const parsed = JSON.parse(raw);
+       if (parsed?.status === "pending_day2" || parsed?.status === "resolved") {
+-        return { status: parsed.status, shownAt: parsed.shownAt ?? null };
++        return {
++          status: parsed.status,
++          shownAt: parsed.shownAt ?? null,
++          dismissCount: parsed.dismissCount ?? 0,
++        };
+       }
+     }
+     if (localStorage.getItem(legacySeenKey(email)) === "true") {
+-      return { status: "resolved", shownAt: null };
++      return { status: "resolved", shownAt: null, dismissCount: 0 };
+     }
+-    return { status: "not_asked", shownAt: null };
++    return { status: "not_asked", shownAt: null, dismissCount: 0 };
+   } catch {
+-    return { status: "not_asked", shownAt: null };
++    return { status: "not_asked", shownAt: null, dismissCount: 0 };
+   }
+ };
+ 
+@@ -76,19 +90,40 @@ export const shouldOfferSlackInvite = (email: string): boolean =>
+ // Starts the day-2 clock on the invite's first touchpoint, shown or silent — an ignored offer resolves to exactly one later dedicated ask.
+ export const markSlackInviteOffered = (email: string): void => {
+   if (readRecord(email).status !== "not_asked") return;
+-  writeRecord(email, { status: "pending_day2", shownAt: Date.now() });
++  writeRecord(email, { status: "pending_day2", shownAt: Date.now(), dismissCount: 0 });
+ };
+ 
+-// Joining or declining the day-2 popup both end the ask for good — the two outcomes don't need to stay distinguishable in storage.
++// Joining ends the ask for good.
+ export const markSlackInviteResolved = (email: string): void => {
+-  writeRecord(email, { status: "resolved", shownAt: readRecord(email).shownAt });
++  const record = readRecord(email);
++  writeRecord(email, {
++    status: "resolved",
++    shownAt: record.shownAt,
++    dismissCount: record.dismissCount,
++  });
++};
++
++// Dismissing without joining (✕ / overlay / Escape / "Maybe later") snoozes the
++// next ask by SNOOZE_DELAY_MS instead of leaving it permanently due. After
++// MAX_STANDALONE_PROMPTS total asks, stops for good rather than nagging forever.
++export const markSlackInviteDismissed = (email: string): void => {
++  const record = readRecord(email);
++  if (record.status !== "pending_day2") return;
++  const dismissCount = record.dismissCount + 1;
++  if (dismissCount >= MAX_STANDALONE_PROMPTS) {
++    writeRecord(email, { status: "resolved", shownAt: record.shownAt, dismissCount });
++    return;
++  }
++  writeRecord(email, { status: "pending_day2", shownAt: Date.now(), dismissCount });
+ };
+ 
+-// Whether the dedicated day-2 popup is due: offered once, at least a day ago, still unresolved.
++// Whether the dedicated day-2 popup is due: offered once, at least a day ago
++// (or a full snooze period, for a re-ask after a prior dismissal), still unresolved.
+ export const shouldShowStandaloneSlackInvite = (email: string): boolean => {
+   const record = readRecord(email);
+   if (record.status !== "pending_day2" || record.shownAt == null) return false;
+-  return Date.now() - record.shownAt >= DAY2_DELAY_MS;
++  const delay = record.dismissCount === 0 ? DAY2_DELAY_MS : SNOOZE_DELAY_MS;
++  return Date.now() - record.shownAt >= delay;
+ };
+ 
+ // Shared so the embedded and standalone entry points never resolve two different links.

@@ -1,0 +1,3 @@
+web/src/components/CommunitySlackInvite.vue
+web/src/utils/slackCommunityInvite.spec.ts
+web/src/utils/slackCommunityInvite.ts
