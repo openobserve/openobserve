@@ -48,6 +48,7 @@ impl SourceMetadata {
 }
 
 pub(super) enum Blocks {
+    NotRequested,
     Disabled,
     Active(Box<BlockFile>),
 }
@@ -87,7 +88,11 @@ impl Blocks {
     ) -> Result<MergedFile> {
         EncodingJob::run(move || {
             let Self::Active(active) = self else {
-                return Ok(MergedFile::MetricsHashMerged { data_path, meta });
+                return match self {
+                    Self::Disabled => Ok(MergedFile::MetricsFinalUnindexed { data_path, meta }),
+                    Self::NotRequested => anyhow::bail!("block finalization was not requested"),
+                    Self::Active(_) => unreachable!(),
+                };
             };
             let parent = ParentMetadata {
                 rows: u64::try_from(meta.records)?,
@@ -105,7 +110,7 @@ impl Blocks {
                 }
                 Err(error) => {
                     log::warn!("metrics index finalization failed; skipping index: {error}");
-                    Ok(MergedFile::MetricsHashMerged { data_path, meta })
+                    Ok(MergedFile::MetricsFinalUnindexed { data_path, meta })
                 }
             }
         })

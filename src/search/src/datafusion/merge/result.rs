@@ -55,6 +55,11 @@ pub enum MergedFile {
         data_path: tempfile::TempPath,
         meta: FileMeta,
     },
+    /// Closed-hour hash-ordered output without a usable `.midx`.
+    MetricsFinalUnindexed {
+        data_path: tempfile::TempPath,
+        meta: FileMeta,
+    },
     /// Finalized indexed metrics output spooled to local disk.
     MetricsIndexed {
         data_path: tempfile::TempPath,
@@ -69,6 +74,7 @@ impl MergedFile {
             Self::Standard { .. } | Self::StandardFile { .. } => None,
             Self::MetricsHashSorted { .. } => Some(MetricsFileLayout::HashSorted),
             Self::MetricsHashMerged { .. } => Some(MetricsFileLayout::HashMerged),
+            Self::MetricsFinalUnindexed { .. } => Some(MetricsFileLayout::FinalUnindexed),
             Self::MetricsIndexed { .. } => Some(MetricsFileLayout::Indexed),
         }
     }
@@ -97,6 +103,7 @@ impl MergedFile {
             }
             Self::StandardFile { .. }
             | Self::MetricsHashMerged { .. }
+            | Self::MetricsFinalUnindexed { .. }
             | Self::MetricsIndexed { .. } => Err(DataFusionError::Execution(
                 "ingester cannot consume compactor spooled output".to_string(),
             )),
@@ -112,7 +119,8 @@ impl MergedFile {
                 Ok((data, meta, None))
             }
             Self::StandardFile { data_path, meta }
-            | Self::MetricsHashMerged { data_path, meta } => {
+            | Self::MetricsHashMerged { data_path, meta }
+            | Self::MetricsFinalUnindexed { data_path, meta } => {
                 Ok((tokio::fs::read(&data_path).await?, meta, None))
             }
             Self::MetricsIndexed {

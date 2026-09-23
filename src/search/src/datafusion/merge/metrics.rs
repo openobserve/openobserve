@@ -83,7 +83,10 @@ pub(super) struct MetricsOutput {
 
 impl MetricsOutput {
     fn prepare_blocks(&self, schema: &Arc<Schema>, with_index: bool) -> Blocks {
-        if !with_index || !metrics_block::is_supported_schema(schema) {
+        if !with_index {
+            return Blocks::NotRequested;
+        }
+        if !metrics_block::is_supported_schema(schema) {
             return Blocks::Disabled;
         }
         match Blocks::try_new(schema) {
@@ -313,19 +316,24 @@ impl ActiveMetricsParquetWriter {
         }
         file_meta.compressed_size =
             i64::try_from(size).map_err(|e| DataFusionError::External(Box::new(e)))?;
-        if matches!(self.blocks, Blocks::Disabled) {
-            Ok(MergedFile::MetricsHashMerged {
+        match self.blocks {
+            Blocks::NotRequested => Ok(MergedFile::MetricsHashMerged {
                 data_path,
                 meta: file_meta,
-            })
-        } else {
-            self.blocks
-                .finish(
-                    data_path,
-                    file_meta,
-                    SourceMetadata::Parquet(parquet_metadata),
-                )
-                .await
+            }),
+            Blocks::Disabled => Ok(MergedFile::MetricsFinalUnindexed {
+                data_path,
+                meta: file_meta,
+            }),
+            blocks => {
+                blocks
+                    .finish(
+                        data_path,
+                        file_meta,
+                        SourceMetadata::Parquet(parquet_metadata),
+                    )
+                    .await
+            }
         }
     }
 }
@@ -395,16 +403,18 @@ impl ActiveMetricsVortexWriter {
         file_meta.compressed_size = i64::try_from(size)?;
         let schema =
             verify_vortex_source(&self.data_path, &file_meta, &self.schema, session).await?;
-        if matches!(self.blocks, Blocks::Disabled) {
-            Ok(MergedFile::MetricsHashMerged {
+        match self.blocks {
+            Blocks::NotRequested => Ok(MergedFile::MetricsHashMerged {
                 data_path: self.data_path,
                 meta: file_meta,
-            })
-        } else {
-            Ok(self
-                .blocks
+            }),
+            Blocks::Disabled => Ok(MergedFile::MetricsFinalUnindexed {
+                data_path: self.data_path,
+                meta: file_meta,
+            }),
+            blocks => Ok(blocks
                 .finish(self.data_path, file_meta, SourceMetadata::Vortex(schema))
-                .await?)
+                .await?),
         }
     }
 }
@@ -654,7 +664,7 @@ mod tests {
             Field::new("tag", DataType::Utf8, true),
         ];
         if unsupported {
-            fields.push(Field::new("trace_id", DataType::Utf8, true));
+            fields.push(Field::new("__oo_midx_bad", DataType::Utf8, true));
         }
         let metadata = semantic
             .into_iter()
@@ -673,12 +683,15 @@ mod tests {
             Arc::new(arrow::array::StringArray::from(vec![Some("x"); rows.len()])),
         ];
         if schema.fields().len() == 5 {
-            columns.push(Arc::new(arrow::array::StringArray::from(vec![
-                Some(
-                    "per-point"
-                );
-                rows.len()
-            ])));
+            columns.push(Arc::new(arrow::array::StringArray::from_iter_values(
+                (0..rows.len()).map(|i| {
+                    if i % 2 == 0 {
+                        "per-point-a"
+                    } else {
+                        "per-point-b"
+                    }
+                }),
+            )));
         }
         RecordBatch::try_new(Arc::clone(schema), columns).unwrap()
     }
@@ -1109,6 +1122,23 @@ mod tests {
                 rows
             );
             assert_eq!(meta.records, 2);
+        }
+    }
+
+    #[tokio::test]
+    async fn otlp_per_point_column_keeps_index() {
+        let mut fields = block_schema(None, false).fields().to_vec();
+        fields.push(Arc::new(Field::new("start_time", DataType::Utf8, true)));
+        let schema = Arc::new(Schema::new(fields));
+        let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
+        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+            let mut output = block_output(CompactMergeOutput::Disk);
+            output.file_format = format;
+            let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
+                .await
+                .unwrap()
+                .remove(0);
+            assert!(matches!(file, MergedFile::MetricsIndexed { .. }));
         }
     }
 

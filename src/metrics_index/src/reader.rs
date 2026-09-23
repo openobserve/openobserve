@@ -34,13 +34,19 @@ pub(super) struct MetricsIndexData {
     pub(super) row_group_size: Option<u32>,
 }
 
+pub(super) struct IndexLabels {
+    pub requested: Arc<Vec<String>>,
+    pub flat: Arc<Vec<String>>,
+}
+
 pub(super) async fn load_metrics_index_file(
     account: &str,
     path: &str,
     format: config::FileFormat,
     parent_rows: usize,
     parent_size: i64,
-    labels: Arc<Vec<String>>,
+    index_size: i64,
+    labels: IndexLabels,
 ) -> Result<MetricsIndexData> {
     let parent = metrics_block::ParentMetadata {
         rows: u64::try_from(parent_rows)
@@ -48,7 +54,7 @@ pub(super) async fn load_metrics_index_file(
         compressed_size: u64::try_from(parent_size)
             .map_err(|error| DataFusionError::External(error.into()))?,
     };
-    load_block_metadata(account, path, parent, format, labels).await
+    load_block_metadata(account, path, parent, index_size, format, labels).await
 }
 
 /// Evaluate `filter` over the run rows and collect the selected physical row
@@ -134,38 +140,63 @@ async fn load_block_metadata(
     account: &str,
     path: &str,
     parent: metrics_block::ParentMetadata,
+    index_size: i64,
     format: config::FileFormat,
-    labels: Arc<Vec<String>>,
+    labels: IndexLabels,
 ) -> Result<MetricsIndexData> {
     let location = path.into();
-    let size = infra::cache::storage::head(account, &location)
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?
-        .size;
-    let start = size
-        .checked_sub(metrics_block::FOOTER_LEN as u64)
-        .ok_or_else(|| DataFusionError::Execution("Truncated MIDX footer".into()))?;
-    let bytes = infra::cache::storage::get_range(account, &location, start..size)
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?;
-    let footer = metrics_block::read_footer(&bytes, size)
-        .map_err(|error| DataFusionError::External(error.into()))?;
+    let known_size = u64::try_from(index_size).ok().filter(|size| *size > 0);
+    let size = if let Some(size) = known_size {
+        size
+    } else {
+        infra::cache::storage::head(account, &location)
+            .await
+            .map_err(|error| DataFusionError::External(Box::new(error)))?
+            .size
+    };
+    let footer = match read_block_footer(account, path, size).await {
+        Ok(footer) => footer,
+        Err(error) if known_size.is_some() => {
+            let actual_size = infra::cache::storage::head(account, &location)
+                .await
+                .map_err(|error| DataFusionError::External(Box::new(error)))?
+                .size;
+            if actual_size == size {
+                return Err(error);
+            }
+            read_block_footer(account, path, actual_size).await?
+        }
+        Err(error) => return Err(error),
+    };
     let metadata =
         infra::cache::storage::get_range(account, &location, footer.metadata_range.clone())
             .await
             .map_err(|error| DataFusionError::External(Box::new(error)))?;
     tokio::task::spawn_blocking(move || {
-        let index = metrics_block::decode_index(metadata, &footer, &parent, &labels)
+        let index = metrics_block::decode_index(metadata, &footer, &parent, &labels.requested)
             .map_err(|error| DataFusionError::External(error.into()))?;
-        metrics_block_index_data(&index, format)
+        metrics_block_index_data(&index, format, &labels.flat)
     })
     .await
     .map_err(|error| DataFusionError::External(Box::new(error)))?
 }
 
+async fn read_block_footer(account: &str, path: &str, size: u64) -> Result<metrics_block::Footer> {
+    let start = size
+        .checked_sub(metrics_block::FOOTER_LEN as u64)
+        .ok_or_else(|| DataFusionError::Execution("Truncated MIDX footer".into()))?;
+    let location = path.into();
+    let bytes = infra::cache::storage::get_range(account, &location, start..size)
+        .await
+        .map_err(|error| DataFusionError::External(Box::new(error)))?;
+    metrics_block::read_footer(&bytes, size)
+        .map_err(|error| DataFusionError::External(error.into()))
+}
+
 fn metrics_block_index_data(
     index: &metrics_block::Index,
     format: config::FileFormat,
+    flat_labels: &[String],
 ) -> Result<MetricsIndexData> {
     let row_group_size = match format {
         config::FileFormat::Parquet => Some(index.row_group_size.ok_or_else(|| {
@@ -187,12 +218,18 @@ fn metrics_block_index_data(
         index.blocks.row_counts(),
     ))];
     for (i, field) in index.labels.schema().fields().iter().enumerate() {
-        if let Ok(source_field) = index.source_schema.field_with_name(field.name()) {
-            fields.push(source_field.clone());
-            columns.push(arrow::compute::cast(
-                index.labels.column(i),
-                source_field.data_type(),
-            )?);
+        if index.source_schema.field_with_name(field.name()).is_ok() {
+            if flat_labels.contains(field.name()) {
+                let source_field = index.source_schema.field_with_name(field.name())?;
+                fields.push(source_field.clone());
+                columns.push(arrow::compute::cast(
+                    index.labels.column(i),
+                    source_field.data_type(),
+                )?);
+            } else {
+                fields.push(field.as_ref().clone());
+                columns.push(Arc::clone(index.labels.column(i)));
+            }
         }
     }
     let schema = Arc::new(arrow::datatypes::Schema::new(fields));
@@ -291,6 +328,7 @@ mod tests {
             ),
         }
         .unwrap();
+        file.meta.mindex_size = i64::try_from(bytes.len()).unwrap();
         (batch, file, bytes)
     }
 
@@ -324,13 +362,14 @@ mod tests {
                 (MatchOp::Equal, "unmatched", vec![]),
             ] {
                 let mut files = vec![file.clone()];
+                let case = format!("{format:?} {op:?} {value}");
                 let matchers = Matchers::new(vec![Matcher::new(op, "path", value)]);
                 let (_, exact) =
                     crate::search("prune", &mut files, batch.schema().as_ref(), &matchers, 1)
                         .await
                         .unwrap()
                         .unwrap();
-                assert!(exact);
+                assert!(exact, "{case}");
                 if expected.is_empty() {
                     assert!(files.is_empty());
                 } else {
@@ -344,6 +383,62 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn stale_mindex_size_retries_with_object_size() {
+        let (_, file, bytes) = fixture(config::FileFormat::Parquet).await;
+        store(&file, Some(bytes)).await;
+        let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
+        let data = load_metrics_index_file(
+            &file.account,
+            &path,
+            config::FileFormat::Parquet,
+            file.meta.records as usize,
+            file.meta.compressed_size,
+            file.meta.mindex_size + 1,
+            IndexLabels {
+                requested: Arc::new(vec!["path".to_string()]),
+                flat: Arc::new(Vec::new()),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(data.parent_records, 6);
+    }
+
+    #[tokio::test]
+    async fn equality_keeps_dictionary_and_regex_flattens_label() {
+        let (_, file, bytes) = fixture(config::FileFormat::Vortex).await;
+        store(&file, Some(bytes)).await;
+        let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
+        for flat in [false, true] {
+            let data = load_metrics_index_file(
+                &file.account,
+                &path,
+                config::FileFormat::Vortex,
+                file.meta.records as usize,
+                file.meta.compressed_size,
+                file.meta.mindex_size,
+                IndexLabels {
+                    requested: Arc::new(vec!["path".to_string()]),
+                    flat: Arc::new(if flat {
+                        vec!["path".to_string()]
+                    } else {
+                        vec![]
+                    }),
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                matches!(
+                    data.schema.field_with_name("path").unwrap().data_type(),
+                    DataType::Dictionary(_, _)
+                ),
+                !flat
+            );
         }
     }
 

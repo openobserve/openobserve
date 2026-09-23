@@ -340,23 +340,7 @@ fn changed_labels_order_schema_and_row_totals_fail_closed() {
 }
 
 #[test]
-fn paths_and_supported_schema_are_generic_but_strict() {
-    assert_eq!(
-        sidecar_path("files/o/metrics/m/2026/09/18/07/custom=x/indexed-v1-a.parquet").as_deref(),
-        Some("files/o/midx/m/2026/09/18/07/custom=x/indexed-v1-a.midx")
-    );
-    assert_eq!(
-        sidecar_path("files/o/metrics/m/2026/09/18/07/custom=x/indexed-v1-a.vortex").as_deref(),
-        Some("files/o/midx/m/2026/09/18/07/custom=x/indexed-v1-a.midx")
-    );
-    for key in [
-        "files/o/metrics/m/2026/09/18/07/indexed-v1-a.unknown",
-        "files/o/logs/m/2026/09/18/07/indexed-v1-a.parquet",
-        "files/o/metrics/m/2026/09/18/07/hash-sorted-v1-a.parquet",
-        "files/o/metrics/m/2026/09/18/../indexed-v1-a.parquet",
-    ] {
-        assert!(sidecar_path(key).is_none());
-    }
+fn supported_schema_excludes_per_point_columns() {
     assert_eq!(
         identity_label_columns(schema().as_ref()).unwrap(),
         vec!["label_a", "label_b"]
@@ -364,8 +348,36 @@ fn paths_and_supported_schema_are_generic_but_strict() {
     for name in ["start_time", "flag", "trace_id", "exemplars"] {
         let mut fields = schema().fields().to_vec();
         fields.push(Arc::new(Field::new(name, DataType::Utf8, true)));
-        assert!(!is_supported_schema(&Schema::new(fields)));
+        let schema = Schema::new(fields);
+        assert!(is_supported_schema(&schema));
+        assert_eq!(
+            identity_label_columns(&schema).unwrap(),
+            ["label_a", "label_b"]
+        );
     }
+}
+
+#[test]
+fn per_point_columns_do_not_block_index_or_change_series_labels() {
+    let input = batch(&rows());
+    let mut fields = input.schema().fields().to_vec();
+    fields.push(Arc::new(Field::new("start_time", DataType::Int64, false)));
+    fields.push(Arc::new(Field::new("flag", DataType::Utf8, true)));
+    let schema = Arc::new(Schema::new(fields));
+    let mut columns = input.columns().to_vec();
+    columns.push(Arc::new(Int64Array::from_iter_values(
+        0..input.num_rows() as i64,
+    )));
+    columns.push(Arc::new(StringArray::from_iter_values(
+        (0..input.num_rows()).map(|i| if i % 2 == 0 { "a" } else { "b" }),
+    )));
+    let input = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
+    let mut writer = BlockWriter::new_pending(Vec::new(), Arc::clone(&schema), 2).unwrap();
+    writer.write(&input).unwrap();
+    let blob = writer.finish_for_vortex(parent(), schema).unwrap();
+    let decoded = index(&blob, &["label_a", "label_b"]).unwrap();
+    assert_eq!(decoded.labels.schema().fields().len(), 2);
+    assert_eq!(decoded_rows(&blob, &decoded).len(), input.num_rows());
 }
 
 #[test]

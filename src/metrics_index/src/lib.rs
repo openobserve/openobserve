@@ -228,7 +228,11 @@ mod tests {
             config::FileFormat::Vortex,
             rows,
             123,
-            Arc::new(requested.to_vec()),
+            0,
+            crate::reader::IndexLabels {
+                requested: Arc::new(requested.to_vec()),
+                flat: Arc::new(Vec::new()),
+            },
         )
         .await
         .unwrap()

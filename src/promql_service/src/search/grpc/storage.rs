@@ -269,13 +269,20 @@ async fn cache_metrics_index_files(trace_id: &str, org_id: &str, files: &[FileKe
         return;
     }
     let start = std::time::Instant::now();
-    // sidecar sizes are not tracked in file_list; 0 lets the downloader skip the size check
     let mut sidecar_stats = ScanStats::default();
     let (cache_type, cache_hits, cache_misses) = cache_files(
         trace_id,
         &sidecars
             .iter()
-            .map(|(f, path)| (f.id, &f.account, path, 0, f.meta.max_ts))
+            .map(|(f, path)| {
+                (
+                    f.id,
+                    &f.account,
+                    path,
+                    f.meta.mindex_size.max(0),
+                    f.meta.max_ts,
+                )
+            })
             .collect_vec(),
         &mut sidecar_stats,
         "midx",

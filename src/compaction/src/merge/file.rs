@@ -460,6 +460,7 @@ async fn publish_merged_output(
     cache_locally: bool,
     storage_tier: storage::StorageTier,
 ) -> anyhow::Result<(Bytes, FileMeta)> {
+    let final_unindexed = matches!(&file, MergedFile::MetricsFinalUnindexed { .. });
     let (data, mut meta, index_path) = file.into_upload_parts().await?;
     let bytes = Bytes::from(data);
     meta.compressed_size = i64::try_from(bytes.len())?;
@@ -485,6 +486,9 @@ async fn publish_merged_output(
     storage::put_with_tier(account, key, bytes.clone(), storage_tier).await?;
     if let Some((key, index)) = index {
         storage::put_with_tier(account, &key, index, storage_tier).await?;
+    }
+    if final_unindexed {
+        log::warn!("[COMPACT] finalized metrics file {key} has no MIDX");
     }
     Ok((bytes, meta))
 }
@@ -515,7 +519,7 @@ mod tests {
             Field::new("value", DataType::Float64, true),
             Field::new(
                 if kind == "unsupported" {
-                    "trace_id"
+                    "__oo_midx_bad"
                 } else {
                     "tag"
                 },
@@ -574,7 +578,8 @@ mod tests {
                 let mut file = produced_metrics_output(format, kind).await;
                 let meta = match &mut file {
                     MergedFile::MetricsIndexed { meta, .. }
-                    | MergedFile::MetricsHashMerged { meta, .. } => meta,
+                    | MergedFile::MetricsHashMerged { meta, .. }
+                    | MergedFile::MetricsFinalUnindexed { meta, .. } => meta,
                     _ => panic!("metrics output expected"),
                 };
                 meta.index_size = 79;
@@ -582,6 +587,15 @@ mod tests {
                 let key = format!(
                     "files/publish/metrics/m/2026/09/20/00/{}",
                     file.file_name("unused", format)
+                );
+                let layout = MetricsFileLayout::of(&key);
+                assert_eq!(
+                    layout,
+                    Some(match kind {
+                        "block" => MetricsFileLayout::Indexed,
+                        "none" => MetricsFileLayout::HashMerged,
+                        _ => MetricsFileLayout::FinalUnindexed,
+                    })
                 );
                 let account = memory_storage_account().await;
                 let (data, meta) = publish_merged_output(

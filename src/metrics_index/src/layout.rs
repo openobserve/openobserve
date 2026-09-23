@@ -61,12 +61,15 @@ pub enum MetricsFileLayout {
     /// written by the compactor's hour-end merge
     /// (`indexed-v1-{id}.parquet` or `.vortex`).
     Indexed,
+    /// Closed-hour hash-ordered output whose index could not be generated.
+    FinalUnindexed,
 }
 
 impl MetricsFileLayout {
     const HASH_SORTED_PREFIX: &'static str = "hash-sorted-v1-";
     const HASH_MERGED_PREFIX: &'static str = "hash-merged-v1-";
     const INDEXED_PREFIX: &'static str = "indexed-v1-";
+    const FINAL_UNINDEXED_PREFIX: &'static str = "final-unindexed-v1-";
     const METRICS_INDEX_DIR: &'static str = "midx";
     const METRICS_INDEX_EXT: &'static str = ".midx";
 
@@ -77,6 +80,7 @@ impl MetricsFileLayout {
             (Self::HASH_SORTED_PREFIX, Self::HashSorted),
             (Self::HASH_MERGED_PREFIX, Self::HashMerged),
             (Self::INDEXED_PREFIX, Self::Indexed),
+            (Self::FINAL_UNINDEXED_PREFIX, Self::FinalUnindexed),
         ] {
             if let Some(id) = file_name.strip_prefix(prefix)
                 && let Some(file_format) = FileFormat::from_extension(id)
@@ -104,6 +108,7 @@ impl MetricsFileLayout {
             Self::HashSorted => Self::HASH_SORTED_PREFIX,
             Self::HashMerged => Self::HASH_MERGED_PREFIX,
             Self::Indexed => Self::INDEXED_PREFIX,
+            Self::FinalUnindexed => Self::FINAL_UNINDEXED_PREFIX,
         }
     }
 
@@ -179,6 +184,13 @@ mod metrics_file_layout_tests {
             MetricsFileLayout::of("hash-merged-v1-77.parquet"),
             Some(MetricsFileLayout::HashMerged)
         );
+        assert_eq!(
+            MetricsFileLayout::of("final-unindexed-v1-77.parquet"),
+            Some(MetricsFileLayout::FinalUnindexed)
+        );
+        assert!(MetricsFileLayout::is_hash_ordered(
+            "final-unindexed-v1-77.vortex"
+        ));
         assert!(MetricsFileLayout::is_hash_ordered(
             "hash-merged-v1-77.vortex"
         ));
@@ -252,6 +264,12 @@ mod metrics_file_layout_tests {
         assert_eq!(
             MetricsFileLayout::metrics_index_path(
                 "files/default/metrics/cpu/2026/08/19/07/hash-sorted-v1-456.parquet"
+            ),
+            None
+        );
+        assert_eq!(
+            MetricsFileLayout::metrics_index_path(
+                "files/default/metrics/cpu/2026/08/19/07/final-unindexed-v1-456.parquet"
             ),
             None
         );

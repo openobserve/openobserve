@@ -75,9 +75,13 @@ macro_rules! get_col {
     };
 }
 
-fn optional_size(rb: &RecordBatch, name: &str, row: usize) -> i64 {
+fn optional_size_column<'a>(rb: &'a RecordBatch, name: &str) -> Option<&'a Int64Array> {
     rb.column_by_name(name)
         .and_then(|column| column.as_any().downcast_ref::<Int64Array>())
+}
+
+fn optional_size(column: Option<&Int64Array>, row: usize) -> i64 {
+    column
         .filter(|column| !column.is_null(row))
         .map_or(0, |column| column.value(row))
 }
@@ -98,6 +102,8 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(compressed_size_col, "compressed_size", Int64Array, rb);
     get_col!(index_size_col, "index_size", Int64Array, rb);
     get_col!(updated_at_col, "updated_at", Int64Array, rb);
+    let mindex_size_col = optional_size_column(&rb, "mindex_size");
+    let bloom_ver_col = optional_size_column(&rb, "bloom_ver");
 
     let mut ret = Vec::with_capacity(rb.num_rows());
     for idx in 0..rb.num_rows() {
@@ -116,8 +122,8 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
             original_size: original_size_col.value(idx),
             compressed_size: compressed_size_col.value(idx),
             index_size: index_size_col.value(idx),
-            mindex_size: optional_size(&rb, "mindex_size", idx),
-            bloom_ver: optional_size(&rb, "bloom_ver", idx),
+            mindex_size: optional_size(mindex_size_col, idx),
+            bloom_ver: optional_size(bloom_ver_col, idx),
             updated_at: updated_at_col.value(idx),
         };
         ret.push(t);
@@ -156,6 +162,7 @@ fn record_batch_to_stats(rb: RecordBatch) -> Vec<(String, StreamStats)> {
     get_col!(original_size_col, "original_size", Int64Array, rb);
     get_col!(compressed_size_col, "compressed_size", Int64Array, rb);
     get_col!(index_size_col, "index_size", Int64Array, rb);
+    let mindex_size_col = optional_size_column(&rb, "mindex_size");
 
     let mut ret = Vec::with_capacity(rb.num_rows());
     for idx in 0..rb.num_rows() {
@@ -168,7 +175,7 @@ fn record_batch_to_stats(rb: RecordBatch) -> Vec<(String, StreamStats)> {
             storage_size: original_size_col.value(idx) as f64,
             compressed_size: compressed_size_col.value(idx) as f64,
             index_size: index_size_col.value(idx) as f64,
-            mindex_size: optional_size(&rb, "mindex_size", idx) as f64,
+            mindex_size: optional_size(mindex_size_col, idx) as f64,
         };
         let stream = stream_col.value(idx).to_string();
         ret.push((stream, t));

@@ -35,12 +35,12 @@ use datafusion::{
     physical_plan::PhysicalExpr,
 };
 use futures::{StreamExt, stream};
-use promql_parser::label::Matchers;
+use promql_parser::label::{MatchOp, Matchers};
 
 use crate::{
     cache::METRICS_INDEX_SELECTION_CACHE,
     layout::MetricsFileLayout,
-    reader::{evaluate_metrics_index, load_metrics_index_file},
+    reader::{IndexLabels, evaluate_metrics_index, load_metrics_index_file},
 };
 
 /// Apply the `.midx` metrics indexes of indexed metrics files in `files` before
@@ -114,6 +114,7 @@ pub async fn search(
                 cache_key,
                 expected_rows,
                 file.meta.compressed_size,
+                file.meta.mindex_size,
             ),
         );
     }
@@ -129,8 +130,10 @@ pub async fn search(
         let mut cache = METRICS_INDEX_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for (data_path, (account, sidecar_path, cache_key, expected_rows, compressed_size)) in
-            index_files
+        for (
+            data_path,
+            (account, sidecar_path, cache_key, expected_rows, compressed_size, mindex_size),
+        ) in index_files
         {
             metrics::METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL
                 .with_label_values::<&str>(&[])
@@ -149,12 +152,16 @@ pub async fn search(
                     cache_key,
                     expected_rows,
                     compressed_size,
+                    mindex_size,
                 ));
             }
         }
     } else {
         misses.extend(index_files.into_iter().map(
-            |(data_path, (account, sidecar_path, cache_key, expected_rows, compressed_size))| {
+            |(
+                data_path,
+                (account, sidecar_path, cache_key, expected_rows, compressed_size, mindex_size),
+            )| {
                 (
                     data_path,
                     account,
@@ -162,16 +169,34 @@ pub async fn search(
                     cache_key,
                     expected_rows,
                     compressed_size,
+                    mindex_size,
                 )
             },
         ));
     }
     let cache_hits = evaluated.len();
     let concurrency = target_partitions.max(1).saturating_mul(2).min(64);
+    let regex_labels = Arc::new(
+        matchers
+            .matchers
+            .iter()
+            .filter(|matcher| matches!(&matcher.op, MatchOp::Re(_) | MatchOp::NotRe(_)))
+            .map(|matcher| matcher.name.clone())
+            .collect::<Vec<_>>(),
+    );
     let matchers = Arc::new(matchers.clone());
     let mut evaluations = stream::iter(misses.into_iter().map(
-        |(data_path, account, sidecar_path, cache_key, expected_rows, compressed_size)| {
+        |(
+            data_path,
+            account,
+            sidecar_path,
+            cache_key,
+            expected_rows,
+            compressed_size,
+            mindex_size,
+        )| {
             let labels = Arc::clone(&matcher_labels);
+            let regex_labels = Arc::clone(&regex_labels);
             let matchers = Arc::clone(&matchers);
             async move {
                 let result = async {
@@ -183,7 +208,11 @@ pub async fn search(
                         })?,
                         expected_rows,
                         compressed_size,
-                        Arc::clone(&labels),
+                        mindex_size,
+                        IndexLabels {
+                            requested: Arc::clone(&labels),
+                            flat: regex_labels,
+                        },
                     )
                     .await?;
                     tokio::task::spawn_blocking(move || {

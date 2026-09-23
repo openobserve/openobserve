@@ -148,35 +148,9 @@ pub fn max_compressed_block_len(row_count: u32) -> Result<usize> {
     Ok(zstd::zstd_safe::compress_bound(raw))
 }
 
-/// Only immutable indexed metrics objects with a supported source format can own this container.
-pub fn sidecar_path(parent_key: &str) -> Option<String> {
-    let mut parts: Vec<_> = parent_key.split('/').map(str::to_owned).collect();
-    if parts.len() < 9
-        || parts[0] != "files"
-        || parts[2] != "metrics"
-        || parts
-            .iter()
-            .any(|part| part.is_empty() || part == "." || part == "..")
-    {
-        return None;
-    }
-    let name = parts.last()?;
-    let name = name.strip_prefix("indexed-v1-")?;
-    let id = name
-        .strip_suffix(".parquet")
-        .or_else(|| name.strip_suffix(".vortex"))?;
-    if id.is_empty() {
-        return None;
-    }
-    let result_name = format!("indexed-v1-{id}.midx");
-    parts[2] = "midx".to_owned();
-    *parts.last_mut()? = result_name;
-    Some(parts.join("/"))
-}
-
 pub fn identity_label_columns(schema: &Schema) -> Result<Vec<String>> {
     capacity(
-        schema.fields().len() <= MAX_LABEL_COLUMNS + 3,
+        schema.fields().len() <= MAX_LABEL_COLUMNS + 3 + NON_IDENTITY.len(),
         "MAX_LABEL_COLUMNS",
     )?;
     let mut names = HashSet::new();
@@ -207,10 +181,9 @@ pub fn identity_label_columns(schema: &Schema) -> Result<Vec<String>> {
             !name.starts_with("__oo_midx_"),
             "reserved metadata label name"
         );
-        ensure!(
-            !NON_IDENTITY.contains(&name),
-            "unsupported per-point column {name}"
-        );
+        if NON_IDENTITY.contains(&name) {
+            continue;
+        }
         ensure!(
             is_label_type(field.data_type()),
             "unsupported label type for {name}"
