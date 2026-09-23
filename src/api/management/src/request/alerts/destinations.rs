@@ -769,17 +769,11 @@ mod tests {
 
     // 409 Conflict
     #[test]
-    fn test_used_by_alert_is_conflict() {
+    fn test_in_use_is_conflict() {
         assert_eq!(
-            status(DestinationError::UsedByAlert("my-alert".to_string())),
-            StatusCode::CONFLICT
-        );
-    }
-
-    #[test]
-    fn test_used_by_pipeline_is_conflict() {
-        assert_eq!(
-            status(DestinationError::UsedByPipeline("my-pipeline".to_string())),
+            status(DestinationError::InUse(
+                "'x' is used by 1 alert".to_string()
+            )),
             StatusCode::CONFLICT
         );
     }

@@ -24,10 +24,7 @@ use db::{
     user,
 };
 
-use crate::{
-    auth::is_ofga_unsupported,
-    common::{infra::config::ALERTS, meta::authz::Authz},
-};
+use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz};
 
 /// Helper function to ensure a prebuilt template exists for the given type.
 /// Returns the template name if successful.
@@ -369,37 +366,11 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
-    let cacher = ALERTS.read().await;
-    for (stream_key, (_, alert)) in cacher.iter() {
-        if stream_key.starts_with(&format!("{org_id}/"))
-            && alert.destinations.contains(&name.to_string())
-        {
-            return Err(DestinationError::UsedByAlert(alert.name.to_string()));
-        }
-    }
-    drop(cacher);
-
-    if let Ok(pls) = infra::pipeline::list_by_org(org_id).await {
-        for pl in pls {
-            if pl.contains_remote_destination(name) {
-                return Err(DestinationError::UsedByPipeline(pl.name));
-            }
-        }
-    }
-
-    // Folder-blind on purpose: a destination is in use if ANY workflow in the
-    // org references it, wherever it lives.
-    #[cfg(feature = "enterprise")]
-    if let Ok(workflows) = crate::workflows::list_workflows(org_id, None, None, None).await {
-        for w in workflows {
-            for node in w.nodes {
-                if let config::meta::pipeline::components::NodeData::Destination(dest) = node.data
-                    && dest.destination_id == name
-                {
-                    return Err(DestinationError::UsedByPipeline(w.id));
-                }
-            }
-        }
+    let uses = super::destination_usage::destination_usage(org_id, name).await?;
+    if !uses.is_empty() {
+        return Err(DestinationError::InUse(
+            super::destination_usage::usage_message(name, &uses),
+        ));
     }
 
     db::alerts::destinations::delete(org_id, name).await?;

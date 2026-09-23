@@ -327,6 +327,26 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     Ok(out)
 }
 
+/// Synthetics whose `destinations` array contains the given name; fails closed, unlike `list`.
+pub async fn list_referencing_destination<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    destination_name: &str,
+) -> Result<Vec<Synthetic>, errors::Error> {
+    let models = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .all(conn)
+        .await?;
+    let mut out = Vec::new();
+    for m in models {
+        let s = Synthetic::try_from(m)?;
+        if s.destinations.iter().any(|d| d == destination_name) {
+            out.push(s);
+        }
+    }
+    Ok(out)
+}
+
 /// How many checks in an org are pinned to each environment, keyed by environment id.
 pub async fn count_by_environment<C: ConnectionTrait>(
     conn: &C,

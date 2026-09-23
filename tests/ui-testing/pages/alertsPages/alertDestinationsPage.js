@@ -56,7 +56,9 @@ export class AlertDestinationsPage {
         this.importJsonFileTab = '[data-test="tab-import_json_file"]';
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
-        this.destinationInUseMessage = 'Destination is currently used by alert:';
+        // Backend message shape: "'name' is used by 2 synthetic monitors (a, b), 1 escalation
+        // policy (t) and 1 alert (my-alert)" — counts per consumer kind, with names in parens.
+        this.destinationInUseMessage = 'is used by';
         this.nextPageButton = '[data-test="alert-destinations-list-next-btn"]';
         // Search input is an OInput wrapper; inner native input uses `-field` suffix for fill/click
         this.destinationListSearchInputField = '[data-test="destination-list-search-input-field"]';
@@ -745,15 +747,16 @@ export class AlertDestinationsPage {
         await deleteButton.click();
         await this.page.locator(this.confirmButton).click();
 
-        // Check if "Destination is currently used by alert" message appears
+        // Check if the "'name' is used by ..." message appears
         try {
             const inUseMessage = await this.page.getByText(this.destinationInUseMessage).textContent({ timeout: 3000 });
 
-            // Extract alert name from message: "Destination is currently used by alert: Automation_Alert_3Igfv"
-            const match = inUseMessage.match(/alert:\s*(.+)$/);
+            // Extract alert names from a segment like "1 alert (my-alert)" or
+            // "2 alerts (alert-a, alert-b)" anywhere in the message.
+            const match = inUseMessage.match(/\d+\s+alerts?\s*\(([^)]+)\)/);
             if (match && match[1]) {
-                const alertName = match[1].trim();
-                testLogger.warn('Destination in use by alert, deleting alert first', { destinationName, alertName });
+                const alertNames = match[1].split(',').map((s) => s.trim()).filter(Boolean);
+                testLogger.warn('Destination in use by alert(s), deleting them first', { destinationName, alertNames });
 
                 // Close the error dialog
                 const closeBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
@@ -764,8 +767,10 @@ export class AlertDestinationsPage {
                 }
                 await this.page.waitForTimeout(500);
 
-                // Navigate to alerts and delete the alert
-                await this.alertsPage.searchAndDeleteAlert(alertName);
+                // Navigate to alerts and delete every blocking alert
+                for (const alertName of alertNames) {
+                    await this.alertsPage.searchAndDeleteAlert(alertName);
+                }
 
                 // Navigate back to destinations
                 await this.navigateToDestinations();
