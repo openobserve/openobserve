@@ -21,7 +21,12 @@ const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
-// outside the explorer's default "Past 15 Minutes" so the first card query is legitimately empty
+/**
+ * How far back the seeded history goes. It has to sit OUTSIDE the window the
+ * explorer opens on (its default, "Past 15 Minutes") so the first card query is
+ * legitimately empty, and INSIDE `ZO_INGEST_ALLOWED_UPTO` (5 hours in the
+ * regression workflow) so the rows are not dropped on the way in.
+ */
 const HISTORY_MINUTES_AGO = 26;
 
 const org = () => getOrgIdentifier() || 'default';

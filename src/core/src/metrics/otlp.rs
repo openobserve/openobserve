@@ -24,9 +24,9 @@ use axum::{
     response::{IntoResponse, Response as HttpResponse},
 };
 use bytes::{Bytes, BytesMut};
-use chrono::Utc;
+use chrono::{DateTime, Days, Utc};
 use config::{
-    TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
@@ -34,6 +34,7 @@ use config::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamType},
     },
+    metrics,
     utils::{
         flatten::{self, format_label_name, format_label_name_cow},
         json,
@@ -55,7 +56,6 @@ use prost::Message;
 use schema::stream_schema_exists;
 
 use super::{
-    admission,
     columnar::{self, ColumnarStream},
     ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream},
     native_histogram,
@@ -68,6 +68,8 @@ use crate::{
     },
     pipeline::batch_execution::ExecutablePipeline,
 };
+
+const TS_OUT_OF_BOUNDS: &str = "timestamp_out_of_bounds";
 
 /// A number point's labels, rebuilt per point on top of its metric's base labels.
 struct PointLabels {
@@ -140,13 +142,13 @@ struct Admission<'a> {
     org_id: &'a str,
     metric_name: &'a str,
     pipelines: &'a mut HashMap<String, Vec<ExecutablePipeline>>,
-    policies: &'a mut admission::StreamPolicies,
+    policies: &'a mut StreamPolicies,
     partial_success: &'a mut ExportMetricsPartialSuccess,
     points: &'a mut PointAdmission,
 }
 
 impl Admission<'_> {
-    async fn direct_bounds(&mut self, stream_name: &str) -> Option<admission::TimestampBounds> {
+    async fn direct_bounds(&mut self, stream_name: &str) -> Option<TimestampBounds> {
         if self.stream_has_pipeline(stream_name).await {
             None
         } else {
@@ -185,7 +187,7 @@ impl PointAdmission {
         partial_success: &mut ExportMetricsPartialSuccess,
         org_id: &str,
         stream_name: &str,
-        reason: admission::OutOfBounds,
+        reason: OutOfBounds,
     ) {
         if self.rejected.insert(id) {
             partial_success.rejected_data_points += 1;
@@ -193,6 +195,113 @@ impl PointAdmission {
             reason.count(org_id, stream_name);
         }
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TimestampBounds {
+    max_ts: i64,
+    retention: Option<(i64, i64)>,
+}
+
+impl TimestampBounds {
+    fn new(now: i64, retention_days: i64) -> Self {
+        let cfg = get_config();
+        // the upload job drops a whole day at a time, so the bound is that day's start
+        let retention = (retention_days > 0)
+            .then(|| DateTime::from_timestamp_micros(now))
+            .flatten()
+            .and_then(|now| now.checked_sub_days(Days::new(retention_days as u64)))
+            .and_then(|day| day.date_naive().and_hms_opt(0, 0, 0))
+            .map(|day| (retention_days, day.and_utc().timestamp_micros()));
+        Self {
+            max_ts: now.saturating_add(cfg.limit.ingest_allowed_in_future_micro),
+            retention,
+        }
+    }
+
+    fn check(&self, timestamp: i64) -> std::result::Result<(), OutOfBounds> {
+        if timestamp > self.max_ts {
+            return Err(OutOfBounds::Future);
+        }
+        match self.retention {
+            Some((days, min_ts)) if timestamp < min_ts => Err(OutOfBounds::Retention(days)),
+            _ => Ok(()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OutOfBounds {
+    Future,
+    Retention(i64),
+}
+
+impl OutOfBounds {
+    fn message(&self) -> String {
+        match self {
+            Self::Future => schema::get_future_discard_error().to_string(),
+            Self::Retention(days) => format!(
+                "Too old data, older than the stream's data retention of {days} days and would be deleted. Data discarded."
+            ),
+        }
+    }
+
+    fn count(&self, org_id: &str, stream_name: &str) {
+        metrics::INGEST_ERRORS
+            .with_label_values(&[
+                org_id,
+                StreamType::Metrics.as_str(),
+                stream_name,
+                TS_OUT_OF_BOUNDS,
+            ])
+            .inc();
+    }
+}
+
+struct StreamPolicies {
+    org_id: String,
+    now: i64,
+    by_stream: HashMap<String, StreamPolicy>,
+}
+
+impl StreamPolicies {
+    fn new(org_id: &str, now: i64) -> Self {
+        Self {
+            org_id: org_id.to_string(),
+            now,
+            by_stream: HashMap::new(),
+        }
+    }
+
+    async fn get(&mut self, stream_name: &str) -> StreamPolicy {
+        if let Some(policy) = self.by_stream.get(stream_name) {
+            return *policy;
+        }
+        let deleting = db::compact::retention::is_deleting_stream(
+            &self.org_id,
+            StreamType::Metrics,
+            stream_name,
+            None,
+        );
+        let retention_days =
+            infra::schema::get_settings(&self.org_id, stream_name, StreamType::Metrics)
+                .await
+                .map(|s| s.data_retention)
+                .filter(|days| *days > 0)
+                .unwrap_or_else(|| get_config().compact.data_retention_days);
+        let policy = StreamPolicy {
+            deleting,
+            bounds: TimestampBounds::new(self.now, retention_days),
+        };
+        self.by_stream.insert(stream_name.to_string(), policy);
+        policy
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct StreamPolicy {
+    deleting: bool,
+    bounds: TimestampBounds,
 }
 
 pub async fn otlp_proto(
@@ -283,7 +392,7 @@ pub async fn handle_otlp_request(
 
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let mut policies = admission::StreamPolicies::new(org_id, started_at);
+    let mut policies = StreamPolicies::new(org_id, started_at);
 
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
@@ -1006,7 +1115,7 @@ async fn admit_record_groups(
 
 async fn admit_otlp_pipeline_outputs(
     outputs: &mut RecordsByStream<usize>,
-    policies: &mut admission::StreamPolicies,
+    policies: &mut StreamPolicies,
     points: &mut PointAdmission,
     partial_success: &mut ExportMetricsPartialSuccess,
 ) {
@@ -1460,7 +1569,40 @@ mod tests {
         const NOW: i64 = 1_700_000_000_000_000;
         const DAY: i64 = 86_400_000_000;
 
-        async fn policies(org: &str, streams: &[(&str, i64)]) -> admission::StreamPolicies {
+        #[test]
+        fn test_timestamp_bounds_refuse_the_future_window_and_retention() {
+            let hour = 3600 * 1_000_000;
+            let day = 24 * hour;
+            let in_future = get_config().limit.ingest_allowed_in_future_micro;
+            let now = 1_700_000_000 * 1_000_000;
+            let bounds = TimestampBounds::new(now, 7);
+
+            assert_eq!(bounds.check(now), Ok(()));
+            assert_eq!(bounds.check(now + in_future), Ok(()));
+            assert_eq!(bounds.check(now + in_future + 1), Err(OutOfBounds::Future));
+            assert_eq!(bounds.check(i64::MAX), Err(OutOfBounds::Future));
+
+            // the retention day itself is kept whole, exactly as the upload job keeps it
+            let retention_day_start = (now - 7 * day) / day * day;
+            assert_eq!(bounds.check(retention_day_start), Ok(()));
+            assert_eq!(bounds.check(now - 7 * day), Ok(()));
+            assert_eq!(
+                bounds.check(retention_day_start - 1),
+                Err(OutOfBounds::Retention(7))
+            );
+            assert_eq!(bounds.check(0), Err(OutOfBounds::Retention(7)));
+        }
+
+        #[test]
+        fn test_timestamp_bounds_without_retention_only_refuse_the_future() {
+            let now = 1_700_000_000 * 1_000_000;
+            let bounds = TimestampBounds::new(now, 0);
+            assert_eq!(bounds.check(0), Ok(()));
+            assert_eq!(bounds.check(now - 365 * 24 * 3600 * 1_000_000), Ok(()));
+            assert_eq!(bounds.check(i64::MAX), Err(OutOfBounds::Future));
+        }
+
+        async fn policies(org: &str, streams: &[(&str, i64)]) -> StreamPolicies {
             for (stream, days) in streams {
                 infra::schema::put_stream_settings(
                     format!("{org}/metrics/{stream}"),
@@ -1471,7 +1613,7 @@ mod tests {
                 )
                 .await;
             }
-            admission::StreamPolicies::new(org, NOW)
+            StreamPolicies::new(org, NOW)
         }
 
         fn point(timestamp: i64, name: Option<&str>) -> NumberDataPoint {
@@ -1728,10 +1870,8 @@ mod tests {
         async fn destination_policy_uses_global_fallback_and_request_cache() {
             let org = "otlp_policy_cache";
             let mut policies = policies(org, &[("fallback", 0), ("cached", 30)]).await;
-            let expected = admission::TimestampBounds::new(
-                NOW,
-                config::get_config().compact.data_retention_days,
-            );
+            let expected =
+                TimestampBounds::new(NOW, config::get_config().compact.data_retention_days);
             let fallback = policies.get("fallback").await.bounds;
             for timestamp in [0, NOW - 10 * DAY, NOW, i64::MAX] {
                 assert_eq!(fallback.check(timestamp), expected.check(timestamp));
@@ -1752,14 +1892,14 @@ mod tests {
                 policies.get("cached").await.bounds.check(NOW - 10 * DAY),
                 Ok(())
             );
-            let mut next_request = admission::StreamPolicies::new(org, NOW);
+            let mut next_request = StreamPolicies::new(org, NOW);
             assert_eq!(
                 next_request
                     .get("cached")
                     .await
                     .bounds
                     .check(NOW - 10 * DAY),
-                Err(admission::OutOfBounds::Retention(1))
+                Err(OutOfBounds::Retention(1))
             );
         }
 
@@ -1823,7 +1963,7 @@ mod tests {
                 .write()
                 .await
                 .insert(stream.clone(), vec![pipeline("base", &["archive"]).await]);
-            let mut policies = admission::StreamPolicies::new("otlp_empty", NOW);
+            let mut policies = StreamPolicies::new("otlp_empty", NOW);
             let mut pipelines = HashMap::new();
             let mut partial = ExportMetricsPartialSuccess::default();
             let mut points = PointAdmission::default();
@@ -1989,7 +2129,7 @@ mod tests {
             ] {
                 let partial = ExportMetricsPartialSuccess {
                     rejected_data_points: 2,
-                    error_message: admission::OutOfBounds::Future.message(),
+                    error_message: OutOfBounds::Future.message(),
                 };
                 let response = format_response(partial.clone(), req_type).unwrap();
                 let body = axum::body::to_bytes(response.into_body(), usize::MAX)

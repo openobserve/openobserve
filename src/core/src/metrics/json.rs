@@ -44,10 +44,7 @@ use db::{self, alerts::alert::cache_stream_key};
 use infra::schema::SchemaCache;
 use ingestion_common::{IngestionResponse, StreamStatus};
 
-use super::{
-    admission,
-    ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream},
-};
+use super::ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream};
 use crate::{
     common::meta::{authz::Authz, stream::SchemaRecords},
     ingestion::{TriggerAlertData, check_ingestion_allowed},
@@ -62,6 +59,7 @@ const ENDPOINT: &str = "/api/org/ingest/metrics/_json";
 type Row = (json::Map<String, json::Value>, i64);
 
 /// Per-request lookups, each filled the first time a stream is seen.
+#[derive(Default)]
 struct StreamLookups {
     schemas: HashMap<String, SchemaCache>,
     pipelines: HashMap<String, Vec<ExecutablePipeline>>,
@@ -70,22 +68,7 @@ struct StreamLookups {
     need_all_values: HashMap<String, bool>,
     partitions: HashMap<String, Vec<StreamPartition>>,
     alerts: HashMap<String, Vec<Alert>>,
-    policies: admission::StreamPolicies,
-}
-
-impl StreamLookups {
-    fn new(org_id: &str, now: i64) -> Self {
-        Self {
-            schemas: HashMap::new(),
-            pipelines: HashMap::new(),
-            user_defined_schemas: HashMap::new(),
-            need_original: HashMap::new(),
-            need_all_values: HashMap::new(),
-            partitions: HashMap::new(),
-            alerts: HashMap::new(),
-            policies: admission::StreamPolicies::new(org_id, now),
-        }
-    }
+    deleting: HashMap<String, bool>,
 }
 
 /// The value a JSON metric record carries, put through the same policy as every other
@@ -115,7 +98,7 @@ fn parse_metric_value(value: &json::Value) -> Result<json::Value, anyhow::Error>
     super::metric_value(raw).ok_or_else(|| anyhow!("invalid value, not a number"))
 }
 
-/// Queues a record for its pipelines or write, or records why it was refused; `false` if deleting.
+/// Queues a validated record for its pipelines or its write; `false` if its stream is deleting.
 async fn buffer_record(
     org_id: &str,
     stream_name: Option<&str>,
@@ -123,7 +106,6 @@ async fn buffer_record(
     lookups: &mut StreamLookups,
     pipeline_inputs: &mut PipelineInputs<&'static str>,
     records_by_stream: &mut RecordsByStream<&'static str>,
-    stream_status_map: &mut HashMap<String, StreamStatus>,
 ) -> Result<bool> {
     let json::Value::Object(mut record) = flatten::flatten(record)? else {
         unreachable!("flatten only returns an object")
@@ -147,8 +129,21 @@ async fn buffer_record(
         *v = json::Value::String(stream_name.clone());
     }
 
-    let policy = lookups.policies.get(&stream_name).await;
-    if policy.deleting {
+    // check stream if it is deleting
+    let is_deleting = match lookups.deleting.get(&stream_name) {
+        Some(v) => *v,
+        None => {
+            let flag = db::compact::retention::is_deleting_stream(
+                org_id,
+                StreamType::Metrics,
+                &stream_name,
+                None,
+            );
+            lookups.deleting.insert(stream_name.clone(), flag);
+            flag
+        }
+    };
+    if is_deleting {
         return Ok(false);
     }
 
@@ -185,33 +180,6 @@ async fn buffer_record(
         ));
     };
 
-    let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
-        None => now_micros(),
-        // `as_f64` is `None` for a literal out of f64 range (`1e400`), which unwrapping
-        // turned into a panic on a request body anyone can send
-        Some(json::Value::Number(s)) => time::parse_i64_to_timestamp_micros(
-            s.as_f64()
-                .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?
-                as i64,
-        ),
-        Some(_) => {
-            return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
-        }
-    };
-    let has_pipeline = lookups
-        .pipelines
-        .get(&stream_name)
-        .is_some_and(|v| !v.is_empty());
-    // a pipeline picks the destination, whose bounds apply to its output instead
-    if !has_pipeline && let Err(reason) = policy.bounds.check(timestamp) {
-        refuse_record(stream_status_map, org_id, &stream_name, reason);
-        return Ok(true);
-    }
-    record.insert(
-        TIMESTAMP_COL_NAME.to_string(),
-        json::Value::Number(timestamp.into()),
-    );
-
     if !lookups.schemas.contains_key(&stream_name) {
         let mut schema = infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
         if schema == Schema::empty() {
@@ -231,7 +199,29 @@ async fn buffer_record(
             .insert(stream_name.clone(), SchemaCache::new(schema));
     }
 
-    if has_pipeline {
+    let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
+        None => now_micros(),
+        // `as_f64` is `None` for a literal out of f64 range (`1e400`), which unwrapping
+        // turned into a panic on a request body anyone can send
+        Some(json::Value::Number(s)) => time::parse_i64_to_timestamp_micros(
+            s.as_f64()
+                .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?
+                as i64,
+        ),
+        Some(_) => {
+            return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
+        }
+    };
+    record.insert(
+        TIMESTAMP_COL_NAME.to_string(),
+        json::Value::Number(timestamp.into()),
+    );
+
+    if lookups
+        .pipelines
+        .get(&stream_name)
+        .is_some_and(|v| !v.is_empty())
+    {
         pipeline_inputs
             .entry(stream_name)
             .or_default()
@@ -245,20 +235,6 @@ async fn buffer_record(
             .push((record, metric_type));
     }
     Ok(true)
-}
-
-fn refuse_record(
-    stream_status_map: &mut HashMap<String, StreamStatus>,
-    org_id: &str,
-    stream_name: &str,
-    reason: admission::OutOfBounds,
-) {
-    let status = stream_status_map
-        .entry(stream_name.to_string())
-        .or_insert_with(|| StreamStatus::new(stream_name));
-    status.status.failed += 1;
-    status.status.error = reason.message();
-    reason.count(org_id, stream_name);
 }
 
 /// One stream's rows, each with a checked value, `__hash__` and string labels, and its first type.
@@ -445,7 +421,7 @@ pub async fn ingest(
     let start = Instant::now();
     let started_at = now_micros();
 
-    let mut lookups = StreamLookups::new(org_id, started_at);
+    let mut lookups = StreamLookups::default();
     let mut stream_status_map: HashMap<String, StreamStatus> = HashMap::new();
     let mut pipeline_inputs: PipelineInputs<&'static str> = HashMap::new();
     let mut records_by_stream: RecordsByStream<&'static str> = HashMap::new();
@@ -460,7 +436,6 @@ pub async fn ingest(
             &mut lookups,
             &mut pipeline_inputs,
             &mut records_by_stream,
-            &mut stream_status_map,
         )
         .await?;
         if !buffered {
@@ -473,7 +448,7 @@ pub async fn ingest(
         log::warn!("[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted");
     }
 
-    let (mut pipeline_outputs, failures) = ingest::run_pipelines(
+    let (pipeline_outputs, failures) = ingest::run_pipelines(
         org_id,
         &lookups.pipelines,
         pipeline_inputs,
@@ -495,12 +470,6 @@ pub async fn ingest(
             stream_status.status.error = message;
         }
     }
-    admission::admit_pipeline_outputs(
-        &mut pipeline_outputs,
-        &mut lookups.policies,
-        |stream, reason| refuse_record(&mut stream_status_map, org_id, stream, reason),
-    )
-    .await;
     for (stream_name, records) in pipeline_outputs {
         records_by_stream
             .entry(stream_name)
