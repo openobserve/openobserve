@@ -13383,6 +13383,7 @@
       "searchHistoryNotEnabled": "Arama geçmişi etkin değil.",
       "enableUsageReporting": "Kullanım raporlamasını etkinleştirmek için ZO_USAGE_REPORTING_ENABLED'ı true olarak ayarlayın.",
       "selectStreamToExtractPatterns": "Desenleri çıkarmak için lütfen bir akış seçin",
+      "patternsUnavailableForMultiStream": "Birden fazla akış seçildiğinde desenler kullanılamaz. Lütfen tek bir akış seçin.",
       "errorExtractingPatterns": "Desenler çıkarılırken hata. Lütfen tekrar deneyin.",
       "nameOfPanelRequired": "Panel adı gerekli",
       "errorsFixAndTryAgain": "Bazı hatalar var, lütfen düzeltin ve tekrar deneyin",

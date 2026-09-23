@@ -13383,6 +13383,7 @@
       "searchHistoryNotEnabled": "検索履歴が有効になっていません。",
       "enableUsageReporting": "使用状況レポートを有効にするには、ZO_USAGE_REPORTING_ENABLED を true に設定してください。",
       "selectStreamToExtractPatterns": "パターンを抽出するストリームを選択してください",
+      "patternsUnavailableForMultiStream": "複数のストリームが選択されている場合、パターンは利用できません。ストリームを1つだけ選択してください。",
       "errorExtractingPatterns": "パターンの抽出中にエラーが発生しました。もう一度お試しください。",
       "nameOfPanelRequired": "パネルの名前が必要です",
       "errorsFixAndTryAgain": "いくつかのエラーがあります。修正してからもう一度お試しください。",

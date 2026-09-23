@@ -13383,6 +13383,7 @@
       "searchHistoryNotEnabled": "L'historique de recherche n'est pas activé.",
       "enableUsageReporting": "Définissez ZO_USAGE_REPORTING_ENABLED sur true pour activer le rapport d'utilisation.",
       "selectStreamToExtractPatterns": "Veuillez sélectionner un flux pour extraire les motifs",
+      "patternsUnavailableForMultiStream": "Les motifs ne sont pas disponibles lorsque plusieurs flux sont sélectionnés. Veuillez sélectionner un seul flux.",
       "errorExtractingPatterns": "Erreur lors de l'extraction des motifs. Veuillez réessayer.",
       "nameOfPanelRequired": "Le nom du panneau est requis",
       "errorsFixAndTryAgain": "Il y a des erreurs, veuillez les corriger et réessayer",

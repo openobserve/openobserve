@@ -13383,6 +13383,7 @@
       "searchHistoryNotEnabled": "سجل البحث غير مفعل.",
       "enableUsageReporting": "قم بضبط ZO_USAGE_REPORTING_ENABLED على true لتفعيل تقارير الاستخدام.",
       "selectStreamToExtractPatterns": "يرجى اختيار تدفق لاستخراج الأنماط",
+      "patternsUnavailableForMultiStream": "الأنماط غير متاحة عند تحديد عدة جداول. يرجى تحديد جدول واحد.",
       "errorExtractingPatterns": "خطأ في استخراج الأنماط. يرجى المحاولة مرة أخرى.",
       "nameOfPanelRequired": "اسم اللجنة مطلوب",
       "errorsFixAndTryAgain": "هناك بعض الأخطاء، يرجى تصحيحها والمحاولة مرة أخرى",

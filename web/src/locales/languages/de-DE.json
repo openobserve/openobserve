@@ -13383,6 +13383,7 @@
       "searchHistoryNotEnabled": "Suchverlauf ist nicht aktiviert.",
       "enableUsageReporting": "Setzen Sie ZO_USAGE_REPORTING_ENABLED auf true, um die Nutzungsberichterstattung zu aktivieren.",
       "selectStreamToExtractPatterns": "Bitte wählen Sie einen Stream aus, um Muster zu extrahieren",
+      "patternsUnavailableForMultiStream": "Muster sind nicht verfügbar, wenn mehrere Streams ausgewählt sind. Bitte wählen Sie einen einzelnen Stream aus.",
       "errorExtractingPatterns": "Fehler beim Extrahieren von Mustern. Bitte versuchen Sie es erneut.",
       "nameOfPanelRequired": "Name des Panels ist erforderlich",
       "errorsFixAndTryAgain": "Es gibt einige Fehler, bitte beheben Sie diese und versuchen Sie es erneut",

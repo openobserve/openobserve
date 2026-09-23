@@ -13383,6 +13383,7 @@
       "searchHistoryNotEnabled": "Lịch sử tìm kiếm không được bật.",
       "enableUsageReporting": "Đặt ZO_USAGE_REPORTING_ENABLED thành true để bật báo cáo sử dụng.",
       "selectStreamToExtractPatterns": "Vui lòng chọn một stream để trích xuất mẫu",
+      "patternsUnavailableForMultiStream": "Không có mẫu khi chọn nhiều stream. Vui lòng chọn một stream.",
       "errorExtractingPatterns": "Lỗi khi trích xuất mẫu. Vui lòng thử lại.",
       "nameOfPanelRequired": "Tên của bảng là bắt buộc",
       "errorsFixAndTryAgain": "Có một số lỗi, vui lòng sửa chúng và thử lại",

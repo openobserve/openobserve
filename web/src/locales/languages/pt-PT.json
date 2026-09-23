@@ -13383,6 +13383,7 @@
       "searchHistoryNotEnabled": "O histórico de pesquisa não está ativado.",
       "enableUsageReporting": "Defina ZO_USAGE_REPORTING_ENABLED como true para ativar o relatório de uso.",
       "selectStreamToExtractPatterns": "Selecione um stream para extrair padrões",
+      "patternsUnavailableForMultiStream": "Padrões não estão disponíveis quando vários streams são selecionados. Selecione um único stream.",
       "errorExtractingPatterns": "Erro ao extrair padrões. Tente novamente.",
       "nameOfPanelRequired": "O nome do painel é obrigatório",
       "errorsFixAndTryAgain": "Há alguns erros, corrija-os e tente novamente",

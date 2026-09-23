@@ -13383,6 +13383,7 @@
       "searchHistoryNotEnabled": "La cronologia delle ricerche non è abilitata.",
       "enableUsageReporting": "Imposta ZO_USAGE_REPORTING_ENABLED su true per abilitare il report di utilizzo.",
       "selectStreamToExtractPatterns": "Seleziona un flusso per estrarre i pattern",
+      "patternsUnavailableForMultiStream": "I pattern non sono disponibili quando sono selezionati più stream. Seleziona un singolo stream.",
       "errorExtractingPatterns": "Errore nell'estrazione dei pattern. Riprova.",
       "nameOfPanelRequired": "Il nome del pannello è obbligatorio",
       "errorsFixAndTryAgain": "Ci sono alcuni errori, correggili e riprova",
