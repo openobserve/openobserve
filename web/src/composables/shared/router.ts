@@ -216,6 +216,15 @@ const useRoutes = () => {
         titleKey: "routeTitles.slackOAuthCallback",
       },
     },
+    {
+      path: "/public/dashboards/:slug",
+      name: "publicDashboard",
+      component: () => import("@/views/Dashboards/PublicDashboard.vue"),
+      meta: {
+        public: true,
+        titleKey: "dashboard.header",
+      },
+    },
   ];
 
   const homeChildRoutes = [
