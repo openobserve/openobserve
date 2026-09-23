@@ -306,8 +306,12 @@ if (fs.existsSync(specsRoot)) {
   log(`specs tree ${specsRoot} not present — skipping the spec-exists check`);
 }
 
-let emitted = include.filter((s) => (s.run_files || []).length);
+// Everything downstream — smoke selection included — sees only shards that actually run,
+// so a documentation-only entry can never be selected, validated against smoke_config or
+// emitted as a job with an empty run_files.
+const runnable = include.filter((s) => (s.run_files || []).length);
 if (docOnly.length) log(`documentation-only (never run): ${docOnly.join(", ")}`);
+let emitted = runnable;
 if (changedFilesPath) {
   // Selection only exists for pull_request; merge_group/push must always get the full matrix.
   const event = process.env.GITHUB_EVENT_NAME;
@@ -332,7 +336,7 @@ if (changedFilesPath) {
       log(`merged smoke config overlay ${entConfigPath}`);
     }
   }
-  validateSmokeConfig(include, config);
+  validateSmokeConfig(runnable, config);
   let raw;
   try {
     raw = fs.readFileSync(changedFilesPath, "utf8");
@@ -343,16 +347,16 @@ if (changedFilesPath) {
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
-  const selected = selectShards(include, config, changedFiles);
+  const selected = selectShards(runnable, config, changedFiles);
   if (selected) {
     emitted = selected;
     log(
-      `smoke: ${emitted.length}/${include.length} shards — ${emitted
+      `smoke: ${emitted.length}/${runnable.length} shards — ${emitted
         .map((s) => s.testfolder)
         .join(", ")}`
     );
   } else {
-    log(`smoke: falling back to full matrix (${include.length} shards)`);
+    log(`smoke: falling back to full matrix (${runnable.length} shards)`);
   }
 }
 

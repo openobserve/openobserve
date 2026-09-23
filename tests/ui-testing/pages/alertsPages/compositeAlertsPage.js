@@ -419,7 +419,9 @@ export class CompositeAlertsPage {
    *
    * Only what the select has RENDERED: a searchable OSelect windows its list,
    * so treat this as "does not offer" evidence for a small fixture set, never
-   * as the complete option universe.
+   * as the complete option universe. `searchText` narrows the list first so the
+   * fixtures under test are inside the window; `settleOn` is the option value to
+   * wait for before reading, so the filtered list is not read mid-render.
    */
   async optionIdsFor(id, searchText, settleOn) {
     const base = this.locators.childSelectBase(id);

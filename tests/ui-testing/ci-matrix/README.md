@@ -139,10 +139,12 @@ Review the delta on purpose now and then instead — monthly is plenty. Nothing 
 it, and nothing should: an alpha shard is only worth adding once someone has confirmed it
 passes there.
 
-The one thing CI does enforce is that this manifest cannot name a spec that no longer
-exists: the shard's test step fails on a missing file. That is the failure which kept
-`logsQueryBuilder.spec.js` listed for ~4 months after it was split, silently costing the
-shard its coverage while the job stayed green.
+The one thing CI does enforce is that a manifest cannot name a spec that no longer exists.
+For `ci_matrix_cloud.json` that check lives in the shard's own test step, because alpha1
+builds its matrix directly from the manifest; for the manifests built through
+`build-ci-matrix.js` it happens earlier, at `generate_matrix`. Neither existed when
+`logsQueryBuilder.spec.js` stayed listed for ~4 months after it was split — the test step
+printed a cross and carried on, so the shard lost its coverage while the job stayed green.
 
 ### Deciding whether a spec belongs on alpha
 
