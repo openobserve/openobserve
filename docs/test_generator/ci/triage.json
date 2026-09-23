@@ -1,0 +1,26 @@
+{
+  "feature_slug": "logs-patterns-multi-stream-guard",
+  "feature_title": "Logs Patterns Multi-Stream Guard",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "searchPatternsMultiStream.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/searchPatternsMultiStream.spec.js",
+  "playwright_group": "Logs-Features",
+  "source_files": [
+    "web/src/plugins/logs/Index.vue",
+    "web/src/composables/useLogs/usePatterns.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives under web/src/** (web/src/plugins/logs/Index.vue, web/src/composables/useLogs/usePatterns.ts, web/src/locales/languages/*.json) plus scripts/translations/. No path is under enterprise-owned directories and none of the enterprise keyword signals (cipher, SSO, SAML, RBAC, SDR, sensitive-data, logo-management) appear in the changed paths or symbols, so this is an open-source change.",
+    "skip": "Not skipped. The change is user-facing: web/src/plugins/logs/Index.vue now intercepts multi-stream pattern extraction and shows an error notification while clearing stale pattern results. No skip marker, label, or skip comment was provided (trigger_comment.txt and feature_hint.txt are empty).",
+    "e2e": "E2E is warranted. The diff alters a user-exercisable UI flow in the Logs page: when more than one stream is selected (non-SQL mode), the app now cancels/clears patterns and surfaces a notification instead of letting the request fail server-side and leaving stale single-stream results on screen. This interaction and its clearing behavior need UI verification.",
+    "area": "Area is Logs. The bulk of the UI change is in web/src/plugins/logs/Index.vue with supporting logic in web/src/composables/useLogs/usePatterns.ts, and the existing patterns sibling spec (searchPatterns.spec.js) lives under tests/ui-testing/playwright-tests/Logs/.",
+    "group": "playwright_group is Logs-Features. That matrix shard (actual_folder Logs) already owns the closest sibling spec searchPatterns.spec.js alongside other Logs feature specs such as indexquery.spec.js and shareLink.spec.js, so the new patterns multi-stream guard belongs there.",
+    "existing_tests": "No E2E specs in the diff. No files under tests/ui-testing/playwright-tests/ were changed (the changed files are only web/src/** and scripts/translations/**), so there is no existing Playwright coverage to extend or reconcile."
+  }
+}

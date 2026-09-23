@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/searchPatternsMultiStream.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/searchPatterns.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-multistream-share-url.spec.js",
+    "tests/ui-testing/playwright-tests/Streams/multiselect-stream.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "searchPatterns.spec.js is @enterprise-tagged and covers the data-dependent patterns-extraction happy path (ingestion + FTS + enable_log_patterns_extraction), not the OSS client-side multi-stream guard. The multiselect/share-url specs exercise multi-stream selection but never enter patterns mode. No existing spec asserts the guard's toast or its skip-before-API behavior, so a brand-new OSS spec is required; run-context spec_path is searchPatternsMultiStream.spec.js, which must be registered under the Logs-Features shard in ci_matrix.json."
+}

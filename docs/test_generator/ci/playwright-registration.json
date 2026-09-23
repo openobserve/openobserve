@@ -1,0 +1,6 @@
+{
+  "group": "Logs-Features",
+  "spec_filename": "searchPatternsMultiStream.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}
