@@ -2680,4 +2680,113 @@ export default class DashboardVariablesScoped {
     await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${typeValue}"]`).click();
     await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
   }
+
+  // ==========================================
+  // Dashboard Refresh Without Cache
+  // ==========================================
+
+  /**
+   * Open the dashboard refresh-options dropdown (the caret beside Refresh).
+   */
+  async openDashboardRefreshOptions() {
+    const trigger = this.page.locator('[data-test="dashboard-refresh-options-btn"]');
+    await trigger.waitFor({ state: "visible", timeout: 15000 });
+    await trigger.click();
+  }
+
+  /**
+   * Locator for the dashboard-level "Refresh Cache & Reload" menu item.
+   * @returns {import('@playwright/test').Locator}
+   */
+  getRefreshWithoutCacheMenuItem() {
+    return this.page.locator('[data-test="dashboard-refresh-without-cache-btn"]');
+  }
+
+  /**
+   * Open the refresh-options dropdown, click "Refresh Cache & Reload", and wait
+   * for the resulting _search_stream request carrying clear_cache=true. Returns
+   * the matched request URL so the caller can assert the cache flag.
+   * @returns {Promise<URL>}
+   */
+  async clickRefreshWithoutCacheAndWaitForClearCache() {
+    await this.openDashboardRefreshOptions();
+    const item = this.getRefreshWithoutCacheMenuItem();
+    await item.waitFor({ state: "visible", timeout: 10000 });
+
+    const [request] = await Promise.all([
+      this.page.waitForRequest(
+        (req) => req.url().includes("_search_stream") && req.url().includes("clear_cache=true"),
+        { timeout: 30000 }
+      ),
+      item.click(),
+    ]);
+    return new URL(request.url());
+  }
+
+  /**
+   * Locator for a panel's kebab dropdown button by its title.
+   * @param {string} title - Panel title
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelKebab(title) {
+    return this.page.locator(`[data-test="dashboard-edit-panel-${title}-dropdown"]`);
+  }
+
+  /**
+   * Locator for the panel-level "Refresh Cache & Reload" menu item.
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelRefreshWithoutCacheItem() {
+    return this.page.locator('[data-test="dashboard-refresh-without-cache"]');
+  }
+
+  /**
+   * Open a panel's kebab dropdown, click its "Refresh Cache & Reload" item, and
+   * wait for the resulting _search_stream request carrying clear_cache=true.
+   * @param {string} title - Panel title (kebab data-test suffix)
+   * @returns {Promise<URL>}
+   */
+  async clickPanelRefreshWithoutCacheAndWaitForClearCache(title) {
+    const kebab = this.getPanelKebab(title);
+    await kebab.waitFor({ state: "visible", timeout: 15000 });
+
+    // Reka UI dropdowns can drop a click that lands mid-animation — retry once.
+    const item = this.getPanelRefreshWithoutCacheItem();
+    const openItem = async () => {
+      await kebab.click();
+      await item.waitFor({ state: "visible", timeout: 10000 });
+    };
+    try {
+      await openItem();
+    } catch {
+      await this.page.keyboard.press("Escape");
+      await openItem();
+    }
+
+    const [request] = await Promise.all([
+      this.page.waitForRequest(
+        (req) => req.url().includes("_search_stream") && req.url().includes("clear_cache=true"),
+        { timeout: 30000 }
+      ),
+      item.click(),
+    ]);
+    return new URL(request.url());
+  }
+
+  /**
+   * Click the standard dashboard Refresh (cache ON) and wait for the resulting
+   * _search_stream request, returning its URL so the caller can assert the
+   * clear_cache param is absent.
+   * @returns {Promise<URL>}
+   */
+  async clickDashboardRefreshAndWaitForSearch() {
+    const [request] = await Promise.all([
+      this.page.waitForRequest(
+        (req) => req.url().includes("_search_stream"),
+        { timeout: 30000 }
+      ),
+      this.clickDashboardRefresh(),
+    ]);
+    return new URL(request.url());
+  }
 }

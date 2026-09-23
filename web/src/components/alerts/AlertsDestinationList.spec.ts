@@ -552,7 +552,7 @@ describe("AlertsDestinationList", () => {
 
   // ── pagination restoration ──────────────────────────────────────────────────
   // OTable is stubbed in this harness (see OTableStub above), so the actual
-  // TanStack pageIndex restoration (setTimeout(0) + table.setPageIndex) cannot
+  // TanStack pageIndex restoration (setTimeout(0) + OTable restorePage) cannot
   // be exercised end-to-end here. These tests cover what IS reachable: seeding
   // currentPage from the URL, and that navigating to/from the add/edit/import
   // views preserves the `page` query param instead of stripping it.

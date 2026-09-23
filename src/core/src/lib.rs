@@ -56,6 +56,8 @@ pub mod public_dashboards;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 use search_service as search;
+#[cfg(feature = "profiling")]
+pub mod self_profiles;
 pub mod self_reporting;
 pub mod service;
 pub mod session;

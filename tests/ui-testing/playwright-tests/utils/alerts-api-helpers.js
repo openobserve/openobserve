@@ -331,6 +331,15 @@ async function ingest(page, stream, rows) {
   return api(page, 'post', `${urls().v1}/${stream}/_json`, rows);
 }
 
+/**
+ * Delete a stream by name. `delete_all` stays false so a scheduled alert that
+ * references the stream is left orphaned — which is exactly what the chart
+ * error-state spec needs to make `generate_sql` fail on the detail page.
+ */
+async function deleteStream(page, stream, type = 'logs') {
+  return api(page, 'delete', `${urls().v1}/streams/${stream}?type=${type}`);
+}
+
 /** Per-group state of a multi-alert (empty list on a simple alert). */
 async function getAlertGroups(page, alertId) {
   const r = await api(page, 'get', `${urls().v2}/alerts/${alertId}/groups`);
@@ -395,6 +404,6 @@ module.exports = {
   createAlert, listAlerts, findAlertId, getAlert, deleteAlerts,
   seedAlertFixtures, seedAlertFixturesOnce,
   listAlertsInFolder, findAlertIdInFolder, deleteAlertInFolder, deleteAlertFolder,
-  createAlertFolder, ingest, getAlertGroups, getAlertTransitions,
+  createAlertFolder, ingest, deleteStream, getAlertGroups, getAlertTransitions,
   waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,
 };

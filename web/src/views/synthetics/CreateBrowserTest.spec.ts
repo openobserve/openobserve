@@ -28,12 +28,16 @@ const {
   mockServiceCreate,
   mockServiceUpdate,
   mockServiceGet,
+  mockServiceListEnvironments,
+  mockServiceListGlobalVariables,
   mockRouterPush,
   mockRouterReplace,
   mockToast,
   mockRecorderStopReplay,
+  mockRecorderReplay,
   mockRecorderReplayPhase,
   mockDetectExtension,
+  mockJourneyToWireSteps,
   mockGetFoldersListByType,
   mockRoute,
 } = vi.hoisted(() => ({
@@ -43,17 +47,24 @@ const {
   mockServiceCreate: vi.fn().mockResolvedValue({ data: { id: "new-check-1" } }),
   mockServiceUpdate: vi.fn().mockResolvedValue({}),
   mockServiceGet: vi.fn().mockResolvedValue({ data: {} }),
+  // The shared tiers replay resolves against; empty unless a case fills them.
+  mockServiceListEnvironments: vi.fn().mockResolvedValue({ data: [] }),
+  mockServiceListGlobalVariables: vi.fn().mockResolvedValue({ data: [] }),
   mockRouterPush: vi.fn(),
   mockRouterReplace: vi.fn(),
   mockToast: vi.fn(() => vi.fn()),
   // Shared so a test can assert the view delegates the stop instead of driving
   // the phase itself. The composable owns stopping → stopped.
   mockRecorderStopReplay: vi.fn().mockResolvedValue(undefined),
+  // Shared so a replay case can read the url and variables the view resolved.
+  mockRecorderReplay: vi.fn().mockResolvedValue({}),
   mockRecorderReplayPhase: { value: "idle" },
   // Shared so tests can flip the warm extension probe (mount) and the Record
   // click probe — both go through recorder.detectExtension.
   mockDetectExtension: vi.fn().mockResolvedValue(false),
   mockGetFoldersListByType: vi.fn().mockResolvedValue([]),
+  // Empty by default, so runReplay returns before it touches the recorder.
+  mockJourneyToWireSteps: vi.fn(() => [] as unknown[]),
   // Mutable so a test can drive `?folder=` — the preselected folder is read
   // from the route on mount.
   mockRoute: { params: {} as Record<string, string>, query: {} as Record<string, string> },
@@ -76,7 +87,7 @@ vi.mock("@/composables/useSyntheticsRecorder", () => ({
     activeStepId: { value: null },
     replayResult: { value: null },
     error: { value: null },
-    replay: vi.fn().mockResolvedValue({}),
+    replay: mockRecorderReplay,
     stopReplay: mockRecorderStopReplay,
     stopReplayAndForget: vi.fn(),
     registerAutoDetect: vi.fn(),
@@ -99,6 +110,8 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
       create: mockServiceCreate,
       update: mockServiceUpdate,
       get: mockServiceGet,
+      listEnvironments: mockServiceListEnvironments,
+      listGlobalVariables: mockServiceListGlobalVariables,
     },
   });
 });
@@ -126,7 +139,7 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 }));
 
 vi.mock("@/utils/synthetics/mapRecordedStep", () => ({
-  journeyToWireSteps: vi.fn(() => []),
+  journeyToWireSteps: mockJourneyToWireSteps,
 }));
 
 vi.mock("@/components/synthetics/CreateBrowserTest.schema", () => {
@@ -347,6 +360,7 @@ describe("CreateBrowserTest", () => {
     // Re-primed here because clearAllMocks keeps implementations — a test that
     // resolves the probe true must not leak into the next one.
     mockDetectExtension.mockResolvedValue(false);
+    mockServiceListEnvironments.mockResolvedValue({ data: [] });
     mockRoute.query = {};
   });
 
@@ -403,6 +417,16 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
+    });
+
+    it("should show a placeholder example under the Starting URL", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      const hint = wrapper.find('[data-test="synthetics-create-url-hint"]').text();
+      expect(hint).toContain("{{variables}}");
+      expect(hint).toContain("{{BASE_URL}}");
+      expect(hint).not.toContain("{{baseUrl}}");
     });
   });
 
@@ -875,6 +899,101 @@ describe("CreateBrowserTest", () => {
       expect(panel(wrapper).exists()).toBe(false);
       expect(journeyStub(wrapper).props("variablesPanelOpen")).toBe(false);
       expect(splitter(wrapper).props("modelValue")).toBe(100);
+    });
+  });
+
+  describe("Journey step — replay", () => {
+    const journeyStub = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-browser-journey"]');
+    const variable = (name: string, value?: string, kind: "plain" | "secret" = "plain") => ({
+      id: name,
+      name,
+      kind,
+      value,
+      has_value: true,
+      description: "",
+      example: "",
+      tags: [],
+      used_by_checks: 0,
+      created_at: 0,
+      updated_at: 0,
+    });
+    const environment = (id: string, variables: unknown[], is_global = false) => ({
+      id,
+      name: id,
+      description: "",
+      is_global,
+      created_at: 0,
+      updated_at: 0,
+      checks_count: 0,
+      variables,
+    });
+
+    /** Mounts an edit of a templated check pinned to `environments`, with the org's three tiers loaded. */
+    async function mountTemplatedCheck(environments: string[]) {
+      mockServiceListEnvironments.mockResolvedValue({
+        data: [
+          environment("global", [], true),
+          environment("prod", [variable("BASE_URL", "https://prod.test")]),
+          environment("stg", [
+            variable("BASE_URL", "https://stg.test"),
+            variable("PASSWORD", undefined, "secret"),
+          ]),
+        ],
+      });
+      mockServiceGet.mockResolvedValue({
+        data: { name: "Login", url: "{{BASE_URL}}/login", environments, journey: [] },
+      });
+      const w = mountPage({ editId: "check-123" });
+      await flushPromises();
+      return w;
+    }
+
+    async function replay(w: VueWrapper, steps: unknown[]) {
+      mockJourneyToWireSteps.mockReturnValueOnce(steps);
+      journeyStub(w).vm.$emit("replay");
+      await flushPromises();
+    }
+
+    beforeEach(() => {
+      mockRecorderReplay.mockClear();
+    });
+
+    it("should replay against the check's first pinned environment", async () => {
+      wrapper = await mountTemplatedCheck(["stg"]);
+
+      await replay(wrapper, [{ action: "navigate", url: "{{BASE_URL}}/login" }]);
+
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      const [, url, variables] = mockRecorderReplay.mock.calls[0];
+      expect(url).toBe("https://stg.test/login");
+      expect(variables).toContainEqual({ name: "BASE_URL", value: "https://stg.test" });
+    });
+
+    it("should fall back to the org's first named environment when the check pins none", async () => {
+      wrapper = await mountTemplatedCheck([]);
+
+      await replay(wrapper, [{ action: "navigate", url: "{{BASE_URL}}/login" }]);
+
+      expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://prod.test/login");
+    });
+
+    it("should replay at once with a referenced secret left literal, and never prompt", async () => {
+      wrapper = await mountTemplatedCheck(["stg"]);
+
+      await replay(wrapper, [{ action: "fill", value: "{{PASSWORD}}" }]);
+
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      expect(mockRecorderReplay.mock.calls[0]?.[0]).toEqual([
+        { action: "fill", value: "{{PASSWORD}}" },
+      ]);
+      expect(wrapper.findComponent({ name: "ReplaySecretPrompt" }).exists()).toBe(false);
+    });
+
+    it("should hand the journey the resolved starting URL for recording", async () => {
+      wrapper = await mountTemplatedCheck(["stg"]);
+
+      expect(journeyStub(wrapper).props("startUrl")).toBe("https://stg.test/login");
     });
   });
 
