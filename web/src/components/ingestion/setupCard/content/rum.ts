@@ -30,7 +30,7 @@ import type { RichCardContent, RichCardStepVariant } from "../types";
  * Pinned browser SDK release the CDN URLs point at — bump in one place.
  * Pinning (vs @latest) gives immutable CDN caching and no surprise upgrades.
  */
-export const RUM_SDK_VERSION = "0.3.4";
+export const RUM_SDK_VERSION = "0.4.3";
 
 const CDN_HOST = "https://browsersdk.openobserve.ai";
 const cdnUrl = (bundle: string) => `${CDN_HOST}/${RUM_SDK_VERSION}/${bundle}`;
