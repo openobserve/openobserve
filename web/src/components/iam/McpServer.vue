@@ -35,11 +35,7 @@ const { endpoint } = useIngestion();
 
 const docUrl = "https://openobserve.ai/docs/integration/ai/mcp/";
 
-// McpServerCard reads `url` and `org` only — it builds the endpoint from them
-// and gets its credential from the service account it mints, never from the org
-// ingestion passcode. `token` is required by CardSubstitutions but unused here,
-// so it stays empty rather than being filled from a credential this page does
-// not render.
+// McpServerCard mints its own service-account credential, so `token` is unused here
 const subs = computed<CardSubstitutions>(() => ({
   url: store.state.zoConfig?.web_url || endpoint.value?.url || "",
   org: store.state.selectedOrganization?.identifier ?? "",

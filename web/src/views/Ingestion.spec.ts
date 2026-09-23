@@ -134,10 +134,7 @@ describe("Ingestion", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    // vi.clearAllMocks() clears calls but KEEPS a mockRejectedValue set by a
-    // previous test. onBeforeMount now reads the passcode, so a leftover
-    // rejection would settle into the next test's spies. Re-establish a benign
-    // default, and start every test from a cold query cache.
+    // clearAllMocks keeps a previous test's mockRejectedValue, which onBeforeMount would settle into
     queryClient.clear();
     organizationsService.get_organization_passcode.mockResolvedValue({
       data: { data: { token: "default-token", passcode: "default-passcode" } },
@@ -470,11 +467,7 @@ describe("Ingestion", () => {
     });
   });
 
-  // The feature this guards was previously dead code: the 403 handling lived in
-  // getOrganizationPasscode(), which onBeforeMount never called, so the banner
-  // could never appear in the running app while unit tests that invoked the
-  // method directly still passed. These tests mount the component and drive the
-  // REAL lifecycle entry point, so they fail if the wiring is removed again.
+  // mounts the component so the lifecycle wiring itself is under test, not just the method
   describe("passcode 403 via the real mount path", () => {
     const mountIngestion = async () => {
       const w = mount(Ingestion, {
@@ -506,9 +499,7 @@ describe("Ingestion", () => {
 
       const w = await mountIngestion();
 
-      // Asserting store state (not a spy) — this is what the banner renders from.
       expect(store.state.organizationData.organizationPasscodeForbidden).toBe(true);
-      // The passcode must not have been overwritten with an empty credential.
       expect(store.state.organizationData.organizationPasscode).not.toBe("");
       w.unmount();
     });
@@ -537,26 +528,7 @@ describe("Ingestion", () => {
     });
   });
 
-  // Regression: the 403 banner used to be defeated by a race.
-  //
-  // onBeforeMount fires GET /{org}/ingestion-tokens and GET /{org}/passcode
-  // concurrently. Both are now guarded server-side by the same check, so they
-  // agree — but they are still two independent requests, and a tokens response
-  // already in flight (or served from cache) can land alongside a passcode 403.
-  // When it did, the tokenOptions watcher dispatched
-  // setOrganizationPasscodeForbidden(false) plus the real token, so whichever
-  // promise resolved last decided whether the credential was shown — and the
-  // banner was routinely cleared right after a 403 had been observed.
-  //
-  // The rest of the suite could not catch this because list_org_ingestion_tokens
-  // defaults to an EMPTY list, so the tokenOptions watcher never ran. These
-  // tests stub a NON-EMPTY token list alongside the 403 — the configuration that
-  // actually reproduces it.
-  //
-  // NOTE: assertions read `w.vm.store`, the store the component itself resolves
-  // through useStore(). That is the real app store, NOT the `store` helper this
-  // file only *provides* — asserting on the helper would silently observe an
-  // object the component never writes to.
+  // assertions read `w.vm.store`: the `store` helper this file provides is not the one the component writes to
   describe("passcode 403 is authoritative over a concurrent /ingestion-tokens", () => {
     const ORG_TOKEN = "o2oi_orgwide_token_value";
 
@@ -591,8 +563,7 @@ describe("Ingestion", () => {
     };
 
     const stubNonEmptyTokens = () => {
-      // The query returns the axios body; fetchOrgTokens then dispatches its
-      // `.data`, so the token array has to sit one level deeper than it looks.
+      // fetchOrgTokens dispatches `.data` of the body, so the array sits one level deeper
       organizationsService.list_org_ingestion_tokens.mockResolvedValue({
         data: { data: [tokenRow] },
       });
@@ -615,19 +586,15 @@ describe("Ingestion", () => {
 
       const w = await mountIngestion();
 
-      // The tokens response really did arrive — otherwise this would be
-      // re-proving the already-covered empty-list case rather than the race.
+      // without this the test would re-prove the empty-list case, not the race
       expect(orgData(w).orgTokens).toHaveLength(1);
-      // ...and the observed 403 survived it.
       expect(orgData(w).organizationPasscodeForbidden).toBe(true);
-      // The org-wide credential must not have been published by the selector.
       expect(orgData(w).organizationPasscode).not.toBe(ORG_TOKEN);
       w.unmount();
     });
 
     it("keeps the banner when the tokens response lands AFTER the 403", async () => {
-      // Ordering must not matter. Here the passcode rejects promptly and the
-      // token list resolves on a later macrotask — the opposite interleaving.
+      // the opposite interleaving: passcode rejects first, tokens resolve on a later macrotask
       organizationsService.get_organization_passcode.mockRejectedValue({
         response: { status: 403 },
       });
@@ -655,8 +622,6 @@ describe("Ingestion", () => {
       const w = await mountIngestion();
       expect(orgData(w).organizationPasscodeForbidden).toBe(true);
 
-      // User-initiated rather than a race, but the rule is the same: a 403 means
-      // the credential was never this role's to see.
       w.vm.onTokenSelected("default");
       await flushPromises();
 
@@ -666,8 +631,6 @@ describe("Ingestion", () => {
     });
 
     it("still shows tokens to a caller the passcode endpoint allows", async () => {
-      // The guard must not become a blanket "never show tokens": an Admin/Root
-      // (or an FGA-granted user) gets a 200 and the selector works as before.
       stubNonEmptyTokens();
       organizationsService.get_organization_passcode.mockResolvedValue({
         data: { data: { passcode: "allowed-passcode", user: "a@b.c" } },
@@ -695,8 +658,7 @@ describe("Ingestion", () => {
       const w = await mountIngestion();
       expect(orgData(w).organizationPasscodeForbidden).toBe(true);
 
-      // Switch orgs: MainLayout wipes organizationData, and the new org's own
-      // passcode read (a 200 here) must be free to decide again.
+      // MainLayout wipes organizationData on an org switch, so the new read decides afresh
       const componentStore = w.vm.store;
       const previous = componentStore.state.selectedOrganization.identifier;
       componentStore.state.selectedOrganization = {
@@ -724,10 +686,6 @@ describe("Ingestion", () => {
     });
   });
 
-  // NOTE: these exercise getOrganizationPasscode() directly. They are retained
-  // only because the function is now genuinely reachable (onBeforeMount calls
-  // it); on their own they prove nothing about the app actually running it —
-  // that is what the "real mount path" block above is for.
   describe("getOrganizationPasscode", () => {
     it("should successfully get organization passcode", async () => {
       if (!wrapper) {
@@ -747,8 +705,7 @@ describe("Ingestion", () => {
       organizationsService.get_organization_passcode.mockResolvedValue(mockResponse);
       const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
 
-      // onBeforeMount now performs this read, so it is a cache hit for an hour —
-      // drop it so the call under test reaches the mock above.
+      // onBeforeMount already cached this read, so the call under test would not reach the mock
       queryClient.clear();
       await wrapper.vm.getOrganizationPasscode();
 
@@ -840,8 +797,7 @@ describe("Ingestion", () => {
       apiKeysService.listRUMTokens.mockResolvedValue(mockResponse);
       const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
 
-      // Mounting already cached a token, and the read is a cache hit for an
-      // hour — drop it so the call under test reaches the mock above.
+      // mounting already cached this read, so the call under test would not reach the mock
       queryClient.clear();
       await wrapper.vm.getRUMToken();
 

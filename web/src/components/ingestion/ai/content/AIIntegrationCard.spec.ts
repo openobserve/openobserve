@@ -16,7 +16,6 @@ import store from "@/test/unit/helpers/store";
 const BANNER = '[data-test="ai-integration-card-passcode-forbidden"]';
 const CARD = '[data-test="ai-integration-card"]';
 
-// A card whose runnable snippet embeds the credential.
 const CONTENT_WITH_TOKEN = [
   "# Anthropic",
   "",
@@ -27,7 +26,6 @@ const CONTENT_WITH_TOKEN = [
   "```",
 ].join("\n");
 
-// A card that is purely explanatory — endpoints and prose, no credential.
 const CONTENT_WITHOUT_TOKEN = [
   "# Anthropic",
   "",
@@ -81,8 +79,6 @@ describe("AIIntegrationCard passcode gating", () => {
   });
 
   it("still renders a card that embeds no credential when the passcode is forbidden", () => {
-    // The whole point of matching CopyContent's gate: prose, endpoints and doc
-    // links stay visible to a non-Admin when there is no credential to leak.
     store.state.organizationData.organizationPasscodeForbidden = true;
     wrapper = mountCard(CONTENT_WITHOUT_TOKEN);
 

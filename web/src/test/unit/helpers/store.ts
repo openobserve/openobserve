@@ -20,8 +20,6 @@ import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types
 const organizationObj = {
   organizationPasscode: "",
   organizationPasscodeForbidden: false,
-  // Mirror of the production organizationObj — Ingestion.vue's token selector
-  // reads this, so it must exist here for the selector watcher to be testable.
   orgTokens: [] as Array<{ name: string; token: string; enabled: boolean }>,
   allDashboardList: {},
   rumToken: {

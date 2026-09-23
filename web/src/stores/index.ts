@@ -39,9 +39,7 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
 const organizationObj = {
   organizationPasscode: "",
   organizationPasscodeUser: "",
-  // true once a passcode read came back 403 — the caller lacks the Admin/Root
-  // role. Distinct from an empty passcode, which would otherwise render as a
-  // syntactically valid but non-functional credential in the ingestion snippets.
+  // distinct from an empty passcode, which renders as a valid-looking but dead credential
   organizationPasscodeForbidden: false,
   allDashboardList: {},
   allDashboardData: {},

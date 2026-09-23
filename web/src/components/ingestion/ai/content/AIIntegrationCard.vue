@@ -52,21 +52,11 @@ const subs = computed<CardSubstitutions>(() => {
   };
 });
 
-// The passcode read came back 403 — this role cannot see the org ingestion
-// token. Withhold the card rather than substitute an empty password into the
-// commands: a snippet that looks right and silently fails to authenticate is
-// worse than an honest "you can't see this".
 const passcodeForbidden = computed(
   () => !!store.state.organizationData?.organizationPasscodeForbidden,
 );
 
-// ...but only withhold it when this card actually embeds the credential.
-// renderMarkdown substitutes {token} (and only inside code blocks), so a card
-// whose content has no {token} carries no credential — its prose, endpoints and
-// doc links are still useful to a non-Admin and should not be hidden. This
-// mirrors CopyContent.vue's `contentNeedsPasscode` gate; the cards are fetched
-// from a separate content repo at build time, so "they all embed a token" is
-// not a property this component can rely on.
+// cards come from a separate content repo, so a card may carry no {token} at all
 const contentNeedsPasscode = computed(() => String(props.content ?? "").includes("{token}"));
 
 const parsed = computed(() => parseCard(props.content));

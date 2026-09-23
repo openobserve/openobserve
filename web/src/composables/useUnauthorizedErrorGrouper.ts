@@ -34,9 +34,7 @@ const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
   destinations: "toastMessages.composables.resources.destinations",
   templates: "toastMessages.composables.resources.templates",
   reports: "toastMessages.composables.resources.reports",
-  // Both paths expose the org-wide ingestion token and are guarded by the same
-  // server-side check, so a 403 on either reads as "Ingestion Token" rather
-  // than as a raw path.
+  // both paths expose the same org-wide ingestion token
   passcode: "toastMessages.composables.resources.passcode",
   "ingestion-tokens": "toastMessages.composables.resources.passcode",
   "llm/models": "toastMessages.composables.resources.llmModelPricing",

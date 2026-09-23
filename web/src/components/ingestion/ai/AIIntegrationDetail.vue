@@ -68,22 +68,11 @@ const subs = computed<CardSubstitutions>(() => {
   };
 });
 
-// The passcode read came back 403 — the org ingestion token is not this role's
-// to see. The rich card's commands embed it, so withhold them rather than render
-// a credential with an empty password. (The legacy CopyContent fallback below
-// guards itself, so only the rich path needs this.)
 const passcodeForbidden = computed(
   () => !!store.state.organizationData?.organizationPasscodeForbidden,
 );
 
-// ...but only withhold the rich card when it actually embeds the credential.
-// Mirrors AIIntegrationCard.vue's `contentNeedsPasscode`, except the test must
-// run against the RAW markdown: `richContent` is the built RichCardContent
-// object returned by getRichCardContent(), which has already had {token}
-// substituted away (and `String(object)` would be "[object Object]", silently
-// withholding nothing). The raw markdown still carries the placeholder, so it
-// is the honest source for "does this card carry a credential?". A card without
-// {token} — prose, endpoints, doc links only — stays visible to a non-Admin.
+// must test the RAW markdown: richContent has already had {token} substituted away
 const richContentNeedsPasscode = computed(() =>
   String(getAICardRaw(integration.value?.contentSlug ?? integration.value?.slug) ?? "").includes(
     "{token}",

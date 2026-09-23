@@ -72,10 +72,6 @@ const subs = computed<CardSubstitutions>(() => {
 
 const content = computed(() => getDataSourceCard(props.slug, subs.value, t));
 
-// The passcode read came back 403 — the org ingestion token is not this role's
-// to see. The card's commands embed it, so withhold them rather than hand the
-// user a snippet whose credential has an empty password. (The legacy
-// CopyContent fallback guards itself, so only the rich path needs this.)
 const passcodeForbidden = computed(
   () => !!store.state.organizationData?.organizationPasscodeForbidden,
 );

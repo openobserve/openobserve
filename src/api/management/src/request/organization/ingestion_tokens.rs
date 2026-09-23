@@ -56,8 +56,6 @@ pub async fn list_ingestion_tokens(
     Headers(user_email): Headers<UserEmail>,
     Path(org_id): Path<String>,
 ) -> Response {
-    // GET /{org}/ingestion-tokens -> the route table maps GET on this path to
-    // the "LIST" FGA permission on the "passcode" resource.
     if let Err(resp) = super::require_credential_access(
         &org_id,
         user_email.user_id.as_str(),
@@ -111,9 +109,6 @@ pub async fn create_ingestion_token(
 ) -> Response {
     let user_id = user_email.user_id.as_str();
 
-    // POST /{org}/ingestion-tokens -> the route table declares
-    // `ofga_permission: None` for POST, and `resolve_permission` falls back to
-    // the HTTP method, so the effective permission is the literal "POST".
     if let Err(resp) = super::require_credential_access(
         &org_id,
         user_id,
@@ -177,11 +172,7 @@ pub async fn enable_disable_ingestion_token(
 ) -> Response {
     let user_id = user_email.user_id.as_str();
 
-    // PATCH /{org}/ingestion-tokens/{name} -> the route table maps PATCH on this
-    // path to the "PUT" FGA permission on the "passcode" resource. (No type in
-    // model.fga defines a PATCH relation, so the route declares Some("PUT")
-    // explicitly rather than letting `resolve_permission` fall back to the HTTP
-    // method — asking OpenFGA for an undefined relation is a 400, which denies.)
+    // the route table maps this PATCH to the PUT permission; model.fga has no PATCH relation
     if let Err(resp) = super::require_credential_access(
         &org_id,
         user_id,

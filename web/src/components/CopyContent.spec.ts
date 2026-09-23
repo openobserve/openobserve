@@ -339,9 +339,6 @@ describe("CopyContent.vue Branch Coverage", () => {
     });
   });
 
-  // A 403 on the passcode read leaves organizationPasscode empty. Substituting
-  // that would render a valid-looking snippet whose credential has no password,
-  // so the credential-bearing block is withheld and the reason is shown instead.
   describe("Passcode Forbidden Branch Coverage", () => {
     const forbiddenStore = createStore({
       state: {
