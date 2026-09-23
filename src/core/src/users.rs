@@ -1654,7 +1654,7 @@ mod tests {
             "dummy",
             UserRequest {
                 email: "user@zo.dev".to_string(),
-                password: "pass#123".to_string(),
+                password: "Pass#1234567890".to_string(),
                 role: common::meta::user::UserOrgRole {
                     base_role: UserRole::Admin,
                     custom_role: None,
@@ -1987,7 +1987,7 @@ mod tests {
             "dummy",
             UserRequest {
                 email: email.to_string(),
-                password: "Pass#1234".to_string(),
+                password: "Pass#1234567890".to_string(),
                 role: common::meta::user::UserOrgRole {
                     base_role: UserRole::Admin,
                     custom_role: None,
@@ -2017,8 +2017,8 @@ mod tests {
                 token: None,
                 first_name: None,
                 last_name: None,
-                old_password: Some("Pass#1234".to_string()),
-                new_password: Some("Newpass#1234".to_string()),
+                old_password: Some("Pass#1234567890".to_string()),
+                new_password: Some("Newpass#12345678".to_string()),
                 role: None,
                 change_password: true,
                 remove_lockout: false,
@@ -2110,7 +2110,7 @@ mod tests {
             "dummy",
             UserRequest {
                 email: email.to_string(),
-                password: "Pass#1234".to_string(),
+                password: "Pass#1234567890".to_string(),
                 role: common::meta::user::UserOrgRole {
                     base_role: UserRole::Admin,
                     custom_role: None,
@@ -2126,19 +2126,19 @@ mod tests {
         assert!(resp.is_ok());
 
         assert_eq!(
-            self_change_password(email, "Pass#1234", "Newpass#1234")
+            self_change_password(email, "Pass#1234567890", "Newpass#12345678")
                 .await
                 .status(),
             200
         );
         assert_eq!(
-            self_change_password(email, "Newpass#1234", "Pass#1234")
+            self_change_password(email, "Newpass#12345678", "Pass#1234567890")
                 .await
                 .status(),
             400
         );
         assert_eq!(
-            self_change_password(email, "Newpass#1234", "Third#12345")
+            self_change_password(email, "Newpass#12345678", "Third#1234567890")
                 .await
                 .status(),
             200
@@ -2183,7 +2183,7 @@ mod tests {
             "dummy",
             UserRequest {
                 email: email.to_string(),
-                password: "Pass#1234".to_string(),
+                password: "Pass#1234567890".to_string(),
                 role: common::meta::user::UserOrgRole {
                     base_role: UserRole::Viewer,
                     custom_role: None,
