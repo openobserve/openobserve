@@ -475,10 +475,13 @@ pub struct StreamStats {
 }
 
 impl StreamStats {
-    /// Returns true iff [start, end] time range intersects with the stream's
-    /// time range.
+    /// Returns true iff [start, end] intersects the stream's time range, or the stream has no
+    /// stats yet.
     pub fn time_range_intersects(&self, start: i64, end: i64) -> bool {
-        assert!(start <= end);
+        // stats are built from persisted files only, so a stream with none is unknown, not empty
+        if self.doc_time_max == 0 {
+            return true;
+        }
         let (min, max) = self.time_range();
         // [min, max] does *not* intersect with [start, end] if either
         //
@@ -496,11 +499,16 @@ impl StreamStats {
 
     fn time_range(&self) -> (i64, i64) {
         assert!(self.doc_time_min <= self.doc_time_max);
-        let file_push_interval = Duration::try_seconds(get_config().limit.file_push_interval as _)
+        let cfg = get_config();
+        // stats lag ingestion by the WAL retention plus the stats job interval, not just the push
+        let slack_secs = cfg.limit.file_push_interval
+            + cfg.limit.max_file_retention_time
+            + cfg.limit.calculate_stats_interval;
+        let slack = Duration::try_seconds(slack_secs as _)
             .unwrap()
             .num_microseconds()
             .unwrap();
-        (self.doc_time_min, self.doc_time_max + file_push_interval)
+        (self.doc_time_min, self.doc_time_max + slack)
     }
 
     pub fn add_file_meta(&mut self, meta: &FileMeta) {
@@ -1932,7 +1940,7 @@ mod tests {
 
     #[test]
     fn test_stream_stats_time_range_intersects() {
-        // Use large timestamps so file_push_interval (10s = 10_000_000 µs) doesn't confuse results
+        // Use large timestamps so the stats slack (~20 min in µs) doesn't confuse results
         let base: i64 = 1_700_000_000_000_000; // ~2023-11-14 in µs
         let stats = StreamStats {
             doc_time_min: base,
@@ -1949,8 +1957,21 @@ mod tests {
         assert!(stats.time_range_intersects(base - 1_000_000, base + 5_000_000));
         // query ends exactly at stream min — no intersection (min < end: base < base is false)
         assert!(!stats.time_range_intersects(base - 1_000_000, base));
-        // query starts well after effective max (doc_time_max + file_push_interval ~10s)
-        assert!(!stats.time_range_intersects(base + 20_000_000, base + 30_000_000));
+        // the WAL and the stats job can hold data back for a while, so the upper bound is slack
+        let cfg = get_config();
+        let slack = ((cfg.limit.file_push_interval
+            + cfg.limit.max_file_retention_time
+            + cfg.limit.calculate_stats_interval)
+            * 1_000_000) as i64;
+        // query starts exactly at effective max (doc_time_max + slack) — still intersects
+        assert!(stats.time_range_intersects(base + slack, base + slack + 1_000_000));
+        // query starts after effective max
+        assert!(!stats.time_range_intersects(base + slack + 2_000_000, base + slack + 3_000_000));
+        // a stream with no persisted files has no stats and must not be filtered out
+        let no_stats = StreamStats::default();
+        assert!(no_stats.time_range_intersects(base, base + 1_000_000));
+        // an inverted range does not panic
+        assert!(!stats.time_range_intersects(base + 1_000_000, base));
     }
 
     // ── PartitionTimeLevel ────────────────────────────────────────────────────

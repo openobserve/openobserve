@@ -8,18 +8,21 @@ source stream already exists" (src/core/src/pipeline/mod.rs).
 Verified against a local debug build before these assertions were written:
 status 400 and that exact message.
 
-The `source` object MUST carry `org_id`. The guard compares the incoming source
-against `list_streams_with_pipeline`, whose entries are fully qualified, so a
-payload omitting `org_id` compares unequal and slips past the check — see
-`test_source_without_org_id_documents_the_bypass` at the end, which records that
-gap rather than asserting the desired behaviour.
+A `source` omitting `org_id` used to slip past the guard: the incoming stream
+compared unequal to the fully-qualified entries from `list_streams_with_pipeline`,
+so the check never fired and the pipeline was stored unqualified. `save_pipeline`
+and `update_pipeline` now default an empty source org to the pipeline's own org
+(`default_source_org`), covered by `test_source_without_org_id_rejects_the_second_pipeline`
+and `test_source_and_nodes_without_org_id_reject_the_second_pipeline`.
+
+Worth keeping green: with two realtime pipelines on one stream, both fire per
+record. Measured on a pre-fix build, 5 ingested records produced `successful: 10`
+and 2 rows per marker downstream — silent duplication at 2x ingest cost.
 """
 
 import logging
 import os
 import time
-
-import pytest
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -33,10 +36,14 @@ def _ingest(session, base_url, stream):
     assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text}"
 
 
-def _realtime_pipeline(name, stream, include_org_id=True):
+def _realtime_pipeline(name, stream, include_org_id=True, include_node_org_id=True,
+                       source_org=None):
     source = {"source_type": "realtime", "stream_name": stream, "stream_type": "logs"}
-    if include_org_id:
+    if source_org is not None:
+        source["org_id"] = source_org
+    elif include_org_id:
         source["org_id"] = ORG_ID
+    node_org = {"org_id": ORG_ID} if include_node_org_id else {}
     return {
         "name": name,
         "description": "",
@@ -45,14 +52,14 @@ def _realtime_pipeline(name, stream, include_org_id=True):
             {
                 "id": "n1",
                 "data": {"node_type": "stream", "stream_name": stream,
-                         "stream_type": "logs", "org_id": ORG_ID},
+                         "stream_type": "logs", **node_org},
                 "position": {"x": 0, "y": 0},
                 "io_type": "input",
             },
             {
                 "id": "n2",
                 "data": {"node_type": "stream", "stream_name": f"{stream}_out",
-                         "stream_type": "logs", "org_id": ORG_ID},
+                         "stream_type": "logs", **node_org},
                 "position": {"x": 200, "y": 0},
                 "io_type": "output",
             },
@@ -64,6 +71,12 @@ def _realtime_pipeline(name, stream, include_org_id=True):
 
 def _create(session, base_url, payload):
     return session.post(f"{base_url}api/{ORG_ID}/pipelines", json=payload)
+
+
+def _get_by_name(session, base_url, name):
+    resp = session.get(f"{base_url}api/{ORG_ID}/pipelines")
+    assert resp.status_code == 200, f"pipeline list failed: {resp.status_code} {resp.text}"
+    return next((p for p in resp.json().get("list", []) if p.get("name") == name), None)
 
 
 def _delete_by_name(session, base_url, name):
@@ -136,21 +149,10 @@ class TestRealtimePipelineExclusivity:
             _delete_by_name(session, base_url, name_a)
             _delete_by_name(session, base_url, name_b)
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="#6443 org_id bypass: with org_id omitted from source, the incoming stream "
-               "compares unequal to the fully-qualified entries in list_streams_with_pipeline, "
-               "so the exclusivity check is skipped. XPASSes once that gap is closed.",
-    )
     def test_source_without_org_id_rejects_the_second_pipeline(
         self, create_session, base_url, random_string
     ):
-        """Asserts the DESIRED behaviour (400) for the org_id bypass, marked xfail.
-
-        Written this way round so the suite never goes red at the moment the gap is
-        fixed: it XFAILs while the bypass is open and XPASSes once the comparison is
-        made org-agnostic or org_id becomes required on the source. Drop the marker then.
-        """
+        """A source omitting org_id must not slip past the exclusivity check."""
         session = create_session
         suffix = random_string(6).lower()
         stream = f"pytest_6443_noorg_{suffix}"
@@ -172,3 +174,92 @@ class TestRealtimePipelineExclusivity:
         finally:
             _delete_by_name(session, base_url, first)
             _delete_by_name(session, base_url, second)
+
+    def test_source_and_nodes_without_org_id_reject_the_second_pipeline(
+        self, create_session, base_url, random_string
+    ):
+        """validate() rebuilds source from the first node, so the node needs qualifying too."""
+        session = create_session
+        suffix = random_string(6).lower()
+        stream = f"pytest_6443_nonode_{suffix}"
+        first, second = f"pytest6443ma{suffix}", f"pytest6443mb{suffix}"
+
+        _ingest(session, base_url, stream)
+        time.sleep(3)
+        try:
+            resp = _create(session, base_url, _realtime_pipeline(
+                first, stream, include_org_id=False, include_node_org_id=False))
+            assert resp.status_code == 200, f"first: {resp.status_code} {resp.text}"
+            time.sleep(3)
+
+            resp = _create(session, base_url, _realtime_pipeline(
+                second, stream, include_org_id=False, include_node_org_id=False))
+            logger.info("second (no org_id anywhere) -> %s %s", resp.status_code, resp.text[:200])
+            assert resp.status_code == 400, (
+                "#6443: a second realtime pipeline must be rejected even when org_id is "
+                f"omitted from both source and nodes. Got {resp.status_code} {resp.text}"
+            )
+            assert DUPLICATE_MSG in resp.text, \
+                f"#6443: the rejection must name the duplicate source stream, got {resp.text}"
+        finally:
+            _delete_by_name(session, base_url, first)
+            _delete_by_name(session, base_url, second)
+
+    def test_source_org_disagreeing_with_the_node_still_rejects(
+        self, create_session, base_url, random_string
+    ):
+        """validate() rebuilds source from the node, so a bogus source org must not decide."""
+        session = create_session
+        suffix = random_string(6).lower()
+        stream = f"pytest_6443_mismatch_{suffix}"
+        first, second = f"pytest6443xa{suffix}", f"pytest6443xb{suffix}"
+
+        _ingest(session, base_url, stream)
+        time.sleep(3)
+        try:
+            resp = _create(session, base_url, _realtime_pipeline(first, stream))
+            assert resp.status_code == 200, f"first: {resp.status_code} {resp.text}"
+            time.sleep(3)
+
+            resp = _create(session, base_url, _realtime_pipeline(
+                second, stream, source_org="anotherorg"))
+            logger.info("second (source org disagrees) -> %s %s", resp.status_code, resp.text[:200])
+            assert resp.status_code == 400, (
+                "#6443: the guard must compare the node-derived source that is actually "
+                f"persisted, not a source org the client supplied. Got {resp.status_code} {resp.text}"
+            )
+            assert DUPLICATE_MSG in resp.text, \
+                f"#6443: the rejection must name the duplicate source stream, got {resp.text}"
+        finally:
+            _delete_by_name(session, base_url, first)
+            _delete_by_name(session, base_url, second)
+
+    def test_editing_a_pipeline_without_touching_its_source_succeeds(
+        self, create_session, base_url, random_string
+    ):
+        """Normalizing only the incoming side would read a legacy empty org as a source
+        change, and changing a realtime source is rejected by design — blocking all edits."""
+        session = create_session
+        suffix = random_string(6).lower()
+        stream = f"pytest_6443_edit_{suffix}"
+        name = f"pytest6443ed{suffix}"
+
+        _ingest(session, base_url, stream)
+        time.sleep(3)
+        try:
+            resp = _create(session, base_url, _realtime_pipeline(name, stream))
+            assert resp.status_code == 200, f"create: {resp.status_code} {resp.text}"
+            time.sleep(3)
+
+            stored = _get_by_name(session, base_url, name)
+            assert stored, f"#6443: the created pipeline must be listed"
+            stored["description"] = "edited, source untouched"
+
+            resp = session.put(f"{base_url}api/{ORG_ID}/pipelines", json=stored)
+            logger.info("edit without source change -> %s %s", resp.status_code, resp.text[:200])
+            assert resp.status_code == 200, (
+                "#6443: editing a realtime pipeline without touching its source must succeed. "
+                f"Got {resp.status_code} {resp.text}"
+            )
+        finally:
+            _delete_by_name(session, base_url, name)

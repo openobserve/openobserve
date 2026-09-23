@@ -47,6 +47,7 @@ mod present_over_time;
 mod quantile_over_time;
 mod resets;
 mod scalar;
+mod sort;
 mod stddev_over_time;
 mod stdvar_over_time;
 mod sum_over_time;
@@ -64,6 +65,7 @@ pub(crate) use math_operations::*;
 pub(crate) use predict_linear::predict_linear;
 pub(crate) use quantile_over_time::quantile_over_time;
 pub(crate) use scalar::scalar;
+pub(crate) use sort::sort;
 pub(crate) use time_operations::*;
 pub(crate) use vector::vector;
 
@@ -310,6 +312,8 @@ pub(crate) struct SeriesRange<'a, F: ?Sized> {
     start_index: usize,
     end_index: usize,
     counter: Option<CounterSeries<'a>>,
+    /// The window end an `@` modifier pins every step to.
+    pinned: Option<i64>,
 }
 
 impl<'a, F: RangeFunc + ?Sized> SeriesRange<'a, F> {
@@ -335,7 +339,13 @@ impl<'a, F: RangeFunc + ?Sized> SeriesRange<'a, F> {
                 eval_ctx,
                 range_micros,
             ),
+            pinned: None,
         }
+    }
+
+    pub(crate) fn pinned_at(mut self, at: Option<i64>) -> Self {
+        self.pinned = at;
+        self
     }
 }
 
@@ -344,10 +354,11 @@ impl<F: RangeFunc + ?Sized> Iterator for SeriesRange<'_, F> {
 
     fn next(&mut self) -> Option<Self::Item> {
         for (slot, &eval_ts) in self.timestamps.by_ref() {
+            let window_end = self.pinned.unwrap_or(eval_ts);
             let window_samples = advance_sample_window(
                 self.samples,
-                eval_ts - self.range_micros,
-                eval_ts,
+                window_end - self.range_micros,
+                window_end,
                 &mut self.start_index,
                 &mut self.end_index,
             );
@@ -356,7 +367,7 @@ impl<F: RangeFunc + ?Sized> Iterator for SeriesRange<'_, F> {
             }
             let value = match &self.counter {
                 Some(counter) => {
-                    counter.extrapolate(self.start_index, self.end_index, eval_ts, self.range)
+                    counter.extrapolate(self.start_index, self.end_index, window_end, self.range)
                 }
                 None => self.func.exec(window_samples, eval_ts, &self.range),
             };
@@ -379,6 +390,19 @@ pub(crate) fn instant_lookback_func() -> std::sync::Arc<dyn RangeFunc> {
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
+where
+    F: RangeFunc,
+{
+    eval_range_at(data, func, eval_ctx, None)
+}
+
+/// `eval_range` over the one window ending at `pinned`, still evaluated at every step.
+pub(crate) fn eval_range_at<F>(
+    data: Value,
+    func: F,
+    eval_ctx: &EvalContext,
+    pinned: Option<i64>,
+) -> Result<Value>
 where
     F: RangeFunc,
 {
@@ -423,6 +447,7 @@ where
             let mut result_samples = Vec::with_capacity(timestamps.len());
             result_samples.extend(
                 SeriesRange::new(&metric.samples, &func, range, eval_ctx, &timestamps)
+                    .pinned_at(pinned)
                     .map(|(slot, value)| Sample::new(timestamps[slot], value)),
             );
 

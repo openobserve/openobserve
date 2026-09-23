@@ -785,11 +785,16 @@ pub async fn handle_request(
     )
     .await;
 
+    let status = match &write_result {
+        Ok(_) => StatusCode::OK,
+        Err(e) => crate::ingestion::write_error_status(e),
+    };
+
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     let label_values = [
         endpoint,
-        if write_result.is_ok() { "200" } else { "500" },
+        status.as_str(),
         org_id,
         StreamType::Logs.as_str(),
         "",
@@ -805,7 +810,7 @@ pub async fn handle_request(
     if let Err(e) = write_result {
         log::error!("Error while writing logs: {e}");
         return Ok(MetaHttpResponse::error_with_header(
-            StatusCode::INTERNAL_SERVER_ERROR,
+            status,
             format!("error while writing log data: {e}"),
         ));
     }
@@ -1759,5 +1764,83 @@ mod tests {
             value["partialSuccess"]["errorMessage"],
             json::Value::String("boom".into())
         );
+    }
+
+    #[test]
+    fn test_otlp_json_decodes_non_canonical_doubles() {
+        use crate::ingestion::grpc::get_val_with_type_retained;
+
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"ratio","value":{"doubleValue":0.10}}]},"scopeLogs":[{"scope":{"name":"s","attributes":[{"key":"exp","value":{"doubleValue":1e0}}]},"logRecords":[{"timeUnixNano":"1789000000000000001","body":{"doubleValue":-2.50},"attributes":[{"key":"r","value":{"doubleValue":1.5}},{"key":"nested","value":{"kvlistValue":{"values":[{"key":"k","value":{"arrayValue":{"values":[{"doubleValue":1E-7}]}}}]}}},{"key":"id","value":{"intValue":"9223372036854775807"}}]},{"timeUnixNano":1789000000000000002,"body":{"stringValue":"valid record in the same batch"}}]}]}]}"#;
+        // arbitrary_precision is enabled workspace-wide, so the plain decode must fail here
+        assert!(json::from_slice::<ExportLogsServiceRequest>(body).is_err());
+
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_floats(body).unwrap();
+        let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
+        let resource_logs = &request.resource_logs[0];
+        let resource = resource_logs.resource.as_ref().unwrap();
+        assert_eq!(value(&resource.attributes[0]), Some(DoubleValue(0.1)));
+        let scope_logs = &resource_logs.scope_logs[0];
+        let scope = scope_logs.scope.as_ref().unwrap();
+        assert_eq!(value(&scope.attributes[0]), Some(DoubleValue(1.0)));
+
+        let records = &scope_logs.log_records;
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].time_unix_nano, 1_789_000_000_000_000_001);
+        assert_eq!(records[1].time_unix_nano, 1_789_000_000_000_000_002);
+        assert_eq!(
+            records[0].body.as_ref().and_then(|v| v.value.clone()),
+            Some(DoubleValue(-2.5))
+        );
+        assert_eq!(value(&records[0].attributes[0]), Some(DoubleValue(1.5)));
+        assert_eq!(
+            get_val_with_type_retained(&records[0].attributes[1].value.as_ref()),
+            json::json!({"k": [1e-7]})
+        );
+        assert_eq!(value(&records[0].attributes[2]), Some(IntValue(i64::MAX)));
+    }
+
+    #[test]
+    fn test_otlp_json_keeps_strict_errors() {
+        for body in [
+            &br#"{"resourceLogs":[{"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#[..],
+            br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":1}}]}]}]}"#,
+            br#"{"resourceLogs":["#,
+        ] {
+            let strict = json::from_slice::<ExportLogsServiceRequest>(body).map(|_| ());
+            let lenient =
+                json::from_slice_lenient_floats::<ExportLogsServiceRequest>(body).map(|_| ());
+            assert!(strict.is_err());
+            assert_eq!(
+                strict.map_err(|e| e.to_string()),
+                lenient.map_err(|e| e.to_string())
+            );
+        }
+
+        let float_with_bad_bytes = br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"doubleValue":1.5},"attributes":[{"key":"b","value":{"bytesValue":"!"}}]}]}]}]}"#;
+        assert!(
+            json::from_slice_lenient_floats::<ExportLogsServiceRequest>(float_with_bad_bytes)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_otlp_json_without_floats_decodes_exactly_as_before() {
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"s","value":{"stringValue":"x"}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1789000000000000001","body":{"stringValue":"x"},"attributes":[{"key":"i","value":{"intValue":"42"}},{"key":"b","value":{"boolValue":true}}]}]}]}]}"#;
+        assert_eq!(
+            json::from_slice_lenient_floats::<ExportLogsServiceRequest>(body).unwrap(),
+            json::from_slice::<ExportLogsServiceRequest>(body).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_otlp_json_float_rescues_a_body_that_repeats_a_field() {
+        // the retry decodes through a Value, which keeps the last of two repeated fields
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"r","value":{"doubleValue":1.5}}]},"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#;
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_floats(body).unwrap();
+        let scope = request.resource_logs[0].scope_logs[0]
+            .scope
+            .as_ref()
+            .unwrap();
+        assert_eq!(scope.name, "b");
     }
 }
