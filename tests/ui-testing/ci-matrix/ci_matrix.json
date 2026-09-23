@@ -254,7 +254,8 @@
       "splunk-hec-ingestion-window.spec.js",
       "connectDataSourcePopup.spec.js",
       "otableSelectCell.spec.js",
-      "theme.spec.js"
+      "theme.spec.js",
+      "ingestion-passcode-forbidden.spec.js"
     ],
     "disabled": []
   },
