@@ -2031,11 +2031,11 @@
       "addToGroup": "加入使用者群組",
       "addToRole": "指派角色",
       "step1Title": "複製您的權杖",
-      "copyHint": "請立即複製此權杖——您將無法再次看到它。",
+      "copyHint": "這是您唯一一次能看到此權杖的機會。請立即複製或下載，之後將無法再次取得。",
       "done": "完成",
       "applying": "正在套用存取權限…",
-      "grantedRoles": "已指派角色：{roles}",
-      "grantedGroups": "已新增至使用者群組：{groups}",
+      "rolesAssignedLabel": "已指派角色",
+      "groupsAssignedLabel": "已加入使用者群組",
       "failedRoles": "無法指派角色：{roles}",
       "failedGroups": "無法新增至使用者群組：{groups}",
       "failedHint": "您可以之後從「角色」和「使用者群組」頁面授予這些權限。"
@@ -2045,6 +2045,9 @@
         "label": "服務帳戶名稱",
         "placeholder": "例如 ingest-bot",
         "help": "小寫字母、數字和連字符。儲存為名稱{suffix}"
+      },
+      "identifier": {
+        "label": "識別碼"
       },
       "roles": {
         "label": "指派角色",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "識別碼",
+        "roles": "角色",
         "token": "權杖",
         "created": "建立時間"
       }
@@ -2186,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "繫結至這些角色的任何使用者與服務帳戶將失去存取權限。"
-      }
+      },
+      "assignColumn": "指派",
+      "assignBtn": "新增",
+      "assignedBadge": "已指派",
+      "assignBannerText": "將 {member} 加入角色 — 請點選下方角色旁的「新增」。",
+      "assignBannerDone": "完成",
+      "assignSuccess": "已將 {member} 加入角色「{role}」。",
+      "assignError": "無法將該帳戶加入該角色。請再試一次。"
     },
     "group": {
       "name": {
@@ -2217,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "這些群組的成員將失去這些群組所授予的角色。"
-      }
+      },
+      "assignColumn": "指派",
+      "assignBtn": "新增",
+      "assignedBadge": "已指派",
+      "assignBannerText": "將 {member} 加入使用者群組 — 請點選下方群組旁的「新增」。",
+      "assignBannerDone": "完成",
+      "assignSuccess": "已將 {member} 加入群組「{group}」。",
+      "assignError": "無法將該帳戶加入該群組。請再試一次。"
     },
     "appGroups": {
       "deleteGroupTitle": "刪除群組",
@@ -13378,6 +13396,7 @@
       "searchHistoryNotEnabled": "搜尋記錄未啟用。",
       "enableUsageReporting": "將 ZO_USAGE_REPORTING_ENABLED 設定為 true 以啟用使用情況報告。",
       "selectStreamToExtractPatterns": "請選取一個串流以提取模式",
+      "patternsUnavailableForMultiStream": "當選取多個串流時，模式無法使用。請選取單一串流。",
       "errorExtractingPatterns": "提取模式時發生錯誤。請重試。",
       "nameOfPanelRequired": "面板名稱為必填",
       "errorsFixAndTryAgain": "存在一些錯誤，請修正後重試",
