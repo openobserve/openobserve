@@ -349,6 +349,8 @@ export class LogsPage {
         this.requiredFieldsErrorText = 'Please select required fields to render the chart';
         // logs.index.selectStarNotSupportedForVisualization (en-US.json)
         this.selectStarNotSupportedToastText = 'Select * query is not supported for visualization';
+        // logs.index.patternsUnavailableForMultiStream (en-US.json) — the multi-stream guard error toast.
+        this.multiStreamPatternsToastText = 'Patterns are not available when multiple streams are selected. Please select a single stream.';
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
@@ -10102,6 +10104,20 @@ export class LogsPage {
      */
     async expectSelectStarVisualizationToast() {
         await this.expectToastContaining(this.selectStarNotSupportedToastText);
+    }
+
+    async expectMultiStreamPatternsToast() {
+        // The guard fires synchronously on mount before any network call, so the caller
+        // arms the toast recorder (startToastRecorder) before navigating to the patterns URL.
+        await this.expectToastContaining(this.multiStreamPatternsToastText);
+    }
+
+    async expectNoMultiStreamPatternsToast() {
+        // Wait for a full mount first: the guard runs during setupLogsTab, so a buggy guard
+        // that fired for a single stream would already be recorded before this assertion.
+        await expect(this.page.locator(this.qPageContainer)).toBeVisible({ timeout: 30000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await this.expectNoToastContaining(this.multiStreamPatternsToastText);
     }
 
     /**
