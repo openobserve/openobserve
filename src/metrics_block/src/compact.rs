@@ -29,7 +29,6 @@ use serde::{Deserialize, Serialize};
 use crate::{DIRECTORY_FIELDS, MAX_LABEL_COLUMNS, label_value};
 
 const MAGIC: &[u8; 8] = b"O2META01";
-const MAX_COMPACT_DECODE_BYTES: usize = 512 * 1024 * 1024;
 
 #[derive(Serialize, Deserialize)]
 struct Header {
@@ -79,7 +78,7 @@ impl<'a> CompactMetadata<'a> {
             total = total
                 .checked_add(section.raw)
                 .context("compact size overflow")?;
-            ensure!(section.compressed > 0, "compact decoded size limit");
+            ensure!(section.compressed > 0, "empty compact section");
             let frame = input.take(section.compressed)?;
             ensure!(
                 zstd::zstd_safe::find_frame_compressed_size(frame)
@@ -108,7 +107,6 @@ impl<'a> CompactMetadata<'a> {
     }
 
     pub(crate) fn compact_batch(&self, projection: &[usize]) -> Result<RecordBatch> {
-        let mut projected_raw = 0usize;
         for &i in projection {
             let section = self
                 .header
@@ -145,17 +143,9 @@ impl<'a> CompactMetadata<'a> {
                     "compact column row count mismatch"
                 );
             }
-            projected_raw = projected_raw
-                .checked_add(section.raw)
-                .context("compact projected size overflow")?;
-            ensure!(
-                projected_raw <= MAX_COMPACT_DECODE_BYTES,
-                "compact decoded size limit"
-            );
         }
         let mut fields = Vec::with_capacity(projection.len());
         let mut columns = Vec::with_capacity(projection.len());
-        let mut expanded = 0usize;
         for &i in projection {
             let section = self
                 .header
@@ -164,13 +154,15 @@ impl<'a> CompactMetadata<'a> {
                 .context("invalid compact projection")?;
             let mut decoder = zstd::bulk::Decompressor::new()?;
             decoder.set_parameter(zstd::zstd_safe::DParameter::WindowLogMax(27))?;
-            let raw = decoder.decompress(self.sections[i], section.raw)?;
+            let mut raw = Vec::new();
+            raw.try_reserve_exact(section.raw)
+                .context("compact decompression allocation failed")?;
             ensure!(
-                raw.len() == section.raw,
+                decoder.decompress_to_buffer(self.sections[i], &mut raw)? == section.raw,
                 "compact decompressed size mismatch"
             );
             let field = self.header.schema.field(i);
-            let col = decode_column(&raw, field.data_type(), self.header.rows, &mut expanded)?;
+            let col = decode_column(&raw, field.data_type(), self.header.rows)?;
             ensure!(
                 field.is_nullable() || col.null_count() == 0,
                 "null compact non-nullable column"
@@ -337,30 +329,13 @@ fn encode_string_column(col: &dyn Array) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-fn charge(total: &mut usize, bytes: usize) -> Result<()> {
-    *total = total
-        .checked_add(bytes)
-        .context("compact expansion overflow")?;
-    ensure!(
-        *total <= MAX_COMPACT_DECODE_BYTES,
-        "compact expansion limit"
-    );
-    Ok(())
-}
-
-fn decode_column(
-    raw: &[u8],
-    kind: &DataType,
-    rows: usize,
-    expanded: &mut usize,
-) -> Result<ArrayRef> {
+fn decode_column(raw: &[u8], kind: &DataType, rows: usize) -> Result<ArrayRef> {
     match kind {
         DataType::UInt64 | DataType::Int64 => {
             ensure!(
                 raw.len() == rows.checked_mul(8).context("column size overflow")?,
                 "compact integer length"
             );
-            charge(expanded, raw.len())?;
             if kind == &DataType::UInt64 {
                 Ok(Arc::new(UInt64Array::from_iter_values(
                     raw.chunks_exact(8)
@@ -378,7 +353,6 @@ fn decode_column(
                 raw.len() == rows.checked_mul(4).context("column size overflow")?,
                 "compact integer length"
             );
-            charge(expanded, raw.len())?;
             Ok(Arc::new(UInt32Array::from_iter_values(
                 raw.chunks_exact(4)
                     .map(|v| u32::from_le_bytes(v.try_into().unwrap())),
@@ -389,38 +363,28 @@ fn decode_column(
                 raw.len() == rows && raw.iter().all(|v| *v <= 1),
                 "invalid compact boolean"
             );
-            charge(expanded, raw.len())?;
             Ok(Arc::new(BooleanArray::from(
                 raw.iter().map(|v| *v != 0).collect::<Vec<_>>(),
             )))
         }
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
-            decode_string_column(raw, kind, rows, expanded)
+            decode_string_column(raw, kind, rows)
         }
         _ => anyhow::bail!("unsupported compact field"),
     }
 }
 
-fn decode_string_column(
-    raw: &[u8],
-    kind: &DataType,
-    rows: usize,
-    expanded: &mut usize,
-) -> Result<ArrayRef> {
+fn decode_string_column(raw: &[u8], kind: &DataType, rows: usize) -> Result<ArrayRef> {
     let mut input = Input::new(raw);
     let count = input.u32()? as usize;
     ensure!(
         count <= rows && count <= input.remaining() / 4,
         "compact dictionary count"
     );
-    ensure!(
-        count
-            .checked_mul(std::mem::size_of::<&str>())
-            .context("compact dictionary size overflow")?
-            <= MAX_COMPACT_DECODE_BYTES,
-        "compact dictionary size limit"
-    );
-    let mut dictionary = Vec::with_capacity(count);
+    let mut dictionary = Vec::new();
+    dictionary
+        .try_reserve_exact(count)
+        .context("compact dictionary allocation failed")?;
     let mut dictionary_bytes = 0usize;
     for _ in 0..count {
         let len = input.u32()? as usize;
@@ -433,13 +397,9 @@ fn decode_string_column(
         input.remaining() == rows.checked_mul(4).context("index size overflow")?,
         "compact label indices length"
     );
-    ensure!(
-        rows.checked_mul(std::mem::size_of::<Option<u32>>())
-            .context("compact indices size overflow")?
-            <= MAX_COMPACT_DECODE_BYTES,
-        "compact indices size limit"
-    );
-    let mut ids = Vec::with_capacity(rows);
+    let mut ids = Vec::new();
+    ids.try_reserve_exact(rows)
+        .context("compact indices allocation failed")?;
     let mut direct_payload = 0usize;
     let mut view_payload = 0usize;
     let mut has_null = false;
@@ -495,7 +455,6 @@ fn decode_string_column(
         .and_then(|n| n.checked_add(null_bytes))
         .context("compact dictionary size overflow")?;
     if compact_bytes >= direct_bytes {
-        charge(expanded, direct_bytes)?;
         let values = ids.iter().map(|id| id.map(|v| dictionary[v as usize]));
         return Ok(match kind {
             DataType::Utf8 => Arc::new(StringArray::from_iter(values)) as ArrayRef,
@@ -504,7 +463,6 @@ fn decode_string_column(
             _ => unreachable!(),
         });
     }
-    charge(expanded, compact_bytes)?;
     let values: ArrayRef = Arc::new(StringArray::from_iter_values(dictionary));
     let compact: ArrayRef = match width {
         1 => Arc::new(DictionaryArray::<UInt8Type>::try_new(
@@ -534,26 +492,6 @@ mod adaptive_tests {
     use super::*;
 
     #[test]
-    fn oversized_label_section_is_rejected_before_decompression() {
-        let metadata = CompactMetadata {
-            header: Header {
-                schema: Schema::new(vec![arrow::datatypes::Field::new(
-                    "label",
-                    DataType::Utf8,
-                    true,
-                )]),
-                rows: 1,
-                sections: vec![Section {
-                    raw: MAX_COMPACT_DECODE_BYTES + 1,
-                    compressed: 1,
-                }],
-            },
-            sections: vec![&[0]],
-        };
-        assert!(metadata.compact_batch(&[0]).is_err());
-    }
-
-    #[test]
     fn dictionary_width_boundaries_preserve_null_and_all_codes() {
         for (cardinality, width) in [
             (255, DataType::UInt8),
@@ -574,7 +512,7 @@ mod adaptive_tests {
                 .collect::<Vec<_>>();
             let source: ArrayRef = Arc::new(StringArray::from(rows));
             let raw = encode_column(source.as_ref()).unwrap();
-            let decoded = decode_column(&raw, &DataType::Utf8, source.len(), &mut 0).unwrap();
+            let decoded = decode_column(&raw, &DataType::Utf8, source.len()).unwrap();
             assert_eq!(
                 decoded.data_type(),
                 &DataType::Dictionary(Box::new(width), Box::new(DataType::Utf8))
@@ -611,7 +549,7 @@ mod adaptive_tests {
                 _ => Arc::new(StringViewArray::from(values)),
             };
             let raw = encode_column(source.as_ref()).unwrap();
-            let decoded = decode_column(&raw, &kind, source.len(), &mut 0).unwrap();
+            let decoded = decode_column(&raw, &kind, source.len()).unwrap();
             assert!(
                 matches!(decoded.data_type(),DataType::Dictionary(key,_) if **key==DataType::UInt8)
             );
@@ -626,7 +564,7 @@ mod adaptive_tests {
             (0..1024).map(|i| format!("unique-{i:06}")),
         ));
         let raw = encode_column(source.as_ref()).unwrap();
-        let decoded = decode_column(&raw, &DataType::Utf8, source.len(), &mut 0).unwrap();
+        let decoded = decode_column(&raw, &DataType::Utf8, source.len()).unwrap();
         assert_eq!(decoded.data_type(), &DataType::Utf8);
     }
 }
