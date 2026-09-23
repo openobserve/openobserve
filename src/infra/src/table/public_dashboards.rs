@@ -48,14 +48,12 @@ pub async fn get_snapshot<C: ConnectionTrait>(
     public_dashboard_id: &str,
     preset_secs: i64,
 ) -> Result<Option<public_dashboard_snapshots::Model>, errors::Error> {
-    Ok(
-        public_dashboard_snapshots::Entity::find_by_id((
-            public_dashboard_id.to_string(),
-            preset_secs,
-        ))
-        .one(conn)
-        .await?,
-    )
+    Ok(public_dashboard_snapshots::Entity::find_by_id((
+        public_dashboard_id.to_string(),
+        preset_secs,
+    ))
+    .one(conn)
+    .await?)
 }
 
 /// Which presets currently have a built snapshot — feeds the sanitized config's
@@ -104,7 +102,10 @@ pub async fn upsert_snapshot<C: ConnectionTrait>(
 ) -> Result<(), errors::Error> {
     let res = public_dashboard_snapshots::Entity::update_many()
         .col_expr(public_dashboard_snapshots::Column::Data, Expr::value(data))
-        .col_expr(public_dashboard_snapshots::Column::BuiltAt, Expr::value(now))
+        .col_expr(
+            public_dashboard_snapshots::Column::BuiltAt,
+            Expr::value(now),
+        )
         .filter(public_dashboard_snapshots::Column::PublicDashboardId.eq(public_dashboard_id))
         .filter(public_dashboard_snapshots::Column::PresetSecs.eq(preset_secs))
         .exec(conn)
@@ -130,7 +131,9 @@ pub async fn prune_snapshots<C: ConnectionTrait>(
     let mut q = public_dashboard_snapshots::Entity::delete_many()
         .filter(public_dashboard_snapshots::Column::PublicDashboardId.eq(public_dashboard_id));
     if !keep_presets.is_empty() {
-        q = q.filter(public_dashboard_snapshots::Column::PresetSecs.is_not_in(keep_presets.to_vec()));
+        q = q.filter(
+            public_dashboard_snapshots::Column::PresetSecs.is_not_in(keep_presets.to_vec()),
+        );
     }
     q.exec(conn).await?;
     Ok(())

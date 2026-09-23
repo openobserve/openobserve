@@ -81,8 +81,8 @@ pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
         pd_table::upsert_snapshot(conn, &pd.id, *preset, &json, now).await?;
     }
 
-    let auth_json = (!authorized.is_empty())
-        .then(|| serde_json::to_string(&authorized).unwrap_or_default());
+    let auth_json =
+        (!authorized.is_empty()).then(|| serde_json::to_string(&authorized).unwrap_or_default());
     let unauth_json = (!unauthorized.is_empty())
         .then(|| serde_json::to_string(&unauthorized).unwrap_or_default());
     pd_table::mark_rebuilt(
@@ -120,8 +120,15 @@ async fn build_panels(
             let mut queries_meta = Vec::new();
             let mut any_ok = false;
             let mut reason = "no_query".to_string();
-            for q in &panel.queries {
-                queries_meta.push(serde_json::json!({ "startTime": start, "endTime": end }));
+            for (qi, q) in panel.queries.iter().enumerate() {
+                // Same per-query metadata the live loader builds for an unshifted query.
+                queries_meta.push(serde_json::json!({
+                    "startTime": start,
+                    "endTime": end,
+                    "queryType": panel.query_type,
+                    "timeRangeGap": { "seconds": 0, "periodAsStr": "" },
+                    "panelQueryIndex": qi,
+                }));
                 match run_query(
                     org,
                     publisher,
@@ -179,9 +186,29 @@ async fn run_query(
     unauthorized: &mut BTreeSet<String>,
 ) -> Result<(serde_json::Value, serde_json::Value), String> {
     if query_type == "promql" {
-        run_promql(org, publisher, q, vars, start, end, authorized, unauthorized).await
+        run_promql(
+            org,
+            publisher,
+            q,
+            vars,
+            start,
+            end,
+            authorized,
+            unauthorized,
+        )
+        .await
     } else {
-        run_sql(org, publisher, q, vars, start, end, authorized, unauthorized).await
+        run_sql(
+            org,
+            publisher,
+            q,
+            vars,
+            start,
+            end,
+            authorized,
+            unauthorized,
+        )
+        .await
     }
 }
 
@@ -231,6 +258,8 @@ async fn run_sql(
             sql,
             start_time: start,
             end_time: end,
+            // Same as the live panel loader; the default (10) truncated every panel's result.
+            size: -1,
             track_total_hits: false,
             ..Default::default()
         },
@@ -247,15 +276,14 @@ async fn run_sql(
     .await
     {
         Ok(resp) => {
-            // Store the whole response as the per-query `data`; `resultMetaData`
-            // is the same object minus `hits` (carries histogram_interval etc.
-            // that convertPanelData reads for time-bucketed charts).
-            let full = serde_json::to_value(&resp).unwrap_or_default();
-            let mut meta = full.clone();
-            if let Some(obj) = meta.as_object_mut() {
-                obj.remove("hits");
-            }
-            Ok((full, meta))
+            // Mirror the live loader's shapes: `data[i]` is the hits array and
+            // `resultMetaData[i]` is a per-partition array of the response minus hits.
+            let mut meta = serde_json::to_value(&resp).unwrap_or_default();
+            let hits = meta
+                .as_object_mut()
+                .and_then(|obj| obj.remove("hits"))
+                .unwrap_or_else(|| serde_json::Value::Array(vec![]));
+            Ok((hits, serde_json::Value::Array(vec![meta])))
         }
         Err(e) => {
             log::warn!("public dashboard rebuild query failed: {e}");
@@ -360,18 +388,30 @@ fn promql_fixed_vars(start: i64, end: i64) -> BTreeMap<String, serde_json::Value
     let step_secs = (range_secs / 400).max(scrape);
     let rate = (4 * scrape).max(step_secs + scrape);
     let mut m = BTreeMap::new();
-    m.insert("__interval".to_string(), serde_json::json!(format!("{step_secs}s")));
+    m.insert(
+        "__interval".to_string(),
+        serde_json::json!(format!("{step_secs}s")),
+    );
     m.insert(
         "__interval_ms".to_string(),
         serde_json::json!(format!("{}ms", step_secs * 1000)),
     );
-    m.insert("__rate_interval".to_string(), serde_json::json!(format!("{rate}s")));
+    m.insert(
+        "__rate_interval".to_string(),
+        serde_json::json!(format!("{rate}s")),
+    );
     m.insert(
         "__percentile_interval".to_string(),
         serde_json::json!(format!("{rate}s")),
     );
-    m.insert("__range".to_string(), serde_json::json!(format!("{range_secs}s")));
-    m.insert("__range_s".to_string(), serde_json::json!(range_secs.to_string()));
+    m.insert(
+        "__range".to_string(),
+        serde_json::json!(format!("{range_secs}s")),
+    );
+    m.insert(
+        "__range_s".to_string(),
+        serde_json::json!(range_secs.to_string()),
+    );
     m.insert(
         "__range_ms".to_string(),
         serde_json::json!((range_secs * 1000).to_string()),
@@ -482,7 +522,7 @@ pub async fn create(
         default_range_secs: cfg.time_range.default_range_secs,
         allowed_presets_secs: Some(serde_json::to_string(&cfg.time_range.allowed_presets_secs)?),
         frozen_variables: Some(serde_json::to_string(&cfg.frozen_variables)?),
-        rebuild_secs: clamp_rebuild_secs(cfg.rebuild_secs),
+        rebuild_secs: cfg.rebuild_secs,
         last_rebuilt_at: None,
         rebuild_state: 0,
         unauthorized_streams: None,
@@ -517,8 +557,7 @@ pub async fn get(org: &str, dashboard_id: &str) -> Result<Option<PublicDashboard
 pub async fn delete(org: &str, id: &str) -> Result<bool, anyhow::Error> {
     let existed = pd_table::delete(org, id).await?;
     if existed {
-        let _ =
-            db::scheduler::delete(org, db::scheduler::TriggerModule::PublicDashboard, id).await;
+        let _ = db::scheduler::delete(org, db::scheduler::TriggerModule::PublicDashboard, id).await;
     }
     Ok(existed)
 }
@@ -536,9 +575,23 @@ async fn register_trigger(org: &str, id: &str, next_run_at: i64) -> Result<(), a
         .map_err(|e| anyhow::anyhow!("failed to register rebuild trigger: {e}"))
 }
 
-fn clamp_rebuild_secs(secs: i32) -> i32 {
-    let floor = config::get_config().public_dashboards.min_rebuild_secs as i32;
-    secs.max(floor).max(1)
+/// Reject a publish request the server would otherwise have to rewrite, so the
+/// author learns the real cadence instead of it being silently raised.
+pub fn validate_config(cfg: &PublicDashboardConfig) -> Result<(), String> {
+    check_rebuild_secs(
+        cfg.rebuild_secs,
+        config::get_config().public_dashboards.min_rebuild_secs,
+    )
+}
+
+fn check_rebuild_secs(secs: i32, floor: u64) -> Result<(), String> {
+    if i64::from(secs) < floor.max(1) as i64 {
+        return Err(format!(
+            "rebuild_secs must be at least {} seconds",
+            floor.max(1)
+        ));
+    }
+    Ok(())
 }
 
 async fn gen_unique_slug() -> Result<String, anyhow::Error> {
@@ -584,16 +637,32 @@ mod tests {
     }
 
     #[test]
+    fn rebuild_secs_below_floor_is_rejected_not_raised() {
+        assert!(check_rebuild_secs(10, 10).is_ok());
+        assert!(check_rebuild_secs(60, 10).is_ok());
+        let err = check_rebuild_secs(5, 10).unwrap_err();
+        assert_eq!(err, "rebuild_secs must be at least 10 seconds");
+        // A zero floor still refuses a non-positive cadence.
+        assert!(check_rebuild_secs(0, 0).is_err());
+    }
+
+    #[test]
     fn substitutes_all_three_syntaxes() {
         let v = vars(&[("svc", json!("api"))]);
-        assert_eq!(substitute_vars("a=$svc b=${svc} c={{svc}}", &v), "a=api b=api c=api");
+        assert_eq!(
+            substitute_vars("a=$svc b=${svc} c={{svc}}", &v),
+            "a=api b=api c=api"
+        );
     }
 
     #[test]
     fn bare_form_respects_word_boundary() {
         let v = vars(&[("env", json!("prod"))]);
         // $env must not eat the prefix of $environment.
-        assert_eq!(substitute_vars("$env $environment", &v), "prod $environment");
+        assert_eq!(
+            substitute_vars("$env $environment", &v),
+            "prod $environment"
+        );
     }
 
     #[test]
@@ -618,13 +687,19 @@ mod tests {
     #[test]
     fn missing_variable_is_left_untouched() {
         let v = vars(&[("a", json!("1"))]);
-        assert_eq!(substitute_vars("$b + ${c} + {{d}}", &v), "$b + ${c} + {{d}}");
+        assert_eq!(
+            substitute_vars("$b + ${c} + {{d}}", &v),
+            "$b + ${c} + {{d}}"
+        );
     }
 
     #[test]
     fn empty_vars_returns_query_unchanged() {
         let v = BTreeMap::new();
-        assert_eq!(substitute_vars("select * from t where a=$x", &v), "select * from t where a=$x");
+        assert_eq!(
+            substitute_vars("select * from t where a=$x", &v),
+            "select * from t where a=$x"
+        );
     }
 
     #[test]
