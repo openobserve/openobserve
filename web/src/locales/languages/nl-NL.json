@@ -10976,7 +10976,8 @@
       "scorers": "Scorers",
       "scoreConfigs": "Score-configuraties",
       "remoteTasks": "Remote taken",
-      "playground": "Speelomgeving"
+      "playground": "Speelomgeving",
+      "prompts": "Prompts"
     },
     "subtitle": {
       "llmInsights": "Volg latentie, fouten, tokens en kosten in al je LLM-verkeer",
@@ -11437,6 +11438,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "Inline-prompt",
+          "prompt_ref": "Beheerde prompt",
           "remote": "Extern",
           "sdk": "SDK"
         },

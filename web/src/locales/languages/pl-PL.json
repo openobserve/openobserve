@@ -10976,7 +10976,8 @@
       "scorers": "Oceniacze",
       "scoreConfigs": "Konfiguracje ocen",
       "remoteTasks": "Zadania zdalne",
-      "playground": "Piaskownica"
+      "playground": "Piaskownica",
+      "prompts": "Prompty"
     },
     "subtitle": {
       "llmInsights": "Śledź opóźnienia, błędy, tokeny i koszty w ruchu LLM",
@@ -11437,6 +11438,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "Prompt wbudowany",
+          "prompt_ref": "Zarządzany prompt",
           "remote": "Zdalne",
           "sdk": "SDK"
         },

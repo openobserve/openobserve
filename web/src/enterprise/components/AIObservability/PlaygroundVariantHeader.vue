@@ -110,6 +110,15 @@
       variant="ghost-muted"
       size="icon-xs"
       class="shrink-0"
+      icon-left="save"
+      :title="raw('Save as Prompt')"
+      :data-test="`ai-playground-variant-save-prompt-${label}`"
+      @click="emit('save-as-prompt')"
+    />
+    <OButton
+      variant="ghost-muted"
+      size="icon-xs"
+      class="shrink-0"
       icon-left="science"
       :title="t('aiObservability.playground.createExperiment')"
       :data-test="`ai-playground-variant-experiment-${label}`"
@@ -189,6 +198,7 @@ const emit = defineEmits<{
   reset: [];
   remove: [];
   "create-experiment": [];
+  "save-as-prompt": [];
 }>();
 
 const { t } = useI18nTyped();
