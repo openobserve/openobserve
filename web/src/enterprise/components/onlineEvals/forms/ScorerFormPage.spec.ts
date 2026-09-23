@@ -175,6 +175,21 @@ describe("ScorerFormPage", () => {
     expect(payload.scorer.params.extra_metadata_fields).toBeUndefined();
   });
 
+  it("drops hidden duplicate rows so a decision-model scorer can still save", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "my-scorer");
+    setField(wrapper, "providerId", "p1");
+    setField(wrapper, "extraMetadataFields", [
+      { name: "dup", type: "string", description: "" },
+      { name: "dup", type: "number", description: "" },
+    ]);
+    setField(wrapper, "providerId", "p2");
+    await submit(wrapper);
+
+    expect(oform(wrapper).form.state.isValid).toBe(true);
+    expect(onlineEvalsService.scorers.create).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects duplicate extra-metadata field names", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "my-scorer");
