@@ -14,9 +14,10 @@
  * can never produce a false red.
  *
  * The snooze/dismiss/join/caption interactions are Cloud-only and unreachable on OSS
- * (blocked by the same render gate), so they are planned as test.fixme placeholders
- * with their real assertion bodies kept intact — they run, surface the gap as an
- * expected "fixme", and go green once a Cloud E2E matrix exists.
+ * (blocked by the same render gate), so they are declared as test.fixme placeholders
+ * with their assertion bodies kept intact for a future Cloud run — fixme always skips
+ * and never executes the body, so these tests are not run and will not go green until
+ * they are converted to run (test.skip keyed off isCloudEnvironment) on a Cloud matrix.
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
