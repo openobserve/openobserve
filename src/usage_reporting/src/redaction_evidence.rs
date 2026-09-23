@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The async entry point every SDR call site hands its evidence rows to.
-//!
-//! It lives beside the reporting queue rather than in `openobserve-core`, so the crates
-//! that ingest outside the log path -- enrichment tables among them -- can report a scan
-//! they could not run without depending on the whole ingest crate.
+//! Beside the queue, not in `openobserve-core`, so crates outside the log path can report a scan.
 
 use config::{
     meta::{

@@ -586,8 +586,7 @@ pub async fn handle_otlp_request(
                 })
                 .collect();
             ingest::apply_redaction(org_id, &local_metric_name, &mut json_data).await;
-            // The stored hash was taken pre-trim, so rehashing an untouched UDS record forks its
-            // series identity.
+            // Rehashing an untouched UDS record forks its series identity: the hash predates trim.
             for (prior, (record, _)) in before.into_iter().zip(json_data.iter_mut()) {
                 let redacted =
                     super::signature_without_labels(record, METRICS_HASH_EXCLUDED_LABELS);
