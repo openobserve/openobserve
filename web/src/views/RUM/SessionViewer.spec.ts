@@ -931,3 +931,137 @@ describe("SessionViewer.vue — segment manifest and windowed fetch", () => {
     wrapper.unmount();
   });
 });
+
+describe("SessionViewer.vue — seek offsets against the player baseline", () => {
+  const sessionStart = 1692884313968;
+  const manifestRows = [
+    { start: sessionStart, end: sessionStart + 999, has_full_snapshot: true, records_count: 2 },
+    {
+      start: sessionStart + 1000,
+      end: sessionStart + 1999,
+      has_full_snapshot: false,
+      records_count: 1,
+    },
+    {
+      start: sessionStart + 2000,
+      end: sessionStart + 2999,
+      has_full_snapshot: true,
+      records_count: 1,
+    },
+  ];
+
+  beforeEach(() => {
+    streaming.sqls = [];
+    streaming.responder = (sql: string, from: number) => {
+      if (from > 0) return [];
+      if (sql.includes("has_full_snapshot")) return manifestRows;
+      const lo = Number(/start >= (\d+)/.exec(sql)?.[1] ?? 0);
+      const hi = Number(/start <= (\d+)/.exec(sql)?.[1] ?? 0);
+      return manifestRows
+        .filter((row) => row.start >= lo && row.start <= hi)
+        .map((row) => ({
+          start: row.start,
+          end: row.end,
+          segment: JSON.stringify({ records: [{ type: 4, timestamp: row.start, data: {} }] }),
+        }));
+    };
+  });
+
+  // event_time at +2500 anchors the first window on the +2000 snapshot, away from segment 0.
+  async function mountAnchored() {
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session-abc",
+      query: {
+        start_time: "1692884313968000",
+        end_time: "1692884769270000",
+        event_time: String(sessionStart + 2500),
+      },
+    });
+    const wrapper = mountSessionViewer(router);
+    for (let i = 0; i < 12; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    return wrapper;
+  }
+
+  it("anchors the first window on the snapshot before the forwarded event", async () => {
+    const wrapper = await mountAnchored();
+
+    expect((wrapper.vm as any).windowStart).toBe(sessionStart + 2000);
+    wrapper.unmount();
+  });
+
+  it("subtracts the window offset from a sidebar seek", async () => {
+    const wrapper = await mountAnchored();
+    const gotoSpy = vi.fn();
+    (wrapper.vm as any).videoPlayerRef = {
+      goto: gotoSpy,
+      playerState: { isPlaying: false, startTime: sessionStart + 2000 },
+    };
+
+    (wrapper.vm as any).handleSidebarEvent("event-click", {
+      event_id: "e1",
+      relativeTime: 2400,
+    });
+
+    expect(gotoSpy).toHaveBeenCalledWith(400, false);
+    wrapper.unmount();
+  });
+
+  it("falls back to the window start when the player has not reported its baseline", async () => {
+    const wrapper = await mountAnchored();
+    const gotoSpy = vi.fn();
+    (wrapper.vm as any).videoPlayerRef = { goto: gotoSpy, playerState: { isPlaying: false } };
+
+    (wrapper.vm as any).handleSidebarEvent("event-click", {
+      event_id: "e1",
+      relativeTime: 2400,
+    });
+
+    expect(gotoSpy).toHaveBeenCalledWith(400, false);
+    wrapper.unmount();
+  });
+
+  it("subtracts the window offset from the forwarded auto-seek", async () => {
+    const wrapper = await mountAnchored();
+    const gotoSpy = vi.fn();
+    vi.useFakeTimers();
+    try {
+      (wrapper.vm as any).segmentEvents = [{ id: "e1", relativeTime: 2500 }];
+      (wrapper.vm as any).videoPlayerRef = {
+        goto: gotoSpy,
+        playerState: { isPlaying: false, startTime: sessionStart + 2000 },
+      };
+      await wrapper.vm.$nextTick();
+      // The render that follows reclaims the template ref, so the stub has to be put back.
+      (wrapper.vm as any).videoPlayerRef = {
+        goto: gotoSpy,
+        playerState: { isPlaying: false, startTime: sessionStart + 2000 },
+      };
+      vi.advanceTimersByTime(1500);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(gotoSpy).toHaveBeenCalledWith(500, false);
+    wrapper.unmount();
+  });
+
+  it("ends a target before the window in a terminal state, not a loading spinner", async () => {
+    const wrapper = await mountAnchored();
+    const gotoSpy = vi.fn();
+    (wrapper.vm as any).videoPlayerRef = {
+      goto: gotoSpy,
+      playerState: { isPlaying: false, startTime: sessionStart + 2000 },
+    };
+
+    (wrapper.vm as any).handleSidebarEvent("event-click", {
+      event_id: "e1",
+      relativeTime: 500,
+    });
+
+    expect(gotoSpy).toHaveBeenCalledWith(0, false);
+    expect((wrapper.vm as any).pendingSeek).toBeNull();
+    expect((wrapper.vm as any).segmentNotice).toContain("before the part of the session");
+    wrapper.unmount();
+  });
+});

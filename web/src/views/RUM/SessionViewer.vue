@@ -230,6 +230,10 @@ const manifest = shallowRef<ManifestEntry[]>([]);
 const manifestSummary = ref<ManifestSummary | null>(null);
 const loadedRanges = shallowRef<TimeRange[]>([]);
 const pendingSeek = ref<number | null>(null);
+// Absolute start of the first window fed to the player, which is the player's own time origin.
+const windowStart = ref(0);
+// A target before the window can never be reached, because the background loader only moves forward.
+const unreachableSeek = ref(false);
 // Background batches outlive a route change; without this they keep pushing into a dead tree.
 let cancelled = false;
 const sessionNotFound = ref(false);
@@ -301,6 +305,7 @@ const sessionDetails = ref({
 
 // One line under the player: a seek still waiting on its window, else a manifest cut short.
 const segmentNotice = computed(() => {
+  if (unreachableSeek.value) return t("rum.sessionReplaySeekBehindWindow");
   if (pendingSeek.value !== null) return t("rum.sessionReplaySeekLoading");
   if (manifestSummary.value?.truncated)
     return t("rum.sessionReplayTruncated", { count: manifestSummary.value.segmentCount });
@@ -364,7 +369,7 @@ watch(
         if (videoPlayerRef.value) {
           try {
             videoPlayerRef.value.goto(
-              relativeTime[0],
+              toPlayerOffset(Number(relativeTime[0])),
               false, // Don't auto-play
             );
             hasAutoSeeked.value = true; // Mark as seeked
@@ -581,7 +586,8 @@ const loadRemainingSegments = async (fromIndex: number) => {
 // Absolute time the player must reach first: the forwarded event if the route asks for one, else the session start.
 const initialTarget = () => {
   const sessionStart = Number(sessionState.data.selectedSession?.start_time) || 0;
-  const relative = Number(forwardToEventTime.value) || 0;
+  // forwardToEventTime is a [milliseconds, label] pair; only the first element is a time.
+  const relative = Number(forwardToEventTime.value?.[0]) || 0;
   return relative > 0 ? sessionStart + relative : sessionStart;
 };
 
@@ -594,6 +600,9 @@ const getSessionSegments = async () => {
   }
 
   isLoading.value.push(true);
+  // A second load must not judge seeks against the previous session's window.
+  windowStart.value = 0;
+  unreachableSeek.value = false;
   try {
     const { hits, complete } = await fetchAllPages(manifestSql());
     manifest.value = hits as ManifestEntry[];
@@ -603,6 +612,7 @@ const getSessionSegments = async () => {
     // Only the window from the nearest full snapshot to the target, so the first frame does not wait on the whole session.
     const firstWindow = selectInitialWindow(manifest.value, initialTarget());
     if (!firstWindow) return;
+    windowStart.value = firstWindow.from;
 
     const { hits: bodyHits } = await fetchAllPages(bodiesSql(firstWindow.from, firstWindow.to));
     if (cancelled) return;
@@ -851,6 +861,20 @@ function formatTimeDifference(start_time: number, end_time: number) {
 const getFormattedDate = (timestamp: number) =>
   formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 
+// goto() counts from the first event fed to the player, which is the anchored window, not the session start.
+const toPlayerOffset = (relativeTime: number) => {
+  const sessionStart = Number(sessionState.data.selectedSession?.start_time) || 0;
+  const baseline =
+    Number(videoPlayerRef.value?.playerState?.startTime) || windowStart.value || sessionStart;
+  return Math.max(0, relativeTime - (baseline - sessionStart));
+};
+
+// The loader only moves forward, so a target before the window never becomes playable in this run.
+const isBehindWindow = (relativeTime: number) => {
+  const sessionStart = Number(sessionState.data.selectedSession?.start_time) || 0;
+  return windowStart.value > 0 && sessionStart + relativeTime < windowStart.value;
+};
+
 const planSeekForRelativeTime = (relativeTime: number) =>
   planSeek(
     (Number(sessionState.data.selectedSession?.start_time) || 0) + relativeTime,
@@ -866,7 +890,10 @@ watch(loadedRanges, () => {
   if (plan.status === "needs-fetch") return;
   pendingSeek.value = null;
   if (plan.status === "ready") {
-    videoPlayerRef.value?.goto(target, !!videoPlayerRef.value?.playerState?.isPlaying);
+    videoPlayerRef.value?.goto(
+      toPlayerOffset(target),
+      !!videoPlayerRef.value?.playerState?.isPlaying,
+    );
   }
 });
 
@@ -878,11 +905,17 @@ const handleSidebarEvent = (event: string, payload: any) => {
     showEventDetailDrawer.value = true;
   }
 
+  const relativeTime = Number(payload.relativeTime) || 0;
+
   // Always seek to the event time in the video player
-  videoPlayerRef.value?.goto(payload.relativeTime, !!videoPlayerRef.value?.playerState?.isPlaying);
+  videoPlayerRef.value?.goto(
+    toPlayerOffset(relativeTime),
+    !!videoPlayerRef.value?.playerState?.isPlaying,
+  );
 
   // The seek still happened; this only tracks whether the window behind it is loaded yet.
-  const plan = planSeekForRelativeTime(Number(payload.relativeTime) || 0);
-  pendingSeek.value = plan.status === "needs-fetch" ? Number(payload.relativeTime) || 0 : null;
+  unreachableSeek.value = isBehindWindow(relativeTime);
+  const plan = unreachableSeek.value ? null : planSeekForRelativeTime(relativeTime);
+  pendingSeek.value = plan?.status === "needs-fetch" ? relativeTime : null;
 };
 </script>

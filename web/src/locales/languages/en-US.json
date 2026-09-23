@@ -1351,6 +1351,7 @@
     "noSessionReplay": "No session replay available",
     "loadingSessionReplay": "Loading session replay…",
     "sessionReplaySeekLoading": "Loading the selected part of this session…",
+    "sessionReplaySeekBehindWindow": "This moment is before the part of the session that is loaded. Reopen the session from this event to play it.",
     "sessionReplayTruncated": "This session is too long to load completely. Showing the first {count} segments.",
     "seek": "Seek",
     "sessionMetricsAria": "Session metrics summary",

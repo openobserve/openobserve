@@ -21,10 +21,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 // vi.mock is hoisted — must be at top of file
-vi.mock("lodash-es", () => ({
-  cloneDeep: vi.fn((obj) => JSON.parse(JSON.stringify(obj))),
-}));
-
 vi.mock("@/utils/zincutils", () => ({
   getPath: vi.fn(() => "/test/path"),
 }));
