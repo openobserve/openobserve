@@ -343,6 +343,15 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.sweepSlice).toHaveBeenCalledWith({ skipCache: false });
     });
 
+    /// The route remounts on every visit, so a force here is one request per visit for nothing.
+    it("reads the stream list from the cache on mount, leaving the force to Refresh", async () => {
+      mountExplorer();
+      await flushPromises();
+
+      expect(grid.loadStreams).toHaveBeenCalledTimes(1);
+      expect(grid.loadStreams).not.toHaveBeenCalledWith(true);
+    });
+
     it("a MANUAL refresh keeps the grid mounted while the stream list reloads", async () => {
       const wrapper = mountExplorer();
       let spinnerDuringReload: boolean | undefined;
