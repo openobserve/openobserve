@@ -110,8 +110,7 @@ const columns = computed<OTableColumnDef[]>(() => {
 // this column sorted ascending, so a strip would restate what the rows already say.
 const isUnusedRole = (row: any): boolean => row?.user_count === 0;
 
-const isAssigned = (row: any): boolean =>
-  (props.assignedRoleNames ?? []).includes(row?.role_name);
+const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includes(row?.role_name);
 </script>
 
 <template>

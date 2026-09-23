@@ -1195,15 +1195,11 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.tokenTab = "header";
       await nextTick();
 
-      await wrapper
-        .find('[data-test="service-accounts-list-token-copy-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="service-accounts-list-token-copy-btn"]').trigger("click");
       await flushPromises();
 
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("the-token");
-      expect(navigator.clipboard.writeText).not.toHaveBeenCalledWith(
-        wrapper.vm.tokenHeaderSnippet,
-      );
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalledWith(wrapper.vm.tokenHeaderSnippet);
     });
 
     it("renders the active tab's snippet in a dedicated OCodeBlock with its own copy action", async () => {

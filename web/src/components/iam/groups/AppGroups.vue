@@ -312,7 +312,12 @@ const assignMemberToGroup = async (group: any) => {
     await updateGroup({
       group_name: group.group_name,
       org_identifier: store.state.selectedOrganization.identifier,
-      payload: { add_roles: [], remove_roles: [], add_users: [assignTarget.value], remove_users: [] },
+      payload: {
+        add_roles: [],
+        remove_roles: [],
+        add_users: [assignTarget.value],
+        remove_users: [],
+      },
     });
     assignedGroupNames.value = [...assignedGroupNames.value, group.group_name];
     toast({

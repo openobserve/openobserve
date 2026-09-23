@@ -603,9 +603,7 @@ describe("AppGroups - quick-assign via ?member=", () => {
 
   const mountWithMember = async (member?: string) => {
     const { getGroups } = await import("@/services/iam");
-    vi.mocked(getGroups).mockResolvedValue(
-      createMockAxiosResponse(["admin", "developers"]) as any,
-    );
+    vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse(["admin", "developers"]) as any);
     queryClient.clear();
     mockGroupsState.groups = [{ group_name: "admin" }, { group_name: "developers" }] as any;
     mockAssignRoute.query = member ? { member } : {};
@@ -641,7 +639,12 @@ describe("AppGroups - quick-assign via ?member=", () => {
     expect(updateGroup).toHaveBeenCalledWith({
       group_name: "admin",
       org_identifier: store.state.selectedOrganization.identifier,
-      payload: { add_roles: [], remove_roles: [], add_users: ["svc.o2.ai@sa.internal"], remove_users: [] },
+      payload: {
+        add_roles: [],
+        remove_roles: [],
+        add_users: ["svc.o2.ai@sa.internal"],
+        remove_users: [],
+      },
     });
   });
 
@@ -661,9 +664,7 @@ describe("AppGroups - quick-assign via ?member=", () => {
 
   it("dismissing the banner clears ?member= from the route", async () => {
     const { getGroups } = await import("@/services/iam");
-    vi.mocked(getGroups).mockResolvedValue(
-      createMockAxiosResponse(["admin", "developers"]) as any,
-    );
+    vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse(["admin", "developers"]) as any);
     queryClient.clear();
     mockGroupsState.groups = [{ group_name: "admin" }, { group_name: "developers" }] as any;
     mockAssignRoute.query = {
