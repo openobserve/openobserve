@@ -1474,6 +1474,8 @@
     "sessionReplay": "工作階段重播",
     "viewSessionReplay": "檢視工作階段重播",
     "playSessionReplay": "播放工作階段重播",
+    "noReplayRecordedTitle": "此工作階段未錄製重播",
+    "noReplayRecordedMessage": "工作階段 {id} 沒有可播放的重播區段。",
     "discoverSessionTitle": "探索工作階段重播以深入了解使用者互動",
     "discoverSessionMessage": "工作階段重播會擷取並重播使用者在網站或應用程式上的互動行為，讓您以視覺化方式檢閱使用者如何瀏覽、在哪裡按下、輸入了什麼，以及如何與內容互動",
     "loadingErrorDetails": "正在擷取錯誤詳細資訊，請稍候。",
@@ -13036,10 +13038,12 @@
           },
           "variables": {
             "input": {
-              "trace": "來自追蹤根 Span 的輸入。"
+              "trace": "來自追蹤根聊天 Span 的輸入。",
+              "session": "開場問題：來自第一個追蹤之根聊天 Span 的輸入。"
             },
             "output": {
-              "trace": "來自追蹤根 Span 的輸出。"
+              "trace": "來自追蹤根聊天 Span 的輸出。",
+              "session": "最終答案：來自最後一個追蹤之根聊天 Span 的輸出。"
             },
             "statistics": {
               "trace": "追蹤指標：Span 計數、持續時間、LLM 與工具呼叫、錯誤、Token 和成本。",
@@ -13051,6 +13055,10 @@
             "steps": {
               "trace": "Span 依時間順序排列；當追蹤很長時，中間部分會被摺疊。",
               "session": "按時間順序排列的追蹤，表示為對話輪次。"
+            },
+            "tool_calls": {
+              "trace": "追蹤中的每個工具呼叫，依時間順序，包含其名稱、輸入、輸出與狀態。",
+              "session": "工作階段中所有追蹤的每個工具呼叫，依時間順序，包含其名稱、輸入、輸出與狀態。"
             }
           }
         }

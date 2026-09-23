@@ -84,6 +84,9 @@ const defaultObject = {
     selectedSession: {
       start_time: 0,
       end_time: 0,
+      // Start of the first segment that carries a full snapshot, i.e. where playback can
+      // actually begin. Null when no segment carries one. See SessionViewer's replayOrigin.
+      replay_start: null as number | null,
       browser: "",
       os: "",
       ip: "",

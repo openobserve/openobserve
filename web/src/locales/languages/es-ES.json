@@ -1474,6 +1474,8 @@
     "sessionReplay": "Reproducción de sesión",
     "viewSessionReplay": "Ver reproducción de sesión",
     "playSessionReplay": "Reproducir la reproducción de la sesión",
+    "noReplayRecordedTitle": "No se grabó ninguna repetición para esta sesión",
+    "noReplayRecordedMessage": "La sesión {id} no tiene segmentos de repetición para reproducir.",
     "discoverSessionTitle": "Descubra la reproducción de sesiones para comprender en detalle las interacciones de los usuarios",
     "discoverSessionMessage": "La reproducción de sesiones captura y reproduce las interacciones de los usuarios en su sitio web o aplicación. Esto te permite revisar visualmente cómo navegan los usuarios, dónde hacen clic, qué escriben y cómo interactúan con tu contenido",
     "loadingErrorDetails": "Agárrate fuerte, estamos buscando los detalles del error.",
@@ -13041,10 +13043,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Entrada del span raíz del trace."
+              "trace": "Entrada desde el span raíz de chat de la traza.",
+              "session": "La pregunta inicial: entrada desde el span raíz de chat de la primera traza."
             },
             "output": {
-              "trace": "Salida del span raíz del trace."
+              "trace": "Salida desde el span raíz de chat de la traza.",
+              "session": "La respuesta final: salida desde el span raíz de chat de la última traza."
             },
             "statistics": {
               "trace": "Métricas del trace: número de spans, duración, llamadas a LLM y herramientas, errores, tokens y coste.",
@@ -13056,6 +13060,10 @@
             "steps": {
               "trace": "Spans en orden cronológico; el centro se pliega cuando el trace es muy largo.",
               "session": "Traces en orden cronológico, representados como turnos de conversación."
+            },
+            "tool_calls": {
+              "trace": "Cada llamada a herramienta en la traza, en orden temporal, con su nombre, entrada, salida y estado.",
+              "session": "Cada llamada a herramienta en las trazas de la sesión, en orden temporal, con su nombre, entrada, salida y estado."
             }
           }
         }
