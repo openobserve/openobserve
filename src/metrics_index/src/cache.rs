@@ -24,8 +24,8 @@ use hashlink::LruCache;
 pub(super) static METRICS_INDEX_SELECTION_CACHE: LazyLock<Mutex<MetricsIndexSelectionCache>> =
     LazyLock::new(|| Mutex::new(MetricsIndexSelectionCache::default()));
 
-/// Selected physical row ranges of one sidecar plus the parquet row-group size they map onto.
-pub(super) type CachedSelection = (Arc<Vec<Range<usize>>>, u32);
+/// Selected physical row ranges and the Parquet row-group size, absent for Vortex.
+pub(super) type CachedSelection = (Arc<Vec<Range<usize>>>, Option<u32>);
 
 pub(super) struct MetricsIndexSelectionCache {
     entries: LruCache<String, CachedSelection>,

@@ -2031,11 +2031,11 @@
       "addToGroup": "添加到用户组",
       "addToRole": "分配角色",
       "step1Title": "复制令牌",
-      "copyHint": "立即复制此令牌——您将无法再次看到它。",
+      "copyHint": "这是您唯一一次能看到此令牌的机会。请立即复制或下载，之后将无法再次获取。",
       "done": "完成了",
       "applying": "正在应用访问授权…",
-      "grantedRoles": "已分配角色：{roles}",
-      "grantedGroups": "已添加到用户组：{groups}",
+      "rolesAssignedLabel": "已分配角色",
+      "groupsAssignedLabel": "已添加到用户组",
       "failedRoles": "无法分配角色：{roles}",
       "failedGroups": "无法添加到用户组：{groups}",
       "failedHint": "您可以稍后从角色和用户组页面授予这些权限。"
@@ -2045,6 +2045,9 @@
         "label": "服务账户名称",
         "placeholder": "例如 ingest-bot",
         "help": "小写字母、数字和连字符。保存为 name{suffix}"
+      },
+      "identifier": {
+        "label": "标识符"
       },
       "roles": {
         "label": "分配角色",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "标识符",
+        "roles": "角色",
         "token": "令牌",
         "created": "已创建"
       }
@@ -2185,7 +2189,14 @@
       },
       "bulkDelete": {
         "impact": "绑定到这些角色的任何用户和服务帐户都将失去访问权限。"
-      }
+      },
+      "assignColumn": "分配",
+      "assignBtn": "添加",
+      "assignedBadge": "已分配",
+      "assignBannerText": "将 {member} 添加到角色 — 点击下方角色旁的“添加”。",
+      "assignBannerDone": "完成",
+      "assignSuccess": "已将 {member} 添加到角色“{role}”。",
+      "assignError": "无法将该账户添加到该角色。请重试。"
     },
     "group": {
       "name": {
@@ -2216,7 +2227,14 @@
       },
       "bulkDelete": {
         "impact": "这些群组的成员将失去他们授予的角色。"
-      }
+      },
+      "assignColumn": "分配",
+      "assignBtn": "添加",
+      "assignedBadge": "已分配",
+      "assignBannerText": "将 {member} 添加到用户组 — 点击下方用户组旁的“添加”。",
+      "assignBannerDone": "完成",
+      "assignSuccess": "已将 {member} 添加到用户组“{group}”。",
+      "assignError": "无法将该账户添加到该用户组。请重试。"
     },
     "appGroups": {
       "deleteGroupTitle": "删除群组",
@@ -13372,6 +13390,7 @@
       "searchHistoryNotEnabled": "搜索历史未启用。",
       "enableUsageReporting": "将 ZO_USAGE_REPORTING_ENABLED 设置为 true 以启用使用报告。",
       "selectStreamToExtractPatterns": "请选择要提取模式的流",
+      "patternsUnavailableForMultiStream": "选择多个数据流时无法使用模式。请选择单个数据流。",
       "errorExtractingPatterns": "提取模式时出错。请重试。",
       "nameOfPanelRequired": "面板名称是必需的",
       "errorsFixAndTryAgain": "存在一些错误，请修复后重试",

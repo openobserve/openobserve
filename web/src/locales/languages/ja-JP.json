@@ -2031,11 +2031,11 @@
       "addToGroup": "ユーザーグループに追加する",
       "addToRole": "役割を割り当てる",
       "step1Title": "トークンをコピーする",
-      "copyHint": "このトークンを今すぐコピーしてください。今後表示することはできません。",
+      "copyHint": "このトークンが表示されるのは今回だけです。今すぐコピーまたはダウンロードしてください。後から再取得することはできません。",
       "done": "完了",
       "applying": "アクセス権限を適用中...",
-      "grantedRoles": "割り当てられたロール: {roles}",
-      "grantedGroups": "ユーザーグループに追加: {groups}",
+      "rolesAssignedLabel": "割り当てられたロール",
+      "groupsAssignedLabel": "ユーザーグループに追加済み",
       "failedRoles": "ロールを割り当てられませんでした: {roles}",
       "failedGroups": "ユーザーグループに追加できませんでした: {groups}",
       "failedHint": "これらは後でロールとユーザーグループのページから付与できます。"
@@ -2045,6 +2045,9 @@
         "label": "サービスアカウント名",
         "placeholder": "例: ingest-bot",
         "help": "小文字、数字、ハイフン。名前{suffix}として保存"
+      },
+      "identifier": {
+        "label": "識別子"
       },
       "roles": {
         "label": "ロールを割り当て",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "識別子",
+        "roles": "ロール",
         "token": "トークン",
         "created": "作成されました"
       }
@@ -2185,7 +2189,14 @@
       },
       "bulkDelete": {
         "impact": "これらのロールにバインドされているユーザーおよびサービスアカウントはすべてアクセスできなくなります。"
-      }
+      },
+      "assignColumn": "割り当て",
+      "assignBtn": "追加",
+      "assignedBadge": "割り当て済み",
+      "assignBannerText": "{member} をロールに追加します — 下のロールの横にある [追加] をクリックしてください。",
+      "assignBannerDone": "完了",
+      "assignSuccess": "{member} をロール \"{role}\" に追加しました。",
+      "assignError": "そのロールにアカウントを追加できませんでした。もう一度お試しください。"
     },
     "group": {
       "name": {
@@ -2216,7 +2227,14 @@
       },
       "bulkDelete": {
         "impact": "これらのグループのメンバーは、付与された役割を失います。"
-      }
+      },
+      "assignColumn": "割り当て",
+      "assignBtn": "追加",
+      "assignedBadge": "割り当て済み",
+      "assignBannerText": "{member} をユーザーグループに追加します — 下のグループの横にある [追加] をクリックしてください。",
+      "assignBannerDone": "完了",
+      "assignSuccess": "{member} をグループ \"{group}\" に追加しました。",
+      "assignError": "そのグループにアカウントを追加できませんでした。もう一度お試しください。"
     },
     "appGroups": {
       "deleteGroupTitle": "グループを削除",
@@ -13372,6 +13390,7 @@
       "searchHistoryNotEnabled": "検索履歴が有効になっていません。",
       "enableUsageReporting": "使用状況レポートを有効にするには、ZO_USAGE_REPORTING_ENABLED を true に設定してください。",
       "selectStreamToExtractPatterns": "パターンを抽出するストリームを選択してください",
+      "patternsUnavailableForMultiStream": "複数のストリームが選択されている場合、パターンは利用できません。ストリームを1つだけ選択してください。",
       "errorExtractingPatterns": "パターンの抽出中にエラーが発生しました。もう一度お試しください。",
       "nameOfPanelRequired": "パネルの名前が必要です",
       "errorsFixAndTryAgain": "いくつかのエラーがあります。修正してからもう一度お試しください。",

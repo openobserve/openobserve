@@ -15,11 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use axum::{
-    http::{StatusCode, header},
-    response::{IntoResponse, Response},
-};
-use bytes::BytesMut;
+use axum::{http::StatusCode, response::Response};
 use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
@@ -42,17 +38,16 @@ use opentelemetry_proto::tonic::{
     common::v1::InstrumentationScope,
     logs::v1::LogRecord,
 };
-use prost::Message;
 use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+    common::meta::{http::HttpResponse as MetaHttpResponse, otlp::otlp_export_response},
     db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
-        grpc::{get_val, get_val_with_type_retained},
+        grpc::{get_severity_value, get_val, get_val_with_type_retained},
     },
 };
 
@@ -109,11 +104,17 @@ fn build_otlp_log_record(
         }
     }
 
-    rec["severity"] = if !log_record.severity_text.is_empty() {
-        log_record.severity_text.to_owned().into()
+    let severity = if log_record.severity_text.is_empty() {
+        get_severity_value(log_record.severity_number)
     } else {
-        log_record.severity_number.into()
+        Some(log_record.severity_text.as_str())
     };
+    if let Some(severity) = severity {
+        rec["severity"] = severity.into();
+    }
+    if log_record.severity_number != 0 {
+        rec["severity_number"] = log_record.severity_number.into();
+    }
 
     rec["body"] = get_val(&log_record.body.as_ref());
     rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
@@ -132,51 +133,6 @@ fn build_otlp_log_record(
     }
     rec[TIMESTAMP_COL_NAME] = timestamp.into();
     Some(rec)
-}
-
-/// ProtoJSON rules: int64 as a decimal string, and `partial_success` omitted on a clean success.
-fn export_response_to_proto_json(res: &ExportLogsServiceResponse) -> json::Value {
-    match &res.partial_success {
-        Some(ps) if ps.rejected_log_records != 0 || !ps.error_message.is_empty() => {
-            let mut partial = json::Map::new();
-            if ps.rejected_log_records != 0 {
-                partial.insert(
-                    "rejectedLogRecords".to_string(),
-                    json::Value::String(ps.rejected_log_records.to_string()),
-                );
-            }
-            if !ps.error_message.is_empty() {
-                partial.insert(
-                    "errorMessage".to_string(),
-                    json::Value::String(ps.error_message.clone()),
-                );
-            }
-            json::json!({ "partialSuccess": partial })
-        }
-        _ => json::json!({}),
-    }
-}
-
-/// OTLP/HTTP requires the response body to use the encoding the request arrived in.
-fn format_http_response(res: ExportLogsServiceResponse, req_type: OtlpRequestType) -> Response {
-    match req_type {
-        OtlpRequestType::HttpJson => (
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, CONTENT_TYPE_JSON)],
-            json::to_vec(&export_response_to_proto_json(&res)).expect("serialize response"),
-        )
-            .into_response(),
-        _ => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            (
-                StatusCode::OK,
-                [(header::CONTENT_TYPE, CONTENT_TYPE_PROTO)],
-                out.freeze(),
-            )
-                .into_response()
-        }
-    }
 }
 
 pub async fn handle_request(
@@ -767,7 +723,7 @@ pub async fn handle_request(
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
-        return Ok(format_http_response(res, req_type)); // just return
+        return Ok(otlp_export_response(&res, req_type)); // just return
     }
 
     // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
@@ -815,7 +771,7 @@ pub async fn handle_request(
         ));
     }
 
-    Ok(format_http_response(res, req_type))
+    Ok(otlp_export_response(&res, req_type))
 }
 
 #[cfg(test)]
@@ -836,9 +792,10 @@ mod tests {
     };
     use prost::Message;
 
-    use super::{
-        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, export_response_to_proto_json, format_http_response,
-        normalized_resource_map, otlp_log_record,
+    use super::{normalized_resource_map, otlp_export_response, otlp_log_record};
+    use crate::common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        otlp::export_response_to_proto_json,
     };
 
     fn partial_response(rejected: i64, error: &str) -> ExportLogsServiceResponse {
@@ -854,7 +811,7 @@ mod tests {
         res: ExportLogsServiceResponse,
         req_type: OtlpRequestType,
     ) -> (axum::http::StatusCode, String, Vec<u8>) {
-        let response = format_http_response(res, req_type);
+        let response = otlp_export_response(&res, req_type);
         let status = response.status();
         let content_type = response
             .headers()
@@ -956,6 +913,34 @@ mod tests {
             })
             .is_none()
         );
+    }
+
+    #[test]
+    fn test_severity_text_derived_from_number_and_number_kept_when_set() {
+        let build = |severity_number: i32, severity_text: &str| {
+            let record = LogRecord {
+                severity_number,
+                severity_text: severity_text.to_string(),
+                ..Default::default()
+            };
+            otlp_log_record(&json::Map::new(), None, None, &record, 1)
+        };
+
+        let rec = build(17, "");
+        assert_eq!(rec["severity"], json::json!("ERROR"));
+        assert_eq!(rec["severity_number"], json::json!(17));
+
+        let rec = build(17, "Error");
+        assert_eq!(rec["severity"], json::json!("Error"));
+        assert_eq!(rec["severity_number"], json::json!(17));
+
+        let rec = build(0, "Error");
+        assert_eq!(rec["severity"], json::json!("Error"));
+        assert!(rec.get("severity_number").is_none());
+
+        let rec = build(0, "");
+        assert!(rec.get("severity").is_none());
+        assert!(rec.get("severity_number").is_none());
     }
 
     use crate::logs::otlp::handle_request;

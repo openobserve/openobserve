@@ -2609,6 +2609,7 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "opentelemetry",
+ "opentelemetry-proto",
  "parking_lot 0.12.5",
  "prost 0.14.4",
  "reqwest 0.13.4",
@@ -5966,6 +5967,7 @@ dependencies = [
  "hashlink 0.11.1",
  "itertools 0.14.0",
  "log",
+ "metrics_block",
  "object_store",
  "opentelemetry",
  "parking_lot 0.12.5",
@@ -6933,6 +6935,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics_block"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "parquet",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "zstd",
+]
+
+[[package]]
 name = "metrics_index"
 version = "0.1.0"
 dependencies = [
@@ -6945,6 +6962,8 @@ dependencies = [
  "hashlink 0.11.1",
  "infra",
  "log",
+ "metrics_block",
+ "object_store",
  "promql",
  "promql-parser",
  "regex",
@@ -11306,6 +11325,7 @@ dependencies = [
  "log",
  "md5",
  "memchr",
+ "metrics_block",
  "metrics_index",
  "o2_enterprise",
  "object_store",

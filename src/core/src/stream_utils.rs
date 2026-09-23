@@ -180,6 +180,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
         };
         populate_file_meta(&[&batch], &mut file_meta, None, None)
@@ -218,6 +219,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
         };
         populate_file_meta(&[&batch], &mut file_meta, Some("time"), Some("time"))
@@ -367,6 +369,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
         };
 
@@ -418,6 +421,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
         };
 
@@ -440,6 +444,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
         };
 
@@ -543,6 +548,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
         };
 

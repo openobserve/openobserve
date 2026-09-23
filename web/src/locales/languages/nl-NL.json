@@ -2031,11 +2031,11 @@
       "addToGroup": "Aan een gebruikersgroep toevoegen",
       "addToRole": "Een rol toewijzen",
       "step1Title": "Kopieer je token",
-      "copyHint": "Kopieer dit token nu — je zult het niet meer kunnen zien.",
+      "copyHint": "Dit is de enige keer dat u dit token te zien krijgt. Kopieer of download het nu, het kan niet opnieuw worden opgehaald.",
       "done": "Klaar",
       "applying": "Toegangsrechten toepassen...",
-      "grantedRoles": "Rollen toegewezen: {roles}",
-      "grantedGroups": "Toegevoegd aan gebruikersgroepen: {groups}",
+      "rolesAssignedLabel": "Toegewezen rollen",
+      "groupsAssignedLabel": "Toegevoegd aan gebruikersgroepen",
       "failedRoles": "Kon rollen niet toewijzen: {roles}",
       "failedGroups": "Kon niet toevoegen aan gebruikersgroepen: {groups}",
       "failedHint": "Je kunt deze later toewijzen via de pagina's Rollen en Gebruikersgroepen."
@@ -2045,6 +2045,9 @@
         "label": "Serviceaccountnaam",
         "placeholder": "bijv. ingest-bot",
         "help": "Kleine letters, cijfers en koppeltekens. Opgeslagen als naam{suffix}"
+      },
+      "identifier": {
+        "label": "Identifier"
       },
       "roles": {
         "label": "Rollen toewijzen",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Identificatie",
+        "roles": "Rollen",
         "token": "Blijk",
         "created": "Gemaakt"
       }
@@ -2185,7 +2189,14 @@
       },
       "bulkDelete": {
         "impact": "Alle gebruikers en serviceaccounts die aan deze rollen zijn gekoppeld, verliezen de toegang."
-      }
+      },
+      "assignColumn": "Toewijzen",
+      "assignBtn": "Toevoegen",
+      "assignedBadge": "Toegewezen",
+      "assignBannerText": "Voeg {member} toe aan een rol — klik hieronder op Toevoegen naast een rol.",
+      "assignBannerDone": "Gereed",
+      "assignSuccess": "{member} toegevoegd aan rol \"{role}\".",
+      "assignError": "Het account kon niet aan die rol worden toegevoegd. Probeer het opnieuw."
     },
     "group": {
       "name": {
@@ -2216,7 +2227,14 @@
       },
       "bulkDelete": {
         "impact": "Leden van deze groepen verliezen de door hen toegekende rollen."
-      }
+      },
+      "assignColumn": "Toewijzen",
+      "assignBtn": "Toevoegen",
+      "assignedBadge": "Toegewezen",
+      "assignBannerText": "Voeg {member} toe aan een gebruikersgroep — klik hieronder op Toevoegen naast een groep.",
+      "assignBannerDone": "Gereed",
+      "assignSuccess": "{member} toegevoegd aan groep \"{group}\".",
+      "assignError": "Het account kon niet aan die groep worden toegevoegd. Probeer het opnieuw."
     },
     "appGroups": {
       "deleteGroupTitle": "Groep verwijderen",
@@ -13372,6 +13390,7 @@
       "searchHistoryNotEnabled": "Zoekgeschiedenis is niet ingeschakeld.",
       "enableUsageReporting": "Stel ZO_USAGE_REPORTING_ENABLED in op true om gebruiksrapportage in te schakelen.",
       "selectStreamToExtractPatterns": "Selecteer een stream om patronen te extraheren",
+      "patternsUnavailableForMultiStream": "Patronen zijn niet beschikbaar wanneer meerdere streams zijn geselecteerd. Selecteer één stream.",
       "errorExtractingPatterns": "Fout bij extraheren van patronen. Probeer het opnieuw.",
       "nameOfPanelRequired": "Naam van paneel is vereist",
       "errorsFixAndTryAgain": "Er zijn fouten, corrigeer deze en probeer het opnieuw",
