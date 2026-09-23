@@ -8,6 +8,8 @@
  * Usage:
  *   node build-ci-matrix.js <base.json>                 # OSS: base manifest verbatim
  *   node build-ci-matrix.js <base.json> <overlay.json>  # ENT: base + enterprise overlay
+ *   ... --extra-fields org,user                         # also emit these per-shard fields
+ *       (playwright_alpha1.yml: each cloud shard carries its alpha org + Dex user)
  *   ... --select-for-changes <changed-files.txt>        # PR smoke: emit only the shards
  *       owning the changed files — via run_files (specs), their test folder, the shared
  *       folder_paths map in smoke_config.json (keyed by actual_folder), or optional
@@ -31,6 +33,10 @@
  * entries are documentation only: this script never emits them, so they don't run,
  * but the record + reason survive. "_comment" (or any _-prefixed key) is also ignored.
  *
+ * Every caller gets the same validation: unique testfolders, no empty shard, no spec
+ * listed twice (within a shard or across two shards), no spec both active and disabled,
+ * and no run_files entry without a file on disk.
+ *
  * This lives in OSS so ENT can reuse it from its tree-merged OSS checkout.
  */
 const fs = require("fs");
@@ -47,6 +53,19 @@ function log(msg) {
 }
 
 const globCache = new Map();
+
+// The fields every shard carries into the GitHub matrix. --extra-fields may add to this
+// list but never shadow one of them.
+const EMITTED_FIELDS = [
+  "testfolder",
+  "actual_folder",
+  "browser",
+  "run_files",
+  "quick_mode_enabled",
+  "ingest_allowed_upto",
+  "slo_backfill_chunk_secs",
+  "workers",
+];
 
 function globToRegExp(glob) {
   const cached = globCache.get(glob);
@@ -193,9 +212,24 @@ if (selectIdx !== -1) {
   if (!changedFilesPath) die("--select-for-changes requires a path to a changed-files list");
   args.splice(selectIdx, 2);
 }
+const extraIdx = args.indexOf("--extra-fields");
+let extraFields = [];
+if (extraIdx !== -1) {
+  const list = args[extraIdx + 1];
+  if (!list) die("--extra-fields requires a comma-separated field list");
+  extraFields = list
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const clash = extraFields.find((x) => EMITTED_FIELDS.includes(x));
+  if (clash) die(`--extra-fields "${clash}" is already emitted for every shard`);
+  args.splice(extraIdx, 2);
+}
 const [basePath, overlayPath] = args;
 if (!basePath) {
-  die("usage: build-ci-matrix.js <base.json> [overlay.json] [--select-for-changes <changed.txt>]");
+  die(
+    "usage: build-ci-matrix.js <base.json> [overlay.json] [--select-for-changes <changed.txt>] [--extra-fields a,b]"
+  );
 }
 
 const base = readJson(basePath);
@@ -240,9 +274,10 @@ if (overlayPath) {
   }
 }
 
-// Sanity: unique testfolders, no empty shards, no dup specs, and no spec both
-// active (run_files) and disabled in the same shard.
+// Sanity: unique testfolders, no empty shards, no dup specs (within a shard OR across
+// shards), no spec both active and disabled, and no spec that does not exist on disk.
 const seen = new Set();
+const specOwner = new Map();
 for (const s of include) {
   if (!s.testfolder) die(`shard missing testfolder: ${JSON.stringify(s)}`);
   if (seen.has(s.testfolder)) die(`duplicate testfolder "${s.testfolder}"`);
@@ -257,6 +292,36 @@ for (const s of include) {
       die(`shard "${s.testfolder}": "${d.file}" is in both run_files and disabled`);
     }
   }
+  // Across shards: two shards listing the same spec run it twice, which no one asks for
+  // on purpose — it happens when two PRs register the same new spec in different shards.
+  for (const spec of s.run_files) {
+    const key = `${s.actual_folder}/${spec}`;
+    const owner = specOwner.get(key);
+    if (owner) die(`"${key}" is listed in both "${owner}" and "${s.testfolder}" — keep one`);
+    specOwner.set(key, s.testfolder);
+  }
+}
+
+// A run_files entry that no longer exists on disk is the one failure mode a green CI run
+// cannot show you: playwright_alpha1.yml skips missing paths with a warning, and a
+// Playwright path argument that matches nothing simply selects no tests. So a spec that
+// was renamed or split stops running and the shard stays green. Resolve every entry
+// against the specs tree that sits beside the manifest and fail here instead.
+const specsRoot = path.resolve(path.dirname(basePath), "..", "playwright-tests");
+if (fs.existsSync(specsRoot)) {
+  const missing = [];
+  for (const s of include) {
+    for (const spec of s.run_files) {
+      if (!fs.existsSync(path.join(specsRoot, s.actual_folder, spec))) {
+        missing.push(`${s.testfolder} → ${s.actual_folder}/${spec}`);
+      }
+    }
+  }
+  if (missing.length) {
+    die(`run_files entries with no file on disk (renamed, split or deleted):\n  ${missing.join("\n  ")}`);
+  }
+} else {
+  log(`specs tree ${specsRoot} not present — skipping the spec-exists check`);
 }
 
 let emitted = include;
@@ -351,6 +416,17 @@ const matrix = emitted.map((s) => ({
   // to pin workers to 1 — otherwise the files race each other, which is not
   // something the specs themselves can express.
   workers: s.workers === undefined || s.workers === null ? "" : String(s.workers),
+  // Pass-through fields a caller asked for with --extra-fields. playwright_alpha1.yml
+  // needs org + user: a cloud shard reads matrix.org for its alpha organization (data
+  // isolation) and matrix.user to pick the Dex user whose shared-auth artifact it pulls.
+  ...Object.fromEntries(
+    extraFields.map((k) => {
+      if (s[k] === undefined || s[k] === null) {
+        die(`shard "${s.testfolder}" has no "${k}", but --extra-fields requires it`);
+      }
+      return [k, s[k]];
+    })
+  ),
 }));
 
 process.stdout.write(JSON.stringify({ include: matrix }));
