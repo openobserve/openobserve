@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+use std::collections::BTreeSet;
+
 use axum::{
     Json,
     extract::{Path, Query},
@@ -44,10 +46,16 @@ pub struct AppendPromptVersionQuery {
 #[derive(Clone, Debug, Deserialize, IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolvePromptQuery {
+    /// Prompt name.
     pub name: String,
+    /// Movable label to resolve. Defaults to `production` when both `label`
+    /// and `version` are omitted.
     pub label: Option<String>,
+    /// Immutable prompt version to resolve.
     pub version: Option<i32>,
     #[serde(alias = "folderId", alias = "folder_id")]
+    /// Optional folder assertion. A mismatch returns the prompt with an HTTP
+    /// `Warning` header.
     pub folder: Option<String>,
 }
 
@@ -101,6 +109,19 @@ async fn can_manage_prompt_settings(org_id: &str, _user_id: &str) -> bool {
     {
         true
     }
+}
+
+fn validate_protected_labels(labels: BTreeSet<String>) -> Result<BTreeSet<String>, PromptError> {
+    labels
+        .into_iter()
+        .map(|label| {
+            let label = prompts::validate_label(&label)?;
+            if label == prompts::LATEST_LABEL {
+                return Err(PromptError::InvalidLabel);
+            }
+            Ok(label)
+        })
+        .collect()
 }
 
 fn idempotency_key(headers: &HeaderMap) -> Result<Option<String>, Response> {
@@ -381,6 +402,10 @@ pub async fn update_prompt_settings(
             "Unauthorized Access",
         );
     }
+    body.protected_labels = match validate_protected_labels(body.protected_labels) {
+        Ok(labels) => labels,
+        Err(error) => return prompt_error_response(error),
+    };
     if let Some(webhook) = &mut body.webhook {
         webhook.endpoint = match infra::outbound_http::validate_endpoint(&webhook.endpoint) {
             Ok(endpoint) => endpoint.to_string(),

@@ -465,7 +465,10 @@ async function load() {
   } catch (error: unknown) {
     toast({
       variant: "error",
-      message: raw(error instanceof Error ? error.message : "Failed to load prompt."),
+      message:
+        error instanceof Error
+          ? raw(error.message)
+          : t("aiObservability.promptManagement.loadPromptError"),
     });
   } finally {
     loading.value = false;

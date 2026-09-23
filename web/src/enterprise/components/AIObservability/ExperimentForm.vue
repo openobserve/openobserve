@@ -305,9 +305,9 @@
               <template v-else-if="taskType === 'prompt_ref'">
                 <OFormSelect
                   name="promptId"
-                  :label="raw('Managed Prompt')"
+                  :label="t('aiObservability.experiments.form.managedPromptLabel')"
                   :options="promptOptions"
-                  :placeholder="raw('Select a Prompt')"
+                  :placeholder="t('aiObservability.experiments.form.managedPromptPlaceholder')"
                   searchable
                   required
                   data-test="ai-experiment-form-prompt-select"
@@ -315,7 +315,7 @@
                 <div class="flex flex-wrap items-end gap-3">
                   <OFormSelect
                     name="promptSelectionMode"
-                    :label="raw('Resolve by')"
+                    :label="t('aiObservability.experiments.form.promptResolveBy')"
                     :options="promptSelectionModeOptions"
                     class="w-40"
                     data-test="ai-experiment-form-prompt-mode"
@@ -323,15 +323,15 @@
                   <OFormInput
                     v-if="promptSelectionMode === 'label'"
                     name="promptLabel"
-                    :label="raw('Label')"
-                    :placeholder="raw('production')"
+                    :label="t('aiObservability.promptManagement.label')"
+                    :placeholder="t('aiObservability.experiments.form.promptLabelPlaceholder')"
                     class="min-w-0 flex-1"
                     data-test="ai-experiment-form-prompt-label"
                   />
                   <OFormSelect
                     v-else
                     name="promptVersion"
-                    :label="raw('Version')"
+                    :label="t('aiObservability.promptManagement.version')"
                     :options="promptVersionOptions"
                     class="min-w-0 flex-1"
                     data-test="ai-experiment-form-prompt-version"
@@ -344,7 +344,7 @@
                     :disabled="!promptId"
                     @click="resolvePromptSelection"
                   >
-                    Resolve
+                    {{ t("aiObservability.experiments.form.promptResolve") }}
                   </OButton>
                 </div>
                 <div
@@ -352,8 +352,11 @@
                   class="rounded-default border-status-success-text bg-status-success-bg border px-3 py-2 text-xs"
                   data-test="ai-experiment-form-prompt-pin"
                 >
-                  Immutable pin: {{ resolvedPrompt.prompt.name }}@v{{
-                    resolvedPrompt.version.version
+                  {{
+                    t("aiObservability.experiments.form.promptImmutablePin", {
+                      name: resolvedPrompt.prompt.name,
+                      version: resolvedPrompt.version.version,
+                    })
                   }}
                   <span class="text-text-secondary font-mono">
                     · {{ resolvedPrompt.prompt.entityId }}</span
@@ -373,19 +376,19 @@
                   <div class="min-w-0 flex-1">
                     <OFormSelect
                       name="model"
-                      :label="raw('Model override')"
+                      :label="t('aiObservability.experiments.form.promptModelOverrideLabel')"
                       :options="modelOptions"
-                      :placeholder="raw('Use Prompt model or Provider default')"
+                      :placeholder="
+                        t('aiObservability.experiments.form.promptModelOverridePlaceholder')
+                      "
                       searchable
                       creatable
                       clearable
                       :disabled="!providerSelected"
                       :help-text="
-                        raw(
-                          promptModelOverride
-                            ? 'Overrides the managed Prompt model.'
-                            : 'Using the managed Prompt model.',
-                        )
+                        promptModelOverride
+                          ? t('aiObservability.experiments.form.promptModelOverrideActive')
+                          : t('aiObservability.experiments.form.promptModelOverrideInherited')
                       "
                       data-test="ai-experiment-form-prompt-model"
                     />
@@ -397,13 +400,11 @@
                       min="0"
                       max="2"
                       step="0.1"
-                      :label="raw('Temperature override')"
+                      :label="t('aiObservability.experiments.form.promptTemperatureOverrideLabel')"
                       :help-text="
-                        raw(
-                          promptTemperatureOverride
-                            ? 'Overrides Prompt parameters.'
-                            : 'Using Prompt parameters.',
-                        )
+                        promptTemperatureOverride
+                          ? t('aiObservability.experiments.form.promptTemperatureOverrideActive')
+                          : t('aiObservability.experiments.form.promptTemperatureOverrideInherited')
                       "
                       data-test="ai-experiment-form-prompt-temperature"
                     />
@@ -719,9 +720,9 @@ const taskTypeOptions = computed(() => [
     subLabel: t("aiObservability.experiments.form.taskTypeInlineHelp"),
   },
   {
-    label: raw("Managed Prompt"),
+    label: t("aiObservability.experiments.form.taskTypePromptRef"),
     value: "prompt_ref",
-    subLabel: raw("Pin an immutable managed Prompt version."),
+    subLabel: t("aiObservability.experiments.form.taskTypePromptRefHelp"),
   },
   {
     label: t("aiObservability.experiments.form.taskTypeRemote"),
@@ -743,17 +744,19 @@ const remoteTaskOptions = computed(() =>
       subLabel: raw(task.endpoint),
     })),
 );
-const promptSelectionModeOptions = [
-  { label: raw("Label"), value: "label" },
-  { label: raw("Version"), value: "version" },
-];
+const promptSelectionModeOptions = computed(() => [
+  { label: t("aiObservability.promptManagement.label"), value: "label" },
+  { label: t("aiObservability.promptManagement.version"), value: "version" },
+]);
 const promptOptions = computed(() =>
   prompts.value
     .filter((prompt) => prompt.status === "active")
     .map((prompt) => ({
       label: raw(prompt.name),
       value: prompt.entityId,
-      subLabel: raw(`latest v${prompt.latestVersion}`),
+      subLabel: t("aiObservability.experiments.form.promptLatestVersion", {
+        version: prompt.latestVersion,
+      }),
     })),
 );
 const promptVersionOptions = computed(() => {
