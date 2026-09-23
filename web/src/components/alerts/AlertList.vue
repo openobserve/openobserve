@@ -379,19 +379,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </span>
                 <span v-else class="text-text-body">—</span>
-                <!-- §4.8 health badge: its own element keyed off notice_class, never a synthetic status. -->
-                <OTooltip
-                  v-if="anomalyNoticeBadge(row)"
-                  :max-width="'25rem'"
-                  :content="anomalyNoticeTooltip(row)"
-                >
-                  <OTag
-                    variant="warning-quiet"
-                    class="ms-1.5"
-                    :label="anomalyNoticeBadge(row)?.label"
-                    :data-test="`alert-list-${row.name}-anomaly-notice`"
-                  />
-                </OTooltip>
               </template>
 
               <!-- Priority (PT-3). Unset renders an em dash, not a chip:
@@ -962,7 +949,6 @@ import {
   nextTick,
 } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { anomalyNoticeBadgeKeys } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -1083,16 +1069,6 @@ export default defineComponent({
     /// still better than an empty cell that reads as "routed from rules".
     const oncallTeamName = (teamId: string): I18nText =>
       raw(oncallTeams.value.find((team) => team.id === teamId)?.name ?? teamId);
-
-    // §4.8: the badge keys off the API's notice_class alone — never error-string prefixes.
-    const anomalyNoticeBadge = (row: any): { label: I18nText } | null => {
-      const keys = anomalyNoticeBadgeKeys(row?.notice_class);
-      return keys ? { label: t(keys.labelKey as any) } : null;
-    };
-    const anomalyNoticeTooltip = (row: any): I18nText => {
-      const keys = anomalyNoticeBadgeKeys(row?.notice_class);
-      return raw(keys ? keys.tooltipKeys.map((k) => t(k as any)).join(" ") : "");
-    };
 
     async function fetchOnCallTeams() {
       if (!oncallEnabled.value) return;
@@ -1874,7 +1850,6 @@ export default defineComponent({
       firing_count: anomaly.firing_count ?? "--",
       status: anomaly.status || "--",
       last_error: anomaly.last_error || null,
-      notice_class: anomaly.notice_class ?? null,
       // Anomaly rows share the alerts table, so they share its On-call team
       // column. This branch returns before the mapping below, so anything the
       // column needs has to be listed here as well or the row renders as
@@ -3722,8 +3697,6 @@ export default defineComponent({
     return {
       oncallEnabled,
       oncallTeamName,
-      anomalyNoticeBadge,
-      anomalyNoticeTooltip,
       lgUp,
       raw,
       t,
