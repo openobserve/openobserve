@@ -55,6 +55,11 @@ test.describe('Composite alerts — builder', {
     }
   });
 
+  /** The stem shared by one call's fixtures, e.g. "b6_0_lz4k9abc" -> "b6_". */
+  function fixtureStem(name) {
+    return name.slice(0, name.indexOf('_') + 1);
+  }
+
   async function children(page, prefix, count) {
     const made = await createChildAlerts(page, prefix, count);
     created.push(...made.map((c) => c.id));
@@ -95,7 +100,9 @@ test.describe('Composite alerts — builder', {
     const [a, b, c] = await children(page, 'b6', 3);
     await openBuilderWith(page, [a, b]);
 
-    const options = await pm.compositeAlertsPage.optionIdsFor(a.id);
+    // Search by the prefix these three share so all of them are inside the picker's
+    // windowed list — otherwise "not offered" and "not rendered yet" look identical.
+    const options = await pm.compositeAlertsPage.optionIdsFor(a.id, fixtureStem(a.name), c.id);
     expect(options).toContain(a.id); // its own value stays selectable
     expect(options).toContain(c.id);
     expect(options).not.toContain(b.id);

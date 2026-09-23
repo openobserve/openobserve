@@ -1732,7 +1732,8 @@ export default defineComponent({
     onMounted(async () => {
       mountedAt = performance.now();
       syncTimeRange();
-      await grid.loadStreams(true);
+      // Cache-first: the route remounts on every visit, so a force would discard the shared list.
+      await grid.loadStreams();
 
       track("metrics_explorer_opened", {
         metric_count: grid.cards.value.length,

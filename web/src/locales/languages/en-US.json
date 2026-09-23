@@ -2031,11 +2031,11 @@
       "addToGroup": "Add to a user group",
       "addToRole": "Assign a role",
       "step1Title": "Copy your token",
-      "copyHint": "Copy this token now — you won't be able to see it again.",
+      "copyHint": "This is the only time you'll see this token. Copy or download it now, it can't be retrieved again.",
       "done": "Done",
       "applying": "Applying access grants…",
-      "grantedRoles": "Roles assigned: {roles}",
-      "grantedGroups": "Added to user groups: {groups}",
+      "rolesAssignedLabel": "Roles assigned",
+      "groupsAssignedLabel": "Added to user groups",
       "failedRoles": "Could not assign roles: {roles}",
       "failedGroups": "Could not add to user groups: {groups}",
       "failedHint": "You can grant these later from the Roles and User Groups pages."
@@ -2045,6 +2045,9 @@
         "label": "Service account name",
         "placeholder": "e.g. ingest-bot",
         "help": "Lowercase letters, numbers and hyphens. Saved as name{suffix}"
+      },
+      "identifier": {
+        "label": "Identifier"
       },
       "roles": {
         "label": "Assign roles",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Identifier",
+        "roles": "Roles",
         "token": "Token",
         "created": "Created"
       }
@@ -2186,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Any users and service accounts bound to these roles will lose access."
-      }
+      },
+      "assignColumn": "Assign",
+      "assignBtn": "Add",
+      "assignedBadge": "Assigned",
+      "assignBannerText": "Add {member} to a role — click Add next to a role below.",
+      "assignBannerDone": "Done",
+      "assignSuccess": "Added {member} to role \"{role}\".",
+      "assignError": "Could not add the account to that role. Please try again."
     },
     "group": {
       "name": {
@@ -2217,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Members of these groups will lose the roles granted by them."
-      }
+      },
+      "assignColumn": "Assign",
+      "assignBtn": "Add",
+      "assignedBadge": "Assigned",
+      "assignBannerText": "Add {member} to a user group — click Add next to a group below.",
+      "assignBannerDone": "Done",
+      "assignSuccess": "Added {member} to group \"{group}\".",
+      "assignError": "Could not add the account to that group. Please try again."
     },
     "appGroups": {
       "deleteGroupTitle": "Delete Group",
@@ -13385,6 +13403,7 @@
       "searchHistoryNotEnabled": "Search history is not enabled.",
       "enableUsageReporting": "Set ZO_USAGE_REPORTING_ENABLED to true to enable usage reporting.",
       "selectStreamToExtractPatterns": "Please select a stream to extract patterns",
+      "patternsUnavailableForMultiStream": "Patterns are not available when multiple streams are selected. Please select a single stream.",
       "errorExtractingPatterns": "Error extracting patterns. Please try again.",
       "nameOfPanelRequired": "Name of Panel is required",
       "errorsFixAndTryAgain": "There are some errors, please fix them and try again",

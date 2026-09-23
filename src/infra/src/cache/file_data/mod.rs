@@ -232,19 +232,13 @@ async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Erro
             }
         }
         FileType::Midx => {
-            // Arrow IPC file: 8-byte leading magic, footer, i32 footer length, 6-byte magic
-            const ARROW_MAGIC: &[u8; 6] = b"ARROW1";
-            if bytes.len() < 18 {
+            if bytes.len() < metrics_block::FOOTER_LEN {
                 return Err(anyhow::anyhow!("invalid metrics index file"));
             }
-            if &bytes[..6] != ARROW_MAGIC || &bytes[bytes.len() - 6..] != ARROW_MAGIC {
-                return Err(anyhow::anyhow!("arrow ipc magic bytes mismatch"));
-            }
-            let footer_len =
-                i32::from_le_bytes(bytes[bytes.len() - 10..bytes.len() - 6].try_into().unwrap());
-            if footer_len < 0 || 8 + footer_len as usize + 10 > bytes.len() {
-                return Err(anyhow::anyhow!("arrow ipc footer size mismatch"));
-            }
+            metrics_block::read_footer(
+                &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
+                bytes.len() as u64,
+            )?;
         }
     }
     Ok(())
@@ -315,8 +309,7 @@ async fn download_from_storage(
                 // so we check if the footer is valid. If it is, then the db entry is invalid
                 // and we reset it. If footer is invalid, the store has a corrupted file
                 // so we mark it as deleted, and return error.
-                // data files (parquet/vortex) are tracked in file_list, ttv/midx index files are
-                // not
+                // Only data files have standalone file-list rows whose size can be corrected.
                 let is_data_file = file.ends_with(".parquet") || file.ends_with(".vortex");
                 let valid_parquet = file.ends_with(".parquet")
                     && validate_file(&data_bytes, FileType::Parquet).await.is_ok();
@@ -533,40 +526,50 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn validate_midx_checks_arrow_ipc_magic_and_footer() {
+    async fn validate_midx_checks_current_footer() {
         use arrow::{
-            array::{RecordBatch, UInt32Array},
+            array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
             datatypes::{DataType, Field, Schema},
-            ipc::writer::FileWriter,
         };
-        let schema = std::sync::Arc::new(Schema::new(vec![Field::new(
-            "__oo_midx_row_count",
-            DataType::UInt32,
-            false,
-        )]));
+        let schema = std::sync::Arc::new(Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("value", DataType::Float64, false),
+        ]));
         let batch = RecordBatch::try_new(
             schema.clone(),
-            vec![std::sync::Arc::new(UInt32Array::from(vec![3, 2]))],
+            vec![
+                std::sync::Arc::new(UInt64Array::from(vec![1, 1])),
+                std::sync::Arc::new(Int64Array::from(vec![10, 20])),
+                std::sync::Arc::new(Float64Array::from(vec![1.0, 2.0])),
+            ],
         )
         .unwrap();
-        let mut writer = FileWriter::try_new(Vec::new(), &schema).unwrap();
+        let mut writer =
+            metrics_block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
         writer.write(&batch).unwrap();
-        let bytes = writer.into_inner().unwrap();
+        let bytes = writer
+            .finish_for_vortex(
+                metrics_block::ParentMetadata {
+                    rows: 2,
+                    compressed_size: 123,
+                },
+                schema,
+            )
+            .unwrap();
 
         assert!(validate_file(&bytes, FileType::Midx).await.is_ok());
-        // truncated: trailing magic gone
         assert!(
             validate_file(&bytes[..bytes.len() - 3], FileType::Midx)
                 .await
                 .is_err()
         );
-        // footer length claims more bytes than the file has
         let mut oversized = bytes.clone();
         let len = oversized.len();
-        oversized[len - 10..len - 6].copy_from_slice(&i32::MAX.to_le_bytes());
+        oversized[len - 16..len - 8].copy_from_slice(&u64::MAX.to_le_bytes());
         assert!(validate_file(&oversized, FileType::Midx).await.is_err());
         assert!(
-            validate_file(b"not an arrow file", FileType::Midx)
+            validate_file(b"not a MIDX file", FileType::Midx)
                 .await
                 .is_err()
         );
