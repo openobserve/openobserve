@@ -222,7 +222,7 @@
                  optional field in the app — not as a separate uppercase badge
                  on its own line. -->
                 <div class="flex flex-col gap-0.5">
-                  <strong class="text-xs font-semibold">{{
+                  <strong v-if="!decisionProvider" class="text-xs font-semibold">{{
                     t("onlineEvals.scorer.extraFieldsLabel")
                   }}</strong>
                   <small
