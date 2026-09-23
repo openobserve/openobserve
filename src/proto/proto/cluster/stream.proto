@@ -36,4 +36,5 @@ message StreamStats {
     double storage_size = 6;
     double compressed_size = 7;
     double index_size = 8;
+    double mindex_size = 9;
 }
