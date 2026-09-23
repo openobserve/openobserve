@@ -2513,7 +2513,7 @@ mod tests {
 
     // only the real tree catches a snappy strip reordered inside the decompression layer
     #[tokio::test]
-    async fn snappy_survives_decompression_only_on_the_routes_that_decode_it() {
+    async fn snappy_is_not_rejected_by_the_decompression_layer() {
         let app = Router::new().nest("/api", service_routes());
         let snappy_post = |uri: &str| {
             Request::builder()
@@ -2527,6 +2527,7 @@ mod tests {
         for uri in [
             "/api/default/loki/api/v1/push",
             "/api/default/prometheus/api/v1/write",
+            "/api/default/v1/logs",
         ] {
             let status = app
                 .clone()
@@ -2536,13 +2537,6 @@ mod tests {
                 .status();
             assert_ne!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE, "{uri}");
         }
-
-        let status = app
-            .oneshot(snappy_post("/api/default/v1/logs"))
-            .await
-            .unwrap()
-            .status();
-        assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
 
     // ── unauthenticated /config bootstrap ─────────────────────────────────

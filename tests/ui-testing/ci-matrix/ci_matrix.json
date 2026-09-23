@@ -99,7 +99,8 @@
       "dashboard-multi-sql.spec.js",
       "crossLinkMultiStream.spec.js",
       "dashboards-form-validation.spec.js",
-      "dashboard-refresh-without-cache.spec.js"
+      "dashboard-refresh-without-cache.spec.js",
+      "dashboard-print-layout.spec.js"
     ],
     "disabled": [
       {
@@ -252,6 +253,7 @@
       "datetime-picker-copy-paste.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "connectDataSourcePopup.spec.js",
+      "otableSelectCell.spec.js",
       "theme.spec.js"
     ],
     "disabled": []
