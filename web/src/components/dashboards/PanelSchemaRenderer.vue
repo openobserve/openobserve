@@ -926,7 +926,8 @@ export default defineComponent({
     // ======= [END] dashboard PrintMode =======
 
     onMounted(async () => {
-      // fetch all panels
+      // The panel list only feeds annotation editing; injected-data panels have no live dashboard to fetch.
+      if (injectedPromqlData?.value) return;
       await fetchAllPanels();
     });
 

@@ -185,6 +185,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="store.state.printMode !== true"
             variant="outline"
             size="icon-toolbar"
+            data-test="dashboard-publish-public-btn"
+            icon-left="public"
+            @click="showPublicShareDialog = true"
+          >
+            <OTooltip :content="t('dashboard.publicDashboard.shareTooltip')" />
+          </OButton>
+          <PublicShareDialog
+            v-if="currentDashboardData.data?.dashboardId"
+            v-model="showPublicShareDialog"
+            :dashboard-id="currentDashboardData.data.dashboardId"
+            :variables-config="currentDashboardData.data?.variables"
+            :time-obj="currentTimeObj"
+            :current-values="variablesData"
+          />
+          <OButton
+            v-if="!isFullscreen"
+            v-show="store.state.printMode !== true"
+            variant="outline"
+            size="icon-toolbar"
             data-test="dashboard-setting-btn"
             @click="openSettingsDialog"
             icon-left="settings"
@@ -363,6 +382,7 @@ import {
 } from "@/utils/dashboard/panelTimeUtils";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
+import PublicShareDialog from "@/components/dashboards/PublicShareDialog.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import useNotifications from "@/composables/useNotifications";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -410,6 +430,7 @@ export default defineComponent({
     OPageLayout,
     DateTimePickerDashboard,
     ShareButton,
+    PublicShareDialog,
     AutoRefreshInterval,
     ExportDashboard,
     DashboardSettings,
@@ -587,6 +608,7 @@ export default defineComponent({
 
     // variables data
     const variablesData = reactive({});
+    const showPublicShareDialog = ref(false);
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
@@ -1886,6 +1908,7 @@ export default defineComponent({
       refreshedVariablesDataUpdated,
       onDeletePanel,
       variablesData,
+      showPublicShareDialog,
       variablesDataUpdated,
       showDashboardSettingsDialog,
       openSettingsDialog,
