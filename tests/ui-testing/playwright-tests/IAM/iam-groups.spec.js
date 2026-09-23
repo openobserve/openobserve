@@ -56,8 +56,23 @@ const req = async (page, method, path, data) => {
     return { status: resp.status(), body: await resp.json().catch(() => ({})) };
 };
 
-const listRoles = async (page) => (await req(page, 'GET', '/roles')).body || [];
-const listGroups = async (page) => (await req(page, 'GET', '/groups')).body || [];
+/** `/roles` and `/groups` answer with a JSON array only when RBAC is actually on.
+ *  With OpenFGA absent they return an error OBJECT, which `|| []` lets through —
+ *  truthy, not iterable — so the `for...of` in sweepLeftovers threw
+ *  "(intermediate value) is not iterable" from beforeAll and took all 23 tests
+ *  with it, reporting a TypeError instead of the missing precondition. Assert the
+ *  shape and say what actually came back. */
+const asNameList = (what, { status, body }) => {
+    if (Array.isArray(body)) return body;
+    throw new Error(
+        `GET ${what} did not return an array (status ${status}). ` +
+        `This usually means RBAC/OpenFGA is not enabled on the server under test — ` +
+        `Roles and Groups do not exist without it. Body: ${JSON.stringify(body).slice(0, 200)}`,
+    );
+};
+
+const listRoles = async (page) => asNameList('/roles', await req(page, 'GET', '/roles'));
+const listGroups = async (page) => asNameList('/groups', await req(page, 'GET', '/groups'));
 const getGroup = async (page, name) => (await req(page, 'GET', `/groups/${name}`)).body || {};
 const listUsers = async (page) => (await req(page, 'GET', '/users')).body?.data ?? [];
 
