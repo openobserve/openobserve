@@ -28,7 +28,9 @@ import { computed } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { PromptVersion } from "@/services/llm-prompts.service";
-import { raw } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   left: PromptVersion;
@@ -53,9 +55,9 @@ const configRows = computed(() =>
 );
 
 const columns: OTableColumnDef[] = [
-  { id: "field", header: raw("Setting"), accessorKey: "field" },
-  { id: "left", header: raw("Earlier"), accessorKey: "left" },
-  { id: "right", header: raw("Later"), accessorKey: "right" },
-  { id: "changed", header: raw("Changed"), accessorKey: "changed" },
+  { id: "field", header: t("aiObservability.promptManagement.setting"), accessorKey: "field" },
+  { id: "left", header: t("aiObservability.promptManagement.earlier"), accessorKey: "left" },
+  { id: "right", header: t("aiObservability.promptManagement.later"), accessorKey: "right" },
+  { id: "changed", header: t("aiObservability.promptManagement.changed"), accessorKey: "changed" },
 ];
 </script>

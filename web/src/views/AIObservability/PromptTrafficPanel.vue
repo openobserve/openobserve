@@ -201,30 +201,30 @@ function displayCost(value: unknown): string {
   return Number.isFinite(cost) ? `$${cost.toFixed(6)}` : "—";
 }
 const breakdownColumns: OTableColumnDef[] = [
-  { id: "label", header: raw("Label"), accessorKey: "label" },
-  { id: "model", header: raw("Model"), accessorKey: "model" },
-  { id: "calls", header: raw("Calls"), accessorKey: "calls" },
-  { id: "errors", header: raw("Errors"), accessorKey: "errors" },
+  { id: "label", header: t("aiObservability.promptManagement.label"), accessorKey: "label" },
+  { id: "model", header: t("aiObservability.promptManagement.model"), accessorKey: "model" },
+  { id: "calls", header: t("aiObservability.promptManagement.calls"), accessorKey: "calls" },
+  { id: "errors", header: t("aiObservability.promptManagement.errors"), accessorKey: "errors" },
   {
     id: "p50_latency_ms",
-    header: raw("P50 ms"),
+    header: t("aiObservability.promptManagement.p50Milliseconds"),
     accessorFn: (row: Record<string, unknown>) => displayMilliseconds(row.p50_latency_ms),
   },
   {
     id: "p95_latency_ms",
-    header: raw("P95 ms"),
+    header: t("aiObservability.promptManagement.p95Milliseconds"),
     accessorFn: (row: Record<string, unknown>) => displayMilliseconds(row.p95_latency_ms),
   },
   {
     id: "cost",
-    header: raw("Cost"),
+    header: t("aiObservability.promptManagement.cost"),
     accessorFn: (row: Record<string, unknown>) => displayCost(row.cost),
   },
 ];
 const recentColumns: OTableColumnDef[] = [
   {
     id: "timestamp",
-    header: raw("Time"),
+    header: t("aiObservability.promptManagement.time"),
     accessorFn: (row: PromptTrafficRow) => {
       const timestampUs = Number(row.timestamp);
       return Number.isFinite(timestampUs)
@@ -236,16 +236,24 @@ const recentColumns: OTableColumnDef[] = [
         : "—";
     },
   },
-  { id: "model", header: raw("Model"), accessorKey: "model" },
-  { id: "label", header: raw("Label"), accessorKey: "label" },
-  { id: "status", header: raw("Status"), accessorKey: "status" },
+  { id: "model", header: t("aiObservability.promptManagement.model"), accessorKey: "model" },
+  { id: "label", header: t("aiObservability.promptManagement.label"), accessorKey: "label" },
+  { id: "status", header: t("aiObservability.promptManagement.status"), accessorKey: "status" },
   {
     id: "latencyMs",
-    header: raw("Latency ms"),
+    header: t("aiObservability.promptManagement.latencyMilliseconds"),
     accessorFn: (row: PromptTrafficRow) => displayMilliseconds(row.latencyMs),
   },
-  { id: "cost", header: raw("Cost"), accessorFn: (row: PromptTrafficRow) => displayCost(row.cost) },
-  { id: "scores", header: raw("Latest scores"), accessorKey: "scores" },
+  {
+    id: "cost",
+    header: t("aiObservability.promptManagement.cost"),
+    accessorFn: (row: PromptTrafficRow) => displayCost(row.cost),
+  },
+  {
+    id: "scores",
+    header: t("aiObservability.promptManagement.latestScores"),
+    accessorKey: "scores",
+  },
 ];
 
 async function refresh() {
