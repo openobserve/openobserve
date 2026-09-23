@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "حدث خطأ أثناء نسخ المحتوى.",
+    "passcodeForbiddenMessage": "يلزم امتلاك دور المسؤول أو الجذر لعرض رمز الابتلاع. اطلب من المسؤول أمر الإعداد، أو الدور اللازم لرؤيته هنا.",
     "updateRUMTokenMessage": "هل أنت متأكد من أنك تريد تحديث رمز RUM لهذه المؤسسة؟",
     "completeAwsIntegration": "إكمال تكامل AWS",
     "deployAwsServicesOneClick": "نشر جميع خدمات AWS المحددة بنقرة واحدة باستخدام كومة CloudFormation واحدة.",
@@ -15803,7 +15804,8 @@
         "destinations": "الوجهات",
         "templates": "القوالب",
         "reports": "التقارير",
-        "llmModelPricing": "تسعير نماذج LLM"
+        "llmModelPricing": "تسعير نماذج LLM",
+        "passcode": "رمز الابتلاع"
       },
       "noPermissionToChangeFavorites": "ليس لديك إذن لتغيير المفضلات",
       "couldNotUpdateFavoriteDashboards": "تعذر تحديث لوحات القيادة المفضلة"

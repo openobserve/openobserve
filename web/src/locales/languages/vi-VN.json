@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "Lỗi khi sao chép nội dung.",
+    "passcodeForbiddenMessage": "Cần vai trò Admin hoặc Root để xem token tiếp nhận dữ liệu. Hãy hỏi quản trị viên để biết lệnh thiết lập, hoặc vai trò cần thiết để xem token này tại đây.",
     "updateRUMTokenMessage": "Bạn có chắc chắn muốn cập nhật mã thông báo RUM cho tổ chức này không?",
     "completeAwsIntegration": "Hoàn tất tích hợp AWS",
     "deployAwsServicesOneClick": "Triển khai tất cả các dịch vụ AWS đã chọn chỉ bằng một cú nhấp chuột với một ngăn xếp CloudFormation duy nhất.",
@@ -15803,7 +15804,8 @@
         "destinations": "Điểm đến",
         "templates": "Mẫu",
         "reports": "Báo cáo",
-        "llmModelPricing": "Giá mô hình LLM"
+        "llmModelPricing": "Giá mô hình LLM",
+        "passcode": "Token tiếp nhận dữ liệu"
       },
       "noPermissionToChangeFavorites": "Bạn không có quyền thay đổi mục yêu thích",
       "couldNotUpdateFavoriteDashboards": "Không thể cập nhật bảng điều khiển yêu thích"

@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "Fout bij het kopiëren van inhoud.",
+    "passcodeForbiddenMessage": "Admin- of Root-rol vereist om het ingestietoken te bekijken. Vraag een beheerder om het installatiecommando, of om de rol die nodig is om het hier te zien.",
     "updateRUMTokenMessage": "Weet je zeker dat je het RUM-token voor deze organisatie wilt bijwerken?",
     "completeAwsIntegration": "AWS-integratie voltooien",
     "deployAwsServicesOneClick": "Implementeer alle geselecteerde AWS-services in één klik met behulp van een enkele CloudFormation-stack.",
@@ -15803,7 +15804,8 @@
         "destinations": "Bestemmingen",
         "templates": "Sjablonen",
         "reports": "Rapporten",
-        "llmModelPricing": "LLM-modelprijzen"
+        "llmModelPricing": "LLM-modelprijzen",
+        "passcode": "Ingestietoken"
       },
       "noPermissionToChangeFavorites": "Je hebt geen toestemming om favorieten te wijzigen",
       "couldNotUpdateFavoriteDashboards": "Kan favoriete dashboards niet bijwerken"
