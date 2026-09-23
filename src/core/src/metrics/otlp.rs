@@ -492,12 +492,14 @@ pub async fn handle_otlp_request(
                                         &stream_partitioning_map,
                                     )
                                 });
-                        let records = match columnar {
-                            Some(columnar) => {
-                                append_number_points(columnar, &rec, points.iter().copied())
-                            }
-                            None => number_point_records(&rec, points.iter().copied()),
-                        };
+                        let records = admitted_number_records(
+                            columnar.as_mut(),
+                            &rec,
+                            &points,
+                            stream_executable_pipelines
+                                .get(&metric_name)
+                                .map(Vec::as_slice),
+                        );
                         records
                             .into_iter()
                             .map(|record| (record, point_admission.allocate()))
@@ -800,6 +802,19 @@ fn number_point_records<'a>(
     records
 }
 
+fn admitted_number_records(
+    columnar: Option<&mut ColumnarStream>,
+    rec: &json::Value,
+    points: &[&NumberDataPoint],
+    pipelines: Option<&[ExecutablePipeline]>,
+) -> Vec<json::Value> {
+    match (columnar, pipelines) {
+        // An earlier override-only metric can cache a builder before the base pipeline is known.
+        (Some(columnar), Some([])) => append_number_points(columnar, rec, points.iter().copied()),
+        _ => number_point_records(rec, points.iter().copied()),
+    }
+}
+
 /// Writes number data points straight to arrow, returning JSON records for those it cannot take.
 fn append_number_points<'a>(
     columnar: &mut ColumnarStream,
@@ -939,9 +954,16 @@ fn number_point_stream<'a>(point: &NumberDataPoint, metric_name: &'a str) -> Cow
         .find(|attr| format_label_name_cow(&attr.key) == NAME_LABEL)
         .map(|attr| {
             let value = get_val(&attr.value.as_ref());
-            Cow::Owned(format_stream_name(
-                value.as_str().unwrap_or_default().to_string(),
-            ))
+            let name = match value {
+                json::Value::String(name) => name,
+                value => flatten_record(json::json!({NAME_LABEL: value}))
+                    .expect("a metric name label is wrapped in an object")
+                    .get(NAME_LABEL)
+                    .and_then(json::Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+            };
+            Cow::Owned(format_stream_name(name))
         })
         .unwrap_or(Cow::Borrowed(metric_name))
 }
@@ -1488,6 +1510,182 @@ mod tests {
             }))
             .unwrap();
             ExecutablePipeline::new(&pipeline).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn repeated_metric_revalidates_cached_columnar_pipeline_eligibility() {
+            let org = "otlp_late_pipeline";
+            let source = StreamParams::new(org, "base", StreamType::Metrics);
+            let configured = pipeline("base", &["archive"]).await;
+            crate::cache::STREAM_EXECUTABLE_PIPELINES
+                .write()
+                .await
+                .insert(source.clone(), vec![configured]);
+            let mut policies = policies(org, &[("base", 30), ("archive", 30)]).await;
+            let mut pipelines = HashMap::from([("archive".to_string(), vec![])]);
+            let mut partial = ExportMetricsPartialSuccess::default();
+            let mut points = PointAdmission::default();
+            let rec = json!({"__name__": "base"});
+            let first = [point(NOW, Some("archive"))];
+            let admitted = admit_number_points(
+                &first,
+                &mut Admission {
+                    org_id: org,
+                    metric_name: "base",
+                    pipelines: &mut pipelines,
+                    policies: &mut policies,
+                    partial_success: &mut partial,
+                    points: &mut points,
+                },
+            )
+            .await;
+            assert!(!pipelines.contains_key("base"));
+            let schema = Schema::new(vec![
+                Field::new(NAME_LABEL, DataType::Utf8, true),
+                Field::new("start_time", DataType::Utf8, true),
+                Field::new("flag", DataType::Utf8, true),
+                Field::new(VALUE_LABEL, DataType::Float64, true),
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, true),
+            ]);
+            let schemas = HashMap::from([("base".to_string(), SchemaCache::new(schema))]);
+            let mut cached = columnar::columnar_stream_for(
+                org,
+                "base",
+                &schemas,
+                &pipelines,
+                &HashMap::new(),
+                &HashMap::new(),
+                &HashMap::new(),
+            );
+            assert!(cached.is_some());
+            let first_records = admitted_number_records(
+                cached.as_mut(),
+                &rec,
+                &admitted,
+                pipelines.get("base").map(Vec::as_slice),
+            );
+            assert_eq!(first_records.len(), 1);
+            let later = [point(
+                NOW + config::get_config().limit.ingest_allowed_in_future_micro + 1,
+                None,
+            )];
+            let admitted = admit_number_points(
+                &later,
+                &mut Admission {
+                    org_id: org,
+                    metric_name: "base",
+                    pipelines: &mut pipelines,
+                    policies: &mut policies,
+                    partial_success: &mut partial,
+                    points: &mut points,
+                },
+            )
+            .await;
+            assert_eq!(admitted.len(), 1);
+            assert_eq!(pipelines["base"].len(), 1);
+            let records = admitted_number_records(
+                cached.as_mut(),
+                &rec,
+                &admitted,
+                pipelines.get("base").map(Vec::as_slice),
+            );
+            assert_eq!(records.len(), 1);
+            assert!(
+                cached
+                    .unwrap()
+                    .into_entries(org, "base")
+                    .unwrap()
+                    .is_empty()
+            );
+            let inputs = HashMap::from([(
+                "base".to_string(),
+                records
+                    .into_iter()
+                    .map(|record| (record, points.allocate()))
+                    .collect(),
+            )]);
+            let mut partitions = HashMap::from([("archive".to_string(), vec![])]);
+            let (mut outputs, failures) =
+                ingest::run_pipelines(org, &pipelines, inputs, &HashMap::new(), &mut partitions)
+                    .await;
+            assert!(failures.is_empty());
+            assert_eq!(outputs["archive"].len(), 1);
+            admit_otlp_pipeline_outputs(&mut outputs, &mut policies, &mut points, &mut partial)
+                .await;
+            assert!(outputs.is_empty());
+            assert_eq!(partial.rejected_data_points, 1);
+            crate::cache::STREAM_EXECUTABLE_PIPELINES
+                .write()
+                .await
+                .remove(&source);
+        }
+
+        #[tokio::test]
+        async fn array_name_override_uses_flattened_destination_policy_and_pipeline() {
+            use opentelemetry_proto::tonic::common::v1::ArrayValue;
+
+            let org = "otlp_array_name";
+            let mut policies = policies(org, &[("base", 30), ("_archive_", 30), ("", 1)]).await;
+            let mut pipelines = ["base", "_archive_", ""]
+                .into_iter()
+                .map(|name| (name.to_string(), vec![]))
+                .collect::<HashMap<_, _>>();
+            let mut partial = ExportMetricsPartialSuccess::default();
+            let mut points = PointAdmission::default();
+            let mut old = point(NOW - 10 * DAY, Some("archive"));
+            old.attributes[0].value = Some(AnyValue {
+                value: Some(any_value::Value::ArrayValue(ArrayValue {
+                    values: vec![AnyValue {
+                        value: Some(any_value::Value::StringValue("archive".to_string())),
+                    }],
+                })),
+            });
+            let input = [
+                old.clone(),
+                NumberDataPoint {
+                    time_unix_nano: (NOW
+                        + config::get_config().limit.ingest_allowed_in_future_micro
+                        + 1) as u64
+                        * 1000,
+                    ..old
+                },
+            ];
+            let records = number_point_records(&json!({"__name__": "base"}), &input);
+            let flattened = flatten_record(records[0].clone()).unwrap();
+            let destination =
+                format_stream_name(flattened[NAME_LABEL].as_str().unwrap().to_string());
+            assert_eq!(destination, "_archive_");
+            assert_eq!(number_point_stream(&input[0], "base"), destination);
+            let admitted = admit_number_points(
+                &input,
+                &mut Admission {
+                    org_id: org,
+                    metric_name: "base",
+                    pipelines: &mut pipelines,
+                    policies: &mut policies,
+                    partial_success: &mut partial,
+                    points: &mut points,
+                },
+            )
+            .await;
+            assert_eq!(admitted, vec![&input[0]]);
+            assert_eq!(partial.rejected_data_points, 1);
+            pipelines.insert(destination, vec![pipeline("_archive_", &["routed"]).await]);
+            let admitted = admit_number_points(
+                &input,
+                &mut Admission {
+                    org_id: org,
+                    metric_name: "base",
+                    pipelines: &mut pipelines,
+                    policies: &mut policies,
+                    partial_success: &mut partial,
+                    points: &mut points,
+                },
+            )
+            .await;
+            assert_eq!(admitted, input.iter().collect::<Vec<_>>());
+            assert_eq!(partial.rejected_data_points, 1);
         }
 
         #[tokio::test]
