@@ -1030,11 +1030,7 @@ mod tests {
         );
     }
 
-    /// `retrain_interval_days == 0` is the operator's "Never" — the first option in the UI
-    /// dropdown — and not a small cadence. It is a sentinel outside the ordered cadence domain,
-    /// so no bound may be applied to it: a clamp that treats it as a number converts every
-    /// deliberate opt-out into a forced retrain at the floor. The scheduler's `should_train`
-    /// owns the live rule; this pins the contract it and any future cadence arithmetic must keep.
+    /// `retrain_interval_days == 0` is the operator's "Never" sentinel, so no bound may touch it.
     #[test]
     fn retrain_interval_days_zero_means_never_and_no_cadence_bound_may_touch_it() {
         const NEVER: i32 = 0;
@@ -1058,8 +1054,7 @@ mod tests {
             }
         }
 
-        // No age ever makes a "Never" config due — not one the floor would have fired at, and
-        // not one older than every bound in play.
+        // No age ever makes a "Never" config due.
         for age_days in [0_i64, 1, 7, 30, 365, 100_000] {
             assert!(
                 !retrain_due_at(NEVER, age_days),
@@ -1080,8 +1075,7 @@ mod tests {
             );
         }
 
-        // And the sentinel must reach the scheduler intact: replication copies the field
-        // verbatim, so a peer's "Never" cannot arrive as a cadence.
+        // Replication copies the field verbatim, so a peer's "Never" cannot arrive as a cadence.
         let mut local = make_model("anom-1", "org");
         local.retrain_interval_days = 7;
         let mut active = local.into_active_model();

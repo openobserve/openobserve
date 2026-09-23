@@ -13,19 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The bucket origin `histogram()` lowers to, and the one rule that depends on it.
-//!
-//! `rewrite_histogram` does not let `date_bin` default to the Unix epoch: it passes
-//! [`ORIGIN_LITERAL`] as `date_bin`'s third argument, so buckets are anchored at
-//! 2001-01-01T00:00:00Z. The tantivy index-optimizer fast path instead floors to the epoch
-//! (`start_time - start_time % interval`).
-//!
-//! The two grids therefore agree only where the interval divides [`DATE_BIN_ORIGIN_SECS`],
-//! which is 11,323 whole days. That agreement is a **coincidence of the origin, not a
-//! guarantee** — the same warning `slo::query` carries — so every consumer reads the constant
-//! from here rather than restating the number: `rewrite_histogram` for the `date_bin` argument
-//! itself, `merge::downsampling` for the rollup SQL, and the anomaly interval rule for what it
-//! accepts. Move the origin here and all three move together.
+//! The two bucket grids agree only where the interval divides [`DATE_BIN_ORIGIN_SECS`].
 
 /// The literal `rewrite_histogram` passes as `date_bin`'s origin argument.
 pub const ORIGIN_LITERAL: &str = "2001-01-01T00:00:00";
@@ -50,8 +38,7 @@ pub fn histogram_origin_skew(interval_secs: i64) -> i64 {
 mod tests {
     use super::*;
 
-    /// Bucket widths an operator can plausibly pick that divide the origin. Adding a value
-    /// here that does not divide it fails `an_accepted_interval_puts_both_grids_on_one_edge`.
+    /// Every value here must divide the origin, or the both-grids-on-one-edge test fails.
     const ACCEPTED_INTERVALS: [(&str, i64); 14] = [
         ("30s", 30),
         ("1m", 60),
@@ -87,8 +74,7 @@ mod tests {
         DATE_BIN_ORIGIN_SECS + (ts - DATE_BIN_ORIGIN_SECS).div_euclid(step) * step
     }
 
-    /// Moving the origin in `rewrite_histogram` must break a test, not detection: this
-    /// derives the constant from the literal instead of restating the number.
+    /// Derived from the literal so moving the origin breaks a test rather than detection.
     #[test]
     fn the_constant_matches_the_literal_rewrite_histogram_passes() {
         let parsed = chrono::NaiveDateTime::parse_from_str(ORIGIN_LITERAL, "%Y-%m-%dT%H:%M:%S")

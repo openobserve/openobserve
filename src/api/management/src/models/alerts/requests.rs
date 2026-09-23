@@ -352,8 +352,7 @@ pub struct UpdateAnomalyAlertFields {
     /// Set-only through this endpoint: clearing a budget goes through the direct anomaly API.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_budget_per_day: Option<f64>,
-    /// Set-only through this endpoint, like the budget above: clearing the half-width back to
-    /// the default goes through the direct anomaly API, which carries the double-option.
+    /// Set-only here; clearing back to the default goes through the direct anomaly API.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub level_half_width_seconds: Option<i64>,
     pub alert_enabled: Option<bool>,

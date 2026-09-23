@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! `level_half_width_seconds`: NULL means the shipped one-day default, so existing configs
-//! keep the level bandwidth they were fitted with.
+//! `level_half_width_seconds`: NULL means the shipped one-day default, so old configs are kept.
 
 use sea_orm_migration::prelude::*;
 
@@ -42,8 +41,7 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 
-    /// Losing it only returns every config to the default half-width, which is the value they
-    /// all carry today.
+    /// Lossless: dropping the column returns every config to the default half-width it has today.
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Symmetric with up(): a down on a schema that never got the column must not error.
         if !manager.has_column(TABLE, COLUMN).await? {
@@ -54,8 +52,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-/// Seconds, not microseconds: a half-width is a human-scale span an operator types, and
-/// `big_integer` still spans centuries at that resolution.
+/// Seconds, not microseconds: `big_integer` still spans centuries at that resolution.
 fn add_column_stmt() -> TableAlterStatement {
     Table::alter()
         .table(AnomalyConfig::Table)

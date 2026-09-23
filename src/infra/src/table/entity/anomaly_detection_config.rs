@@ -29,8 +29,7 @@ pub struct Model {
     /// Alert budget (delivered alerts/day). NULL = percentile mode, exactly the pre-budget
     /// behaviour.
     pub alert_budget_per_day: Option<f64>,
-    /// Level-window half-width in SECONDS. NULL = the shipped one-day default, which is what
-    /// every config written before this column existed means.
+    /// Seconds; NULL means the shipped one-day default, which is what pre-column rows mean.
     pub level_half_width_seconds: Option<i64>,
     pub seasonality: String,
     pub is_trained: bool,
