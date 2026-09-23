@@ -278,12 +278,24 @@ if (overlayPath) {
 // shards), no spec both active and disabled, and no spec that does not exist on disk.
 const seen = new Set();
 const specOwner = new Map();
+const docOnly = [];
 for (const s of include) {
   if (!s.testfolder) die(`shard missing testfolder: ${JSON.stringify(s)}`);
   if (seen.has(s.testfolder)) die(`duplicate testfolder "${s.testfolder}"`);
   seen.add(s.testfolder);
   if (!s.actual_folder) s.actual_folder = s.testfolder;
-  if (!s.run_files || s.run_files.length === 0) die(`shard "${s.testfolder}" has no run_files`);
+  // A documentation-only entry carries no run_files and exists purely to record, in its
+  // "disabled" array, why a whole module stays off this suite — there is no shard to hang
+  // those verdicts on otherwise. It is dropped from the emitted matrix below, so it never
+  // becomes a job. An entry with neither run_files nor disabled records nothing and runs
+  // nothing, which is a manifest bug.
+  if (!s.run_files || s.run_files.length === 0) {
+    if (!(s.disabled || []).length) {
+      die(`shard "${s.testfolder}" has no run_files and no disabled entries — it records nothing and runs nothing`);
+    }
+    docOnly.push(s.testfolder);
+    continue;
+  }
   if (new Set(s.run_files).size !== s.run_files.length) {
     die(`shard "${s.testfolder}" has duplicate run_files`);
   }
@@ -324,7 +336,8 @@ if (fs.existsSync(specsRoot)) {
   log(`specs tree ${specsRoot} not present — skipping the spec-exists check`);
 }
 
-let emitted = include;
+let emitted = include.filter((s) => (s.run_files || []).length);
+if (docOnly.length) log(`documentation-only (never run): ${docOnly.join(", ")}`);
 if (changedFilesPath) {
   // Selection only exists for pull_request; merge_group/push must always get the full matrix.
   const event = process.env.GITHUB_EVENT_NAME;
