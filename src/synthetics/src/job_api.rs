@@ -1057,6 +1057,9 @@ pub const REASON_CONFIG_REFERENCE_MISSING: &str = "config_reference_missing";
 pub const REASON_CONFIG_REFERENCE_PENDING: &str = "config_reference_pending";
 pub const REASON_CONFIG_REFERENCE_INVALID: &str = "config_reference_invalid";
 pub const REASON_CONFIG_VARIABLE_UNDEFINED: &str = "config_variable_undefined";
+/// A shared secret row the check references exists but holds no value; retrying cannot fix it.
+pub const REASON_CONFIG_SECRET_UNSET: &str = "config_secret_unset";
+pub const REASON_CONFIG_VARIABLE_LIMIT: &str = "config_variable_limit";
 
 /// Expansion could not produce a runnable journey; `guard_failure` means a guard of ours failed.
 #[derive(Debug, Clone)]
@@ -1301,11 +1304,16 @@ fn merge_variable_tiers(
         };
         merged.insert(var.name.clone(), value);
     }
+    // A plain error here would 500, and a 500 makes the probe retry a job that can never resolve.
     if merged.len() > MAX_VARIABLES {
-        anyhow::bail!(
-            "check {synthetics_id} resolves {} variables, more than the {MAX_VARIABLES} allowed",
-            merged.len()
-        );
+        return Err(anyhow::Error::new(ConfigError {
+            status_reason: REASON_CONFIG_VARIABLE_LIMIT,
+            message: format!(
+                "check {synthetics_id} resolves {} variables, more than the {MAX_VARIABLES} allowed",
+                merged.len()
+            ),
+            guard_failure: false,
+        }));
     }
     Ok(merged)
 }
@@ -3185,9 +3193,14 @@ mod tests {
             .collect();
         assert!(merge_variable_tiers(shared.clone(), &[], &dek(), "check-1").is_ok());
         // One inline variable that does not collide pushes the merged set over.
-        assert!(
-            merge_variable_tiers(shared, &[variable("EXTRA", "1")], &dek(), "check-1").is_err()
-        );
+        let err =
+            merge_variable_tiers(shared, &[variable("EXTRA", "1")], &dek(), "check-1").unwrap_err();
+        // A plain error would 500, and the probe would retry a job that can never resolve.
+        let cfg = err
+            .downcast_ref::<ConfigError>()
+            .expect("the cap must settle the job, not 500");
+        assert_eq!(cfg.status_reason, REASON_CONFIG_VARIABLE_LIMIT);
+        assert!(!cfg.guard_failure);
     }
 
     #[test]
