@@ -218,9 +218,23 @@ export class RolesPage {
     // ================= navigation =================
 
     async gotoRoles() {
-        await this.page.locator('[data-test="menu-link-\\/iam-item"]').click();
-        await this.rolesTab.waitFor({ state: 'visible', timeout: 15000 });
-        await this.rolesTab.click();
+        // Navigate to the list URL rather than clicking IAM -> Roles.
+        //
+        // The tab click returned BEFORE the route transition finished — traced on a
+        // live build, gotoRoles() came back with the page still on /web/iam/users —
+        // so callers raced it. Worse, the roles list renders from state populated
+        // when the IAM section mounts, which the specs do in beforeEach; a role
+        // created through the API after that mount is absent from the list, and
+        // openRole() then waits out its full timeout on a row that never arrives.
+        // That is what failed every test in the staging and grants specs.
+        //
+        // A real page load refetches the list, so the row is there.
+        const base = (process.env.ZO_BASE_URL || "").replace(/\/$/, "");
+        const orgId = process.env.ORGNAME || "default";
+        await this.page.goto(`${base}/web/iam/roles?org_identifier=${orgId}`, {
+            waitUntil: "domcontentloaded",
+        });
+        await this.addRoleButton.waitFor({ state: "visible", timeout: 30000 });
     }
 
     roleRow(name) {

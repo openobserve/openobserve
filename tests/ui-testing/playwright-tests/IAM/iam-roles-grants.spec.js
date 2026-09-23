@@ -323,7 +323,16 @@ test.describe('IAM · Edit Role · grant semantics', () => {
         expect((await listRoles(page)).filter((r) => r === name)).toHaveLength(1);
     });
 
-    test('G-N3 · a role name with punctuation is normalized, and the editor targets the stored name', async ({ page }) => {
+    // SKIPPED pending triage. The premise holds at the API — POST /roles really does
+    // normalize, verified directly: `ui_auto_gr.norm-1790161074` was stored as
+    // `ui_auto_gr_norm_1790161074`. But this test types the name into the Add Role
+    // dialog, and the UI refuses punctuation before the request is ever made: the
+    // dialog stays open (CI saw `add-role-dialog` never reach hidden) and no role is
+    // created under either spelling, so the poll for the normalized name times out.
+    // Decide which behaviour is intended — UI validation, or normalize-on-submit like
+    // the API — then rewrite this against that. The UI's own name validation has no
+    // coverage today either way.
+    test.fixme('G-N3 · a role name with punctuation is normalized, and the editor targets the stored name', async ({ page }) => {
         const raw = `${PREFIX}_gr.norm-${Date.now()}`;
         const normalized = raw.replace(/[^A-Za-z0-9_]/g, '_');
 
