@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "Erreur lors de la copie du contenu.",
+    "passcodeForbiddenMessage": "Le rôle Admin ou Root est nécessaire pour voir le jeton d'ingestion. Demandez à un administrateur la commande de configuration, ou le rôle requis pour le voir ici.",
     "updateRUMTokenMessage": "Êtes-vous sûr de vouloir mettre à jour le jeton RUM pour cette organisation ?",
     "completeAwsIntegration": "Terminer l'intégration AWS",
     "deployAwsServicesOneClick": "Déployez tous les services AWS sélectionnés en un clic à l'aide d'une seule pile CloudFormation.",
@@ -15805,7 +15806,8 @@
         "destinations": "Destinations",
         "templates": "Modèles",
         "reports": "Rapports",
-        "llmModelPricing": "Tarification des modèles LLM"
+        "llmModelPricing": "Tarification des modèles LLM",
+        "passcode": "Jeton d'ingestion"
       },
       "noPermissionToChangeFavorites": "Vous n'avez pas la permission de modifier les favoris",
       "couldNotUpdateFavoriteDashboards": "Impossible de mettre à jour les tableaux de bord favoris"

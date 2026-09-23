@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "Fehler beim Kopieren des Inhalts.",
+    "passcodeForbiddenMessage": "Administrator- oder Root-Rolle erforderlich, um das Datenerfassungs-Token anzuzeigen. Fragen Sie einen Administrator nach dem Einrichtungsbefehl oder nach der Rolle, die erforderlich ist, um es hier zu sehen.",
     "updateRUMTokenMessage": "Sind Sie sicher, dass Sie das RUM-Token für diese Organisation aktualisieren möchten?",
     "completeAwsIntegration": "AWS-Integration abschließen",
     "deployAwsServicesOneClick": "Stellen Sie alle ausgewählten AWS-Dienste mit einem Klick mithilfe eines einzigen CloudFormation-Stacks bereit.",
@@ -15805,7 +15806,8 @@
         "destinations": "Ziele",
         "templates": "Vorlagen",
         "reports": "Berichte",
-        "llmModelPricing": "LLM-Modellpreise"
+        "llmModelPricing": "LLM-Modellpreise",
+        "passcode": "Datenerfassungs-Token"
       },
       "noPermissionToChangeFavorites": "Sie haben keine Berechtigung, Favoriten zu ändern",
       "couldNotUpdateFavoriteDashboards": "Favoriten-Dashboards konnten nicht aktualisiert werden"
