@@ -28,6 +28,7 @@ import {
 } from "@/utils/rum/fields";
 import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
 import { spanWindowUs } from "@/utils/rum/traceWindow";
+import { collapseViewDocuments } from "@/utils/rum/viewDocuments";
 import { sqlIn } from "@/utils/query/sqlFilterBuilder";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
@@ -67,11 +68,14 @@ export default function useRumSpanBuilder(
           org_identifier: orgId,
           query: {
             query: {
-              sql: `SELECT * FROM "_rumdata" WHERE ${sqlIn("view_id", viewIds)} AND type = 'view' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+              // Newest first: a view is re-sent on every update and only the last
+              // document carries its final time spent, so an ascending page of 10
+              // dropped it for any view open longer than a few keep-alives.
+              sql: `SELECT * FROM "_rumdata" WHERE ${sqlIn("view_id", viewIds)} AND type = 'view' ORDER BY ${store.state.zoConfig.timestamp_column} DESC`,
               start_time: startTime,
               end_time: endTime,
               from: 0,
-              size: 10,
+              size: 50,
             },
           },
           page_type: "logs",
@@ -352,15 +356,8 @@ export default function useRumSpanBuilder(
   };
 
   const buildViewSpans = (viewEvents: any[], traceId: string): any[] => {
-    const dedupedViews = new Map<string, any>();
-    for (const view of viewEvents) {
-      const existing = dedupedViews.get(view.view_id);
-      if (!existing || (view.view_time_spent > 0 && !existing.view_time_spent)) {
-        dedupedViews.set(view.view_id, view);
-      }
-    }
-
-    return [...dedupedViews.values()].map((view) => {
+    // A view's documents share its start `date`, so only the version says which is final.
+    return collapseViewDocuments(viewEvents).map((view: any) => {
       const viewDuration = view.view_time_spent || view.view_loading_time;
       return {
         [tsCol()]: view.date,
