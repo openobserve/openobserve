@@ -231,6 +231,10 @@ fn decode_index_inner(
         &parent == expected && parent.rows > 0 && parent.compressed_size > 0,
         "parent metadata mismatch"
     );
+    ensure!(
+        u64::try_from(compact.rows())? <= expected.rows,
+        "block count limit"
+    );
     let source_schema: Schema = serde_json::from_str(
         properties
             .get(SCHEMA_KEY)

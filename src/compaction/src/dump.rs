@@ -1171,6 +1171,7 @@ mod tests {
             "index_size",
             "bloom_ver",
             "updated_at",
+            "mindex_size",
         ];
 
         for (i, expected_name) in expected_columns.iter().enumerate() {
@@ -1535,8 +1536,8 @@ mod tests {
             original_size: 25_000,
             compressed_size: 12_500,
             index_size: 1_250,
-            mindex_size: 0,
-            bloom_ver: 0,
+            mindex_size: 125,
+            bloom_ver: 1,
             updated_at: 20_001,
         };
 
@@ -1559,6 +1560,8 @@ mod tests {
         assert_eq!(r.original_size, original.original_size);
         assert_eq!(r.compressed_size, original.compressed_size);
         assert_eq!(r.index_size, original.index_size);
+        assert_eq!(r.mindex_size, original.mindex_size);
+        assert_eq!(r.bloom_ver, original.bloom_ver);
         assert_eq!(r.updated_at, original.updated_at);
     }
 
