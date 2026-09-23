@@ -97,6 +97,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_metrics_timestamp_rejections_survive_export_reply() {
+        use opentelemetry_proto::tonic::collector::metrics::v1::{
+            ExportMetricsPartialSuccess, ExportMetricsServiceResponse,
+        };
+
+        let expected = ExportMetricsServiceResponse {
+            partial_success: Some(ExportMetricsPartialSuccess {
+                rejected_data_points: 2,
+                error_message: "timestamp outside destination retention".to_string(),
+            }),
+        };
+        let response = (StatusCode::OK, expected.encode_to_vec()).into_response();
+        let actual = export_reply::<ExportMetricsServiceResponse>(response)
+            .await
+            .unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[tokio::test]
     async fn test_empty_success_body_is_full_success() {
         let reply =
             export_reply::<ExportTraceServiceResponse>(StatusCode::OK.into_response()).await;
