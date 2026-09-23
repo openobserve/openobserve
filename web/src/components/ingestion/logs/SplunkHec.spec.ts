@@ -28,6 +28,14 @@ vi.mock("@/components/CopyContent.vue", () => ({
 
 vi.mock("../../../utils/zincutils", () => ({
   getImageURL: vi.fn().mockReturnValue("http://example.com/image.png"),
+  getIngestionURL: vi.fn(() => "https://ingest.example.com:5080"),
+  getEndPoint: vi.fn((url: string) => ({
+    url,
+    host: "ingest.example.com",
+    port: "5080",
+    protocol: "https",
+    tls: "On",
+  })),
 }));
 
 const mockStore = createStore({
@@ -86,9 +94,21 @@ describe("SplunkHec", () => {
   });
 
   describe("Endpoint resolution", () => {
-    it("should build the collector URL from the page origin", () => {
+    it("should build the collector URL from the configured ingestion endpoint", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.endpointUrl).toBe(`${window.location.origin}/services/collector`);
+      expect(wrapper.vm.endpointUrl).toBe("https://ingest.example.com:5080/services/collector");
+    });
+
+    it("should resolve the host through getIngestionURL, like every other ingestion card", async () => {
+      wrapper = createWrapper();
+      const { getEndPoint, getIngestionURL } = await vi.importMock("../../../utils/zincutils");
+      expect(getIngestionURL).toHaveBeenCalled();
+      expect(getEndPoint).toHaveBeenCalledWith("https://ingest.example.com:5080");
+    });
+
+    it("should not fall back to the browser origin serving the UI", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.endpointUrl).not.toContain(window.location.origin);
     });
 
     it("should build the collector URL at the root, with no organization segment", () => {
@@ -98,12 +118,25 @@ describe("SplunkHec", () => {
       expect(wrapper.vm.endpointUrl).not.toContain("/api/");
     });
 
-    it("should not carry a ZO_BASE_URI path, which the root-mounted collector has no prefix for", () => {
+    it("should keep a ZO_BASE_URI prefix, which the collector is served under too", async () => {
+      const { getEndPoint, getIngestionURL } = await vi.importMock("../../../utils/zincutils");
+      getIngestionURL.mockReturnValueOnce("https://ingest.example.com:5080/web");
+      getEndPoint.mockReturnValueOnce({
+        url: "https://ingest.example.com:5080/web",
+        host: "ingest.example.com",
+        port: "5080",
+        protocol: "https",
+        tls: "On",
+      });
       wrapper = createWrapper();
-      // getIngestionURL() keeps the base_uri prefix; the collector sits outside it.
-      expect(wrapper.vm.endpointUrl).not.toContain("/web/");
-      expect(wrapper.vm.endpointUrl).toMatch(/^https?:\/\/[^/]+\/services\/collector$/);
-      expect(wrapper.vm.healthContent).toMatch(/https?:\/\/[^/]+\/services\/collector\/health$/);
+      expect(wrapper.vm.endpointUrl).toBe("https://ingest.example.com:5080/web/services/collector");
+    });
+
+    it("should point the health probe at the same host", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.healthContent).toContain(
+        "https://ingest.example.com:5080/services/collector/health",
+      );
     });
   });
 
@@ -111,7 +144,9 @@ describe("SplunkHec", () => {
     it("should build a curl example carrying the Splunk auth scheme", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.curlContent).toContain("curl");
-      expect(wrapper.vm.curlContent).toContain(`${window.location.origin}/services/collector`);
+      expect(wrapper.vm.curlContent).toContain(
+        "https://ingest.example.com:5080/services/collector",
+      );
       expect(wrapper.vm.curlContent).toContain("Authorization: Splunk [SPLUNK_HEC_TOKEN]");
     });
 

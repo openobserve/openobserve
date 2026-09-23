@@ -412,19 +412,17 @@ fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
     let method = http_method.to_string();
-    let path = request
-        .uri()
-        .path()
-        .strip_prefix("/")
-        .unwrap_or("")
-        .to_string();
+    let path = request.uri().path();
+    let path = path.strip_prefix("/").unwrap_or(path).to_string();
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
-    // Org-relative view of the path so the ingestion-route classifier sees
-    // segment 0 as `{org_id}`. `audit_middleware` runs before prefix stripping,
-    // so `path` here is e.g. `[base_uri/]api/{org}/_bulk`; take everything after
-    // the `api/` segment.
-    let ingestion_path = path.split_once("api/").map(|(_, rest)| rest).unwrap_or("");
+    let ingestion_path = if path.starts_with("api/") {
+        path.split_once("api/")
+            .map(|(_, rest)| rest)
+            .unwrap_or(&path)
+    } else {
+        &path
+    };
 
     if get_o2_config().common.audit_enabled
         && !(path_columns
@@ -1143,7 +1141,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}", get(pipelines::backfill::get_backfill).put(pipelines::backfill::update_backfill).delete(pipelines::backfill::delete_backfill))
         .route("/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}/enable", put(pipelines::backfill::enable_backfill))
 
-
         // Short URLs
         .route("/{org_id}/short", post(short_url::shorten))
         .route("/{org_id}/short/{short_id}", get(short_url::retrieve))
@@ -1370,7 +1367,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/query_manager/cancel", put(search::query_manager::cancel_multiple_query))
             .route("/{org_id}/query_manager/{query_id}/cancel", delete(search::query_manager::cancel_query))
 
-
             // search inspector
             .route("/{org_id}/search/profile", get(search::search_inspector::get_search_profile))
 
@@ -1479,7 +1475,19 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/synthetics/agent-tokens/rotate", post(synthetics::rotate_agent_token))
             .route("/{org_id}/synthetics/agent-tokens/{name}", patch(synthetics::set_agent_token_enabled))
             .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
+            .route("/{org_id}/synthetics/variables", get(synthetics::list_synthetics_variables).post(synthetics::create_synthetics_variable))
+            .route("/{org_id}/synthetics/variables/{id}", put(synthetics::update_synthetics_variable).delete(synthetics::delete_synthetics_variable))
+            .route("/{org_id}/synthetics/variables/{id}/split", post(synthetics::split_synthetics_variable))
+            .route("/{org_id}/synthetics/environments", get(synthetics::list_synthetics_environments).post(synthetics::create_synthetics_environment))
+            .route("/{org_id}/synthetics/environments/_resync", post(synthetics::resync_synthetics_environments))
+            .route("/{org_id}/synthetics/environments/{env}", put(synthetics::update_synthetics_environment).delete(synthetics::delete_synthetics_environment))
+            .route("/{org_id}/synthetics/environments/{env}/duplicate", post(synthetics::duplicate_synthetics_environment))
+            .route("/{org_id}/synthetics/environments/{env}/variables", get(synthetics::list_synthetics_environment_variables).post(synthetics::create_synthetics_environment_variable))
+            .route("/{org_id}/synthetics/environments/{env}/variables/{id}", put(synthetics::update_synthetics_environment_variable).delete(synthetics::delete_synthetics_environment_variable))
+            .route("/{org_id}/synthetics/environments/{env}/variables/{id}/promote", post(synthetics::promote_environment_variable))
             .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
+            .route("/{org_id}/synthetics/{id}/resolved-variables", get(synthetics::get_synthetic_resolved_variables))
+            .route("/{org_id}/synthetics/{id}/variables/{name}/promote", post(synthetics::promote_synthetic_variable))
             .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
             .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
             .route("/{org_id}/synthetics/{id}/artifact", get(synthetics::get_artifact))
@@ -1912,11 +1920,7 @@ pub fn service_routes() -> Router {
             );
     }
 
-    // Apply middlewares in order: preprocessing -> decompression -> cors -> server header -> auth
-    // -> audit -> blocked orgs NOTE: Preprocessing middleware removes Content-Encoding: snappy
-    // header before tower_http sees it. This prevents 415 errors while allowing handlers to
-    // manually decompress snappy data. tower_http's RequestDecompressionLayer handles gzip,
-    // deflate, brotli, and zstd.
+    // Snappy preprocessing sits outside RequestDecompressionLayer, which rejects snappy with 415.
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
@@ -1941,41 +1945,29 @@ pub fn service_routes() -> Router {
 
 /// Create other service routes (AWS, GCP, RUM)
 pub fn other_service_routes() -> Router {
-    // AWS routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let aws_routes = Router::new()
         .route(
             "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
         .layer(middleware::from_fn(aws_auth_middleware))
-        .layer(RequestDecompressionLayer::new())
-        .layer(middleware::from_fn(
-            decompression::preprocess_encoding_middleware,
-        ));
+        .layer(RequestDecompressionLayer::new());
 
-    // GCP routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let gcp_routes = Router::new()
         .route(
             "/{org_id}/{stream_name}/_sub",
             post(logs::ingest::handle_gcp_request),
         )
         .layer(middleware::from_fn(gcp_auth_middleware))
-        .layer(RequestDecompressionLayer::new())
-        .layer(middleware::from_fn(
-            decompression::preprocess_encoding_middleware,
-        ));
+        .layer(RequestDecompressionLayer::new());
 
-    // RUM routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let rum_routes = Router::new()
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
-        .layer(RequestDecompressionLayer::new())
-        .layer(middleware::from_fn(
-            decompression::preprocess_encoding_middleware,
-        ));
+        .layer(RequestDecompressionLayer::new());
 
     Router::new()
         .nest("/aws", aws_routes)
@@ -2014,12 +2006,8 @@ pub fn splunk_collector_routes() -> Router {
         // Applied innermost so it caps the DECOMPRESSED body: `.layer` wraps
         // outermost-last, so everything below this runs before it.
         .layer(DefaultBodyLimit::max(hec_collector::hec_max_body_bytes()))
-        // Root-level routers inherit nothing from `service_routes`, so the
-        // decompression pair has to be re-applied here.
+        // Root-level routers inherit nothing from `service_routes`, hence the repeated layer.
         .layer(RequestDecompressionLayer::new())
-        .layer(middleware::from_fn(
-            decompression::preprocess_encoding_middleware,
-        ))
         // Outermost, so the 10 MiB cap is measured on the wire before any
         // decompression can amplify an unauthenticated body.
         .layer(middleware::from_fn(hec_collector::wire_body_limit_middleware))
@@ -2521,6 +2509,34 @@ mod tests {
             app.oneshot(req).await.unwrap().status(),
             StatusCode::UNAUTHORIZED
         );
+    }
+
+    // only the real tree catches a snappy strip reordered inside the decompression layer
+    #[tokio::test]
+    async fn snappy_is_not_rejected_by_the_decompression_layer() {
+        let app = Router::new().nest("/api", service_routes());
+        let snappy_post = |uri: &str| {
+            Request::builder()
+                .method(Method::POST)
+                .uri(uri)
+                .header(header::CONTENT_ENCODING, "snappy")
+                .body(Body::from("snappy bytes"))
+                .unwrap()
+        };
+
+        for uri in [
+            "/api/default/loki/api/v1/push",
+            "/api/default/prometheus/api/v1/write",
+            "/api/default/v1/logs",
+        ] {
+            let status = app
+                .clone()
+                .oneshot(snappy_post(uri))
+                .await
+                .unwrap()
+                .status();
+            assert_ne!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE, "{uri}");
+        }
     }
 
     // ── unauthenticated /config bootstrap ─────────────────────────────────
