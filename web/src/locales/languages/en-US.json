@@ -14614,9 +14614,10 @@
       "errorPatternsWindowDesc": "Normalized across {window} · click a row to filter runs"
     },
     "save": {
-      "usedByTitle": "\"{name}\" is used by {count} other test | \"{name}\" is used by {count} other tests",
-      "usedByBody": "Your changes apply to all of them on their next run.",
-      "blockedBody": "The save didn't go through. Remove those references first, then save again."
+      "usedByTitle": "{count} test that uses \"{name}\" will start failing | {count} tests that use \"{name}\" will start failing",
+      "usedByBody": "This change adds {names}. The tests listed above don't define it, so it stays unresolved on their next run.",
+      "blockedBody": "The save didn't go through. Remove those references first, then save again.",
+      "usedByCount": "Used by {count} test | Used by {count} tests"
     },
     "scheduleAlert": {
       "addNewDestination": "Add New Destination",

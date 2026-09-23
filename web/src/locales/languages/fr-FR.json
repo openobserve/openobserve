@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "L'enregistrement n'a pas abouti. Supprimez d'abord ces références, puis enregistrez à nouveau.",
-      "usedByBody": "Vos modifications s'appliquent à tous lors de leur prochaine exécution.",
-      "usedByTitle": "« {name} » est utilisé par {count} autre test | « {name} » est utilisé par {count} autres tests"
+      "usedByBody": "Cette modification ajoute {names}. Les tests ci-dessus ne le définissent pas, il restera donc non résolu lors de leur prochaine exécution.",
+      "usedByTitle": "{count} test qui utilise « {name} » va échouer | {count} tests qui utilisent « {name} » vont échouer",
+      "usedByCount": "Utilisé par {count} test | Utilisé par {count} tests"
     }
   },
   "statusPages": {

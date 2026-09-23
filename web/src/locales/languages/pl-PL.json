@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "Zapis się nie powiódł. Najpierw usuń te odwołania, potem zapisz ponownie.",
-      "usedByBody": "Twoje zmiany obejmą je wszystkie przy ich następnym uruchomieniu.",
-      "usedByTitle": "\"{name}\" jest używany przez {count} inny test | \"{name}\" jest używany przez {count} innych testów"
+      "usedByBody": "Ta zmiana dodaje {names}. Wymienione wyżej testy tego nie definiują, więc pozostanie nierozwiązane przy ich następnym uruchomieniu.",
+      "usedByTitle": "{count} test używający \"{name}\" zacznie zawodzić | {count} testów używających \"{name}\" zacznie zawodzić",
+      "usedByCount": "Używany przez {count} test | Używany przez {count} testów"
     }
   },
   "statusPages": {

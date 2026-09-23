@@ -17,7 +17,7 @@
 
 use std::collections::HashMap;
 
-use config::meta::synthetics::{BrowserConfig, SyntheticType};
+use config::meta::synthetics::{BrowserConfig, Synthetic, SyntheticType};
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
 };
@@ -77,9 +77,37 @@ pub async fn list_parents_for_many<C: ConnectionTrait>(
     org_id: &str,
     child_ids: &[String],
 ) -> Result<HashMap<String, Vec<ParentRef>>, sea_orm::DbErr> {
+    Ok(parents_and_rows(conn, org_id, child_ids).await?.0)
+}
+
+/// `list_parents`, plus each parent's stored definition — the same single read, nothing decrypted.
+pub async fn list_parents_with_definitions<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    child_id: &str,
+) -> Result<(Vec<ParentRef>, HashMap<String, Synthetic>), sea_orm::DbErr> {
+    let (mut grouped, rows) = parents_and_rows(conn, org_id, &[child_id.to_owned()]).await?;
+    let defined = rows
+        .into_iter()
+        .filter_map(|(id, row)| Synthetic::try_from(row).ok().map(|s| (id, s)))
+        .collect();
+    Ok((grouped.remove(child_id).unwrap_or_default(), defined))
+}
+
+async fn parents_and_rows<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    child_ids: &[String],
+) -> Result<
+    (
+        HashMap<String, Vec<ParentRef>>,
+        HashMap<String, synthetics_checks::Model>,
+    ),
+    sea_orm::DbErr,
+> {
     let mut grouped: HashMap<String, Vec<ParentRef>> = HashMap::new();
     if child_ids.is_empty() {
-        return Ok(grouped);
+        return Ok((grouped, HashMap::new()));
     }
     let links = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -87,7 +115,7 @@ pub async fn list_parents_for_many<C: ConnectionTrait>(
         .all(conn)
         .await?;
     if links.is_empty() {
-        return Ok(grouped);
+        return Ok((grouped, HashMap::new()));
     }
     let parents: HashMap<String, synthetics_checks::Model> = synthetics_checks::Entity::find()
         .filter(synthetics_checks::Column::OrgId.eq(org_id))
@@ -110,7 +138,7 @@ pub async fn list_parents_for_many<C: ConnectionTrait>(
     for list in grouped.values_mut() {
         list.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
     }
-    Ok(grouped)
+    Ok((grouped, parents))
 }
 
 pub async fn refs_for_parents<C: ConnectionTrait>(

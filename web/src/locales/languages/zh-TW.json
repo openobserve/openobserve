@@ -14894,8 +14894,9 @@
     },
     "save": {
       "blockedBody": "儲存未成功。請先移除這些參照，然後重新儲存。",
-      "usedByBody": "您的變更會在它們下次執行時套用到全部。",
-      "usedByTitle": "「{name}」正被其他 {count} 個測試使用"
+      "usedByBody": "此變更新增了 {names}。上面列出的測試沒有定義它，因此在它們下次執行時仍無法解析。",
+      "usedByTitle": "使用「{name}」的 {count} 個測試將開始失敗",
+      "usedByCount": "被 {count} 個測試使用"
     }
   },
   "statusPages": {

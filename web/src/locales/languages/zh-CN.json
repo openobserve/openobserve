@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "保存未成功。请先移除这些引用，然后重新保存。",
-      "usedByBody": "您的更改将在它们下次运行时应用到所有测试。",
-      "usedByTitle": "“{name}”正被其他 {count} 个测试使用"
+      "usedByBody": "此更改新增了 {names}。上面列出的测试没有定义它，因此在它们下次运行时仍无法解析。",
+      "usedByTitle": "使用“{name}”的 {count} 个测试将开始失败",
+      "usedByCount": "被 {count} 个测试使用"
     }
   },
   "statusPages": {

@@ -57,6 +57,7 @@ import {
   expandJourney,
   loadChildren,
   opensStartingUrl,
+  placeholdersIn,
   type ChildJourney,
   type ExpansionMap,
 } from "@/utils/synthetics/expandJourney";
@@ -1019,6 +1020,8 @@ const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
 
 /** Load-time lookup only; the save-time `checkUsageThenSave` asks again on its own. */
 const referencedByState = ref<ReferencedByState>("none");
+/** The passive indicator's number; the tri-state above cannot carry it. */
+const referencedByCount = ref(0);
 const showExtractDialog = ref(false);
 
 async function loadReferencedBy(id: string) {
@@ -1027,9 +1030,11 @@ async function loadReferencedBy(id: string) {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.referencedBy(org, id);
     const count = (res.data?.references?.length ?? 0) + (res.data?.hidden_reference_count ?? 0);
+    referencedByCount.value = count;
     referencedByState.value = count > 0 ? "some" : "none";
   } catch (err) {
     console.error("[synthetics] referencedBy lookup failed", err);
+    referencedByCount.value = 0;
     referencedByState.value = "unknown";
   }
 }
@@ -1138,13 +1143,18 @@ function onContinueToConfigure() {
   currentStep.value = 2;
 }
 
-// Saving a referenced check changes what its parents run, so the author confirms first.
+// Saving a referenced check can break its parents, so the author confirms that case first.
 interface UsedByReference {
   id: string;
   name: string;
   folder_id: string;
+  undefined_placeholders?: string[];
 }
-const usedByInfo = ref<{ references: UsedByReference[]; hidden: number } | null>(null);
+const usedByInfo = ref<{
+  references: UsedByReference[];
+  hidden: number;
+  names: string[];
+} | null>(null);
 const usedByDialogOpen = computed({
   get: () => usedByInfo.value !== null,
   set: (open: boolean) => {
@@ -1154,7 +1164,17 @@ const usedByDialogOpen = computed({
     }
   },
 });
+/** Built here, not in the template: a `{{NAME}}` literal inside a mustache breaks the parser. */
+const usedByNames = computed(() =>
+  (usedByInfo.value?.names ?? []).map((name) => "{{" + name + "}}").join(", "),
+);
 let pendingSaveAction: (() => Promise<void>) | null = null;
+
+/** Only the names this edit adds; the full set would re-report parents that were already broken. */
+const addedPlaceholders = computed(() => {
+  const before = new Set(placeholdersIn(savedCheck.value?.journey ?? []));
+  return placeholdersIn(check.value.journey).filter((name) => !before.has(name));
+});
 
 /** A failed `referencedBy` lookup must not block the save; it proceeds as unreferenced. */
 async function checkUsageThenSave(afterPersist: () => Promise<void>) {
@@ -1165,17 +1185,21 @@ async function checkUsageThenSave(afterPersist: () => Promise<void>) {
     nextTick(() => journeyRef.value?.revealCapNotice());
     return;
   }
-  if (!check.value.id) {
+  const names = addedPlaceholders.value;
+  // An edit that adds no placeholder cannot break a parent, so it asks nothing.
+  if (!check.value.id || names.length === 0) {
     await afterPersist();
     return;
   }
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.referencedBy(org, check.value.id);
-    const references = (res.data?.references ?? []) as UsedByReference[];
+    const res = await syntheticsService.referencedBy(org, check.value.id, names);
+    const references = ((res.data?.references ?? []) as UsedByReference[]).filter(
+      (ref) => (ref.undefined_placeholders ?? []).length > 0,
+    );
     const hidden = res.data?.hidden_reference_count ?? 0;
-    if (references.length + hidden > 0) {
-      usedByInfo.value = { references, hidden };
+    if (references.length > 0) {
+      usedByInfo.value = { references, hidden, names };
       pendingSaveAction = afterPersist;
       return;
     }
@@ -1745,6 +1769,13 @@ function onClearResults() {
                 </span>
               </template>
             </template>
+            <span
+              v-if="referencedByCount > 0"
+              class="text-text-secondary text-xs"
+              data-test="synthetics-used-by-indicator"
+            >
+              {{ t("synthetics.save.usedByCount", { count: referencedByCount }) }}
+            </span>
             <span class="flex-1" aria-hidden="true" />
 
             <OButton
@@ -1858,14 +1889,14 @@ function onClearResults() {
       </div>
     </template>
 
-    <!-- Saving changes what the checks that reference this one run. -->
+    <!-- Only when this save leaves a parent with a placeholder it does not define. -->
     <ODialog
       v-model:open="usedByDialogOpen"
       size="sm"
       :title="
         t('synthetics.save.usedByTitle', {
           name: check.name,
-          count: (usedByInfo?.references.length ?? 0) + (usedByInfo?.hidden ?? 0),
+          count: usedByInfo?.references.length ?? 0,
         })
       "
       :primary-button-label="t('common.save')"
@@ -1883,7 +1914,7 @@ function onClearResults() {
         <p v-if="(usedByInfo?.hidden ?? 0) > 0" class="text-text-secondary m-0 text-xs">
           {{ t("synthetics.delete.hiddenReferences", { count: usedByInfo?.hidden ?? 0 }) }}
         </p>
-        <p class="m-0">{{ t("synthetics.save.usedByBody") }}</p>
+        <p class="m-0">{{ t("synthetics.save.usedByBody", { names: usedByNames }) }}</p>
       </div>
     </ODialog>
 

@@ -36,6 +36,27 @@ use crate::service::auth::{check_folder_write_permissions, check_permissions};
 
 // ── Local query / body types ──────────────────────────────────────────────────
 
+/// The placeholder names a save is about to add, so the used-by list can say which parents break.
+#[derive(Debug, Default, Deserialize)]
+pub struct ReferencedByQuery {
+    pub placeholders: Option<String>,
+}
+
+impl ReferencedByQuery {
+    /// `None` when the caller asked nothing, so the response stays exactly what it was.
+    fn placeholder_names(&self) -> Option<std::collections::BTreeSet<String>> {
+        let names: std::collections::BTreeSet<String> = self
+            .placeholders
+            .as_deref()?
+            .split(',')
+            .map(str::trim)
+            .filter(|n| !n.is_empty())
+            .map(str::to_owned)
+            .collect();
+        (!names.is_empty()).then_some(names)
+    }
+}
+
 #[derive(Debug, Default, Deserialize)]
 pub struct ListSyntheticsQuery {
     pub folder: Option<String>,
@@ -527,6 +548,25 @@ async fn readable_parents(
         }));
     }
     (references, hidden)
+}
+
+/// Adds `undefined_placeholders` to every readable parent; an empty list means it defines them all.
+fn stamp_undefined_placeholders(
+    references: &mut [serde_json::Value],
+    definitions: &std::collections::HashMap<String, config::meta::synthetics::Synthetic>,
+    names: &std::collections::BTreeSet<String>,
+    shared: &openobserve_synthetics::service::composition::SharedTier,
+) {
+    use openobserve_synthetics::service::composition;
+    for reference in references.iter_mut() {
+        let undefined = reference
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|id| definitions.get(id))
+            .map(|parent| composition::undefined_for_check(parent, names, shared))
+            .unwrap_or_default();
+        reference["undefined_placeholders"] = serde_json::json!(undefined);
+    }
 }
 
 fn composition_conflict(
@@ -1167,6 +1207,7 @@ pub async fn run_synthetic_now(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Check ID"),
+        ("placeholders" = Option<String>, Query, description = "Comma-separated placeholder names; each readable parent reports which of them it does not define"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -1175,16 +1216,25 @@ pub async fn run_synthetic_now(
 )]
 pub async fn get_referenced_by(
     Path((org_id, id)): Path<(String, String)>,
+    Query(query): Query<ReferencedByQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let conn = infra::db::get_orm_client_ro().await;
-    match infra::table::synthetics_refs::list_parents(conn, &org_id, &id).await {
-        Ok(parents) => {
+    match infra::table::synthetics_refs::list_parents_with_definitions(conn, &org_id, &id).await {
+        Ok((parents, definitions)) => {
             // Slugs, not KSUIDs — the UI links to `?folder=<slug>` like every other surface.
             let parents =
                 openobserve_synthetics::service::composition::to_public_refs(parents).await;
-            let (references, hidden) =
+            let (mut references, hidden) =
                 readable_parents(&org_id, &user_email.user_id, parents).await;
+            // After redaction only: evaluating first would leak unreadable parents through timing.
+            if let Some(names) = query.placeholder_names() {
+                let shared =
+                    openobserve_synthetics::service::composition::load_shared_tier(conn, &org_id)
+                        .await
+                        .unwrap_or_default();
+                stamp_undefined_placeholders(&mut references, &definitions, &names, &shared);
+            }
             MetaHttpResponse::json(
                 serde_json::json!({ "references": references, "hidden_reference_count": hidden }),
             )
@@ -2164,7 +2214,7 @@ mod tests {
         service::composition::CompositionError as CE,
     };
 
-    use super::composition_error_response;
+    use super::{ReferencedByQuery, composition_error_response, stamp_undefined_placeholders};
 
     async fn mapped(e: CE) -> (u16, serde_json::Value) {
         let resp = composition_error_response("acme", "u@x", anyhow::Error::new(e))
@@ -2414,5 +2464,67 @@ mod tests {
 
         assert_eq!(recorded(a).0 - before_a.0, 3);
         assert_eq!(recorded(b).0 - before_b.0, 7);
+    }
+
+    fn parent_defining(id: &str, names: &[&str]) -> config::meta::synthetics::Synthetic {
+        config::meta::synthetics::Synthetic {
+            id: id.into(),
+            check_type: config::meta::synthetics::SyntheticType::Browser,
+            variables: names
+                .iter()
+                .map(|n| config::meta::synthetics::SyntheticVariable {
+                    name: (*n).into(),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn no_parameter_means_no_breakage_evaluation() {
+        assert!(ReferencedByQuery::default().placeholder_names().is_none());
+        assert!(
+            ReferencedByQuery {
+                placeholders: Some(" , ".into()),
+            }
+            .placeholder_names()
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn only_the_parents_that_fail_to_define_a_name_report_it() {
+        let names = ReferencedByQuery {
+            placeholders: Some("PROMO_CODE, REGION".into()),
+        }
+        .placeholder_names()
+        .unwrap();
+        let definitions = std::collections::HashMap::from([
+            (
+                "p1".to_string(),
+                parent_defining("p1", &["PROMO_CODE", "REGION"]),
+            ),
+            ("p2".to_string(), parent_defining("p2", &["REGION"])),
+        ]);
+        // Only readable parents reach here; a hidden one is never in the list to be stamped.
+        let mut references = vec![
+            serde_json::json!({ "id": "p1", "name": "one", "folder_id": "f" }),
+            serde_json::json!({ "id": "p2", "name": "two", "folder_id": "f" }),
+        ];
+        stamp_undefined_placeholders(
+            &mut references,
+            &definitions,
+            &names,
+            &openobserve_synthetics::service::composition::SharedTier::default(),
+        );
+        assert_eq!(
+            references[0]["undefined_placeholders"],
+            serde_json::json!([])
+        );
+        assert_eq!(
+            references[1]["undefined_placeholders"],
+            serde_json::json!(["PROMO_CODE"])
+        );
     }
 }

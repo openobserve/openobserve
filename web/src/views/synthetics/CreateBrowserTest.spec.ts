@@ -1378,6 +1378,64 @@ describe("CreateBrowserTest", () => {
       );
     });
 
+    it("shows the used-by count without blocking anything", async () => {
+      mockServiceReferencedBy.mockResolvedValue({
+        data: { references: [{ id: "p1", name: "One" }], hidden_reference_count: 2 },
+      });
+      wrapper = await mountEdit();
+
+      expect(wrapper.find('[data-test="synthetics-used-by-indicator"]').text()).toBe(
+        "Used by 3 tests",
+      );
+    });
+
+    it("asks nothing on a save that adds no placeholder", async () => {
+      wrapper = await mountEdit();
+      mockServiceReferencedBy.mockClear();
+
+      const afterPersist = vi.fn().mockResolvedValue(undefined);
+      await (wrapper.vm as any).checkUsageThenSave(afterPersist);
+
+      expect(mockServiceReferencedBy).not.toHaveBeenCalled();
+      expect((wrapper.vm as any).usedByInfo).toBeNull();
+      expect(afterPersist).toHaveBeenCalledTimes(1);
+    });
+
+    it("confirms only when a parent fails to define the newly added placeholder", async () => {
+      wrapper = await mountEdit();
+      (wrapper.vm as any).check.journey[2].value = "{{USER}} {{PROMO}}";
+      await flushPromises();
+
+      // Every parent defines it, so the save goes through unannounced.
+      mockServiceReferencedBy.mockResolvedValue({
+        data: {
+          references: [{ id: "p1", name: "One", undefined_placeholders: [] }],
+          hidden_reference_count: 1,
+        },
+      });
+      const afterPersist = vi.fn().mockResolvedValue(undefined);
+      await (wrapper.vm as any).checkUsageThenSave(afterPersist);
+
+      // Only the name this edit adds is sent; {{USER}} was already in the saved journey.
+      expect(mockServiceReferencedBy).toHaveBeenCalledWith("default", "check-123", ["PROMO"]);
+      expect((wrapper.vm as any).usedByInfo).toBeNull();
+      expect(afterPersist).toHaveBeenCalledTimes(1);
+
+      mockServiceReferencedBy.mockResolvedValue({
+        data: {
+          references: [{ id: "p1", name: "One", undefined_placeholders: ["PROMO"] }],
+          hidden_reference_count: 1,
+        },
+      });
+      const blocked = vi.fn().mockResolvedValue(undefined);
+      await (wrapper.vm as any).checkUsageThenSave(blocked);
+
+      expect(blocked).not.toHaveBeenCalled();
+      expect((wrapper.vm as any).usedByInfo.references).toHaveLength(1);
+      expect((wrapper.vm as any).usedByInfo.names).toEqual(["PROMO"]);
+      expect((wrapper.vm as any).usedByInfo.hidden).toBe(1);
+    });
+
     it("looks up referenced-by on load in edit mode and not in create mode", async () => {
       // The response id differs from the route id on purpose: the route id is the one to use.
       wrapper = await mountEdit({ id: "stale-id" });

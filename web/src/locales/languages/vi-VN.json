@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "Lưu không thành công. Hãy xóa các tham chiếu đó trước, rồi lưu lại.",
-      "usedByBody": "Thay đổi của bạn áp dụng cho tất cả ở lần chạy tiếp theo của chúng.",
-      "usedByTitle": "\"{name}\" đang được {count} bài test khác sử dụng"
+      "usedByBody": "Thay đổi này thêm {names}. Các bài test ở trên không định nghĩa nó, nên nó sẽ chưa được giải quyết ở lần chạy tiếp theo.",
+      "usedByTitle": "{count} bài test dùng \"{name}\" sẽ bắt đầu thất bại",
+      "usedByCount": "Được {count} bài test sử dụng"
     }
   },
   "statusPages": {

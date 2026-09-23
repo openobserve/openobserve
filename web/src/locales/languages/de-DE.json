@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "Das Speichern wurde nicht übernommen. Entfernen Sie zuerst diese Verweise und speichern Sie erneut.",
-      "usedByBody": "Ihre Änderungen gelten für alle beim nächsten Lauf.",
-      "usedByTitle": "\"{name}\" wird von {count} anderen Test verwendet | \"{name}\" wird von {count} anderen Tests verwendet"
+      "usedByBody": "Diese Änderung fügt {names} hinzu. Die oben genannten Tests definieren es nicht, daher bleibt es beim nächsten Lauf ungelöst.",
+      "usedByTitle": "{count} Test, der \"{name}\" verwendet, wird fehlschlagen | {count} Tests, die \"{name}\" verwenden, werden fehlschlagen",
+      "usedByCount": "Von {count} Test verwendet | Von {count} Tests verwendet"
     }
   },
   "statusPages": {

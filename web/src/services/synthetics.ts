@@ -134,8 +134,13 @@ const syntheticsService = {
   },
 
   /** Checks that reference `id` as a subtest — used to warn before deleting or unpublishing it. */
-  referencedBy: (orgIdentifier: string, id: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/${id}/referenced-by`),
+  referencedBy: (orgIdentifier: string, id: string, placeholders?: string[]) => {
+    // Absent means "do not evaluate breakage" — an empty value would read as an empty name list.
+    const query = placeholders?.length
+      ? `?placeholders=${encodeURIComponent(placeholders.join(","))}`
+      : "";
+    return http().get(`/api/${orgIdentifier}/synthetics/${id}/referenced-by${query}`);
+  },
 
   artifactUrl: (orgIdentifier: string, key: string, folderId?: string) => {
     // Fallback proxy URL. key format:

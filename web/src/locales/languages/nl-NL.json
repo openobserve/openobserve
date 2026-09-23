@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "Het opslaan is niet gelukt. Verwijder eerst die verwijzingen en sla opnieuw op.",
-      "usedByBody": "Uw wijzigingen gelden voor alle bij hun volgende run.",
-      "usedByTitle": "\"{name}\" wordt gebruikt door {count} andere test | \"{name}\" wordt gebruikt door {count} andere tests"
+      "usedByBody": "Deze wijziging voegt {names} toe. De hierboven genoemde tests definiëren het niet, dus blijft het onopgelost bij hun volgende run.",
+      "usedByTitle": "{count} test die \"{name}\" gebruikt gaat falen | {count} tests die \"{name}\" gebruiken gaan falen",
+      "usedByCount": "Gebruikt door {count} test | Gebruikt door {count} tests"
     }
   },
   "statusPages": {

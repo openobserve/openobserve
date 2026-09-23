@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "Kaydetme gerçekleşmedi. Önce bu referansları kaldırın, sonra tekrar kaydedin.",
-      "usedByBody": "Değişiklikleriniz bir sonraki çalıştırmalarında hepsine uygulanır.",
-      "usedByTitle": "\"{name}\" başka {count} test tarafından kullanılıyor"
+      "usedByBody": "Bu değişiklik {names} ekliyor. Yukarıdaki testler bunu tanımlamıyor, bu yüzden bir sonraki çalıştırmalarında çözümlenmeden kalacak.",
+      "usedByTitle": "\"{name}\" kullanan {count} test başarısız olmaya başlayacak",
+      "usedByCount": "{count} test tarafından kullanılıyor"
     }
   },
   "statusPages": {

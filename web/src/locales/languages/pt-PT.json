@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "Não foi possível guardar. Remova primeiro essas referências e guarde de novo.",
-      "usedByBody": "As suas alterações aplicam-se a todos na próxima execução.",
-      "usedByTitle": "\"{name}\" é usado por {count} outro teste | \"{name}\" é usado por {count} outros testes"
+      "usedByBody": "Esta alteração adiciona {names}. Os testes acima não o definem, por isso ficará por resolver na próxima execução.",
+      "usedByTitle": "{count} teste que usa \"{name}\" vai começar a falhar | {count} testes que usam \"{name}\" vão começar a falhar",
+      "usedByCount": "Usado por {count} teste | Usado por {count} testes"
     }
   },
   "statusPages": {

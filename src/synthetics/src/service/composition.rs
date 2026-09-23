@@ -245,6 +245,19 @@ pub fn undefined_among(names: &BTreeSet<String>, defined: &HashSet<String>) -> V
         .collect()
 }
 
+/// The names `check` fails to resolve in at least one of the environments it is bound to.
+pub fn undefined_for_check(
+    check: &Synthetic,
+    names: &BTreeSet<String>,
+    shared: &SharedTier,
+) -> Vec<String> {
+    let mut out: BTreeSet<String> = BTreeSet::new();
+    for (_, defined) in scoped_defined_names(check, &shared_scopes(check, shared)) {
+        out.extend(undefined_among(names, &defined));
+    }
+    out.into_iter().collect()
+}
+
 fn check_rules(
     own_id: Option<&str>,
     body: &Synthetic,

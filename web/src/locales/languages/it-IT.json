@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "Il salvataggio non è andato a buon fine. Rimuovi prima quei riferimenti, poi salva di nuovo.",
-      "usedByBody": "Le tue modifiche si applicano a tutti alla loro prossima esecuzione.",
-      "usedByTitle": "\"{name}\" è usato da {count} altro test | \"{name}\" è usato da {count} altri test"
+      "usedByBody": "Questa modifica aggiunge {names}. I test elencati sopra non lo definiscono, quindi resterà non risolto alla loro prossima esecuzione.",
+      "usedByTitle": "{count} test che usa \"{name}\" inizierà a fallire | {count} test che usano \"{name}\" inizieranno a fallire",
+      "usedByCount": "Usato da {count} test | Usato da {count} test"
     }
   },
   "statusPages": {

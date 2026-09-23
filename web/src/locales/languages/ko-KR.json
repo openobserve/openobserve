@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "저장이 완료되지 않았습니다. 먼저 해당 참조를 제거한 후 다시 저장하세요.",
-      "usedByBody": "변경 사항은 다음 실행 시 모두에 적용됩니다.",
-      "usedByTitle": "\"{name}\"은(는) 다른 {count}개 테스트에서 사용 중입니다"
+      "usedByBody": "이 변경은 {names}을(를) 추가합니다. 위 테스트들은 이를 정의하지 않으므로 다음 실행에서 해결되지 않은 채 남습니다.",
+      "usedByTitle": "\"{name}\"을(를) 사용하는 {count}개 테스트가 실패하기 시작합니다",
+      "usedByCount": "{count}개 테스트에서 사용 중"
     }
   },
   "statusPages": {

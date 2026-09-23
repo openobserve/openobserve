@@ -14899,8 +14899,9 @@
     },
     "save": {
       "blockedBody": "保存できませんでした。先にそれらの参照を削除してから、もう一度保存してください。",
-      "usedByBody": "変更は次回の実行時にすべてに適用されます。",
-      "usedByTitle": "「{name}」は他の {count} 件のテストで使われています"
+      "usedByBody": "この変更で {names} が追加されます。上記のテストはこれを定義していないため、次回の実行で未解決のままになります。",
+      "usedByTitle": "「{name}」を使う {count} 件のテストが失敗するようになります",
+      "usedByCount": "{count} 件のテストで使用中"
     }
   },
   "statusPages": {
