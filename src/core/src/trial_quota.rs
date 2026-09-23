@@ -1285,6 +1285,54 @@ pub enum AiUsageAuthorizationError {
     Unavailable(String),
 }
 
+/// Reject a chat request that cannot be billed without consuming a free credit.
+/// The final authorization must still run after the upstream accepts the request:
+/// another request can exhaust the balance between this check and deduction.
+pub async fn precheck_ai_usage(
+    org_id: &str,
+    feature: TrialQuotaFeature,
+    user_email: &str,
+) -> Result<(), AiUsageAuthorizationError> {
+    let pool = feature.pool();
+    if get_remaining_for_pool(org_id, pool) >= feature.cost() {
+        return Ok(());
+    }
+    let exhausted = QuotaExhaustedError {
+        usage_count: get_used_for_pool(org_id, pool),
+        usage_limit: get_limit_for_pool(org_id, pool),
+    };
+    authorize_paid_overage(org_id, pool, user_email, &exhausted.to_string()).await
+}
+
+async fn authorize_paid_overage(
+    org_id: &str,
+    pool: TrialQuotaPool,
+    user_email: &str,
+    exhausted_message: &str,
+) -> Result<(), AiUsageAuthorizationError> {
+    let resolution = resolve_paid_overage(org_id, pool)
+        .await
+        .map_err(|error| AiUsageAuthorizationError::Unavailable(error.to_string()))?;
+    match resolution.billing_status {
+        PaidOverageBillingStatus::Eligible if resolution.effective => Ok(()),
+        PaidOverageBillingStatus::Eligible => {
+            let status = paid_overage_status_for_user(org_id, pool, resolution, user_email).await;
+            Err(AiUsageAuthorizationError::PaidOverageConsentRequired(
+                status,
+            ))
+        }
+        PaidOverageBillingStatus::AdditionalCreditsRequired => {
+            Err(AiUsageAuthorizationError::PaymentRequired(
+                "AI credit limit exhausted. Contact your account manager to add more credits."
+                    .to_string(),
+            ))
+        }
+        PaidOverageBillingStatus::SubscriptionRequired => Err(
+            AiUsageAuthorizationError::PaymentRequired(exhausted_message.to_string()),
+        ),
+    }
+}
+
 /// Authorize and meter exactly one AI operation.
 ///
 /// Free quota is always attempted first. Exhaustion never records billable
@@ -1300,39 +1348,15 @@ pub async fn authorize_ai_usage(
             Ok(AiUsagePermit { feature })
         }
         Err(exhausted) => {
-            let pool = feature.pool();
-            let resolution = resolve_paid_overage(org_id, pool)
-                .await
-                .map_err(|error| AiUsageAuthorizationError::Unavailable(error.to_string()))?;
-            match resolution.billing_status {
-                PaidOverageBillingStatus::Eligible if resolution.effective => {
-                    record_billable_ai_usage(org_id, usage_context, feature);
-                    Ok(AiUsagePermit { feature })
-                }
-                PaidOverageBillingStatus::Eligible => {
-                    let status = paid_overage_status_for_user(
-                        org_id,
-                        pool,
-                        resolution,
-                        &usage_context.user_email,
-                    )
-                    .await;
-                    Err(AiUsageAuthorizationError::PaidOverageConsentRequired(
-                        status,
-                    ))
-                }
-                PaidOverageBillingStatus::AdditionalCreditsRequired => {
-                    Err(AiUsageAuthorizationError::PaymentRequired(
-                        "AI credit limit exhausted. Contact your account manager to add more credits."
-                            .to_string(),
-                    ))
-                }
-                PaidOverageBillingStatus::SubscriptionRequired => {
-                    Err(AiUsageAuthorizationError::PaymentRequired(
-                        exhausted.to_string(),
-                    ))
-                }
-            }
+            authorize_paid_overage(
+                org_id,
+                feature.pool(),
+                &usage_context.user_email,
+                &exhausted.to_string(),
+            )
+            .await?;
+            record_billable_ai_usage(org_id, usage_context, feature);
+            Ok(AiUsagePermit { feature })
         }
     }
 }
