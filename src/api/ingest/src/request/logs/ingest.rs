@@ -42,6 +42,7 @@ use crate::{
     service::{
         ingestion::get_thread_id,
         logs::{self, otlp::handle_request},
+        profiles::otlp_error_response,
     },
 };
 
@@ -506,14 +507,12 @@ pub async fn otlp_logs_write(
             Ok(req) => (req, OtlpRequestType::HttpProtobuf),
             Err(e) => {
                 log::error!("[LOGS:OTLP] Invalid proto: org_id: {org_id} {e}");
-                return (
+                return otlp_error_response(
+                    OtlpRequestType::HttpProtobuf,
                     StatusCode::BAD_REQUEST,
-                    Json(MetaHttpResponse::error(
-                        StatusCode::BAD_REQUEST,
-                        format!("Invalid proto: {e}"),
-                    )),
-                )
-                    .into_response();
+                    3, // INVALID_ARGUMENT
+                    format!("Invalid proto: {e}"),
+                );
             }
         },
         Some(OtlpRequestType::HttpJson) => {

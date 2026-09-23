@@ -76,6 +76,7 @@ use crate::{
         evaluate_trigger, get_thread_id, grpc::get_val, write_file,
     },
     logs::IngestJsonData,
+    profiles::otlp_error_response,
     traces::otel::{OtelIngestionProcessor, is_llm_trace},
 };
 
@@ -454,7 +455,12 @@ pub async fn otlp_proto(
         Ok(v) => v,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid proto: org_id: {org_id}, error: {e}");
-            return Ok(MetaHttpResponse::bad_request(format!("Invalid proto: {e}")));
+            return Ok(otlp_error_response(
+                OtlpRequestType::HttpProtobuf,
+                http::StatusCode::BAD_REQUEST,
+                3, // INVALID_ARGUMENT
+                format!("Invalid proto: {e}"),
+            ));
         }
     };
     match handle_otlp_request(
