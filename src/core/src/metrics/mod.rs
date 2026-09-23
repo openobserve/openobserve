@@ -30,6 +30,7 @@ use datafusion::arrow::datatypes::Schema;
 
 use crate::ingestion::TriggerAlertData;
 
+mod admission;
 mod columnar;
 mod ingest;
 pub mod json;

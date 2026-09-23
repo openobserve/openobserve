@@ -24,9 +24,9 @@ use axum::{
     response::{IntoResponse, Response as HttpResponse},
 };
 use bytes::{Bytes, BytesMut};
-use chrono::{DateTime, Days, Utc};
+use chrono::Utc;
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    TIMESTAMP_COL_NAME,
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
@@ -34,7 +34,6 @@ use config::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamType},
     },
-    metrics,
     utils::{
         flatten::{self, format_label_name, format_label_name_cow},
         json,
@@ -56,6 +55,7 @@ use prost::Message;
 use schema::stream_schema_exists;
 
 use super::{
+    admission::{self, Admission, PointAdmission, StreamPolicies, admit_record_groups},
     columnar::{self, ColumnarStream},
     ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream},
     native_histogram,
@@ -68,8 +68,6 @@ use crate::{
     },
     pipeline::batch_execution::ExecutablePipeline,
 };
-
-const TS_OUT_OF_BOUNDS: &str = "timestamp_out_of_bounds";
 
 /// A number point's labels, rebuilt per point on top of its metric's base labels.
 struct PointLabels {
@@ -135,173 +133,6 @@ impl MetricRecords<'_> {
                 .any(|point| number_point_value(point).is_some()),
         }
     }
-}
-
-/// What a metric's admission needs from the request: pipelines decide where a record lands.
-struct Admission<'a> {
-    org_id: &'a str,
-    metric_name: &'a str,
-    pipelines: &'a mut HashMap<String, Vec<ExecutablePipeline>>,
-    policies: &'a mut StreamPolicies,
-    partial_success: &'a mut ExportMetricsPartialSuccess,
-    points: &'a mut PointAdmission,
-}
-
-impl Admission<'_> {
-    async fn direct_bounds(&mut self, stream_name: &str) -> Option<TimestampBounds> {
-        if self.stream_has_pipeline(stream_name).await {
-            None
-        } else {
-            Some(self.policies.get(stream_name).await.bounds)
-        }
-    }
-
-    async fn stream_has_pipeline(&mut self, stream_name: &str) -> bool {
-        if !self.pipelines.contains_key(stream_name) {
-            let stream_param = StreamParams::new(self.org_id, stream_name, StreamType::Metrics);
-            let found = crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
-            self.pipelines.insert(stream_name.to_string(), found);
-        }
-        self.pipelines
-            .get(stream_name)
-            .is_some_and(|v| !v.is_empty())
-    }
-}
-
-#[derive(Default)]
-struct PointAdmission {
-    next_id: usize,
-    rejected: HashSet<usize>,
-}
-
-impl PointAdmission {
-    fn allocate(&mut self) -> usize {
-        let id = self.next_id;
-        self.next_id += 1;
-        id
-    }
-
-    fn reject(
-        &mut self,
-        id: usize,
-        partial_success: &mut ExportMetricsPartialSuccess,
-        org_id: &str,
-        stream_name: &str,
-        reason: OutOfBounds,
-    ) {
-        if self.rejected.insert(id) {
-            partial_success.rejected_data_points += 1;
-            partial_success.error_message = reason.message();
-            reason.count(org_id, stream_name);
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct TimestampBounds {
-    max_ts: i64,
-    retention: Option<(i64, i64)>,
-}
-
-impl TimestampBounds {
-    fn new(now: i64, retention_days: i64) -> Self {
-        let cfg = get_config();
-        // the upload job drops a whole day at a time, so the bound is that day's start
-        let retention = (retention_days > 0)
-            .then(|| DateTime::from_timestamp_micros(now))
-            .flatten()
-            .and_then(|now| now.checked_sub_days(Days::new(retention_days as u64)))
-            .and_then(|day| day.date_naive().and_hms_opt(0, 0, 0))
-            .map(|day| (retention_days, day.and_utc().timestamp_micros()));
-        Self {
-            max_ts: now.saturating_add(cfg.limit.ingest_allowed_in_future_micro),
-            retention,
-        }
-    }
-
-    fn check(&self, timestamp: i64) -> std::result::Result<(), OutOfBounds> {
-        if timestamp > self.max_ts {
-            return Err(OutOfBounds::Future);
-        }
-        match self.retention {
-            Some((days, min_ts)) if timestamp < min_ts => Err(OutOfBounds::Retention(days)),
-            _ => Ok(()),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum OutOfBounds {
-    Future,
-    Retention(i64),
-}
-
-impl OutOfBounds {
-    fn message(&self) -> String {
-        match self {
-            Self::Future => schema::get_future_discard_error().to_string(),
-            Self::Retention(days) => format!(
-                "Too old data, older than the stream's data retention of {days} days and would be deleted. Data discarded."
-            ),
-        }
-    }
-
-    fn count(&self, org_id: &str, stream_name: &str) {
-        metrics::INGEST_ERRORS
-            .with_label_values(&[
-                org_id,
-                StreamType::Metrics.as_str(),
-                stream_name,
-                TS_OUT_OF_BOUNDS,
-            ])
-            .inc();
-    }
-}
-
-struct StreamPolicies {
-    org_id: String,
-    now: i64,
-    by_stream: HashMap<String, StreamPolicy>,
-}
-
-impl StreamPolicies {
-    fn new(org_id: &str, now: i64) -> Self {
-        Self {
-            org_id: org_id.to_string(),
-            now,
-            by_stream: HashMap::new(),
-        }
-    }
-
-    async fn get(&mut self, stream_name: &str) -> StreamPolicy {
-        if let Some(policy) = self.by_stream.get(stream_name) {
-            return *policy;
-        }
-        let deleting = db::compact::retention::is_deleting_stream(
-            &self.org_id,
-            StreamType::Metrics,
-            stream_name,
-            None,
-        );
-        let retention_days =
-            infra::schema::get_settings(&self.org_id, stream_name, StreamType::Metrics)
-                .await
-                .map(|s| s.data_retention)
-                .filter(|days| *days > 0)
-                .unwrap_or_else(|| get_config().compact.data_retention_days);
-        let policy = StreamPolicy {
-            deleting,
-            bounds: TimestampBounds::new(self.now, retention_days),
-        };
-        self.by_stream.insert(stream_name.to_string(), policy);
-        policy
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct StreamPolicy {
-    deleting: bool,
-    bounds: TimestampBounds,
 }
 
 pub async fn otlp_proto(
@@ -429,6 +260,7 @@ pub async fn handle_otlp_request(
             for metric in &scope_metric.metrics {
                 let metric_name = format_stream_name(metric.name.to_string());
 
+                // check stream if it is deleting
                 if policies.get(&metric_name).await.deleting {
                     skipped_records += 1;
                     continue;
@@ -438,7 +270,8 @@ pub async fn handle_otlp_request(
                     metric_name: &metric_name,
                     pipelines: &mut stream_executable_pipelines,
                     policies: &mut policies,
-                    partial_success: &mut partial_success,
+                    rejected_data_points: &mut partial_success.rejected_data_points,
+                    error_message: &mut partial_success.error_message,
                     points: &mut point_admission,
                 };
 
@@ -665,6 +498,12 @@ pub async fn handle_otlp_request(
                         .await;
                     }
 
+                    // get stream pipeline -- for the stream this record actually lands in, which
+                    // is not always the metric's own name: a histogram's rows all carry a
+                    // `_count` / `_sum` / `_bucket` name and none carry the base. Registering the
+                    // base here anyway would leave a stream in stream_executable_pipelines with
+                    // no buffered inputs, and the loop at the end of this function reports that
+                    // as a bug on every export request.
                     if !stream_executable_pipelines.contains_key(&local_metric_name) {
                         let stream_param =
                             StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
@@ -1042,13 +881,7 @@ async fn admit_number_points<'a>(
             Ok(()) => admitted.push(point),
             Err(reason) => {
                 let id = admission.points.allocate();
-                admission.points.reject(
-                    id,
-                    admission.partial_success,
-                    admission.org_id,
-                    &stream_name,
-                    reason,
-                );
+                admission.reject(id, &stream_name, reason);
             }
         }
     }
@@ -1077,62 +910,17 @@ fn number_point_stream<'a>(point: &NumberDataPoint, metric_name: &'a str) -> Cow
         .unwrap_or(Cow::Borrowed(metric_name))
 }
 
-async fn admit_record_groups(
-    groups: Vec<Vec<json::Value>>,
-    admission: &mut Admission<'_>,
-) -> Vec<(json::Value, usize)> {
-    let mut admitted = Vec::new();
-    for group in groups {
-        let id = admission.points.allocate();
-        for record in group {
-            let stream_name = format_stream_name(
-                record
-                    .get(NAME_LABEL)
-                    .and_then(json::Value::as_str)
-                    .unwrap_or_default()
-                    .to_string(),
-            );
-            if admission.stream_has_pipeline(&stream_name).await {
-                admitted.push((record, id));
-                continue;
-            }
-            let timestamp = record.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64);
-            let bounds = admission.policies.get(&stream_name).await.bounds;
-            match timestamp.map(|ts| bounds.check(ts)) {
-                Some(Err(reason)) => admission.points.reject(
-                    id,
-                    admission.partial_success,
-                    admission.org_id,
-                    &stream_name,
-                    reason,
-                ),
-                _ => admitted.push((record, id)),
-            }
-        }
-    }
-    admitted
-}
-
 async fn admit_otlp_pipeline_outputs(
     outputs: &mut RecordsByStream<usize>,
     policies: &mut StreamPolicies,
     points: &mut PointAdmission,
     partial_success: &mut ExportMetricsPartialSuccess,
 ) {
-    for (stream_name, records) in outputs.iter_mut() {
-        let bounds = policies.get(stream_name).await.bounds;
-        records.retain(|(record, id)| {
-            let timestamp = record.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64);
-            match timestamp.map(|ts| bounds.check(ts)) {
-                Some(Err(reason)) => {
-                    points.reject(*id, partial_success, &policies.org_id, stream_name, reason);
-                    false
-                }
-                _ => true,
-            }
-        });
-    }
-    outputs.retain(|_, records| !records.is_empty());
+    admission::admit_pipeline_outputs(outputs, policies, points, |reason| {
+        partial_success.rejected_data_points += 1;
+        partial_success.error_message = reason.message();
+    })
+    .await;
 }
 
 /// A gauge or sum point's value under the shared policy, `None` for one that writes no record.
@@ -1564,43 +1352,10 @@ mod tests {
         use config::meta::{pipeline::Pipeline, stream::StreamSettings};
         use opentelemetry_proto::tonic::common::v1::{AnyValue, any_value};
 
-        use super::*;
+        use super::{super::super::admission::OutOfBounds, *};
 
         const NOW: i64 = 1_700_000_000_000_000;
         const DAY: i64 = 86_400_000_000;
-
-        #[test]
-        fn test_timestamp_bounds_refuse_the_future_window_and_retention() {
-            let hour = 3600 * 1_000_000;
-            let day = 24 * hour;
-            let in_future = get_config().limit.ingest_allowed_in_future_micro;
-            let now = 1_700_000_000 * 1_000_000;
-            let bounds = TimestampBounds::new(now, 7);
-
-            assert_eq!(bounds.check(now), Ok(()));
-            assert_eq!(bounds.check(now + in_future), Ok(()));
-            assert_eq!(bounds.check(now + in_future + 1), Err(OutOfBounds::Future));
-            assert_eq!(bounds.check(i64::MAX), Err(OutOfBounds::Future));
-
-            // the retention day itself is kept whole, exactly as the upload job keeps it
-            let retention_day_start = (now - 7 * day) / day * day;
-            assert_eq!(bounds.check(retention_day_start), Ok(()));
-            assert_eq!(bounds.check(now - 7 * day), Ok(()));
-            assert_eq!(
-                bounds.check(retention_day_start - 1),
-                Err(OutOfBounds::Retention(7))
-            );
-            assert_eq!(bounds.check(0), Err(OutOfBounds::Retention(7)));
-        }
-
-        #[test]
-        fn test_timestamp_bounds_without_retention_only_refuse_the_future() {
-            let now = 1_700_000_000 * 1_000_000;
-            let bounds = TimestampBounds::new(now, 0);
-            assert_eq!(bounds.check(0), Ok(()));
-            assert_eq!(bounds.check(now - 365 * 24 * 3600 * 1_000_000), Ok(()));
-            assert_eq!(bounds.check(i64::MAX), Err(OutOfBounds::Future));
-        }
 
         async fn policies(org: &str, streams: &[(&str, i64)]) -> StreamPolicies {
             for (stream, days) in streams {
@@ -1676,7 +1431,8 @@ mod tests {
                     metric_name: "base",
                     pipelines: &mut pipelines,
                     policies: &mut policies,
-                    partial_success: &mut partial,
+                    rejected_data_points: &mut partial.rejected_data_points,
+                    error_message: &mut partial.error_message,
                     points: &mut points,
                 },
             )
@@ -1719,7 +1475,8 @@ mod tests {
                     metric_name: "base",
                     pipelines: &mut pipelines,
                     policies: &mut policies,
-                    partial_success: &mut partial,
+                    rejected_data_points: &mut partial.rejected_data_points,
+                    error_message: &mut partial.error_message,
                     points: &mut points,
                 },
             )
@@ -1806,7 +1563,8 @@ mod tests {
                     metric_name: "base",
                     pipelines: &mut pipelines,
                     policies: &mut policies,
-                    partial_success: &mut partial,
+                    rejected_data_points: &mut partial.rejected_data_points,
+                    error_message: &mut partial.error_message,
                     points: &mut points,
                 },
             )
@@ -1821,7 +1579,8 @@ mod tests {
                     metric_name: "base",
                     pipelines: &mut pipelines,
                     policies: &mut policies,
-                    partial_success: &mut partial,
+                    rejected_data_points: &mut partial.rejected_data_points,
+                    error_message: &mut partial.error_message,
                     points: &mut points,
                 },
             )
@@ -1857,50 +1616,14 @@ mod tests {
                     metric_name: "base",
                     pipelines: &mut pipelines,
                     policies: &mut policies,
-                    partial_success: &mut partial,
+                    rejected_data_points: &mut partial.rejected_data_points,
+                    error_message: &mut partial.error_message,
                     points: &mut points,
                 },
             )
             .await;
             assert_eq!(admitted, vec![&input[0], &input[2], &input[4]]);
             assert_eq!(partial.rejected_data_points, 3);
-        }
-
-        #[tokio::test]
-        async fn destination_policy_uses_global_fallback_and_request_cache() {
-            let org = "otlp_policy_cache";
-            let mut policies = policies(org, &[("fallback", 0), ("cached", 30)]).await;
-            let expected =
-                TimestampBounds::new(NOW, config::get_config().compact.data_retention_days);
-            let fallback = policies.get("fallback").await.bounds;
-            for timestamp in [0, NOW - 10 * DAY, NOW, i64::MAX] {
-                assert_eq!(fallback.check(timestamp), expected.check(timestamp));
-            }
-            assert_eq!(
-                policies.get("cached").await.bounds.check(NOW - 10 * DAY),
-                Ok(())
-            );
-            infra::schema::put_stream_settings(
-                format!("{org}/metrics/cached"),
-                Arc::new(StreamSettings {
-                    data_retention: 1,
-                    ..Default::default()
-                }),
-            )
-            .await;
-            assert_eq!(
-                policies.get("cached").await.bounds.check(NOW - 10 * DAY),
-                Ok(())
-            );
-            let mut next_request = StreamPolicies::new(org, NOW);
-            assert_eq!(
-                next_request
-                    .get("cached")
-                    .await
-                    .bounds
-                    .check(NOW - 10 * DAY),
-                Err(OutOfBounds::Retention(1))
-            );
         }
 
         #[tokio::test]
@@ -1927,7 +1650,8 @@ mod tests {
                     metric_name: "base",
                     pipelines: &mut pipelines,
                     policies: &mut policies,
-                    partial_success: &mut partial,
+                    rejected_data_points: &mut partial.rejected_data_points,
+                    error_message: &mut partial.error_message,
                     points: &mut points,
                 },
             )
@@ -1947,7 +1671,8 @@ mod tests {
                     metric_name: "base",
                     pipelines: &mut pipelines,
                     policies: &mut policies,
-                    partial_success: &mut partial,
+                    rejected_data_points: &mut partial.rejected_data_points,
+                    error_message: &mut partial.error_message,
                     points: &mut points,
                 },
             )
@@ -1982,7 +1707,8 @@ mod tests {
                 metric_name: "base",
                 pipelines: &mut pipelines,
                 policies: &mut policies,
-                partial_success: &mut partial,
+                rejected_data_points: &mut partial.rejected_data_points,
+                error_message: &mut partial.error_message,
                 points: &mut points,
             };
             assert!(admit_number_points(&[], &mut admission).await.is_empty());
@@ -2051,7 +1777,8 @@ mod tests {
                     metric_name: "metric",
                     pipelines: &mut pipelines,
                     policies: &mut policies,
-                    partial_success: &mut partial,
+                    rejected_data_points: &mut partial.rejected_data_points,
+                    error_message: &mut partial.error_message,
                     points: &mut points,
                 },
             )
@@ -2092,7 +1819,8 @@ mod tests {
                     metric_name: "metric",
                     pipelines: &mut pipelines,
                     policies: &mut policies,
-                    partial_success: &mut partial,
+                    rejected_data_points: &mut partial.rejected_data_points,
+                    error_message: &mut partial.error_message,
                     points: &mut points,
                 },
             )
