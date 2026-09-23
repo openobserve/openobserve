@@ -54,8 +54,8 @@
 
     // Generate a resource-timing entry (trackResources captures this).
     doFetch: function () {
-      setStatus('Fetching https://browsersdk.openobserve.ai/0.3.4/openobserve-rum-slim.js …');
-      fetch('https://browsersdk.openobserve.ai/0.3.4/openobserve-rum-slim.js', { cache: 'no-store' })
+      setStatus('Fetching https://browsersdk.openobserve.ai/0.4.3/openobserve-rum-slim.js …');
+      fetch('https://browsersdk.openobserve.ai/0.4.3/openobserve-rum-slim.js', { cache: 'no-store' })
         .then(function (r) { setStatus('Fetch done: HTTP ' + r.status); })
         .catch(function (e) { setStatus('Fetch failed: ' + e.message); });
     },
