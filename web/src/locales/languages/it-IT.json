@@ -2031,11 +2031,11 @@
       "addToGroup": "Aggiungi a un gruppo di utenti",
       "addToRole": "Assegna un ruolo",
       "step1Title": "Copia il tuo token",
-      "copyHint": "Copia questo token ora: non potrai vederlo più.",
+      "copyHint": "Questa è l'unica volta in cui vedrai questo token. Copialo o scaricalo ora, non sarà possibile recuperarlo di nuovo.",
       "done": "Fatto",
       "applying": "Applicazione delle concessioni di accesso...",
-      "grantedRoles": "Ruoli assegnati: {roles}",
-      "grantedGroups": "Aggiunto ai gruppi di utenti: {groups}",
+      "rolesAssignedLabel": "Ruoli assegnati",
+      "groupsAssignedLabel": "Aggiunto ai gruppi utente",
       "failedRoles": "Impossibile assegnare i ruoli: {roles}",
       "failedGroups": "Impossibile aggiungere ai gruppi di utenti: {groups}",
       "failedHint": "Puoi concederli successivamente dalle pagine Ruoli e Gruppi di utenti."
@@ -2045,6 +2045,9 @@
         "label": "Nome account di servizio",
         "placeholder": "ad es. ingest-bot",
         "help": "Lettere minuscole, numeri e trattini. Salvato come nome{suffix}"
+      },
+      "identifier": {
+        "label": "Identificatore"
       },
       "roles": {
         "label": "Assegna ruoli",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Identificatore",
+        "roles": "Ruoli",
         "token": "Token",
         "created": "Creato"
       }
@@ -2186,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Tutti gli utenti e gli account di servizio associati a questi ruoli perderanno l'accesso."
-      }
+      },
+      "assignColumn": "Assegna",
+      "assignBtn": "Aggiungi",
+      "assignedBadge": "Assegnato",
+      "assignBannerText": "Aggiungi {member} a un ruolo — fai clic su Aggiungi accanto a un ruolo di seguito.",
+      "assignBannerDone": "Fatto",
+      "assignSuccess": "Aggiunto {member} al ruolo \"{role}\".",
+      "assignError": "Impossibile aggiungere l'account a quel ruolo. Riprova."
     },
     "group": {
       "name": {
@@ -2217,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "I membri di questi gruppi perderanno i ruoli da loro assegnati."
-      }
+      },
+      "assignColumn": "Assegna",
+      "assignBtn": "Aggiungi",
+      "assignedBadge": "Assegnato",
+      "assignBannerText": "Aggiungi {member} a un gruppo utente — fai clic su Aggiungi accanto a un gruppo di seguito.",
+      "assignBannerDone": "Fatto",
+      "assignSuccess": "Aggiunto {member} al gruppo \"{group}\".",
+      "assignError": "Impossibile aggiungere l'account a quel gruppo. Riprova."
     },
     "appGroups": {
       "deleteGroupTitle": "Elimina gruppo",

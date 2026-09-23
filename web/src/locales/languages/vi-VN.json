@@ -2031,11 +2031,11 @@
       "addToGroup": "Thêm vào nhóm người dùng",
       "addToRole": "Gán vai trò",
       "step1Title": "Sao chép mã của bạn",
-      "copyHint": "Sao chép mã này ngay — bạn sẽ không thể xem lại nó.",
+      "copyHint": "Đây là lần duy nhất bạn nhìn thấy token này. Hãy sao chép hoặc tải xuống ngay, không thể truy xuất lại lần nữa.",
       "done": "Hoàn tất",
       "applying": "Đang áp dụng quyền truy cập…",
-      "grantedRoles": "Vai trò đã gán: {roles}",
-      "grantedGroups": "Đã thêm vào nhóm người dùng: {groups}",
+      "rolesAssignedLabel": "Vai trò đã gán",
+      "groupsAssignedLabel": "Đã thêm vào nhóm người dùng",
       "failedRoles": "Không thể gán vai trò: {roles}",
       "failedGroups": "Không thể thêm vào nhóm người dùng: {groups}",
       "failedHint": "Bạn có thể cấp các quyền này sau từ trang Vai trò và Nhóm người dùng."
@@ -2045,6 +2045,9 @@
         "label": "Tên tài khoản dịch vụ",
         "placeholder": "ví dụ: ingest-bot",
         "help": "Chữ thường, số và dấu gạch ngang. Lưu dưới dạng name{suffix}"
+      },
+      "identifier": {
+        "label": "Định danh"
       },
       "roles": {
         "label": "Gán vai trò",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Định danh",
+        "roles": "Vai trò",
         "token": "Mã",
         "created": "Đã tạo"
       }
@@ -2186,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Mọi người dùng và tài khoản dịch vụ liên kết với các vai trò này sẽ mất quyền truy cập."
-      }
+      },
+      "assignColumn": "Gán",
+      "assignBtn": "Thêm",
+      "assignedBadge": "Đã gán",
+      "assignBannerText": "Thêm {member} vào một vai trò — nhấp Thêm bên cạnh vai trò bên dưới.",
+      "assignBannerDone": "Xong",
+      "assignSuccess": "Đã thêm {member} vào vai trò \"{role}\".",
+      "assignError": "Không thể thêm tài khoản vào vai trò đó. Vui lòng thử lại."
     },
     "group": {
       "name": {
@@ -2217,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Các thành viên của những nhóm này sẽ mất các vai trò được cấp bởi chúng."
-      }
+      },
+      "assignColumn": "Gán",
+      "assignBtn": "Thêm",
+      "assignedBadge": "Đã gán",
+      "assignBannerText": "Thêm {member} vào một nhóm người dùng — nhấp Thêm bên cạnh nhóm bên dưới.",
+      "assignBannerDone": "Xong",
+      "assignSuccess": "Đã thêm {member} vào nhóm \"{group}\".",
+      "assignError": "Không thể thêm tài khoản vào nhóm đó. Vui lòng thử lại."
     },
     "appGroups": {
       "deleteGroupTitle": "Xóa nhóm",
