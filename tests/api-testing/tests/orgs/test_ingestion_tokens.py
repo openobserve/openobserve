@@ -25,6 +25,7 @@ import pytest
 
 from support.client import OpenObserveClient
 from support.factories import unique_name
+from support.wait import WaitTimeout, wait_until
 
 logger = logging.getLogger(__name__)
 
@@ -309,19 +310,37 @@ def test_ingest_with_org_token_succeeds(
 def test_ingest_with_disabled_token_fails(
     client: OpenObserveClient, temp_token: dict
 ):
-    """Disabled org token is rejected on ingestion."""
+    """Disabled org token is rejected on ingestion.
+
+    Disabling propagates to the auth cache via an async coordinator event, so
+    an ingest right after the PATCH can still race a stale cache hit; poll
+    instead of asserting on a single attempt.
+    """
     # disable
     client.patch(
         f"ingestion-tokens/{temp_token['name']}",
         json={"enabled": False},
     )
     tc = _token_client(ORG_ID, temp_token["token"])
-    resp = tc.post(
-        "disabled_test/_json",
-        json=[{"ts": 0, "message": "should fail"}],
-    )
-    assert resp.status_code == HTTPStatus.UNAUTHORIZED, \
-        f"expected 401, got {resp.status_code}: {resp.text}"
+    last_resp = {}
+
+    def _ingest_rejected():
+        last_resp["resp"] = tc.post(
+            "disabled_test/_json",
+            json=[{"ts": 0, "message": "should fail"}],
+        )
+        return last_resp["resp"].status_code == HTTPStatus.UNAUTHORIZED
+
+    try:
+        wait_until(
+            _ingest_rejected,
+            timeout=15,
+            interval=0.5,
+            msg="disabled token still accepted for ingestion",
+        )
+    except WaitTimeout:
+        resp = last_resp["resp"]
+        pytest.fail(f"expected 401, got {resp.status_code}: {resp.text}")
 
     # Re-enable to leave the token in its original state
     client.patch(

@@ -1,0 +1,497 @@
+<!--
+Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div class="flex h-full flex-col">
+    <OTable
+      :frame="false"
+      data-test="synthetics-variables-table"
+      :data="visibleRows"
+      :columns="columns"
+      row-key="id"
+      pagination="client"
+      :page-size="20"
+      :page-size-options="[10, 20, 50, 100]"
+      sorting="client"
+      filter-mode="client"
+      :default-columns="false"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="synthetics-variables"
+      :show-global-filter="false"
+      :loading="loading"
+    >
+      <template #toolbar>
+        <OTooltip side="bottom" :content="raw(`${scopeLabel} — ${scopeSummary}`)">
+          <div class="flex w-80 shrink-0 items-center gap-2" data-test="synthetics-scope-summary">
+            <span class="text-text-heading min-w-0 truncate text-sm font-semibold">{{
+              scopeLabel
+            }}</span>
+            <OBadge v-if="environment" variant="default" size="sm" class="shrink-0">{{
+              scopeSummary
+            }}</OBadge>
+            <span v-else class="text-text-secondary shrink-0 text-sm">{{ scopeSummary }}</span>
+          </div>
+        </OTooltip>
+        <OSearchInput
+          v-model="filterQuery"
+          class="flex-1"
+          :placeholder="t('synthetics.variables.searchPlaceholder')"
+        />
+      </template>
+      <template #toolbar-trailing>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="refresh"
+          :loading="loading"
+          data-test="synthetics-variables-refresh-btn"
+          @click="$emit('refresh')"
+        >
+          <OTooltip side="bottom" :content="t('common.refresh')" />
+        </OButton>
+      </template>
+
+      <template #cell-name="{ row }">
+        <span class="font-mono" data-test="synthetics-variable-name">{{ row.name }}</span>
+        <span
+          v-if="shadowNoteFor(row)"
+          class="text-text-muted text-2xs ms-2"
+          data-test="synthetics-variable-shadow-note"
+        >
+          {{ shadowNoteFor(row) }}
+        </span>
+      </template>
+
+      <template #cell-kind="{ row }">
+        <OBadge :variant="row.kind === 'secret' ? 'warning' : 'default'">
+          {{
+            row.kind === "secret"
+              ? t("synthetics.variables.kindSecret")
+              : t("synthetics.variables.kindPlain")
+          }}
+        </OBadge>
+      </template>
+
+      <template #cell-value="{ row }">
+        <OBadge
+          v-if="row.kind === 'secret' && !row.has_value"
+          variant="warning"
+          data-test="synthetics-variable-value-empty"
+          >{{ t("synthetics.variables.notSet") }}</OBadge
+        >
+        <span
+          v-else-if="row.kind === 'secret'"
+          class="text-muted-foreground font-mono"
+          data-test="synthetics-variable-secret-value"
+          >••••••</span
+        >
+        <OBadge
+          v-else-if="row.value === ''"
+          variant="warning"
+          data-test="synthetics-variable-value-empty"
+          >{{ t("synthetics.variables.valueEmpty") }}</OBadge
+        >
+        <span
+          v-else
+          class="truncate font-mono"
+          :title="row.value"
+          data-test="synthetics-variable-plain-value"
+          >{{ row.value }}</span
+        >
+      </template>
+
+      <template #cell-used_by_checks="{ row }">
+        <span data-test="synthetics-variable-usage">
+          {{
+            t("synthetics.variables.usedByChecks", { n: row.used_by_checks }, row.used_by_checks)
+          }}
+        </span>
+      </template>
+
+      <template #cell-updated_at="{ row }">
+        <span>{{ relativeTime(row.updated_at) }}</span>
+      </template>
+
+      <template #cell-actions="{ row }">
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="edit"
+          data-test="synthetics-variable-edit-btn"
+          @click="openEdit(row)"
+        />
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="content-copy"
+          data-test="synthetics-variable-duplicate-btn"
+          @click="openDuplicate(row)"
+        >
+          <OTooltip side="bottom" :content="t('synthetics.duplicate.action')" />
+        </OButton>
+        <OTooltip
+          v-if="environment"
+          side="bottom"
+          :content="
+            row.kind === 'secret'
+              ? t('synthetics.promote.secretBlocked')
+              : t('synthetics.promote.toGlobal')
+          "
+        >
+          <span class="inline-flex">
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="drive-file-move"
+              :disabled="row.kind === 'secret'"
+              data-test="synthetics-variable-promote-btn"
+              @click="promote(row)"
+            />
+          </span>
+        </OTooltip>
+        <OButton
+          v-if="!environment && environments.length > 0"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="drive-file-move"
+          data-test="synthetics-variable-split-btn"
+          @click="openSplit(row)"
+        >
+          <OTooltip side="bottom" :content="t('synthetics.split.action')" />
+        </OButton>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="delete"
+          data-test="synthetics-variable-delete-btn"
+          @click="removeVariable(row)"
+        />
+      </template>
+
+      <template #empty>
+        <OEmptyState
+          :title="t('synthetics.variables.emptyTitle')"
+          :description="
+            filterQuery
+              ? t('synthetics.variables.emptyFiltered')
+              : t('synthetics.variables.emptyBody')
+          "
+          :filtered="Boolean(filterQuery)"
+        />
+      </template>
+    </OTable>
+
+    <SyntheticsDuplicateVariableDialog
+      v-model:open="duplicateDialog.show"
+      :source="duplicateDialog.data"
+      :environment="environment"
+      @done="$emit('refresh')"
+    />
+
+    <SyntheticsSplitVariableDialog
+      v-model:open="splitDialog.show"
+      :variable="splitDialog.data"
+      :environments="environments"
+      @done="$emit('refresh')"
+    />
+
+    <SyntheticsVariableForm
+      v-model:open="drawer.show"
+      :is-edit="drawer.isEdit"
+      :data="drawer.data"
+      :environment="environment"
+      :other-tier-names="otherTierNames"
+      @update:list="$emit('refresh')"
+    />
+  </div>
+</template>
+
+<script lang="ts">
+import { computed, defineComponent, ref } from "vue";
+import type { PropType } from "vue";
+import { useStore } from "vuex";
+import { raw, useI18nTyped } from "@/types/i18n";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import syntheticsService from "@/services/synthetics";
+import type { SyntheticsVariable } from "@/types/synthetics";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type { SyntheticsEnvironment } from "@/types/synthetics";
+import SyntheticsVariableForm from "./SyntheticsVariableForm.vue";
+import SyntheticsSplitVariableDialog from "./SyntheticsSplitVariableDialog.vue";
+import SyntheticsDuplicateVariableDialog from "./SyntheticsDuplicateVariableDialog.vue";
+import { filterVariables, relativeTime } from "./usage";
+import { crossTierShadow, duplicatePrefill } from "./scope";
+import { serverMessage } from "./serverMessage";
+
+export default defineComponent({
+  name: "SyntheticsVariablesList",
+  components: {
+    OTable,
+    OButton,
+    OBadge,
+    OEmptyState,
+    OSearchInput,
+    OTooltip,
+    SyntheticsVariableForm,
+    SyntheticsSplitVariableDialog,
+    SyntheticsDuplicateVariableDialog,
+  },
+  emits: ["refresh"],
+  props: {
+    variables: { type: Array as PropType<SyntheticsVariable[]>, default: () => [] },
+    loading: { type: Boolean, default: false },
+    /** Environment NAME, or null for the unscoped tier. */
+    environment: { type: String as PropType<string | null>, default: null },
+    /** Split destinations. Empty on the global tab means there is nowhere to split to. */
+    environments: { type: Array as PropType<SyntheticsEnvironment[]>, default: () => [] },
+    /** The unscoped tier, for cross-tier shadow awareness in every scope. */
+    globals: { type: Array as PropType<SyntheticsVariable[]>, default: () => [] },
+    /** Scope identity, rendered in the toolbar — the pane has no header band. */
+    scopeLabel: { type: String, default: "" },
+    scopeSummary: { type: String, default: "" },
+  },
+  setup(props, { emit, expose }) {
+    const { t } = useI18nTyped();
+    const store = useStore();
+    const { confirm } = useConfirmDialog();
+    const filterQuery = ref("");
+
+    const otherTierNames = computed<Record<string, string[]>>(() => {
+      const map: Record<string, string[]> = {};
+      if (props.environment) {
+        for (const g of props.globals) map[g.name] = [];
+        return map;
+      }
+      for (const env of props.environments) {
+        for (const v of env.variables ?? []) {
+          (map[v.name] ??= []).push(env.name);
+        }
+      }
+      return map;
+    });
+    const drawer = ref({ show: false, isEdit: false, data: null as SyntheticsVariable | null });
+    const splitDialog = ref({ show: false, data: null as SyntheticsVariable | null });
+    const duplicateDialog = ref({ show: false, data: null as SyntheticsVariable | null });
+
+    const columns: OTableColumnDef[] = [
+      {
+        id: "name",
+        header: t("synthetics.variables.name"),
+        accessorKey: "name",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
+      },
+      {
+        id: "kind",
+        header: t("synthetics.variables.kind"),
+        accessorKey: "kind",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 110,
+        meta: { align: "left" },
+      },
+      {
+        id: "value",
+        header: t("synthetics.variables.value"),
+        accessorKey: "value",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 220,
+        meta: { align: "left" },
+      },
+      {
+        id: "used_by_checks",
+        header: t("synthetics.variables.usedBy"),
+        accessorKey: "used_by_checks",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 140,
+        meta: { align: "left" },
+      },
+      {
+        id: "updated_at",
+        header: t("synthetics.variables.lastUpdated"),
+        accessorKey: "updated_at",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 140,
+        meta: { align: "left" },
+      },
+      {
+        id: "actions",
+        header: raw(""),
+        isAction: true,
+        pinned: "right",
+        size: 160,
+        minSize: 160,
+        sortable: false,
+        meta: { align: "center" },
+      },
+    ];
+
+    const visibleRows = computed(() => filterVariables(props.variables, filterQuery.value));
+
+    function openCreate() {
+      drawer.value = { show: true, isEdit: false, data: null };
+    }
+    function openEdit(row: SyntheticsVariable) {
+      drawer.value = { show: true, isEdit: true, data: row };
+    }
+
+    function openSplit(row: SyntheticsVariable) {
+      splitDialog.value = { show: true, data: row };
+    }
+
+    function openDuplicate(row: SyntheticsVariable) {
+      if (row.kind === "secret") {
+        drawer.value = { show: true, isEdit: false, data: duplicatePrefill(row) };
+        return;
+      }
+      duplicateDialog.value = { show: true, data: row };
+    }
+
+    async function promote(row: SyntheticsVariable) {
+      if (!props.environment) return;
+      const org = store.state.selectedOrganization.identifier;
+      try {
+        await syntheticsService.promoteEnvironmentVariable(org, props.environment, row.id);
+        emit("refresh");
+        const stillOverriding = props.environments
+          .filter(
+            (env) =>
+              env.name !== props.environment &&
+              (env.variables ?? []).some((v) => v.name === row.name),
+          )
+          .map((env) => env.name);
+        toast({
+          variant: "success",
+          message: stillOverriding.length
+            ? t("synthetics.promote.doneShadowed", { envs: stillOverriding.join(", ") })
+            : t("synthetics.promote.done"),
+        });
+      } catch (error) {
+        toast({
+          variant: "error",
+          message: serverMessage(error) ?? t("synthetics.promote.failed"),
+        });
+      }
+    }
+
+    function shadowNoteFor(row: SyntheticsVariable) {
+      const relation = crossTierShadow(
+        row.name,
+        props.environment,
+        props.environments,
+        props.globals,
+      );
+      if (!relation) return "";
+      return relation.kind === "overrides-global"
+        ? t("synthetics.variables.overridesGlobalNote")
+        : t("synthetics.variables.overriddenInNote", { envs: relation.envs.join(", ") });
+    }
+
+    /** Names the fallback a delete uncovers, so the dialog states the blast radius. */
+    function deleteFallbackNote(row: SyntheticsVariable) {
+      const relation = crossTierShadow(
+        row.name,
+        props.environment,
+        props.environments,
+        props.globals,
+      );
+      if (!relation) return "";
+      return relation.kind === "overrides-global"
+        ? t("synthetics.variables.deleteEnvFallback", { env: props.environment ?? "" })
+        : t("synthetics.variables.deleteGlobalFallback", {
+            envs: relation.envs.join(", "),
+            name: row.name,
+          });
+    }
+
+    async function removeVariable(row: SyntheticsVariable) {
+      const base =
+        row.used_by_checks > 0
+          ? t(
+              "synthetics.variables.deleteUsed",
+              { name: row.name, n: row.used_by_checks },
+              row.used_by_checks,
+            )
+          : t("synthetics.variables.deleteConfirm", { name: row.name });
+      const fallback = deleteFallbackNote(row);
+      const ok = await confirm({
+        title: t("synthetics.variables.deleteTitle"),
+        // Name the blast radius before asking, not after.
+        message: fallback ? raw(`${base} ${fallback}`) : base,
+      });
+      if (!ok) return;
+
+      const org = store.state.selectedOrganization.identifier;
+      try {
+        const force = row.used_by_checks > 0;
+        await (props.environment
+          ? syntheticsService.deleteEnvironmentVariable(org, props.environment, row.id, force)
+          : syntheticsService.deleteGlobalVariable(org, row.id, force));
+        emit("refresh");
+        toast({ variant: "success", message: t("synthetics.variables.deleted") });
+      } catch (error) {
+        toast({
+          variant: "error",
+          message: serverMessage(error) ?? t("synthetics.variables.deleteFailed"),
+        });
+      }
+    }
+
+    expose({ openCreate });
+
+    return {
+      t,
+      raw,
+      columns,
+      otherTierNames,
+      shadowNoteFor,
+      filterQuery,
+      visibleRows,
+      drawer,
+      splitDialog,
+      duplicateDialog,
+      relativeTime,
+      openSplit,
+      openDuplicate,
+      promote,
+      openCreate,
+      openEdit,
+      removeVariable,
+    };
+  },
+});
+</script>

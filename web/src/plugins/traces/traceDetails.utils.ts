@@ -50,6 +50,12 @@ export function resolveSessionId(spans: any[] | null | undefined): string {
   return s ? String(s.gen_ai_conversation_id || s.session_id || "") : "";
 }
 
+/** First RUM bridge span whose browser session has a replay to play; null when the trace has none. */
+export function resolveReplaySpan(spans: any[] | null | undefined): any | null {
+  if (!spans?.length) return null;
+  return spans.find((sp: any) => sp?.rum_session_id && sp?.rum_session_has_replay === true) ?? null;
+}
+
 /**
  * Resolve the trace-details window from the route query. Unusable bounds
  * collapse to `0/0` — the API's "no caller range" — and always together,

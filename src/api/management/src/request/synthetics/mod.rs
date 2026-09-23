@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod last_check;
+mod variables;
 
 use axum::{
     Json,
@@ -24,6 +25,7 @@ use axum::{
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use openobserve_api_common::extractors::Headers;
 use serde::Deserialize;
+pub use variables::*;
 
 use crate::service::auth::UserEmail;
 // OSS has an arm that always returns false, so every guard below is gated
@@ -74,6 +76,108 @@ pub struct BulkDeleteSyntheticsRequestBody {
 pub struct MoveSyntheticsRequestBody {
     pub synthetic_ids: Vec<String>,
     pub dst_folder_id: String,
+}
+
+/// Refuses a check that pins itself to an environment the caller cannot use.
+#[cfg(feature = "enterprise")]
+async fn require_env_access(
+    org_id: &str,
+    user_id: &str,
+    environments: &[String],
+) -> Result<(), Response> {
+    for id in environments {
+        let name = env_name(org_id, id).await?;
+        if !can_use_env(org_id, user_id, &name).await {
+            return Err(env_forbidden(&name));
+        }
+    }
+    Ok(())
+}
+
+/// An update needs write access to every environment the check runs in, and to each one it leaves.
+#[cfg(feature = "enterprise")]
+async fn require_update_env_access(
+    org_id: &str,
+    user_id: &str,
+    submitted: &[String],
+    stored: &[String],
+) -> Result<(), Response> {
+    require_env_access(org_id, user_id, submitted).await?;
+    for id in stored.iter().filter(|id| !submitted.contains(id)) {
+        let name = match openobserve_synthetics::service::get_environment_name(org_id, id).await {
+            Ok(Some(name)) => name,
+            // A deleted environment has nothing left to protect.
+            Ok(None) => continue,
+            Err(e) => {
+                tracing::error!("[synthetics] require_update_env_access: {e}");
+                return Err(env_load_failed());
+            }
+        };
+        if !can_use_env(org_id, user_id, &name).await {
+            return Err(env_forbidden(&name));
+        }
+    }
+    Ok(())
+}
+
+/// The environments a stored check runs in; a failed read refuses rather than checking nothing.
+#[cfg(feature = "enterprise")]
+async fn stored_environments(org_id: &str, id: &str) -> Result<Vec<String>, Response> {
+    match openobserve_synthetics::service::environments_of(org_id, id).await {
+        Ok(Some(environments)) => Ok(environments),
+        Ok(None) => Err(MetaHttpResponse::not_found("check not found")),
+        Err(e) => {
+            tracing::error!("[synthetics] stored_environments: {e}");
+            Err(env_load_failed())
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn env_name(org_id: &str, id: &str) -> Result<String, Response> {
+    match openobserve_synthetics::service::get_environment_name(org_id, id).await {
+        Ok(Some(name)) => Ok(name),
+        Ok(None) => Err(MetaHttpResponse::bad_request(format!(
+            "environments: no environment with id '{id}' in this org"
+        ))),
+        Err(e) => {
+            tracing::error!("[synthetics] env_name: {e}");
+            Err(MetaHttpResponse::forbidden("Forbidden"))
+        }
+    }
+}
+
+/// Running in an environment hands the check its secrets, so it takes the same PUT that edits them.
+#[cfg(feature = "enterprise")]
+async fn can_use_env(org_id: &str, user_id: &str, name: &str) -> bool {
+    check_permissions(
+        name,
+        org_id,
+        user_id,
+        "synthetic_environment",
+        "PUT",
+        None,
+        false,
+        false,
+        true,
+    )
+    .await
+}
+
+#[cfg(feature = "enterprise")]
+fn env_load_failed() -> Response {
+    MetaHttpResponse::error(
+        StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+        "could not load the check's environments",
+    )
+    .into_response()
+}
+
+#[cfg(feature = "enterprise")]
+fn env_forbidden(name: &str) -> Response {
+    MetaHttpResponse::forbidden(format!(
+        "Forbidden: no write access to environment '{name}'"
+    ))
 }
 
 // ── Runs API ──────────────────────────────────────────────────────────────────
@@ -370,6 +474,13 @@ pub async fn create_synthetic(
         .filter(|f| !f.is_empty())
         .unwrap_or_else(|| config::meta::folder::DEFAULT_FOLDER.to_string());
 
+    #[cfg(feature = "enterprise")]
+    if let Err(response) =
+        require_env_access(&org_id, &user_email.user_id, &body.environments).await
+    {
+        return response;
+    }
+
     let created_by = user_email.user_id.as_str();
     match openobserve_synthetics::service::create_synthetic(&org_id, body, created_by).await {
         Ok(check) => MetaHttpResponse::json(check),
@@ -500,6 +611,19 @@ pub async fn update_synthetic(
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    {
+        let stored = match stored_environments(&org_id, &id).await {
+            Ok(stored) => stored,
+            Err(response) => return response,
+        };
+        if let Err(response) =
+            require_update_env_access(&org_id, &user_email.user_id, &body.environments, &stored)
+                .await
+        {
+            return response;
+        }
+    }
     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
         Ok(check) => MetaHttpResponse::json(check),
         Err(e) => {
@@ -780,6 +904,16 @@ pub async fn run_synthetic_now(
     .await
     {
         return MetaHttpResponse::forbidden("Forbidden");
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        let stored = match stored_environments(&org_id, &id).await {
+            Ok(stored) => stored,
+            Err(response) => return response,
+        };
+        if let Err(response) = require_env_access(&org_id, &user_email.user_id, &stored).await {
+            return response;
+        }
     }
     match openobserve_synthetics::service::run_synthetic_now(&org_id, &id).await {
         Ok(()) => (StatusCode::ACCEPTED, "").into_response(),
@@ -1116,6 +1250,7 @@ async fn process_ack(
             degraded,
             status_reason: resp.status_reason.clone(),
             failing_locations: resp.failing_locations.clone(),
+            failing_environments: resp.failing_environments.clone(),
             passing_locations: resp.passing_locations.clone(),
         };
         tokio::spawn(async move {
@@ -1721,6 +1856,7 @@ mod tests {
             consecutive_failures: 0,
             failing_locations: Vec::new(),
             passing_locations: Vec::new(),
+            failing_environments: Vec::new(),
             usage_events,
         }
     }

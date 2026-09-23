@@ -125,6 +125,16 @@ vi.mock("@/services/alerts", async (importOriginal) => {
     },
   });
 });
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    listEnvironments: vi.fn(async () => ({
+      data: [
+        { id: "org/staging", name: "staging", is_global: false },
+        { id: "global_org", name: "global", is_global: true },
+      ],
+    })),
+  },
+}));
 vi.mock("@/services/reports", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -240,6 +250,7 @@ import EditRole from "@/components/iam/roles/EditRole.vue";
 import onlineEvalsService from "@/services/online-evals.service";
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import syntheticsService from "@/services/synthetics";
 import dashboardService from "@/services/dashboards";
 import alertService from "@/services/alerts";
 
@@ -396,6 +407,15 @@ const RESOURCE_CATALOG = [
     visible: true,
     parent: "",
     order: 17,
+  },
+  {
+    key: "synthetic_environment",
+    display_name: "Synthetic Environments",
+    has_entities: true,
+    top_level: true,
+    visible: true,
+    parent: "",
+    order: 18,
   },
 ];
 
@@ -694,6 +714,22 @@ describe("EditRole - entities population", () => {
       "name",
     );
     expect(wrapper.vm.permissionsState.permissions[0].entities.length).toBe(1);
+  });
+
+  it("getResourceEntities loads synthetic environments keyed by name", async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "synthetic_environment",
+    );
+
+    await wrapper.vm.getResourceEntities(resource);
+
+    expect(syntheticsService.listEnvironments).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+    );
+    expect(resource.entities.map((e) => e.name)).toEqual(["staging", "global"]);
+    expect(resource.is_loading).toBe(false);
   });
 
   it("getResourceEntities loads provider entities", async () => {

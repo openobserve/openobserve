@@ -156,10 +156,10 @@ pub async fn create(
     // ignore this for all non _meta orgs
     #[cfg(feature = "cloud")]
     if org_id == META_ORG_ID
-        && let Some(mappings) = settings.domain_org_mappings
+        && let Some(mut mappings) = settings.domain_org_mappings
     {
         field_found = true;
-        for mapping in &mappings {
+        for mapping in &mut mappings {
             use o2_openfga::authorizer::groups::get_all_groups;
 
             if openobserve_core::organization::get_org(&mapping.org_id)
@@ -169,6 +169,13 @@ pub async fn create(
                 return MetaHttpResponse::bad_request(format!(
                     "No org with org id {} found",
                     mapping.org_id
+                ));
+            }
+
+            if mapping.domain.is_empty() || mapping.domain.contains(' ') {
+                return MetaHttpResponse::bad_request(format!(
+                    "domain cannot have space or be empty, bad domain '{}'",
+                    mapping.domain
                 ));
             }
 
@@ -202,6 +209,8 @@ pub async fn create(
                     ));
                 }
             }
+
+            mapping.domain = mapping.domain.to_lowercase();
         }
         data.domain_org_mappings = mappings;
     }

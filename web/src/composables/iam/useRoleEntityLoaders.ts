@@ -30,6 +30,7 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
+import type { SyntheticsEnvironment } from "@/types/synthetics";
 import workflowService from "@/services/workflows";
 import onlineEvalsService from "@/services/online-evals.service";
 import llmQueuesService from "@/services/llm-queues.service";
@@ -113,6 +114,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       rfolder: getReportFolders,
       synthetic_folder: getSyntheticsFolders,
       synthetics: getSynthetics,
+      synthetic_environment: getSyntheticEnvironments,
       workflow_folder: getWorkflowFolders,
       workflows: getWorkflows,
       re_patterns: getRePatterns,
@@ -305,6 +307,15 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     return new Promise((resolve) => {
       resolve(true);
     });
+  };
+  const getSyntheticEnvironments = async () => {
+    // Grants are written against the environment name, so the name is the entity key.
+    const res = await syntheticsService.listEnvironments(
+      store.state.selectedOrganization.identifier,
+    );
+    const environments: SyntheticsEnvironment[] = res.data ?? [];
+    updateResourceEntities("synthetic_environment", ["name"], [...environments]);
+    return true;
   };
   const getWorkflowFolders = async () => {
     const folders: any = await commonService.list_Folders(
@@ -697,6 +708,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getAlertFolders,
     getSyntheticsFolders,
     getSynthetics,
+    getSyntheticEnvironments,
     getWorkflowFolders,
     getWorkflows,
     _getGroups,

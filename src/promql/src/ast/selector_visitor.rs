@@ -25,7 +25,8 @@ impl ExprVisitor for MetricSelectorVisitor {
 
     fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
         match expr {
-            Expr::VectorSelector(_) | Expr::MatrixSelector(_) => {
+            // each selector runs its own engine, so a repeated one would be scanned twice
+            Expr::VectorSelector(_) | Expr::MatrixSelector(_) if !self.exprs.contains(expr) => {
                 self.exprs.push(expr.clone());
             }
             _ => {}
@@ -36,10 +37,10 @@ impl ExprVisitor for MetricSelectorVisitor {
 
 #[cfg(test)]
 mod tests {
-
     use promql_parser::parser;
 
     use super::*;
+    use crate::ast::visitor::walk_expr;
 
     #[test]
     fn test_selector_visitor() {
@@ -57,7 +58,7 @@ mod tests {
 
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricSelectorVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
 
         let expected = [
             "container_fs_reads_bytes_total{container!=\"\",device=~\"(/dev/)?(mmcblk[0-9]p[0-9]+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)\"}[5m]",
@@ -75,7 +76,7 @@ mod tests {
 
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricSelectorVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
         let expected = [
             "http_requests_total{environment=~\"staging|testing|development\",method!=\"GET\"} offset 5m",
         ];
@@ -100,7 +101,37 @@ mod tests {
         let promql = "1 + 2";
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricSelectorVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
         assert!(visitor.exprs.is_empty());
+    }
+
+    #[test]
+    fn test_selector_visitor_dedups_repeated_selectors() {
+        let ast = parser::parse("topk(scalar(m), m) + m{a=\"b\"}").unwrap();
+        let mut visitor = MetricSelectorVisitor::default();
+        walk_expr(&mut visitor, &ast).unwrap();
+        let expected = ["m", "m{a=\"b\"}"];
+        assert_eq!(
+            visitor.exprs,
+            expected
+                .into_iter()
+                .map(|expr| parser::parse(expr).unwrap())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_selector_visitor_collects_aggregation_param_selectors() {
+        let ast = parser::parse("topk(scalar(k{a=\"b\"}), m)").unwrap();
+        let mut visitor = MetricSelectorVisitor::default();
+        walk_expr(&mut visitor, &ast).unwrap();
+        let expected = ["m", "k{a=\"b\"}"];
+        assert_eq!(
+            visitor.exprs,
+            expected
+                .into_iter()
+                .map(|expr| parser::parse(expr).unwrap())
+                .collect::<Vec<_>>()
+        );
     }
 }
