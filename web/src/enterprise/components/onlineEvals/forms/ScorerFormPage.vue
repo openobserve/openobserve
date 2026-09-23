@@ -678,7 +678,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, toRef } from "vue";
+import { computed, onMounted, ref, toRef, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -1103,6 +1103,12 @@ const selectedProvider = computed(
   () => props.providers.find((p) => p.id === formValues.value.providerId) || null,
 );
 const decisionProvider = computed(() => isDecisionOnlyProvider(selectedProvider.value));
+// Hidden rows would still be validated, so drop them when a decision provider is chosen.
+watch(decisionProvider, (isDecision) => {
+  if (isDecision && formValues.value.extraMetadataFields.length) {
+    form.setFieldValue("extraMetadataFields", [], { dontUpdateMeta: true });
+  }
+});
 
 const promptVariables = computed(() => extractTemplateVariables(formValues.value.template || ""));
 
