@@ -677,6 +677,19 @@ describe("useRumSpanBuilder", () => {
     });
   });
 
+  describe("fetchRumEventsForTrace — view query", () => {
+    it("should fetch the newest view documents first so the final one is never paged out", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const query = searchCalls("type = 'view'")[0][0].query.query;
+      expect(query.sql).toMatch(/ORDER BY _timestamp DESC$/);
+      expect(query.size).toBeGreaterThan(10);
+    });
+  });
+
   describe("fetchRumEventsForTrace — action query", () => {
     it("should send the action query with the parsed ids when action_id is a non-empty array", async () => {
       mockSearchRoutes({
@@ -997,6 +1010,25 @@ describe("useRumSpanBuilder", () => {
 
       const viewSpans = spans.filter((s) => s.rum_event_type === "view");
       expect(viewSpans).toHaveLength(1);
+    });
+
+    it("should take the view's latest document version, whatever order the rows arrive in", () => {
+      // Documents of one view share `date`; the stream returns them in arbitrary order.
+      const v10 = makeViewEvent({ _o2_document_version: 10, view_time_spent: 1_800_000_000_000 });
+      const v2 = makeViewEvent({ _o2_document_version: 2, view_time_spent: 31_000_000 });
+      const v14 = makeViewEvent({ _o2_document_version: 14, view_time_spent: 10_514_000_000_000 });
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans(
+        [makeTracedResource()],
+        [v10, v2, v14],
+        [],
+        [makeResourceEvent()],
+      );
+
+      const viewSpans = spans.filter((s) => s.rum_event_type === "view");
+      expect(viewSpans).toHaveLength(1);
+      expect(viewSpans[0].duration).toBe(10_514_000_000);
     });
 
     it("should use view_name as fallback when view_url is absent", () => {
