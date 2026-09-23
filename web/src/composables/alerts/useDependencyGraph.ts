@@ -29,10 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
 import { alertDependenciesQuery } from "@/services/alerts.queries";
-import {
-  destinationsQuery,
-  destinationUsageQuery,
-} from "@/services/alert_destination.queries";
+import { destinationsQuery, destinationUsageQuery } from "@/services/alert_destination.queries";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import type { I18nKey } from "@/types/i18n";

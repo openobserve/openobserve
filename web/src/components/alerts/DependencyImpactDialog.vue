@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             value="neutral"
             :data-test="`dependency-impact-blocker-${b.kind}`"
           >
-            <OIcon :name="depKindIcon(b.kind)" size="xs" class="me-0.5 text-text-secondary" />
+            <OIcon :name="depKindIcon(b.kind)" size="xs" class="text-text-secondary me-0.5" />
             {{ b.label }}
           </OTag>
         </div>
