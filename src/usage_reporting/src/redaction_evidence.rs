@@ -62,6 +62,17 @@ pub fn record_gap(scope: &EvidenceScope, reason: GapReason, dropped_rows: u64) {
         .inc_by(dropped_rows);
 }
 
+/// The enterprise engine enqueues its own rows, so it has to bump this counter itself.
+pub fn count_regions(scope: &EvidenceScope, row: &RedactionEvidence) {
+    if row.redacted_regions == 0 {
+        return;
+    }
+    let policy = row.policy.as_deref().unwrap_or("Redact");
+    metrics::SDR_REDACTED_REGIONS_TOTAL
+        .with_label_values(&[&scope.org_id, &scope.stream_type, policy])
+        .inc_by(row.redacted_regions);
+}
+
 fn enqueue_rows(scope: &EvidenceScope, rows: Vec<RedactionEvidence>) {
     for row in rows {
         count_regions(scope, &row);
@@ -72,17 +83,6 @@ fn enqueue_rows(scope: &EvidenceScope, rows: Vec<RedactionEvidence>) {
         };
         record_gap(scope, reason, 1);
     }
-}
-
-/// The enterprise engine enqueues its own rows, so it has to bump this counter itself.
-pub fn count_regions(scope: &EvidenceScope, row: &RedactionEvidence) {
-    if row.redacted_regions == 0 {
-        return;
-    }
-    let policy = row.policy.as_deref().unwrap_or("Redact");
-    metrics::SDR_REDACTED_REGIONS_TOTAL
-        .with_label_values(&[&scope.org_id, &scope.stream_type, policy])
-        .inc_by(row.redacted_regions);
 }
 
 #[cfg(test)]

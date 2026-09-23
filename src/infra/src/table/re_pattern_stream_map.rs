@@ -137,23 +137,6 @@ impl std::fmt::Display for PatternPolicy {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UnknownPolicy {
-    pub value: String,
-    pub hint: Option<String>,
-}
-
-impl std::fmt::Display for UnknownPolicy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.hint {
-            Some(hint) => write!(f, "unsupported value {:?}: {hint}", self.value),
-            None => write!(f, "unsupported value {:?}", self.value),
-        }
-    }
-}
-
-impl std::error::Error for UnknownPolicy {}
-
 impl<T> From<T> for ApplyPolicy
 where
     T: AsRef<str>,
@@ -177,6 +160,23 @@ impl std::fmt::Display for ApplyPolicy {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownPolicy {
+    pub value: String,
+    pub hint: Option<String>,
+}
+
+impl std::fmt::Display for UnknownPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.hint {
+            Some(hint) => write!(f, "unsupported value {:?}: {hint}", self.value),
+            None => write!(f, "unsupported value {:?}", self.value),
+        }
+    }
+}
+
+impl std::error::Error for UnknownPolicy {}
 
 impl From<Model> for PatternAssociationEntry {
     fn from(value: Model) -> Self {

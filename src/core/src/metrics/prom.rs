@@ -1029,7 +1029,9 @@ fn metadata_sql(
 /// Redacts a stream's pending records and drops the series hash computed from the raw labels.
 #[cfg(feature = "vectorscan")]
 async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [PendingRecord]) {
-    if json_data.is_empty() {
+    if json_data.is_empty()
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(stream_name)
+    {
         return;
     }
     let mut rows: Vec<(i64, json::Map<String, json::Value>)> = json_data

@@ -572,6 +572,14 @@ fn sorted_labels<I: IntoIterator<Item = String>>(labels: I) -> Vec<String> {
 mod tests {
     use super::*;
 
+    fn rule(name: &str, body: &str, policy: &str) -> PatternRule {
+        PatternRule {
+            name: name.to_string(),
+            body: body.to_string(),
+            policy: policy.to_string(),
+        }
+    }
+
     #[test]
     fn evidence_kind_strings_are_the_documented_discriminators() {
         assert_eq!(EvidenceKind::Redaction.to_string(), "redaction");
@@ -880,14 +888,6 @@ mod tests {
         let one = pattern_set_hash(&["aaa".to_string()]);
         let twice = pattern_set_hash(&["aaa".to_string(), "aaa".to_string()]);
         assert_eq!(one, twice);
-    }
-
-    fn rule(name: &str, body: &str, policy: &str) -> PatternRule {
-        PatternRule {
-            name: name.to_string(),
-            body: body.to_string(),
-            policy: policy.to_string(),
-        }
     }
 
     #[test]

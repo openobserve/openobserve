@@ -132,24 +132,25 @@ pub async fn ingest(
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
     let log_ingestion_errors = ingestion_log_enabled().await;
-    // A stream that was never going to be scanned must not be failed by the scanner.
+    // A scanner outage must never fail ingestion; the evidence row says it failed open.
     #[cfg(feature = "vectorscan")]
     let pattern_manager = match get_pattern_manager().await {
         Ok(manager) => Some(manager),
         Err(_) if !should_apply_sdr(in_stream_name) => None,
         Err(e) => {
+            log::error!("[LOGS:JSON] failed to get pattern manager for SDR redaction: {e}");
             crate::self_reporting::redaction_evidence::publish_scan_unavailable(
                 &config::meta::self_reporting::redaction::EvidenceScope::new(
                     org_id,
                     in_stream_name,
                     StreamType::Logs,
                 ),
-                config::meta::self_reporting::redaction::FailPosture::Closed,
+                config::meta::self_reporting::redaction::FailPosture::Open,
                 0,
                 config::meta::self_reporting::redaction::DataWindow::default(),
             )
             .await;
-            return Err(e.into());
+            None
         }
     };
     let stream_type = StreamType::Logs;

@@ -230,7 +230,9 @@ pub(super) async fn apply_redaction<T>(
     stream_name: &str,
     records: &mut [(json::Map<String, json::Value>, T)],
 ) {
-    if records.is_empty() {
+    if records.is_empty()
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(stream_name)
+    {
         return;
     }
     let mut rows: Vec<(i64, json::Map<String, json::Value>)> = records

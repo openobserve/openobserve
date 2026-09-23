@@ -489,6 +489,9 @@ pub(crate) async fn apply_redaction(
 ) {
     #[cfg(feature = "vectorscan")]
     {
+        if config::meta::self_reporting::redaction::is_self_reporting_stream(_stream_name) {
+            return;
+        }
         // Enrichment rows genuinely carry no timestamp; a real zero would claim a 1970 window.
         let mut rows: Vec<(i64, json::Map<String, json::Value>)> = _payload
             .iter_mut()

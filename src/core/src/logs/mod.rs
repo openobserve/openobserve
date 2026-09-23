@@ -863,7 +863,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "vectorscan")]
-    fn refresh_no_longer_drops_original_the_engine_already_redacted() {
+    fn refresh_keeps_original_the_engine_already_redacted() {
         let mut records = vec![record_with(&[
             ("email", "[REDACTED]"),
             (config::ORIGINAL_DATA_COL_NAME, "{\"email\":\"[REDACTED]\"}"),

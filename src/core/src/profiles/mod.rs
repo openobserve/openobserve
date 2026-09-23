@@ -469,7 +469,9 @@ async fn apply_redaction(
     stream_name: &str,
     records: &mut Vec<json::Map<String, json::Value>>,
 ) {
-    if records.is_empty() {
+    if records.is_empty()
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(stream_name)
+    {
         return;
     }
     let mut rows: Vec<(i64, json::Map<String, json::Value>)> = std::mem::take(records)

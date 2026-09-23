@@ -116,7 +116,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         "[SUPER_CLUSTER:DB] updating associations for {org}/{stype}/{stream}"
                     );
 
-                    let update: UpdateSettingsWrapper<PatternAssociation> =
+                    let mut update: UpdateSettingsWrapper<PatternAssociation> =
                         serde_json::from_slice(&updates)?;
 
                     if update.add.is_empty() && update.remove.is_empty() {
@@ -124,15 +124,12 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     }
 
                     // Node-to-node, not user input: rejecting here would wedge the queue.
-                    for item in update.add.iter() {
-                        if !PatternPolicy::is_recognised(&item.policy) {
-                            log::error!(
-                                "[SUPER_CLUSTER:DB] policy {:?} for {org}/{stype}/{stream} field {} cannot be decoded by this build; degrading it to Detect, so this field is counted but NOT redacted",
-                                item.policy,
-                                item.field
-                            );
-                        }
-                    }
+                    db::re_pattern::degrade_unsupported_policies(
+                        &org,
+                        &stream,
+                        stype,
+                        &mut update.add,
+                    );
 
                     let added = update
                         .add

@@ -431,7 +431,7 @@ fn validate_associations_to_add(
 }
 
 /// The row already exists in the DB, so refusing it would only leave this node's map stale.
-fn degrade_unsupported_policies(
+pub fn degrade_unsupported_policies(
     org: &str,
     stream: &str,
     stype: StreamType,

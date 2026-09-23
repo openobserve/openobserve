@@ -647,8 +647,9 @@ mod tests {
         let b = labels(&[("host", json::json!("b")), ("region", json::json!("eu"))]);
         assert_ne!(series_signature(&a), series_signature(&b));
     }
+
     #[test]
-    fn test_recomputing_the_series_hash_over_a_hashed_record_is_stable() {
+    fn series_signature_is_stable_over_a_hashed_record() {
         let mut record = json::Map::new();
         record.insert("__name__".to_string(), json::json!("http_requests"));
         record.insert("region".to_string(), json::json!("us-east-1"));
