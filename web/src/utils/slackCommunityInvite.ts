@@ -96,7 +96,11 @@ export const markSlackInviteOffered = (email: string): void => {
 // Joining ends the ask for good.
 export const markSlackInviteResolved = (email: string): void => {
   const record = readRecord(email);
-  writeRecord(email, { status: "resolved", shownAt: record.shownAt, dismissCount: record.dismissCount });
+  writeRecord(email, {
+    status: "resolved",
+    shownAt: record.shownAt,
+    dismissCount: record.dismissCount,
+  });
 };
 
 // Dismissing without joining (✕ / overlay / Escape / "Maybe later") snoozes the
