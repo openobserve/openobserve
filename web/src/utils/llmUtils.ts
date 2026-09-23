@@ -478,9 +478,7 @@ export function extractLLMData(span: any): LLMData | null {
   const evaluation = parseEvaluationScores(span);
   const parsedPromptVersion = Number(span.gen_ai_prompt_version);
   const promptVersion =
-    Number.isInteger(parsedPromptVersion) && parsedPromptVersion > 0
-      ? parsedPromptVersion
-      : null;
+    Number.isInteger(parsedPromptVersion) && parsedPromptVersion > 0 ? parsedPromptVersion : null;
 
   return {
     provider: span.gen_ai_system || span.gen_ai_provider_name || "unknown",

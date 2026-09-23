@@ -20,17 +20,35 @@
         class="w-28"
         data-test="prompt-traffic-window"
       />
-      <OButton variant="outline" size="icon-sm" icon-left="refresh" :loading="loading" @click="refresh" />
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        icon-left="refresh"
+        :loading="loading"
+        @click="refresh"
+      />
     </div>
 
-    <div v-if="error" class="rounded-default bg-error-subtle text-status-error-text px-3 py-2 text-xs">{{ error }}</div>
-    <div v-if="!streamName" class="text-text-secondary rounded-default border-border-default border border-dashed p-6 text-center text-xs">
+    <div
+      v-if="error"
+      class="rounded-default bg-error-subtle text-status-error-text px-3 py-2 text-xs"
+    >
+      {{ error }}
+    </div>
+    <div
+      v-if="!streamName"
+      class="text-text-secondary rounded-default border-border-default border border-dashed p-6 text-center text-xs"
+    >
       {{ t("aiObservability.promptManagement.selectTraceStream") }}
     </div>
 
     <template v-else>
       <section class="grid grid-cols-5 gap-2 max-lg:grid-cols-3 max-md:grid-cols-2">
-        <div v-for="card in cards" :key="card.label" class="rounded-default border-border-default bg-surface-base border p-3">
+        <div
+          v-for="card in cards"
+          :key="card.label"
+          class="rounded-default border-border-default bg-surface-base border p-3"
+        >
           <div class="text-text-secondary text-2xs font-semibold">{{ card.label }}</div>
           <div class="text-text-heading mt-1 text-xl font-bold tabular-nums">{{ card.value }}</div>
         </div>
@@ -67,7 +85,11 @@
         >
           <template #cell-scores="{ row }">
             <div class="flex flex-wrap gap-1">
-              <OTag v-for="score in row.scores" :key="`${score.name}-${score.value}`" variant="default-soft">
+              <OTag
+                v-for="score in row.scores"
+                :key="`${score.name}-${score.value}`"
+                variant="default-soft"
+              >
                 {{ score.name }}: {{ score.value }}
               </OTag>
               <span v-if="!row.scores.length" class="text-text-secondary">{{ raw("—") }}</span>
@@ -88,13 +110,15 @@
           :key="entry.experiment.id"
           class="border-b-border-default flex items-center gap-2 border-b py-2 text-xs"
         >
-          <span class="text-text-heading min-w-0 flex-1 truncate font-medium">{{ entry.experiment.name }}</span>
+          <span class="text-text-heading min-w-0 flex-1 truncate font-medium">{{
+            entry.experiment.name
+          }}</span>
           <OTag v-if="entry.kind === 'content_match'" variant="default-soft">
             {{ t("aiObservability.promptManagement.contentMatch") }}
           </OTag>
           <span class="text-text-secondary">{{ entry.experiment.status }}</span>
         </article>
-        <p class="text-text-secondary mt-2 text-2xs">
+        <p class="text-text-secondary text-2xs mt-2">
           {{ t("aiObservability.promptManagement.contentMatchHelp") }}
         </p>
       </section>
@@ -112,8 +136,13 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import useStreams from "@/composables/useStreams";
 import { useI18nTyped, raw } from "@/types/i18n";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import type { Prompt, PromptVersion } from "@/services/llm-prompts.service";
-import { usePromptAnalytics, type PromptAnalyticsWindow } from "./usePromptAnalytics";
+import {
+  usePromptAnalytics,
+  type PromptAnalyticsWindow,
+  type PromptTrafficRow,
+} from "./usePromptAnalytics";
 
 const props = defineProps<{
   orgId: string;
@@ -128,19 +157,11 @@ const streamName = ref("");
 const window = ref<PromptAnalyticsWindow>("24h");
 const promptRef = toRef(props, "prompt");
 const versionRef = toRef(props, "version");
-const {
-  kpis,
-  breakdown,
-  recent,
-  evidence,
-  loading,
-  error,
-  loadTraffic,
-  loadExperimentEvidence,
-} = usePromptAnalytics(promptRef, versionRef, streamName, window);
+const { kpis, breakdown, recent, evidence, loading, error, loadTraffic, loadExperimentEvidence } =
+  usePromptAnalytics(promptRef, versionRef, streamName, window);
 
 const streamOptions = computed(() =>
-  (store.state.streams?.traces ?? []).map((stream: { name: string }) => ({
+  (store.state.streams?.traces?.list ?? []).map((stream: { name: string }) => ({
     label: raw(stream.name),
     value: stream.name,
   })),
@@ -169,22 +190,61 @@ const cards = computed(() => [
     value: kpis.value.cost == null ? "—" : `$${kpis.value.cost.toFixed(4)}`,
   },
 ]);
+function displayMilliseconds(value: unknown): string {
+  if (value == null || value === "") return "—";
+  const milliseconds = Number(value);
+  return Number.isFinite(milliseconds) ? milliseconds.toFixed(0) : "—";
+}
+function displayCost(value: unknown): string {
+  if (value == null || value === "") return "—";
+  const cost = Number(value);
+  return Number.isFinite(cost) ? `$${cost.toFixed(6)}` : "—";
+}
 const breakdownColumns: OTableColumnDef[] = [
   { id: "label", header: raw("Label"), accessorKey: "label" },
   { id: "model", header: raw("Model"), accessorKey: "model" },
   { id: "calls", header: raw("Calls"), accessorKey: "calls" },
   { id: "errors", header: raw("Errors"), accessorKey: "errors" },
-  { id: "p50_latency_ms", header: raw("P50 ms"), accessorKey: "p50_latency_ms" },
-  { id: "p95_latency_ms", header: raw("P95 ms"), accessorKey: "p95_latency_ms" },
-  { id: "cost", header: raw("Cost"), accessorKey: "cost" },
+  {
+    id: "p50_latency_ms",
+    header: raw("P50 ms"),
+    accessorFn: (row: Record<string, unknown>) => displayMilliseconds(row.p50_latency_ms),
+  },
+  {
+    id: "p95_latency_ms",
+    header: raw("P95 ms"),
+    accessorFn: (row: Record<string, unknown>) => displayMilliseconds(row.p95_latency_ms),
+  },
+  {
+    id: "cost",
+    header: raw("Cost"),
+    accessorFn: (row: Record<string, unknown>) => displayCost(row.cost),
+  },
 ];
 const recentColumns: OTableColumnDef[] = [
-  { id: "timestamp", header: raw("Time"), accessorKey: "timestamp" },
+  {
+    id: "timestamp",
+    header: raw("Time"),
+    accessorFn: (row: PromptTrafficRow) => {
+      const timestampUs = Number(row.timestamp);
+      return Number.isFinite(timestampUs)
+        ? timestampToTimezoneDate(
+            timestampUs / 1_000,
+            store.state.timezone,
+            "yyyy-MM-dd HH:mm:ss.SSS",
+          )
+        : "—";
+    },
+  },
   { id: "model", header: raw("Model"), accessorKey: "model" },
   { id: "label", header: raw("Label"), accessorKey: "label" },
   { id: "status", header: raw("Status"), accessorKey: "status" },
-  { id: "latencyMs", header: raw("Latency ms"), accessorKey: "latencyMs" },
-  { id: "cost", header: raw("Cost"), accessorKey: "cost" },
+  {
+    id: "latencyMs",
+    header: raw("Latency ms"),
+    accessorFn: (row: PromptTrafficRow) => displayMilliseconds(row.latencyMs),
+  },
+  { id: "cost", header: raw("Cost"), accessorFn: (row: PromptTrafficRow) => displayCost(row.cost) },
   { id: "scores", header: raw("Latest scores"), accessorKey: "scores" },
 ];
 
@@ -194,8 +254,12 @@ async function refresh() {
 
 onMounted(async () => {
   await getStreams("traces", false, false).catch(() => null);
-  if (!streamName.value && streamOptions.value.length) streamName.value = streamOptions.value[0].value;
+  if (!streamName.value && streamOptions.value.length)
+    streamName.value = streamOptions.value[0].value;
   await loadExperimentEvidence(props.orgId).catch(() => null);
 });
-watch(() => [props.version.id, props.orgId], () => loadExperimentEvidence(props.orgId));
+watch(
+  () => [props.version.id, props.orgId],
+  () => loadExperimentEvidence(props.orgId),
+);
 </script>

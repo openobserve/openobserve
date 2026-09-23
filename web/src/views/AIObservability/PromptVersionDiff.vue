@@ -7,7 +7,7 @@
         <pre
           class="bg-surface-base border-border-default rounded-default max-h-80 overflow-auto border p-3 font-mono text-xs whitespace-pre-wrap"
           :data-test="`prompt-diff-${side.key}`"
-        >{{ side.payload }}</pre>
+          >{{ side.payload }}</pre>
       </section>
     </div>
 

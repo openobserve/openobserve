@@ -205,9 +205,7 @@ const llmPromptsService = {
   ): Promise<PromptMutationResult> {
     const response = await http().post(`${entityBase(orgId, entityId)}/versions`, input, {
       params: options.ifHead == null ? undefined : { if_head: options.ifHead },
-      ...(options.idempotencyKey
-        ? { headers: { "Idempotency-Key": options.idempotencyKey } }
-        : {}),
+      ...(options.idempotencyKey ? { headers: { "Idempotency-Key": options.idempotencyKey } } : {}),
     });
     return response.data;
   },
@@ -261,10 +259,7 @@ const llmPromptsService = {
     return (await http().get(`${base(orgId)}/settings`)).data;
   },
 
-  async updateSettings(
-    orgId: string,
-    input: UpdatePromptSettingsInput,
-  ): Promise<PromptSettings> {
+  async updateSettings(orgId: string, input: UpdatePromptSettingsInput): Promise<PromptSettings> {
     return (await http().put(`${base(orgId)}/settings`, input)).data;
   },
 

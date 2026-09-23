@@ -26,7 +26,10 @@
           <h4 class="text-text-heading m-0 text-sm font-semibold">
             {{ t("aiObservability.promptManagement.webhook") }}
           </h4>
-          <OSwitch v-model="webhookEnabled" :label="t('aiObservability.promptManagement.enabled')" />
+          <OSwitch
+            v-model="webhookEnabled"
+            :label="t('aiObservability.promptManagement.enabled')"
+          />
         </div>
         <template v-if="webhookEnabled">
           <OInput
@@ -45,22 +48,28 @@
             multiple
             data-test="prompt-settings-webhook-events"
           />
-          <div class="rounded-default bg-surface-base border-border-default flex items-center gap-2 border p-3">
+          <div
+            class="rounded-default bg-surface-base border-border-default flex items-center gap-2 border p-3"
+          >
             <OIcon :name="secretConfigured ? 'lock' : 'lock-open'" size="sm" />
             <div class="min-w-0 flex-1">
               <div class="text-text-heading text-xs font-semibold">
                 {{ t("aiObservability.promptManagement.signingSecret") }}
               </div>
               <div class="text-text-secondary text-2xs">
-                {{ secretConfigured ? t("aiObservability.promptManagement.secretConfigured") : t("aiObservability.promptManagement.secretNotConfigured") }}
+                {{
+                  secretConfigured
+                    ? t("aiObservability.promptManagement.secretConfigured")
+                    : t("aiObservability.promptManagement.secretNotConfigured")
+                }}
               </div>
             </div>
           </div>
           <OInput
             v-model="secret"
             type="password"
-          :label="t('aiObservability.promptManagement.rotateSigningSecret')"
-          :help-text="t('aiObservability.promptManagement.rotateSigningSecretHelp')"
+            :label="t('aiObservability.promptManagement.rotateSigningSecret')"
+            :help-text="t('aiObservability.promptManagement.rotateSigningSecretHelp')"
             autocomplete="new-password"
             data-test="prompt-settings-secret"
           />
@@ -115,7 +124,6 @@ const canSave = computed(() => {
   }
 });
 
-
 async function load() {
   if (!props.open) return;
   try {
@@ -127,7 +135,10 @@ async function load() {
     secretConfigured.value = settings.webhook?.secretConfigured ?? false;
     secret.value = "";
   } catch (error: unknown) {
-    toast({ variant: "error", message: raw(error instanceof Error ? error.message : "Failed to load settings.") });
+    toast({
+      variant: "error",
+      message: raw(error instanceof Error ? error.message : "Failed to load settings."),
+    });
   }
 }
 
@@ -139,7 +150,9 @@ async function save() {
         .split(",")
         .map((label) => label.trim())
         .filter(Boolean),
-      webhook: webhookEnabled.value ? { endpoint: endpoint.value.trim(), events: events.value } : null,
+      webhook: webhookEnabled.value
+        ? { endpoint: endpoint.value.trim(), events: events.value }
+        : null,
     });
     if (webhookEnabled.value && secret.value) {
       const rotated = await llmPromptsService.rotateSecret(props.orgId, secret.value);
@@ -154,7 +167,10 @@ async function save() {
     emit("update:open", false);
     toast({ variant: "success", message: raw("Prompt settings saved.") });
   } catch (error: unknown) {
-    toast({ variant: "error", message: raw(error instanceof Error ? error.message : "Failed to save settings.") });
+    toast({
+      variant: "error",
+      message: raw(error instanceof Error ? error.message : "Failed to save settings."),
+    });
   } finally {
     saving.value = false;
   }
