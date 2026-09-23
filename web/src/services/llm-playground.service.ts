@@ -200,7 +200,7 @@ const DECISION_ONLY_KINDS = ["systemone"];
 
 type ProviderLike = { providerType?: string; provider_type?: string };
 
-/** True for a provider that returns only a typed score: no chat, reasoning, or metadata. */
+/** True for a provider that returns only a typed score: no chat and no extra metadata. */
 export function isDecisionOnlyProvider(provider?: ProviderLike | null): boolean {
   return DECISION_ONLY_KINDS.includes(
     (provider?.providerType ?? provider?.provider_type ?? "").toLowerCase(),

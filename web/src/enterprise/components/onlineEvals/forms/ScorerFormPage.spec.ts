@@ -157,8 +157,8 @@ describe("ScorerFormPage", () => {
     expect(wrapper.emitted("saved")).toBeTruthy();
   });
 
-  // A decision model returns only the score; the backend refuses reasoning or metadata for it.
-  it("drops reasoning and extra fields for a decision-model provider", async () => {
+  // A decision model fills no extra fields; its reasoning is the answer summary, so it stays.
+  it("drops extra fields but keeps reasoning for a decision-model provider", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "my-scorer");
     setField(wrapper, "extraMetadataFields", [{ name: "why", type: "string", description: "" }]);
@@ -166,12 +166,12 @@ describe("ScorerFormPage", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="scorer-form-decision-provider-note"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="scorer-form-include-reasoning"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="scorer-form-include-reasoning"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="scorer-form-extra-field-add"]').exists()).toBe(false);
 
     await submit(wrapper);
     const [, payload] = (onlineEvalsService.scorers.create as any).mock.calls[0];
-    expect(payload.scorer.params.include_reasoning).toBe(false);
+    expect(payload.scorer.params.include_reasoning).toBe(true);
     expect(payload.scorer.params.extra_metadata_fields).toBeUndefined();
   });
 
