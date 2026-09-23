@@ -32,7 +32,8 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    organization, service_accounts, short_url, slos, sourcemaps, status, status_pages, stream,
+    organization, public_dashboards, service_accounts, short_url, slos, sourcemaps, status,
+    status_pages, stream,
     synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
@@ -741,6 +742,21 @@ pub fn basic_routes() -> Router {
                 get(status_pages::public::feed),
             )
             .route("/status/{slug}", get(status_pages::public::page));
+    }
+
+    // Public dashboards: same unauthenticated point-read plane (basic_routes),
+    // gated by its own master switch. The SPA viewer route (/public/dashboards)
+    // is served by the frontend catch-all, so only the data APIs live here.
+    if get_config().public_dashboards.enabled {
+        router = router
+            .route(
+                "/api/public_dashboards/{slug}",
+                get(public_dashboards::public::config),
+            )
+            .route(
+                "/api/public_dashboards/{slug}/data",
+                get(public_dashboards::public::data),
+            );
     }
 
     router
@@ -1497,6 +1513,17 @@ pub fn service_routes() -> Router {
                 post(synthetics::job_artifact_urls),
             )
             .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload));
+
+        // Public dashboards — authenticated admin CRUD (publish / view / revoke).
+        // The public read plane lives in basic_routes, not here. Gated by the
+        // ZO_PUBLIC_DASHBOARD_ENABLED flag (checked in-handler). RBAC on the
+        // parent dashboard is enforced by the route-permission middleware.
+        router = router.route(
+            "/{org_id}/dashboards/{dashboard_id}/public",
+            get(public_dashboards::admin::get)
+                .post(public_dashboards::admin::create)
+                .delete(public_dashboards::admin::delete),
+        );
 
         // Status pages — authenticated admin CRUD (the public read plane lives
         // in basic_routes, not here). Ships with synthetics, no separate

@@ -54,6 +54,9 @@ pub enum TriggerModule {
     /// next rung's delay. Its own lane so a paging timer is never queued
     /// behind an alert evaluation backlog.
     OncallEscalation,
+    /// One job per public dashboard: rebuild its materialized snapshots on the
+    /// author-chosen cadence.
+    PublicDashboard,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -69,6 +72,7 @@ impl std::fmt::Display for TriggerModule {
             Self::SloBackfill => write!(f, "slo_backfill"),
             Self::CompositeAlert => write!(f, "composite_alert"),
             Self::OncallEscalation => write!(f, "oncall_escalation"),
+            Self::PublicDashboard => write!(f, "public_dashboard"),
         }
     }
 }
@@ -236,6 +240,10 @@ mod tests {
         assert_eq!(TriggerModule::Slo.to_string(), "slo");
         assert_eq!(TriggerModule::SloBackfill.to_string(), "slo_backfill");
         assert_eq!(TriggerModule::CompositeAlert.to_string(), "composite_alert");
+        assert_eq!(
+            TriggerModule::PublicDashboard.to_string(),
+            "public_dashboard"
+        );
     }
 
     /// The discriminant IS the stored value. A variant inserted above an
@@ -253,6 +261,7 @@ mod tests {
         assert_eq!(TriggerModule::SloBackfill as i32, 7);
         assert_eq!(TriggerModule::CompositeAlert as i32, 8);
         assert_eq!(TriggerModule::OncallEscalation as i32, 9);
+        assert_eq!(TriggerModule::PublicDashboard as i32, 10);
     }
 
     #[test]

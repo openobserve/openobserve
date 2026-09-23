@@ -977,6 +977,7 @@ pub struct Config {
     pub enrichment_table: EnrichmentTable,
     pub slo: Slo,
     pub synthetics: Synthetics,
+    pub public_dashboards: PublicDashboards,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
 }
@@ -1003,6 +1004,42 @@ pub struct DatabaseMonitoring {
         help = "Rollup window and job cadence in seconds. This is also the freshness floor: rolled-up data is up to one interval stale, and the read path covers the remainder with a live delta query over un-rolled-up spans. Lowering it shrinks that delta (cheaper reads, fresher pages) at the cost of a more frequent rollup job and more `_o2_db_stats` rows."
     )]
     pub rollup_interval_secs: u64,
+}
+
+/// Public (unauthenticated) dashboards. Master switch plus the timing/limit
+/// knobs the rebuilder and public serving plane clamp to.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct PublicDashboards {
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_ENABLED",
+        default = false,
+        help = "Master switch for public dashboards. Off by default; the public HTTP routes and the snapshot rebuilder only exist when this is true."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_RPM",
+        default = 240,
+        help = "Per-IP requests-per-minute limit on the unauthenticated public-dashboard routes (0 disables)."
+    )]
+    pub rpm: u64,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MIN_REBUILD_SECS",
+        default = 30,
+        help = "Minimum seconds between snapshot rebuilds; the author-chosen cadence is clamped up to this floor."
+    )]
+    pub min_rebuild_secs: u64,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_DEFAULT_REBUILD_SECS",
+        default = 60,
+        help = "Default seconds between snapshot rebuilds when the share does not specify a cadence."
+    )]
+    pub default_rebuild_secs: u64,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_SNAPSHOT_CACHE_TTL_SECS",
+        default = 30,
+        help = "In-process cache TTL for public-dashboard point-reads; keep <= ZO_PUBLIC_DASHBOARD_MIN_REBUILD_SECS so viewers never lag a rebuild behind."
+    )]
+    pub snapshot_cache_ttl_secs: u64,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the

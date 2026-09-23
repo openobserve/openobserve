@@ -186,6 +186,7 @@ mod m20260831_000001_add_exhausted_at_to_oncall_responses;
 mod m20260901_000001_reset_anomaly_detection_retries;
 mod m20260903_000001_add_anomaly_last_failed_at;
 mod m20260906_000001_add_anomaly_last_alert_fired_at;
+mod m20260907_000001_create_public_dashboards_tables;
 mod m20260910_000001_add_folder_id_to_workflows;
 mod m20260911_000001_add_splunk_token_to_org_ingestion_tokens;
 mod m20260912_000001_add_anomaly_alert_budget;
@@ -471,6 +472,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
             Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
             Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
+            Box::new(m20260907_000001_create_public_dashboards_tables::Migration),
         ]
     }
 }

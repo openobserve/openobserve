@@ -598,6 +598,9 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::OncallEscalation => {
             handle_oncall_escalation_triggers(trigger).await
         }
+        db::scheduler::TriggerModule::PublicDashboard => {
+            handle_public_dashboard_triggers(trace_id, trigger).await
+        }
     }
 }
 
@@ -3404,6 +3407,71 @@ async fn handle_query_recommendations_triggers(
         // Return Ok since the next run has been successfully queued
     }
 
+    Ok(())
+}
+
+/// Rebuild one public dashboard's snapshots, then reschedule at its cadence.
+/// If the share is gone / disabled / expired, drop the cron instead.
+async fn handle_public_dashboard_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    let conn = get_orm_client_rw().await;
+    let now = now_micros();
+    let pd_id = &trigger.module_key;
+
+    let mut new_trigger = db::scheduler::Trigger {
+        next_run_at: now,
+        is_realtime: false,
+        is_silenced: false,
+        status: db::scheduler::TriggerStatus::Waiting,
+        retries: 0,
+        ..trigger.clone()
+    };
+
+    let pd = match infra::table::public_dashboards::get(conn, pd_id).await {
+        Ok(Some(pd)) if pd.enabled && pd.visibility != 0 => pd,
+        Ok(_) => {
+            db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::PublicDashboard,
+                pd_id,
+            )
+            .await?;
+            return Ok(());
+        }
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] public dashboard load failed: {pd_id}: {e}"
+            );
+            new_trigger.next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
+            db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
+            return Ok(());
+        }
+    };
+
+    if let Some(exp) = pd.expires_at {
+        if exp <= now {
+            db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::PublicDashboard,
+                pd_id,
+            )
+            .await?;
+            return Ok(());
+        }
+    }
+
+    if let Err(e) = crate::public_dashboards::rebuild_one(&pd).await {
+        log::error!("[SCHEDULER trace_id {trace_id}] public dashboard rebuild failed: {pd_id}: {e}");
+    }
+
+    let rebuild_secs = pd.rebuild_secs.max(1) as i64;
+    // Schedule from rebuild COMPLETION, not the pre-rebuild `now`: a rebuild
+    // slower than the interval must not schedule the next run in the past
+    // (which would refire back-to-back with no spacing).
+    new_trigger.next_run_at = now_micros() + rebuild_secs * 1_000_000;
+    db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
     Ok(())
 }
 

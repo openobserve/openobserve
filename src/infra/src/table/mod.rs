@@ -63,6 +63,7 @@ pub mod org_storage_providers;
 pub mod org_users;
 pub mod organizations;
 pub mod providers;
+pub mod public_dashboards;
 pub mod ratelimit;
 pub mod re_pattern;
 pub mod re_pattern_stream_map;

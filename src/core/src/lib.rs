@@ -52,6 +52,7 @@ pub mod pipeline;
 pub mod profiles;
 #[cfg(feature = "enterprise")]
 pub mod providers;
+pub mod public_dashboards;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 use search_service as search;

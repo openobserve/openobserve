@@ -95,6 +95,13 @@ export default function (store: any) {
 
     const isAuthenticated = store.state.loggedIn;
 
+    // Public routes (unauthenticated viewer plane) opt out of the auth guard
+    // entirely — never redirect an anonymous visitor to /login.
+    if (to.meta && to.meta.public) {
+      next();
+      return;
+    }
+
     if (
       !isAuthenticated &&
       (to.path === "/cb" ||
