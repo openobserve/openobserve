@@ -26,10 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("iam.addRole") }}
       </OButton>
     </template>
-    <!-- Arrived via the service account token popup's "Assign a role" link
-         (?member=<email>): that link used to just redirect here and leave the
-         user with no way to actually add the account to anything. Now the
-         Assign column below does the write directly. -->
+    <!-- ?member=<email> (from the token popup's "Assign a role" link) drives the Assign column below. -->
     <OBanner
       v-if="assignTarget"
       variant="info"
@@ -148,10 +145,7 @@ const route = useRoute();
 
 const store = useStore();
 
-// ── Quick-assign (arrived via ?member=<email>) ────────────────────────────
-// The service-account token popup's "Assign a role" link lands here with the
-// account's email in the query. Previously nothing read it — this now drives
-// the Assign column in RoleTable.
+// ?member=<email> from the token popup's "Assign a role" link; drives the Assign column in RoleTable.
 const assignTarget = computed(() => (route.query.member as string) || "");
 const assigningRoleName = ref<string | null>(null);
 const assignedRoleNames = ref<string[]>([]);

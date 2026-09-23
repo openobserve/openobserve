@@ -26,10 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("iam.addGroup") }}
       </OButton>
     </template>
-    <!-- Arrived via the service account token popup's "Add to a user group"
-         link (?member=<email>): that link used to just redirect here and
-         leave the user with no way to actually add the account to anything.
-         The Assign column below does the write directly. -->
+    <!-- ?member=<email> (from the token popup's "Add to a user group" link) drives the Assign column below. -->
     <OBanner
       v-if="assignTarget"
       variant="info"

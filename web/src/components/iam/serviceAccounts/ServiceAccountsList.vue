@@ -743,10 +743,7 @@ export default defineComponent({
     const confirmBulkDelete = ref(false);
     const bulkDeleteLoading = ref(false);
 
-    // Map of account email -> role names, for the Roles column. A single
-    // batched org-wide request (same endpoint AppRoles.vue uses for its member
-    // counts), not one lookup per row. Enterprise/cloud only; on OSS the
-    // column itself is never rendered so this is simply never called.
+    // Email -> role names for the Roles column; one batched org-wide request instead of per-row lookups.
     const serviceAccountRoles = ref<Record<string, string[]> | null>(null);
 
     const loadServiceAccountRoles = async (force = false) => {

@@ -45,10 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop mt-2"
         />
 
-        <!-- The identifier is immutable after creation (it's the Basic-auth
-             username), so update mode shows it read-only instead of an
-             editable field — previously it wasn't shown at all here, leaving
-             no way to see what account you were editing. -->
+        <!-- Read-only: the identifier is the Basic-auth username, immutable after creation. -->
         <div v-if="beingUpdated" class="mt-2">
           <label class="text-text-secondary mb-1 block text-xs font-medium">
             {{ t("serviceAccounts.form.identifier.label") }}

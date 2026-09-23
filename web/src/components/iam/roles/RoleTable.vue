@@ -161,10 +161,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
       <slot name="toolbar-trailing" />
     </template>
 
-    <!-- Quick-assign column, only rendered when a member is being assigned
-         (arrived via the "Assign a role" link from the service-account token
-         popup). Lets the member be added to a role right here instead of
-         redirecting to a page that could not do anything with them. -->
+    <!-- Rendered only when a member (?member=<email>) is being assigned via the token popup's link. -->
     <template #cell-assign="{ row }">
       <div class="flex items-center justify-center">
         <OBadge v-if="isAssigned(row)" variant="success" icon="check" size="sm">
