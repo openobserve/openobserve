@@ -43,7 +43,7 @@
         data-test="ai-experiment-detail-save-prompt"
         @click="savePromptOpen = true"
       >
-        Save as Prompt
+        {{ t("aiObservability.experiments.detail.saveAsPrompt") }}
       </OButton>
       <OButton
         v-else-if="detail?.experiment.task.type === 'prompt_ref'"
@@ -52,7 +52,7 @@
         data-test="ai-experiment-detail-open-prompt"
         @click="openManagedPrompt"
       >
-        Open Prompt
+        {{ t("aiObservability.experiments.detail.openPrompt") }}
       </OButton>
       <OButton
         size="sm"

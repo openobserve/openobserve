@@ -11565,6 +11565,8 @@
           "latency": "Latency",
           "p50Latency": "P50 Latency"
         },
+        "saveAsPrompt": "Save as Prompt",
+        "openPrompt": "Open Prompt",
         "retryFailed": "Retry Failed Slots",
         "loadError": "Failed to load the experiment",
         "skippedCount": "{count} skipped",
