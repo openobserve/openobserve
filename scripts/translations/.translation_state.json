@@ -10150,6 +10150,7 @@
       "errorsFixAndTryAgain": "e0fa7e73ce02634d",
       "histogramUnavailableCtesDistinctLimit": "793245c990e58618",
       "nameOfPanelRequired": "f6e881161cdf0296",
+      "patternsUnavailableForMultiStream": "20fbfaa16e107fb8",
       "queryEmptySelectFieldsToBuild": "4ef9689c6ed0fa4d",
       "searchHistoryNotEnabled": "691a7305a130697b",
       "selectStarNotSupportedForVisualization": "bed69cc7f618c5ad",

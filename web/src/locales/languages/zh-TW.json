@@ -13396,6 +13396,7 @@
       "searchHistoryNotEnabled": "搜尋記錄未啟用。",
       "enableUsageReporting": "將 ZO_USAGE_REPORTING_ENABLED 設定為 true 以啟用使用情況報告。",
       "selectStreamToExtractPatterns": "請選取一個串流以提取模式",
+      "patternsUnavailableForMultiStream": "當選取多個串流時，模式無法使用。請選取單一串流。",
       "errorExtractingPatterns": "提取模式時發生錯誤。請重試。",
       "nameOfPanelRequired": "面板名稱為必填",
       "errorsFixAndTryAgain": "存在一些錯誤，請修正後重試",

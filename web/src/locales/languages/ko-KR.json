@@ -13401,6 +13401,7 @@
       "searchHistoryNotEnabled": "검색 기록이 활성화되지 않았습니다.",
       "enableUsageReporting": "사용량 보고를 활성화하려면 ZO_USAGE_REPORTING_ENABLED를 true로 설정하세요.",
       "selectStreamToExtractPatterns": "패턴을 추출할 스트림을 선택하세요.",
+      "patternsUnavailableForMultiStream": "여러 스트림을 선택한 경우 패턴을 사용할 수 없습니다. 단일 스트림을 선택하세요.",
       "errorExtractingPatterns": "패턴 추출 중 오류가 발생했습니다. 다시 시도하세요.",
       "nameOfPanelRequired": "패널 이름은 필수입니다.",
       "errorsFixAndTryAgain": "일부 오류가 있습니다. 수정한 후 다시 시도하세요.",

@@ -13401,6 +13401,7 @@
       "searchHistoryNotEnabled": "История поиска не включена.",
       "enableUsageReporting": "Установите ZO_USAGE_REPORTING_ENABLED в true, чтобы включить отчет об использовании.",
       "selectStreamToExtractPatterns": "Пожалуйста, выберите поток для извлечения шаблонов",
+      "patternsUnavailableForMultiStream": "Шаблоны недоступны при выборе нескольких потоков. Пожалуйста, выберите один поток.",
       "errorExtractingPatterns": "Ошибка извлечения шаблонов. Пожалуйста, попробуйте снова.",
       "nameOfPanelRequired": "Имя панели обязательно",
       "errorsFixAndTryAgain": "Есть некоторые ошибки, исправьте их и попробуйте снова",

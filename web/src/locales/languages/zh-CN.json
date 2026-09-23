@@ -13401,6 +13401,7 @@
       "searchHistoryNotEnabled": "搜索历史未启用。",
       "enableUsageReporting": "将 ZO_USAGE_REPORTING_ENABLED 设置为 true 以启用使用报告。",
       "selectStreamToExtractPatterns": "请选择要提取模式的流",
+      "patternsUnavailableForMultiStream": "选择多个数据流时无法使用模式。请选择单个数据流。",
       "errorExtractingPatterns": "提取模式时出错。请重试。",
       "nameOfPanelRequired": "面板名称是必需的",
       "errorsFixAndTryAgain": "存在一些错误，请修复后重试",

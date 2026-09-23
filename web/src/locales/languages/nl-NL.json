@@ -13401,6 +13401,7 @@
       "searchHistoryNotEnabled": "Zoekgeschiedenis is niet ingeschakeld.",
       "enableUsageReporting": "Stel ZO_USAGE_REPORTING_ENABLED in op true om gebruiksrapportage in te schakelen.",
       "selectStreamToExtractPatterns": "Selecteer een stream om patronen te extraheren",
+      "patternsUnavailableForMultiStream": "Patronen zijn niet beschikbaar wanneer meerdere streams zijn geselecteerd. Selecteer één stream.",
       "errorExtractingPatterns": "Fout bij extraheren van patronen. Probeer het opnieuw.",
       "nameOfPanelRequired": "Naam van paneel is vereist",
       "errorsFixAndTryAgain": "Er zijn fouten, corrigeer deze en probeer het opnieuw",
