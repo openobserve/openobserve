@@ -36,13 +36,11 @@ const fn credential_access_allowed(
     is_admin_or_root || (fga_consulted && fga_allowed)
 }
 
-/// Admin/Root, or an explicit FGA grant when OpenFGA is on; the middleware may have bypassed it.
+/// Admin/Root, or the middleware's OpenFGA decision when OpenFGA is on.
 pub(crate) async fn require_credential_access(
     org_id: &str,
     user_id: &str,
     action: &str,
-    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))] resource: &str,
-    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))] fga_permission: &str,
 ) -> Result<(), Response> {
     if db::user::is_root_user(user_id) {
         return Ok(());
@@ -60,25 +58,13 @@ pub(crate) async fn require_credential_access(
 
     #[cfg(feature = "enterprise")]
     let (fga_consulted, fga_allowed) = {
-        if is_admin_or_root || !o2_openfga::config::get_config().enabled {
+        if is_admin_or_root {
             (false, false)
+        } else if o2_openfga::config::get_config().enabled {
+            // these routes are bypass: false with the object in the path, so the middleware decided
+            (true, true)
         } else {
-            (
-                true,
-                openobserve_core::auth::check_permissions(
-                    org_id,
-                    org_id,
-                    user_id,
-                    resource,
-                    fga_permission,
-                    None,
-                    // must match route table (EntitySource::Org): grants live on _all_{org}
-                    true,
-                    false,
-                    false,
-                )
-                .await,
-            )
+            (false, false)
         }
     };
 

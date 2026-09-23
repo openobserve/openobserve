@@ -346,14 +346,9 @@ pub async fn get_user_passcode(
 ) -> Response {
     let org = org_id;
     let user_id = user_email.user_id.as_str();
-    if let Err(resp) = super::require_credential_access(
-        &org,
-        user_id,
-        "read the organization ingestion token",
-        "passcode",
-        "LIST",
-    )
-    .await
+    if let Err(resp) =
+        super::require_credential_access(&org, user_id, "read the organization ingestion token")
+            .await
     {
         return resp;
     }
@@ -399,14 +394,9 @@ pub async fn update_user_passcode(
 ) -> Response {
     let org = org_id;
     let user_id = user_email.user_id.as_str();
-    if let Err(resp) = super::require_credential_access(
-        &org,
-        user_id,
-        "rotate the organization ingestion token",
-        "passcode",
-        "PUT",
-    )
-    .await
+    if let Err(resp) =
+        super::require_credential_access(&org, user_id, "rotate the organization ingestion token")
+            .await
     {
         return resp;
     }

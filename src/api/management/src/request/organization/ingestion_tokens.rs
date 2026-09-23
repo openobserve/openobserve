@@ -60,8 +60,6 @@ pub async fn list_ingestion_tokens(
         &org_id,
         user_email.user_id.as_str(),
         "list ingestion tokens",
-        "passcode",
-        "LIST",
     )
     .await
     {
@@ -109,14 +107,8 @@ pub async fn create_ingestion_token(
 ) -> Response {
     let user_id = user_email.user_id.as_str();
 
-    if let Err(resp) = super::require_credential_access(
-        &org_id,
-        user_id,
-        "create ingestion tokens",
-        "passcode",
-        "POST",
-    )
-    .await
+    if let Err(resp) =
+        super::require_credential_access(&org_id, user_id, "create ingestion tokens").await
     {
         return resp;
     }
@@ -172,14 +164,8 @@ pub async fn enable_disable_ingestion_token(
 ) -> Response {
     let user_id = user_email.user_id.as_str();
 
-    if let Err(resp) = super::require_credential_access(
-        &org_id,
-        user_id,
-        "manage ingestion tokens",
-        "passcode",
-        "PUT",
-    )
-    .await
+    if let Err(resp) =
+        super::require_credential_access(&org_id, user_id, "manage ingestion tokens").await
     {
         return resp;
     }
