@@ -35,7 +35,7 @@ test.describe("Org Ingestion Token (Passcode) Access Control", () => {
 
     test("ServiceAccount GET /passcode returns 403 (API boundary)", {
         tag: ['@ingestion-passcode-forbidden', '@all', '@api', '@P0'],
-    }, async ({ page }, testInfo) => {
+    }, async ({ page, request }, testInfo) => {
         const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
 
@@ -54,12 +54,13 @@ test.describe("Org Ingestion Token (Passcode) Access Control", () => {
 
         // Service accounts are keyed by the synthesized <name>.<org>@sa.internal
         // identifier, and are not Admin/Root — so require_credential_access must
-        // deny the org passcode read. Use a raw request (not authedRequest), which
-        // would self-heal on the 403 and mask the access-control behavior.
+        // deny the org passcode read. Use the isolated `request` fixture (not
+        // `page.request`), which would inherit the logged-in session's auth_tokens
+        // cookie and authenticate as the root user (200) — masking the SA's 403.
         const org = getOrgIdentifier();
         const saIdentifier = pm.iamPage.serviceAccountEmailFor(uniqueName);
         const basic = Buffer.from(`${saIdentifier}:${token}`).toString('base64');
-        const response = await page.request.get(`${process.env.ZO_BASE_URL}/api/${org}/passcode`, {
+        const response = await request.get(`${process.env.ZO_BASE_URL}/api/${org}/passcode`, {
             headers: { 'Authorization': `Basic ${basic}` },
         });
 
