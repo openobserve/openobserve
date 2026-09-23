@@ -3484,7 +3484,9 @@ async fn handle_public_dashboard_triggers(
     }
 
     if let Err(e) = crate::public_dashboards::rebuild_one(&pd).await {
-        log::error!("[SCHEDULER trace_id {trace_id}] public dashboard rebuild failed: {pd_id}: {e}");
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] public dashboard rebuild failed: {pd_id}: {e}"
+        );
     }
 
     let rebuild_secs = pd.rebuild_secs.max(1) as i64;

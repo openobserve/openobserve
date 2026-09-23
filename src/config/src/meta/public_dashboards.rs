@@ -121,6 +121,10 @@ pub struct SanitizedDashboard {
     pub available_presets: Vec<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub built_at: Option<i64>,
+    /// The renderer keys time-series axes off this; anonymous viewers get no `/config`.
+    pub timestamp_column: String,
+    /// Viewer re-read interval — the author's "Refresh every" rebuild cadence.
+    pub refresh_secs: i64,
 }
 
 #[cfg(test)]

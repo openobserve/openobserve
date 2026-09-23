@@ -19,14 +19,17 @@
     data-test="dashboards-public-share-dialog"
     size="sm"
     :title="t('dashboard.publicDashboard.dialogTitle')"
-    :secondary-button-label="published ? t('dashboard.publicDashboard.revoke') : t('dashboard.publicDashboard.cancel')"
+    :secondary-button-label="
+      published ? t('dashboard.publicDashboard.revoke') : t('dashboard.publicDashboard.cancel')
+    "
     :secondary-button-variant="published ? 'destructive' : 'outline'"
-    :primary-button-label="published ? t('dashboard.publicDashboard.done') : t('dashboard.publicDashboard.publish')"
+    :primary-button-label="
+      published ? t('dashboard.publicDashboard.done') : t('dashboard.publicDashboard.publish')
+    "
     :primary-button-loading="submitting"
-    :primary-button-disabled="!published && !form.presets.length"
+    :primary-button-disabled="!published && (!form.presets.length || !rebuildSecsValid)"
     @click:secondary="published ? revoke() : (open = false)"
     @click:primary="published ? (open = false) : publish()"
-    @show="onShow"
   >
     <div v-if="loading" class="flex justify-center py-8">
       <OSpinner variant="dots" size="lg" />
@@ -43,14 +46,14 @@
         <OButton
           variant="outline"
           size="sm"
-          icon-left="content_copy"
+          icon-left="content-copy"
           data-test="dashboards-public-share-dialog-copy-btn"
           @click="copyUrl"
         >
           {{ t("dashboard.publicDashboard.copyLink") }}
         </OButton>
       </div>
-      <div class="text-xs text-text-secondary">
+      <div class="text-text-secondary text-xs">
         {{ t("dashboard.publicDashboard.linkHint") }}
       </div>
     </div>
@@ -77,7 +80,17 @@
       <OInput
         v-model.number="form.rebuildSecs"
         type="number"
+        :min="minRebuildSecs"
         :label="t('dashboard.publicDashboard.refreshEvery')"
+        :help-text="
+          t('dashboard.publicDashboard.refreshEveryMin', { secs: raw(String(minRebuildSecs)) })
+        "
+        :error="!rebuildSecsValid"
+        :error-message="
+          rebuildSecsValid
+            ? undefined
+            : t('dashboard.publicDashboard.refreshEveryMin', { secs: raw(String(minRebuildSecs)) })
+        "
         data-test="dashboards-public-share-dialog-rebuild-input"
       />
       <div
@@ -85,7 +98,7 @@
         class="flex flex-col gap-1.5"
         data-test="dashboards-public-share-dialog-variables"
       >
-        <div class="text-xs text-text-secondary">
+        <div class="text-text-secondary text-xs">
           {{ t("dashboard.publicDashboard.defaultVariableValues") }}
         </div>
         <VariablesValueSelector
@@ -101,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -120,7 +133,6 @@ interface PresetOption {
   value: number;
 }
 
-const MIN_REBUILD_SECS = 30;
 const PRESET_SECONDS = [900, 3600, 21600, 86400, 604800, 2592000];
 
 const props = withDefaults(
@@ -163,16 +175,18 @@ const open = computed({
 });
 
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
+// The server's floor for the refresh cadence (ZO_PUBLIC_DASHBOARD_MIN_REBUILD_SECS).
+const minRebuildSecs = computed(
+  () => Number(store.state.zoConfig?.public_dashboard_min_rebuild_secs) || 30,
+);
+const rebuildSecsValid = computed(() => Number(form.value.rebuildSecs) >= minRebuildSecs.value);
 // Reshape the live selection ([{name,value}]) into the selector's expected
 // { value: { name: value } } seed, so it opens on the current values.
 const seedValues = computed(() => ({
-  value: (props.currentValues?.values ?? []).reduce<Record<string, unknown>>(
-    (m, v) => {
-      if (v?.name != null) m[v.name] = v.value;
-      return m;
-    },
-    {},
-  ),
+  value: (props.currentValues?.values ?? []).reduce<Record<string, unknown>>((m, v) => {
+    if (v?.name != null) m[v.name] = v.value;
+    return m;
+  }, {}),
 }));
 const presetOptions = computed<PresetOption[]>(() =>
   PRESET_SECONDS.map((value) => ({ value, label: presetLabel(value) })),
@@ -181,9 +195,7 @@ const selectedPresetOptions = computed<PresetOption[]>(() =>
   presetOptions.value.filter((o) => form.value.presets.includes(o.value)),
 );
 const publicUrl = computed(() =>
-  slug.value
-    ? `${window.location.origin}/web/public/dashboards/${slug.value}`
-    : "",
+  slug.value ? `${window.location.origin}/web/public/dashboards/${slug.value}` : "",
 );
 
 function presetLabel(secs: number): I18nText {
@@ -233,13 +245,20 @@ const onShow = async () => {
   }
 };
 
+// ODialog has no `show` event, so load the existing share whenever it opens.
+watch(
+  open,
+  (isOpen) => {
+    if (isOpen) onShow();
+  },
+  { immediate: true },
+);
+
 const publish = async () => {
   submitting.value = true;
   try {
     const presets = form.value.presets.slice().sort((a, b) => a - b);
-    const def = presets.includes(form.value.defaultPreset)
-      ? form.value.defaultPreset
-      : presets[0];
+    const def = presets.includes(form.value.defaultPreset) ? form.value.defaultPreset : presets[0];
     const res = await adminService.publish(org.value, props.dashboardId, {
       visibility: "public",
       time_range: {
@@ -250,10 +269,7 @@ const publish = async () => {
       // Fall back to the current selection if the selector hasn't emitted yet
       // (publish clicked while query-driven options were still loading).
       frozen_variables: normalizeVars(liveVariables.value ?? props.currentValues),
-      rebuild_secs: Math.max(
-        MIN_REBUILD_SECS,
-        Number(form.value.rebuildSecs) || MIN_REBUILD_SECS,
-      ),
+      rebuild_secs: Number(form.value.rebuildSecs),
     });
     slug.value = res?.data?.slug ?? "";
     published.value = true;

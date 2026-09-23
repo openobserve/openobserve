@@ -25,8 +25,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{
-    meta::dashboards::Dashboard,
-    meta::public_dashboards::{SanitizedDashboard, TimeRangePolicy},
+    meta::{
+        dashboards::Dashboard,
+        public_dashboards::{SanitizedDashboard, TimeRangePolicy},
+    },
     utils::time::now_micros,
 };
 use infra::{
@@ -80,7 +82,8 @@ pub async fn config(Path(slug): Path<String>) -> Response {
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
     };
     let conn = get_orm_client_ro().await;
-    let Ok(Some((_folder, dash))) = dashboards::get_by_id(&pd.org_id, &pd.dashboard_id).await else {
+    let Ok(Some((_folder, dash))) = dashboards::get_by_id(&pd.org_id, &pd.dashboard_id).await
+    else {
         return StatusCode::NOT_FOUND.into_response();
     };
     let (title, layout) = project_layout(&dash);
@@ -93,6 +96,8 @@ pub async fn config(Path(slug): Path<String>) -> Response {
         time_range: time_policy(&pd),
         available_presets,
         built_at: pd.last_rebuilt_at,
+        timestamp_column: config::TIMESTAMP_COL_NAME.to_string(),
+        refresh_secs: i64::from(pd.rebuild_secs),
     })
     .into_response()
 }
@@ -219,7 +224,10 @@ mod tests {
         assert!(!s.contains("top_stream"), "{s}");
         assert!(!s.contains("secret_stream"), "{s}");
         assert!(!s.contains("nested_stream"), "{s}");
-        assert!(!s.contains("cust_id") && !s.contains("acme-secret-123"), "{s}");
+        assert!(
+            !s.contains("cust_id") && !s.contains("acme-secret-123"),
+            "{s}"
+        );
         assert!(!s.contains("vrl_a") && !s.contains("vrl_b"), "{s}");
         // Non-secret render structure is preserved.
         assert!(s.contains("keep me"), "{s}");

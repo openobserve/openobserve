@@ -213,6 +213,8 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    /// Floor for a public dashboard's "Refresh every" cadence; the share dialog enforces it.
+    public_dashboard_min_rebuild_secs: u64,
     oncall_enabled: bool,
     /// Whether private locations — pools served by long-running agents deployed
     /// inside the customer's network — are available. Enterprise only, so the
@@ -601,6 +603,7 @@ pub async fn zo_config(
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        public_dashboard_min_rebuild_secs: cfg.public_dashboards.min_rebuild_secs,
         oncall_enabled,
         synthetics_private_locations_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),

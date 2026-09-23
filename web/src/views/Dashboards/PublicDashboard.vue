@@ -15,18 +15,18 @@
 
  Unauthenticated standalone viewer — no app shell, no store user, no OPageLayout
  (deliberate: this page renders for anonymous visitors outside the authed app).
- Panels stack in a single column; faithful x/y/w/h grid placement would need the
- shared dashboard grid-layout engine adapted to read snapshots, a follow-up.
+ Panels render through the authed dashboard's own grid (RenderDashboardCharts,
+ view-only) fed with pre-built snapshots, so no query ever runs from here.
 -->
 <template>
-  <div class="min-h-screen bg-surface-subtle px-4 pt-3 pb-8">
+  <div class="bg-surface-base flex min-h-screen flex-col">
     <div
       v-if="state === 'loading' || state === 'preparing'"
       class="flex min-h-[60vh] flex-col items-center justify-center gap-3"
       data-test="dashboards-public-dashboard-loading"
     >
       <OSpinner variant="dots" size="lg" />
-      <div v-if="state === 'preparing'" class="text-sm text-text-secondary">
+      <div v-if="state === 'preparing'" class="text-text-secondary text-sm">
         {{ t("dashboard.publicDashboard.preparing") }}
       </div>
     </div>
@@ -36,7 +36,7 @@
       class="flex min-h-[60vh] flex-col items-center justify-center"
       data-test="dashboards-public-dashboard-error"
     >
-      <div class="text-sm text-text-secondary">
+      <div class="text-text-secondary text-sm">
         {{
           state === "unavailable"
             ? t("dashboard.publicDashboard.unavailable")
@@ -46,8 +46,8 @@
     </div>
 
     <template v-else>
-      <header class="flex items-center justify-between gap-3 pb-2">
-        <div class="text-lg font-semibold text-text-heading">
+      <header class="px-page-edge flex items-center justify-between gap-3 pt-3">
+        <div class="text-text-heading text-lg font-semibold">
           {{ config.title }}
         </div>
         <div class="flex items-center gap-3">
@@ -60,67 +60,41 @@
             data-test="dashboards-public-dashboard-preset-select"
             @update:model-value="loadData"
           />
-          <span v-if="builtAtLabel" class="text-xs text-text-secondary">
-            {{ builtAtLabel }}
-          </span>
+          <div class="text-text-secondary flex shrink-0 flex-col text-xs whitespace-nowrap">
+            <span v-if="builtAtLabel">{{ builtAtLabel }}</span>
+            <span v-if="refreshInLabel" data-test="dashboards-public-dashboard-refresh-countdown">
+              {{ refreshInLabel }}
+            </span>
+          </div>
         </div>
       </header>
 
-      <OTabs
-        v-if="tabs.length > 1"
-        v-model="activeTab"
-        dense
-        align="left"
-        class="mb-2 border-b border-border-default"
-      >
-        <OTab
-          v-for="tab in tabs"
-          :key="tab.tabId"
-          :name="tab.tabId"
-          :label="raw(tab.name)"
-        />
-      </OTabs>
-
-      <div class="flex flex-col gap-2">
-        <div
-          v-for="panel in activePanels"
-          :key="panel.id"
-          class="flex min-h-80 flex-col overflow-hidden rounded-surface border border-border-default bg-surface-panel"
-          :data-test="`dashboards-public-dashboard-panel-${panel.id}`"
-        >
-          <div
-            class="border-b border-border-default px-2 py-1.5 text-compact font-medium text-text-heading"
-          >
-            {{ panel.title }}
-          </div>
-          <div class="relative min-h-0 flex-1">
-            <PublicPanelRenderer
-              v-if="panelReady(panel)"
-              :panel-schema="panel"
-              :snapshot="snapshotFor(panel)"
-            />
-            <div
-              v-else
-              class="flex h-full items-center justify-center text-xs text-text-placeholder"
-            >
-              {{ t("dashboard.publicDashboard.panelNotAvailable") }}
-            </div>
-          </div>
-        </div>
-      </div>
+      <RenderDashboardCharts
+        class="min-h-0 flex-1"
+        :frame="false"
+        :view-only="true"
+        :show-tabs="true"
+        :dashboard-data="dashboardData"
+        :dashboard-name="config.title"
+        :current-time-obj="currentTimeObj"
+        :should-refresh-without-cache-obj="{}"
+        :injected-panel-data="injectedPanelData"
+        :allow-alert-creation="false"
+        :show-legends-button="true"
+        data-test="dashboards-public-dashboard-charts"
+      />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, provide } from "vue";
 import { useRoute } from "vue-router";
+import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
-import PublicPanelRenderer from "@/components/dashboards/PublicPanelRenderer.vue";
+import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import publicDashboardsService from "@/services/public_dashboards";
 
 interface PresetOption {
@@ -129,20 +103,19 @@ interface PresetOption {
 }
 
 const route = useRoute();
+const store = useStore();
 const { t } = useI18nTyped();
 const slug = String(route.params.slug || "");
 
-const state = ref<"loading" | "ready" | "preparing" | "notfound" | "unavailable">(
-  "loading",
-);
+const state = ref<"loading" | "ready" | "preparing" | "notfound" | "unavailable">("loading");
 const config = ref<Record<string, any>>({});
 const snapshot = ref<Record<string, any>>({});
-const activeTab = ref<string>("");
 const selectedPreset = ref<number | null>(null);
+// RenderDashboardCharts and TabList read and switch the active tab through this.
+const selectedTabId = ref<string>("");
+provide("selectedTabId", selectedTabId);
 
-const tabs = computed<any[]>(() =>
-  Array.isArray(config.value.layout) ? config.value.layout : [],
-);
+const tabs = computed<any[]>(() => (Array.isArray(config.value.layout) ? config.value.layout : []));
 const timeEditable = computed(() => !!config.value?.time_range?.editable);
 const presetOptions = computed<PresetOption[]>(() =>
   (config.value?.available_presets ?? [])
@@ -150,20 +123,56 @@ const presetOptions = computed<PresetOption[]>(() =>
     .sort((a: number, b: number) => a - b)
     .map((secs: number) => ({ value: secs, label: presetLabel(secs) })),
 );
+const builtAt = computed<number | null>(
+  () => snapshot.value?.built_at ?? config.value?.built_at ?? null,
+);
 const builtAtLabel = computed<I18nText | "">(() =>
-  config.value?.built_at
+  builtAt.value
     ? t("dashboard.publicDashboard.updatedAt", {
-        time: raw(new Date(config.value.built_at / 1000).toLocaleString()),
+        time: raw(new Date(builtAt.value / 1000).toLocaleString()),
       })
     : "",
 );
-const activePanels = computed<any[]>(() => {
-  const tab = tabs.value.find((tb) => tb.tabId === activeTab.value);
-  return tab?.panels ?? [];
+
+// Variables are frozen server-side, so the grid gets none and renders no selectors.
+const dashboardData = computed(() => ({
+  dashboardId: slug,
+  title: config.value.title,
+  version: 8,
+  tabs: tabs.value,
+  variables: { list: [] },
+}));
+
+// The window the snapshot was built for, so any time-aware chrome matches the data.
+const currentTimeObj = computed(() => {
+  const endMs = builtAt.value ? builtAt.value / 1000 : Date.now();
+  const startMs = endMs - (selectedPreset.value ?? 0) * 1000;
+  return { __global: { start_time: new Date(startMs), end_time: new Date(endMs) } };
 });
 
-const snapshotFor = (panel: any) => snapshot.value?.panels?.[panel.id] ?? null;
-const panelReady = (panel: any) => snapshotFor(panel)?.state?.state === "ok";
+// Each panel renders its snapshot instead of querying; withheld panels carry a message.
+const injectedPanelData = computed(() => {
+  const out: Record<string, unknown> = {};
+  for (const tab of tabs.value) {
+    for (const panel of tab?.panels ?? []) {
+      const snap = snapshot.value?.panels?.[panel.id];
+      out[panel.id] =
+        snap?.state?.state === "ok"
+          ? {
+              data: snap.data ?? [],
+              metadata: snap.metadata ?? { queries: [] },
+              resultMetaData: snap.resultMetaData ?? [],
+            }
+          : {
+              data: [],
+              metadata: { queries: [] },
+              resultMetaData: [],
+              errorDetail: { message: t("dashboard.publicDashboard.panelNotAvailable"), code: "" },
+            };
+    }
+  }
+  return out;
+});
 
 function presetLabel(secs: number): I18nText {
   const range =
@@ -209,11 +218,27 @@ const loadData = async () => {
   }
 };
 
+const applyConfig = (next: Record<string, any>) => {
+  // Keep the layout reference when unchanged so the grid is not rebuilt on every refresh.
+  const sameLayout = JSON.stringify(next.layout) === JSON.stringify(config.value.layout);
+  config.value = sameLayout ? { ...next, layout: config.value.layout } : next;
+  // Anonymous viewers only get the minimal /config bootstrap, which lacks the
+  // timestamp column the renderer needs to detect time-series axes.
+  if (next.timestamp_column && store.state.zoConfig?.timestamp_column !== next.timestamp_column) {
+    store.dispatch("setConfig", {
+      ...store.state.zoConfig,
+      timestamp_column: next.timestamp_column,
+    });
+  }
+  if (!tabs.value.some((tab) => tab.tabId === selectedTabId.value)) {
+    selectedTabId.value = tabs.value[0]?.tabId ?? "";
+  }
+};
+
 const load = async () => {
   try {
     const res = await publicDashboardsService.getConfig(slug);
-    config.value = res.data ?? {};
-    activeTab.value = tabs.value[0]?.tabId ?? "";
+    applyConfig(res.data ?? {});
     selectedPreset.value = pickDefaultPreset();
     await loadData();
   } catch (e: unknown) {
@@ -221,5 +246,44 @@ const load = async () => {
   }
 };
 
-onMounted(load);
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+const refreshSecs = computed(() => Number(config.value?.refresh_secs) || 0);
+// Seconds until the next re-read; counts down on the author's "Refresh every" cadence.
+const secondsLeft = ref(0);
+const refreshInLabel = computed<I18nText | "">(() =>
+  refreshSecs.value > 0 && state.value === "ready"
+    ? t("dashboard.publicDashboard.refreshIn", { secs: raw(String(secondsLeft.value)) })
+    : "",
+);
+
+// Re-read on the author's "Refresh every" cadence — the same interval the snapshot rebuilds on.
+const refresh = async () => {
+  if (state.value !== "ready") return;
+  try {
+    const res = await publicDashboardsService.getConfig(slug);
+    applyConfig(res.data ?? {});
+    await loadData();
+  } catch (e: unknown) {
+    mapError(e);
+  }
+};
+
+// Paused while the tab is hidden, so a background tab never polls.
+const tick = async () => {
+  if (document.hidden || refreshSecs.value <= 0) return;
+  secondsLeft.value -= 1;
+  if (secondsLeft.value > 0) return;
+  secondsLeft.value = refreshSecs.value;
+  await refresh();
+};
+
+onMounted(async () => {
+  await load();
+  secondsLeft.value = refreshSecs.value;
+  refreshTimer = setInterval(tick, 1000);
+});
+
+onBeforeUnmount(() => {
+  if (refreshTimer) clearInterval(refreshTimer);
+});
 </script>

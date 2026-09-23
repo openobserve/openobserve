@@ -564,6 +564,46 @@ describe("usePanelDataLoader", () => {
       expect(loader.metadata.value).toEqual(injected.value.metadata);
     });
 
+    it("renders injected data for a panel whose query text was stripped, with its error", async () => {
+      // Public dashboards strip query text; the injected snapshot must still render.
+      const panelSchema = ref({ id: "public-panel", queryType: "sql", queries: [{}] });
+      const injected = ref({
+        data: [[{ x_axis_1: "2026-01-01T00:00:00", y_axis_1: 3 }]],
+        metadata: { queries: [{ startTime: 1000, endTime: 2000 }] },
+        resultMetaData: [[{ histogram_interval: 30 }]],
+        errorDetail: { message: "withheld", code: "" },
+      });
+
+      const loader = usePanelDataLoader(
+        panelSchema,
+        ref({ start_time: new Date(Date.now() - 3600000), end_time: new Date() }),
+        ref({ values: [] }),
+        ref({ offsetWidth: 1000 }),
+        ref(false), // forceLoad
+        ref("dashboards"), // searchType
+        ref("d"), // dashboardId
+        ref("f"), // folderId
+        ref(null), // reportId
+        ref(null), // runId
+        ref(null), // tabId
+        ref(null), // tabName
+        ref(null), // searchResponse
+        ref(false), // is_ui_histogram
+        ref(null), // dashboardName
+        ref(null), // folderName
+        ref(false), // shouldRefreshWithoutCache
+        ref(undefined), // regionClusterParams
+        ref(false), // allowAnnotationsAPI
+        injected, // injectedPromqlData
+      );
+
+      await loader.loadData();
+
+      expect(loader.data.value).toEqual(injected.value.data);
+      expect(loader.resultMetaData.value).toEqual(injected.value.resultMetaData);
+      expect(loader.errorDetail.value).toEqual({ message: "withheld", code: "" });
+    });
+
     it("should handle invalid timestamps", () => {
       const panelSchema = ref({
         id: "test-panel",

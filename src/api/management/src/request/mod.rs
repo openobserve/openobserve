@@ -54,6 +54,7 @@ pub mod playground;
 pub mod profiling;
 #[cfg(feature = "enterprise")]
 pub mod providers;
+pub mod public_dashboards;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
 #[cfg(feature = "enterprise")]
@@ -66,7 +67,6 @@ pub mod short_url;
 pub mod slos;
 pub mod sourcemaps;
 pub mod status;
-pub mod public_dashboards;
 pub mod status_pages;
 pub mod stream;
 pub mod synthetics;

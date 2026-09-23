@@ -17,11 +17,11 @@
 //! statement is idempotent for retry and none of the ALTER traps apply.
 //!
 //! Shape notes that are contracts, not preferences:
-//! - `public_dashboards.slug` is the globally unique public identifier; that
-//!   global uniqueness is what lets it resolve with no org in the URL.
-//! - `public_dashboard_snapshots` holds one materialized row per (public
-//!   dashboard, time-range preset). `data` is the serialized rendered result
-//!   the anonymous plane point-reads — it never runs a query at view time.
+//! - `public_dashboards.slug` is the globally unique public identifier; that global uniqueness is
+//!   what lets it resolve with no org in the URL.
+//! - `public_dashboard_snapshots` holds one materialized row per (public dashboard, time-range
+//!   preset). `data` is the serialized rendered result the anonymous plane point-reads — it never
+//!   runs a query at view time.
 
 use sea_orm_migration::prelude::*;
 
@@ -31,7 +31,9 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.create_table(create_public_dashboards_stmt()).await?;
+        manager
+            .create_table(create_public_dashboards_stmt())
+            .await?;
         manager.create_index(pubdash_slug_idx()).await?;
         manager.create_index(pubdash_org_dashboard_idx()).await?;
         manager.create_table(create_snapshots_stmt()).await?;

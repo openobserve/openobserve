@@ -28,8 +28,8 @@ vi.mock("@/composables/useNotifications", () => ({
 import adminService from "@/services/public_dashboards_admin";
 import PublicShareDialog from "@/components/dashboards/PublicShareDialog.vue";
 
-// Stub ODialog so the test can trigger its primary/secondary actions and its
-// @show; render the body slot so the form/selector mount.
+// Stub ODialog so the test can trigger its primary/secondary actions; render
+// the body slot so the form/selector mount.
 const ODialogStub = {
   name: "ODialog",
   template:
@@ -44,10 +44,7 @@ const ODialogStub = {
     "primaryButtonLoading",
     "primaryButtonDisabled",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "show"],
-  mounted() {
-    this.$emit("show");
-  },
+  emits: ["update:open", "click:primary", "click:secondary"],
 };
 
 // Stub the variable selector to emit the author's live selection on mount.
@@ -100,14 +97,45 @@ describe("PublicShareDialog", () => {
     expect(payload.frozen_variables).toEqual({ env: "prod" });
   });
 
+  it("sends the author's cadence unchanged when it meets the server minimum", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, public_dashboard_min_rebuild_secs: 10 };
+    (adminService.get as any).mockRejectedValue({ response: { status: 404 } });
+    (adminService.publish as any).mockResolvedValue({ data: { slug: "xyz" } });
+    const w = build();
+    await flushPromises();
+    await w.find('[data-test="dashboards-public-share-dialog-rebuild-input"] input').setValue("10");
+    await w.find(".dlg-primary").trigger("click");
+    await flushPromises();
+    expect((adminService.publish as any).mock.calls[0][2].rebuild_secs).toBe(10);
+  });
+
+  it("blocks publishing below the server minimum instead of silently raising it", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, public_dashboard_min_rebuild_secs: 30 };
+    (adminService.get as any).mockRejectedValue({ response: { status: 404 } });
+    const w = build();
+    await flushPromises();
+    await w.find('[data-test="dashboards-public-share-dialog-rebuild-input"] input').setValue("10");
+    expect(w.findComponent({ name: "ODialog" }).props("primaryButtonDisabled")).toBe(true);
+  });
+
   it("opens in published mode when a share already exists", async () => {
     (adminService.get as any).mockResolvedValue({ data: { slug: "existing" } });
     const w = build();
     await flushPromises();
-    expect(
-      w.find('[data-test="dashboards-public-share-dialog-copy-btn"]').exists(),
-    ).toBe(true);
+    expect(w.find('[data-test="dashboards-public-share-dialog-copy-btn"]').exists()).toBe(true);
     expect(adminService.publish).not.toHaveBeenCalled();
+  });
+
+  it("loads the existing share when the dialog is opened after mount", async () => {
+    (adminService.get as any).mockResolvedValue({ data: { slug: "existing" } });
+    const w = build();
+    await w.setProps({ modelValue: false });
+    vi.clearAllMocks();
+    (adminService.get as any).mockResolvedValue({ data: { slug: "existing" } });
+    await w.setProps({ modelValue: true });
+    await flushPromises();
+    expect(adminService.get).toHaveBeenCalledWith(expect.any(String), "dash-1");
+    expect(w.find('[data-test="dashboards-public-share-dialog-copy-btn"]').exists()).toBe(true);
   });
 
   it("revokes via the secondary action in published mode", async () => {

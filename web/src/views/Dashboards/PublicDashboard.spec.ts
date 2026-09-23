@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { shallowMount, flushPromises } from "@vue/test-utils";
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -25,6 +25,7 @@ vi.mock("@/services/public_dashboards", () => ({
 
 import service from "@/services/public_dashboards";
 import PublicDashboard from "@/views/Dashboards/PublicDashboard.vue";
+import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 
 const CONFIG = {
   title: "My Dashboard",
@@ -38,15 +39,18 @@ const CONFIG = {
   time_range: { editable: true, default_range_secs: 3600, allowed_presets_secs: [3600, 86400] },
   available_presets: [3600, 86400],
   built_at: 1_700_000_000_000_000,
+  refresh_secs: 30,
 };
 
 const buildWrapper = () =>
   shallowMount(PublicDashboard, { global: { plugins: [i18n], provide: { store } } });
 
 const has = (w: any, id: string) => w.find(`[data-test="${id}"]`).exists();
+const grid = (w: any) => w.findComponent(RenderDashboardCharts);
 
 describe("PublicDashboard viewer", () => {
   beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.useRealTimers());
 
   it("shows the loading state before requests resolve", () => {
     (service.getConfig as any).mockReturnValue(new Promise(() => {}));
@@ -54,16 +58,35 @@ describe("PublicDashboard viewer", () => {
     expect(has(w, "dashboards-public-dashboard-loading")).toBe(true);
   });
 
-  it("renders panels once config + snapshot load (ready)", async () => {
+  it("renders the dashboard grid view-only, fed with the snapshot (ready)", async () => {
+    (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
+    (service.getData as any).mockResolvedValue({
+      status: 200,
+      data: { panels: { p1: { state: { state: "ok" }, data: [[{ y: 1 }]] } } },
+    });
+    const w = buildWrapper();
+    await flushPromises();
+    expect(grid(w).exists()).toBe(true);
+    expect(grid(w).props("viewOnly")).toBe(true);
+    expect(grid(w).props("dashboardData").tabs).toEqual(CONFIG.layout);
+    expect(grid(w).props("dashboardData").variables).toEqual({ list: [] });
+    expect(grid(w).props("injectedPanelData").p1.data).toEqual([[{ y: 1 }]]);
+    expect(has(w, "dashboards-public-dashboard-error")).toBe(false);
+  });
+
+  it("re-reads config and snapshot every refresh_secs", async () => {
+    vi.useFakeTimers();
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
     (service.getData as any).mockResolvedValue({
       status: 200,
       data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
     });
-    const w = buildWrapper();
+    buildWrapper();
     await flushPromises();
-    expect(has(w, "dashboards-public-dashboard-panel-p1")).toBe(true);
-    expect(has(w, "dashboards-public-dashboard-error")).toBe(false);
+    expect(service.getData).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(service.getConfig).toHaveBeenCalledTimes(2);
+    expect(service.getData).toHaveBeenCalledTimes(2);
   });
 
   it("shows the preparing state on a 202 (snapshot not built yet)", async () => {
@@ -102,7 +125,25 @@ describe("PublicDashboard viewer", () => {
     expect(w.text()).toContain("currently unavailable");
   });
 
-  it("renders the Not-available placeholder for a withheld panel", async () => {
+  it("counts down to the next auto refresh", async () => {
+    vi.useFakeTimers();
+    (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
+    (service.getData as any).mockResolvedValue({
+      status: 200,
+      data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
+    });
+    const w = buildWrapper();
+    await flushPromises();
+    const countdown = () =>
+      w.find('[data-test="dashboards-public-dashboard-refresh-countdown"]').text();
+    expect(countdown()).toBe("Auto refresh in 30s");
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(countdown()).toBe("Auto refresh in 25s");
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(countdown()).toBe("Auto refresh in 30s");
+  });
+
+  it("injects a Not-available error for a withheld panel", async () => {
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
     (service.getData as any).mockResolvedValue({
       status: 200,
@@ -110,6 +151,8 @@ describe("PublicDashboard viewer", () => {
     });
     const w = buildWrapper();
     await flushPromises();
-    expect(w.text()).toContain("Not available");
+    const p1 = grid(w).props("injectedPanelData").p1;
+    expect(p1.data).toEqual([]);
+    expect(p1.errorDetail.message).toContain("Not available");
   });
 });

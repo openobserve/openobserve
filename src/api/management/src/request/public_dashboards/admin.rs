@@ -86,6 +86,9 @@ pub async fn create(
     if let Some(r) = feature_gate() {
         return r;
     }
+    if let Err(msg) = openobserve_core::public_dashboards::validate_config(&body) {
+        return MetaHttpResponse::bad_request(msg);
+    }
     match openobserve_core::public_dashboards::get(&org_id, &dashboard_id).await {
         Ok(Some(_)) => {
             return MetaHttpResponse::bad_request(

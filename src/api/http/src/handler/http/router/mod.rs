@@ -33,8 +33,7 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
     organization, public_dashboards, service_accounts, short_url, slos, sourcemaps, status,
-    status_pages, stream,
-    synthetics, users,
+    status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
@@ -1522,17 +1521,6 @@ pub fn service_routes() -> Router {
             )
             .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload));
 
-        // Public dashboards — authenticated admin CRUD (publish / view / revoke).
-        // The public read plane lives in basic_routes, not here. Gated by the
-        // ZO_PUBLIC_DASHBOARD_ENABLED flag (checked in-handler). RBAC on the
-        // parent dashboard is enforced by the route-permission middleware.
-        router = router.route(
-            "/{org_id}/dashboards/{dashboard_id}/public",
-            get(public_dashboards::admin::get)
-                .post(public_dashboards::admin::create)
-                .delete(public_dashboards::admin::delete),
-        );
-
         // Status pages — authenticated admin CRUD (the public read plane lives
         // in basic_routes, not here). Ships with synthetics, no separate
         // toggle. RBAC is enforced by the OpenFGA route-permission middleware
@@ -1621,6 +1609,17 @@ pub fn service_routes() -> Router {
                 );
         }
     }
+
+    // Public dashboards — authenticated admin CRUD (publish / view / revoke).
+    // The public read plane lives in basic_routes, not here. Gated by the
+    // ZO_PUBLIC_DASHBOARD_ENABLED flag (checked in-handler). RBAC on the
+    // parent dashboard is enforced by the route-permission middleware.
+    router = router.route(
+        "/{org_id}/dashboards/{dashboard_id}/public",
+        get(public_dashboards::admin::get)
+            .post(public_dashboards::admin::create)
+            .delete(public_dashboards::admin::delete),
+    );
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
