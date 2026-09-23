@@ -319,8 +319,7 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js",
-      "logsRefreshCacheDropdown.spec.js"
+      "timezoneDisplay.spec.js"
     ],
     "disabled": [
       {

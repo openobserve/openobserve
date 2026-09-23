@@ -101,6 +101,23 @@ A spec cannot be in both `run_files` and `disabled` — the build fails if it is
 The ENT overlay only ever carries the **delta** from OSS. It must not re-list any spec
 already in `ci_matrix.json`; `build-ci-matrix.js` fails the run if it does.
 
+## What the build script validates
+
+Every workflow that builds its matrix through `build-ci-matrix.js` gets the same checks,
+so a bad manifest fails at `generate_matrix` instead of somewhere downstream:
+
+- unique `testfolder`, no shard with an empty `run_files`
+- no spec listed twice — **within a shard or across two shards**. Two shards listing the
+  same spec silently runs it twice; it happens when two PRs register the same new spec in
+  different shards.
+- no spec in both `run_files` and `disabled`
+- **every `run_files` entry exists on disk.** This is the one that cannot be seen from a
+  green run: `playwright_alpha1.yml` skips a missing path with a warning, and a Playwright
+  path argument matching nothing simply selects no tests — so a renamed or split spec stops
+  running while its shard stays green. Paths resolve against `../playwright-tests/` next to
+  the manifest; the check is skipped (with a log line) if that tree is not checked out.
+
+---
 ---
 
 ## The alpha1 cloud matrix (`ci_matrix_cloud.json`, ENT repo)
