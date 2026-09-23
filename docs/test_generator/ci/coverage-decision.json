@@ -1,0 +1,11 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/RUM/rum-onboarding-snippets.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/RUM/rum-onboarding-snippets.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-cdn-dataflow.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-npm-dataflow.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "rum-onboarding-snippets.spec.js already drives the frontend-monitoring onboarding card and asserts the NPM path (install command, org/site/insecureHTTP init injection, copy controls). The PR headline — the CDN variant's O2_RUM/O2_LOGS globals + 0.4.3 bundle URLs — is entirely uncovered there (the spec never switches to the CDN variant). Add 3 new test() blocks to that file rather than a new spec: it reuses the existing beforeEach token bootstrap, PageManager, and the @rumOnboarding tag group. The dataflow specs exercise the fixture app (already renamed to O2 globals + 0.4.3 in fixtures/rum/*), not the product snippet UI, so they need no change. File is already registered in ci_matrix.json (RUM shard) -> needs_registration false."
+}

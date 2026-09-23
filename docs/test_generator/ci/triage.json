@@ -1,0 +1,28 @@
+{
+  "feature_slug": "rum-sdk-global-rename",
+  "feature_title": "RUM SDK O2 Global Rename & Version Bump",
+  "area": "RUM",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "rum-onboarding-snippets.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/RUM/rum-onboarding-snippets.spec.js",
+  "playwright_group": "RUM",
+  "source_files": [
+    "web/src/components/ingestion/setupCard/content/rum.ts",
+    "web/src/components/ingestion/recommended/FrontendRumConfig.spec.ts",
+    "web/src/components/ingestion/setupCard/content/rum.spec.ts",
+    "web/vite.config.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path in changed_files.txt is under web/src/, web/, or tests/ui-testing/ — none are in enterprise-owned locations (no enterprise/, o2_enterprise/, src/enterprise/). Frontend Monitoring (RUM) is a core OSS feature, and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR/logo-management) appear in the changed paths or symbols, so this is an open-source change.",
+    "skip": "Not skipped: no tests-added label or skip comment was passed (trigger_comment.txt is empty), and the change is user-facing — it rewrites the install-code snippets and SDK version in the Frontend Monitoring (RUM) setup card, not docs/CI-only.",
+    "e2e": "E2E is warranted because web/src/components/ingestion/setupCard/content/rum.ts changes the generated install code a user sees and copies (global rename OO_RUM/OO_LOGS → O2_RUM/O2_LOGS, SDK version 0.3.4 → 0.4.3), and the same rename propagates to the RUM E2E fixtures and the rum-traffic helper, so existing RUM dataflow/onboarding specs must keep matching the new globals.",
+    "area": "RUM — the entire change is about the Frontend Monitoring (RUM) setup card and its test fixtures; sibling RUM specs live under tests/ui-testing/playwright-tests/RUM/ (actual_folder RUM in the CI matrix).",
+    "group": "The RUM testfolder in tests/ui-testing/ci-matrix/ci_matrix_cloud.json maps actual_folder RUM and already names rum-onboarding-snippets.spec.js (alongside the cdn/npm/page dataflow specs), so it is the natural shard; it is currently documentation-only with empty run_files, so the Engineer must re-add the spec to run_files.",
+    "existing_tests": "No Playwright E2E specs in the diff — the only playwright-tests path changed is tests/ui-testing/playwright-tests/utils/rum-traffic.js (a shared utility, not a *.spec.js). The changed web/src/**/*.spec.ts files (FrontendRumConfig.spec.ts, rum.spec.ts) are Vitest unit tests and do not count as E2E coverage."
+  }
+}
