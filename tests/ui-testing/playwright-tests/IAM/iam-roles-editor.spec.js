@@ -270,21 +270,18 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         expect(falseZero, `counter showed a real zero before loading finished: ${[...seen]}`).toBe(false);
     });
 
-    // SKIPPED — but this is a REAL DEFECT, not a broken test. Verified on pentest
-    // (matched build, 2026-09-23): the rail renders 48 module keys while
-    // GET /resources reports 49 visible top-level modules, and the one it drops is
-    // `summary`:
+    // SKIPPED — the assertion is wrong, and there is NO product defect here.
     //
-    //   {"key":"summary","display_name":"Summary","order":18,"parent":"",
-    //    "visible":true,"has_entities":false,"top_level":true}
+    // It compares railModuleKeys().length against the number of visible top-level
+    // resources and sees 48 vs 49. Verified on pentest that the rail is complete: the
+    // `summary` module renders and is grantable. The rail holds 50 elements over 49
+    // distinct slugs, because "Role Overview" reuses the `summary` module's slug, and
+    // the helper filters that slug to stop Role Overview counting as a module — taking
+    // the real module with it. I filed this as o2-enterprise#2717 before checking the
+    // element behind the slug; it is closed as invalid.
     //
-    // It is not an unmapped resource — roleModules.ts maps it (group "platform",
-    // which is in GROUP_ORDER and has a label, and whose other members do render) —
-    // and has_entities:false is not the cause either, since 21 other visible
-    // top-level resources share it and appear. So a module the API publishes is
-    // silently absent from the rail, which is exactly the failure mode this test was
-    // written to catch: a grant on `summary` cannot be made through the UI at all.
-    // Filed as o2-enterprise#2717. Re-enable with the fix.
+    // To re-enable: assert that every key from GET /resources appears in the rail,
+    // rather than comparing totals. Membership survives the collision; a count cannot.
     test.fixme('U-15 · a role with grants across every module renders the whole rail', async ({ page }) => {
         const resources = (await req(page, 'GET', '/resources')).body || [];
         const expected = resources.filter((r) => r.visible && !r.parent && r.key !== 'org').length;

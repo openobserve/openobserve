@@ -128,6 +128,18 @@ export class RolesPage {
     }
 
     /** Distinct module keys in the rail, immune to the duplicate desktop/mobile render. */
+    /**
+     * Distinct module keys in the rail.
+     *
+     * `summary` is filtered because the rail's "Role Overview" nav item and the real
+     * `summary` permission module BOTH render as `edit-role-module-rail-item-summary`
+     * — two elements, one slug — and without the filter Role Overview counts as a
+     * module. The cost is that a published module is dropped too, so THIS LIST IS ONE
+     * SHORT of what the rail actually offers. Do not compare its length against a
+     * resource total: that reads as a missing module when nothing is missing, which
+     * is exactly how o2-enterprise#2717 came to be filed and closed as invalid.
+     * Test membership, or give Role Overview its own slug and drop the filter.
+     */
     async railModuleKeys() {
         const slugs = await this.page
             .locator('[data-test^="edit-role-module-rail-item-"]')
