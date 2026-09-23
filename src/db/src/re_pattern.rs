@@ -200,7 +200,8 @@ pub async fn process_association_changes(
             stream_type: stype,
             field: item.field,
             pattern_id: item.pattern_id,
-            policy: PatternPolicy::from(item.policy),
+            policy: PatternPolicy::from(&item.policy),
+            policy_repr: Some(item.policy),
             apply_at: ApplyPolicy::from(item.apply_at),
         })
         .collect();
@@ -214,7 +215,8 @@ pub async fn process_association_changes(
             stream_type: stype,
             field: item.field,
             pattern_id: item.pattern_id,
-            policy: PatternPolicy::from(item.policy),
+            policy: PatternPolicy::from(&item.policy),
+            policy_repr: Some(item.policy),
             apply_at: ApplyPolicy::from(item.apply_at),
         })
         .collect();

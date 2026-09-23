@@ -95,7 +95,18 @@ pub struct PatternAssociationEntry {
     pub field: String,
     pub pattern_id: String,
     pub policy: PatternPolicy,
+    // The wire spelling, kept so a policy this build cannot decode is not rewritten on disk.
+    pub policy_repr: Option<String>,
     pub apply_at: ApplyPolicy,
+}
+
+impl PatternAssociationEntry {
+    /// What to store: the value as it arrived, so an older node never overwrites a newer policy.
+    pub fn stored_policy(&self) -> String {
+        self.policy_repr
+            .clone()
+            .unwrap_or_else(|| self.policy.to_string())
+    }
 }
 
 impl<T> From<T> for PatternPolicy
@@ -176,20 +187,22 @@ impl From<Model> for PatternAssociationEntry {
             stream_type: StreamType::from(value.stream_type),
             field: value.field,
             pattern_id: value.pattern_id,
-            policy: PatternPolicy::from(value.policy),
+            policy: PatternPolicy::from(&value.policy),
+            policy_repr: Some(value.policy),
             apply_at: ApplyPolicy::from(value.apply_at),
         }
     }
 }
 
 pub async fn add(entry: PatternAssociationEntry) -> Result<(), errors::Error> {
+    let stored_policy = entry.stored_policy();
     let record = ActiveModel {
         org: Set(entry.org),
         stream: Set(entry.stream),
         stream_type: Set(entry.stream_type.to_string()),
         field: Set(entry.field),
         pattern_id: Set(entry.pattern_id),
-        policy: Set(entry.policy.to_string()),
+        policy: Set(stored_policy),
         apply_at: Set(entry.apply_at.to_string()),
         ..Default::default()
     };
@@ -242,12 +255,12 @@ pub async fn batch_process(
 
     if !added.is_empty() {
         let models = added.into_iter().map(|a| ActiveModel {
+            policy: Set(a.stored_policy()),
             org: Set(a.org),
             stream: Set(a.stream),
             stream_type: Set(a.stream_type.to_string()),
             field: Set(a.field),
             pattern_id: Set(a.pattern_id),
-            policy: Set(a.policy.to_string()),
             apply_at: Set(a.apply_at.to_string()),
             ..Default::default()
         });
@@ -386,10 +399,26 @@ mod tests {
             policy: "SomeFuturePolicy".to_string(),
             apply_at: "AtIngestion".to_string(),
         };
-        assert_eq!(
-            PatternAssociationEntry::from(model).policy,
-            PatternPolicy::Detect
-        );
+        let entry = PatternAssociationEntry::from(model);
+        assert_eq!(entry.policy, PatternPolicy::Detect);
+        // Stored as it arrived, so a newer node's policy survives to be understood after upgrade.
+        assert_eq!(entry.stored_policy(), "SomeFuturePolicy");
+    }
+
+    #[test]
+    fn a_policy_this_build_knows_is_stored_by_its_own_name() {
+        let entry = PatternAssociationEntry {
+            id: 0,
+            org: "org".to_string(),
+            stream: "logs".to_string(),
+            stream_type: StreamType::Logs,
+            field: "message".to_string(),
+            pattern_id: "p1".to_string(),
+            policy: PatternPolicy::Redact,
+            policy_repr: None,
+            apply_at: ApplyPolicy::AtIngestion,
+        };
+        assert_eq!(entry.stored_policy(), "Redact");
     }
 
     #[test]

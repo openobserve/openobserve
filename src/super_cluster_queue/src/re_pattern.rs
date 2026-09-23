@@ -145,7 +145,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                             stream_type: stype,
                             field: item.field,
                             pattern_id: item.pattern_id,
-                            policy: PatternPolicy::from(item.policy),
+                            policy: PatternPolicy::from(&item.policy),
+                            policy_repr: Some(item.policy),
                             apply_at: ApplyPolicy::from(item.apply_at),
                         })
                         .collect();
@@ -160,7 +161,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                             stream_type: stype,
                             field: item.field,
                             pattern_id: item.pattern_id,
-                            policy: PatternPolicy::from(item.policy),
+                            policy: PatternPolicy::from(&item.policy),
+                            policy_repr: Some(item.policy),
                             apply_at: ApplyPolicy::from(item.apply_at),
                         })
                         .collect();
