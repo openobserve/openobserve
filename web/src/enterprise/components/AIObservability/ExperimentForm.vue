@@ -352,8 +352,12 @@
                   class="rounded-default border-status-success-text bg-status-success-bg border px-3 py-2 text-xs"
                   data-test="ai-experiment-form-prompt-pin"
                 >
-                  Immutable pin: {{ resolvedPrompt.prompt.name }}@v{{ resolvedPrompt.version.version }}
-                  <span class="text-text-secondary font-mono"> · {{ resolvedPrompt.prompt.entityId }}</span>
+                  Immutable pin: {{ resolvedPrompt.prompt.name }}@v{{
+                    resolvedPrompt.version.version
+                  }}
+                  <span class="text-text-secondary font-mono">
+                    · {{ resolvedPrompt.prompt.entityId }}</span
+                  >
                 </div>
                 <OFormSelect
                   name="providerId"
@@ -376,7 +380,13 @@
                       creatable
                       clearable
                       :disabled="!providerSelected"
-                      :help-text="raw(promptModelOverride ? 'Overrides the managed Prompt model.' : 'Using the managed Prompt model.')"
+                      :help-text="
+                        raw(
+                          promptModelOverride
+                            ? 'Overrides the managed Prompt model.'
+                            : 'Using the managed Prompt model.',
+                        )
+                      "
                       data-test="ai-experiment-form-prompt-model"
                     />
                   </div>
@@ -388,13 +398,18 @@
                       max="2"
                       step="0.1"
                       :label="raw('Temperature override')"
-                      :help-text="raw(promptTemperatureOverride ? 'Overrides Prompt parameters.' : 'Using Prompt parameters.')"
+                      :help-text="
+                        raw(
+                          promptTemperatureOverride
+                            ? 'Overrides Prompt parameters.'
+                            : 'Using Prompt parameters.',
+                        )
+                      "
                       data-test="ai-experiment-form-prompt-temperature"
                     />
                   </div>
                 </div>
               </template>
-
 
               <!-- A remote task is pinned by `name@version`, so the only things
                    left to choose are the two overrides the API accepts. -->
@@ -801,7 +816,6 @@ async function resolvePromptSelection() {
   }
 }
 
-
 const selectedRemoteTask = computed(
   () => remoteTasks.value.find((task) => task.taskRef === taskRef.value) ?? null,
 );
@@ -963,7 +977,6 @@ function promptOverrides(values: ExperimentForm) {
   return Object.keys(overrides).length ? overrides : null;
 }
 
-
 function buildTask(values: ExperimentForm): ExperimentCreatePayload["task"] {
   if (values.taskType === "remote") {
     return { type: "remote", taskRef: values.taskRef, overrides: remoteOverrides(values) };
@@ -1093,10 +1106,7 @@ watch(
   runPreview,
   { deep: true },
 );
-watch(
-  [promptId, promptSelectionMode, promptLabel, promptVersion],
-  resolvePromptSelection,
-);
+watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
 onBeforeRouteLeave((to, _from, next) => {
   if (allowLeave || !isDirty.value) {

@@ -14,18 +14,18 @@
         :key="side.version"
         class="rounded-default border-border-default bg-surface-base border p-3"
       >
-          <div class="text-text-heading text-xs font-semibold">
-            {{ t("aiObservability.promptManagement.versionNumber", { version: side.version }) }}
-          </div>
+        <div class="text-text-heading text-xs font-semibold">
+          {{ t("aiObservability.promptManagement.versionNumber", { version: side.version }) }}
+        </div>
         <dl class="mt-2 grid grid-cols-2 gap-2 text-xs">
-            <dt class="text-text-secondary">{{ t("aiObservability.promptManagement.scoreP50") }}</dt>
+          <dt class="text-text-secondary">{{ t("aiObservability.promptManagement.scoreP50") }}</dt>
           <dd class="text-right tabular-nums">{{ metric(side.p50) }}</dd>
-            <dt class="text-text-secondary">{{ t("aiObservability.promptManagement.scoreIqr") }}</dt>
+          <dt class="text-text-secondary">{{ t("aiObservability.promptManagement.scoreIqr") }}</dt>
           <dd class="text-right tabular-nums">{{ metric(side.iqr) }}</dd>
         </dl>
       </div>
     </div>
-    <p class="text-text-secondary mt-2 text-2xs">
+    <p class="text-text-secondary text-2xs mt-2">
       {{ t("aiObservability.promptManagement.scoreEvidenceHelp") }}
     </p>
   </section>
@@ -50,9 +50,9 @@ const loading = ref(false);
 const error = ref("");
 const left = ref<PromptVersionScoreSummary | null>(null);
 const right = ref<PromptVersionScoreSummary | null>(null);
-const sides = computed(() => [left.value, right.value].filter(
-  (value): value is PromptVersionScoreSummary => value != null,
-));
+const sides = computed(() =>
+  [left.value, right.value].filter((value): value is PromptVersionScoreSummary => value != null),
+);
 
 function metric(value: number | null): string {
   return value == null ? "—" : value.toFixed(3);
@@ -78,9 +78,5 @@ async function load() {
   }
 }
 
-watch(
-  () => [props.orgId, props.promptId, ...props.versions],
-  load,
-  { immediate: true },
-);
+watch(() => [props.orgId, props.promptId, ...props.versions], load, { immediate: true });
 </script>

@@ -17,14 +17,17 @@
         icon-left="settings"
         data-test="prompts-settings"
         @click="settingsOpen = true"
-      >{{ t("aiObservability.promptManagement.settings") }}</OButton>
+        >{{ t("aiObservability.promptManagement.settings") }}</OButton
+      >
       <OButton variant="primary" size="sm" data-test="prompt-new" @click="openCreate">
         {{ t("aiObservability.promptManagement.newPrompt") }}
       </OButton>
     </template>
 
     <div class="flex min-h-0 flex-1 max-md:flex-col">
-      <aside class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b">
+      <aside
+        class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
+      >
         <FolderList type="prompts" @update:active-folder-id="selectFolder" />
       </aside>
 
@@ -51,7 +54,7 @@
               <OInput
                 v-model="search"
                 class="min-w-56 flex-1"
-              :placeholder="t('aiObservability.promptManagement.searchNameOrTag')"
+                :placeholder="t('aiObservability.promptManagement.searchNameOrTag')"
                 clearable
                 data-test="prompt-search"
               >
@@ -65,10 +68,19 @@
                 class="w-36"
                 data-test="prompt-status-filter"
               />
-            <OInput v-model="tagFilter" class="w-40" :placeholder="t('aiObservability.promptManagement.filterTag')" clearable />
+              <OInput
+                v-model="tagFilter"
+                class="w-40"
+                :placeholder="t('aiObservability.promptManagement.filterTag')"
+                clearable
+              />
               <OToggleGroup v-model="folderScope" type="single">
-              <OToggleGroupItem value="current" size="xs">{{ t("aiObservability.promptManagement.thisFolder") }}</OToggleGroupItem>
-              <OToggleGroupItem value="all" size="xs">{{ t("aiObservability.promptManagement.allFolders") }}</OToggleGroupItem>
+                <OToggleGroupItem value="current" size="xs">{{
+                  t("aiObservability.promptManagement.thisFolder")
+                }}</OToggleGroupItem>
+                <OToggleGroupItem value="all" size="xs">{{
+                  t("aiObservability.promptManagement.allFolders")
+                }}</OToggleGroupItem>
               </OToggleGroup>
             </div>
           </template>
@@ -86,13 +98,17 @@
           <template #cell-name="{ row }">
             <div class="flex min-w-0 flex-col">
               <span class="text-text-heading truncate font-medium">{{ row.name }}</span>
-              <span v-if="row.description" class="text-text-secondary truncate text-2xs">{{ row.description }}</span>
+              <span v-if="row.description" class="text-text-secondary text-2xs truncate">{{
+                row.description
+              }}</span>
             </div>
           </template>
           <template #cell-tags="{ row }">
             <div class="flex max-w-64 flex-wrap gap-1">
-              <OTag v-for="tag in row.tags" :key="tag" variant="default-soft" shape="rounded">{{ tag }}</OTag>
-            <span v-if="!row.tags.length" class="text-text-secondary">{{ raw("—") }}</span>
+              <OTag v-for="tag in row.tags" :key="tag" variant="default-soft" shape="rounded">{{
+                tag
+              }}</OTag>
+              <span v-if="!row.tags.length" class="text-text-secondary">{{ raw("—") }}</span>
             </div>
           </template>
           <template #cell-labels="{ row }">
@@ -104,15 +120,24 @@
                 shape="rounded"
               >
                 <OIcon v-if="protectedLabels.includes(label.name)" name="lock" size="xs" />
-                {{ t("aiObservability.promptManagement.labelVersion", { name: label.name, version: label.version }) }}
+                {{
+                  t("aiObservability.promptManagement.labelVersion", {
+                    name: label.name,
+                    version: label.version,
+                  })
+                }}
               </OTag>
             </div>
           </template>
           <template #cell-latestVersion="{ row }">
-            <span class="tabular-nums">{{ t("aiObservability.promptManagement.versionNumber", { version: row.latestVersion }) }}</span>
+            <span class="tabular-nums">{{
+              t("aiObservability.promptManagement.versionNumber", { version: row.latestVersion })
+            }}</span>
           </template>
           <template #cell-status="{ row }">
-            <OTag :variant="row.status === 'active' ? 'success-soft' : 'default-soft'">{{ row.status }}</OTag>
+            <OTag :variant="row.status === 'active' ? 'success-soft' : 'default-soft'">{{
+              row.status
+            }}</OTag>
           </template>
           <template #cell-updatedAt="{ row }">
             <OTimeCell :value="row.updatedAt" unit="ms" mode="relative" :empty-label="raw('—')" />
@@ -120,11 +145,22 @@
           <template #cell-actions="{ row }">
             <ODropdown side="bottom" align="end" @click.stop>
               <template #trigger>
-                <OButton variant="ghost" size="icon-xs" icon-left="more-vert" :title="raw('Prompt actions')" />
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="more-vert"
+                  :title="raw('Prompt actions')"
+                />
               </template>
-              <ODropdownItem @select="openEdit(row)">{{ t("aiObservability.promptManagement.createNewVersion") }}</ODropdownItem>
-              <ODropdownItem @select="openMove(row)">{{ t("aiObservability.promptManagement.moveToFolder") }}</ODropdownItem>
-              <ODropdownItem v-if="row.status === 'active'" @select="archive(row)">{{ t("aiObservability.promptManagement.archive") }}</ODropdownItem>
+              <ODropdownItem @select="openEdit(row)">{{
+                t("aiObservability.promptManagement.createNewVersion")
+              }}</ODropdownItem>
+              <ODropdownItem @select="openMove(row)">{{
+                t("aiObservability.promptManagement.moveToFolder")
+              }}</ODropdownItem>
+              <ODropdownItem v-if="row.status === 'active'" @select="archive(row)">{{
+                t("aiObservability.promptManagement.archive")
+              }}</ODropdownItem>
             </ODropdown>
           </template>
         </OTable>
@@ -144,7 +180,12 @@
       @open-playground="openPlayground"
     >
       <template #traffic="{ version }">
-        <PromptTrafficPanel v-if="version" :org-id="orgId" :prompt="selectedPrompt!" :version="version" />
+        <PromptTrafficPanel
+          v-if="version"
+          :org-id="orgId"
+          :prompt="selectedPrompt!"
+          :version="version"
+        />
       </template>
     </PromptDetailDrawer>
 
@@ -184,7 +225,11 @@
         @folder-selected="moveDestination = $event.value"
       />
       <p v-if="movingPrompt" class="text-text-secondary mt-3 text-xs">
-        {{ t("aiObservability.promptManagement.moveKeepsVersions", { count: movingPrompt.latestVersion }) }}
+        {{
+          t("aiObservability.promptManagement.moveKeepsVersions", {
+            count: movingPrompt.latestVersion,
+          })
+        }}
       </p>
     </ODialog>
   </OPageLayout>
@@ -212,6 +257,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { getFoldersListByType } from "@/utils/commons";
 import llmPromptsService, {
   type Prompt,
@@ -228,6 +274,7 @@ import { storePromptPlaygroundHandoff } from "./promptPlaygroundHandoff";
 
 const store = useStore();
 const { t } = useI18nTyped();
+const { confirm } = useConfirmDialog();
 const route = useRoute();
 const router = useRouter();
 const prompts = ref<Prompt[]>([]);
@@ -248,7 +295,9 @@ const moveOpen = ref(false);
 const movingPrompt = ref<Prompt | null>(null);
 const moveDestination = ref("");
 
-const orgId = computed(() => String(store.state.selectedOrganization?.identifier ?? route.query.org_identifier ?? ""));
+const orgId = computed(() =>
+  String(store.state.selectedOrganization?.identifier ?? route.query.org_identifier ?? ""),
+);
 const routeVersion = computed(() => {
   const parsed = Number(route.query.version);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -264,7 +313,12 @@ const filteredPrompts = computed(() => {
   return prompts.value.filter((prompt) => {
     if (folderScope.value === "current" && prompt.folderId !== activeFolderId.value) return false;
     if (statusFilter.value !== "all" && prompt.status !== statusFilter.value) return false;
-    if (needle && !prompt.name.toLowerCase().includes(needle) && !prompt.tags.some((value) => value.toLowerCase().includes(needle))) return false;
+    if (
+      needle &&
+      !prompt.name.toLowerCase().includes(needle) &&
+      !prompt.tags.some((value) => value.toLowerCase().includes(needle))
+    )
+      return false;
     return !tag || prompt.tags.some((value) => value.toLowerCase() === tag);
   });
 });
@@ -299,14 +353,18 @@ function errorText(error: unknown, fallback: string): string {
     const response = error.response;
     if (response && typeof response === "object" && "data" in response) {
       const data = response.data;
-      if (data && typeof data === "object" && "message" in data && typeof data.message === "string") {
+      if (
+        data &&
+        typeof data === "object" &&
+        "message" in data &&
+        typeof data.message === "string"
+      ) {
         return data.message;
       }
     }
   }
   return error instanceof Error ? error.message : fallback;
 }
-
 
 async function loadPrompts() {
   if (!orgId.value) return;
@@ -316,7 +374,8 @@ async function loadPrompts() {
     const selected = String(route.query.selected ?? "");
     if (selected) {
       selectedPrompt.value = prompts.value.find((prompt) => prompt.entityId === selected) ?? null;
-      if (!selectedPrompt.value) selectedPrompt.value = await llmPromptsService.get(orgId.value, selected);
+      if (!selectedPrompt.value)
+        selectedPrompt.value = await llmPromptsService.get(orgId.value, selected);
       drawerOpen.value = true;
     }
   } catch (error: unknown) {
@@ -331,7 +390,10 @@ async function loadSettings() {
     protectedLabels.value = (await llmPromptsService.getSettings(orgId.value)).protectedLabels;
   } catch (error: unknown) {
     if (errorStatus(error) !== 403) {
-      toast({ variant: "error", message: raw(errorText(error, "Failed to load prompt settings.")) });
+      toast({
+        variant: "error",
+        message: raw(errorText(error, "Failed to load prompt settings.")),
+      });
     }
   }
 }
@@ -340,7 +402,12 @@ function selectFolder(folderId: string) {
   activeFolderId.value = folderId || "default";
   router.replace(
     aiPromptsRoute(orgId.value, {
-      query: { ...route.query, folder: activeFolderId.value, selected: undefined, version: undefined },
+      query: {
+        ...route.query,
+        folder: activeFolderId.value,
+        selected: undefined,
+        version: undefined,
+      },
     }),
   );
 }
@@ -377,7 +444,11 @@ function openCreate() {
 async function openEdit(prompt: Prompt) {
   try {
     editingPrompt.value = prompt;
-    editingVersion.value = await llmPromptsService.getVersion(orgId.value, prompt.entityId, prompt.latestVersion);
+    editingVersion.value = await llmPromptsService.getVersion(
+      orgId.value,
+      prompt.entityId,
+      prompt.latestVersion,
+    );
     editorOpen.value = true;
   } catch (error: unknown) {
     toast({ variant: "error", message: raw(errorText(error, "Failed to load prompt version.")) });
@@ -419,14 +490,26 @@ async function movePrompt() {
     });
     replacePrompt(updated);
     moveOpen.value = false;
-    toast({ variant: "success", message: raw(`Prompt moved. ${versionCount} versions unchanged.`) });
+    toast({
+      variant: "success",
+      message: raw(`Prompt moved. ${versionCount} versions unchanged.`),
+    });
   } catch (error: unknown) {
     toast({ variant: "error", message: raw(errorText(error, "Failed to move prompt.")) });
   }
 }
 
 async function archive(prompt: Prompt) {
-  if (!window.confirm(`Archive ${prompt.name}? Existing version references continue to resolve.`)) return;
+  if (
+    !(await confirm({
+      title: t("aiObservability.promptManagement.archivePrompt"),
+      message: t("aiObservability.promptManagement.archivePromptConfirmMessage", {
+        name: raw(prompt.name),
+      }),
+      confirmLabel: t("aiObservability.promptManagement.archive"),
+    }))
+  )
+    return;
   try {
     const updated = await llmPromptsService.archive(orgId.value, prompt.entityId);
     replacePrompt(updated);

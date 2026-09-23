@@ -3,8 +3,16 @@
   <ODialog
     :open="open"
     size="xl"
-    :title="prompt ? t('aiObservability.promptManagement.createVersion', { version: prompt.latestVersion + 1 }) : t('aiObservability.promptManagement.newPrompt')"
-    :primary-button-label="prompt ? t('aiObservability.promptManagement.saveVersion') : t('aiObservability.promptManagement.createPrompt')"
+    :title="
+      prompt
+        ? t('aiObservability.promptManagement.createVersion', { version: prompt.latestVersion + 1 })
+        : t('aiObservability.promptManagement.newPrompt')
+    "
+    :primary-button-label="
+      prompt
+        ? t('aiObservability.promptManagement.saveVersion')
+        : t('aiObservability.promptManagement.createPrompt')
+    "
     :secondary-button-label="t('aiObservability.promptManagement.cancel')"
     :primary-button-loading="saving"
     :primary-button-disabled="!canSave"
@@ -14,14 +22,22 @@
     @click:primary="save"
   >
     <div class="flex max-h-[72vh] flex-col gap-4 overflow-auto p-0.5">
-      <div v-if="prompt && baseVersion" class="rounded-default bg-info-subtle text-text-body px-3 py-2 text-xs">
-        {{ t("aiObservability.promptManagement.editingVersion", { from: baseVersion.version, to: prompt.latestVersion + 1 }) }}
+      <div
+        v-if="prompt && baseVersion"
+        class="rounded-default bg-info-subtle text-text-body px-3 py-2 text-xs"
+      >
+        {{
+          t("aiObservability.promptManagement.editingVersion", {
+            from: baseVersion.version,
+            to: prompt.latestVersion + 1,
+          })
+        }}
       </div>
 
       <div class="grid grid-cols-2 gap-3 max-md:grid-cols-1">
         <OInput
           v-model="name"
-        :label="t('aiObservability.promptManagement.name')"
+          :label="t('aiObservability.promptManagement.name')"
           :placeholder="raw('support-answer')"
           :disabled="Boolean(prompt)"
           required
@@ -29,7 +45,7 @@
         />
         <OSelect
           v-model="type"
-        :label="t('aiObservability.promptManagement.type')"
+          :label="t('aiObservability.promptManagement.type')"
           :options="typeOptions"
           label-key="label"
           value-key="value"
@@ -38,8 +54,18 @@
         />
       </div>
 
-      <OTextarea v-if="!prompt" v-model="description" :label="t('aiObservability.promptManagement.description')" :rows="2" />
-      <OInput v-if="!prompt" v-model="tagsText" :label="t('aiObservability.promptManagement.tags')" :placeholder="raw('support, production')" />
+      <OTextarea
+        v-if="!prompt"
+        v-model="description"
+        :label="t('aiObservability.promptManagement.description')"
+        :rows="2"
+      />
+      <OInput
+        v-if="!prompt"
+        v-model="tagsText"
+        :label="t('aiObservability.promptManagement.tags')"
+        :placeholder="raw('support, production')"
+      />
 
       <section class="flex flex-col gap-2">
         <div class="flex items-center justify-between">
@@ -71,7 +97,13 @@
           @move="moveMessage"
         />
         <div v-if="variables.length" class="flex flex-wrap gap-1">
-          <OTag v-for="variable in variables" :key="variable" variant="default-soft" shape="rounded">{{ variable }}</OTag>
+          <OTag
+            v-for="variable in variables"
+            :key="variable"
+            variant="default-soft"
+            shape="rounded"
+            >{{ variable }}</OTag
+          >
         </div>
       </section>
 
@@ -98,12 +130,28 @@
           data-test="prompt-editor-model"
         />
         <span v-if="capableProviders.length" class="text-text-secondary text-2xs">
-          {{ t("aiObservability.promptManagement.availableProviders", { providers: capableProviders.join(", ") }) }}
+          {{
+            t("aiObservability.promptManagement.availableProviders", {
+              providers: capableProviders.join(", "),
+            })
+          }}
         </span>
         <div class="grid grid-cols-3 gap-3 max-md:grid-cols-1">
-          <OTextarea v-model="paramsText" :label="t('aiObservability.promptManagement.parametersJson')" :rows="4" />
-          <OTextarea v-model="toolsText" :label="t('aiObservability.promptManagement.toolsJson')" :rows="4" />
-          <OTextarea v-model="responseFormatText" :label="t('aiObservability.promptManagement.responseFormatJson')" :rows="4" />
+          <OTextarea
+            v-model="paramsText"
+            :label="t('aiObservability.promptManagement.parametersJson')"
+            :rows="4"
+          />
+          <OTextarea
+            v-model="toolsText"
+            :label="t('aiObservability.promptManagement.toolsJson')"
+            :rows="4"
+          />
+          <OTextarea
+            v-model="responseFormatText"
+            :label="t('aiObservability.promptManagement.responseFormatJson')"
+            :rows="4"
+          />
         </div>
       </section>
 
@@ -121,12 +169,22 @@
           {{ t("aiObservability.promptManagement.sameContentExists") }}
         </div>
         <div v-for="match in matches" :key="match.id" class="text-text-secondary">
-          {{ t("aiObservability.promptManagement.promptVersionReference", { name: match.name, version: match.version }) }}
+          {{
+            t("aiObservability.promptManagement.promptVersionReference", {
+              name: match.name,
+              version: match.version,
+            })
+          }}
         </div>
       </div>
 
       <div class="flex justify-end">
-        <OButton variant="outline" size="sm" :disabled="!hasBody" @click="emit('test', handoffVersion, name)">
+        <OButton
+          variant="outline"
+          size="sm"
+          :disabled="!hasBody"
+          @click="emit('test', handoffVersion, name)"
+        >
           {{ t("aiObservability.promptManagement.testInPlayground") }}
         </OButton>
       </div>
@@ -215,7 +273,8 @@ const payload = computed(() =>
 );
 const variables = computed(() => {
   const found = new Set<string>();
-  const text = type.value === "text" ? textPayload.value : variant.messages.map((m) => m.content).join("\n");
+  const text =
+    type.value === "text" ? textPayload.value : variant.messages.map((m) => m.content).join("\n");
   for (const match of text.matchAll(/\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g)) found.add(match[1]);
   return [...found].sort();
 });
@@ -237,7 +296,8 @@ const canSave = computed(
 const modelOptions = computed(() => {
   const models = new Set<string>();
   for (const provider of providers.value) {
-    for (const available of provider.availableModels ?? provider.available_models ?? []) models.add(available);
+    for (const available of provider.availableModels ?? provider.available_models ?? [])
+      models.add(available);
     const preferred = provider.defaultModel ?? provider.default_model;
     if (preferred) models.add(preferred);
   }
@@ -248,7 +308,10 @@ const capableProviders = computed(() =>
   providers.value
     .filter((provider) => {
       const models = provider.availableModels ?? provider.available_models ?? [];
-      return models.includes(model.value) || (provider.defaultModel ?? provider.default_model) === model.value;
+      return (
+        models.includes(model.value) ||
+        (provider.defaultModel ?? provider.default_model) === model.value
+      );
     })
     .map((provider) => provider.name),
 );
@@ -299,7 +362,6 @@ function isPlaygroundRole(value: unknown): value is PlaygroundRole {
   return typeof value === "string" && PLAYGROUND_ROLES.some((role) => role === value);
 }
 
-
 function chatMessages(payload: unknown): PlaygroundMessage[] {
   const defaults: PlaygroundMessage[] = [
     { id: "prompt-system", role: "system", content: "" },
@@ -345,14 +407,13 @@ async function save() {
       config: configValue.value,
     });
     matches.value = discoveredMatches;
-    if (
-      discoveredMatches.length &&
-      confirmedMatchFingerprint.value !== contentFingerprint.value
-    ) {
+    if (discoveredMatches.length && confirmedMatchFingerprint.value !== contentFingerprint.value) {
       confirmedMatchFingerprint.value = contentFingerprint.value;
       toast({
         variant: "warning",
-        message: raw("Matching content already exists. Review the matches, then save again to continue."),
+        message: raw(
+          "Matching content already exists. Review the matches, then save again to continue.",
+        ),
       });
       return;
     }
@@ -366,7 +427,6 @@ async function save() {
             commitMessage: commitMessage.value.trim(),
             source: "ui",
             baseVersion: props.baseVersion?.version ?? props.prompt.latestVersion,
-            baseHash: props.baseVersion?.contentHash ?? null,
           },
           { ifHead: props.prompt.latestVersion, idempotencyKey: crypto.randomUUID() },
         )
@@ -377,7 +437,10 @@ async function save() {
             folderId: props.folderId,
             type: type.value,
             description: description.value.trim() || null,
-            tags: tagsText.value.split(",").map((tag) => tag.trim()).filter(Boolean),
+            tags: tagsText.value
+              .split(",")
+              .map((tag) => tag.trim())
+              .filter(Boolean),
             payload: payload.value,
             config: configValue.value,
             commitMessage: commitMessage.value.trim(),
@@ -387,9 +450,15 @@ async function save() {
         );
     emit("saved", result.prompt);
     emit("update:open", false);
-    toast({ variant: "success", message: raw(props.prompt ? `Saved v${result.version.version}.` : "Prompt created.") });
+    toast({
+      variant: "success",
+      message: raw(props.prompt ? `Saved v${result.version.version}.` : "Prompt created."),
+    });
   } catch (error: unknown) {
-    toast({ variant: "error", message: raw(error instanceof Error ? error.message : "Failed to save prompt.") });
+    toast({
+      variant: "error",
+      message: raw(error instanceof Error ? error.message : "Failed to save prompt."),
+    });
   } finally {
     saving.value = false;
   }
@@ -422,7 +491,9 @@ function moveMessage(from: number, to: number) {
   if (message) variant.messages.splice(to, 0, message);
 }
 
-watch(() => [props.open, props.prompt?.entityId, props.baseVersion?.id], reset, { immediate: true });
+watch(() => [props.open, props.prompt?.entityId, props.baseVersion?.id], reset, {
+  immediate: true,
+});
 watch(
   () => props.open,
   async (open) => {

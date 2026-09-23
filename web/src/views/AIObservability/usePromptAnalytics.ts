@@ -2,9 +2,7 @@
 
 import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
-import llmExperimentsService, {
-  type LlmExperiment,
-} from "@/services/llm-experiments.service";
+import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import type { Prompt, PromptVersion } from "@/services/llm-prompts.service";
 import { latestScoresFromSql } from "@/enterprise/components/onlineEvals/utils/latestScoreSql";
 
@@ -60,7 +58,6 @@ function stringOrNull(value: unknown): string | null {
   return typeof value === "string" && value ? value : null;
 }
 
-
 function scoreValue(row: Record<string, unknown>): unknown {
   return row.value_numeric ?? row.value_boolean ?? row.value_categorical ?? null;
 }
@@ -76,7 +73,8 @@ function quartiles(experiments: LlmExperiment[]): { p50: number | null; iqr: num
   );
   if (!values.length) return { p50: null, iqr: null };
   values.sort((left, right) => left - right);
-  const at = (fraction: number) => values[Math.min(values.length - 1, Math.floor(fraction * values.length))];
+  const at = (fraction: number) =>
+    values[Math.min(values.length - 1, Math.floor(fraction * values.length))];
   const q1 = at(0.25);
   const p50 = at(0.5);
   const q3 = at(0.75);
@@ -107,7 +105,6 @@ export async function loadPromptVersionScoreComparison(
     right: { version: versions[1], ...quartiles(right) },
   };
 }
-
 
 export function usePromptAnalytics(
   prompt: Ref<Prompt>,
@@ -147,8 +144,8 @@ export function usePromptAnalytics(
       "SELECT",
       "  COUNT(*) AS calls,",
       "  COUNT(CASE WHEN span_status = 'ERROR' THEN 1 END) AS errors,",
-      "  approx_percentile_cont(TRY_CAST(duration AS DOUBLE) / 1000000.0, 0.5) AS p50_latency_ms,",
-      "  approx_percentile_cont(TRY_CAST(duration AS DOUBLE) / 1000000.0, 0.95) AS p95_latency_ms,",
+      "  approx_percentile_cont(TRY_CAST(duration AS DOUBLE) / 1000.0, 0.5) AS p50_latency_ms,",
+      "  approx_percentile_cont(TRY_CAST(duration AS DOUBLE) / 1000.0, 0.95) AS p95_latency_ms,",
       "  SUM(TRY_CAST(gen_ai_usage_cost AS DOUBLE)) AS cost",
       `FROM "${stream}"`,
       `WHERE ${where}`,
@@ -159,8 +156,8 @@ export function usePromptAnalytics(
       "  COALESCE(gen_ai_response_model, gen_ai_request_model, '') AS model,",
       "  COUNT(*) AS calls,",
       "  COUNT(CASE WHEN span_status = 'ERROR' THEN 1 END) AS errors,",
-      "  approx_percentile_cont(TRY_CAST(duration AS DOUBLE) / 1000000.0, 0.5) AS p50_latency_ms,",
-      "  approx_percentile_cont(TRY_CAST(duration AS DOUBLE) / 1000000.0, 0.95) AS p95_latency_ms,",
+      "  approx_percentile_cont(TRY_CAST(duration AS DOUBLE) / 1000.0, 0.5) AS p50_latency_ms,",
+      "  approx_percentile_cont(TRY_CAST(duration AS DOUBLE) / 1000.0, 0.95) AS p95_latency_ms,",
       "  SUM(TRY_CAST(gen_ai_usage_cost AS DOUBLE)) AS cost",
       `FROM "${stream}"`,
       `WHERE ${where}`,
@@ -202,14 +199,20 @@ export function usePromptAnalytics(
         model: stringOrNull(row.gen_ai_response_model) ?? stringOrNull(row.gen_ai_request_model),
         label: stringOrNull(row.gen_ai_prompt_label),
         status: stringOrNull(row.span_status),
-        latencyMs: (toNumber(row.duration) ?? 0) / 1_000_000,
+        latencyMs: toNumber(row.duration) == null ? null : Number(row.duration) / 1_000,
         cost: toNumber(row.gen_ai_usage_cost),
         scores: [],
       }));
       recent.value = await mergeLatestScores(rows, startUs, endUs);
     } catch (caught: unknown) {
       error.value = caught instanceof Error ? caught.message : "Prompt traffic query failed.";
-      kpis.value = { calls: 0, errorRate: null, p50LatencyMs: null, p95LatencyMs: null, cost: null };
+      kpis.value = {
+        calls: 0,
+        errorRate: null,
+        p50LatencyMs: null,
+        p95LatencyMs: null,
+        cost: null,
+      };
       breakdown.value = [];
       recent.value = [];
     } finally {
@@ -240,7 +243,6 @@ export function usePromptAnalytics(
       scores: [...(byTarget.get(row.spanId) ?? []), ...(byTarget.get(row.traceId) ?? [])],
     }));
   }
-
 
   async function loadExperimentEvidence(orgId: string) {
     const [managed, contentMatches] = await Promise.all([

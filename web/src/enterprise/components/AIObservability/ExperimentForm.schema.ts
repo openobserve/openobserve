@@ -115,7 +115,6 @@ export const makeExperimentSchema = (t: (_key: string) => string) =>
         return;
       }
 
-
       // A remote task must name a PUBLISHED version. The server resolves the
       // ref against the registry and refuses a bare name, so a value without
       // an "@" could only ever fail there.

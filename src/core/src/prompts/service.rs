@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 use chrono::Utc;
+use config::meta::folder::DEFAULT_FOLDER;
 use infra::table::{
     entity::{
         llm_prompt_label_events as label_events, llm_prompt_labels as labels,
@@ -36,16 +37,18 @@ pub async fn list_prompts(
 ) -> Result<Vec<Prompt>, PromptError> {
     let db = infra::db::get_orm_client_ro().await;
     let physical_folder_id = match folder_id {
-        Some(folder_id) => Some(
-            folders::get_pk(
-                db,
-                org_id,
-                folder_id,
-                config::meta::folder::FolderType::Prompts,
-            )
-            .await?
-            .ok_or(PromptError::FolderNotFound)?,
-        ),
+        Some(folder_id) => match folders::get_pk(
+            db,
+            org_id,
+            folder_id,
+            config::meta::folder::FolderType::Prompts,
+        )
+        .await?
+        {
+            Some(folder_pk) => Some(folder_pk),
+            None if folder_id == DEFAULT_FOLDER => return Ok(Vec::new()),
+            None => return Err(PromptError::FolderNotFound),
+        },
         None => None,
     };
     let models =
@@ -363,13 +366,12 @@ pub async fn create_prompt(
     input.commit_message = validate_commit_message(&input.commit_message)?;
     input.tags = normalize_tags(input.tags);
     validate_payload(input.prompt_type, &input.payload)?;
-    if input.folder_id.trim().is_empty() {
+    input.folder_id = input.folder_id.trim().to_string();
+    if input.folder_id.is_empty() || input.folder_id == DEFAULT_FOLDER {
         input.folder_id =
             db::folders::ensure_default_folder(org_id, config::meta::folder::FolderType::Prompts)
                 .await?
                 .folder_id;
-    } else {
-        input.folder_id = input.folder_id.trim().to_string();
     }
     let webhook = webhook_for(
         org_id,

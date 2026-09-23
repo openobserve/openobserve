@@ -418,9 +418,7 @@ const savePromptConfig = computed<PromptConfig>(() => {
         parameters: parsePromptJson(tool.parameters) ?? {},
       },
     })),
-    responseFormat: variant.responseSchema
-      ? parsePromptJson(variant.responseSchema)
-      : null,
+    responseFormat: variant.responseSchema ? parsePromptJson(variant.responseSchema) : null,
   };
 });
 
@@ -616,11 +614,13 @@ function promptMessages(payload: unknown): PlaygroundMessage[] {
   if (!Array.isArray(payload)) return [];
   return payload.flatMap((entry): PlaygroundMessage[] => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
-    return [{
-      id: playgroundId("message"),
-      role: promptRole("role" in entry ? entry.role : "user"),
-      content: String("content" in entry ? (entry.content ?? "") : ""),
-    }];
+    return [
+      {
+        id: playgroundId("message"),
+        role: promptRole("role" in entry ? entry.role : "user"),
+        content: String("content" in entry ? (entry.content ?? "") : ""),
+      },
+    ];
   });
 }
 
@@ -637,8 +637,7 @@ function promptTools(value: unknown): PlaygroundTool[] {
         : entry;
     const name = "name" in candidate ? String(candidate.name ?? "") : "";
     if (!name) return [];
-    const description =
-      "description" in candidate ? String(candidate.description ?? "") : "";
+    const description = "description" in candidate ? String(candidate.description ?? "") : "";
     const parameters = "parameters" in candidate ? candidate.parameters : {};
     return [{ name, description, parameters: JSON.stringify(parameters ?? {}, null, 2) }];
   });

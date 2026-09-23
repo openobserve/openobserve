@@ -1291,8 +1291,7 @@ export default defineComponent({
           : "";
       const version = Number(props.span?.gen_ai_prompt_version);
       const label =
-        typeof props.span?.gen_ai_prompt_label === "string" &&
-        props.span.gen_ai_prompt_label.trim()
+        typeof props.span?.gen_ai_prompt_label === "string" && props.span.gen_ai_prompt_label.trim()
           ? props.span.gen_ai_prompt_label.trim()
           : null;
       const orgId = String(store.state.selectedOrganization?.identifier ?? "");
@@ -1332,7 +1331,6 @@ export default defineComponent({
       resolvePromptAttribution,
       { immediate: true },
     );
-
 
     const hasDbSpan = computed(() =>
       Object.keys(props.span ?? {}).some((key) => key.startsWith("db_")),

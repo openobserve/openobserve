@@ -4,7 +4,11 @@
     :open="open"
     size="lg"
     :title="t('aiObservability.promptManagement.saveAsPrompt')"
-    :primary-button-label="mode === 'create' ? t('aiObservability.promptManagement.createPrompt') : t('aiObservability.promptManagement.appendVersion')"
+    :primary-button-label="
+      mode === 'create'
+        ? t('aiObservability.promptManagement.createPrompt')
+        : t('aiObservability.promptManagement.appendVersion')
+    "
     :secondary-button-label="t('aiObservability.promptManagement.cancel')"
     :primary-button-disabled="!canSave"
     :primary-button-loading="saving"
@@ -53,7 +57,12 @@
           {{ t("aiObservability.promptManagement.matchingContentExists") }}
         </div>
         <div v-for="match in matches" :key="match.id" class="text-text-secondary mt-1">
-          {{ t("aiObservability.promptManagement.promptVersionReference", { name: match.name, version: match.version }) }}
+          {{
+            t("aiObservability.promptManagement.promptVersionReference", {
+              name: match.name,
+              version: match.version,
+            })
+          }}
         </div>
         <div class="text-text-secondary mt-2">
           {{ t("aiObservability.promptManagement.saveAgainToContinue") }}
@@ -194,7 +203,11 @@ async function save() {
     } else {
       const target = prompts.value.find((prompt) => prompt.entityId === targetId.value);
       if (!target) throw new Error("Select an active Prompt.");
-      const base = await llmPromptsService.getVersion(props.orgId, target.entityId, target.latestVersion);
+      const base = await llmPromptsService.getVersion(
+        props.orgId,
+        target.entityId,
+        target.latestVersion,
+      );
       const result = await llmPromptsService.createVersion(
         props.orgId,
         target.entityId,
@@ -223,5 +236,9 @@ async function save() {
   }
 }
 
-watch(() => props.open, (open) => open && reset(), { immediate: true });
+watch(
+  () => props.open,
+  (open) => open && reset(),
+  { immediate: true },
+);
 </script>

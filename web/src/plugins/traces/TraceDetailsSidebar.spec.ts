@@ -2064,9 +2064,7 @@ describe("TraceDetailsSidebar", async () => {
       });
       await flushPromises();
 
-      const chip = attributed.find(
-        '[data-test="trace-details-sidebar-prompt-attribution"]',
-      );
+      const chip = attributed.find('[data-test="trace-details-sidebar-prompt-attribution"]');
       expect(chip.text()).toContain("support-answer@v3 · production");
       await chip.trigger("click");
       expect(mockPromptResolve).toHaveBeenCalledWith("test-org", {
