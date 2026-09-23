@@ -121,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="no-border o2-search-input w-64 max-md:w-auto max-md:min-w-40 max-md:flex-1"
-                :placeholder="t('logStream.search')"
+                class="no-border o2-search-input min-w-0 flex-1 max-md:min-w-40"
+                :placeholder="t('logStream.search')"  
                 :debounce="300"
               />
             </div>
