@@ -15,6 +15,7 @@
 
 import { reactive, ref } from "vue";
 import type { TranslateFn } from "@/types/i18n";
+import { placeholderNames } from "@/components/synthetics/variables/placeholders";
 import { mapWireSteps, substituteVariables } from "@/utils/synthetics/mapRecordedStep";
 import type {
   BrowserStep,
@@ -65,6 +66,20 @@ export function isExtensionOutdated(version: string | undefined): boolean {
   return false;
 }
 
+// substitutePlaceholders leaves an unbound name verbatim, which the browser would type as text.
+function assertResolved(texts: (string | undefined)[], vars: Record<string, string>): void {
+  for (const text of texts) {
+    const name = text
+      ? placeholderNames(text).find((n) => !Object.prototype.hasOwnProperty.call(vars, n))
+      : undefined;
+    if (name) throw new Error(`unresolved variable {{${name}}}`);
+  }
+}
+
+function substitutedTexts(step: WireStep): (string | undefined)[] {
+  return [step.url, step.value, step.text, step.key, step.selector, step.name];
+}
+
 /** The extension opens `targetUrl` first, so it takes the same substitution (and the same refusal) a step url does. */
 function resolveTargetUrl(
   targetUrl: string | undefined,
@@ -72,6 +87,7 @@ function resolveTargetUrl(
 ): string | undefined {
   if (targetUrl === undefined) return undefined;
   const vars = Object.fromEntries((variables ?? []).map((v) => [v.name, v.value]));
+  assertResolved([targetUrl], vars);
   if (Object.keys(vars).length === 0) return targetUrl;
   return substituteVariables({ id: START_LOAD_STEP_ID, action: "navigate", url: targetUrl }, vars)
     .url;
@@ -512,6 +528,7 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
     const targetUrl = resolveTargetUrl(opts.targetUrl, opts.variables);
     // Also with an empty map, before any state flips: a child's `{{X}}` must stop the restore.
     const vars = Object.fromEntries((opts.variables ?? []).map((v) => [v.name, v.value]));
+    prefixSteps.forEach((s) => assertResolved(substitutedTexts(s), vars));
     const resolved = prefixSteps.map((s) => substituteVariables(s, vars));
     error.value = "";
     liveSteps.value = [];
@@ -720,6 +737,7 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
     // Resolved before any state flips: an unresolved placeholder must not leave a phantom running replay.
     const vars = Object.fromEntries((variables ?? []).map((v) => [v.name, v.value]));
     // Also with an empty map: a child's `{{X}}` would otherwise be typed into the page literally.
+    steps.forEach((s) => assertResolved(substitutedTexts(s), vars));
     const resolvedSteps = steps.map((s) => substituteVariables(s, vars));
     const resolvedTargetUrl = resolveTargetUrl(targetUrl, variables);
     replayResult.value = null;
