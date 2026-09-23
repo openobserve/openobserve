@@ -250,10 +250,12 @@ fn scope(org_id: &str, pool: TrialQuotaPool) -> String {
 /// and never aggregated. Adding a feature key to a pool therefore cannot
 /// revoke consent an org has already given.
 fn set_cached_paid_overage(org_id: &str, pool: TrialQuotaPool, enabled: bool) {
-    ORG_PAID_OVERAGE
-        .write()
-        .insert(scope(org_id, pool), enabled);
+    // Bumped while the write lock is held: reconciliation re-checks the epoch
+    // under the same lock, so releasing it first would let a stale snapshot
+    // pass the guard and clobber this write.
+    let mut cache = ORG_PAID_OVERAGE.write();
     ORG_PAID_OVERAGE_EPOCH.fetch_add(1, Ordering::Release);
+    cache.insert(scope(org_id, pool), enabled);
 }
 
 /// The org's cumulative consent for one pool. A missing entry is `false`.
@@ -2118,7 +2120,7 @@ mod tests {
         let org_id = "paid-overage-extended-pool";
         let ai = TrialQuotaPool::AiCredits;
         let values = fold_paid_overage([(org_id, ai.feature_keys()[0], true)]);
-        *ORG_PAID_OVERAGE.write() = values;
+        ORG_PAID_OVERAGE.write().extend(values);
 
         // Every other backing row is absent, as when a fourth AI feature ships.
         assert!(get_paid_overage_enabled_for_pool(org_id, ai));
@@ -2216,7 +2218,7 @@ mod tests {
         // The stale snapshot still says disabled; applying it would revoke consent.
         let stale = fold_paid_overage([(org_id, ai.feature_keys()[0], false)]);
         if ORG_PAID_OVERAGE_EPOCH.load(Ordering::Acquire) == epoch {
-            *ORG_PAID_OVERAGE.write() = stale;
+            ORG_PAID_OVERAGE.write().extend(stale);
         }
         assert!(get_paid_overage_enabled_for_pool(org_id, ai));
     }

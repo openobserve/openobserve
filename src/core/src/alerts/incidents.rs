@@ -1269,6 +1269,12 @@ async fn create_new_incident(
                             "[INCIDENTS::RCA] New incident {} retained without RCA: {error}",
                             incident.id
                         );
+                        // §6: no verdict is coming, so nothing may go on holding a page for one.
+                        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                            org_id,
+                            &incident.id,
+                        )
+                        .await;
                         None
                     }
                 }
@@ -1646,6 +1652,13 @@ async fn find_or_create_incident(
                                     log::info!(
                                         "[INCIDENTS::RCA] Skipping new-alert reanalysis for {incident_id_rca}: {error}"
                                     );
+                                    // §6: no verdict is coming, so nothing may go on holding a page
+                                    // for one.
+                                    o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                                        &org_id_rca,
+                                        &incident_id_rca,
+                                    )
+                                    .await;
                                     None
                                 }
                             }
@@ -2298,7 +2311,9 @@ pub async fn trigger_rca_for_incident(
     build_on_previous: bool,
     // A caller that emits Begin before spawning must authorize synchronously and
     // pass this one-shot proof so the spawned task cannot meter twice.
-    usage_permit: Option<crate::AiUsagePermit>,
+    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))] usage_permit: Option<
+        crate::AiUsagePermit,
+    >,
 ) -> Result<(), anyhow::Error> {
     use o2_enterprise::enterprise::{
         ai::client::get_agent_client, common::config::get_config as get_o2_config,
@@ -2652,6 +2667,12 @@ pub async fn update_status(
                         log::info!(
                             "[INCIDENTS::RCA] Reopened incident {incident_id_rca} retained without reanalysis: {error}"
                         );
+                        // §6: no verdict is coming, so nothing may go on holding a page for one.
+                        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                            &org_id_rca,
+                            &incident_id_rca,
+                        )
+                        .await;
                         None
                     }
                 }
