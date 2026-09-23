@@ -317,6 +317,7 @@ async fn run_promql(
         query_exemplars: false,
         use_cache: Some(false),
         search_type: Some(config::meta::search::SearchEventType::DerivedStream),
+        search_event_context: None,
         regions: vec![],
         clusters: vec![],
     };
