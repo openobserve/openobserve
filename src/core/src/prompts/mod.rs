@@ -106,7 +106,10 @@ pub enum PromptSelector {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ResolvePurpose {
+    /// Serve a pinned version even when the prompt was archived after the
+    /// reference was created.
     Runtime,
+    /// Create a new reference only while the prompt is active.
     NewReference,
 }
 

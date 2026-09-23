@@ -107,11 +107,23 @@ const events = ref<PromptWebhookEvent[]>([]);
 const secret = ref("");
 const secretConfigured = ref(false);
 const saving = ref(false);
-const eventOptions: Array<{ label: ReturnType<typeof raw>; value: PromptWebhookEvent }> = [
-  { label: raw("Version created"), value: "version_created" },
-  { label: raw("Label moved"), value: "label_moved" },
-  { label: raw("Label deleted"), value: "label_deleted" },
-  { label: raw("Prompt archived"), value: "archived" },
+const eventOptions: Array<{ label: ReturnType<typeof t>; value: PromptWebhookEvent }> = [
+  {
+    label: t("aiObservability.promptManagement.webhookEvent.versionCreated"),
+    value: "version_created",
+  },
+  {
+    label: t("aiObservability.promptManagement.webhookEvent.labelMoved"),
+    value: "label_moved",
+  },
+  {
+    label: t("aiObservability.promptManagement.webhookEvent.labelDeleted"),
+    value: "label_deleted",
+  },
+  {
+    label: t("aiObservability.promptManagement.webhookEvent.promptArchived"),
+    value: "archived",
+  },
 ];
 const canSave = computed(() => {
   if (!webhookEnabled.value) return true;

@@ -21,6 +21,10 @@ use config::utils::json;
 
 use crate::traces::otel::attributes::{GenAiAttributes, LangfuseAttributes};
 
+/// Prompt identity extracted from GenAI semantic-convention attributes.
+///
+/// Official `gen_ai.prompt.*` values take precedence over legacy Langfuse
+/// aliases when both are present.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct PromptAttribution {
     pub name: Option<String>,
@@ -31,6 +35,8 @@ pub struct PromptAttribution {
 pub struct PromptExtractor;
 
 impl PromptExtractor {
+    /// Extracts prompt identity, accepting only positive integer versions and
+    /// falling back to Langfuse aliases when official attributes are absent.
     pub fn extract(&self, attributes: &HashMap<String, json::Value>) -> PromptAttribution {
         PromptAttribution {
             name: string_with_fallback(

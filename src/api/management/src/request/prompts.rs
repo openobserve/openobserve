@@ -89,6 +89,20 @@ async fn can_move_protected_label(
     }
 }
 
+async fn can_manage_prompt_settings(org_id: &str, _user_id: &str) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        check_permissions(
+            org_id, org_id, _user_id, "prompts", "PUT", None, false, false, false,
+        )
+        .await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        true
+    }
+}
+
 fn idempotency_key(headers: &HeaderMap) -> Result<Option<String>, Response> {
     headers
         .get("Idempotency-Key")
@@ -267,7 +281,14 @@ pub async fn match_prompts(
 #[utoipa::path(
     get, path = "/{org_id}/prompts/resolve", context_path = "/api", tag = "Prompts",
     params(("org_id" = String, Path), ResolvePromptQuery),
-    responses((status = 200, body = inline(ResolvedPromptResponseBody)), (status = 304))
+    responses(
+        (
+            status = 200,
+            body = inline(ResolvedPromptResponseBody),
+            headers(("Warning" = String, description = "Folder assertion mismatch"))
+        ),
+        (status = 304)
+    )
 )]
 pub async fn resolve_prompt(
     Path(org_id): Path<String>,
@@ -353,6 +374,13 @@ pub async fn update_prompt_settings(
     Headers(user): Headers<UserEmail>,
     Json(mut body): Json<PromptSettingsRequestBody>,
 ) -> Response {
+    if !can_manage_prompt_settings(&org_id, &user.user_id).await {
+        return machine_error(
+            StatusCode::FORBIDDEN,
+            "unauthorized_access",
+            "Unauthorized Access",
+        );
+    }
     if let Some(webhook) = &mut body.webhook {
         webhook.endpoint = match infra::outbound_http::validate_endpoint(&webhook.endpoint) {
             Ok(endpoint) => endpoint.to_string(),
@@ -388,6 +416,13 @@ pub async fn update_prompt_secret(
     Headers(user): Headers<UserEmail>,
     Json(body): Json<PromptSecretRequestBody>,
 ) -> Response {
+    if !can_manage_prompt_settings(&org_id, &user.user_id).await {
+        return machine_error(
+            StatusCode::FORBIDDEN,
+            "unauthorized_access",
+            "Unauthorized Access",
+        );
+    }
     if body.secret.is_empty() {
         return machine_error(
             StatusCode::BAD_REQUEST,

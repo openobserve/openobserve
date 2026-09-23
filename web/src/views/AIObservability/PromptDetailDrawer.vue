@@ -389,10 +389,13 @@ const comparisonVersionNumbers = computed<[number, number] | null>(() =>
   compared.value.length === 2 ? [compared.value[0].version, compared.value[1].version] : null,
 );
 const stats = computed(() => [
-  { label: "Versions", value: versions.value.length },
-  { label: "Labels", value: visibleLabels.value.length },
-  { label: "Latest", value: `v${props.prompt?.latestVersion ?? 0}` },
-  { label: "Status", value: props.prompt?.status ?? "—" },
+  { label: t("aiObservability.promptManagement.versions"), value: versions.value.length },
+  { label: t("aiObservability.promptManagement.labels"), value: visibleLabels.value.length },
+  {
+    label: t("aiObservability.promptManagement.latest"),
+    value: `v${props.prompt?.latestVersion ?? 0}`,
+  },
+  { label: t("aiObservability.promptManagement.status"), value: props.prompt?.status ?? "—" },
 ]);
 const sourceOptions = [
   { label: raw("All sources"), value: "all" },
@@ -487,7 +490,10 @@ async function moveLabel() {
     const prompt = await llmPromptsService.get(props.orgId, props.prompt.entityId);
     emit("updated", prompt);
     labelName.value = "";
-    toast({ variant: "success", message: raw("Label moved. SDK picks this up within ~60s.") });
+    toast({
+      variant: "success",
+      message: t("aiObservability.promptManagement.labelMoveSuccess"),
+    });
   } catch (error: unknown) {
     toast({
       variant: "error",
@@ -508,7 +514,10 @@ async function deleteLabel(label: PromptLabel) {
       label.version,
     );
     emit("updated", await llmPromptsService.get(props.orgId, props.prompt.entityId));
-    toast({ variant: "success", message: raw("Label deleted.") });
+    toast({
+      variant: "success",
+      message: t("aiObservability.promptManagement.labelDeleteSuccess"),
+    });
   } catch (error: unknown) {
     toast({
       variant: "error",

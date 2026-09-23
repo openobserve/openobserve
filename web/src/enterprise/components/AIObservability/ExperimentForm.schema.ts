@@ -109,7 +109,7 @@ export const makeExperimentSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["promptId"],
-            message: "Resolve a Prompt to an immutable version.",
+            message: t("aiObservability.experiments.form.validation.promptRefRequired"),
           });
         }
         return;
