@@ -1615,29 +1615,23 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: redirectToSessionReplay edge cases", () => {
-    it("should handle case when firstRumSessionData is null (lines 1851-1853)", () => {
+    it("should not navigate when no span has a replayable RUM session", () => {
       const routerPushSpy = vi.spyOn(router, "push");
-      // Set spanList without RUM session data - firstRumSessionData will be null
       wrapper.vm.searchObj.data.traceDetails.spanList =
         tracesMockData.tracesDetails.traceSpans.hits;
 
-      // Verify firstRumSessionData is null
-      expect(wrapper.vm.firstRumSessionData).toBeNull();
-
-      // This should not throw an error now that the bug is fixed
-      // Previously would throw: Cannot read properties of null (reading 'rum_session_id')
       expect(() => wrapper.vm.redirectToSessionReplay()).not.toThrow();
       expect(routerPushSpy).not.toHaveBeenCalled();
       routerPushSpy.mockRestore();
     });
 
-    it("should navigate to session viewer when rum_session_id exists", () => {
+    it("should navigate to session viewer when a RUM session with a replay exists", () => {
       const routerPushSpy = vi.spyOn(router, "push");
-      // Add RUM session data to spanList
       wrapper.vm.searchObj.data.traceDetails.spanList = [
         {
           ...tracesMockData.tracesDetails.traceSpans.hits[0],
           rum_session_id: "session-123",
+          rum_session_has_replay: true,
           start_time: 1000000000,
           end_time: 2000000000,
           rum_date: 1500000000,
@@ -1846,16 +1840,17 @@ describe("TraceDetails", () => {
   });
 
   describe("Coverage: RUM session integration", () => {
-    it("should show session replay button when RUM session exists", async () => {
+    it("should show session replay button when a RUM session with a replay exists", async () => {
       wrapper.vm.searchObj.data.traceDetails.spanList = [
         {
           ...tracesMockData.tracesDetails.traceSpans.hits[0],
           rum_session_id: "session-123",
+          rum_session_has_replay: true,
         },
       ];
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.hasRumSessionId).toBe(true);
+      expect(wrapper.vm.hasReplaySession).toBe(true);
       const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
       expect(replayBtn.exists()).toBe(true);
     });
@@ -1865,13 +1860,13 @@ describe("TraceDetails", () => {
         tracesMockData.tracesDetails.traceSpans.hits;
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.hasRumSessionId).toBe(false);
+      expect(wrapper.vm.hasReplaySession).toBe(false);
       const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
       expect(replayBtn.exists()).toBe(false);
     });
 
     it("should hide session replay button when hideSessionReplayButton prop is true", async () => {
-      // The button v-if checks hasRumSessionId && !hideSessionReplayButton
+      // The button v-if checks hasReplaySession && !hideSessionReplayButton
       const hiddenWrapper = mount(TraceDetails, {
         attachTo: "#app",
         props: {
@@ -1880,6 +1875,7 @@ describe("TraceDetails", () => {
             {
               ...tracesMockData.tracesDetails.traceSpans.hits[0],
               rum_session_id: "session-hidden",
+              rum_session_has_replay: true,
             },
           ],
           mode: "embedded",

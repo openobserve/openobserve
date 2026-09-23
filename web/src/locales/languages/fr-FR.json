@@ -1474,6 +1474,8 @@
     "sessionReplay": "Rediffusion de la session",
     "viewSessionReplay": "Afficher la rediffusion de la session",
     "playSessionReplay": "Replay de la session",
+    "noReplayRecordedTitle": "Aucun replay n'a été enregistré pour cette session",
+    "noReplayRecordedMessage": "La session {id} n'a aucun segment de replay à lire.",
     "discoverSessionTitle": "Découvrez Session Replay pour comprendre en détail les interactions des utilisateurs",
     "discoverSessionMessage": "Session Replay capture et rejoue les interactions des utilisateurs sur votre site Web ou votre application. Cela vous permet d'examiner visuellement la façon dont les utilisateurs naviguent, où ils cliquent, ce qu'ils saisissent et comment ils interagissent avec votre contenu",
     "loadingErrorDetails": "Attendez, nous sommes en train de récupérer les détails de l'erreur.",

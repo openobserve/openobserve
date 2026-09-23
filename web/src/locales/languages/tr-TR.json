@@ -1474,6 +1474,8 @@
     "sessionReplay": "Oturum Tekrar Oynatma",
     "viewSessionReplay": "Oturum Tekrarını Görüntüle",
     "playSessionReplay": "Oturum Oynatma Oynatma",
+    "noReplayRecordedTitle": "Bu oturum için kayıt oynatımı yapılmadı",
+    "noReplayRecordedMessage": "{id} oturumunun oynatılacak kayıt oynatım bölümü yok.",
     "discoverSessionTitle": "Kullanıcı Etkileşimlerini Ayrıntılı Anlamak için Oturum Tekrarını Keşfedin",
     "discoverSessionMessage": "Session Replay, web sitenizdeki veya uygulamanızdaki kullanıcı etkileşimlerini yakalar ve tekrarlar. Bu, kullanıcıların nasıl gezindiklerini, nereye tıkladıklarını, ne yazdıklarını ve içeriğinizle nasıl etkileşim kurduklarını görsel olarak incelemenizi sağlar.",
     "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",

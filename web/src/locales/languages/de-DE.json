@@ -1474,6 +1474,8 @@
     "sessionReplay": "Sitzungswiederholung",
     "viewSessionReplay": "Sitzungswiederholung anzeigen",
     "playSessionReplay": "Sitzungswiederholung abspielen",
+    "noReplayRecordedTitle": "Für diese Sitzung wurde keine Wiedergabe aufgezeichnet",
+    "noReplayRecordedMessage": "Sitzung {id} hat keine Wiedergabesegmente zum Abspielen.",
     "discoverSessionTitle": "Entdecken Sie Session Replay, um Benutzerinteraktionen im Detail zu verstehen",
     "discoverSessionMessage": "Session Replay erfasst Benutzerinteraktionen auf Ihrer Website oder Anwendung und spielt sie erneut ab. Auf diese Weise können Sie visuell überprüfen, wie Benutzer navigieren, wohin sie klicken, was sie eingeben und wie sie mit Ihren Inhalten interagieren",
     "loadingErrorDetails": "Halten Sie sich fest, wir rufen Fehlerdetails ab.",

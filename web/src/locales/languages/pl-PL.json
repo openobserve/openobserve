@@ -1474,6 +1474,8 @@
     "sessionReplay": "Odtwarzanie sesji",
     "viewSessionReplay": "Wyświetl odtwarzanie sesji",
     "playSessionReplay": "Odtwórz sesję",
+    "noReplayRecordedTitle": "Nie nagrano powtórki dla tej sesji",
+    "noReplayRecordedMessage": "Sesja {id} nie ma segmentów powtórki do odtworzenia.",
     "discoverSessionTitle": "Odkryj odtwarzanie sesji, aby szczegółowo zrozumieć interakcje użytkowników",
     "discoverSessionMessage": "Odtwarzanie sesji rejestruje i odtwarza interakcje użytkowników na Twojej stronie internetowej lub w aplikacji. Pozwala to wizualnie przejrzeć, jak użytkownicy nawigują, gdzie klikają, co wpisują i w jaki sposób angażują się w treści.",
     "loadingErrorDetails": "Trzymaj się, pobieramy szczegóły błędu.",

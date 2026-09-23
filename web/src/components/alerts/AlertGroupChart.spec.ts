@@ -171,3 +171,84 @@ describe("AlertGroupChart — stream deleted after the alert was created", () =>
     expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(false);
   });
 });
+
+/** The SQL the chart hands the renderer. */
+const chartQuery = (wrapper: any) =>
+  wrapper.findComponent({ name: "PanelSchemaRenderer" }).props("panelSchema")?.queries?.[0]?.query;
+
+describe("AlertGroupChart — the query handed to the renderer", () => {
+  const mountWith = (sql: string, extra: Record<string, any> = {}) => {
+    vi.mocked(alertsService.generate_sql).mockResolvedValue({ data: { sql } } as any);
+    return mountChart({
+      stream_name: "logs",
+      stream_type: "logs",
+      query_condition: { type: "sql", sql, aggregation: null, ...extra },
+      trigger_condition: { threshold: 3 },
+    });
+  };
+
+  // A count alert has no aggregation, so the chart must take the count-rewrite
+  // path. Using the aggregation rewrite here yields a query with no value column.
+  it("takes the count path when the alert has no aggregation", async () => {
+    wrapper = await mountWith("SELECT _timestamp, log FROM \"logs\" WHERE svc = 'api'");
+    expect(chartQuery(wrapper)).toBe(
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "logs" ' +
+        "WHERE svc = 'api' GROUP BY 1",
+    );
+  });
+
+  // #14514 end to end through the component: a literal or a function call that
+  // merely contains a SQL keyword must not corrupt the rewritten query.
+  it.each([
+    [
+      "literal containing 'from'",
+      `SELECT 'data selected from openobserve' AS d, _timestamp FROM "logs"`,
+    ],
+    ["EXTRACT(EPOCH FROM now())", `SELECT EXTRACT(EPOCH FROM now()) AS e, _timestamp FROM "logs"`],
+    [
+      "the issue's reported query",
+      `SELECT 'test data selected from openobserve to keep' as description, count(*) as total_count FROM "logs" WHERE k8s_cluster = 'production'`,
+    ],
+  ])("survives a keyword lookalike: %s (#14514)", async (_name, sql) => {
+    wrapper = await mountWith(sql);
+    const q = chartQuery(wrapper) as string;
+    expect(q).toMatch(/count\(\*\) AS zo_sql_num FROM "logs"/);
+    expect((q.match(/'/g) || []).length % 2).toBe(0);
+    expect([...q].reduce((d, c) => d + (c === "(" ? 1 : c === ")" ? -1 : 0), 0)).toBe(0);
+  });
+
+  it("preserves a WHERE-clause literal that contains a SQL keyword", async () => {
+    wrapper = await mountWith(`SELECT _timestamp FROM "logs" WHERE msg = 'rate limit exceeded'`);
+    expect(chartQuery(wrapper)).toContain("'rate limit exceeded'");
+  });
+
+  // With an aggregation configured the chart must use the aggregation rewrite,
+  // which charts the aggregate per group rather than a row count.
+  it("takes the aggregation path when the alert aggregates", async () => {
+    wrapper = await mountWith(
+      'SELECT svc, count(*) AS alert_agg_value FROM "logs" GROUP BY svc HAVING alert_agg_value > 0',
+      { aggregation: { group_by: ["svc"], function: "count" } },
+    );
+    const q = chartQuery(wrapper) as string;
+    expect(q).toContain("zo_sql_num");
+    expect(q).not.toMatch(/HAVING/i);
+    expect(q).toMatch(/histogram\(_timestamp\) AS zo_sql_key/);
+  });
+
+  // Two group-by columns are ONE group, so the series needs the whole
+  // combination as its name — otherwise two groups draw as indistinguishable lines.
+  it("collapses a multi-column group-by into one composite label", async () => {
+    wrapper = await mountWith(
+      'SELECT svc, region, count(*) AS alert_agg_value FROM "logs" GROUP BY svc, region',
+      { aggregation: { group_by: ["svc", "region"], function: "count" } },
+    );
+    const q = chartQuery(wrapper) as string;
+    expect(q).toContain("zo_group_label");
+    expect(q).toMatch(/GROUP BY 1, zo_group_label/i);
+  });
+
+  it("renders no panel when the rewrite cannot produce a chart query", async () => {
+    wrapper = await mountWith("SELECT 1");
+    expect(wrapper.findComponent({ name: "PanelSchemaRenderer" }).exists()).toBe(false);
+  });
+});
