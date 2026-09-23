@@ -1488,9 +1488,9 @@ fn expand_journey(
         let Some(child) = children.get(&child_id) else {
             continue;
         };
-        if let Some(var) = placeholders_in(&child.steps)
-            .into_iter()
-            .find(|p| !defined.contains(p))
+        if let Some(var) =
+            crate::service::composition::undefined_among(&placeholders_in(&child.steps), defined)
+                .first()
         {
             return Err(ConfigError {
                 status_reason: REASON_CONFIG_VARIABLE_UNDEFINED,

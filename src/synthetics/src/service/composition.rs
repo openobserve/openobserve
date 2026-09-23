@@ -15,7 +15,7 @@
 
 //! Save-time and delete-time composition rules; all DB reads happen in the thin async wrappers.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use config::meta::{
     synthetics::{BrowserConfig, Synthetic, SyntheticType, validate_expanded_steps},
@@ -147,6 +147,28 @@ pub async fn to_public_refs(mut parents: Vec<ParentRef>) -> Vec<ParentRef> {
     parents
 }
 
+/// Every name a check resolves on its own: its declared variables plus its journey secret slots.
+pub fn defined_names(check: &Synthetic) -> HashSet<String> {
+    let mut names: HashSet<String> = check.variables.iter().map(|v| v.name.clone()).collect();
+    if let Some(secrets) = check.config.get("secrets").and_then(|s| s.as_array()) {
+        names.extend(
+            secrets
+                .iter()
+                .filter_map(|s| s.get("name").and_then(|n| n.as_str()).map(str::to_owned)),
+        );
+    }
+    names
+}
+
+/// The names `defined` does not cover, in sorted order.
+pub fn undefined_among(names: &BTreeSet<String>, defined: &HashSet<String>) -> Vec<String> {
+    names
+        .iter()
+        .filter(|n| !defined.contains(n.as_str()))
+        .cloned()
+        .collect()
+}
+
 fn check_rules(
     own_id: Option<&str>,
     body: &Synthetic,
@@ -214,18 +236,10 @@ fn check_rules(
         }
     }
     // Secret names count as defined: resolve injects their decrypted values into env_inject.
-    let defined: HashSet<&str> = body
-        .variables
-        .iter()
-        .map(|v| v.name.as_str())
-        .chain(cfg.secrets.iter().map(|s| s.name.as_str()))
-        .collect();
+    let defined = defined_names(body);
     for child_id in &refs {
         let child = &children[child_id];
-        if let Some(var) = placeholders_in(&child.steps)
-            .into_iter()
-            .find(|p| !defined.contains(p.as_str()))
-        {
+        if let Some(var) = undefined_among(&placeholders_in(&child.steps), &defined).first() {
             return Err(CompositionError::Invalid(format!(
                 "variables: '{child_id}' uses {{{{{var}}}}}, which this test does not define"
             )));
