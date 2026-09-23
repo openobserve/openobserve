@@ -1,0 +1,22 @@
+{
+  "feature_slug": "ingestion-passcode-forbidden",
+  "feature_title": "Org Ingestion Token (Passcode) Access Control",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "ingestion-passcode-forbidden.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/ingestion-passcode-forbidden.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/views/Ingestion.vue",
+    "web/src/components/CopyContent.vue",
+    "web/src/components/ingestion/ai/content/AIIntegrationCard.vue",
+    "web/src/components/ingestion/ai/AIIntegrationDetail.vue",
+    "web/src/components/ingestion/setupCard/DataSourceSetupCard.vue",
+    "web/src/stores/index.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

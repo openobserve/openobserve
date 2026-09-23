@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/ingestion-passcode-forbidden.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/ingestion-config.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/ingestionTokens.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/serviceAccount.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-cdn-dataflow.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-page-dataflow.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the org passcode access-control behavior (organizationPasscodeForbidden latch + warning banner). ingestion-config.spec.js covers navigation/copy/doc-links only, ingestionTokens.spec.js covers the IAM token CRUD surface, and serviceAccount.spec.js covers service-account lifecycle without ever calling GET /{org}/passcode. The RUM specs touched by the diff are unrelated (CDN dataflow skip-on-no-init) and provide no passcode coverage. A brand-new GeneralTests spec is required and must be registered in ci_matrix.json's GeneralTests run_files."
+}

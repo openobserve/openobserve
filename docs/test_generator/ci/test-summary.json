@@ -1,0 +1,7 @@
+[
+  { "title": "Admin/Root sees the real Kubernetes setup card with no forbidden banner", "action": "new", "verifies": "the 200 passcode path renders the data-source setup card with the passcode substituted and no forbidden banner" },
+  { "title": "ServiceAccount GET /passcode returns 403 (API boundary)", "action": "new", "verifies": "a service-account principal is denied the org ingestion passcode with HTTP 403" },
+  { "title": "Forbidden role sees the warning banner instead of the passcode snippet — not wired: OSS users/mod.rs:213-216,307-313 force base_role=Admin", "action": "new", "verifies": "a non-admin/root session sees the passcode-forbidden banner instead of the snippet (parked fixme — feature-incomplete in OSS)" },
+  { "title": "Legacy curl CopyContent renders normally for an allowed session", "action": "new", "verifies": "the legacy curl snippet renders without the copy-content forbidden banner" },
+  { "title": "AI Integrations card renders normally for an allowed session", "action": "new", "verifies": "the AI integration surface renders without the AI forbidden banners" }
+]
