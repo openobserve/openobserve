@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "Błąd podczas kopiowania zawartości.",
+    "passcodeForbiddenMessage": "Do wyświetlenia tokenu pozyskiwania danych wymagana jest rola administratora lub Root. Poproś administratora o polecenie konfiguracji albo o rolę potrzebną, aby go tu zobaczyć.",
     "updateRUMTokenMessage": "Czy na pewno chcesz zaktualizować token RUM dla tej organizacji?",
     "completeAwsIntegration": "Zakończ integrację AWS",
     "deployAwsServicesOneClick": "Wdróż wszystkie wybrane usługi AWS jednym kliknięciem przy użyciu pojedynczego stosu CloudFormation.",
@@ -15803,7 +15804,8 @@
         "destinations": "Cele",
         "templates": "Szablony",
         "reports": "Raporty",
-        "llmModelPricing": "Cennik modeli LLM"
+        "llmModelPricing": "Cennik modeli LLM",
+        "passcode": "Token pozyskiwania danych"
       },
       "noPermissionToChangeFavorites": "Nie masz uprawnień do zmiany ulubionych",
       "couldNotUpdateFavoriteDashboards": "Nie udało się zaktualizować ulubionych pulpitów"

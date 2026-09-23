@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "コンテンツのコピー中にエラーが発生しました。",
+    "passcodeForbiddenMessage": "取り込みトークンを表示するには管理者または Root ロールが必要です。セットアップコマンド、またはこの画面で表示するために必要なロールについて、管理者にお問い合わせください。",
     "updateRUMTokenMessage": "この組織のRUMトークンを更新してもよろしいですか？",
     "completeAwsIntegration": "AWSインテグレーションを完了",
     "deployAwsServicesOneClick": "単一のCloudFormationスタックを使用して、選択したすべてのAWSサービスをワンクリックでデプロイします。",
@@ -15803,7 +15804,8 @@
         "destinations": "宛先",
         "templates": "テンプレート",
         "reports": "レポート",
-        "llmModelPricing": "LLMモデルの価格設定"
+        "llmModelPricing": "LLMモデルの価格設定",
+        "passcode": "取り込みトークン"
       },
       "noPermissionToChangeFavorites": "お気に入りを変更する権限がありません",
       "couldNotUpdateFavoriteDashboards": "お気に入りのダッシュボードを更新できませんでした"

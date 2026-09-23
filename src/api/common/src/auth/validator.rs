@@ -1133,15 +1133,11 @@ async fn oo_validator_internal(
             Some(value) => value,
             None => return Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
         };
-        // Sessions bypass the permission check; the raw session flag is passed
-        // separately so credential-level policies can still see it.
-        let mut modified_auth_info = auth_info.clone();
-        modified_auth_info.bypass_check = is_from_session || auth_info.bypass_check;
         validator(
             req_data,
             &username,
             &password,
-            &modified_auth_info,
+            auth_info,
             path_prefix,
             is_from_session,
         )

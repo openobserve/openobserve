@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "Erro ao copiar conteúdo.",
+    "passcodeForbiddenMessage": "É necessário ter a função de Administrador ou Root para visualizar o token de ingestão. Peça a um administrador o comando de configuração ou a função necessária para vê-lo aqui.",
     "updateRUMTokenMessage": "Tem certeza de que deseja atualizar o token RUM para esta organização?",
     "completeAwsIntegration": "Concluir Integração com AWS",
     "deployAwsServicesOneClick": "Implante todos os serviços AWS selecionados em um clique usando uma única pilha CloudFormation.",
@@ -15803,7 +15804,8 @@
         "destinations": "Destinos",
         "templates": "Modelos",
         "reports": "Relatórios",
-        "llmModelPricing": "Preços de Modelos LLM"
+        "llmModelPricing": "Preços de Modelos LLM",
+        "passcode": "Token de ingestão"
       },
       "noPermissionToChangeFavorites": "Você não tem permissão para alterar favoritos",
       "couldNotUpdateFavoriteDashboards": "Não foi possível atualizar os dashboards favoritos"
