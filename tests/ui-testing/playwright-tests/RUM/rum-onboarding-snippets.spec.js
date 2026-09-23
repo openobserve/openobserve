@@ -100,5 +100,6 @@ test.describe('RUM Onboarding Snippets', () => {
     await pm.rumIngestionPage.expectInstallSnippetContains(
       'npm i @openobserve/browser-rum @openobserve/browser-logs',
     );
+    await pm.rumIngestionPage.expectInitSnippetContains('openobserveRum.init');
   });
 });
