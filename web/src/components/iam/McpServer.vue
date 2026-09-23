@@ -21,15 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   McpServerCard (copy/paste client configs) under the standard IAM page header.
 -->
 <script setup lang="ts">
-import { orgPasscodeQuery } from "@/services/organizations.queries";
-import { queryClient } from "@/composables/query/queryClient";
-import { computed, onMounted } from "vue";
+import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import McpServerCard from "@/components/ingestion/ai/McpServerCard.vue";
 import useIngestion from "@/composables/useIngestion";
-import { b64EncodeStandard } from "@/utils/zincutils";
 import type { CardSubstitutions } from "@/components/ingestion/ai/content/renderMarkdown";
 
 const { t } = useI18nTyped();
@@ -38,31 +35,12 @@ const { endpoint } = useIngestion();
 
 const docUrl = "https://openobserve.ai/docs/integration/ai/mcp/";
 
-const subs = computed<CardSubstitutions>(() => {
-  const email = store.state.userInfo?.email ?? "";
-  const passcode = store.state.organizationData?.organizationPasscode ?? "";
-  return {
-    url: store.state.zoConfig?.web_url || endpoint.value?.url || "",
-    org: store.state.selectedOrganization?.identifier ?? "",
-    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
-  };
-});
-
-onMounted(() => {
-  // Read every mount: Ingestion writes its selected token into the same slot,
-  // so a populated slot is no evidence the passcode is there.
-  queryClient
-    .fetchQuery(orgPasscodeQuery(store.state.selectedOrganization.identifier))
-    .then((res: any) => {
-      if (res.data?.passcode) {
-        store.dispatch("setOrganizationPasscode", res.data.passcode);
-        store.dispatch("setOrganizationPasscodeUser", res.data.user);
-      }
-    })
-    .catch(() => {
-      // Non-critical: the card still shows the endpoint + a placeholder token.
-    });
-});
+// McpServerCard mints its own service-account credential, so `token` is unused here
+const subs = computed<CardSubstitutions>(() => ({
+  url: store.state.zoConfig?.web_url || endpoint.value?.url || "",
+  org: store.state.selectedOrganization?.identifier ?? "",
+  token: "",
+}));
 </script>
 
 <template>

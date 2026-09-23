@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "Ошибка при копировании содержимого.",
+    "passcodeForbiddenMessage": "Для просмотра токена приема данных требуется роль администратора или Root. Запросите у администратора команду настройки или роль, необходимую для его отображения здесь.",
     "updateRUMTokenMessage": "Вы уверены, что хотите обновить RUM-токен для этой организации?",
     "completeAwsIntegration": "Завершить интеграцию AWS",
     "deployAwsServicesOneClick": "Разверните все выбранные сервисы AWS одним щелчком с помощью одного стека CloudFormation.",
@@ -15803,7 +15804,8 @@
         "destinations": "Получатели",
         "templates": "Шаблоны",
         "reports": "Отчёты",
-        "llmModelPricing": "Цены на модели LLM"
+        "llmModelPricing": "Цены на модели LLM",
+        "passcode": "Токен приема данных"
       },
       "noPermissionToChangeFavorites": "У вас нет разрешения изменять избранное",
       "couldNotUpdateFavoriteDashboards": "Не удалось обновить избранные панели мониторинга"

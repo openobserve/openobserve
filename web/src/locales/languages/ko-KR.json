@@ -3605,6 +3605,7 @@
   },
   "ingestion": {
     "copyContentError": "콘텐츠를 복사하는 중 오류가 발생했습니다.",
+    "passcodeForbiddenMessage": "수집 토큰을 보려면 관리자 또는 루트 역할이 필요합니다. 관리자에게 설정 명령을 요청하거나, 여기에서 확인하는 데 필요한 역할을 요청하세요.",
     "updateRUMTokenMessage": "이 조직의 RUM 토큰을 업데이트하시겠습니까?",
     "completeAwsIntegration": "AWS 통합 완료",
     "deployAwsServicesOneClick": "단일 CloudFormation 스택을 사용하여 선택한 모든 AWS 서비스를 한 번의 클릭으로 배포합니다.",
@@ -15803,7 +15804,8 @@
         "destinations": "대상",
         "templates": "템플릿",
         "reports": "보고서",
-        "llmModelPricing": "LLM 모델 가격"
+        "llmModelPricing": "LLM 모델 가격",
+        "passcode": "수집 토큰"
       },
       "noPermissionToChangeFavorites": "즐겨찾기를 변경할 권한이 없습니다.",
       "couldNotUpdateFavoriteDashboards": "즐겨찾기 대시보드를 업데이트하지 못했습니다."
