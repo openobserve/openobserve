@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, computed } from "vue";
+import { defineComponent, ref, onBeforeMount, onBeforeUnmount, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
