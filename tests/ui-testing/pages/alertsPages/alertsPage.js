@@ -1673,6 +1673,37 @@ export class AlertsPage {
         await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
     }
 
+    // ==================== LIST PAGINATION (OTable pagination bar) ====================
+
+    // Click the list's next-page button. Disabled on the last page, so callers must
+    // assert they are on a multi-page folder first.
+    async clickNextPage() {
+        const nextPageBtn = this.page.locator('[data-test="o2-table-next-page-btn"]');
+        await nextPageBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await nextPageBtn.click();
+    }
+
+    // Read the pagination info text ("Showing X - Y of Z"), whitespace-normalised.
+    async getPaginationInfoText() {
+        const text = await this.page.locator('[data-test="o2-table-pagination-info"]').textContent().catch(() => null);
+        return (text || '').replace(/\s+/g, ' ').trim();
+    }
+
+    // Assert the pagination info matches a regex (auto-retrying).
+    async expectPaginationInfoToMatch(pattern) {
+        await expect
+            .poll(async () => await this.getPaginationInfoText(), { timeout: 20000 })
+            .toMatch(pattern);
+    }
+
+    // Assert the list rendered at least one data row (not the empty state), which
+    // proves a page switch/clamp landed on a populated page rather than an empty flash.
+    async expectAtLeastOneListRow() {
+        await expect(
+            this.page.locator('[data-test^="o2-table-row-"]').first(),
+        ).toBeVisible({ timeout: 20000 });
+    }
+
     async verifyFolderExistsError() {
         await expect(this.page.getByText(this.locators.folderExistsError)).toBeVisible();
     }

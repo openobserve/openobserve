@@ -23,7 +23,10 @@
       "alerts-composite-preview.spec.js",
       "alerts-composite-detail.spec.js",
       "alerts-evaluation-chart.spec.js",
-      "alerts-chart-error-state.spec.js"
+      "alerts-chart-error-state.spec.js",
+      "alertsPagination.spec.js",
+      "alertTemplatesPagination.spec.js",
+      "alertDestinationsPagination.spec.js"
     ],
     "disabled": [
       {
