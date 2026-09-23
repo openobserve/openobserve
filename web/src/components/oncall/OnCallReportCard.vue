@@ -93,17 +93,19 @@ const rendered = computed(() => {
   max-width: 68ch;
 }
 
-/* Capped at the screen's own 14px ceiling: a heading ramp taller than the page
-   title reads as a different application embedded in the card. */
+/* Capped at the page title's own 16px: a heading ramp taller than the page title
+   reads as a different application embedded in the card. */
 .report-body :deep(h1) {
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 .report-body :deep(h2) {
-  font-size: 0.9375rem;
+  font-size: var(--text-sm);
 }
+/* Body size, not smaller: a subsection heading below the prose it introduces
+   reads as a label. Weight and the margins below carry the distinction. */
 .report-body :deep(h3),
 .report-body :deep(h4) {
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 .report-body :deep(h1),
 .report-body :deep(h2),
@@ -149,16 +151,16 @@ const rendered = computed(() => {
 
 .report-body :deep(code) {
   background: var(--color-surface-subtle);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-default);
   padding: 0 0.25rem;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
 }
 .report-body :deep(pre) {
   background: var(--color-surface-subtle);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-default);
   padding: 0.5rem;
   overflow-x: auto;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
 }
 /* Inline padding on the first line of a block indents it past the rest, and the
    chip background doubles up on the block's own. */
@@ -170,7 +172,7 @@ const rendered = computed(() => {
 
 .report-body :deep(table) {
   width: 100%;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
 }
 /* `subtle` is ~1.07:1 on the card in light mode — the rule vanishes. */
 .report-body :deep(th),

@@ -22,11 +22,14 @@ use super::subject::SubjectType;
 use crate::meta::alerts::priority::AlertPriority;
 
 /// What the RCA agent is told about the thing it is investigating.
+///
+/// A field it has nothing to say about is omitted from the wire, never sent as `null` — `o2-ai`
+/// routes on key presence, which a null satisfies.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RcaContext {
     pub subject_type: SubjectType,
     pub subject_id: String,
-    // Omitted, never null: the agent routes on `"incident_id" in context`, which a null satisfies.
+    /// Omitted, never null: the agent routes on `"incident_id" in context`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub incident_id: Option<String>,
     pub org_id: String,

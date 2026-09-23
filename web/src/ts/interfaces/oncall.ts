@@ -453,7 +453,7 @@ export type L0Mode =
   | "gate"
   /** The agent investigates; whether the priority also pages is the team's ladder, not this mode. */
   | "only"
-  /** The agent never runs; the page behaves exactly as it did before L0. */
+  /** The agent never runs; the page behaves exactly as it did without AI triage. */
   | "off";
 
 /**

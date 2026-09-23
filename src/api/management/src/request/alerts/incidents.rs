@@ -501,39 +501,37 @@ pub async fn trigger_incident_rca(
     )
     .await;
 
-    // Existence check only: the builder below re-derives everything this used to supply.
-    let _incident =
-        match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
-            .await
-        {
-            Ok(Some(i)) => i,
-            Ok(None) => {
-                let _ = openobserve_core::incidents::append_event(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Incident not found",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        None,
-                    ),
-                )
-                .await;
-                return MetaHttpResponse::not_found("Incident not found");
-            }
-            Err(e) => {
-                let _ = openobserve_core::incidents::append_event(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Database error",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        Some(format!("{:#}", e)),
-                    ),
-                )
-                .await;
-                return MetaHttpResponse::internal_error(e);
-            }
-        };
+    // Existence check only: the builder below re-derives everything this used to supply, so this
+    // reads the one row rather than hydrating every alert on the incident to throw them away.
+    match infra::table::alert_incidents::get(&org_id, &incident_id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            let _ = openobserve_core::incidents::append_event(
+                &org_id,
+                &incident_id,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
+                    "Incident not found",
+                    config::meta::alerts::incidents::AnalysisTriggerType::Manual,
+                    None,
+                ),
+            )
+            .await;
+            return MetaHttpResponse::not_found("Incident not found");
+        }
+        Err(e) => {
+            let _ = openobserve_core::incidents::append_event(
+                &org_id,
+                &incident_id,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
+                    "Database error",
+                    config::meta::alerts::incidents::AnalysisTriggerType::Manual,
+                    Some(format!("{:#}", e)),
+                ),
+            )
+            .await;
+            return MetaHttpResponse::internal_error(e);
+        }
+    }
 
     // Build RCA context. Each run is a fresh analysis unless the caller explicitly opts
     // into continuity — chaining every run compounds the report (and the agent's context)

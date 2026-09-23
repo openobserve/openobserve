@@ -1793,6 +1793,20 @@ async fn trigger_rca_for_alert_firing(
     let trace_id = trace_id.to_string();
 
     tokio::spawn(async move {
+        // §2.3: the record's own `AnalysisState` is the in-flight marker a retried opener reads.
+        // Asked before the credentials fetch and the health round-trip, so a firing that reopened
+        // nothing pays for neither.
+        let mut pending = Vec::new();
+        for paged in &opened {
+            if escalation::analysis_may_run(&org_id, &paged.response.subject).await {
+                pending.push(paged);
+            }
+        }
+        let Some(representative) = pending.first() else {
+            // Nothing is waiting on an answer — every record was already settled.
+            return;
+        };
+
         let (email, token) = match crate::organization::get_sre_agent_credentials(&org_id).await {
             Ok(c) => c,
             Err(e) => {
@@ -1814,18 +1828,6 @@ async fn trigger_rca_for_alert_firing(
             release_alert_firing_hold(&org_id, &opened).await;
             return;
         }
-
-        // §2.3: the record's own `AnalysisState` is the in-flight marker a retried opener reads.
-        let mut pending = Vec::new();
-        for paged in &opened {
-            if escalation::analysis_may_run(&org_id, &paged.response.subject).await {
-                pending.push(paged);
-            }
-        }
-        let Some(representative) = pending.first() else {
-            // Nothing is waiting on an answer — every record was already settled.
-            return;
-        };
 
         // One report is written to every record this firing opened, so scoping the prompt to one
         // group's dimensions would mis-describe the others. Sent only when they all agree.
@@ -1863,14 +1865,37 @@ async fn trigger_rca_for_alert_firing(
                 )
                 .await;
             }
-            Ok(_) => {}
+            Ok(_) => {
+                release_analysis_without_verdict(&org_id, &subjects).await;
+            }
             Err(e) => {
                 log::warn!(
                     "[SCHEDULER trace_id {trace_id}] RCA call failed for {org_id}/{alert_name}: {e}"
                 );
+                release_analysis_without_verdict(&org_id, &subjects).await;
             }
         }
     });
+}
+
+/// I10 again, for a run that happened and came back empty: `Failed`, not `Skipped`, because the
+/// agent was asked. Without it the hold serves out the whole triage budget waiting on an answer
+/// that already came back.
+#[cfg(feature = "enterprise")]
+async fn release_analysis_without_verdict(
+    org_id: &str,
+    subjects: &[config::meta::oncall::SubjectRef],
+) {
+    let now = config::utils::time::now_micros();
+    for subject in subjects {
+        if let Err(e) = o2_enterprise::enterprise::oncall::escalation::analysis_produced_no_verdict(
+            org_id, subject, now,
+        )
+        .await
+        {
+            log::warn!("[SCHEDULER] could not release the triage hold on {subject}: {e}");
+        }
+    }
 }
 
 /// I10: nothing is coming, so nothing may go on holding a page for one.
