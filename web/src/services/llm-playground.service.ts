@@ -198,13 +198,18 @@ export function responseSchemaSupport(providerType?: string): ResponseSchemaSupp
 /** Answers typed decisions only, so it can never run a chat completion. */
 const DECISION_ONLY_KINDS = ["systemone"];
 
-/** Providers that can serve a chat completion (playground runs, experiment tasks). */
-export function chatProviders<T extends { providerType?: string; provider_type?: string }>(
-  providers: T[],
-): T[] {
-  return providers.filter(
-    (p) => !DECISION_ONLY_KINDS.includes((p.providerType ?? p.provider_type ?? "").toLowerCase()),
+type ProviderLike = { providerType?: string; provider_type?: string };
+
+/** True for a provider that returns only a typed score: no chat, reasoning, or metadata. */
+export function isDecisionOnlyProvider(provider?: ProviderLike | null): boolean {
+  return DECISION_ONLY_KINDS.includes(
+    (provider?.providerType ?? provider?.provider_type ?? "").toLowerCase(),
   );
+}
+
+/** Providers that can serve a chat completion (playground runs, experiment tasks). */
+export function chatProviders<T extends ProviderLike>(providers: T[]): T[] {
+  return providers.filter((p) => !isDecisionOnlyProvider(p));
 }
 
 /** True when a provider of this kind carries no response schema at all. */
