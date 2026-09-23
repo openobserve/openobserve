@@ -1,0 +1,4 @@
+tests/ui-testing/ci-matrix/ci_matrix.json
+tests/ui-testing/pages/generalPages/modelPricingPage.js
+tests/ui-testing/pages/iamPages/iamPage.js
+tests/ui-testing/playwright-tests/GeneralTests/otableSelectCell.spec.js

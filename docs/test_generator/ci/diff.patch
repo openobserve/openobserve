@@ -1,0 +1,239 @@
+===== COMPLETE LIST OF CHANGED FILES (4 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/ci-matrix/ci_matrix.json
+tests/ui-testing/pages/generalPages/modelPricingPage.js
+tests/ui-testing/pages/iamPages/iamPage.js
+tests/ui-testing/playwright-tests/GeneralTests/otableSelectCell.spec.js
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/ci-matrix/ci_matrix.json b/tests/ui-testing/ci-matrix/ci_matrix.json
+index 801d843cbb6..547b442f978 100644
+--- a/tests/ui-testing/ci-matrix/ci_matrix.json
++++ b/tests/ui-testing/ci-matrix/ci_matrix.json
+@@ -252,6 +252,7 @@
+       "datetime-picker-copy-paste.spec.js",
+       "splunk-hec-ingestion-window.spec.js",
+       "connectDataSourcePopup.spec.js",
++      "otableSelectCell.spec.js",
+       "theme.spec.js"
+     ],
+     "disabled": []
+diff --git a/tests/ui-testing/pages/generalPages/modelPricingPage.js b/tests/ui-testing/pages/generalPages/modelPricingPage.js
+index ad0d223bf9e..82f95e265c7 100644
+--- a/tests/ui-testing/pages/generalPages/modelPricingPage.js
++++ b/tests/ui-testing/pages/generalPages/modelPricingPage.js
+@@ -1,5 +1,5 @@
+ // modelPricingPage.js — Page object for Settings > Model Pricing
+-// Feature: OSS (no enterprise flag required, but gated by model_pricing_enabled config)
++// Feature: Enterprise/Cloud only — the route isn't registered on the OSS build (see useManagementRoutes.ts).
+ // Routes:
+ //   List:   /web/settings/model_pricing?org_identifier={org}
+ //   Editor: /web/settings/model_pricing/edit?org_identifier={org}&id={id}
+diff --git a/tests/ui-testing/pages/iamPages/iamPage.js b/tests/ui-testing/pages/iamPages/iamPage.js
+index 63eeeda9616..4588c79b10d 100644
+--- a/tests/ui-testing/pages/iamPages/iamPage.js
++++ b/tests/ui-testing/pages/iamPages/iamPage.js
+@@ -74,6 +74,13 @@ export class IamPage {
+         // [data-test="o-toast-message"] inside).
+         this.toastMessages = page.locator('[data-test="o-toast-message"]');
+ 
++        // ============================================================
++        // Selection gutter (OTable select cell / select-all)
++        // ============================================================
++        this.selectAllHeaderCell   = page.locator('th[data-test="o2-table-th-select"]');
++        this.selectAllCheckboxBtn  = page.locator('[data-test="o2-table-select-all"] button[role="checkbox"]');
++        this.deleteSelectedBtn     = page.locator('[data-test="service-accounts-list-delete-accounts-btn"]');
++
+         // ============================================================
+         // Per-email runtime factories. Walks from the email-cell up to the
+         // ancestor row, then drills back down to the action buttons that
+@@ -91,6 +98,10 @@ export class IamPage {
+             this.rowByEmail(emailName).locator('[data-test="service-accounts-refresh"]');
+         this.updateButtonByEmail = (emailName) =>
+             this.rowByEmail(emailName).locator('[data-test="service-accounts-edit"]');
++        this.selectCellByEmail = (emailName) =>
++            this.rowByEmail(emailName).locator('td[data-test="o2-table-select-cell"]');
++        this.checkboxByEmail = (emailName) =>
++            this.selectCellByEmail(emailName).locator('button[role="checkbox"]');
+ 
+         // System account row (resolved via the static system-account label).
+         this.systemAccountRow = this.systemAccountLabel.locator(
+@@ -321,6 +332,71 @@ export class IamPage {
+         await this.descriptionInput.fill('Description Details for Service Account');
+     }
+ 
++    // ============================================================
++    // Selection gutter (OTable select cell / select-all)
++    // ============================================================
++
++    async waitForSelectCell(emailName) {
++        await expect(this.selectCellByEmail(emailName)).toBeVisible({ timeout: 15000 });
++    }
++
++    async clickCheckboxByEmail(emailName) {
++        await this.checkboxByEmail(emailName).click();
++    }
++
++    // Click near the right edge so the point lands on the empty padding, not the checkbox itself.
++    async clickSelectCellPadding(emailName) {
++        const cell = this.selectCellByEmail(emailName);
++        const box = await cell.boundingBox();
++        await cell.click({
++            position: { x: box ? box.width - 4 : 40, y: box ? box.height / 2 : 15 },
++        });
++    }
++
++    async clickSelectAllCellPadding() {
++        const cell = this.selectAllHeaderCell;
++        const box = await cell.boundingBox();
++        await cell.click({
++            position: { x: box ? box.width - 4 : 40, y: box ? box.height / 2 : 15 },
++        });
++    }
++
++    async expectRowCheckboxChecked(emailName) {
++        await expect(this.checkboxByEmail(emailName)).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
++    }
++
++    async expectRowCheckboxUnchecked(emailName) {
++        await expect(this.checkboxByEmail(emailName)).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
++    }
++
++    async expectSelectAllCheckboxChecked() {
++        await expect(this.selectAllCheckboxBtn).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
++    }
++
++    async expectSelectAllCheckboxUnchecked() {
++        await expect(this.selectAllCheckboxBtn).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
++    }
++
++    async expectDeleteSelectedBtnVisible() {
++        await expect(this.deleteSelectedBtn).toBeVisible({ timeout: 10000 });
++    }
++
++    async expectDeleteSelectedBtnHidden() {
++        await expect(this.deleteSelectedBtn).toBeHidden({ timeout: 10000 });
++    }
++
++    // Excludes system-managed rows (SRE Agent), which "select all" never selects.
++    async expectAllSelectableRowsSelected() {
++        const selectableRowCount = await this.page
++            .locator('tbody tr[data-test^="o2-table-row-"]')
++            .filter({ hasNot: this.systemAccountLabel })
++            .count();
++        const checkedCount = await this.page
++            .locator('tbody button[role="checkbox"][data-state="checked"]')
++            .count();
++        expect(checkedCount).toBe(selectableRowCount);
++    }
++
+     // ============================================================
+     // SRE Agent system account protection helpers
+     // ============================================================
+diff --git a/tests/ui-testing/playwright-tests/GeneralTests/otableSelectCell.spec.js b/tests/ui-testing/playwright-tests/GeneralTests/otableSelectCell.spec.js
+new file mode 100644
+index 00000000000..6c6c8f1642a
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/GeneralTests/otableSelectCell.spec.js
+@@ -0,0 +1,100 @@
++const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
++const testLogger = require('../utils/test-logger.js');
++const PageManager = require('../../pages/page-manager.js');
++
++// Vehicle: IAM > Service Accounts — Model Pricing is Enterprise/Cloud-only and never renders on the OSS build this shard runs against.
++const uniqueSaName = () => `sa${Date.now()}x${Math.floor(Math.random() * 10000)}`;
++
++test.describe("OTable Select Cell Click Selection testcases", () => {
++    test.describe.configure({ mode: 'parallel' });
++    let pm;
++    let email;
++
++    test.beforeEach(async ({ page }, testInfo) => {
++        testLogger.testStart(testInfo.title, testInfo.file);
++        await navigateToBase(page);
++        pm = new PageManager(page);
++
++        const uniqueName = uniqueSaName();
++        email = pm.iamPage.serviceAccountEmailFor(uniqueName);
++
++        await pm.iamPage.gotoIamPage();
++        await pm.iamPage.iamPageServiceAccountsTab();
++        await pm.iamPage.iamPageAddServiceAccount();
++        await pm.iamPage.enterNameServiceAccount(uniqueName);
++        await pm.iamPage.clickSaveServiceAccount();
++        await pm.iamPage.verifySuccessMessage('Service account created successfully.');
++        await pm.iamPage.clickServiceAccountPopUpClosed();
++        await pm.iamPage.reloadServiceAccountPage();
++        await pm.iamPage.waitForSelectCell(email);
++        testLogger.info('Test setup completed');
++    });
++
++    test.afterEach(async () => {
++        // Best-effort: a failed cleanup delete shouldn't mask a test failure.
++        try {
++            await pm.iamPage.deletedServiceAccount(email);
++            await pm.iamPage.requestServiceAccountOk();
++        } catch {
++            // Row may already be gone — nothing further to clean up.
++        }
++    });
++
++    test("selects then deselects a row by clicking the select-cell padding", {
++        tag: ['@otable-select-cell', '@selection', '@P0', '@all'],
++    }, async () => {
++        testLogger.info('Assert the row is initially unselected');
++        await pm.iamPage.expectRowCheckboxUnchecked(email);
++        await pm.iamPage.expectDeleteSelectedBtnHidden();
++
++        testLogger.info('Click the select-cell padding to select the row');
++        await pm.iamPage.clickSelectCellPadding(email);
++        await pm.iamPage.expectRowCheckboxChecked(email);
++        await pm.iamPage.expectDeleteSelectedBtnVisible();
++
++        testLogger.info('Click the same padding again to deselect the row');
++        await pm.iamPage.clickSelectCellPadding(email);
++        await pm.iamPage.expectRowCheckboxUnchecked(email);
++        await pm.iamPage.expectDeleteSelectedBtnHidden();
++
++        testLogger.info('Test completed');
++    });
++
++    test("selects all then deselects all rows via the header select-cell padding", {
++        tag: ['@otable-select-cell', '@selection', '@selectAll', '@P0', '@all'],
++    }, async () => {
++        testLogger.info('Assert no rows are selected before the header cell click');
++        await pm.iamPage.expectSelectAllCheckboxUnchecked();
++        await pm.iamPage.expectDeleteSelectedBtnHidden();
++
++        testLogger.info('Click the header select-cell padding to select all rows');
++        await pm.iamPage.clickSelectAllCellPadding();
++        await pm.iamPage.expectSelectAllCheckboxChecked();
++        await pm.iamPage.expectAllSelectableRowsSelected();
++        await pm.iamPage.expectDeleteSelectedBtnVisible();
++
++        testLogger.info('Click the header padding again to deselect all rows');
++        await pm.iamPage.clickSelectAllCellPadding();
++        await pm.iamPage.expectSelectAllCheckboxUnchecked();
++        await pm.iamPage.expectDeleteSelectedBtnHidden();
++
++        testLogger.info('Test completed');
++    });
++
++    test.fixme("checkbox square click toggles exactly once without double-firing — blocked by OCheckbox double-fire (label forwards a 2nd click to the button when the checkmark is clicked)", {
++        tag: ['@otable-select-cell', '@checkbox', '@singleFire', '@P1', '@all'],
++    }, async () => {
++        testLogger.info('Assert the row is initially unselected');
++        await pm.iamPage.expectRowCheckboxUnchecked(email);
++
++        testLogger.info('Click the checkbox square to select the row');
++        await pm.iamPage.clickCheckboxByEmail(email);
++        await pm.iamPage.expectRowCheckboxChecked(email);
++
++        testLogger.info('Click the checkbox square again to deselect the row');
++        await pm.iamPage.clickCheckboxByEmail(email);
++        await pm.iamPage.expectRowCheckboxUnchecked(email);
++
++        testLogger.info('Test completed');
++    });
++});

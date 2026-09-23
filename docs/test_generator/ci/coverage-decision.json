@@ -1,0 +1,9 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/otableSelectCell.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/otableSelectCell.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The dev-authored spec already covers the two WIRED headline behaviors (single-row select/deselect via cell padding, select-all/deselect-all via header padding) and correctly parks the UNWIRED checkbox-square double-fire as test.fixme. The spec is already registered in ci_matrix.json. No new spec file is needed. Two distinct edge-case behaviors are still untested and add real coverage without duplicating the P0 paths: (1) the header's indeterminate state when exactly one of several selectable rows is selected, and (2) the isRowSelectable gating that disables the SRE Agent system row and ignores its cell clicks. Append these as new test() cases inside the existing spec (needs_registration stays false)."
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "title": "header shows indeterminate state when exactly one of several selectable rows is selected",
+    "action": "append",
+    "verifies": "the header select-all checkbox reports indeterminate when only one of several selectable rows is selected"
+  },
+  {
+    "title": "system-managed SRE Agent row is non-selectable",
+    "action": "append",
+    "verifies": "the SRE Agent system row checkbox stays disabled/unchecked and its select-cell padding click is ignored"
+  }
+]
