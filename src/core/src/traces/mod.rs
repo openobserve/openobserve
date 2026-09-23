@@ -68,6 +68,7 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::{
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
+        otlp::otlp_error_response,
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext},
     },
@@ -454,7 +455,12 @@ pub async fn otlp_proto(
         Ok(v) => v,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid proto: org_id: {org_id}, error: {e}");
-            return Ok(MetaHttpResponse::bad_request(format!("Invalid proto: {e}")));
+            return Ok(otlp_error_response(
+                OtlpRequestType::HttpProtobuf,
+                http::StatusCode::BAD_REQUEST,
+                3, // INVALID_ARGUMENT
+                format!("Invalid proto: {e}"),
+            ));
         }
     };
     match handle_otlp_request(
