@@ -1474,6 +1474,8 @@
     "sessionReplay": "セッションリプレイ",
     "viewSessionReplay": "セッションリプレイを表示",
     "playSessionReplay": "セッションリプレイを再生",
+    "noReplayRecordedTitle": "このセッションのリプレイは記録されていません",
+    "noReplayRecordedMessage": "セッション {id} には再生できるリプレイセグメントがありません。",
     "discoverSessionTitle": "ユーザーインタラクションを詳細に理解するためのセッションリプレイをご覧ください",
     "discoverSessionMessage": "セッションリプレイは、ウェブサイトまたはアプリケーションでのユーザーインタラクションをキャプチャして再生します。これにより、ユーザーがどのようにナビゲートしたか、どこをクリックしたか、何を入力したか、コンテンツにどのように反応したかを視覚的に確認できます。",
     "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。",
@@ -2029,11 +2031,11 @@
       "addToGroup": "ユーザーグループに追加する",
       "addToRole": "役割を割り当てる",
       "step1Title": "トークンをコピーする",
-      "copyHint": "このトークンを今すぐコピーしてください。今後表示することはできません。",
+      "copyHint": "このトークンが表示されるのは今回だけです。今すぐコピーまたはダウンロードしてください。後から再取得することはできません。",
       "done": "完了",
       "applying": "アクセス権限を適用中...",
-      "grantedRoles": "割り当てられたロール: {roles}",
-      "grantedGroups": "ユーザーグループに追加: {groups}",
+      "rolesAssignedLabel": "割り当てられたロール",
+      "groupsAssignedLabel": "ユーザーグループに追加済み",
       "failedRoles": "ロールを割り当てられませんでした: {roles}",
       "failedGroups": "ユーザーグループに追加できませんでした: {groups}",
       "failedHint": "これらは後でロールとユーザーグループのページから付与できます。"
@@ -2043,6 +2045,9 @@
         "label": "サービスアカウント名",
         "placeholder": "例: ingest-bot",
         "help": "小文字、数字、ハイフン。名前{suffix}として保存"
+      },
+      "identifier": {
+        "label": "識別子"
       },
       "roles": {
         "label": "ロールを割り当て",
@@ -2057,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "識別子",
+        "roles": "ロール",
         "token": "トークン",
         "created": "作成されました"
       }
@@ -2184,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "これらのロールにバインドされているユーザーおよびサービスアカウントはすべてアクセスできなくなります。"
-      }
+      },
+      "assignColumn": "割り当て",
+      "assignBtn": "追加",
+      "assignedBadge": "割り当て済み",
+      "assignBannerText": "{member} をロールに追加します — 下のロールの横にある [追加] をクリックしてください。",
+      "assignBannerDone": "完了",
+      "assignSuccess": "{member} をロール \"{role}\" に追加しました。",
+      "assignError": "そのロールにアカウントを追加できませんでした。もう一度お試しください。"
     },
     "group": {
       "name": {
@@ -2215,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "これらのグループのメンバーは、付与された役割を失います。"
-      }
+      },
+      "assignColumn": "割り当て",
+      "assignBtn": "追加",
+      "assignedBadge": "割り当て済み",
+      "assignBannerText": "{member} をユーザーグループに追加します — 下のグループの横にある [追加] をクリックしてください。",
+      "assignBannerDone": "完了",
+      "assignSuccess": "{member} をグループ \"{group}\" に追加しました。",
+      "assignError": "そのグループにアカウントを追加できませんでした。もう一度お試しください。"
     },
     "appGroups": {
       "deleteGroupTitle": "グループを削除",
@@ -13041,10 +13061,12 @@
           },
           "variables": {
             "input": {
-              "trace": "トレースのルートスパンからの入力。"
+              "trace": "トレースのルートチャット Span からの入力。",
+              "session": "最初の質問: 最初のトレースのルートチャット Span からの入力。"
             },
             "output": {
-              "trace": "トレースのルートスパンからの出力。"
+              "trace": "トレースのルートチャット Span からの出力。",
+              "session": "最終回答: 最後のトレースのルートチャット Span からの出力。"
             },
             "statistics": {
               "trace": "トレースメトリクス: スパン数、期間、LLM とツール呼び出し、エラー、トークン、コスト。",
@@ -13056,6 +13078,10 @@
             "steps": {
               "trace": "時間順のスパン。トレースが非常に長い場合は中間が折りたたまれます。",
               "session": "時間順のトレース。会話のターンとして表現されます。"
+            },
+            "tool_calls": {
+              "trace": "トレース内のすべてのツール呼び出しを、名前、入力、出力、ステータスとともに時系列順に示します。",
+              "session": "セッションのトレース全体にわたるすべてのツール呼び出しを、名前、入力、出力、ステータスとともに時系列順に示します。"
             }
           }
         }
@@ -13375,6 +13401,7 @@
       "searchHistoryNotEnabled": "検索履歴が有効になっていません。",
       "enableUsageReporting": "使用状況レポートを有効にするには、ZO_USAGE_REPORTING_ENABLED を true に設定してください。",
       "selectStreamToExtractPatterns": "パターンを抽出するストリームを選択してください",
+      "patternsUnavailableForMultiStream": "複数のストリームが選択されている場合、パターンは利用できません。ストリームを1つだけ選択してください。",
       "errorExtractingPatterns": "パターンの抽出中にエラーが発生しました。もう一度お試しください。",
       "nameOfPanelRequired": "パネルの名前が必要です",
       "errorsFixAndTryAgain": "いくつかのエラーがあります。修正してからもう一度お試しください。",

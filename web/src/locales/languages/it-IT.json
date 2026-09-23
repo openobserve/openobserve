@@ -1474,6 +1474,8 @@
     "sessionReplay": "Replay della sessione",
     "viewSessionReplay": "Visualizza il replay della sessione",
     "playSessionReplay": "Riproduci sessione",
+    "noReplayRecordedTitle": "Nessun replay registrato per questa sessione",
+    "noReplayRecordedMessage": "La sessione {id} non ha segmenti di replay da riprodurre.",
     "discoverSessionTitle": "Scopri Session Replay per comprendere in dettaglio le interazioni degli utenti",
     "discoverSessionMessage": "Session Replay acquisisce e riproduce le interazioni degli utenti sul tuo sito web o sulla tua applicazione. Ciò ti consente di esaminare visivamente il modo in cui gli utenti navigano, dove fanno clic, cosa digitano e come interagiscono con i tuoi contenuti",
     "loadingErrorDetails": "Tieni duro, stiamo recuperando i dettagli dell'errore.",
@@ -2029,11 +2031,11 @@
       "addToGroup": "Aggiungi a un gruppo di utenti",
       "addToRole": "Assegna un ruolo",
       "step1Title": "Copia il tuo token",
-      "copyHint": "Copia questo token ora: non potrai vederlo più.",
+      "copyHint": "Questa è l'unica volta in cui vedrai questo token. Copialo o scaricalo ora, non sarà possibile recuperarlo di nuovo.",
       "done": "Fatto",
       "applying": "Applicazione delle concessioni di accesso...",
-      "grantedRoles": "Ruoli assegnati: {roles}",
-      "grantedGroups": "Aggiunto ai gruppi di utenti: {groups}",
+      "rolesAssignedLabel": "Ruoli assegnati",
+      "groupsAssignedLabel": "Aggiunto ai gruppi utente",
       "failedRoles": "Impossibile assegnare i ruoli: {roles}",
       "failedGroups": "Impossibile aggiungere ai gruppi di utenti: {groups}",
       "failedHint": "Puoi concederli successivamente dalle pagine Ruoli e Gruppi di utenti."
@@ -2043,6 +2045,9 @@
         "label": "Nome account di servizio",
         "placeholder": "ad es. ingest-bot",
         "help": "Lettere minuscole, numeri e trattini. Salvato come nome{suffix}"
+      },
+      "identifier": {
+        "label": "Identificatore"
       },
       "roles": {
         "label": "Assegna ruoli",
@@ -2057,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Identificatore",
+        "roles": "Ruoli",
         "token": "Token",
         "created": "Creato"
       }
@@ -2184,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Tutti gli utenti e gli account di servizio associati a questi ruoli perderanno l'accesso."
-      }
+      },
+      "assignColumn": "Assegna",
+      "assignBtn": "Aggiungi",
+      "assignedBadge": "Assegnato",
+      "assignBannerText": "Aggiungi {member} a un ruolo — fai clic su Aggiungi accanto a un ruolo di seguito.",
+      "assignBannerDone": "Fatto",
+      "assignSuccess": "Aggiunto {member} al ruolo \"{role}\".",
+      "assignError": "Impossibile aggiungere l'account a quel ruolo. Riprova."
     },
     "group": {
       "name": {
@@ -2215,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "I membri di questi gruppi perderanno i ruoli da loro assegnati."
-      }
+      },
+      "assignColumn": "Assegna",
+      "assignBtn": "Aggiungi",
+      "assignedBadge": "Assegnato",
+      "assignBannerText": "Aggiungi {member} a un gruppo utente — fai clic su Aggiungi accanto a un gruppo di seguito.",
+      "assignBannerDone": "Fatto",
+      "assignSuccess": "Aggiunto {member} al gruppo \"{group}\".",
+      "assignError": "Impossibile aggiungere l'account a quel gruppo. Riprova."
     },
     "appGroups": {
       "deleteGroupTitle": "Elimina gruppo",
@@ -13041,10 +13061,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Input dallo span radice della traccia."
+              "trace": "Input dallo Span chat radice della traccia.",
+              "session": "La domanda iniziale: input dallo Span chat radice della prima traccia."
             },
             "output": {
-              "trace": "Output dallo span radice della traccia."
+              "trace": "Output dallo Span chat radice della traccia.",
+              "session": "La risposta finale: output dallo Span chat radice dell'ultima traccia."
             },
             "statistics": {
               "trace": "Metriche della traccia: numero di span, durata, chiamate LLM e strumenti, errori, token e costo.",
@@ -13056,6 +13078,10 @@
             "steps": {
               "trace": "Span in ordine temporale; la parte centrale viene compressa quando la traccia è molto lunga.",
               "session": "Tracce in ordine temporale, rappresentate come turni di conversazione."
+            },
+            "tool_calls": {
+              "trace": "Ogni chiamata di strumento nella traccia, in ordine temporale, con nome, input, output e stato.",
+              "session": "Ogni chiamata di strumento nelle tracce della sessione, in ordine temporale, con nome, input, output e stato."
             }
           }
         }
@@ -13375,6 +13401,7 @@
       "searchHistoryNotEnabled": "La cronologia delle ricerche non è abilitata.",
       "enableUsageReporting": "Imposta ZO_USAGE_REPORTING_ENABLED su true per abilitare il report di utilizzo.",
       "selectStreamToExtractPatterns": "Seleziona un flusso per estrarre i pattern",
+      "patternsUnavailableForMultiStream": "I pattern non sono disponibili quando sono selezionati più stream. Seleziona un singolo stream.",
       "errorExtractingPatterns": "Errore nell'estrazione dei pattern. Riprova.",
       "nameOfPanelRequired": "Il nome del pannello è obbligatorio",
       "errorsFixAndTryAgain": "Ci sono alcuni errori, correggili e riprova",

@@ -64,7 +64,9 @@ use super::{
     },
 };
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse, otlp::otlp_error_response, stream::SchemaRecords,
+    },
     ingestion::{
         TriggerAlertData, check_ingestion_allowed,
         grpc::{get_exemplar_val, get_metric_val, get_val},
@@ -145,7 +147,12 @@ pub async fn otlp_proto(
         Ok(v) => v,
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid proto: org_id: {org_id}, error: {e}");
-            return Ok(MetaHttpResponse::bad_request(format!("Invalid proto: {e}")));
+            return Ok(otlp_error_response(
+                OtlpRequestType::HttpProtobuf,
+                http::StatusCode::BAD_REQUEST,
+                3, // INVALID_ARGUMENT
+                format!("Invalid proto: {e}"),
+            ));
         }
     };
     match handle_otlp_request(org_id, request, OtlpRequestType::HttpProtobuf, user).await {

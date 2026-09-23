@@ -1474,6 +1474,8 @@
     "sessionReplay": "工作階段重播",
     "viewSessionReplay": "檢視工作階段重播",
     "playSessionReplay": "播放工作階段重播",
+    "noReplayRecordedTitle": "此工作階段未錄製重播",
+    "noReplayRecordedMessage": "工作階段 {id} 沒有可播放的重播區段。",
     "discoverSessionTitle": "探索工作階段重播以深入了解使用者互動",
     "discoverSessionMessage": "工作階段重播會擷取並重播使用者在網站或應用程式上的互動行為，讓您以視覺化方式檢閱使用者如何瀏覽、在哪裡按下、輸入了什麼，以及如何與內容互動",
     "loadingErrorDetails": "正在擷取錯誤詳細資訊，請稍候。",
@@ -2029,11 +2031,11 @@
       "addToGroup": "加入使用者群組",
       "addToRole": "指派角色",
       "step1Title": "複製您的權杖",
-      "copyHint": "請立即複製此權杖——您將無法再次看到它。",
+      "copyHint": "這是您唯一一次能看到此權杖的機會。請立即複製或下載，之後將無法再次取得。",
       "done": "完成",
       "applying": "正在套用存取權限…",
-      "grantedRoles": "已指派角色：{roles}",
-      "grantedGroups": "已新增至使用者群組：{groups}",
+      "rolesAssignedLabel": "已指派角色",
+      "groupsAssignedLabel": "已加入使用者群組",
       "failedRoles": "無法指派角色：{roles}",
       "failedGroups": "無法新增至使用者群組：{groups}",
       "failedHint": "您可以之後從「角色」和「使用者群組」頁面授予這些權限。"
@@ -2043,6 +2045,9 @@
         "label": "服務帳戶名稱",
         "placeholder": "例如 ingest-bot",
         "help": "小寫字母、數字和連字符。儲存為名稱{suffix}"
+      },
+      "identifier": {
+        "label": "識別碼"
       },
       "roles": {
         "label": "指派角色",
@@ -2057,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "識別碼",
+        "roles": "角色",
         "token": "權杖",
         "created": "建立時間"
       }
@@ -2184,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "繫結至這些角色的任何使用者與服務帳戶將失去存取權限。"
-      }
+      },
+      "assignColumn": "指派",
+      "assignBtn": "新增",
+      "assignedBadge": "已指派",
+      "assignBannerText": "將 {member} 加入角色 — 請點選下方角色旁的「新增」。",
+      "assignBannerDone": "完成",
+      "assignSuccess": "已將 {member} 加入角色「{role}」。",
+      "assignError": "無法將該帳戶加入該角色。請再試一次。"
     },
     "group": {
       "name": {
@@ -2215,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "這些群組的成員將失去這些群組所授予的角色。"
-      }
+      },
+      "assignColumn": "指派",
+      "assignBtn": "新增",
+      "assignedBadge": "已指派",
+      "assignBannerText": "將 {member} 加入使用者群組 — 請點選下方群組旁的「新增」。",
+      "assignBannerDone": "完成",
+      "assignSuccess": "已將 {member} 加入群組「{group}」。",
+      "assignError": "無法將該帳戶加入該群組。請再試一次。"
     },
     "appGroups": {
       "deleteGroupTitle": "刪除群組",
@@ -13036,10 +13056,12 @@
           },
           "variables": {
             "input": {
-              "trace": "來自追蹤根 Span 的輸入。"
+              "trace": "來自追蹤根聊天 Span 的輸入。",
+              "session": "開場問題：來自第一個追蹤之根聊天 Span 的輸入。"
             },
             "output": {
-              "trace": "來自追蹤根 Span 的輸出。"
+              "trace": "來自追蹤根聊天 Span 的輸出。",
+              "session": "最終答案：來自最後一個追蹤之根聊天 Span 的輸出。"
             },
             "statistics": {
               "trace": "追蹤指標：Span 計數、持續時間、LLM 與工具呼叫、錯誤、Token 和成本。",
@@ -13051,6 +13073,10 @@
             "steps": {
               "trace": "Span 依時間順序排列；當追蹤很長時，中間部分會被摺疊。",
               "session": "按時間順序排列的追蹤，表示為對話輪次。"
+            },
+            "tool_calls": {
+              "trace": "追蹤中的每個工具呼叫，依時間順序，包含其名稱、輸入、輸出與狀態。",
+              "session": "工作階段中所有追蹤的每個工具呼叫，依時間順序，包含其名稱、輸入、輸出與狀態。"
             }
           }
         }
@@ -13370,6 +13396,7 @@
       "searchHistoryNotEnabled": "搜尋記錄未啟用。",
       "enableUsageReporting": "將 ZO_USAGE_REPORTING_ENABLED 設定為 true 以啟用使用情況報告。",
       "selectStreamToExtractPatterns": "請選取一個串流以提取模式",
+      "patternsUnavailableForMultiStream": "當選取多個串流時，模式無法使用。請選取單一串流。",
       "errorExtractingPatterns": "提取模式時發生錯誤。請重試。",
       "nameOfPanelRequired": "面板名稱為必填",
       "errorsFixAndTryAgain": "存在一些錯誤，請修正後重試",

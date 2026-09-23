@@ -1474,6 +1474,8 @@
     "sessionReplay": "Rediffusion de la session",
     "viewSessionReplay": "Afficher la rediffusion de la session",
     "playSessionReplay": "Replay de la session",
+    "noReplayRecordedTitle": "Aucun replay n'a été enregistré pour cette session",
+    "noReplayRecordedMessage": "La session {id} n'a aucun segment de replay à lire.",
     "discoverSessionTitle": "Découvrez Session Replay pour comprendre en détail les interactions des utilisateurs",
     "discoverSessionMessage": "Session Replay capture et rejoue les interactions des utilisateurs sur votre site Web ou votre application. Cela vous permet d'examiner visuellement la façon dont les utilisateurs naviguent, où ils cliquent, ce qu'ils saisissent et comment ils interagissent avec votre contenu",
     "loadingErrorDetails": "Attendez, nous sommes en train de récupérer les détails de l'erreur.",
@@ -2029,11 +2031,11 @@
       "addToGroup": "Ajouter à un groupe d'utilisateurs",
       "addToRole": "Attribuer un rôle",
       "step1Title": "Copiez votre jeton",
-      "copyHint": "Copiez ce jeton maintenant, vous ne pourrez plus le voir.",
+      "copyHint": "C'est la seule fois où vous verrez ce jeton. Copiez-le ou téléchargez-le maintenant, il ne pourra plus être récupéré.",
       "done": "Terminé",
       "applying": "Application des autorisations d'accès...",
-      "grantedRoles": "Rôles attribués : {roles}",
-      "grantedGroups": "Ajouté aux groupes d'utilisateurs : {groups}",
+      "rolesAssignedLabel": "Rôles attribués",
+      "groupsAssignedLabel": "Ajouté aux groupes d'utilisateurs",
       "failedRoles": "Impossible d'attribuer les rôles : {roles}",
       "failedGroups": "Impossible d'ajouter aux groupes d'utilisateurs : {groups}",
       "failedHint": "Vous pouvez les accorder ultérieurement depuis les pages Rôles et Groupes d'utilisateurs."
@@ -2043,6 +2045,9 @@
         "label": "Nom du compte de service",
         "placeholder": "ex. ingest-bot",
         "help": "Lettres minuscules, chiffres et traits d'union. Enregistré sous name{suffix}"
+      },
+      "identifier": {
+        "label": "Identifiant"
       },
       "roles": {
         "label": "Attribuer des rôles",
@@ -2057,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Identifiant",
+        "roles": "Rôles",
         "token": "Jeton",
         "created": "Créé"
       }
@@ -2184,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Tous les utilisateurs et comptes de service liés à ces rôles perdront l'accès."
-      }
+      },
+      "assignColumn": "Attribuer",
+      "assignBtn": "Ajouter",
+      "assignedBadge": "Attribué",
+      "assignBannerText": "Ajoutez {member} à un rôle — cliquez sur Ajouter à côté d'un rôle ci-dessous.",
+      "assignBannerDone": "Terminé",
+      "assignSuccess": "Ajout de {member} au rôle \"{role}\".",
+      "assignError": "Impossible d'ajouter le compte à ce rôle. Veuillez réessayer."
     },
     "group": {
       "name": {
@@ -2215,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Les membres de ces groupes perdront les rôles qu'ils leur ont attribués."
-      }
+      },
+      "assignColumn": "Attribuer",
+      "assignBtn": "Ajouter",
+      "assignedBadge": "Attribué",
+      "assignBannerText": "Ajoutez {member} à un groupe d'utilisateurs — cliquez sur Ajouter à côté d'un groupe ci-dessous.",
+      "assignBannerDone": "Terminé",
+      "assignSuccess": "Ajout de {member} au groupe \"{group}\".",
+      "assignError": "Impossible d'ajouter le compte à ce groupe. Veuillez réessayer."
     },
     "appGroups": {
       "deleteGroupTitle": "Supprimer le groupe",
@@ -13041,10 +13061,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Entrée provenant du span racine de la trace."
+              "trace": "Entrée provenant du span de chat racine de la trace.",
+              "session": "La question d'ouverture : entrée provenant du span de chat racine de la première trace."
             },
             "output": {
-              "trace": "Sortie provenant du span racine de la trace."
+              "trace": "Sortie provenant du span de chat racine de la trace.",
+              "session": "La réponse finale : sortie provenant du span de chat racine de la dernière trace."
             },
             "statistics": {
               "trace": "Métriques de trace : nombre de spans, durée, appels LLM et d'outils, erreurs, tokens et coût.",
@@ -13056,6 +13078,10 @@
             "steps": {
               "trace": "Spans dans l'ordre chronologique ; le milieu est replié lorsque la trace est très longue.",
               "session": "Traces dans l'ordre chronologique, représentées comme des tours de conversation."
+            },
+            "tool_calls": {
+              "trace": "Chaque appel d'outil dans la trace, par ordre chronologique, avec son nom, son entrée, sa sortie et son statut.",
+              "session": "Chaque appel d'outil dans les traces de la session, par ordre chronologique, avec son nom, son entrée, sa sortie et son statut."
             }
           }
         }
@@ -13375,6 +13401,7 @@
       "searchHistoryNotEnabled": "L'historique de recherche n'est pas activé.",
       "enableUsageReporting": "Définissez ZO_USAGE_REPORTING_ENABLED sur true pour activer le rapport d'utilisation.",
       "selectStreamToExtractPatterns": "Veuillez sélectionner un flux pour extraire les motifs",
+      "patternsUnavailableForMultiStream": "Les motifs ne sont pas disponibles lorsque plusieurs flux sont sélectionnés. Veuillez sélectionner un seul flux.",
       "errorExtractingPatterns": "Erreur lors de l'extraction des motifs. Veuillez réessayer.",
       "nameOfPanelRequired": "Le nom du panneau est requis",
       "errorsFixAndTryAgain": "Il y a des erreurs, veuillez les corriger et réessayer",

@@ -1474,6 +1474,8 @@
     "sessionReplay": "Phát lại phiên",
     "viewSessionReplay": "Xem phát lại phiên",
     "playSessionReplay": "Phát lại phiên",
+    "noReplayRecordedTitle": "Không có phát lại nào được ghi cho phiên này",
+    "noReplayRecordedMessage": "Phiên {id} không có phân đoạn phát lại nào để phát.",
     "discoverSessionTitle": "Khám phá Phát lại phiên để hiểu chi tiết tương tác người dùng",
     "discoverSessionMessage": "Phát lại phiên ghi lại và phát lại các tương tác của người dùng trên trang web hoặc ứng dụng của bạn. Điều này cho phép bạn xem xét trực quan cách người dùng điều hướng, nơi họ nhấp, nội dung họ gõ và cách họ tương tác với nội dung của bạn",
     "loadingErrorDetails": "Hãy chờ một chút, chúng tôi đang lấy chi tiết lỗi.",
@@ -2029,11 +2031,11 @@
       "addToGroup": "Thêm vào nhóm người dùng",
       "addToRole": "Gán vai trò",
       "step1Title": "Sao chép mã của bạn",
-      "copyHint": "Sao chép mã này ngay — bạn sẽ không thể xem lại nó.",
+      "copyHint": "Đây là lần duy nhất bạn nhìn thấy token này. Hãy sao chép hoặc tải xuống ngay, không thể truy xuất lại lần nữa.",
       "done": "Hoàn tất",
       "applying": "Đang áp dụng quyền truy cập…",
-      "grantedRoles": "Vai trò đã gán: {roles}",
-      "grantedGroups": "Đã thêm vào nhóm người dùng: {groups}",
+      "rolesAssignedLabel": "Vai trò đã gán",
+      "groupsAssignedLabel": "Đã thêm vào nhóm người dùng",
       "failedRoles": "Không thể gán vai trò: {roles}",
       "failedGroups": "Không thể thêm vào nhóm người dùng: {groups}",
       "failedHint": "Bạn có thể cấp các quyền này sau từ trang Vai trò và Nhóm người dùng."
@@ -2043,6 +2045,9 @@
         "label": "Tên tài khoản dịch vụ",
         "placeholder": "ví dụ: ingest-bot",
         "help": "Chữ thường, số và dấu gạch ngang. Lưu dưới dạng name{suffix}"
+      },
+      "identifier": {
+        "label": "Định danh"
       },
       "roles": {
         "label": "Gán vai trò",
@@ -2057,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Định danh",
+        "roles": "Vai trò",
         "token": "Mã",
         "created": "Đã tạo"
       }
@@ -2184,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Mọi người dùng và tài khoản dịch vụ liên kết với các vai trò này sẽ mất quyền truy cập."
-      }
+      },
+      "assignColumn": "Gán",
+      "assignBtn": "Thêm",
+      "assignedBadge": "Đã gán",
+      "assignBannerText": "Thêm {member} vào một vai trò — nhấp Thêm bên cạnh vai trò bên dưới.",
+      "assignBannerDone": "Xong",
+      "assignSuccess": "Đã thêm {member} vào vai trò \"{role}\".",
+      "assignError": "Không thể thêm tài khoản vào vai trò đó. Vui lòng thử lại."
     },
     "group": {
       "name": {
@@ -2215,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Các thành viên của những nhóm này sẽ mất các vai trò được cấp bởi chúng."
-      }
+      },
+      "assignColumn": "Gán",
+      "assignBtn": "Thêm",
+      "assignedBadge": "Đã gán",
+      "assignBannerText": "Thêm {member} vào một nhóm người dùng — nhấp Thêm bên cạnh nhóm bên dưới.",
+      "assignBannerDone": "Xong",
+      "assignSuccess": "Đã thêm {member} vào nhóm \"{group}\".",
+      "assignError": "Không thể thêm tài khoản vào nhóm đó. Vui lòng thử lại."
     },
     "appGroups": {
       "deleteGroupTitle": "Xóa nhóm",
@@ -13041,10 +13061,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Đầu vào từ span gốc của trace."
+              "trace": "Đầu vào từ span chat gốc của trace.",
+              "session": "Câu hỏi mở đầu: đầu vào từ span chat gốc của trace đầu tiên."
             },
             "output": {
-              "trace": "Đầu ra từ span gốc của trace."
+              "trace": "Đầu ra từ span chat gốc của trace.",
+              "session": "Câu trả lời cuối cùng: đầu ra từ span chat gốc của trace cuối cùng."
             },
             "statistics": {
               "trace": "Số liệu trace: số span, thời lượng, số lần gọi LLM và công cụ, lỗi, token và chi phí.",
@@ -13056,6 +13078,10 @@
             "steps": {
               "trace": "Các span theo thứ tự thời gian; phần giữa được thu gọn khi trace rất dài.",
               "session": "Các trace theo thứ tự thời gian, được biểu diễn dưới dạng các lượt hội thoại."
+            },
+            "tool_calls": {
+              "trace": "Mọi lệnh gọi công cụ trong trace, theo thứ tự thời gian, kèm tên, đầu vào, đầu ra và trạng thái.",
+              "session": "Mọi lệnh gọi công cụ trong các trace của phiên, theo thứ tự thời gian, kèm tên, đầu vào, đầu ra và trạng thái."
             }
           }
         }
@@ -13375,6 +13401,7 @@
       "searchHistoryNotEnabled": "Lịch sử tìm kiếm không được bật.",
       "enableUsageReporting": "Đặt ZO_USAGE_REPORTING_ENABLED thành true để bật báo cáo sử dụng.",
       "selectStreamToExtractPatterns": "Vui lòng chọn một stream để trích xuất mẫu",
+      "patternsUnavailableForMultiStream": "Không có mẫu khi chọn nhiều stream. Vui lòng chọn một stream.",
       "errorExtractingPatterns": "Lỗi khi trích xuất mẫu. Vui lòng thử lại.",
       "nameOfPanelRequired": "Tên của bảng là bắt buộc",
       "errorsFixAndTryAgain": "Có một số lỗi, vui lòng sửa chúng và thử lại",

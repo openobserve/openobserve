@@ -305,6 +305,7 @@ mod tests {
             meta: Some(FileMeta {
                 compressed_size: 1024,
                 index_size: 512,
+                mindex_size: 0,
                 max_ts: 1234567890,
                 ..Default::default()
             }),
@@ -328,6 +329,7 @@ mod tests {
                 meta: Some(FileMeta {
                     compressed_size: 1024,
                     index_size: 512,
+                    mindex_size: 0,
                     max_ts: 1234567890,
                     ..Default::default()
                 }),
@@ -341,6 +343,7 @@ mod tests {
                 meta: Some(FileMeta {
                     compressed_size: 2048,
                     index_size: 1024,
+                    mindex_size: 0,
                     max_ts: 1234567891,
                     ..Default::default()
                 }),
@@ -354,6 +357,7 @@ mod tests {
                 meta: Some(FileMeta {
                     compressed_size: 3072,
                     index_size: 1536,
+                    mindex_size: 0,
                     max_ts: 1234567892,
                     ..Default::default()
                 }),
@@ -410,6 +414,7 @@ mod tests {
         let valid_meta = FileMeta {
             compressed_size: 1024,
             index_size: 512,
+            mindex_size: 0,
             max_ts: 1234567890,
             ..Default::default()
         };
@@ -422,6 +427,7 @@ mod tests {
         let zero_meta = FileMeta {
             compressed_size: 0,
             index_size: 0,
+            mindex_size: 0,
             max_ts: 0,
             ..Default::default()
         };

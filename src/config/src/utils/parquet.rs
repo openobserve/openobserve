@@ -533,6 +533,7 @@ mod tests {
             original_size: 8,
             compressed_size: 9,
             index_size: 10,
+            mindex_size: 0,
             bloom_ver: 11,
             flattened: true,
         };

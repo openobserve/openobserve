@@ -4,6 +4,7 @@
  * and (where indicated) opens the config sidebar, ready for assertions.
  */
 
+import * as crypto from "crypto";
 import { setupTestDashboard, deleteDashboard } from "./dashCreation.js";
 import { ingestionForMaps } from "./dashIngestion.js";
 import testLogger from '../../utils/test-logger.js';
@@ -81,7 +82,7 @@ export async function discardAndCleanupTestDashboard(page, dashboardName) {
 }
 
 export const generateDashboardName = () =>
-  "Dashboard_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now();
+  "Dashboard_" + crypto.randomBytes(6).toString("hex") + "_" + Date.now();
 
 // ---------------------------------------------------------------------------
 // Base panel builder — all other helpers delegate here

@@ -1474,6 +1474,8 @@
     "sessionReplay": "Odtwarzanie sesji",
     "viewSessionReplay": "Wyświetl odtwarzanie sesji",
     "playSessionReplay": "Odtwórz sesję",
+    "noReplayRecordedTitle": "Nie nagrano powtórki dla tej sesji",
+    "noReplayRecordedMessage": "Sesja {id} nie ma segmentów powtórki do odtworzenia.",
     "discoverSessionTitle": "Odkryj odtwarzanie sesji, aby szczegółowo zrozumieć interakcje użytkowników",
     "discoverSessionMessage": "Odtwarzanie sesji rejestruje i odtwarza interakcje użytkowników na Twojej stronie internetowej lub w aplikacji. Pozwala to wizualnie przejrzeć, jak użytkownicy nawigują, gdzie klikają, co wpisują i w jaki sposób angażują się w treści.",
     "loadingErrorDetails": "Trzymaj się, pobieramy szczegóły błędu.",
@@ -2029,11 +2031,11 @@
       "addToGroup": "Dodaj do grupy użytkowników",
       "addToRole": "Przypisz rolę",
       "step1Title": "Skopiuj swój token",
-      "copyHint": "Skopiuj ten token teraz — nie będziesz mógł go ponownie zobaczyć.",
+      "copyHint": "To jedyny moment, w którym zobaczysz ten token. Skopiuj go lub pobierz teraz — nie będzie można go pobrać ponownie.",
       "done": "Gotowe",
       "applying": "Stosowanie przyznanych dostępu…",
-      "grantedRoles": "Przypisane role: {roles}",
-      "grantedGroups": "Dodano do grup użytkowników: {groups}",
+      "rolesAssignedLabel": "Przypisane role",
+      "groupsAssignedLabel": "Dodano do grup użytkowników",
       "failedRoles": "Nie można przypisać ról: {roles}",
       "failedGroups": "Nie można dodać do grup użytkowników: {groups}",
       "failedHint": "Możesz je przyznać później ze stron Role i Grupy użytkowników."
@@ -2043,6 +2045,9 @@
         "label": "Nazwa konta serwisowego",
         "placeholder": "np. ingest-bot",
         "help": "Małe litery, cyfry i myślniki. Zapisane jako name{suffix}"
+      },
+      "identifier": {
+        "label": "Identyfikator"
       },
       "roles": {
         "label": "Przypisz role",
@@ -2057,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Identyfikator",
+        "roles": "Role",
         "token": "Token",
         "created": "Utworzono"
       }
@@ -2184,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Wszyscy użytkownicy i konta serwisowe powiązane z tymi rolami stracą dostęp."
-      }
+      },
+      "assignColumn": "Przypisz",
+      "assignBtn": "Dodaj",
+      "assignedBadge": "Przypisano",
+      "assignBannerText": "Dodaj {member} do roli — kliknij Dodaj obok roli poniżej.",
+      "assignBannerDone": "Gotowe",
+      "assignSuccess": "Dodano {member} do roli \"{role}\".",
+      "assignError": "Nie udało się dodać konta do tej roli. Spróbuj ponownie."
     },
     "group": {
       "name": {
@@ -2215,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Członkowie tych grup stracą role przyznane przez nie."
-      }
+      },
+      "assignColumn": "Przypisz",
+      "assignBtn": "Dodaj",
+      "assignedBadge": "Przypisano",
+      "assignBannerText": "Dodaj {member} do grupy użytkowników — kliknij Dodaj obok grupy poniżej.",
+      "assignBannerDone": "Gotowe",
+      "assignSuccess": "Dodano {member} do grupy \"{group}\".",
+      "assignError": "Nie udało się dodać konta do tej grupy. Spróbuj ponownie."
     },
     "appGroups": {
       "deleteGroupTitle": "Usuń grupę",
@@ -13041,10 +13061,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Dane wejściowe z głównego spanu trace."
+              "trace": "Dane wejściowe z głównego spanu czatu w trace.",
+              "session": "Pytanie otwierające: dane wejściowe z głównego spanu czatu pierwszego trace."
             },
             "output": {
-              "trace": "Dane wyjściowe z głównego spanu trace."
+              "trace": "Dane wyjściowe z głównego spanu czatu w trace.",
+              "session": "Odpowiedź końcowa: dane wyjściowe z głównego spanu czatu ostatniego trace."
             },
             "statistics": {
               "trace": "Metryki trace: liczba spanów, czas trwania, wywołania LLM i narzędzi, błędy, tokeny i koszt.",
@@ -13056,6 +13078,10 @@
             "steps": {
               "trace": "Spany w kolejności chronologicznej; środkowa część jest zwijana, gdy trace jest bardzo długi.",
               "session": "Trace'y w kolejności chronologicznej, reprezentowane jako tury rozmowy."
+            },
+            "tool_calls": {
+              "trace": "Każde wywołanie narzędzia w trace, w kolejności chronologicznej, wraz z nazwą, danymi wejściowymi, danymi wyjściowymi i statusem.",
+              "session": "Każde wywołanie narzędzia we wszystkich trace'ach sesji, w kolejności chronologicznej, wraz z nazwą, danymi wejściowymi, danymi wyjściowymi i statusem."
             }
           }
         }
@@ -13375,6 +13401,7 @@
       "searchHistoryNotEnabled": "Historia wyszukiwania nie jest włączona.",
       "enableUsageReporting": "Ustaw ZO_USAGE_REPORTING_ENABLED na true, aby włączyć raportowanie użycia.",
       "selectStreamToExtractPatterns": "Wybierz strumień, aby wyodrębnić wzorce",
+      "patternsUnavailableForMultiStream": "Wzorce nie są dostępne, gdy wybrano wiele strumieni. Wybierz pojedynczy strumień.",
       "errorExtractingPatterns": "Błąd wyodrębniania wzorców. Spróbuj ponownie.",
       "nameOfPanelRequired": "Nazwa panelu jest wymagana",
       "errorsFixAndTryAgain": "Wystąpiły błędy, popraw je i spróbuj ponownie",

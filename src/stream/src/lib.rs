@@ -988,6 +988,7 @@ async fn transform_stats(
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
+    stats.mindex_size /= SIZE_IN_MB;
     if stream_type == StreamType::EnrichmentTables
         && let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await
     {
@@ -1299,6 +1300,7 @@ mod tests {
             storage_size: 10.0 * 1024.0 * 1024.0,   // 10MB in bytes
             compressed_size: 5.0 * 1024.0 * 1024.0, // 5MB in bytes
             index_size: 2.0 * 1024.0 * 1024.0,      // 2MB in bytes
+            mindex_size: 3.0 * 1024.0 * 1024.0,
             ..Default::default()
         };
 
@@ -1308,6 +1310,7 @@ mod tests {
         assert_eq!(stats.storage_size, 10.0);
         assert_eq!(stats.compressed_size, 5.0);
         assert_eq!(stats.index_size, 2.0);
+        assert_eq!(stats.mindex_size, 3.0);
     }
 
     #[tokio::test]

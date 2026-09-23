@@ -1474,6 +1474,8 @@
     "sessionReplay": "세션 리플레이",
     "viewSessionReplay": "세션 리플레이 보기",
     "playSessionReplay": "플레이 세션 리플레이",
+    "noReplayRecordedTitle": "이 세션에 대한 리플레이가 기록되지 않았습니다",
+    "noReplayRecordedMessage": "세션 {id}에 재생할 리플레이 세그먼트가 없습니다.",
     "discoverSessionTitle": "세션 리플레이를 통해 사용자 상호작용에 대해 자세히 알아보세요",
     "discoverSessionMessage": "Session Replay는 웹 사이트 또는 애플리케이션에서의 사용자 상호 작용을 캡처하고 재생합니다.이를 통해 사용자가 탐색하는 방식, 클릭한 위치, 입력하는 내용, 콘텐츠에 참여하는 방식을 시각적으로 검토할 수 있습니다.",
     "loadingErrorDetails": "잠시만요. 오류 세부 정보를 가져오는 중입니다.",
@@ -2029,11 +2031,11 @@
       "addToGroup": "사용자 그룹에 추가",
       "addToRole": "역할 할당",
       "step1Title": "토큰 복사",
-      "copyHint": "지금 이 토큰을 복사하세요. 다시는 볼 수 없을 것입니다.",
+      "copyHint": "이 토큰은 지금 한 번만 표시됩니다. 지금 복사하거나 다운로드하세요. 다시는 확인할 수 없습니다.",
       "done": "완료",
       "applying": "액세스 권한 부여 적용 중…",
-      "grantedRoles": "할당된 역할: {roles}",
-      "grantedGroups": "사용자 그룹에 추가됨: {groups}",
+      "rolesAssignedLabel": "할당된 역할",
+      "groupsAssignedLabel": "사용자 그룹에 추가됨",
       "failedRoles": "역할을 할당할 수 없음: {roles}",
       "failedGroups": "사용자 그룹에 추가할 수 없음: {groups}",
       "failedHint": "나중에 역할 및 사용자 그룹 페이지에서 부여할 수 있습니다."
@@ -2043,6 +2045,9 @@
         "label": "서비스 계정 이름",
         "placeholder": "예: ingest-bot",
         "help": "소문자, 숫자, 하이픈. name{suffix}으로 저장됨"
+      },
+      "identifier": {
+        "label": "식별자"
       },
       "roles": {
         "label": "역할 할당",
@@ -2057,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "식별자",
+        "roles": "역할",
         "token": "토큰",
         "created": "생성됨"
       }
@@ -2184,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "이러한 역할에 바인딩된 모든 사용자 및 서비스 계정은 액세스 권한을 잃게 됩니다."
-      }
+      },
+      "assignColumn": "할당",
+      "assignBtn": "추가",
+      "assignedBadge": "할당됨",
+      "assignBannerText": "{member}을(를) 역할에 추가하세요 — 아래 역할 옆의 추가를 클릭하세요.",
+      "assignBannerDone": "완료",
+      "assignSuccess": "{member}을(를) \"{role}\" 역할에 추가했습니다.",
+      "assignError": "해당 계정을 이 역할에 추가할 수 없습니다. 다시 시도하세요."
     },
     "group": {
       "name": {
@@ -2215,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "이러한 그룹의 구성원은 부여받은 역할을 잃게 됩니다."
-      }
+      },
+      "assignColumn": "할당",
+      "assignBtn": "추가",
+      "assignedBadge": "할당됨",
+      "assignBannerText": "{member}을(를) 사용자 그룹에 추가하세요 — 아래 그룹 옆의 추가를 클릭하세요.",
+      "assignBannerDone": "완료",
+      "assignSuccess": "{member}을(를) \"{group}\" 그룹에 추가했습니다.",
+      "assignError": "해당 계정을 이 그룹에 추가할 수 없습니다. 다시 시도하세요."
     },
     "appGroups": {
       "deleteGroupTitle": "그룹 삭제",
@@ -13041,10 +13061,12 @@
           },
           "variables": {
             "input": {
-              "trace": "트레이스의 루트 스팬에서 입력."
+              "trace": "트레이스의 루트 채팅 스팬에서 가져온 입력입니다.",
+              "session": "시작 질문: 첫 번째 트레이스의 루트 채팅 스팬에서 가져온 입력입니다."
             },
             "output": {
-              "trace": "트레이스의 루트 스팬에서 출력."
+              "trace": "트레이스의 루트 채팅 스팬에서 가져온 출력입니다.",
+              "session": "최종 답변: 마지막 트레이스의 루트 채팅 스팬에서 가져온 출력입니다."
             },
             "statistics": {
               "trace": "트레이스 메트릭: 스팬 수, 기간, LLM 및 도구 호출, 오류, 토큰 및 비용.",
@@ -13056,6 +13078,10 @@
             "steps": {
               "trace": "시간 순서의 스팬, 트레이스가 매우 길면 중간이 접힙니다.",
               "session": "대화 턴으로 표현된 시간 순서의 트레이스."
+            },
+            "tool_calls": {
+              "trace": "트레이스의 모든 도구 호출을 시간 순서대로 나열하며, 이름, 입력, 출력, 상태를 포함합니다.",
+              "session": "세션의 트레이스 전반에 걸친 모든 도구 호출을 시간 순서대로 나열하며, 이름, 입력, 출력, 상태를 포함합니다."
             }
           }
         }
@@ -13375,6 +13401,7 @@
       "searchHistoryNotEnabled": "검색 기록이 활성화되지 않았습니다.",
       "enableUsageReporting": "사용량 보고를 활성화하려면 ZO_USAGE_REPORTING_ENABLED를 true로 설정하세요.",
       "selectStreamToExtractPatterns": "패턴을 추출할 스트림을 선택하세요.",
+      "patternsUnavailableForMultiStream": "여러 스트림을 선택한 경우 패턴을 사용할 수 없습니다. 단일 스트림을 선택하세요.",
       "errorExtractingPatterns": "패턴 추출 중 오류가 발생했습니다. 다시 시도하세요.",
       "nameOfPanelRequired": "패널 이름은 필수입니다.",
       "errorsFixAndTryAgain": "일부 오류가 있습니다. 수정한 후 다시 시도하세요.",
