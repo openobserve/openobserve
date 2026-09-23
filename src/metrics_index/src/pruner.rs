@@ -20,7 +20,7 @@ use std::{
 
 use arrow::datatypes::Schema;
 use config::{
-    PARQUET_MAX_ROW_GROUP_SIZE, get_config,
+    get_config,
     meta::{
         promql::is_metrics_hash_excluded_label,
         stream::{FileKey, FileSelection},
@@ -188,10 +188,7 @@ pub async fn search(
                     .await?;
                     tokio::task::spawn_blocking(move || {
                         let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
-                        // indexes without the key predate it: written with the fixed size
-                        let row_group_size = data
-                            .row_group_size
-                            .unwrap_or(PARQUET_MAX_ROW_GROUP_SIZE as u32);
+                        let row_group_size = data.row_group_size;
                         let physical_filter =
                             create_physical_filter(data.schema.as_ref(), &matchers)?;
                         evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
@@ -261,7 +258,7 @@ pub async fn search(
         if ranges.is_empty() {
             return false;
         }
-        file.with_selection(FileSelection::RowRanges(ranges), Some(row_group_size));
+        file.with_selection(FileSelection::RowRanges(ranges), row_group_size);
         true
     });
 

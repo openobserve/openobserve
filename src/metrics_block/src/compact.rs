@@ -170,11 +170,7 @@ impl<'a> CompactMetadata<'a> {
                 "compact decompressed size mismatch"
             );
             let field = self.header.schema.field(i);
-            let col = if crate::is_label_type(field.data_type()) {
-                decode_labels_compact(&raw, field.data_type(), self.header.rows, &mut expanded)?
-            } else {
-                decode_column(&raw, field.data_type(), self.header.rows, &mut expanded)?
-            };
+            let col = decode_column(&raw, field.data_type(), self.header.rows, &mut expanded)?;
             ensure!(
                 field.is_nullable() || col.null_count() == 0,
                 "null compact non-nullable column"
@@ -302,13 +298,15 @@ fn encode_column(col: &dyn Array) -> Result<Vec<u8>> {
                 out.push(u8::from(col.value(i)));
             }
         }
-        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => return encode_labels(col),
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
+            return encode_string_column(col);
+        }
         _ => anyhow::bail!("unsupported compact field"),
     }
     Ok(out)
 }
 
-fn encode_labels(col: &dyn Array) -> Result<Vec<u8>> {
+fn encode_string_column(col: &dyn Array) -> Result<Vec<u8>> {
     let mut dictionary = Vec::new();
     let mut ids = HashMap::new();
     let mut indices = Vec::with_capacity(col.len());
@@ -397,76 +395,13 @@ fn decode_column(
             )))
         }
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
-            decode_labels(raw, kind, rows, expanded)
+            decode_string_column(raw, kind, rows, expanded)
         }
         _ => anyhow::bail!("unsupported compact field"),
     }
 }
 
-fn decode_labels(
-    raw: &[u8],
-    kind: &DataType,
-    rows: usize,
-    expanded: &mut usize,
-) -> Result<ArrayRef> {
-    let mut input = Input::new(raw);
-    let count = input.u32()? as usize;
-    ensure!(
-        count <= rows && count <= input.remaining() / 4,
-        "compact dictionary count"
-    );
-    ensure!(
-        count
-            .checked_mul(std::mem::size_of::<&str>())
-            .context("compact dictionary size overflow")?
-            <= MAX_COMPACT_DECODE_BYTES,
-        "compact dictionary size limit"
-    );
-    let mut dictionary = Vec::with_capacity(count);
-    for _ in 0..count {
-        let len = input.u32()? as usize;
-        dictionary.push(std::str::from_utf8(input.take(len)?)?);
-    }
-    ensure!(
-        input.remaining() == rows.checked_mul(4).context("index size overflow")?,
-        "compact label indices length"
-    );
-    charge(
-        expanded,
-        rows.checked_add(1)
-            .and_then(|v| v.checked_mul(16))
-            .context("label size overflow")?,
-    )?;
-    ensure!(
-        rows.checked_mul(std::mem::size_of::<Option<&str>>())
-            .context("compact label rows overflow")?
-            <= MAX_COMPACT_DECODE_BYTES,
-        "compact label rows limit"
-    );
-    let mut values = Vec::with_capacity(rows);
-    for _ in 0..rows {
-        let id = input.u32()?;
-        let value = if id == u32::MAX {
-            None
-        } else {
-            Some(
-                *dictionary
-                    .get(id as usize)
-                    .context("invalid compact dictionary index")?,
-            )
-        };
-        charge(expanded, value.map_or(0, str::len))?;
-        values.push(value);
-    }
-    Ok(match kind {
-        DataType::Utf8 => Arc::new(StringArray::from(values)) as ArrayRef,
-        DataType::LargeUtf8 => Arc::new(LargeStringArray::from(values)),
-        DataType::Utf8View => Arc::new(StringViewArray::from(values)),
-        _ => unreachable!(),
-    })
-}
-
-fn decode_labels_compact(
+fn decode_string_column(
     raw: &[u8],
     kind: &DataType,
     rows: usize,
@@ -638,9 +573,8 @@ mod adaptive_tests {
                 .chain(std::iter::once(None))
                 .collect::<Vec<_>>();
             let source: ArrayRef = Arc::new(StringArray::from(rows));
-            let raw = encode_labels(source.as_ref()).unwrap();
-            let decoded =
-                decode_labels_compact(&raw, &DataType::Utf8, source.len(), &mut 0).unwrap();
+            let raw = encode_column(source.as_ref()).unwrap();
+            let decoded = decode_column(&raw, &DataType::Utf8, source.len(), &mut 0).unwrap();
             assert_eq!(
                 decoded.data_type(),
                 &DataType::Dictionary(Box::new(width), Box::new(DataType::Utf8))
@@ -676,8 +610,8 @@ mod adaptive_tests {
                 DataType::LargeUtf8 => Arc::new(LargeStringArray::from(values)),
                 _ => Arc::new(StringViewArray::from(values)),
             };
-            let raw = encode_labels(source.as_ref()).unwrap();
-            let decoded = decode_labels_compact(&raw, &kind, source.len(), &mut 0).unwrap();
+            let raw = encode_column(source.as_ref()).unwrap();
+            let decoded = decode_column(&raw, &kind, source.len(), &mut 0).unwrap();
             assert!(
                 matches!(decoded.data_type(),DataType::Dictionary(key,_) if **key==DataType::UInt8)
             );
@@ -691,8 +625,8 @@ mod adaptive_tests {
         let source: ArrayRef = Arc::new(StringArray::from_iter_values(
             (0..1024).map(|i| format!("unique-{i:06}")),
         ));
-        let raw = encode_labels(source.as_ref()).unwrap();
-        let decoded = decode_labels_compact(&raw, &DataType::Utf8, source.len(), &mut 0).unwrap();
+        let raw = encode_column(source.as_ref()).unwrap();
+        let decoded = decode_column(&raw, &DataType::Utf8, source.len(), &mut 0).unwrap();
         assert_eq!(decoded.data_type(), &DataType::Utf8);
     }
 }

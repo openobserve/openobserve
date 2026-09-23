@@ -338,6 +338,10 @@ mod tests {
                     assert!(
                         matches!(&files[0].selection, Some(FileSelection::RowRanges(ranges)) if ranges.as_ref() == &expected)
                     );
+                    assert_eq!(
+                        files[0].row_group_size.is_some(),
+                        format == config::FileFormat::Parquet
+                    );
                 }
             }
         }

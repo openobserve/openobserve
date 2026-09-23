@@ -54,18 +54,6 @@ const NON_IDENTITY: &[&str] = &[
     "flag",
 ];
 
-/// A declared format capacity was exceeded by otherwise eligible input.
-#[derive(Debug)]
-pub struct FormatLimit {
-    message: &'static str,
-}
-impl std::fmt::Display for FormatLimit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "metrics block capacity limit: {}", self.message)
-    }
-}
-impl std::error::Error for FormatLimit {}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ParentMetadata {
     pub rows: u64,
@@ -146,10 +134,6 @@ impl Index {
             })
             .collect()
     }
-}
-
-pub fn is_format_limit_error(error: &anyhow::Error) -> bool {
-    error.is::<FormatLimit>()
 }
 
 /// Bounds scratch space before allocating or decoding one sample block.
@@ -242,11 +226,8 @@ pub fn is_supported_schema(schema: &Schema) -> bool {
 }
 
 fn capacity(condition: bool, message: &'static str) -> Result<()> {
-    if condition {
-        Ok(())
-    } else {
-        Err(FormatLimit { message }.into())
-    }
+    ensure!(condition, "metrics block capacity limit: {message}");
+    Ok(())
 }
 
 fn is_label_type(data_type: &DataType) -> bool {

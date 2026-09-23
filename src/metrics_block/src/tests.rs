@@ -390,7 +390,7 @@ fn projected_labels_do_not_retain_unrequested_large_buffers() {
 }
 
 #[test]
-fn excessive_compressed_length_and_capacity_classification() {
+fn excessive_compressed_length_is_rejected() {
     let blob = fixture();
     let index = index(&blob, &[]).unwrap();
     let mut block = index.blocks.block(0).clone();
@@ -428,11 +428,6 @@ fn excessive_compressed_length_and_capacity_classification() {
             .to_string()
             .contains("compressed block length exceeds")
     );
-    let limit = capacity(false, "MAX_LABEL_COLUMNS").unwrap_err();
-    assert!(is_format_limit_error(&limit));
-    assert!(is_format_limit_error(&limit.context("builder")));
-    let ordinary = anyhow!("invalid sample frame");
-    assert!(!is_format_limit_error(&ordinary));
 }
 
 #[test]
@@ -478,13 +473,16 @@ fn long_view_backing_buffers_and_real_writer_capacity_limit() {
         labels.push(name);
     }
     let too_wide = Arc::new(Schema::new(fields));
-    assert!(is_format_limit_error(
-        &identity_label_columns(too_wide.as_ref()).unwrap_err()
-    ));
+    assert!(
+        identity_label_columns(too_wide.as_ref())
+            .unwrap_err()
+            .to_string()
+            .contains("MAX_LABEL_COLUMNS")
+    );
     let error = BlockWriter::new(Vec::new(), too_wide, labels, parent(), 2)
         .err()
         .unwrap();
-    assert!(is_format_limit_error(&error));
+    assert!(error.to_string().contains("MAX_LABEL_COLUMNS"));
 }
 
 #[test]
