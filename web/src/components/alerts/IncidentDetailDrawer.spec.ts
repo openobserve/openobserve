@@ -41,6 +41,17 @@ vi.mock("@/composables/useConfirmDialog", () => ({
   }),
 }));
 
+const mockPromptForConsent = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/usePaidOverageConsent", () => ({
+  isPaidOverageConsentError: (status: number, body: unknown) =>
+    status === 412 &&
+    typeof body === "object" &&
+    body !== null &&
+    "error_type" in body &&
+    body.error_type === "paid_overage_consent_required",
+  usePaidOverageConsent: () => ({ promptForConsent: mockPromptForConsent }),
+}));
+
 // Mock incidents service
 vi.mock("@/services/incidents", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -598,6 +609,69 @@ describe("IncidentDetailDrawer.vue", () => {
       await wrapper.vm.triggerRca();
 
       expect(incidentsService.triggerRca).not.toHaveBeenCalled();
+    });
+
+    it("retries RCA exactly once after paid usage consent", async () => {
+      const consentError = {
+        isAxiosError: true,
+        response: {
+          status: 412,
+          data: {
+            error_type: "paid_overage_consent_required",
+            consent: {
+              feature: "ai_credits",
+              organization: { org_id: "default", enabled: false, can_manage: true },
+              payer: null,
+              effective: false,
+              billing_status: "eligible",
+            },
+          },
+        },
+      };
+      mockPromptForConsent.mockResolvedValue(true);
+      vi.mocked(incidentsService.triggerRca)
+        .mockRejectedValueOnce(consentError)
+        .mockResolvedValueOnce({
+          data: { rca_content: "Authorized RCA" },
+        });
+
+      await wrapper.vm.triggerRca();
+
+      expect(mockPromptForConsent).toHaveBeenCalledTimes(1);
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(incidentsService.triggerRca).mock.calls[1]).toEqual(
+        vi.mocked(incidentsService.triggerRca).mock.calls[0],
+      );
+    });
+
+    it("does not retry RCA after paid usage is declined", async () => {
+      mockPromptForConsent.mockResolvedValue(false);
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce({
+        isAxiosError: true,
+        response: {
+          status: 412,
+          data: {
+            error_type: "paid_overage_consent_required",
+            consent: {
+              feature: "ai_credits",
+              organization: { org_id: "default", enabled: false, can_manage: true },
+              payer: null,
+              effective: false,
+              billing_status: "eligible",
+            },
+          },
+        },
+      });
+
+      await wrapper.vm.triggerRca();
+
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "info",
+          message: "Paid AI usage was not authorized. No paid request was started.",
+        }),
+      );
     });
   });
 
@@ -1547,6 +1621,42 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.analysisInFlight).toBe(true);
     });
 
+    it("retries severity reanalysis exactly once after consent", async () => {
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      });
+      mockPromptForConsent.mockResolvedValue(true);
+      vi.mocked(incidentsService.triggerRca)
+        .mockRejectedValueOnce({
+          isAxiosError: true,
+          response: {
+            status: 412,
+            data: {
+              error_type: "paid_overage_consent_required",
+              consent: {
+                feature: "ai_credits",
+                organization: { org_id: "default", enabled: false, can_manage: true },
+                payer: null,
+                effective: false,
+                billing_status: "eligible",
+              },
+            },
+          },
+        })
+        .mockResolvedValueOnce({ data: { message: "Analysis started" } });
+
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+
+      expect(mockPromptForConsent).toHaveBeenCalledTimes(1);
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(incidentsService.triggerRca).mock.calls[0]?.[2]).toEqual({
+        reanalysis: true,
+      });
+      expect(vi.mocked(incidentsService.triggerRca).mock.calls[1]).toEqual(
+        vi.mocked(incidentsService.triggerRca).mock.calls[0],
+      );
+    });
     it("does not call updateIncident when no incidentDetails", async () => {
       wrapper.vm.incidentDetails = null;
       await wrapper.vm.updateSeverity("P3");

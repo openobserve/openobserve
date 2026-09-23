@@ -16,9 +16,9 @@
 //! Trial Quota Service — in-memory quota counters with DB persistence.
 //!
 //! Free tier: every org gets a lifetime free grant **per pool**.
-//! Pay-as-you-go: when free credits are exhausted and the org has an active
-//! Stripe subscription, AI metering prices are auto-added to the subscription
-//! and usage is reported to the _usage stream for billing.
+//! Pay-as-you-go: when free credits are exhausted, AI usage continues only
+//! when billing supports metered overage and every required billing
+//! organization has explicitly enabled the cumulative AI Credits setting.
 //!
 //! ## Pools
 //!
@@ -41,7 +41,7 @@
 use std::{
     collections::HashMap,
     sync::{
-        Arc, LazyLock as Lazy, OnceLock, RwLock,
+        Arc, LazyLock as Lazy, OnceLock,
         atomic::{AtomicI64, AtomicU64, Ordering},
     },
     time::Duration,
@@ -55,10 +55,12 @@ use config::{
         cluster::Node,
         self_reporting::usage::{UsageData, UsageEvent},
         stream::StreamType,
+        user::UserRole,
     },
     utils::json,
 };
 use openobserve_synthetics::pool::StepRemaining;
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use utoipa::ToSchema;
@@ -72,6 +74,14 @@ static ORG_USAGE: Lazy<RwLock<HashMap<String, AtomicU64>>> =
 /// Explicit per-`(org, pool)` limits, keyed by [`scope`]. Missing scopes use the
 /// pool's deployment-wide default ([`TrialQuotaPool::default_limit`]).
 static ORG_LIMITS: Lazy<RwLock<HashMap<String, u64>>> = Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Exact per-`(org, feature)` paid-overage authorization. Missing rows are false.
+static ORG_PAID_OVERAGE: Lazy<RwLock<HashMap<String, bool>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Bumped by every consent write. Reconciliation compares it across its DB
+/// snapshot so a write landing mid-read is kept, not reverted to the older row.
+static ORG_PAID_OVERAGE_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 /// Bounded channel for deduction records pending DB flush.
 /// Capacity is generous to avoid backpressure on the hot path.
@@ -233,6 +243,51 @@ fn scope(org_id: &str, pool: TrialQuotaPool) -> String {
     format!("{org_id}\u{1f}{}", pool.key())
 }
 
+/// One cumulative consent value per `(org, pool)` — the runtime source of truth.
+///
+/// The backing `trial_quota_usage` rows exist so the value survives a restart
+/// before reconciliation reloads this cache; they are never read individually
+/// and never aggregated. Adding a feature key to a pool therefore cannot
+/// revoke consent an org has already given.
+fn set_cached_paid_overage(org_id: &str, pool: TrialQuotaPool, enabled: bool) {
+    // Bumped while the write lock is held: reconciliation re-checks the epoch
+    // under the same lock, so releasing it first would let a stale snapshot
+    // pass the guard and clobber this write.
+    let mut cache = ORG_PAID_OVERAGE.write();
+    ORG_PAID_OVERAGE_EPOCH.fetch_add(1, Ordering::Release);
+    cache.insert(scope(org_id, pool), enabled);
+}
+
+/// The org's cumulative consent for one pool. A missing entry is `false`.
+pub fn get_paid_overage_enabled_for_pool(org_id: &str, pool: TrialQuotaPool) -> bool {
+    ORG_PAID_OVERAGE
+        .read()
+        .get(&scope(org_id, pool))
+        .copied()
+        .unwrap_or(false)
+}
+
+/// Fold persisted rows into one cached value per `(org, pool)`.
+///
+/// Only a pool's PRIMARY feature key seeds the value. Every write fans out
+/// transactionally, so the rows agree by construction and a secondary key —
+/// `synthetics_steps` being the existing example — never gets a vote.
+fn fold_paid_overage<'a>(
+    rows: impl IntoIterator<Item = (&'a str, &'a str, bool)>,
+) -> HashMap<String, bool> {
+    let mut values = HashMap::new();
+    for (org_id, feature, enabled) in rows {
+        let Some(pool) = TrialQuotaPool::from_key_of_feature(feature) else {
+            continue;
+        };
+        if pool.feature_keys().first() != Some(&feature) {
+            continue;
+        }
+        values.insert(scope(org_id, pool), enabled);
+    }
+    values
+}
+
 /// Trial quota feature variants — extensible for future metered features
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrialQuotaFeature {
@@ -324,17 +379,13 @@ impl std::error::Error for QuotaExhaustedError {}
 /// deployment-wide default. ⚠️ The value is REGION-LOCAL — see
 /// [`TrialQuotaPool::default_limit`].
 fn get_pool_limit(org_id: &str, pool: TrialQuotaPool) -> u64 {
-    let org_limit = ORG_LIMITS
-        .read()
-        .unwrap()
-        .get(&scope(org_id, pool))
-        .copied();
+    let org_limit = ORG_LIMITS.read().get(&scope(org_id, pool)).copied();
     org_limit.unwrap_or_else(|| pool.default_limit())
 }
 
 /// Get total usage in one pool for an org (single atomic read).
 fn get_pool_used(org_id: &str, pool: TrialQuotaPool) -> u64 {
-    let map = ORG_USAGE.read().unwrap();
+    let map = ORG_USAGE.read();
     map.get(&scope(org_id, pool))
         .map(|v| v.load(Ordering::Relaxed))
         .unwrap_or(0)
@@ -343,14 +394,14 @@ fn get_pool_used(org_id: &str, pool: TrialQuotaPool) -> u64 {
 /// Ensure the per-`(org, pool)` atomic counter exists.
 fn ensure_scope_counter(key: &str) {
     {
-        let map = ORG_USAGE.read().unwrap();
+        let map = ORG_USAGE.read();
         if map.contains_key(key) {
             return;
         }
     }
     // Use entry() instead of direct insert because another thread may have
     // inserted between us dropping the read lock above and acquiring this write lock.
-    let mut map = ORG_USAGE.write().unwrap();
+    let mut map = ORG_USAGE.write();
     map.entry(key.to_string())
         .or_insert_with(|| AtomicU64::new(0));
 }
@@ -361,7 +412,7 @@ fn ensure_scope_counter(key: &str) {
 fn apply_to_pool_counter(org_id: &str, pool: TrialQuotaPool, delta: i64) -> u64 {
     let key = scope(org_id, pool);
     ensure_scope_counter(&key);
-    let map = ORG_USAGE.read().unwrap();
+    let map = ORG_USAGE.read();
     let Some(counter) = map.get(&key) else {
         return 0;
     };
@@ -382,10 +433,7 @@ fn apply_to_pool_counter(org_id: &str, pool: TrialQuotaPool, delta: i64) -> u64 
 }
 
 fn set_cached_limit(org_id: &str, pool: TrialQuotaPool, usage_limit: u64) {
-    ORG_LIMITS
-        .write()
-        .unwrap()
-        .insert(scope(org_id, pool), usage_limit);
+    ORG_LIMITS.write().insert(scope(org_id, pool), usage_limit);
 }
 
 /// HA message broadcast to other nodes after a deduction, an adjustment or a
@@ -409,6 +457,10 @@ pub struct TrialQuotaHaMsg {
     /// The SIGNED movement. Absent or zero ⇒ fall back to `cost`.
     #[serde(default)]
     pub delta: i64,
+    /// One cumulative consent value for `pool`. Absent ⇒ consent is unchanged.
+    /// An older node without this field simply ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paid_overage_enabled: Option<bool>,
     pub source_node: Node,
     /// Microsecond timestamp of when the deduction happened.
     /// Used to skip messages older than the DB snapshot loaded at init.
@@ -447,6 +499,7 @@ fn ha_msg(
         usage_limit,
         pool: Some(pool.key().to_string()),
         delta,
+        paid_overage_enabled: None,
         source_node: LOCAL_NODE.clone(),
         timestamp: config::utils::time::now_micros(),
     }
@@ -457,6 +510,9 @@ fn apply_ha_msg(msg: &TrialQuotaHaMsg) -> Option<(TrialQuotaPool, u64, u64)> {
     let pool = msg.resolved_pool()?;
     if let Some(usage_limit) = msg.usage_limit {
         set_cached_limit(&msg.org_id, pool, usage_limit);
+    }
+    if let Some(enabled) = msg.paid_overage_enabled {
+        set_cached_paid_overage(&msg.org_id, pool, enabled);
     }
     let old = get_pool_used(&msg.org_id, pool);
     let delta = msg.resolved_delta();
@@ -509,6 +565,37 @@ pub async fn set_limit_for_pool(
     Ok(())
 }
 
+/// Persist and distribute ONE cumulative consent value for a pool.
+///
+/// The DB write fans out transactionally across `pool.feature_keys()` purely
+/// for durability and per-feature analytics; the cache — and therefore every
+/// caller, response and prompt — holds a single value for the pool.
+pub async fn set_paid_overage_enabled_for_pool(
+    org_id: &str,
+    pool: TrialQuotaPool,
+    enabled: bool,
+) -> Result<(), anyhow::Error> {
+    infra::table::trial_quota_usage::set_paid_overage_enabled_for_features(
+        org_id,
+        pool.feature_keys(),
+        enabled,
+    )
+    .await?;
+
+    set_cached_paid_overage(org_id, pool, enabled);
+
+    if !LOCAL_NODE.is_single_node() {
+        let mut msg = ha_msg(org_id, pool, 0, None);
+        msg.paid_overage_enabled = Some(enabled);
+        if let Err(err) = publish_ha_msg(&msg).await {
+            log::warn!(
+                "[TRIAL_QUOTA] Failed to broadcast paid-overage update for org={org_id}: {err}"
+            );
+        }
+    }
+    Ok(())
+}
+
 /// Persist and publish an explicit lifetime AI credit limit for an org — the
 /// AI-pool spelling of [`set_limit_for_pool`], which is what the `_meta` admin
 /// endpoint means by "credits".
@@ -537,10 +624,35 @@ pub async fn refresh_limits_from_db() {
                     .and_modify(|current| *current = (*current).max(limit))
                     .or_insert(limit);
             }
-            *ORG_LIMITS.write().unwrap() = limits;
+            *ORG_LIMITS.write() = limits;
         }
         Err(err) => {
             log::warn!("[TRIAL_QUOTA] Failed to refresh organization limits: {err}");
+        }
+    }
+}
+
+/// Reconcile cumulative consent from the database. Replacing the map clears
+/// deleted rows instead of leaving stale authorization resident in memory.
+pub async fn refresh_paid_overage_from_db() {
+    let epoch = ORG_PAID_OVERAGE_EPOCH.load(Ordering::Acquire);
+    match infra::table::trial_quota_usage::load_all_paid_overage().await {
+        Ok(rows) => {
+            let values =
+                fold_paid_overage(rows.iter().map(|(org_id, feature, enabled)| {
+                    (org_id.as_str(), feature.as_str(), *enabled)
+                }));
+            let mut cache = ORG_PAID_OVERAGE.write();
+            // Checked under the write lock: a consent change since `epoch` is newer
+            // than these rows, and the next tick reconciles from a fresh snapshot.
+            if ORG_PAID_OVERAGE_EPOCH.load(Ordering::Acquire) != epoch {
+                log::debug!("[TRIAL_QUOTA] Consent changed during reconciliation, keeping cache");
+                return;
+            }
+            *cache = values;
+        }
+        Err(err) => {
+            log::warn!("[TRIAL_QUOTA] Failed to refresh paid-overage state: {err}");
         }
     }
 }
@@ -579,7 +691,7 @@ pub fn try_deduct_units(
 
     ensure_scope_counter(&key);
 
-    let map = ORG_USAGE.read().unwrap();
+    let map = ORG_USAGE.read();
     let Some(counter) = map.get(&key) else {
         // Unreachable (`ensure_scope_counter` just ran). Treated as "no room"
         // rather than unwrapped: a panic here kills the scheduler tick.
@@ -1011,6 +1123,244 @@ pub fn record_billable_ai_usage(org_id: &str, ctx: &AiUsageContext, feature: Tri
     record_usage_internal(org_id, ctx, feature, true);
 }
 
+/// One organization's cumulative authorization state for a quota feature.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PaidOverageOrganizationStatus {
+    pub org_id: String,
+    pub enabled: bool,
+    pub can_manage: bool,
+}
+
+/// Billing eligibility attached to cumulative paid-overage state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PaidOverageBillingStatus {
+    Eligible,
+    SubscriptionRequired,
+    AdditionalCreditsRequired,
+}
+
+/// Public cumulative state. Internal feature-row keys are intentionally absent.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PaidOverageStatus {
+    pub feature: String,
+    pub organization: PaidOverageOrganizationStatus,
+    pub payer: Option<PaidOverageOrganizationStatus>,
+    pub effective: bool,
+    pub billing_status: PaidOverageBillingStatus,
+}
+
+async fn can_manage_paid_overage(org_id: &str, user_email: &str) -> bool {
+    if user_email.is_empty() {
+        return false;
+    }
+    if matches!(
+        crate::users::get_user(Some(org_id), user_email).await,
+        Some(user) if matches!(user.role, UserRole::Admin | UserRole::Root)
+    ) {
+        return true;
+    }
+    matches!(
+        crate::users::get_user(None, user_email).await,
+        Some(user) if user.role == UserRole::Root
+    )
+}
+
+fn paid_overage_is_effective(
+    billing_status: PaidOverageBillingStatus,
+    organization_enabled: bool,
+    payer_enabled: Option<bool>,
+) -> bool {
+    billing_status == PaidOverageBillingStatus::Eligible
+        && organization_enabled
+        && payer_enabled.unwrap_or(true)
+}
+
+/// The authorization decision: billing eligibility plus cumulative consent.
+///
+/// Deliberately carries no actor-specific permission, so the allow path never
+/// pays for the `can_manage` user lookups that only a denial body needs.
+pub struct PaidOverageResolution {
+    billing_status: PaidOverageBillingStatus,
+    organization_enabled: bool,
+    payer_org_id: Option<String>,
+    payer_enabled: Option<bool>,
+    effective: bool,
+}
+
+impl PaidOverageResolution {
+    pub fn effective(&self) -> bool {
+        self.effective
+    }
+}
+
+/// Resolve billing and cumulative consent. This is the hot path: one billing
+/// lookup and cached consent reads, no user lookups.
+pub async fn resolve_paid_overage(
+    org_id: &str,
+    pool: TrialQuotaPool,
+) -> Result<PaidOverageResolution, anyhow::Error> {
+    let resolution =
+        o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_billing(org_id).await?;
+    let billing_status = if resolution.policy.allows_metered_overage() {
+        PaidOverageBillingStatus::Eligible
+    } else if resolution.policy.requires_additional_credits() {
+        PaidOverageBillingStatus::AdditionalCreditsRequired
+    } else {
+        PaidOverageBillingStatus::SubscriptionRequired
+    };
+    let organization_enabled = get_paid_overage_enabled_for_pool(org_id, pool);
+    let payer_enabled = resolution
+        .payer_org_id
+        .as_ref()
+        .map(|payer_org_id| get_paid_overage_enabled_for_pool(payer_org_id, pool));
+    Ok(PaidOverageResolution {
+        effective: paid_overage_is_effective(billing_status, organization_enabled, payer_enabled),
+        billing_status,
+        organization_enabled,
+        payer_org_id: resolution.payer_org_id,
+        payer_enabled,
+    })
+}
+
+/// Attach the acting user's manage rights to a resolution — the extra lookups
+/// are paid only when a client actually renders the state.
+pub async fn paid_overage_status_for_user(
+    org_id: &str,
+    pool: TrialQuotaPool,
+    resolution: PaidOverageResolution,
+    user_email: &str,
+) -> PaidOverageStatus {
+    let organization = PaidOverageOrganizationStatus {
+        org_id: org_id.to_string(),
+        enabled: resolution.organization_enabled,
+        can_manage: can_manage_paid_overage(org_id, user_email).await,
+    };
+    let payer = match (resolution.payer_org_id, resolution.payer_enabled) {
+        (Some(payer_org_id), Some(enabled)) => Some(PaidOverageOrganizationStatus {
+            enabled,
+            can_manage: can_manage_paid_overage(&payer_org_id, user_email).await,
+            org_id: payer_org_id,
+        }),
+        _ => None,
+    };
+    PaidOverageStatus {
+        feature: pool.key().to_string(),
+        organization,
+        payer,
+        effective: resolution.effective,
+        billing_status: resolution.billing_status,
+    }
+}
+
+/// Resolve billing eligibility and cumulative consent into one public state.
+pub async fn get_paid_overage_status(
+    org_id: &str,
+    pool: TrialQuotaPool,
+    user_email: &str,
+) -> Result<PaidOverageStatus, anyhow::Error> {
+    let resolution = resolve_paid_overage(org_id, pool).await?;
+    Ok(paid_overage_status_for_user(org_id, pool, resolution, user_email).await)
+}
+
+/// Proof that one AI operation was authorized and metered exactly once.
+#[derive(Debug)]
+pub struct AiUsagePermit {
+    feature: TrialQuotaFeature,
+}
+
+impl AiUsagePermit {
+    pub fn feature(&self) -> TrialQuotaFeature {
+        self.feature
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AiUsageAuthorizationError {
+    #[error("Paid usage requires organization consent.")]
+    PaidOverageConsentRequired(PaidOverageStatus),
+    #[error("{0}")]
+    PaymentRequired(String),
+    #[error("AI usage authorization is temporarily unavailable: {0}")]
+    Unavailable(String),
+}
+
+/// Reject a chat request that cannot be billed without consuming a free credit.
+/// The final authorization must still run after the upstream accepts the request:
+/// another request can exhaust the balance between this check and deduction.
+pub async fn precheck_ai_usage(
+    org_id: &str,
+    feature: TrialQuotaFeature,
+    user_email: &str,
+) -> Result<(), AiUsageAuthorizationError> {
+    let pool = feature.pool();
+    if get_remaining_for_pool(org_id, pool) >= feature.cost() {
+        return Ok(());
+    }
+    let exhausted = QuotaExhaustedError {
+        usage_count: get_used_for_pool(org_id, pool),
+        usage_limit: get_limit_for_pool(org_id, pool),
+    };
+    authorize_paid_overage(org_id, pool, user_email, &exhausted.to_string()).await
+}
+
+async fn authorize_paid_overage(
+    org_id: &str,
+    pool: TrialQuotaPool,
+    user_email: &str,
+    exhausted_message: &str,
+) -> Result<(), AiUsageAuthorizationError> {
+    let resolution = resolve_paid_overage(org_id, pool)
+        .await
+        .map_err(|error| AiUsageAuthorizationError::Unavailable(error.to_string()))?;
+    match resolution.billing_status {
+        PaidOverageBillingStatus::Eligible if resolution.effective => Ok(()),
+        PaidOverageBillingStatus::Eligible => {
+            let status = paid_overage_status_for_user(org_id, pool, resolution, user_email).await;
+            Err(AiUsageAuthorizationError::PaidOverageConsentRequired(
+                status,
+            ))
+        }
+        PaidOverageBillingStatus::AdditionalCreditsRequired => {
+            Err(AiUsageAuthorizationError::PaymentRequired(
+                "AI credit limit exhausted. Contact your account manager to add more credits."
+                    .to_string(),
+            ))
+        }
+        PaidOverageBillingStatus::SubscriptionRequired => Err(
+            AiUsageAuthorizationError::PaymentRequired(exhausted_message.to_string()),
+        ),
+    }
+}
+
+/// Authorize and meter exactly one AI operation.
+///
+/// Free quota is always attempted first. Exhaustion never records billable
+/// usage until billing eligibility and every required cumulative consent are true.
+pub async fn authorize_ai_usage(
+    org_id: &str,
+    feature: TrialQuotaFeature,
+    usage_context: &AiUsageContext,
+) -> Result<AiUsagePermit, AiUsageAuthorizationError> {
+    match try_deduct(org_id, feature).await {
+        Ok(_) => {
+            record_free_ai_usage(org_id, usage_context, feature);
+            Ok(AiUsagePermit { feature })
+        }
+        Err(exhausted) => {
+            authorize_paid_overage(
+                org_id,
+                feature.pool(),
+                &usage_context.user_email,
+                &exhausted.to_string(),
+            )
+            .await?;
+            record_billable_ai_usage(org_id, usage_context, feature);
+            Ok(AiUsagePermit { feature })
+        }
+    }
+}
+
 /// AI usage response for the API
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AiUsageResponse {
@@ -1027,12 +1377,34 @@ pub struct AiUsageResponse {
 pub struct PoolUsageResponse {
     /// Stable pool identifier — one of [`TrialQuotaPool::ALL_POOLS`]' keys.
     pub pool: String,
-    /// `"free"` | `"pay_as_you_go"` | `"exhausted"`.
+    /// `"free"` | `"consent_required"` | `"pay_as_you_go"` | `"exhausted"`.
     pub mode: String,
     pub used: u64,
     pub limit: u64,
     pub remaining: u64,
     pub requires_additional_credits: bool,
+}
+fn pool_usage_mode(
+    exhaustion_policy: Option<
+        o2_enterprise::enterprise::cloud::ai_credits::AiCreditExhaustionPolicy,
+    >,
+    pool: TrialQuotaPool,
+    consent_effective: Option<bool>,
+) -> &'static str {
+    use o2_enterprise::enterprise::cloud::ai_credits::AiCreditExhaustionPolicy;
+
+    match exhaustion_policy {
+        None => "free",
+        Some(AiCreditExhaustionPolicy::MeteredOverage) if pool == TrialQuotaPool::AiCredits => {
+            match consent_effective {
+                Some(true) => "pay_as_you_go",
+                Some(false) => "consent_required",
+                None => "exhausted",
+            }
+        }
+        Some(AiCreditExhaustionPolicy::MeteredOverage) => "pay_as_you_go",
+        Some(_) => "exhausted",
+    }
 }
 
 /// The exhaustion policy is a property of the org's billing, not of the pool, so the AI-named
@@ -1086,12 +1458,17 @@ pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResp
     };
     let requires_additional_credits =
         exhaustion_policy.is_some_and(|policy| policy.requires_additional_credits());
-
-    let mode = match exhaustion_policy {
-        None => "free",
-        Some(policy) if policy.allows_metered_overage() => "pay_as_you_go",
-        Some(_) => "exhausted",
+    let consent_effective = if exhaustion_policy
+        .is_some_and(|policy| policy.allows_metered_overage() && pool == TrialQuotaPool::AiCredits)
+    {
+        resolve_paid_overage(org_id, pool)
+            .await
+            .ok()
+            .map(|resolution| resolution.effective())
+    } else {
+        None
     };
+    let mode = pool_usage_mode(exhaustion_policy, pool, consent_effective);
 
     PoolUsageResponse {
         pool: pool.key().to_string(),
@@ -1234,12 +1611,19 @@ pub async fn init_from_db() {
             let (scope_totals, scope_limits) = fold_db_records(&records);
 
             {
-                let mut map = ORG_USAGE.write().unwrap();
+                let mut map = ORG_USAGE.write();
                 for (key, total) in scope_totals {
                     map.insert(key, AtomicU64::new(total));
                 }
             }
-            *ORG_LIMITS.write().unwrap() = scope_limits;
+            *ORG_LIMITS.write() = scope_limits;
+            *ORG_PAID_OVERAGE.write() = fold_paid_overage(records.iter().map(|record| {
+                (
+                    record.org_id.as_str(),
+                    record.feature.as_str(),
+                    record.paid_overage_enabled,
+                )
+            }));
 
             log::info!(
                 "[TRIAL_QUOTA] Loaded {} quota records from DB, watermark={}",
@@ -1644,6 +2028,7 @@ mod tests {
             cost: 0,
             usage_limit: Some(50),
             pool: Some(TrialQuotaPool::SyntheticsBrowserSteps.key().to_string()),
+            paid_overage_enabled: None,
             delta: 0,
             source_node: LOCAL_NODE.clone(),
             timestamp: 1,
@@ -1698,11 +2083,208 @@ mod tests {
             org_id: "acme".to_string(),
             cost,
             usage_limit: None,
+            paid_overage_enabled: None,
             pool: pool.map(str::to_string),
             delta,
             source_node: LOCAL_NODE.clone(),
             timestamp: 1,
         }
+    }
+
+    /// Consent is ONE value per pool. A missing entry reads `false`, and the
+    /// value is never assembled from the backing rows.
+    #[test]
+    fn cumulative_paid_overage_is_one_value_per_pool() {
+        let org_id = "paid-overage-cumulative";
+        assert!(!get_paid_overage_enabled_for_pool(
+            org_id,
+            TrialQuotaPool::AiCredits
+        ));
+
+        set_cached_paid_overage(org_id, TrialQuotaPool::AiCredits, true);
+        assert!(get_paid_overage_enabled_for_pool(
+            org_id,
+            TrialQuotaPool::AiCredits
+        ));
+        // A sibling pool is untouched by an AI Credits write.
+        assert!(!get_paid_overage_enabled_for_pool(
+            org_id,
+            TrialQuotaPool::SyntheticsBrowserSteps
+        ));
+
+        set_cached_paid_overage(org_id, TrialQuotaPool::AiCredits, false);
+        assert!(!get_paid_overage_enabled_for_pool(
+            org_id,
+            TrialQuotaPool::AiCredits
+        ));
+    }
+
+    /// Reconciliation seeds the pool from its PRIMARY feature row only. A
+    /// secondary key — the pre-split `synthetics_steps` is the live example —
+    /// must not get a vote, or extending a pool would revoke granted consent.
+    #[test]
+    fn reconciliation_reads_only_the_primary_feature_row() {
+        let protocol = TrialQuotaPool::SyntheticsProtocolSteps;
+        let [primary, secondary] = [protocol.feature_keys()[0], protocol.feature_keys()[1]];
+
+        let values = fold_paid_overage([
+            ("acme", primary, true),
+            ("acme", secondary, false),
+            ("acme", "a_feature_this_build_lacks", true),
+        ]);
+
+        assert_eq!(values.get(&scope("acme", protocol)), Some(&true));
+        assert_eq!(values.len(), 1, "only the primary row seeds a pool");
+    }
+
+    /// The design's forward-compatibility guarantee: a pool that GAINS a
+    /// feature key keeps the consent its orgs already gave.
+    #[test]
+    fn extending_a_pool_never_revokes_existing_consent() {
+        let org_id = "paid-overage-extended-pool";
+        let ai = TrialQuotaPool::AiCredits;
+        let values = fold_paid_overage([(org_id, ai.feature_keys()[0], true)]);
+        ORG_PAID_OVERAGE.write().extend(values);
+
+        // Every other backing row is absent, as when a fourth AI feature ships.
+        assert!(get_paid_overage_enabled_for_pool(org_id, ai));
+    }
+
+    #[test]
+    fn paid_overage_effective_requires_eligibility_and_every_billing_org() {
+        use PaidOverageBillingStatus::{AdditionalCreditsRequired, Eligible, SubscriptionRequired};
+
+        let cases = [
+            (Eligible, true, None, true),
+            (Eligible, false, None, false),
+            (Eligible, true, Some(true), true),
+            (Eligible, true, Some(false), false),
+            (Eligible, false, Some(true), false),
+            (SubscriptionRequired, true, None, false),
+            (SubscriptionRequired, true, Some(true), false),
+            (AdditionalCreditsRequired, true, None, false),
+            (AdditionalCreditsRequired, true, Some(true), false),
+        ];
+
+        for (billing_status, organization_enabled, payer_enabled, expected) in cases {
+            assert_eq!(
+                paid_overage_is_effective(billing_status, organization_enabled, payer_enabled),
+                expected,
+                "{billing_status:?}, org={organization_enabled}, payer={payer_enabled:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn exhausted_ai_usage_mode_fails_closed_until_consent_is_effective() {
+        use o2_enterprise::enterprise::cloud::ai_credits::AiCreditExhaustionPolicy::{
+            AdditionalCreditsRequired, MeteredOverage, SubscriptionRequired,
+        };
+
+        assert_eq!(
+            pool_usage_mode(None, TrialQuotaPool::AiCredits, None),
+            "free"
+        );
+        assert_eq!(
+            pool_usage_mode(Some(MeteredOverage), TrialQuotaPool::AiCredits, Some(false)),
+            "consent_required"
+        );
+        assert_eq!(
+            pool_usage_mode(Some(MeteredOverage), TrialQuotaPool::AiCredits, Some(true)),
+            "pay_as_you_go"
+        );
+        assert_eq!(
+            pool_usage_mode(Some(MeteredOverage), TrialQuotaPool::AiCredits, None),
+            "exhausted"
+        );
+        assert_eq!(
+            pool_usage_mode(
+                Some(MeteredOverage),
+                TrialQuotaPool::SyntheticsBrowserSteps,
+                None,
+            ),
+            "pay_as_you_go"
+        );
+        assert_eq!(
+            pool_usage_mode(
+                Some(SubscriptionRequired),
+                TrialQuotaPool::AiCredits,
+                Some(true),
+            ),
+            "exhausted"
+        );
+        assert_eq!(
+            pool_usage_mode(
+                Some(AdditionalCreditsRequired),
+                TrialQuotaPool::AiCredits,
+                Some(true),
+            ),
+            "exhausted"
+        );
+    }
+
+    /// Reconciliation must not revert a consent write that landed while its
+    /// snapshot was in flight — the rows it read are already stale.
+    #[test]
+    fn reconciliation_keeps_a_write_that_raced_its_snapshot() {
+        let org_id = "paid-overage-raced";
+        let ai = TrialQuotaPool::AiCredits;
+
+        let epoch = ORG_PAID_OVERAGE_EPOCH.load(Ordering::Acquire);
+        // The admin enables consent after the snapshot was taken.
+        set_cached_paid_overage(org_id, ai, true);
+        assert_ne!(
+            ORG_PAID_OVERAGE_EPOCH.load(Ordering::Acquire),
+            epoch,
+            "a consent write must bump the epoch"
+        );
+
+        // The stale snapshot still says disabled; applying it would revoke consent.
+        let stale = fold_paid_overage([(org_id, ai.feature_keys()[0], false)]);
+        if ORG_PAID_OVERAGE_EPOCH.load(Ordering::Acquire) == epoch {
+            ORG_PAID_OVERAGE.write().extend(stale);
+        }
+        assert!(get_paid_overage_enabled_for_pool(org_id, ai));
+    }
+
+    /// Consent rides the existing quota wire as one optional bool, resolved
+    /// against the message's pool exactly like `usage_limit`.
+    #[test]
+    fn paid_overage_ha_sets_one_value_for_the_messages_pool() {
+        let org_id = "paid-overage-ha";
+        let mut msg = ha(0, Some(TrialQuotaPool::AiCredits.key()), 0);
+        msg.org_id = org_id.to_string();
+        msg.paid_overage_enabled = Some(true);
+
+        apply_ha_msg(&msg).expect("AI credits is a known pool");
+        assert!(get_paid_overage_enabled_for_pool(
+            org_id,
+            TrialQuotaPool::AiCredits
+        ));
+
+        msg.paid_overage_enabled = Some(false);
+        apply_ha_msg(&msg).expect("AI credits is a known pool");
+        assert!(!get_paid_overage_enabled_for_pool(
+            org_id,
+            TrialQuotaPool::AiCredits
+        ));
+    }
+
+    /// An absent field means "unchanged", not "revoke".
+    #[test]
+    fn an_ha_message_without_consent_leaves_it_alone() {
+        let org_id = "paid-overage-ha-silent";
+        set_cached_paid_overage(org_id, TrialQuotaPool::AiCredits, true);
+
+        let mut msg = ha(7, Some(TrialQuotaPool::AiCredits.key()), 7);
+        msg.org_id = org_id.to_string();
+        assert!(msg.paid_overage_enabled.is_none());
+        apply_ha_msg(&msg).expect("AI credits is a known pool");
+
+        assert!(get_paid_overage_enabled_for_pool(
+            org_id,
+            TrialQuotaPool::AiCredits
+        ));
     }
 
     /// A node predating item 2.1 sends neither field; it meant an AI deduction.
@@ -1727,6 +2309,7 @@ mod tests {
                 org_id: org_id.to_string(),
                 cost: 0,
                 usage_limit: Some(150_000),
+                paid_overage_enabled: None,
                 pool: Some("a_pool_a_newer_node_has".to_string()),
                 delta: 1,
                 source_node: LOCAL_NODE.clone(),
@@ -1773,6 +2356,7 @@ mod tests {
             org_id: org_id.clone(),
             cost: 14,
             usage_limit: None,
+            paid_overage_enabled: None,
             pool: Some(TrialQuotaPool::SyntheticsBrowserSteps.key().to_string()),
             delta: 14,
             source_node: LOCAL_NODE.clone(),
@@ -1842,6 +2426,7 @@ mod tests {
             feature: feature.to_string(),
             usage_count,
             usage_limit: None,
+            paid_overage_enabled: false,
             updated_at: 0,
             notified_checkpoint: 0,
         }

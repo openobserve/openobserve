@@ -214,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
+    <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
   </div>
 </template>
 
@@ -273,6 +274,7 @@ import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
+import PaidOverageConsentDialog from "@/components/PaidOverageConsentDialog.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
@@ -303,6 +305,7 @@ export default defineComponent({
     ThemeSwitcher,
     PredefinedThemes,
     O2AIChat,
+    PaidOverageConsentDialog,
     ShortcutCheatsheet,
     GetStarted,
     CommunitySlackInvite,

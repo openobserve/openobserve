@@ -32,6 +32,10 @@ import {
   type StreamState,
 } from "@/components/O2AIChat.reducer";
 import useAiChat from "@/composables/useAiChat";
+import {
+  isPaidOverageConsentError,
+  usePaidOverageConsent,
+} from "@/composables/usePaidOverageConsent";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { useAutoNavigationPreferences } from "@/composables/useAutoNavigationPreferences";
 import type { useChatHistory } from "@/composables/useChatHistory";
@@ -49,6 +53,8 @@ import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { getUUIDv7 } from "@/utils/zincutils";
 
 const { fetchAiChat } = useAiChat();
+// Module scope is safe: the controller closes over module-level singleton state.
+const { promptForConsent } = usePaidOverageConsent();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
 
 // Module scope, not setup(): O2AIChat mounts in both HomeView and MainLayout, and a stream handed off between them must share this state.
@@ -767,6 +773,22 @@ export function useChatStream(options: UseChatStreamOptions) {
     // At most one restore attempt per turn; the notice shows only once the replacement request succeeds.
     let hasReseeded = false;
     let reseedNotice = false;
+    let hasRetriedAfterConsent = false;
+
+    // A consent retry must resend the SAME turn, so its identity is pinned here.
+    const turnOrgId = store.state.selectedOrganization.identifier;
+    const turnChatId = currentChatId.value;
+    const turnMessages = chatMessages.value;
+    const fetchTurn = () =>
+      fetchAiChat(
+        chatMessages.value,
+        "",
+        turnOrgId,
+        turnController.signal,
+        undefined,
+        currentSessionId.value ?? undefined,
+        hasImages ? messagesToSend : undefined,
+      );
 
     // Clear any flag left by a turn that threw or aborted early; a stale `true` abandons a healthy session.
     streamOwnerUnavailable.value = false;
@@ -795,8 +817,10 @@ export function useChatStream(options: UseChatStreamOptions) {
         return;
       }
 
-      if (!response.ok) {
-        let errorBody = null;
+      // Reseed and consent each get an independent one-retry budget; the loop
+      // lets a consent denial after a reseed still be handled, and vice versa.
+      while (response && !response.ok) {
+        let errorBody: any = null;
         try {
           errorBody = await response.json();
         } catch (_) {
@@ -813,32 +837,44 @@ export function useChatStream(options: UseChatStreamOptions) {
           // A NEW id, since the old one would be refused again; streamSessionId stays pinned to the original for cleanup.
           currentSessionId.value = getUUIDv7();
           reseedNotice = true;
-
-          response = await fetchAiChat(
-            chatMessages.value,
-            "",
-            store.state.selectedOrganization.identifier,
-            currentAbortController.value?.signal,
-            undefined,
-            currentSessionId.value,
-            hasImages ? messagesToSend : undefined,
-          );
+          response = await fetchTurn();
 
           // A Stop during the retry returns the cancelled envelope, which has no `ok` and would render as a server error.
           if (response && response.cancelled) {
             return;
           }
+          continue;
         }
-      }
 
-      // Re-check: the reseed above may have produced a fresh response.
-      if (!response.ok) {
-        let errorBody = null;
-        try {
-          errorBody = await response.json();
-        } catch (_) {
-          // body may not be JSON
+        if (isPaidOverageConsentError(response.status, errorBody) && !hasRetriedAfterConsent) {
+          hasRetriedAfterConsent = true;
+          const accepted = await promptForConsent(
+            turnOrgId,
+            "ai_credits",
+            errorBody.consent,
+            turnController.signal,
+          );
+          // The denied request never started on the server, so a decline or a
+          // superseded turn simply stops: nothing was metered to unwind.
+          const turnStillActive =
+            !turnController.signal.aborted &&
+            store.state.selectedOrganization.identifier === turnOrgId &&
+            chatMessages.value === turnMessages &&
+            currentChatId.value === turnChatId;
+          if (!accepted || !turnStillActive) {
+            if (!accepted && turnStillActive) {
+              appendErrorBlock(t("paidUsage.declinedNotice"));
+            }
+            return;
+          }
+
+          response = await fetchTurn();
+          if (response && response.cancelled) {
+            return;
+          }
+          continue;
         }
+
         const err: any = new Error(
           errorBody?.message ||
             t("aiAssistant.aiChat.serverErrorStatus", { status: response.status }),
