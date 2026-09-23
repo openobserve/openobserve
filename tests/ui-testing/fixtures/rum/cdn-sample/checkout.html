@@ -14,15 +14,15 @@
       h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
       var s = o.createElement(u); s.async = 1; s.src = n;
       var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
-    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-logs.js', 'OO_LOGS');
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-logs.js', 'O2_LOGS');
     (function (h, o, u, n, g) {
       h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
       var s = o.createElement(u); s.async = 1; s.src = n;
       var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
-    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-rum.js', 'OO_RUM');
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-rum.js', 'O2_RUM');
   </script>
 
-  <script src="./oo-rum.js"></script>
+  <script src="./o2-rum.js"></script>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -70,14 +70,14 @@
 
         result.textContent = ok ? 'Order placed. Thank you!' : 'Please enter a valid email and card number.';
 
-        if (window.OO_RUM) window.OO_RUM.onReady(function () {
-          window.OO_RUM.addAction(ok ? 'checkout_success' : 'checkout_validation_failed', {
+        if (window.O2_RUM) window.O2_RUM.onReady(function () {
+          window.O2_RUM.addAction(ok ? 'checkout_success' : 'checkout_validation_failed', {
             hasEmail: !!email,
             cardLen: card.length,
           });
         });
-        if (window.OO_LOGS) window.OO_LOGS.onReady(function () {
-          var logger = window.OO_LOGS.logger;
+        if (window.O2_LOGS) window.O2_LOGS.onReady(function () {
+          var logger = window.O2_LOGS.logger;
           ok ? logger.info('Checkout completed') : logger.warn('Checkout validation failed');
         });
       });

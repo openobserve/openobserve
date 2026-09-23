@@ -137,7 +137,7 @@ openobserveRum.startSessionReplayRecording();`;
 
 // ── CDN variant ──────────────────────────────────────────────────────────────
 
-// Standard RUM-agent async loader: creates an OO_RUM / OO_LOGS stub with an onReady
+// Standard RUM-agent async loader: creates an O2_RUM / O2_LOGS stub with an onReady
 // queue, then injects the bundle with `async` so it downloads in parallel and
 // never blocks parsing or first paint. Queued callbacks run when it lands.
 const cdnLoader = (globalName: string, src: string) => `  (function (h, o, u, n, d) {
@@ -158,22 +158,22 @@ const cdnInstall = (
 <!-- Async loaders: both bundles download in parallel without blocking
      rendering. init calls queued via onReady() run as each bundle arrives. -->
 <script>
-${cdnLoader("OO_RUM", cdnUrl("openobserve-rum.js"))}
-${cdnLoader("OO_LOGS", cdnUrl("openobserve-logs.js"))}
+${cdnLoader("O2_RUM", cdnUrl("openobserve-rum.js"))}
+${cdnLoader("O2_LOGS", cdnUrl("openobserve-logs.js"))}
 </script>`;
 
 const cdnInit = (subs: RumCardSubs, token: string) => `<script>
   var options = ${indent(optionsBlock(subs, token), 2).trimStart()};
 
-  OO_RUM.onReady(function () {
-    OO_RUM.init({
+  O2_RUM.onReady(function () {
+    O2_RUM.init({
 ${indent(RUM_INIT_FIELDS, 4)},
     });
-    OO_RUM.startSessionReplayRecording();
+    O2_RUM.startSessionReplayRecording();
   });
 
-  OO_LOGS.onReady(function () {
-    OO_LOGS.init({
+  O2_LOGS.onReady(function () {
+    O2_LOGS.init({
 ${indent(LOGS_INIT_FIELDS, 4)},
     });
   });
