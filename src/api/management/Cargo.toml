@@ -41,15 +41,7 @@ vectorscan = [
     "search_service/vectorscan",
     "stream/vectorscan",
 ]
-profiling = [
-    "dep:jemalloc_pprof",
-    "dep:pprof",
-    "dep:tikv-jemalloc-ctl",
-    "dep:tikv-jemalloc-sys",
-]
-
-[package.metadata.cargo-machete]
-ignored = ["tikv-jemalloc-sys"]
+profiling = ["openobserve-core/profiling"]
 
 [dependencies]
 anyhow.workspace = true
@@ -72,7 +64,6 @@ http.workspace = true
 infra.workspace = true
 ingester.workspace = true
 itertools.workspace = true
-jemalloc_pprof = { workspace = true, optional = true }
 log.workspace = true
 mime.workspace = true
 o2_dex = { workspace = true, optional = true }
@@ -88,7 +79,6 @@ openobserve-org-storage.workspace = true
 openobserve-sourcemaps.workspace = true
 opentelemetry.workspace = true
 promql-service.workspace = true
-pprof = { workspace = true, optional = true }
 regex.workspace = true
 reqwest.workspace = true
 search.workspace = true
@@ -98,8 +88,6 @@ serde.workspace = true
 serde_json.workspace = true
 stream.workspace = true
 svix-ksuid.workspace = true
-tikv-jemalloc-ctl = { workspace = true, optional = true }
-tikv-jemalloc-sys = { workspace = true, optional = true }
 time.workspace = true
 tokio.workspace = true
 tracing.workspace = true

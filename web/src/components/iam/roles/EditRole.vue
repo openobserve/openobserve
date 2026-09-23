@@ -293,6 +293,7 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
+import type { SyntheticsEnvironment } from "@/types/synthetics";
 import workflowService from "@/services/workflows";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -1594,6 +1595,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     rfolder: getReportFolders,
     synthetic_folder: getSyntheticsFolders,
     synthetics: getSynthetics,
+    synthetic_environment: getSyntheticEnvironments,
     workflow_folder: getWorkflowFolders,
     workflows: getWorkflows,
     re_patterns: getRePatterns,
@@ -1776,6 +1778,13 @@ const getSynthetics = async (resource: Entity | Resource) => {
   return new Promise((resolve) => {
     resolve(true);
   });
+};
+const getSyntheticEnvironments = async () => {
+  // Grants are written against the environment name, so the name is the entity key.
+  const res = await syntheticsService.listEnvironments(store.state.selectedOrganization.identifier);
+  const environments: SyntheticsEnvironment[] = res.data ?? [];
+  updateResourceEntities("synthetic_environment", ["name"], [...environments]);
+  return true;
 };
 const getWorkflowFolders = async () => {
   const folders: any = await commonService.list_Folders(
