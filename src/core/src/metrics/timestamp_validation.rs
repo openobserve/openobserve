@@ -103,11 +103,15 @@ impl PointRejectionTracker {
         stream_name: &str,
         reason: TimestampRejection,
     ) -> bool {
-        if !self.rejected.insert(id) {
+        if !self.mark_rejected(id) {
             return false;
         }
         reason.count(org_id, stream_name);
         true
+    }
+
+    pub(super) fn mark_rejected(&mut self, id: usize) -> bool {
+        self.rejected.insert(id)
     }
 }
 
@@ -176,6 +180,7 @@ pub(super) struct StreamTimestampPolicyCache {
     org_id: String,
     now: i64,
     by_stream: HashMap<String, StreamTimestampPolicy>,
+    deleting_by_stream: HashMap<String, bool>,
 }
 
 impl StreamTimestampPolicyCache {
@@ -184,20 +189,29 @@ impl StreamTimestampPolicyCache {
             org_id: org_id.to_string(),
             now,
             by_stream: HashMap::new(),
+            deleting_by_stream: HashMap::new(),
         }
+    }
+
+    pub(super) fn is_deleting(&mut self, stream_name: &str) -> bool {
+        // check if stream is deleting from cache
+        *self
+            .deleting_by_stream
+            .entry(stream_name.to_string())
+            .or_insert_with(|| {
+                db::compact::retention::is_deleting_stream(
+                    &self.org_id,
+                    StreamType::Metrics,
+                    stream_name,
+                    None,
+                )
+            })
     }
 
     pub(super) async fn get(&mut self, stream_name: &str) -> StreamTimestampPolicy {
         if let Some(policy) = self.by_stream.get(stream_name) {
             return *policy;
         }
-        // check if stream is deleting from cache
-        let deleting = db::compact::retention::is_deleting_stream(
-            &self.org_id,
-            StreamType::Metrics,
-            stream_name,
-            None,
-        );
         let retention_days =
             infra::schema::get_settings(&self.org_id, stream_name, StreamType::Metrics)
                 .await
@@ -205,7 +219,6 @@ impl StreamTimestampPolicyCache {
                 .filter(|days| *days > 0)
                 .unwrap_or_else(|| get_config().compact.data_retention_days);
         let policy = StreamTimestampPolicy {
-            deleting,
             bounds: TimestampBounds::new(self.now, retention_days),
         };
         self.by_stream.insert(stream_name.to_string(), policy);
@@ -215,7 +228,6 @@ impl StreamTimestampPolicyCache {
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct StreamTimestampPolicy {
-    pub(super) deleting: bool,
     pub(super) bounds: TimestampBounds,
 }
 
@@ -326,7 +338,6 @@ mod tests {
             policies.by_stream.insert(
                 stream.to_string(),
                 StreamTimestampPolicy {
-                    deleting: false,
                     bounds: TimestampBounds::new(NOW, days),
                 },
             );
@@ -371,7 +382,6 @@ mod tests {
         policies.by_stream.insert(
             "destination".to_string(),
             StreamTimestampPolicy {
-                deleting: false,
                 bounds: TimestampBounds::new(NOW, 1),
             },
         );
@@ -409,6 +419,42 @@ mod tests {
         );
         assert_eq!(outputs["destination"][0].1, (valid_id, NOW));
         assert_eq!(rejections, vec![TimestampRejection::Future]);
+    }
+
+    #[tokio::test]
+    async fn empty_metrics_only_check_deletion_without_loading_retention() {
+        let org = "empty_metrics_no_retention_lookup";
+        let mut policies = StreamTimestampPolicyCache::new(org, NOW);
+        let mut pipelines = HashMap::new();
+        let mut points = PointRejectionTracker::default();
+        let mut rejected = 0;
+        let mut message = String::new();
+        for stream in ["empty_gauge", "no_recorded_value", "nan", "empty_histogram"] {
+            assert!(!policies.is_deleting(stream));
+            let mut validator = TimestampValidator {
+                org_id: org,
+                pipelines: &mut pipelines,
+                policies: &mut policies,
+                rejected_data_points: &mut rejected,
+                error_message: &mut message,
+                points: &mut points,
+            };
+            let samples = [()];
+            assert!(
+                filter_valid_points(&samples, &mut validator, |_| None)
+                    .await
+                    .is_empty()
+            );
+            assert!(
+                filter_record_groups(vec![vec![]], &mut validator)
+                    .await
+                    .is_empty()
+            );
+        }
+        assert!(policies.by_stream.is_empty());
+        assert_eq!(policies.deleting_by_stream.len(), 4);
+        assert!(pipelines.is_empty());
+        assert_eq!(rejected, 0);
     }
 
     #[tokio::test]

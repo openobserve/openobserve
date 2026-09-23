@@ -131,9 +131,7 @@ impl MetricRecords<'_> {
     fn is_empty(&self) -> bool {
         match self {
             Self::Json(records) => records.is_empty(),
-            Self::NumberPoints(points) => !points
-                .iter()
-                .any(|point| number_point_value(point).is_some()),
+            Self::NumberPoints(points) => points.is_empty(),
         }
     }
 }
@@ -264,7 +262,7 @@ pub async fn handle_otlp_request(
                 let metric_name = format_stream_name(metric.name.to_string());
 
                 // check stream if it is deleting
-                if policies.get(&metric_name).await.deleting {
+                if policies.is_deleting(&metric_name) {
                     skipped_records += 1;
                     continue;
                 }
@@ -558,12 +556,15 @@ pub async fn handle_otlp_request(
         log::warn!("[METRICS:OTLP] Skipped {skipped_records} records due to streams being deleted");
     }
 
-    let (mut pipeline_outputs, failures) = ingest::run_pipelines(
+    let (mut pipeline_outputs, failures) = ingest::run_pipelines_with_failure_handler(
         org_id,
         &stream_executable_pipelines,
         stream_pipeline_inputs,
         &user_defined_schema_map,
         &mut stream_partitioning_map,
+        |point_ids| {
+            count_pipeline_failed_points(point_ids, &mut point_rejections, &mut partial_success);
+        },
     )
     .await;
     for failure in failures {
@@ -571,10 +572,7 @@ pub async fn handle_otlp_request(
             PipelineFailure::MissingInputs { message } => {
                 partial_success.error_message = message;
             }
-            PipelineFailure::Batch {
-                records, message, ..
-            } => {
-                partial_success.rejected_data_points += records as i64;
+            PipelineFailure::Batch { message, .. } => {
                 partial_success.error_message = message;
             }
         }
@@ -899,6 +897,18 @@ fn resolve_number_point_stream<'a>(point: &NumberDataPoint, metric_name: &'a str
             Cow::Owned(format_stream_name(name))
         })
         .unwrap_or(Cow::Borrowed(metric_name))
+}
+
+fn count_pipeline_failed_points(
+    point_ids: &[usize],
+    points: &mut PointRejectionTracker,
+    partial_success: &mut ExportMetricsPartialSuccess,
+) {
+    for &id in point_ids {
+        if points.mark_rejected(id) {
+            partial_success.rejected_data_points += 1;
+        }
+    }
 }
 
 async fn filter_otlp_pipeline_outputs(
@@ -1339,17 +1349,6 @@ fn format_response(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::Arc};
-
-    use config::meta::promql::{Metadata, MetricType};
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
-    use opentelemetry_proto::tonic::metrics::v1::{
-        AggregationTemporality, Exemplar, HistogramDataPoint, Metric, NumberDataPoint,
-    };
-    use serde_json::json;
-
-    use super::*;
-
     mod admission_tests {
         use config::meta::{pipeline::Pipeline, stream::StreamSettings};
         use opentelemetry_proto::tonic::common::v1::{AnyValue, any_value};
@@ -1866,6 +1865,49 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn pipeline_batch_failures_share_rejection_counts_with_timestamp_filters() {
+            for batch_first in [false, true] {
+                let org = "otlp_failed_point_identity";
+                let mut policies = policies(org, &[("expired", 1)]).await;
+                let mut tracker = PointRejectionTracker::default();
+                let first = tracker.next_point_id();
+                let second = tracker.next_point_id();
+                let mut partial = ExportMetricsPartialSuccess::default();
+                let mut outputs = HashMap::from([(
+                    "expired".to_string(),
+                    vec![(
+                        json!({"_timestamp": NOW - 10 * DAY})
+                            .as_object()
+                            .unwrap()
+                            .clone(),
+                        first,
+                    )],
+                )]);
+                if batch_first {
+                    count_pipeline_failed_points(
+                        &[first, first, second],
+                        &mut tracker,
+                        &mut partial,
+                    );
+                }
+                filter_otlp_pipeline_outputs(
+                    &mut outputs,
+                    &mut policies,
+                    &mut tracker,
+                    &mut partial,
+                )
+                .await;
+                assert!(outputs.is_empty());
+                if !batch_first {
+                    assert_eq!(partial.rejected_data_points, 1);
+                }
+                count_pipeline_failed_points(&[first, first, second], &mut tracker, &mut partial);
+                count_pipeline_failed_points(&[first, second], &mut tracker, &mut partial);
+                assert_eq!(partial.rejected_data_points, 2);
+            }
+        }
+
+        #[tokio::test]
         async fn timestamp_partial_success_survives_all_response_encodings() {
             for req_type in [
                 OtlpRequestType::HttpJson,
@@ -1890,6 +1932,17 @@ mod tests {
             }
         }
     }
+
+    use std::{collections::HashMap, sync::Arc};
+
+    use config::meta::promql::{Metadata, MetricType};
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use opentelemetry_proto::tonic::metrics::v1::{
+        AggregationTemporality, Exemplar, HistogramDataPoint, Metric, NumberDataPoint,
+    };
+    use serde_json::json;
+
+    use super::*;
 
     /// No target downscaling: the producer's scale is emitted as is, capped only by the valve.
     fn lim(max_buckets: usize) -> native_histogram::ExpansionLimits {

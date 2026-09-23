@@ -13,6 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod columnar;
+mod ingest;
+pub mod json;
+mod native_histogram;
+pub mod otlp;
+mod otlp_json_compat;
+pub mod prom;
+mod prom_decode;
+mod timestamp_validation;
+
 use std::collections::{HashMap, HashSet};
 
 use config::{
@@ -29,16 +39,6 @@ use config::{
 use datafusion::arrow::datatypes::Schema;
 
 use crate::ingestion::TriggerAlertData;
-
-mod columnar;
-mod ingest;
-pub mod json;
-mod native_histogram;
-pub mod otlp;
-mod otlp_json_compat;
-pub mod prom;
-mod prom_decode;
-mod timestamp_validation;
 
 /// Distinct label sets one realtime notification carries, matching the scheduled path's sample.
 const TRIGGER_LABEL_LIMIT: usize = PAYLOAD_SAMPLE_ROWS as usize;
