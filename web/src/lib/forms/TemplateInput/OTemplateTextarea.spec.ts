@@ -217,6 +217,15 @@ describe("OTemplateTextarea", { timeout: 20_000 }, () => {
       expect(activeRow()).toBe("{{BASE_URL}}");
     });
 
+    it("keeps the highlight when the arrow key's own keyup follows", async () => {
+      mountHost();
+      await type("{{");
+      press("ArrowDown");
+      field.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowDown", bubbles: true }));
+      await flushPromises();
+      expect(activeRow()).toBe("{{input}}");
+    });
+
     it("inserts the highlighted name at the caret, not at the end, and reports the pick", async () => {
       mountHost();
       await type("see {{ba and more", 8);

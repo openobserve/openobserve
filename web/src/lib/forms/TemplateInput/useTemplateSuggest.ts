@@ -114,10 +114,13 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
     }, PEEK_DELAY_MS);
   }
 
+  // Resetting the highlight on an unchanged token would undo the arrow key that fired this keyup.
   function checkOpenToken(text: string, caret: number) {
     const token = openTokenAt(text, caret);
     if (!token) return close();
+    const previous = open.value;
     open.value = token;
+    if (previous?.start === token.start && previous.query === token.query) return;
     highlightedIndex.value = 0;
   }
 
