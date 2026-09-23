@@ -111,6 +111,10 @@ so a bad manifest fails at `generate_matrix` instead of somewhere downstream:
   same spec silently runs it twice; it happens when two PRs register the same new spec in
   different shards.
 - no spec in both `run_files` and `disabled`
+- a shard with no `run_files` **and** no `disabled` entries is rejected: it records nothing
+  and runs nothing. An entry with no `run_files` but a populated `disabled` array is a
+  documentation-only entry (used by `ci_matrix_cloud.json` to record why a whole module
+  stays off a suite); it is skipped, never emitted, and logged as such.
 - **every `run_files` entry exists on disk.** This is the one that cannot be seen from a
   green run: `playwright_alpha1.yml` skips a missing path with a warning, and a Playwright
   path argument matching nothing simply selects no tests — so a renamed or split spec stops
