@@ -196,7 +196,7 @@ async fn query(
             }
         };
         let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
-        if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
             log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
             return (
                 StatusCode::BAD_REQUEST,
@@ -496,7 +496,7 @@ async fn query_range(
             }
         };
         let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
-        if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
             log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
             return (
                 StatusCode::BAD_REQUEST,
@@ -1251,6 +1251,11 @@ fn validate_metadata_params(
     } else {
         now_micros()
     };
+    if start > end {
+        let err = "start must not be later than end";
+        log::error!("{err}");
+        return Err(err.to_owned());
+    }
     Ok((selector, start, end))
 }
 
@@ -1403,7 +1408,7 @@ async fn search(
 async fn search_streaming(
     trace_id: &str,
     org_id: &str,
-    req: core_promql::MetricsQueryRequest,
+    mut req: core_promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Response {
@@ -1416,6 +1421,12 @@ async fn search_streaming(
         .enabled;
 
     // adjust start and end time
+    // each partition is searched as its own query, which would read `end()` as the partition's end
+    if let Ok(Some(query)) =
+        promql::ast::at_modifier::resolve_query(&req.query, req.start, req.end, req.step)
+    {
+        req.query = query;
+    }
     let (start, end) = promql::adjust_start_end(req.start, req.end, req.step);
     // generate partitions
     let partitions = generate_search_partition(&req.query, start, end, req.step);
@@ -1610,7 +1621,8 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
 
     // Calculate the offset from the aligned boundary
     // For example, if partition_step is 1 hour and start is 10:23, offset is 23 minutes
-    let offset = start % partition_step;
+    // Boundaries keep start's step phase so every partition evaluates on the query's own grid.
+    let offset = (start - start.rem_euclid(step)).rem_euclid(partition_step);
 
     // Determine where aligned partitions start
     let mut group_start = if offset == 0 {
@@ -1619,14 +1631,16 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
     } else {
         // First partition: from start to next aligned boundary
         // we need to subtract the step to avoid the overlap of the next partition
-        let mut next_aligned_boundary = start - offset + partition_step - step;
-        if start == next_aligned_boundary {
-            next_aligned_boundary += partition_step - step;
+        let mut first_end = start - offset + partition_step - step;
+        // A single-point first partition is folded into the next aligned partition.
+        if first_end == start {
+            first_end += partition_step;
+            if end - first_end < step * 3 {
+                first_end = end;
+            }
         }
-        if next_aligned_boundary <= end {
-            groups.push((start, next_aligned_boundary));
-        }
-        next_aligned_boundary + step
+        groups.push((start, first_end));
+        first_end + step
     };
     while group_start < end {
         let mut group_end = std::cmp::min(group_start + partition_step, end);
@@ -1663,7 +1677,7 @@ fn get_max_lookback_window(query: &str) -> i64 {
         }
     };
     let mut visitor = MaxLookbackWindowVisitor::default();
-    if let Err(err) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+    if let Err(err) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
         log::error!("visit promql expr error: {err}");
         return 0;
     }
@@ -1698,18 +1712,11 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
     type Error = &'static str;
 
     fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
-        match expr {
-            Expr::VectorSelector(_) => {
-                return Ok(false);
-            }
-            Expr::MatrixSelector(ms) => {
-                if ms.range > self.range {
-                    self.range = ms.range;
-                }
-                return Ok(false);
-            }
-            Expr::NumberLiteral(_) | Expr::StringLiteral(_) => return Ok(false),
-            _ => (),
+        // Ok(false) aborts the whole walk, so a leaf must not return it or later selectors are lost
+        if let Expr::MatrixSelector(ms) = expr
+            && ms.range > self.range
+        {
+            self.range = ms.range;
         }
         Ok(true)
     }
@@ -1798,6 +1805,22 @@ mod tests {
         assert_eq!(v.get_range_micros(), 0);
     }
 
+    #[test]
+    fn test_lookback_window_seen_after_a_vector_selector() {
+        assert_eq!(
+            get_max_lookback_window("a + rate(b[24h])"),
+            24 * 3600 * 1_000_000
+        );
+    }
+
+    #[test]
+    fn test_lookback_window_seen_in_aggregation_param() {
+        assert_eq!(
+            get_max_lookback_window("topk(scalar(max_over_time(k[24h])), m)"),
+            24 * 3600 * 1_000_000
+        );
+    }
+
     // --- generate_search_partition ---
 
     #[test]
@@ -1847,6 +1870,54 @@ mod tests {
         assert_eq!(result.last().unwrap().1, end);
     }
 
+    #[test]
+    fn test_partition_unaligned_start_issue_14764() {
+        // 15m range, step=5m, start in the second half of a 10m partition block
+        let start = 1_790_078_349_759_000_i64;
+        let end = 1_790_079_249_759_000_i64;
+        let step = 300_000_000_i64;
+        let query = r#"sum by (flowid) (increase(x{outcome="submitted"}[5m])) > 0"#;
+        let result = generate_search_partition(query, start, end, step);
+        assert_partitions_valid(&result, start, end, step);
+    }
+
+    #[test]
+    fn test_partition_every_start_phase() {
+        let step = 60_000_000_i64;
+        let base = 1_790_078_400_000_000_i64;
+        for query in ["up", "increase(x[5m])"] {
+            for step_mul in [1, 5] {
+                let step = step * step_mul;
+                for shift in (0..3_600_000_000_i64).step_by(17_000_000) {
+                    let start = base + shift;
+                    for points in [4_i64, 11, 16, 61, 200] {
+                        for tail in [0, step / 3] {
+                            let end = start + step * (points - 1) + tail;
+                            let result = generate_search_partition(query, start, end, step);
+                            assert_partitions_valid(&result, start, end, step);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn assert_partitions_valid(parts: &[(i64, i64)], start: i64, end: i64, step: i64) {
+        assert_eq!(parts.first().unwrap().0, start, "{parts:?}");
+        assert_eq!(parts.last().unwrap().1, end, "{parts:?}");
+        for (s, e) in parts {
+            assert!(s <= e, "partition end before start: {parts:?}");
+            assert_eq!(
+                (s - start) % step,
+                0,
+                "partition off the step grid: {parts:?}"
+            );
+        }
+        for w in parts.windows(2) {
+            assert_eq!(w[1].0, w[0].1 + step, "gap or overlap: {parts:?}");
+        }
+    }
+
     // --- validate_metadata_params ---
 
     #[test]
@@ -1885,5 +1956,25 @@ mod tests {
         // A matcher without a metric name should error
         let result = validate_metadata_params(Some("{job=\"prometheus\"}".to_string()), None, None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_start_after_end() {
+        let result = validate_metadata_params(
+            None,
+            Some("1700000200".to_string()),
+            Some("1700000100".to_string()),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_start_equals_end() {
+        let result = validate_metadata_params(
+            None,
+            Some("1700000100".to_string()),
+            Some("1700000100".to_string()),
+        );
+        assert!(result.is_ok());
     }
 }

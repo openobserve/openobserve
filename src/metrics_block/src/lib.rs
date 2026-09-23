@@ -26,27 +26,20 @@ use std::{
 
 use anyhow::{Result, anyhow, ensure};
 use arrow::{
-    array::{
-        Array, DictionaryArray, LargeStringArray, RecordBatch, RecordBatchOptions, StringArray,
-        StringViewArray,
-    },
+    array::{Array, DictionaryArray, LargeStringArray, RecordBatch, StringArray, StringViewArray},
     datatypes::{DataType, Schema, SchemaRef, UInt8Type, UInt16Type, UInt32Type},
 };
 pub use directory::{BlockDirectory, BlockIter};
 pub use reader::{BlockDecoder, decode_additional_labels, decode_block, decode_index, read_footer};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-pub use writer::{BlockWriter, build_from_parquet};
+pub use writer::BlockWriter;
 
-pub const VERSION: u32 = 1;
-pub const FOOTER_LEN: usize = 64;
+pub const VERSION: u32 = 2;
+pub const FOOTER_LEN: usize = 32;
 pub const MAX_BLOCK_ROWS: usize = 8192;
-pub const MAX_METADATA_BYTES: usize = 128 * 1024 * 1024;
-pub const MAX_WRITER_METADATA_BYTES: usize = 256 * 1024 * 1024;
-pub const MAX_BLOCKS: usize = 1_000_000;
 pub const MAX_LABEL_COLUMNS: usize = 128;
-const MAGIC: &[u8; 8] = b"O2MIDX01";
-const DIRECTORY_FIELDS: usize = 9;
+const MAGIC: &[u8; 8] = b"O2MIDX02";
+const DIRECTORY_FIELDS: usize = 8;
 const PARENT_KEY: &str = "o2:midx_parent";
 const SCHEMA_KEY: &str = "o2:midx_source_schema";
 const LABELS_KEY: &str = "o2:midx_labels";
@@ -62,21 +55,8 @@ const NON_IDENTITY: &[&str] = &[
     "flag",
 ];
 
-/// A declared format capacity was exceeded by otherwise eligible input.
-#[derive(Debug)]
-pub struct FormatLimit {
-    message: &'static str,
-}
-impl std::fmt::Display for FormatLimit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "metrics block capacity limit: {}", self.message)
-    }
-}
-impl std::error::Error for FormatLimit {}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ParentIdentity {
-    pub object_key: String,
+pub struct ParentMetadata {
     pub rows: u64,
     pub compressed_size: u64,
 }
@@ -85,7 +65,6 @@ pub struct ParentIdentity {
 pub struct Footer {
     pub version: u32,
     pub metadata_range: Range<u64>,
-    metadata_checksum: [u8; 32],
     pub payload_end: u64,
 }
 
@@ -96,19 +75,18 @@ pub struct BlockMeta {
     pub row_count: u32,
     pub min_timestamp: i64,
     pub max_timestamp: i64,
-    pub payload_offset: u64,
-    pub payload_len: u32,
+    pub block_offset: u64,
+    pub block_length: u32,
     pub strictly_increasing: bool,
-    pub checksum: [u8; 32],
 }
 
 impl BlockMeta {
     /// Metadata validation establishes that this addition cannot overflow.
-    pub fn payload_range(&self) -> Range<u64> {
-        self.payload_offset
+    pub fn block_range(&self) -> Range<u64> {
+        self.block_offset
             ..self
-                .payload_offset
-                .saturating_add(u64::from(self.payload_len))
+                .block_offset
+                .saturating_add(u64::from(self.block_length))
     }
 }
 
@@ -127,7 +105,7 @@ pub struct DecodedBlockRef<'a> {
 #[derive(Debug)]
 pub struct IndexBase {
     pub row_group_size: Option<u32>,
-    pub parent: ParentIdentity,
+    pub parent: ParentMetadata,
     pub source_schema: SchemaRef,
     pub blocks: BlockDirectory,
     footer: Footer,
@@ -140,15 +118,25 @@ pub struct Index {
     missing: Vec<String>,
 }
 
+impl Deref for Index {
+    type Target = IndexBase;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
 impl Index {
+    pub fn estimated_directory_size(&self) -> usize {
+        self.blocks.allocated_bytes()
+    }
+
     pub fn estimated_heap_size(&self) -> usize {
         let schema_bytes =
-            serde_json::to_vec(self.source_schema.as_ref()).map_or(MAX_METADATA_BYTES, |v| v.len());
+            serde_json::to_vec(self.source_schema.as_ref()).map_or(0, |bytes| bytes.len());
         std::mem::size_of::<Self>()
             .saturating_add(std::mem::size_of::<IndexBase>())
-            .saturating_add(32)
-            .saturating_add(self.blocks.allocated_bytes())
-            .saturating_add(self.parent.object_key.capacity())
+            .saturating_add(self.estimated_directory_size())
             .saturating_add(self.labels.get_array_memory_size())
             .saturating_add(self.missing.capacity() * std::mem::size_of::<String>())
             .saturating_add(self.missing.iter().map(String::capacity).sum::<usize>())
@@ -156,10 +144,6 @@ impl Index {
             .saturating_add(
                 (self.source_schema.fields().len() + self.labels.num_columns()).saturating_mul(512),
             )
-    }
-
-    pub fn estimated_directory_size(&self) -> usize {
-        self.blocks.allocated_bytes()
     }
 
     pub fn missing_labels(&self, names: &[String]) -> Result<Vec<String>> {
@@ -213,7 +197,7 @@ impl Index {
             labels: RecordBatch::try_new_with_options(
                 Arc::new(Schema::new(fields)),
                 columns,
-                &RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
+                &arrow::array::RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
             )?,
         })
     }
@@ -247,37 +231,14 @@ impl Index {
             labels: RecordBatch::try_new_with_options(
                 Arc::new(Schema::new(fields)),
                 columns,
-                &RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
+                &arrow::array::RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
             )?,
         })
     }
 
     pub fn for_cache(mut self) -> Self {
-        self.missing = Vec::new();
+        self.missing.clear();
         self
-    }
-
-    #[inline]
-    pub fn label_value(&self, block: usize, name: &str) -> Result<Option<&str>> {
-        ensure!(block < self.blocks.len(), "block index out of bounds");
-        let Some(column) = self.labels.column_by_name(name) else {
-            ensure!(
-                self.missing.iter().any(|missing| missing == name),
-                "label was not projected: {name}"
-            );
-            return Ok(None);
-        };
-        label_value(column.as_ref(), block)
-    }
-
-    pub fn label_values(&self, block: usize, names: &[String]) -> Result<Vec<Option<String>>> {
-        names
-            .iter()
-            .map(|name| {
-                self.label_value(block, name)
-                    .map(|value| value.map(str::to_owned))
-            })
-            .collect()
     }
 
     pub fn select_blocks(
@@ -288,7 +249,6 @@ impl Index {
     ) -> Result<Vec<usize>> {
         let mut normalized: Vec<Range<u64>> = Vec::new();
         if let Some(ranges) = ranges {
-            ensure!(ranges.len() <= MAX_BLOCKS, "too many selection ranges");
             for range in ranges {
                 let start = u64::try_from(range.start)?;
                 let end = u64::try_from(range.end)?;
@@ -360,21 +320,32 @@ impl Index {
         }
         Ok(result)
     }
-}
 
-impl Deref for Index {
-    type Target = IndexBase;
+    #[inline]
+    pub fn label_value(&self, block: usize, name: &str) -> Result<Option<&str>> {
+        ensure!(block < self.blocks.len(), "block index out of bounds");
+        let Some(column) = self.labels.column_by_name(name) else {
+            ensure!(
+                self.missing.iter().any(|missing| missing == name),
+                "label was not projected: {name}"
+            );
+            return Ok(None);
+        };
+        label_value(column.as_ref(), block)
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.base
+    pub fn label_values(&self, block: usize, names: &[String]) -> Result<Vec<Option<String>>> {
+        names
+            .iter()
+            .map(|name| {
+                self.label_value(block, name)
+                    .map(|value| value.map(str::to_owned))
+            })
+            .collect()
     }
 }
 
-pub fn is_format_limit_error(error: &anyhow::Error) -> bool {
-    error.is::<FormatLimit>()
-}
-
-/// Upper bound for a single v1 independently compressed sample payload.
+/// Bounds scratch space before allocating or decoding one sample block.
 pub fn max_compressed_block_len(row_count: u32) -> Result<usize> {
     ensure!(
         row_count > 0 && row_count as usize <= MAX_BLOCK_ROWS,
@@ -386,39 +357,11 @@ pub fn max_compressed_block_len(row_count: u32) -> Result<usize> {
     Ok(zstd::zstd_safe::compress_bound(raw))
 }
 
-/// Only immutable indexed metrics objects with a supported source format can own this container.
-pub fn sidecar_path(parent_key: &str) -> Option<String> {
-    let mut parts: Vec<_> = parent_key.split('/').map(str::to_owned).collect();
-    if parts.len() < 9
-        || parts[0] != "files"
-        || parts[2] != "metrics"
-        || parts
-            .iter()
-            .any(|part| part.is_empty() || part == "." || part == "..")
-    {
-        return None;
-    }
-    let name = parts.last()?;
-    let name = name.strip_prefix("indexed-v1-")?;
-    let id = name
-        .strip_suffix(".parquet")
-        .or_else(|| name.strip_suffix(".vortex"))?;
-    if id.is_empty() {
-        return None;
-    }
-    let result_name = format!("indexed-v1-{id}.midx");
-    parts[2] = "midx".to_owned();
-    *parts.last_mut()? = result_name;
-    Some(parts.join("/"))
-}
-
 pub fn identity_label_columns(schema: &Schema) -> Result<Vec<String>> {
     capacity(
-        schema.fields().len() <= MAX_LABEL_COLUMNS + 3,
+        schema.fields().len() <= MAX_LABEL_COLUMNS + 3 + NON_IDENTITY.len(),
         "MAX_LABEL_COLUMNS",
     )?;
-    // Check static metadata/name size before cloning any field names below.
-    writer::encoded_size(schema, MAX_METADATA_BYTES / 4)?;
     let mut names = HashSet::new();
     ensure!(
         schema
@@ -447,10 +390,9 @@ pub fn identity_label_columns(schema: &Schema) -> Result<Vec<String>> {
             !name.starts_with("__oo_midx_"),
             "reserved metadata label name"
         );
-        ensure!(
-            !NON_IDENTITY.contains(&name),
-            "unsupported per-point column {name}"
-        );
+        if NON_IDENTITY.contains(&name) {
+            continue;
+        }
         ensure!(
             is_label_type(field.data_type()),
             "unsupported label type for {name}"
@@ -466,11 +408,8 @@ pub fn is_supported_schema(schema: &Schema) -> bool {
 }
 
 fn capacity(condition: bool, message: &'static str) -> Result<()> {
-    if condition {
-        Ok(())
-    } else {
-        Err(FormatLimit { message }.into())
-    }
+    ensure!(condition, "metrics block capacity limit: {message}");
+    Ok(())
 }
 
 fn is_label_type(data_type: &DataType) -> bool {
@@ -510,10 +449,6 @@ fn label_value(array: &dyn Array, row: usize) -> Result<Option<&str>> {
         return label_value(array.values().as_ref(), array.keys().value(row) as usize);
     }
     Err(anyhow!("unsupported identity label array"))
-}
-
-fn checksum(bytes: &[u8]) -> [u8; 32] {
-    Sha256::digest(bytes).into()
 }
 
 fn semantic_metadata(schema: &Schema) -> HashMap<String, String> {

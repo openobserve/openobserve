@@ -124,6 +124,7 @@ pub async fn merge_files(
         compressed_size: 0,
         flattened: false,
         index_size: 0,
+        mindex_size: 0,
         bloom_ver: 0,
     };
     if new_file_meta.records == 0 {
@@ -227,7 +228,7 @@ pub async fn merge_files(
 
     let merge_result = {
         let mode = mode.clone();
-        let output = MergeOutput::for_compactor(stream_type).with_file_key_prefix(prefix);
+        let output = MergeOutput::for_compactor(stream_type);
         DATAFUSION_RUNTIME
             .spawn(async move {
                 merge::merge_parquet_files(
@@ -287,23 +288,14 @@ pub async fn merge_files(
     let mut new_files = Vec::with_capacity(outputs.len());
     for file in outputs {
         let id = ider::generate_file_name();
-        let new_file_key = file.file_key(prefix, &id, file_format)?;
+        let new_file_key = format!("{prefix}/{}", file.file_name(&id, file_format));
         let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
         let cache_locally = cfg.cache_latest_files.enabled
             && cfg.cache_latest_files.cache_parquet
             && cfg.cache_latest_files.download_from_node;
-        let account_ref = &account;
-        let (buf, mut new_file_meta) = publish_merged_output(
-            file,
-            &new_file_key,
-            cache_locally,
-            |key, bytes| async move {
-                storage::put_with_tier(account_ref, &key, bytes, storage_tier)
-                    .await
-                    .map_err(anyhow::Error::from)
-            },
-        )
-        .await?;
+        let (buf, mut new_file_meta) =
+            publish_merged_output(file, &account, &new_file_key, cache_locally, storage_tier)
+                .await?;
 
         if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
             generate_inverted_index(
@@ -461,15 +453,14 @@ fn settle_download(
     }
 }
 
-async fn publish_merged_output<F>(
+async fn publish_merged_output(
     file: MergedFile,
+    account: &str,
     key: &str,
     cache_locally: bool,
-    put: impl Fn(String, Bytes) -> F,
-) -> anyhow::Result<(Bytes, FileMeta)>
-where
-    F: Future<Output = anyhow::Result<()>>,
-{
+    storage_tier: storage::StorageTier,
+) -> anyhow::Result<(Bytes, FileMeta)> {
+    let indexed_without_index = matches!(&file, MergedFile::MetricsIndexedNoIndex { .. });
     let (data, mut meta, index_path) = file.into_upload_parts().await?;
     let bytes = Bytes::from(data);
     meta.compressed_size = i64::try_from(bytes.len())?;
@@ -484,12 +475,20 @@ where
     } else {
         None
     };
+    meta.mindex_size = index
+        .as_ref()
+        .map(|(_, bytes)| i64::try_from(bytes.len()))
+        .transpose()?
+        .unwrap_or_default();
     if cache_locally {
         infra::cache::file_data::disk::set(key, bytes.clone()).await?;
     }
-    put(key.to_string(), bytes.clone()).await?;
+    storage::put_with_tier(account, key, bytes.clone(), storage_tier).await?;
     if let Some((key, index)) = index {
-        put(key, index).await?;
+        storage::put_with_tier(account, &key, index, storage_tier).await?;
+    }
+    if indexed_without_index {
+        log::warn!("[COMPACT] indexed metrics file {key} has no MIDX: unsupported schema");
     }
     Ok((bytes, meta))
 }
@@ -503,6 +502,10 @@ mod tests {
     const PLANNED_SIZE: usize = 1024;
 
     async fn produced_indexed_output(format: FileFormat) -> MergedFile {
+        produced_metrics_output(format, "block").await
+    }
+
+    async fn produced_metrics_output(format: FileFormat, kind: &str) -> MergedFile {
         use datafusion::{
             arrow::{
                 array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
@@ -513,24 +516,30 @@ mod tests {
         let schema = Arc::new(Schema::new(vec![
             Field::new("__hash__", DataType::UInt64, false),
             Field::new("_timestamp", DataType::Int64, false),
-            Field::new("value", DataType::Float64, false),
-            Field::new("tag", DataType::Utf8, true),
+            Field::new("value", DataType::Float64, true),
+            Field::new(
+                if kind == "unsupported" {
+                    "__oo_midx_bad"
+                } else {
+                    "tag"
+                },
+                DataType::Utf8,
+                true,
+            ),
         ]));
         let batch = RecordBatch::try_new(
             Arc::clone(&schema),
             vec![
                 Arc::new(UInt64Array::from(vec![1, 1])),
                 Arc::new(Int64Array::from(vec![10, 20])),
-                Arc::new(Float64Array::from(vec![1., 2.])),
+                Arc::new(Float64Array::from(vec![Some(1.), Some(2.)])),
                 Arc::new(StringArray::from(vec!["x", "x"])),
             ],
         )
         .unwrap();
         let table = Arc::new(MemTable::try_new(Arc::clone(&schema), vec![vec![batch]]).unwrap());
-        let mut output = MergeOutput::for_compactor(StreamType::Metrics)
-            .with_file_key_prefix("files/publish/metrics/m/2026/09/20/00");
+        let mut output = MergeOutput::for_compactor(StreamType::Metrics);
         output.file_format = format;
-        output.metrics_blocks_enabled = true;
         merge::merge_parquet_files(
             schema,
             vec![table],
@@ -540,7 +549,11 @@ mod tests {
                 original_size: 128,
                 ..Default::default()
             },
-            &MergeMode::MetricsIndexed,
+            if kind == "none" {
+                &MergeMode::MetricsHashMerged
+            } else {
+                &MergeMode::MetricsIndexed
+            },
             output,
         )
         .await
@@ -549,16 +562,78 @@ mod tests {
         .remove(0)
     }
 
+    async fn memory_storage_account() -> String {
+        let id = ider::uuid();
+        storage::add_account(&id, Box::new(object_store::memory::InMemory::new())).await;
+        format!("{id}:default")
+    }
+
     #[tokio::test(flavor = "multi_thread")]
-    async fn single_pass_publication_returns_only_after_data_and_index_uploads() {
-        for (format, fail_at) in [FileFormat::Parquet, FileFormat::Vortex]
-            .into_iter()
-            .flat_map(|format| [None, Some(0usize), Some(1)].map(|failure| (format, failure)))
-        {
-            let file = produced_indexed_output(format).await;
-            let key = file
-                .file_key("files/publish/metrics/m/2026/09/20/00", "unused", format)
+    async fn mindex_size_matches_full_published_object_for_every_output_kind() {
+        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+            for kind in ["block", "unsupported", "none"] {
+                let mut file = produced_metrics_output(format, kind).await;
+                let meta = match &mut file {
+                    MergedFile::MetricsIndexed { meta, .. }
+                    | MergedFile::MetricsHashMerged { meta, .. }
+                    | MergedFile::MetricsIndexedNoIndex { meta, .. } => meta,
+                    _ => panic!("metrics output expected"),
+                };
+                meta.index_size = 79;
+                meta.mindex_size = 999_999;
+                let key = format!(
+                    "files/publish/metrics/m/2026/09/20/00/{}",
+                    file.file_name("unused", format)
+                );
+                let layout = MetricsFileLayout::of(&key);
+                assert_eq!(
+                    layout,
+                    Some(match kind {
+                        "none" => MetricsFileLayout::HashMerged,
+                        _ => MetricsFileLayout::Indexed,
+                    })
+                );
+                let account = memory_storage_account().await;
+                let (data, meta) = publish_merged_output(
+                    file,
+                    &account,
+                    &key,
+                    false,
+                    storage::StorageTier::Default,
+                )
+                .await
                 .unwrap();
+                assert_eq!(storage::get_bytes(&account, &key).await.unwrap(), data);
+                let indexes = storage::list(&account, "files/publish/midx/")
+                    .await
+                    .unwrap();
+                assert_eq!(indexes.len(), usize::from(kind == "block"));
+                let index = if let Some(path) = indexes.first() {
+                    Some(storage::get_bytes(&account, path).await.unwrap())
+                } else {
+                    None
+                };
+                assert_eq!(meta.index_size, 79);
+                assert_eq!(meta.compressed_size, data.len() as i64);
+                assert_eq!(
+                    meta.mindex_size,
+                    index.as_ref().map_or(0, |bytes| bytes.len() as i64)
+                );
+                if let Some(bytes) = index {
+                    assert!(!bytes.starts_with(b"ARROW1"));
+                }
+            }
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn publication_stores_source_and_index_and_cleans_temp_files() {
+        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+            let file = produced_indexed_output(format).await;
+            let key = format!(
+                "files/publish/metrics/m/2026/09/20/00/{}",
+                file.file_name("unused", format)
+            );
             let paths = match &file {
                 MergedFile::MetricsIndexed {
                     data_path,
@@ -567,53 +642,44 @@ mod tests {
                 } => vec![data_path.to_path_buf(), metrics_index_path.to_path_buf()],
                 _ => panic!("indexed output expected"),
             };
-            let puts = Arc::new(std::sync::Mutex::new(Vec::new()));
-            let received = Arc::clone(&puts);
-            let result = publish_merged_output(file, &key, false, move |name, bytes| {
-                let received = Arc::clone(&received);
-                async move {
-                    let mut entries = received.lock().unwrap();
-                    let position = entries.len();
-                    entries.push((name, bytes));
-                    anyhow::ensure!(fail_at != Some(position), "injected publication failure");
-                    Ok(())
-                }
-            })
-            .await;
-            assert_eq!(result.is_ok(), fail_at.is_none());
-            let puts = puts.lock().unwrap();
-            assert_eq!(puts.len(), if fail_at == Some(0) { 1 } else { 2 });
-            assert!(puts[0].0.ends_with(format.extension()));
-            if puts.len() == 2 {
-                assert!(puts[1].0.ends_with(".midx"));
-                assert!(!puts[1].1.starts_with(b"ARROW1"));
-            }
-            assert!(paths.iter().all(|path| !path.exists()));
+            let account = memory_storage_account().await;
+            publish_merged_output(file, &account, &key, false, storage::StorageTier::Default)
+                .await
+                .unwrap();
+            assert_eq!(storage::list(&account, "files/").await.unwrap().len(), 2);
+            assert!(!storage::get_bytes(&account, &key).await.unwrap().is_empty());
+            let index_key = MetricsFileLayout::metrics_index_path(&key).unwrap();
+            assert!(
+                !storage::get_bytes(&account, &index_key)
+                    .await
+                    .unwrap()
+                    .starts_with(b"ARROW1")
+            );
+            assert!(paths.iter().all(|p| !p.exists()));
         }
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn single_pass_materialization_failure_precedes_all_publication() {
+    async fn materialization_failure_leaves_storage_empty() {
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let file = produced_indexed_output(format).await;
-            let key = file
-                .file_key("files/publish/metrics/m/2026/09/20/00", "unused", format)
-                .unwrap();
+            let key = format!(
+                "files/publish/metrics/m/2026/09/20/00/{}",
+                file.file_name("unused", format)
+            );
             if let MergedFile::MetricsIndexed {
                 metrics_index_path, ..
             } = &file
             {
                 std::fs::remove_file(metrics_index_path).unwrap();
             }
-            let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-            let calls = Arc::clone(&count);
-            let result = publish_merged_output(file, &key, false, move |_, _| {
-                calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                async { Ok(()) }
-            })
-            .await;
-            assert!(result.is_err());
-            assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 0);
+            let account = memory_storage_account().await;
+            assert!(
+                publish_merged_output(file, &account, &key, false, storage::StorageTier::Default)
+                    .await
+                    .is_err()
+            );
+            assert!(storage::list(&account, "files/").await.unwrap().is_empty());
         }
     }
 

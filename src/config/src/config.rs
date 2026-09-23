@@ -82,7 +82,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 83: add folder_id to workflows.
 // 84: add folder_id to workflow_drafts.
 // 85: create llm_experiment_slot_retries.
-pub const DB_SCHEMA_VERSION: u64 = 85;
+// 86: create synthetics shared variables tables; add env to synthetics_jobs.
+// 87: add input_preview to llm_annotation_queue_items.
+pub const DB_SCHEMA_VERSION: u64 = 87;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -979,6 +981,59 @@ pub struct Config {
     pub synthetics: Synthetics,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
+    pub self_profiles: SelfProfiles,
+}
+
+/// Background self CPU/memory profile ingest into `_meta.self_profiles`.
+/// Gated at runtime by `enabled`; sampling code is compile-gated on `profiling`.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct SelfProfiles {
+    #[env_config(
+        name = "ZO_SELF_PROFILES_ENABLED",
+        default = false,
+        help = "Enable background self CPU/memory profile sampling into _meta.self_profiles"
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_INTERVAL_SECS",
+        default = 30,
+        help = "Seconds between self-profile cycle starts; 0 disables the background loop"
+    )]
+    pub interval_secs: u64,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_CPU_SECS",
+        default = 5,
+        help = "CPU sample duration in seconds within each self-profile cycle"
+    )]
+    pub cpu_secs: u64,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_URL",
+        default = "",
+        help = "Empty = in-process ingest; set to POST OTLP Profiles protobuf to a remote URL"
+    )]
+    pub url: String,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_AUTH_HEADER",
+        default = "",
+        help = "Optional Authorization header value for remote ZO_SELF_PROFILES_URL"
+    )]
+    pub auth_header: String,
+}
+
+impl SelfProfiles {
+    /// Returns Ok when the background loop may run; Err with a reason otherwise.
+    pub fn validate_loop_timing(&self) -> Result<(), String> {
+        if !self.enabled || self.interval_secs == 0 {
+            return Ok(());
+        }
+        if self.interval_secs <= self.cpu_secs {
+            return Err(format!(
+                "ZO_SELF_PROFILES_INTERVAL_SECS ({}) must be greater than ZO_SELF_PROFILES_CPU_SECS ({})",
+                self.interval_secs, self.cpu_secs
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Database Monitoring (design: `db-monitoring/dbm-design-doc.md` §8) —
@@ -2885,21 +2940,15 @@ pub struct Compact {
     #[env_config(
         name = "ZO_METRICS_INDEX_ENABLED",
         default = false,
-        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor writes the configured Parquet or Vortex format and merges the pending files of an open hour into size-split `hash-merged-v1-` files and a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+        help = "Enable experimental metrics indexing and sample blocks for newly written metrics data."
     )]
     pub metrics_index_enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_BLOCKS_ENABLED",
-        default = false,
-        help = "Write and read lossless series blocks in metrics indexes. Requires ZO_METRICS_INDEX_ENABLED; keeps the original Parquet or Vortex data for SQL and fallback."
-    )]
-    pub metrics_index_blocks_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(
         name = "ZO_COMPACT_DATA_RETENTION_INTERVAL",
         default = 3600,
-        help = "Interval in seconds for the data retention job, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL"
+        help = "Interval in seconds for generating data retention jobs, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL; pending delete jobs are executed every ZO_COMPACT_INTERVAL"
     )] // seconds
     pub data_retention_interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
@@ -3257,9 +3306,11 @@ pub struct Prometheus {
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
-    /// Max `le` labels (buckets + gap markers + inf) a native histogram sample may
-    /// expand to; over-limit samples are downscaled (adjacent buckets merged).
-    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 16)]
+    /// Exponential histograms are stored at `min(producer schema, this)`, never count-driven.
+    #[env_config(name = "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA", default = 1)]
+    pub exp_histogram_target_schema: i32,
+    /// Safety valve, not a layout knob: past this many `le` labels a sample is downscaled.
+    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 512)]
     pub native_histogram_max_buckets: usize,
 }
 
@@ -3547,6 +3598,8 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
+    check_self_profiles_config(&mut cfg);
+
     // check grpc config
     if let Err(e) = check_grpc_config(&mut cfg) {
         panic!("common config error: {e}");
@@ -3807,6 +3860,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check for metrics limit
     if cfg.limit.metrics_max_points_per_series == 0 {
         cfg.limit.metrics_max_points_per_series = 30_000;
+    }
+    if !(-4..=8).contains(&cfg.prom.exp_histogram_target_schema) {
+        return Err(anyhow::anyhow!(
+            "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA must be within -4..=8, got {}",
+            cfg.prom.exp_histogram_target_schema
+        ));
     }
 
     // check search job retention
@@ -4645,6 +4704,14 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Warns and disables the background loop when interval is not greater than CPU sample duration.
+fn check_self_profiles_config(cfg: &mut Config) {
+    if let Err(reason) = cfg.self_profiles.validate_loop_timing() {
+        log::warn!("[SELF-PROFILES] {reason}; disabling background self-profile loop");
+        cfg.self_profiles.enabled = false;
+    }
+}
+
 /// The env vars that exist in every build but are only ever read by
 /// enterprise-gated code. Setting one in an OSS-only build is configured-and-
 /// ignored, which is indistinguishable from configured-and-broken unless we say
@@ -5044,6 +5111,37 @@ mod tests {
             cfg.limit.req_cols_per_record_limit,
             get_config().limit.req_cols_per_record_limit
         );
+    }
+
+    #[test]
+    fn self_profiles_validate_loop_timing_requires_interval_gt_cpu() {
+        let mut cfg = SelfProfiles {
+            enabled: true,
+            interval_secs: 30,
+            cpu_secs: 5,
+            ..Default::default()
+        };
+        assert!(cfg.validate_loop_timing().is_ok());
+
+        cfg.interval_secs = 5;
+        assert!(cfg.validate_loop_timing().is_err());
+
+        cfg.interval_secs = 0;
+        assert!(cfg.validate_loop_timing().is_ok());
+
+        cfg.enabled = false;
+        cfg.interval_secs = 5;
+        assert!(cfg.validate_loop_timing().is_ok());
+    }
+
+    #[test]
+    fn check_self_profiles_config_disables_on_invalid_timing() {
+        let mut cfg = Config::default();
+        cfg.self_profiles.enabled = true;
+        cfg.self_profiles.interval_secs = 5;
+        cfg.self_profiles.cpu_secs = 5;
+        check_self_profiles_config(&mut cfg);
+        assert!(!cfg.self_profiles.enabled);
     }
 
     #[test]
@@ -5927,6 +6025,30 @@ mod tests {
         cfg.common.feature_bloom_filter_extra_fields = "trace_id".to_string();
         check_common_config(&mut cfg).unwrap();
         assert_eq!(cfg.common.feature_bloom_filter_extra_fields, "trace_id");
+    }
+
+    #[test]
+    fn test_check_common_config_exp_histogram_target_schema_range() {
+        let cfg = Config::init().unwrap();
+        assert_eq!(cfg.prom.exp_histogram_target_schema, 1);
+        assert_eq!(cfg.prom.native_histogram_max_buckets, 512);
+        // check_common_config scales sizes in place, so each call gets a fresh config
+        for schema in [-4, 8] {
+            let mut cfg = Config::init().unwrap();
+            cfg.prom.exp_histogram_target_schema = schema;
+            check_common_config(&mut cfg).unwrap();
+        }
+        for schema in [-5, 9] {
+            let mut cfg = Config::init().unwrap();
+            cfg.prom.exp_histogram_target_schema = schema;
+            let err = check_common_config(&mut cfg).unwrap_err().to_string();
+            assert_eq!(
+                err,
+                format!(
+                    "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA must be within -4..=8, got {schema}"
+                )
+            );
+        }
     }
 
     #[test]

@@ -1474,6 +1474,8 @@
     "sessionReplay": "Phát lại phiên",
     "viewSessionReplay": "Xem phát lại phiên",
     "playSessionReplay": "Phát lại phiên",
+    "noReplayRecordedTitle": "Không có phát lại nào được ghi cho phiên này",
+    "noReplayRecordedMessage": "Phiên {id} không có phân đoạn phát lại nào để phát.",
     "discoverSessionTitle": "Khám phá Phát lại phiên để hiểu chi tiết tương tác người dùng",
     "discoverSessionMessage": "Phát lại phiên ghi lại và phát lại các tương tác của người dùng trên trang web hoặc ứng dụng của bạn. Điều này cho phép bạn xem xét trực quan cách người dùng điều hướng, nơi họ nhấp, nội dung họ gõ và cách họ tương tác với nội dung của bạn",
     "loadingErrorDetails": "Hãy chờ một chút, chúng tôi đang lấy chi tiết lỗi.",
@@ -1954,6 +1956,7 @@
     "ok": "OK",
     "sendInvite": "Gửi Lời mời",
     "inviteByEmail": "Mời qua email. Nhiều email cách nhau bằng dấu chấm phẩy (;) hoặc dấu phẩy (,).",
+    "inviteByEmailPlaceholder": "Mời bằng email",
     "changePassword": "Đổi Mật khẩu",
     "oldPassword": "Mật khẩu cũ",
     "newPassword": "Mật khẩu mới",
@@ -2028,11 +2031,11 @@
       "addToGroup": "Thêm vào nhóm người dùng",
       "addToRole": "Gán vai trò",
       "step1Title": "Sao chép mã của bạn",
-      "copyHint": "Sao chép mã này ngay — bạn sẽ không thể xem lại nó.",
+      "copyHint": "Đây là lần duy nhất bạn nhìn thấy token này. Hãy sao chép hoặc tải xuống ngay, không thể truy xuất lại lần nữa.",
       "done": "Hoàn tất",
       "applying": "Đang áp dụng quyền truy cập…",
-      "grantedRoles": "Vai trò đã gán: {roles}",
-      "grantedGroups": "Đã thêm vào nhóm người dùng: {groups}",
+      "rolesAssignedLabel": "Vai trò đã gán",
+      "groupsAssignedLabel": "Đã thêm vào nhóm người dùng",
       "failedRoles": "Không thể gán vai trò: {roles}",
       "failedGroups": "Không thể thêm vào nhóm người dùng: {groups}",
       "failedHint": "Bạn có thể cấp các quyền này sau từ trang Vai trò và Nhóm người dùng."
@@ -2042,6 +2045,9 @@
         "label": "Tên tài khoản dịch vụ",
         "placeholder": "ví dụ: ingest-bot",
         "help": "Chữ thường, số và dấu gạch ngang. Lưu dưới dạng name{suffix}"
+      },
+      "identifier": {
+        "label": "Định danh"
       },
       "roles": {
         "label": "Gán vai trò",
@@ -2056,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Định danh",
+        "roles": "Vai trò",
         "token": "Mã",
         "created": "Đã tạo"
       }
@@ -2183,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Mọi người dùng và tài khoản dịch vụ liên kết với các vai trò này sẽ mất quyền truy cập."
-      }
+      },
+      "assignColumn": "Gán",
+      "assignBtn": "Thêm",
+      "assignedBadge": "Đã gán",
+      "assignBannerText": "Thêm {member} vào một vai trò — nhấp Thêm bên cạnh vai trò bên dưới.",
+      "assignBannerDone": "Xong",
+      "assignSuccess": "Đã thêm {member} vào vai trò \"{role}\".",
+      "assignError": "Không thể thêm tài khoản vào vai trò đó. Vui lòng thử lại."
     },
     "group": {
       "name": {
@@ -2214,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Các thành viên của những nhóm này sẽ mất các vai trò được cấp bởi chúng."
-      }
+      },
+      "assignColumn": "Gán",
+      "assignBtn": "Thêm",
+      "assignedBadge": "Đã gán",
+      "assignBannerText": "Thêm {member} vào một nhóm người dùng — nhấp Thêm bên cạnh nhóm bên dưới.",
+      "assignBannerDone": "Xong",
+      "assignSuccess": "Đã thêm {member} vào nhóm \"{group}\".",
+      "assignError": "Không thể thêm tài khoản vào nhóm đó. Vui lòng thử lại."
     },
     "appGroups": {
       "deleteGroupTitle": "Xóa nhóm",
@@ -5388,6 +5409,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Làm mới để áp dụng các thay đổi biến mới nhất",
       "refresh": "Làm mới",
+      "refreshCacheReload": "Làm mới cache & tải lại",
+      "moreRefreshOptions": "Thêm tùy chọn làm mới",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Không tìm thấy dashboard hoặc đã bị xóa. Đang chuyển hướng đến danh sách dashboard.",
       "failedToLoadDashboard": "Không thể tải dashboard. Đang chuyển hướng đến danh sách dashboard.",
@@ -9362,7 +9385,28 @@
     "listConjunctionAnd": "{list} và {last}",
     "runsIn": "Chạy trong",
     "recommendedByFieldCoverage": "Được đề xuất dựa trên mức độ bao phủ trường trong các luồng của bạn.",
-    "listConjunctionAndTwo": "{first} và {last}"
+    "listConjunctionAndTwo": "{first} và {last}",
+    "domainOrgMappings": {
+      "title": "Ánh xạ tên miền đến tổ chức",
+      "subtitle": "Người dùng mới đăng nhập bằng tên miền email khớp sẽ tự động được thêm vào tổ chức.",
+      "addMapping": "Thêm ánh xạ",
+      "editMapping": "Chỉnh sửa ánh xạ",
+      "empty": "Chưa có ánh xạ nào. Sử dụng “{addLabel}” để thêm.",
+      "domain": "Tên miền email",
+      "domainHelp": "Phần sau {at_sign} trong địa chỉ email của người dùng.",
+      "organization": "Tổ chức",
+      "organizationPlaceholder": "Mã định danh tổ chức",
+      "organizationHelp": "Mã định danh của tổ chức mà người dùng khớp được thêm vào.",
+      "organizationRequired": "Tổ chức là bắt buộc",
+      "baseRole": "Vai trò cơ bản",
+      "baseRoleHelp": "Vai trò được gán cho người dùng khớp trong tổ chức đó.",
+      "userGroup": "Nhóm người dùng",
+      "userGroupPlaceholder": "Tên nhóm",
+      "userGroupHelp": "Tùy chọn. Người dùng khớp cũng sẽ tham gia nhóm này trong tổ chức đó.",
+      "duplicateDomain": "Đã tồn tại ánh xạ cho tên miền này",
+      "confirmRemove": "Bạn có chắc chắn muốn xóa ánh xạ cho {domain} không?",
+      "deleteTitle": "Xóa ánh xạ"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -13017,10 +13061,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Đầu vào từ span gốc của trace."
+              "trace": "Đầu vào từ span chat gốc của trace.",
+              "session": "Câu hỏi mở đầu: đầu vào từ span chat gốc của trace đầu tiên."
             },
             "output": {
-              "trace": "Đầu ra từ span gốc của trace."
+              "trace": "Đầu ra từ span chat gốc của trace.",
+              "session": "Câu trả lời cuối cùng: đầu ra từ span chat gốc của trace cuối cùng."
             },
             "statistics": {
               "trace": "Số liệu trace: số span, thời lượng, số lần gọi LLM và công cụ, lỗi, token và chi phí.",
@@ -13032,6 +13078,10 @@
             "steps": {
               "trace": "Các span theo thứ tự thời gian; phần giữa được thu gọn khi trace rất dài.",
               "session": "Các trace theo thứ tự thời gian, được biểu diễn dưới dạng các lượt hội thoại."
+            },
+            "tool_calls": {
+              "trace": "Mọi lệnh gọi công cụ trong trace, theo thứ tự thời gian, kèm tên, đầu vào, đầu ra và trạng thái.",
+              "session": "Mọi lệnh gọi công cụ trong các trace của phiên, theo thứ tự thời gian, kèm tên, đầu vào, đầu ra và trạng thái."
             }
           }
         }
@@ -13351,6 +13401,7 @@
       "searchHistoryNotEnabled": "Lịch sử tìm kiếm không được bật.",
       "enableUsageReporting": "Đặt ZO_USAGE_REPORTING_ENABLED thành true để bật báo cáo sử dụng.",
       "selectStreamToExtractPatterns": "Vui lòng chọn một stream để trích xuất mẫu",
+      "patternsUnavailableForMultiStream": "Không có mẫu khi chọn nhiều stream. Vui lòng chọn một stream.",
       "errorExtractingPatterns": "Lỗi khi trích xuất mẫu. Vui lòng thử lại.",
       "nameOfPanelRequired": "Tên của bảng là bắt buộc",
       "errorsFixAndTryAgain": "Có một số lỗi, vui lòng sửa chúng và thử lại",
@@ -13482,6 +13533,166 @@
     "lastRefreshed": "Cập nhật lần cuối: {time}"
   },
   "synthetics": {
+    "variables": {
+      "newButton": "Biến mới",
+      "createTitle": "Thêm biến",
+      "created": "Đã tạo biến {name}",
+      "deleteConfirm": "Xóa {name}?",
+      "deleteFailed": "Không thể xóa biến",
+      "deleteTitle": "Xóa biến",
+      "deleteEnvFallback": "{env} sẽ sử dụng giá trị toàn cục.",
+      "deleteGlobalFallback": "{envs} giữ giá trị riêng của chúng; các môi trường khác sẽ ngừng phân giải {name}.",
+      "overriddenInNote": "Bị ghi đè trong {envs}",
+      "overridesGlobalNote": "Ghi đè giá trị toàn cục",
+      "shadowGlobalTitle": "Ghi đè giá trị toàn cục?",
+      "shadowGlobalMessage": "{name} sẽ ghi đè giá trị toàn cục trong {env}. Các môi trường khác tiếp tục sử dụng giá trị toàn cục.",
+      "shadowedGlobalTitle": "Một số môi trường giữ giá trị riêng của chúng",
+      "shadowedGlobalMessage": "{name} đã có giá trị riêng trong: {envs}. Các môi trường đó giữ giá trị riêng của chúng; mọi môi trường khác sẽ sử dụng giá trị này.",
+      "deleteUsed": "{name} được tham chiếu bởi {n} kiểm tra. Nó sẽ được phân giải thành văn bản nguyên văn cho đến khi bạn cập nhật. Vẫn xóa? | {name} được tham chiếu bởi {n} kiểm tra. Chúng sẽ được phân giải thành văn bản nguyên văn cho đến khi bạn cập nhật. Vẫn xóa?",
+      "deleted": "Đã xóa biến",
+      "description": "Mô tả",
+      "editTitle": "Chỉnh sửa biến",
+      "emptyBody": "Chia sẻ một giá trị giữa các kiểm tra thay vì sao chép nó vào từng kiểm tra.",
+      "emptyFiltered": "Không có biến nào khớp với tìm kiếm của bạn.",
+      "emptyTitle": "Chưa có biến nào",
+      "example": "Ví dụ",
+      "exampleHint": "Hiển thị ở những nơi giá trị bị ẩn. Không bao giờ đặt bí mật thật vào đây.",
+      "examplePlaceholder": "https://shop.example.com",
+      "global": "Toàn cục",
+      "globalSubtitle": "Áp dụng trong mọi môi trường.",
+      "globalReachesProduction": "Giá trị toàn cục áp dụng trong mọi môi trường, kể cả production. Thay đổi ở đây sẽ ảnh hưởng đến mọi kiểm tra dùng tên này mà không có giá trị riêng.",
+      "kind": "Loại",
+      "kindPlain": "Thường",
+      "kindSecret": "Bí mật",
+      "lastUpdated": "Cập nhật lần cuối",
+      "loadFailed": "Không thể tải biến",
+      "name": "Tên",
+      "nameInvalid": "Chỉ dùng chữ cái, chữ số và dấu gạch dưới, bắt đầu bằng chữ cái hoặc dấu gạch dưới",
+      "namePlaceholder": "BASE_URL",
+      "nameRequired": "Tên là bắt buộc",
+      "nameReserved": "_AUTH_ được dành riêng cho thông tin xác thực do probe tự chèn vào",
+      "nameTooLong": "Tên quá dài (tối đa 128 ký tự)",
+      "notSet": "Chưa đặt",
+      "replace": "Thay thế",
+      "saveFailed": "Không thể lưu biến",
+      "scope": "Môi trường",
+      "scopeEnvironment": "Biến này chỉ áp dụng trong {env}.",
+      "scopeGlobal": "Biến này áp dụng trong mọi môi trường.",
+      "searchPlaceholder": "Tìm kiếm biến",
+      "secretNeedsEnvironment": "Global không lưu secret. Hãy tạo secret trong môi trường sẽ bảo vệ nó.",
+      "secretWriteOnly": "Giá trị này chỉ ghi. Không có gì hiển thị lại nó sau khi được lưu.",
+      "title": "Biến",
+      "updated": "Đã cập nhật biến",
+      "usedBy": "Được sử dụng bởi",
+      "usedByChecks": "Không dùng | {n} kiểm tra | {n} kiểm tra",
+      "value": "Giá trị",
+      "valueEmpty": "Trống",
+      "valuePlaceholder": "Giá trị",
+      "valueRequired": "Giá trị là bắt buộc",
+      "valueSet": "Đã đặt · cập nhật {when}"
+    },
+    "environments": {
+      "newButton": "Môi trường mới",
+      "backToList": "Tất cả môi trường",
+      "capReached": "Một lượt kiểm tra có thể nhắm tới tối đa {cap} môi trường.",
+      "cardEmpty": "Chưa có môi trường nào. Hãy tạo chúng trong Synthetics → Biến.",
+      "cardLocked": "Được chọn bởi người dùng có quyền truy cập. Bạn không thể thay đổi nó — kiểm tra vẫn tiếp tục chạy tại đó.",
+      "cardTitle": "Môi trường",
+      "checks": "Kiểm tra",
+      "checksCount": "Chưa sử dụng | {count} kiểm tra | {count} kiểm tra",
+      "createTitle": "Thêm môi trường",
+      "created": "Đã tạo môi trường",
+      "deleteBlockedChecks": "Vẫn được {n} kiểm tra sử dụng. Hãy gỡ nó khỏi các kiểm tra đó trước.",
+      "deleteBlockedSecrets": "Môi trường này vẫn còn biến bí mật. Hãy xóa từng biến trước — biến bí mật không thể khôi phục.",
+      "deleteConfirm": "Xóa {name}?",
+      "deleteFailed": "Không thể xóa môi trường",
+      "deleteTitle": "Xóa môi trường",
+      "deleteWithVariables": "Xóa {name} và {n} biến của nó?",
+      "deleted": "Đã xóa môi trường",
+      "description": "Mô tả",
+      "detailSubtitle": "Các biến nằm trong phạm vi môi trường này.",
+      "editTitle": "Chỉnh sửa môi trường",
+      "emptyBody": "Tạo một môi trường để phân phạm vi biến và bí mật, chẳng hạn như staging và production.",
+      "emptyTitle": "Chưa có môi trường nào",
+      "lastUpdated": "Cập nhật lần cuối",
+      "loadFailed": "Không thể tải các môi trường.",
+      "name": "Tên",
+      "nameInvalid": "Chỉ dùng chữ cái, chữ số, dấu gạch ngang và gạch dưới, không bắt đầu bằng dấu gạch dưới",
+      "namePlaceholder": "production",
+      "nameRequired": "Tên là bắt buộc",
+      "nameTooLong": "Tên quá dài (tối đa 64 ký tự)",
+      "renameBlocked": "Không thể đổi tên môi trường — tên là cơ sở để cấp quyền.",
+      "saveFailed": "Không thể lưu môi trường",
+      "searchPlaceholder": "Tìm kiếm môi trường",
+      "subtitle": "Phân phạm vi các biến và bí mật, đồng thời kiểm soát ai có thể quản lý chúng.",
+      "title": "Môi trường",
+      "updated": "Đã cập nhật môi trường",
+      "usedByChecks": "Không dùng | Được dùng bởi {n} kiểm tra | Được dùng bởi {n} kiểm tra",
+      "variables": "Biến"
+    },
+    "duplicateVariable": {
+      "body": "Tạo một bản sao của {name}, bao gồm cả giá trị của nó, trong cùng phạm vi.",
+      "done": "Đã nhân bản biến",
+      "failed": "Không thể nhân bản biến",
+      "nameLabel": "Tên biến mới"
+    },
+    "duplicate": {
+      "action": "Nhân bản",
+      "body": "Sao chép tất cả {n} biến từ {name} vào một môi trường mới. Các kiểm tra sẽ không được sao chép.",
+      "bodyWithSecrets": "Sao chép {n} biến từ {name}. {secrets} bí mật được sao chép mà không có giá trị và phải đặt lại. Các kiểm tra không được sao chép.",
+      "confirm": "Nhân bản",
+      "done": "Đã nhân bản môi trường",
+      "failed": "Không thể nhân bản môi trường",
+      "nameLabel": "Tên môi trường mới",
+      "title": "Nhân bản {name}"
+    },
+    "inherited": {
+      "notIn": "Không có trong {envs}",
+      "overridesGlobal": "ghi đè toàn cục",
+      "notInMany": "Không có trong {count} môi trường",
+      "overriddenByCheck": "Bị ghi đè bởi biến cục bộ",
+      "title": "Dùng chung",
+      "filterAll": "Tất cả",
+      "filterLabel": "Lọc theo nguồn",
+      "emptyIn": "Không có biến dùng chung trong {env}.",
+      "titleTooltip": "Giá trị được chia sẻ với mọi kiểm tra, quản lý trên tab Môi trường & Biến: các môi trường của kiểm tra này cộng với các biến toàn cục. Các biến cục bộ phía trên được ưu tiên hơn.",
+      "valueSet": "Đã đặt",
+      "valueNotSet": "Chưa đặt",
+      "emptyNone": "Không có biến dùng chung."
+    },
+    "promote": {
+      "done": "Biến giờ là biến toàn cục.",
+      "doneShadowed": "Biến giờ là biến toàn cục. {envs} vẫn ghi đè nó bằng giá trị riêng của chúng.",
+      "failed": "Không thể chuyển biến thành biến toàn cục.",
+      "secretBlocked": "Không thể di chuyển bí mật giữa các môi trường",
+      "toGlobal": "Đặt làm toàn cục"
+    },
+    "promoteCheck": {
+      "action": "Chia sẻ {name}",
+      "confirm": "Di chuyển",
+      "description": "Di chuyển biến này ra khỏi kiểm tra vào một môi trường chia sẻ, nơi các kiểm tra khác cũng có thể dùng nó.",
+      "destination": "Đích",
+      "done": "Đã di chuyển biến",
+      "failed": "Không thể di chuyển biến",
+      "global": "Toàn cục",
+      "secretHint": "Giá trị này được đánh dấu bảo mật, nên nó trở thành secret và không thể chuyển sang toàn cục.",
+      "title": "Chia sẻ {name}",
+      "tooltip": "Di chuyển đến môi trường chia sẻ"
+    },
+    "split": {
+      "action": "Chuyển sang phạm vi môi trường",
+      "alreadyOwn": "Đã có giá trị riêng — giữ nguyên.",
+      "overrideHint": "Để ghi đè chỉ trong một môi trường, hãy tạo biến trong chính môi trường đó.",
+      "confirm": "Chuyển sang phạm vi môi trường",
+      "description": "Mỗi môi trường có giá trị riêng. Biến toàn cục sẽ được thay thế.",
+      "done": "Biến có phạm vi theo môi trường.",
+      "failed": "Không thể đặt phạm vi cho biến.",
+      "title": "Đặt phạm vi {name} theo môi trường.",
+      "unselectedWarning": "Không được chọn: {envs}. Các kiểm tra chạy trên các môi trường đó sẽ ngừng phân giải biến này.",
+      "valuePlaceholder": "Giá trị cho môi trường này",
+      "usedBy": "Được dùng bởi {n} kiểm tra: {names}",
+      "usedByHint": "Việc tách bị từ chối khi bất kỳ kiểm tra nào trong số này sẽ mất giá trị: một kiểm tra không có môi trường, hoặc một kiểm tra chạy trong môi trường chưa được gán giá trị ở đây."
+    },
     "versionPrefix": "v",
     "tokens": {
       "title": "Token Synthetics",
@@ -13551,7 +13762,6 @@
     },
     "variablesPanel": {
       "title": "Biến",
-      "referenceHint": "Tham chiếu trong giá trị bước hoặc URL dưới dạng {token}.",
       "emptyTitle": "Chưa có biến",
       "emptyBody": "Tái sử dụng giá trị giữa các bước — như URL gốc hoặc tên người dùng — và giữ bí mật khỏi giá trị bước.",
       "newVariable": "Biến mới",
@@ -13559,8 +13769,6 @@
       "nameRequired": "Bắt buộc nhập tên.",
       "nameInvalid": "Tên bắt đầu bằng chữ cái hoặc dấu gạch dưới và chỉ sử dụng chữ cái, chữ số và dấu gạch dưới.",
       "nameDuplicate": "Một biến có tên này đã tồn tại.",
-      "usedInSteps": "Được sử dụng trong {count} bước | Được sử dụng trong {count} bước",
-      "notReferenced": "Chưa được tham chiếu bởi bất kỳ bước nào",
       "removed": "Đã xóa {name}",
       "undo": "Hoàn tác",
       "editVariable": "Chỉnh sửa biến {name}",
@@ -13570,7 +13778,13 @@
       "openPanel": "Hiện biến",
       "removeTitle": "Xóa biến?",
       "removeBody": "{name} sẽ bị xóa khỏi kiểm tra này.",
-      "removeWarning": "Nó được tham chiếu bởi {count} bước, bước đó sẽ không còn phân giải được nữa. | Nó được tham chiếu bởi {count} bước, bước đó sẽ không còn phân giải được nữa."
+      "removeWarning": "Nó được tham chiếu bởi {count} bước, bước đó sẽ không còn phân giải được nữa. | Nó được tham chiếu bởi {count} bước, bước đó sẽ không còn phân giải được nữa.",
+      "removeOverrideNote": "Các bước sử dụng {name} giờ sẽ nhận giá trị của {scope}.",
+      "countOfCap": "{count} trên {cap}",
+      "local": "Cục bộ",
+      "resolutionOrder": "Thứ tự phân giải: kiểm tra, sau đó môi trường, rồi toàn cục.",
+      "overridesInherited": "Ghi đè một biến dùng chung — giá trị này được ưu tiên.",
+      "valueTooltipEmpty": "{name}: chưa có giá trị"
     },
     "browserDevices": {
       "desktop": "Máy tính để bàn",
@@ -13898,7 +14112,8 @@
       "timeoutLabel": "Thời gian chờ (ms)",
       "valueFallback": "Giá trị",
       "showSetupSteps": "Hiển thị các bước thiết lập",
-      "waitingForActions": "Đang chờ hành động trong trình duyệt…"
+      "waitingForActions": "Đang chờ hành động trong trình duyệt…",
+      "unboundVariables": "{names} không được định nghĩa trong kiểm tra này, các môi trường của nó hoặc toàn cục, nên nó được nhập nguyên văn. | {names} không được định nghĩa trong kiểm tra này, các môi trường của nó hoặc toàn cục, nên chúng được nhập nguyên văn."
     },
     "labels": {
       "copyOf": "Bản sao của {name}",
@@ -14130,10 +14345,13 @@
     },
     "results": {
       "p95Label": "p95",
+      "allEnvironments": "Tất cả các môi trường",
       "clearFilters": "Xóa bộ lọc",
       "clearFiltersDesc": "Xóa tất cả bộ lọc đang hoạt động",
       "device": "Thiết bị",
       "duration": "Thời lượng",
+      "environment": "Môi trường",
+      "environmentScope": "Phạm vi môi trường",
       "editCheck": "Chỉnh sửa kiểm tra",
       "error": "Lỗi",
       "failed": "Thất bại",
@@ -14302,6 +14520,7 @@
       "passRate": "Tỷ lệ đạt",
       "passRateByBrowser": "Tỷ lệ đạt theo trình duyệt",
       "passRateByDevice": "Tỷ lệ đạt theo thiết bị",
+      "passRateByEnvironment": "Tỷ lệ đạt theo môi trường",
       "passRateByLocation": "Tỷ lệ đạt theo vị trí",
       "durationByLocation": "Thời lượng theo vị trí (Trung bình)",
       "flakyRate": "Flaky Rate",
@@ -14461,7 +14680,8 @@
       "ssh": "SSH",
       "tcp": "TCP",
       "tls": "TLS",
-      "private": "Vị trí riêng tư"
+      "private": "Vị trí riêng tư",
+      "variables": "Môi trường & Biến"
     },
     "timeline": {
       "failed": "Thất bại",
@@ -14505,7 +14725,8 @@
       "stepNameRequired": "Đặt tên cho bước này — đây là tên sẽ hiển thị trong kết quả chạy",
       "typeTextRequired": "Nhập văn bản mà bước này sẽ nhập",
       "expectedRequired": "Nhập giá trị mà xác nhận này sẽ mong đợi",
-      "urlInvalid": "Nhập URL hợp lệ bắt đầu bằng http:// hoặc https://",
+      "urlInvalid": "Nhập một URL bắt đầu bằng http://, https:// hoặc một placeholder biến",
+      "navigateUrlInvalid": "Nhập URL bắt đầu bằng http://, https:// hoặc một biến giữ chỗ.",
       "urlRequired": "URL bắt đầu là bắt buộc",
       "fixHighlightedFields": "Sửa các trường được đánh dấu trước khi lưu",
       "retiredAction": "\"{action}\" không còn được hỗ trợ — hãy xóa hoặc thay thế \"{step}\"",
@@ -14970,7 +15191,6 @@
       "syntheticsTokensRefresh": "Làm mới danh sách token",
       "aiChatToggle": "Bật/tắt trò chuyện AI",
       "aiChatClose": "Đóng trò chuyện AI",
-      "aiChatExpand": "Mở rộng/thu gọn trò chuyện AI",
       "logsSaveView": "Lưu dưới dạng chế độ xem đã lưu",
       "logsExport": "Xuất kết quả dưới dạng CSV",
       "tracesCopyUrl": "Sao chép URL chia sẻ dấu vết",
@@ -18903,7 +19123,7 @@
     "routingSaysPlace": "Tất cả cảnh báo và sự cố từ {value} {noun}",
     "routingSaysPlaces": "Tất cả cảnh báo và sự cố từ {scope}",
     "routingSaysAnything": "Tất cả cảnh báo và sự cố",
-    "routingNoLadder": "chưa có thang leo thang",
+    "routingNoLadder": "Chưa có thang leo thang",
     "routingPagesTeam": "gọi {team}",
     "routingCaughtLast": "{count} lần gọi · lần cuối {when} | {count} lần gọi · lần cuối {when}",
     "routingEmptyBodyNamed": "{team} sẽ không được gọi cho đến khi một quy tắc khớp với cảnh báo đến.",

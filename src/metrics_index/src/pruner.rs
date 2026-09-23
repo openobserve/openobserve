@@ -20,7 +20,7 @@ use std::{
 
 use arrow::datatypes::Schema;
 use config::{
-    PARQUET_MAX_ROW_GROUP_SIZE, get_config,
+    get_config,
     meta::{
         promql::is_metrics_hash_excluded_label,
         stream::{FileKey, FileSelection},
@@ -35,15 +35,24 @@ use datafusion::{
     physical_plan::PhysicalExpr,
 };
 use futures::{StreamExt, stream};
-use promql_parser::label::Matchers;
+use promql_parser::label::{MatchOp, Matchers};
 
 use crate::{
     cache::METRICS_INDEX_SELECTION_CACHE,
     layout::MetricsFileLayout,
-    reader::{evaluate_metrics_index, load_metrics_index_blocks, load_metrics_index_file},
+    reader::{IndexLabels, evaluate_metrics_index, load_metrics_index_file},
 };
 
-/// Unusable sidecars retain their source files and residual matchers for format-specific scans.
+/// Apply the `.midx` metrics indexes of indexed metrics files in `files` before
+/// registering the metrics table.
+///
+/// This mirrors the PromQL Tantivy path: matching physical rows are attached
+/// to each indexed [`FileKey`] (files without a matching series are
+/// dropped) and the generic DataFusion scan later converts that selection into
+/// a Parquet access plan. Files of any other layout are left untouched, in
+/// place, for a full scan. `Ok(None)` means no file or matcher was eligible.
+/// `Ok(Some((took_ms, exact)))`: `exact` means every selection holds exactly
+/// the matching rows, so re-applying the matchers row by row is redundant.
 pub async fn search(
     trace_id: &str,
     files: &mut Vec<FileKey>,
@@ -51,26 +60,9 @@ pub async fn search(
     matchers: &Matchers,
     target_partitions: usize,
 ) -> Result<Option<(usize, bool)>> {
-    let blocks_enabled = get_config().compact.metrics_index_enabled
-        && get_config().compact.metrics_index_blocks_enabled;
-    let matcher_labels = match metrics_index_labels(table_schema, matchers) {
-        Some(labels) => labels,
-        None if blocks_enabled
-            && matchers.matchers.is_empty()
-            && matchers.or_matchers.is_empty() =>
-        {
-            Vec::new()
-        }
-        None => return Ok(None),
+    let Some(matcher_labels) = metrics_index_labels(table_schema, matchers) else {
+        return Ok(None);
     };
-    let block_files = Arc::new(if blocks_enabled {
-        files
-            .iter()
-            .map(|file| (file.key.clone(), file.clone()))
-            .collect::<HashMap<_, _>>()
-    } else {
-        HashMap::new()
-    });
     let matcher_labels = Arc::new(matcher_labels);
     if files.is_empty() {
         return Ok(None);
@@ -82,9 +74,10 @@ pub async fn search(
     let selection_cache_enabled = get_config().search.metrics_index_selection_cache_enabled;
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
-        // only indexed metrics files own a sidecar; other layouts stay as they are
+        // Zero size means this finalized file was published without a sidecar.
         if index_files.contains_key(&file.key)
             || MetricsFileLayout::of(&file.key) != Some(MetricsFileLayout::Indexed)
+            || file.meta.mindex_size <= 0
         {
             continue;
         }
@@ -104,14 +97,9 @@ pub async fn search(
             continue;
         };
         let cache_key = if selection_cache_enabled {
-            let format_key = if blocks_enabled {
-                format!("{sidecar_path}\0series-block:{}", file.meta.compressed_size)
-            } else {
-                sidecar_path.clone()
-            };
             selection_cache_key(
                 &file.account,
-                &format_key,
+                &sidecar_path,
                 expected_rows,
                 &matcher_labels,
                 &filter_key,
@@ -126,7 +114,8 @@ pub async fn search(
                 sidecar_path,
                 cache_key,
                 expected_rows,
-                file.meta.max_ts,
+                file.meta.compressed_size,
+                file.meta.mindex_size,
             ),
         );
     }
@@ -142,8 +131,10 @@ pub async fn search(
         let mut cache = METRICS_INDEX_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for (data_path, (account, sidecar_path, cache_key, expected_rows, max_timestamp)) in
-            index_files
+        for (
+            data_path,
+            (account, sidecar_path, cache_key, expected_rows, compressed_size, mindex_size),
+        ) in index_files
         {
             metrics::METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL
                 .with_label_values::<&str>(&[])
@@ -161,57 +152,73 @@ pub async fn search(
                     sidecar_path,
                     cache_key,
                     expected_rows,
-                    max_timestamp,
+                    compressed_size,
+                    mindex_size,
                 ));
             }
         }
     } else {
         misses.extend(index_files.into_iter().map(
-            |(data_path, (account, sidecar_path, cache_key, expected_rows, max_timestamp))| {
+            |(
+                data_path,
+                (account, sidecar_path, cache_key, expected_rows, compressed_size, mindex_size),
+            )| {
                 (
                     data_path,
                     account,
                     sidecar_path,
                     cache_key,
                     expected_rows,
-                    max_timestamp,
+                    compressed_size,
+                    mindex_size,
                 )
             },
         ));
     }
     let cache_hits = evaluated.len();
     let concurrency = target_partitions.max(1).saturating_mul(2).min(64);
+    let regex_labels = Arc::new(
+        matchers
+            .matchers
+            .iter()
+            .filter(|matcher| matches!(&matcher.op, MatchOp::Re(_) | MatchOp::NotRe(_)))
+            .map(|matcher| matcher.name.clone())
+            .collect::<Vec<_>>(),
+    );
     let matchers = Arc::new(matchers.clone());
     let mut evaluations = stream::iter(misses.into_iter().map(
-        |(data_path, account, sidecar_path, cache_key, expected_rows, max_timestamp)| {
+        |(
+            data_path,
+            account,
+            sidecar_path,
+            cache_key,
+            expected_rows,
+            compressed_size,
+            mindex_size,
+        )| {
             let labels = Arc::clone(&matcher_labels);
+            let regex_labels = Arc::clone(&regex_labels);
             let matchers = Arc::clone(&matchers);
-            let block_files = Arc::clone(&block_files);
             async move {
                 let result = async {
-                    let data = if blocks_enabled {
-                        let file = block_files.get(&data_path).ok_or_else(|| {
-                            DataFusionError::Execution("Missing block index parent".into())
-                        })?;
-                        match load_metrics_index_blocks(file, Arc::clone(&labels)).await {
-                            Ok(data) => data,
-                            Err(error) => {
-                                log::debug!("[trace_id {trace_id}] block index unavailable for {data_path}, trying legacy metrics index: {error}");
-                                load_metrics_index_file(&account, &sidecar_path, max_timestamp, Arc::clone(&labels)).await?
-                            }
-                        }
-                    } else {
-                        load_metrics_index_file(&account, &sidecar_path, max_timestamp, Arc::clone(&labels))
-                            .await?
-                    };
-                    let parquet_parent = data_path.ends_with(".parquet");
+                    let data = load_metrics_index_file(
+                        &account,
+                        &sidecar_path,
+                        config::FileFormat::from_extension(&data_path).ok_or_else(|| {
+                            DataFusionError::Execution("Unsupported metrics source format".into())
+                        })?,
+                        expected_rows,
+                        compressed_size,
+                        mindex_size,
+                        IndexLabels {
+                            requested: Arc::clone(&labels),
+                            flat: regex_labels,
+                        },
+                    )
+                    .await?;
                     tokio::task::spawn_blocking(move || {
                         let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
-                        let row_group_size = if parquet_parent {
-                            Some(data.row_group_size.unwrap_or(PARQUET_MAX_ROW_GROUP_SIZE as u32))
-                        } else {
-                            None
-                        };
+                        let row_group_size = data.row_group_size;
                         let physical_filter =
                             create_physical_filter(data.schema.as_ref(), &matchers)?;
                         evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)

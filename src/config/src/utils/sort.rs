@@ -24,9 +24,33 @@ pub fn sort_float(a: &f64, b: &f64) -> Ordering {
     }
 }
 
+/// PromQL `sort`/`sort_desc` ordering: NaN sorts last in both directions.
+pub fn sort_float_nan_last(a: &f64, b: &f64, descending: bool) -> Ordering {
+    match (a.is_nan(), b.is_nan()) {
+        (true, true) => Ordering::Equal,
+        (true, _) => Ordering::Greater,
+        (_, true) => Ordering::Less,
+        _ if descending => b.partial_cmp(a).unwrap_or(Ordering::Equal),
+        _ => a.partial_cmp(b).unwrap_or(Ordering::Equal),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sort_float_nan_last() {
+        let mut asc = [2.0, f64::NAN, 1.0, 3.0];
+        asc.sort_by(|a, b| sort_float_nan_last(a, b, false));
+        assert_eq!(asc[..3], [1.0, 2.0, 3.0]);
+        assert!(asc[3].is_nan());
+
+        let mut desc = [2.0, f64::NAN, 1.0, 3.0];
+        desc.sort_by(|a, b| sort_float_nan_last(a, b, true));
+        assert_eq!(desc[..3], [3.0, 2.0, 1.0]);
+        assert!(desc[3].is_nan());
+    }
 
     #[test]
     fn test_sort_float() {

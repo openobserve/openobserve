@@ -1474,6 +1474,8 @@
     "sessionReplay": "Odtwarzanie sesji",
     "viewSessionReplay": "Wyświetl odtwarzanie sesji",
     "playSessionReplay": "Odtwórz sesję",
+    "noReplayRecordedTitle": "Nie nagrano powtórki dla tej sesji",
+    "noReplayRecordedMessage": "Sesja {id} nie ma segmentów powtórki do odtworzenia.",
     "discoverSessionTitle": "Odkryj odtwarzanie sesji, aby szczegółowo zrozumieć interakcje użytkowników",
     "discoverSessionMessage": "Odtwarzanie sesji rejestruje i odtwarza interakcje użytkowników na Twojej stronie internetowej lub w aplikacji. Pozwala to wizualnie przejrzeć, jak użytkownicy nawigują, gdzie klikają, co wpisują i w jaki sposób angażują się w treści.",
     "loadingErrorDetails": "Trzymaj się, pobieramy szczegóły błędu.",
@@ -1954,6 +1956,7 @@
     "ok": "OK",
     "sendInvite": "Wyślij zaproszenie",
     "inviteByEmail": "Zaproś przez e-mail. Wiele adresów e-mail oddzielonych średnikami (;) lub przecinkami (,).",
+    "inviteByEmailPlaceholder": "Zaproś przez e-mail",
     "changePassword": "Zmień hasło",
     "oldPassword": "Stare hasło",
     "newPassword": "Nowe hasło",
@@ -2028,11 +2031,11 @@
       "addToGroup": "Dodaj do grupy użytkowników",
       "addToRole": "Przypisz rolę",
       "step1Title": "Skopiuj swój token",
-      "copyHint": "Skopiuj ten token teraz — nie będziesz mógł go ponownie zobaczyć.",
+      "copyHint": "To jedyny moment, w którym zobaczysz ten token. Skopiuj go lub pobierz teraz — nie będzie można go pobrać ponownie.",
       "done": "Gotowe",
       "applying": "Stosowanie przyznanych dostępu…",
-      "grantedRoles": "Przypisane role: {roles}",
-      "grantedGroups": "Dodano do grup użytkowników: {groups}",
+      "rolesAssignedLabel": "Przypisane role",
+      "groupsAssignedLabel": "Dodano do grup użytkowników",
       "failedRoles": "Nie można przypisać ról: {roles}",
       "failedGroups": "Nie można dodać do grup użytkowników: {groups}",
       "failedHint": "Możesz je przyznać później ze stron Role i Grupy użytkowników."
@@ -2042,6 +2045,9 @@
         "label": "Nazwa konta serwisowego",
         "placeholder": "np. ingest-bot",
         "help": "Małe litery, cyfry i myślniki. Zapisane jako name{suffix}"
+      },
+      "identifier": {
+        "label": "Identyfikator"
       },
       "roles": {
         "label": "Przypisz role",
@@ -2056,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Identyfikator",
+        "roles": "Role",
         "token": "Token",
         "created": "Utworzono"
       }
@@ -2183,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Wszyscy użytkownicy i konta serwisowe powiązane z tymi rolami stracą dostęp."
-      }
+      },
+      "assignColumn": "Przypisz",
+      "assignBtn": "Dodaj",
+      "assignedBadge": "Przypisano",
+      "assignBannerText": "Dodaj {member} do roli — kliknij Dodaj obok roli poniżej.",
+      "assignBannerDone": "Gotowe",
+      "assignSuccess": "Dodano {member} do roli \"{role}\".",
+      "assignError": "Nie udało się dodać konta do tej roli. Spróbuj ponownie."
     },
     "group": {
       "name": {
@@ -2214,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Członkowie tych grup stracą role przyznane przez nie."
-      }
+      },
+      "assignColumn": "Przypisz",
+      "assignBtn": "Dodaj",
+      "assignedBadge": "Przypisano",
+      "assignBannerText": "Dodaj {member} do grupy użytkowników — kliknij Dodaj obok grupy poniżej.",
+      "assignBannerDone": "Gotowe",
+      "assignSuccess": "Dodano {member} do grupy \"{group}\".",
+      "assignError": "Nie udało się dodać konta do tej grupy. Spróbuj ponownie."
     },
     "appGroups": {
       "deleteGroupTitle": "Usuń grupę",
@@ -5388,6 +5409,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Odśwież, aby zastosować najnowsze zmiany zmiennych",
       "refresh": "Odśwież",
+      "refreshCacheReload": "Odśwież pamięć podręczną i przeładuj",
+      "moreRefreshOptions": "Więcej opcji odświeżania",
       "dashboard": "Pulpit nawigacyjny",
       "dashboardNotFound": "Pulpit nawigacyjny nie został znaleziony lub został usunięty. Przekierowanie do listy pulpitów nawigacyjnych.",
       "failedToLoadDashboard": "Nie udało się załadować pulpitu nawigacyjnego. Przekierowanie do listy pulpitów nawigacyjnych.",
@@ -9362,7 +9385,28 @@
     "listConjunctionAnd": "{list} i {last}",
     "runsIn": "Działa w",
     "recommendedByFieldCoverage": "Zalecane na podstawie pokrycia pól w Twoich strumieniach.",
-    "listConjunctionAndTwo": "{first} i {last}"
+    "listConjunctionAndTwo": "{first} i {last}",
+    "domainOrgMappings": {
+      "title": "Mapowania domen na organizacje",
+      "subtitle": "Nowi użytkownicy logujący się z pasującą domeną e-mail są automatycznie dodawani do organizacji.",
+      "addMapping": "Dodaj mapowanie",
+      "editMapping": "Edytuj mapowanie",
+      "empty": "Brak mapowań. Użyj „{addLabel}”, aby dodać mapowanie.",
+      "domain": "Domena e-mail",
+      "domainHelp": "Część po {at_sign} w adresie e-mail użytkownika.",
+      "organization": "Organizacja",
+      "organizationPlaceholder": "Identyfikator organizacji",
+      "organizationHelp": "Identyfikator organizacji, do której dodawani są pasujący użytkownicy.",
+      "organizationRequired": "Organizacja jest wymagana",
+      "baseRole": "Rola podstawowa",
+      "baseRoleHelp": "Rola przyznawana pasującym użytkownikom w tej organizacji.",
+      "userGroup": "Grupa użytkowników",
+      "userGroupPlaceholder": "Nazwa grupy",
+      "userGroupHelp": "Opcjonalne. Pasujący użytkownicy dołączają także do tej grupy w tej organizacji.",
+      "duplicateDomain": "Mapowanie dla tej domeny już istnieje",
+      "confirmRemove": "Czy na pewno chcesz usunąć mapowanie dla {domain}?",
+      "deleteTitle": "Usuń mapowanie"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -13017,10 +13061,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Dane wejściowe z głównego spanu trace."
+              "trace": "Dane wejściowe z głównego spanu czatu w trace.",
+              "session": "Pytanie otwierające: dane wejściowe z głównego spanu czatu pierwszego trace."
             },
             "output": {
-              "trace": "Dane wyjściowe z głównego spanu trace."
+              "trace": "Dane wyjściowe z głównego spanu czatu w trace.",
+              "session": "Odpowiedź końcowa: dane wyjściowe z głównego spanu czatu ostatniego trace."
             },
             "statistics": {
               "trace": "Metryki trace: liczba spanów, czas trwania, wywołania LLM i narzędzi, błędy, tokeny i koszt.",
@@ -13032,6 +13078,10 @@
             "steps": {
               "trace": "Spany w kolejności chronologicznej; środkowa część jest zwijana, gdy trace jest bardzo długi.",
               "session": "Trace'y w kolejności chronologicznej, reprezentowane jako tury rozmowy."
+            },
+            "tool_calls": {
+              "trace": "Każde wywołanie narzędzia w trace, w kolejności chronologicznej, wraz z nazwą, danymi wejściowymi, danymi wyjściowymi i statusem.",
+              "session": "Każde wywołanie narzędzia we wszystkich trace'ach sesji, w kolejności chronologicznej, wraz z nazwą, danymi wejściowymi, danymi wyjściowymi i statusem."
             }
           }
         }
@@ -13351,6 +13401,7 @@
       "searchHistoryNotEnabled": "Historia wyszukiwania nie jest włączona.",
       "enableUsageReporting": "Ustaw ZO_USAGE_REPORTING_ENABLED na true, aby włączyć raportowanie użycia.",
       "selectStreamToExtractPatterns": "Wybierz strumień, aby wyodrębnić wzorce",
+      "patternsUnavailableForMultiStream": "Wzorce nie są dostępne, gdy wybrano wiele strumieni. Wybierz pojedynczy strumień.",
       "errorExtractingPatterns": "Błąd wyodrębniania wzorców. Spróbuj ponownie.",
       "nameOfPanelRequired": "Nazwa panelu jest wymagana",
       "errorsFixAndTryAgain": "Wystąpiły błędy, popraw je i spróbuj ponownie",
@@ -13482,6 +13533,166 @@
     "lastRefreshed": "Ostatnie odświeżenie: {time}"
   },
   "synthetics": {
+    "variables": {
+      "newButton": "Nowa zmienna",
+      "createTitle": "Dodaj zmienną",
+      "created": "Utworzono zmienną {name}",
+      "deleteConfirm": "Usunąć {name}?",
+      "deleteFailed": "Nie udało się usunąć zmiennej.",
+      "deleteTitle": "Usuń zmienną",
+      "deleteEnvFallback": "{env} będzie wówczas używać wartości globalnej.",
+      "deleteGlobalFallback": "{envs} zachowają swoje wartości; pozostałe środowiska nie będą już rozwiązywać {name}.",
+      "overriddenInNote": "Nadpisane w {envs}",
+      "overridesGlobalNote": "Nadpisuje wartość globalną.",
+      "shadowGlobalTitle": "Nadpisać wartość globalną?",
+      "shadowGlobalMessage": "{name} nadpisze wartość globalną w {env}. Pozostałe środowiska będą nadal używać wartości globalnej.",
+      "shadowedGlobalTitle": "Niektóre środowiska zachowują swoje wartości",
+      "shadowedGlobalMessage": "{name} ma już własną wartość w: {envs}. Te środowiska zachowują swoją, a pozostałe będą używać tej wartości.",
+      "deleteUsed": "{name} jest przywoływana przez {n} kontrolę. Będzie rozwiązywana jako tekst dosłowny, dopóki jej nie zaktualizujesz. Usunąć mimo to? | {name} jest przywoływana przez {n} kontroli. Będą rozwiązywane jako tekst dosłowny, dopóki ich nie zaktualizujesz. Usunąć mimo to?",
+      "deleted": "Usunięto zmienną",
+      "description": "Opis",
+      "editTitle": "Edytuj zmienną",
+      "emptyBody": "Udostępnij wartość między testami zamiast kopiować ją do każdego z nich.",
+      "emptyFiltered": "Brak zmiennych pasujących do wyszukiwania.",
+      "emptyTitle": "Jeszcze brak zmiennych",
+      "example": "Przykład",
+      "exampleHint": "Wartość przykładowa jest pokazywana tam, gdzie prawdziwa wartość jest ukryta. Nigdy nie umieszczaj tutaj prawdziwego sekretu.",
+      "examplePlaceholder": "https://shop.example.com",
+      "global": "Globalna",
+      "globalSubtitle": "Dotyczy każdego środowiska.",
+      "globalReachesProduction": "Wartości globalne obowiązują w każdym środowisku, w tym produkcyjnym. Zmiana tutaj wpłynie na każdą kontrolę, która używa tej nazwy bez własnej wartości.",
+      "kind": "Rodzaj",
+      "kindPlain": "Zwykła",
+      "kindSecret": "Sekretna",
+      "lastUpdated": "Ostatnia aktualizacja",
+      "loadFailed": "Nie udało się wczytać zmiennych",
+      "name": "Nazwa",
+      "nameInvalid": "Użyj liter, cyfr i podkreśleń, zaczynając od litery lub podkreślenia",
+      "namePlaceholder": "BASE_URL",
+      "nameRequired": "Nazwa jest wymagana",
+      "nameReserved": "_AUTH_ jest zarezerwowana dla poświadczeń, które sama sonda wstrzykuje",
+      "nameTooLong": "Nazwa jest za długa (maks. 128 znaków)",
+      "notSet": "Nie ustawiono",
+      "replace": "Zastąp",
+      "saveFailed": "Nie udało się zapisać zmiennej",
+      "scope": "Środowiska",
+      "scopeEnvironment": "Ta zmienna obowiązuje wyłącznie w środowisku {env}.",
+      "scopeGlobal": "Ta zmienna obowiązuje we wszystkich środowiskach.",
+      "searchPlaceholder": "Szukaj zmiennych",
+      "secretNeedsEnvironment": "Zakres globalny nie przechowuje sekretów. Utwórz sekret w środowisku, które powinno go chronić.",
+      "secretWriteOnly": "Wartość jest tylko do zapisu. Po zapisaniu nie zostanie już nigdzie wyświetlona.",
+      "title": "Zmienne",
+      "updated": "Zaktualizowano zmienną",
+      "usedBy": "Używana przez",
+      "usedByChecks": "Nieużywana | {n} kontrola | {n} kontroli",
+      "value": "Wartość",
+      "valueEmpty": "Pusta",
+      "valuePlaceholder": "Wartość",
+      "valueRequired": "Wartość jest wymagana",
+      "valueSet": "Ustawiono · zaktualizowano {when}"
+    },
+    "environments": {
+      "newButton": "Nowe środowisko",
+      "backToList": "Wszystkie środowiska",
+      "capReached": "Test może dotyczyć maksymalnie {cap} środowisk.",
+      "cardEmpty": "Nie ma jeszcze żadnych środowisk. Utwórz je w sekcji Syntetyki → Zmienne.",
+      "cardLocked": "Wybrane przez użytkownika z dostępem. Nie możesz tego zmienić — test nadal tam działa.",
+      "cardTitle": "Środowiska",
+      "checks": "Testy",
+      "checksCount": "Nieużywane | {count} test | {count} testów",
+      "createTitle": "Dodaj środowisko",
+      "created": "Utworzono środowisko",
+      "deleteBlockedChecks": "Nadal używane przez {n} testów. Najpierw usuń je z tych testów.",
+      "deleteBlockedSecrets": "To środowisko nadal zawiera sekrety. Usuń je pojedynczo — sekretu nie można odzyskać.",
+      "deleteConfirm": "Usunąć {name}?",
+      "deleteFailed": "Nie udało się usunąć środowiska",
+      "deleteTitle": "Usuń środowisko",
+      "deleteWithVariables": "Usunąć {name} i jego {n} zmiennych?",
+      "deleted": "Usunięto środowisko",
+      "description": "Opis",
+      "detailSubtitle": "Zmienne przypisane do tego środowiska.",
+      "editTitle": "Edytuj środowisko",
+      "emptyBody": "Utwórz środowisko, aby określać zakres zmiennych i sekretów, na przykład staging i produkcja.",
+      "emptyTitle": "Brak środowisk",
+      "lastUpdated": "Ostatnia aktualizacja",
+      "loadFailed": "Nie udało się wczytać środowisk",
+      "name": "Nazwa",
+      "nameInvalid": "Użyj liter, cyfr, myślników i podkreśleń; nazwa nie może zaczynać się od podkreślenia.",
+      "namePlaceholder": "produkcja",
+      "nameRequired": "Nazwa jest wymagana",
+      "nameTooLong": "Nazwa jest za długa (maks. 64 znaki)",
+      "renameBlocked": "Nie można zmienić nazwy środowiska — uprawnienia są nadawane na podstawie nazwy.",
+      "saveFailed": "Nie udało się zapisać środowiska",
+      "searchPlaceholder": "Szukaj środowisk",
+      "subtitle": "Definiuj zakres zmiennych i sekretów i kontroluj, kto może nimi zarządzać.",
+      "title": "Środowiska",
+      "updated": "Zaktualizowano środowisko",
+      "usedByChecks": "Nieużywane | Używane przez {n} kontrolę | Używane przez {n} kontroli",
+      "variables": "Zmienne"
+    },
+    "duplicateVariable": {
+      "body": "Tworzy kopię zmiennej {name} wraz z jej wartością w tym samym zakresie.",
+      "done": "Zduplikowano zmienną",
+      "failed": "Nie udało się zduplikować zmiennej",
+      "nameLabel": "Nazwa nowej zmiennej"
+    },
+    "duplicate": {
+      "action": "Duplikuj",
+      "body": "Kopiuje wszystkie zmienne ({n}) z {name} do nowego środowiska. Testy nie są kopiowane.",
+      "bodyWithSecrets": "Kopiuje zmienne ({n}) z {name}. Sekrety ({secrets}) są kopiowane bez wartości i trzeba je ustawić ponownie. Testy nie są kopiowane.",
+      "confirm": "Duplikuj",
+      "done": "Zduplikowano środowisko",
+      "failed": "Nie udało się zduplikować środowiska",
+      "nameLabel": "Nazwa nowego środowiska",
+      "title": "Duplikuj {name}"
+    },
+    "inherited": {
+      "notIn": "Brak w {envs}",
+      "overridesGlobal": "nadpisuje wartość globalną",
+      "notInMany": "Brak w {count} środowiskach",
+      "overriddenByCheck": "Nadpisywane przez zmienną lokalną",
+      "title": "Współdzielone",
+      "filterAll": "Wszystkie",
+      "filterLabel": "Filtruj według źródła",
+      "emptyIn": "Brak współdzielonych zmiennych w środowisku {env}.",
+      "titleTooltip": "Wartości współdzielone z każdym testem, zarządzane w zakładce Środowiska i zmienne: środowiska tego testu oraz wartości globalne. Zmienne lokalne powyżej mają pierwszeństwo.",
+      "valueSet": "Ustawiono",
+      "valueNotSet": "Nie ustawiono",
+      "emptyNone": "Brak współdzielonych zmiennych."
+    },
+    "promote": {
+      "done": "Zmienna jest teraz globalna",
+      "doneShadowed": "Zmienna jest teraz globalna. {envs} wciąż ją nadpisują swoimi wartościami.",
+      "failed": "Nie udało się ustawić zmiennej jako globalnej",
+      "secretBlocked": "Sekretów nie można przenosić między środowiskami",
+      "toGlobal": "Ustaw jako globalną"
+    },
+    "promoteCheck": {
+      "action": "Udostępnij {name}",
+      "confirm": "Przenieś",
+      "description": "Przenosi tę zmienną z kontroli do współdzielonego środowiska, w którym mogą jej używać również inne kontrole.",
+      "destination": "Miejsce docelowe",
+      "done": "Zmienna została przeniesiona",
+      "failed": "Nie udało się przenieść zmiennej",
+      "global": "Globalne",
+      "secretHint": "Ta wartość jest oznaczona jako bezpieczna, więc staje się sekretem i nie może trafić do zakresu globalnego.",
+      "title": "Udostępnij {name}",
+      "tooltip": "Przenieś do współdzielonego środowiska"
+    },
+    "split": {
+      "action": "Przypisz do środowisk",
+      "alreadyOwn": "Ma już własną wartość — pozostaje bez zmian.",
+      "overrideHint": "Aby nadpisać wartość tylko w jednym środowisku, utwórz zmienną w tym środowisku.",
+      "confirm": "Przypisz do środowisk",
+      "description": "Każde środowisko otrzymuje własną wartość. Zmienna globalna jest zastępowana.",
+      "done": "Zakres zmiennej ustawiono na środowiska",
+      "failed": "Nie udało się ustawić zakresu zmiennej na środowiska",
+      "title": "Ustaw zakres {name} na środowiska",
+      "unselectedWarning": "Nie wybrano: {envs}. Testy uruchamiane dla nich przestaną odczytywać tę zmienną.",
+      "valuePlaceholder": "Wartość dla tego środowiska",
+      "usedBy": "Używane przez {n} kontroli: {names}",
+      "usedByHint": "Podział zostanie odrzucony, jeśli którakolwiek z tych kontroli utraciłaby wartość: kontrola bez środowisk lub taka, która działa w środowisku, dla którego nie podano tu wartości."
+    },
     "versionPrefix": "v",
     "tokens": {
       "title": "Tokeny syntetyczne",
@@ -13551,7 +13762,6 @@
     },
     "variablesPanel": {
       "title": "Zmienne",
-      "referenceHint": "Odwołaj się w dowolnej wartości kroku lub adresie URL jako {token}.",
       "emptyTitle": "Brak zmiennych",
       "emptyBody": "Używaj wartości wielokrotnie w różnych krokach — np. bazowego adresu URL lub nazwy użytkownika — i nie umieszczaj sekretów w wartościach kroków.",
       "newVariable": "Nowa zmienna",
@@ -13559,8 +13769,6 @@
       "nameRequired": "Nazwa jest wymagana.",
       "nameInvalid": "Nazwy zaczynają się od litery lub podkreślenia i składają się wyłącznie z liter, cyfr i podkreśleń.",
       "nameDuplicate": "Zmienna o tej nazwie już istnieje.",
-      "usedInSteps": "Użyto w {count} kroku | Użyto w {count} krokach",
-      "notReferenced": "Nie jest jeszcze przywoływany przez żaden krok",
       "removed": "Usunięto {name}",
       "undo": "Cofnij",
       "editVariable": "Edytuj zmienną {name}",
@@ -13570,7 +13778,13 @@
       "openPanel": "Pokaż zmienne",
       "removeTitle": "Usunąć zmienną?",
       "removeBody": "{name} zostanie usunięta z tego sprawdzenia.",
-      "removeWarning": "Jest przywoływany przez {count} krok, który nie będzie mógł zostać rozwiązany | Jest przywoływany przez {count} kroków, które nie będą mogły zostać rozwiązane"
+      "removeWarning": "Jest przywoływany przez {count} krok, który nie będzie mógł zostać rozwiązany | Jest przywoływany przez {count} kroków, które nie będą mogły zostać rozwiązane",
+      "removeOverrideNote": "Kroki używające {name} będą teraz otrzymywać wartość {scope}.",
+      "countOfCap": "{count} z {cap}",
+      "local": "Lokalna",
+      "resolutionOrder": "Kolejność rozwiązywania: test, potem środowisko, na końcu globalna.",
+      "overridesInherited": "Nadpisuje współdzieloną zmienną — ta wartość ma pierwszeństwo.",
+      "valueTooltipEmpty": "{name}: brak wartości"
     },
     "browserDevices": {
       "desktop": "Komputer",
@@ -13898,7 +14112,8 @@
       "timeoutLabel": "Limit czasu (ms)",
       "valueFallback": "Wartość",
       "showSetupSteps": "Pokaż kroki konfiguracji",
-      "waitingForActions": "Oczekiwanie na działania w przeglądarce…"
+      "waitingForActions": "Oczekiwanie na działania w przeglądarce…",
+      "unboundVariables": "{names} nie jest zdefiniowana w tej kontroli, jej środowiskach ani globalnie, więc zostanie wpisana dosłownie. | {names} nie są zdefiniowane w tej kontroli, jej środowiskach ani globalnie, więc zostaną wpisane dosłownie."
     },
     "labels": {
       "copyOf": "Kopia {name}",
@@ -14130,10 +14345,13 @@
     },
     "results": {
       "p95Label": "p95",
+      "allEnvironments": "Wszystkie środowiska",
       "clearFilters": "Wyczyść filtry",
       "clearFiltersDesc": "Usuń wszystkie aktywne filtry",
       "device": "Urządzenie",
       "duration": "Czas trwania",
+      "environment": "Środowisko",
+      "environmentScope": "Zakres środowiskowy",
       "editCheck": "Edytuj sprawdzenie",
       "error": "Błąd",
       "failed": "Nieudane",
@@ -14302,6 +14520,7 @@
       "passRate": "Wskaźnik sukcesu",
       "passRateByBrowser": "Wskaźnik sukcesu według przeglądarki",
       "passRateByDevice": "Wskaźnik sukcesu według urządzenia",
+      "passRateByEnvironment": "Wskaźnik powodzenia według środowiska",
       "passRateByLocation": "Wskaźnik sukcesu według lokalizacji",
       "durationByLocation": "Czas trwania według lokalizacji (śr.)",
       "flakyRate": "Flaky Rate",
@@ -14461,7 +14680,8 @@
       "ssh": "SSH",
       "tcp": "TCP",
       "tls": "TLS",
-      "private": "Lokalizacje prywatne"
+      "private": "Lokalizacje prywatne",
+      "variables": "Środowiska i zmienne"
     },
     "timeline": {
       "failed": "Nieudane",
@@ -14505,7 +14725,8 @@
       "stepNameRequired": "Nadaj temu krokowi nazwę — to ona pojawia się w wynikach uruchomienia",
       "typeTextRequired": "Wprowadź tekst, który ten krok ma wpisać",
       "expectedRequired": "Wprowadź wartość, jakiej powinna oczekiwać ta asercja.",
-      "urlInvalid": "Wprowadź prawidłowy URL zaczynający się od http:// lub https://",
+      "urlInvalid": "Podaj adres URL zaczynający się od http://, https:// lub symbol zastępczy zmiennej",
+      "navigateUrlInvalid": "Wpisz URL zaczynający się od http://, https:// lub symbolu zastępczego zmiennej.",
       "urlRequired": "Początkowy URL jest wymagany",
       "fixHighlightedFields": "Popraw zaznaczone pola przed zapisaniem",
       "retiredAction": "\"{action}\" nie jest już obsługiwane — usuń lub zastąp \"{step}\"",
@@ -14970,7 +15191,6 @@
       "syntheticsTokensRefresh": "Odśwież listę tokenów",
       "aiChatToggle": "Przełącz czat AI",
       "aiChatClose": "Zamknij czat AI",
-      "aiChatExpand": "Rozwiń/zwiń czat AI",
       "logsSaveView": "Zapisz jako zapisany widok",
       "logsExport": "Eksportuj wyniki jako CSV",
       "tracesCopyUrl": "Kopiuj URL do udostępnienia śladu",
@@ -18903,7 +19123,7 @@
     "routingSaysPlace": "Wszystkie alerty i incydenty z {value} {noun}",
     "routingSaysPlaces": "Wszystkie alerty i incydenty z {scope}",
     "routingSaysAnything": "Wszystkie alerty i incydenty",
-    "routingNoLadder": "brak jeszcze drabiny eskalacji",
+    "routingNoLadder": "Brak jeszcze drabiny eskalacyjnej",
     "routingPagesTeam": "wywołuje {team}",
     "routingCaughtLast": "{count} wezwanie · ostatnio {when} | {count} wezwań · ostatnio {when}",
     "routingEmptyBodyNamed": "{team} nie otrzyma wezwania, dopóki reguła nie dopasuje przychodzącego alertu.",

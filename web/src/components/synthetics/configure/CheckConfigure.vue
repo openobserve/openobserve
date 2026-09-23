@@ -35,6 +35,7 @@ import CheckSchedule from "./CheckSchedule.vue";
 import CheckRetries from "./CheckRetries.vue";
 import CheckAlerts from "./CheckAlerts.vue";
 import CheckLocations from "./CheckLocations.vue";
+import CheckEnvironments from "./CheckEnvironments.vue";
 import CheckBrowserDevices from "./CheckBrowserDevices.vue";
 import CheckCapture from "./CheckCapture.vue";
 
@@ -158,6 +159,11 @@ function handleUpdate(value: BrowserCheck) {
               @new-location="emit('new-location')"
               @add-agent="(id: string) => emit('add-agent', id)"
               @refresh-locations="emit('refresh-locations')"
+            />
+            <CheckEnvironments
+              :check="check"
+              data-test="synthetics-check-configure-environments"
+              @update:check="handleUpdate"
             />
             <CheckBrowserDevices
               v-if="(checkType ?? 'browser') === 'browser'"

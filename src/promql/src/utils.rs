@@ -30,8 +30,10 @@ use datafusion::{
 use hashbrown::HashSet;
 use promql_parser::{
     label::{MatchOp, Matcher, Matchers},
-    parser::VectorSelector,
+    parser::{Offset, VectorSelector},
 };
+
+use crate::micros;
 
 const OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER: i64 = 5;
 const OPTIMIZATION_MAX_STEPS: i64 = 30;
@@ -207,9 +209,18 @@ pub(crate) fn batch_run_len(hashes: &[u64], start: usize) -> usize {
     end - start
 }
 
+/// An `offset` in microseconds, positive into the past.
+pub(crate) fn offset_micros(offset: &Option<Offset>) -> i64 {
+    match offset {
+        Some(Offset::Pos(offset)) => micros(*offset),
+        Some(Offset::Neg(offset)) => -micros(*offset),
+        None => 0,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{sync::Arc, time::Duration};
 
     use datafusion::{
         arrow::{
@@ -496,5 +507,14 @@ mod tests {
             batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
             2
         );
+    }
+
+    #[test]
+    fn test_offset_micros() {
+        assert_eq!(offset_micros(&None), 0);
+        let past = Some(Offset::Pos(Duration::from_secs(60)));
+        assert_eq!(offset_micros(&past), 60_000_000);
+        let ahead = Some(Offset::Neg(Duration::from_secs(30)));
+        assert_eq!(offset_micros(&ahead), -30_000_000);
     }
 }

@@ -18,8 +18,8 @@ use std::{collections::HashSet, sync::Arc};
 use anyhow::{Context, Result, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, FixedSizeBinaryArray, Int64Array, RecordBatch,
-        RecordBatchOptions, UInt32Array, UInt64Array,
+        Array, ArrayRef, BooleanArray, Int64Array, RecordBatch, RecordBatchOptions, UInt32Array,
+        UInt64Array,
     },
     datatypes::{DataType, Schema},
 };
@@ -78,16 +78,18 @@ impl BlockDecoder {
             "invalid decoded row count"
         );
         ensure!(
-            block.payload_len as usize <= max_compressed_block_len(block.row_count)?,
-            "compressed block length exceeds v1 bound"
+            block.block_length as usize <= max_compressed_block_len(block.row_count)?,
+            "compressed block length exceeds format bound"
         );
         ensure!(
-            payload.len() == block.payload_len as usize,
+            payload.len() == block.block_length as usize,
             "payload length mismatch"
         );
         ensure!(
-            checksum(payload) == block.checksum,
-            "payload checksum mismatch"
+            zstd::zstd_safe::find_frame_compressed_size(payload)
+                .map_err(|error| anyhow!("invalid sample frame: {error:?}"))?
+                == payload.len(),
+            "extra sample frame bytes"
         );
         let count = block.row_count as usize;
         let size = count.checked_mul(16).context("decoded size overflow")?;
@@ -144,18 +146,18 @@ pub fn read_footer(bytes: &[u8], file_size: u64) -> Result<Footer> {
         bytes.len() == FOOTER_LEN && file_size >= FOOTER_LEN as u64,
         "invalid footer length"
     );
-    let version = read_u32(bytes, 8)?;
+    let version = read_u32(bytes, 0)?;
     ensure!(
-        version == VERSION && &bytes[..8] == MAGIC,
+        version == VERSION && &bytes[24..] == MAGIC,
         "unsupported block-index version/magic"
     );
-    ensure!(read_u32(bytes, 12)? == 0, "unsupported block-index flags");
-    let offset = read_u64(bytes, 16)?;
-    let length = read_u64(bytes, 24)?;
     ensure!(
-        length > 0 && length <= MAX_METADATA_BYTES as u64,
-        "metadata size limit"
+        read_u32(bytes, 4)? == 0,
+        "unsupported block-index reserved field"
     );
+    let offset = read_u64(bytes, 8)?;
+    let length = read_u64(bytes, 16)?;
+    ensure!(length > 0, "metadata size limit");
     let end = offset
         .checked_add(length)
         .context("metadata range overflow")?;
@@ -163,11 +165,9 @@ pub fn read_footer(bytes: &[u8], file_size: u64) -> Result<Footer> {
         end.checked_add(FOOTER_LEN as u64) == Some(file_size),
         "metadata/footer outside file bounds"
     );
-    let metadata_checksum = bytes[32..].try_into()?;
     Ok(Footer {
         version,
         metadata_range: offset..end,
-        metadata_checksum,
         payload_end: offset,
     })
 }
@@ -175,7 +175,7 @@ pub fn read_footer(bytes: &[u8], file_size: u64) -> Result<Footer> {
 pub fn decode_index(
     metadata: Bytes,
     footer: &Footer,
-    expected: &ParentIdentity,
+    expected: &ParentMetadata,
     requested_labels: &[String],
 ) -> Result<Index> {
     decode_index_inner(metadata, footer, expected, requested_labels, None)
@@ -208,7 +208,7 @@ pub fn decode_block(payload: &[u8], block: &BlockMeta) -> Result<DecodedBlock> {
 fn decode_index_inner(
     metadata: Bytes,
     footer: &Footer,
-    expected: &ParentIdentity,
+    expected: &ParentMetadata,
     requested_labels: &[String],
     existing: Option<&Arc<IndexBase>>,
 ) -> Result<Index> {
@@ -222,8 +222,8 @@ fn decode_index_inner(
         "metadata byte length mismatch"
     );
     ensure!(
-        checksum(&metadata) == footer.metadata_checksum,
-        "metadata checksum mismatch"
+        footer.version == VERSION && footer.metadata_range.start == footer.payload_end,
+        "invalid metadata footer"
     );
     let compact = crate::compact::CompactMetadata::parse(&metadata)?;
     let schema = compact.schema();
@@ -238,14 +238,18 @@ fn decode_index_inner(
             .is_some_and(|v| v == &VERSION.to_string()),
         "metadata version mismatch"
     );
-    let parent: ParentIdentity = serde_json::from_str(
+    let parent: ParentMetadata = serde_json::from_str(
         properties
             .get(PARENT_KEY)
-            .context("missing parent identity")?,
+            .context("missing parent metadata")?,
     )?;
     ensure!(
-        &parent == expected && parent.rows > 0 && sidecar_path(&parent.object_key).is_some(),
-        "parent identity mismatch"
+        &parent == expected && parent.rows > 0 && parent.compressed_size > 0,
+        "parent metadata mismatch"
+    );
+    ensure!(
+        u64::try_from(compact.rows())? <= expected.rows,
+        "block count limit"
     );
     let source_schema: Schema = serde_json::from_str(
         properties
@@ -280,7 +284,6 @@ fn decode_index_inner(
         ("__oo_midx_offset", DataType::UInt64),
         ("__oo_midx_length", DataType::UInt32),
         ("__oo_midx_strict", DataType::Boolean),
-        ("__oo_midx_checksum", DataType::FixedSizeBinary(32)),
     ];
     for (index, (name, kind)) in expected_fields.iter().enumerate() {
         let field = schema.field(index);
@@ -329,16 +332,15 @@ fn decode_index_inner(
     projection.sort_unstable();
     let batch = compact.compact_batch(&projection)?;
     let count = batch.num_rows();
-    ensure!(count > 0 && count <= MAX_BLOCKS, "block count limit");
+    ensure!(
+        count > 0 && count as u64 <= expected.rows,
+        "block count limit"
+    );
     let row_group_size = properties
         .get(ROW_GROUP_SIZE_KEY)
         .map(|value| value.parse::<u32>())
         .transpose()?;
     ensure!(row_group_size != Some(0), "invalid parent row group size");
-    ensure!(
-        !parent.object_key.ends_with(".vortex") || row_group_size.is_none(),
-        "Vortex parent cannot declare Parquet row groups"
-    );
     let base = if let Some(base) = existing {
         ensure!(
             base.footer == *footer
@@ -358,7 +360,6 @@ fn decode_index_inner(
             footer: footer.clone(),
         })
     };
-    let blocks = &base.blocks;
     let mut missing = Vec::new();
     let mut fields = Vec::new();
     let mut columns: Vec<ArrayRef> = Vec::new();
@@ -376,7 +377,7 @@ fn decode_index_inner(
         &RecordBatchOptions::new().with_row_count(Some(count)),
     )?;
     for i in 1..count {
-        if blocks.block(i).hash == blocks.block(i - 1).hash {
+        if base.blocks.block(i).hash == base.blocks.block(i - 1).hash {
             for column in labels.columns() {
                 ensure!(
                     label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
@@ -394,11 +395,14 @@ fn decode_index_inner(
 
 fn decode_directory(
     batch: &RecordBatch,
-    parent: &ParentIdentity,
+    parent: &ParentMetadata,
     footer: &Footer,
 ) -> Result<BlockDirectory> {
     let count = batch.num_rows();
-    ensure!(count > 0 && count <= MAX_BLOCKS, "block count limit");
+    ensure!(
+        count > 0 && count as u64 <= parent.rows,
+        "block count limit"
+    );
     for i in 0..DIRECTORY_FIELDS {
         ensure!(batch.column(i).null_count() == 0, "null block descriptor");
     }
@@ -442,11 +446,6 @@ fn decode_directory(
         .as_any()
         .downcast_ref::<BooleanArray>()
         .context("strict type")?;
-    let checksums = batch
-        .column(8)
-        .as_any()
-        .downcast_ref::<FixedSizeBinaryArray>()
-        .context("checksum type")?;
     let mut blocks =
         crate::directory::DirectoryBuilder::new(count, parent.rows, footer.payload_end);
     let mut next_row = 0u64;
@@ -459,21 +458,20 @@ fn decode_directory(
             row_count: counts.value(i),
             min_timestamp: min_times.value(i),
             max_timestamp: max_times.value(i),
-            payload_offset: offsets.value(i),
-            payload_len: lengths.value(i),
+            block_offset: offsets.value(i),
+            block_length: lengths.value(i),
             strictly_increasing: strict.value(i),
-            checksum: checksums.value(i).try_into()?,
         };
         ensure!(
             block.row_count > 0 && block.row_count as usize <= MAX_BLOCK_ROWS,
             "invalid block row count"
         );
         ensure!(
-            block.payload_len as usize <= max_compressed_block_len(block.row_count)?,
-            "compressed block length exceeds v1 bound"
+            block.block_length as usize <= max_compressed_block_len(block.row_count)?,
+            "compressed block length exceeds format bound"
         );
         ensure!(
-            block.row_start == next_row && block.payload_len > 0,
+            block.row_start == next_row && block.block_length > 0,
             "noncontiguous row or payload directory"
         );
         ensure!(
@@ -499,11 +497,11 @@ fn decode_directory(
             .checked_add(u64::from(block.row_count))
             .context("row end overflow")?;
         ensure!(
-            block.payload_offset == next_offset,
+            block.block_offset == next_offset,
             "noncontiguous payload directory"
         );
         next_offset = next_offset
-            .checked_add(u64::from(block.payload_len))
+            .checked_add(u64::from(block.block_length))
             .context("payload end overflow")?;
         ensure!(
             next_row <= parent.rows && next_offset <= footer.payload_end,
@@ -561,10 +559,9 @@ mod decoder_tests {
             row_count: samples.len() as u32,
             min_timestamp: samples[0].0,
             max_timestamp: samples.last().unwrap().0,
-            payload_offset: 0,
-            payload_len: payload.len() as u32,
+            block_offset: 0,
+            block_length: payload.len() as u32,
             strictly_increasing: samples.windows(2).all(|w| w[0].0 < w[1].0),
-            checksum: checksum(&payload),
         };
         (payload, block)
     }
@@ -628,10 +625,9 @@ mod decoder_tests {
         decoder.decode(&payload, &block).unwrap();
         let mut corrupt = payload.clone();
         corrupt[0] ^= 1;
-        let bad_zstd = vec![1, 2, 3, 4];
+        let bad_zstd = [1, 2, 3, 4];
         let mut bad_frame = block.clone();
-        bad_frame.payload_len = bad_zstd.len() as u32;
-        bad_frame.checksum = checksum(&bad_zstd);
+        bad_frame.block_length = bad_zstd.len() as u32;
         let mut bad_endpoint = block.clone();
         bad_endpoint.max_timestamp += 1;
         let mut bad_strict = block.clone();
@@ -669,8 +665,7 @@ mod decoder_tests {
         for length in [15, 17] {
             let bytes = zstd::bulk::compress(&vec![0; length], 1).unwrap();
             let (_, mut metadata) = fixture(&[(0, 0)]);
-            metadata.payload_len = bytes.len() as u32;
-            metadata.checksum = checksum(&bytes);
+            metadata.block_length = bytes.len() as u32;
             assert!(decoder.decode(&bytes, &metadata).is_err());
             assert!(decoder.timestamps.is_empty());
             assert!(decoder.value_bits.is_empty());

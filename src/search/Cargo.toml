@@ -33,9 +33,9 @@ hashlink.workspace = true
 infra.workspace = true
 itertools.workspace = true
 log.workspace = true
+metrics_block.workspace = true
 md5.workspace = true
 memchr.workspace = true
-metrics_block.workspace = true
 metrics_index.workspace = true
 object_store.workspace = true
 transform.workspace = true
@@ -69,7 +69,3 @@ utoipa.workspace = true
 vortex = { workspace = true }
 vortex-btrblocks = { workspace = true }
 vortex-datafusion = { workspace = true }
-
-[dev-dependencies]
-promql.workspace = true
-promql-parser.workspace = true

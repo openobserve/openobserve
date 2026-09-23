@@ -38,6 +38,7 @@ use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
 use flight::common::{Metrics, RemoteScanMetrics};
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
+use opentelemetry::context::FutureExt as _;
 use parking_lot::Mutex;
 use rand::prelude::SliceRandom;
 
@@ -368,7 +369,8 @@ async fn get_remote_batch(
         "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
-    let stream = match client.do_get(request).await {
+    // runs outside the planner span, so the gRPC CLIENT span takes its parent from this context
+    let stream = match client.do_get(request).with_context(context.clone()).await {
         Ok(stream) => stream,
         Err(e) => {
             if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {

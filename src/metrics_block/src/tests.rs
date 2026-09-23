@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The selection API takes a slice of row ranges, including a single range.
-#![allow(clippy::single_range_in_vec_init)]
 use std::{collections::HashMap, sync::Arc};
 
 use arrow::{
@@ -29,6 +27,62 @@ use bytes::Bytes;
 use crate::*;
 
 type Row = (u64, i64, u64, Option<&'static str>, Option<&'static str>);
+
+#[derive(Default)]
+struct WriteState {
+    bytes: Vec<u8>,
+    flush_has_marker: Vec<bool>,
+}
+
+struct FailureWriter {
+    state: Arc<std::sync::Mutex<WriteState>>,
+    fail_after: usize,
+    fail_flush: usize,
+}
+
+impl std::io::Write for FailureWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let mut state = self.state.lock().unwrap();
+        if state.bytes.len() >= self.fail_after {
+            return Err(std::io::Error::other("injected write failure"));
+        }
+        let size = bytes.len().min(self.fail_after - state.bytes.len());
+        state.bytes.extend_from_slice(&bytes[..size]);
+        Ok(size)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        let mut state = self.state.lock().unwrap();
+        let has_marker = state.bytes.ends_with(MAGIC);
+        state.flush_has_marker.push(has_marker);
+        if state.flush_has_marker.len() == self.fail_flush {
+            return Err(std::io::Error::other("injected flush failure"));
+        }
+        Ok(())
+    }
+}
+
+fn build_from_parquet(
+    bytes: bytes::Bytes,
+    parent: crate::ParentMetadata,
+) -> anyhow::Result<Vec<u8>> {
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    anyhow::ensure!(
+        bytes.len() as u64 == parent.compressed_size,
+        "source size mismatch"
+    );
+    let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)?;
+    let schema = builder.schema().clone();
+    let metadata = builder.metadata().as_ref().clone();
+    let mut writer =
+        crate::BlockWriter::new_pending(Vec::new(), schema.clone(), crate::MAX_BLOCK_ROWS)?;
+    for batch in builder.with_batch_size(crate::MAX_BLOCK_ROWS).build()? {
+        let batch = batch?;
+        let batch = RecordBatch::try_new(schema.clone(), batch.columns().to_vec())?;
+        writer.write(&batch)?;
+    }
+    writer.finish_for_parquet(parent, metadata)
+}
 
 fn schema() -> SchemaRef {
     Arc::new(Schema::new_with_metadata(
@@ -77,24 +131,58 @@ fn batch(rows: &[Row]) -> RecordBatch {
     .unwrap()
 }
 
-fn parent() -> ParentIdentity {
-    ParentIdentity {
-        object_key: "files/o/metrics/m/2026/09/18/07/indexed-v1-a.parquet".into(),
+fn parent() -> ParentMetadata {
+    ParentMetadata {
         rows: 7,
         compressed_size: 123,
     }
 }
 
-fn fixture() -> Vec<u8> {
-    let rows = rows();
-    let mut writer = BlockWriter::new(
+fn test_writer(max_rows: usize) -> BlockWriter<Vec<u8>> {
+    BlockWriter::new(
         Vec::new(),
         schema(),
         vec!["label_a".into(), "label_b".into()],
         parent(),
-        2,
+        max_rows,
     )
-    .unwrap();
+    .unwrap()
+}
+
+fn test_footer(blob: &[u8]) -> Footer {
+    read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap()
+}
+
+fn decoded_rows(blob: &[u8], index: &Index) -> Vec<(u64, i64, u64)> {
+    index
+        .blocks
+        .iter()
+        .flat_map(|block| {
+            let range = block.block_range();
+            let samples =
+                decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap();
+            samples
+                .timestamps
+                .into_iter()
+                .zip(samples.value_bits)
+                .map(move |(t, v)| (block.hash, t, v))
+        })
+        .collect()
+}
+
+fn parquet_bytes(input: &RecordBatch, row_group_size: usize) -> Bytes {
+    use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
+    let properties = WriterProperties::builder()
+        .set_max_row_group_row_count(Some(row_group_size))
+        .build();
+    let mut writer = ArrowWriter::try_new(Vec::new(), input.schema(), Some(properties)).unwrap();
+    writer.write(input).unwrap();
+    Bytes::from(writer.into_inner().unwrap())
+}
+
+fn fixture() -> Vec<u8> {
+    let rows = rows();
+    let mut writer = test_writer(2);
     for range in [0..1, 1..5, 5..7] {
         writer.write(&batch(&rows[range])).unwrap();
     }
@@ -120,20 +208,14 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
     assert_eq!(index.blocks.len(), 4);
     assert!(!index.blocks.block(0).strictly_increasing);
     assert!(index.blocks.block(1).strictly_increasing);
-    let mut actual = Vec::new();
-    for (i, block) in index.blocks.iter().enumerate() {
-        let range = block.payload_range();
-        let decoded =
-            decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap();
-        for (time, value) in decoded.timestamps.iter().zip(&decoded.value_bits) {
-            actual.push((block.hash, *time, *value));
-        }
-        assert_eq!(index.label_value(i, "missing").unwrap(), None);
-    }
     assert_eq!(
-        actual,
+        decoded_rows(&blob, &index),
         rows().iter().map(|r| (r.0, r.1, r.2)).collect::<Vec<_>>()
     );
+    assert_eq!(index.label_value(0, "missing").unwrap(), None);
+    let mut writer = test_writer(2);
+    writer.write(&batch(&rows())).unwrap();
+    assert_eq!(writer.finish().unwrap(), blob);
     assert_eq!(
         index
             .label_values(0, &["label_a".into(), "label_b".into()])
@@ -147,83 +229,12 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
         vec![Some("".into()), None]
     );
     assert!(index.label_value(0, "not_projected").is_err());
-    assert_eq!(
-        index.estimated_directory_size(),
-        index.blocks.len() * 72 + index.blocks.len().div_ceil(8)
-    );
 }
 
 #[test]
-fn deterministic_independent_of_input_batch_boundaries() {
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
-    writer.write(&batch(&rows())).unwrap();
-    assert_eq!(writer.finish().unwrap(), fixture());
-}
-
-#[test]
-fn selection_is_whole_series_before_hash_or_time_pruning() {
+fn numeric_parent_and_projection_are_validated() {
     let blob = fixture();
-    let index = index(&blob, &[]).unwrap();
-    assert_eq!(index.labels.num_rows(), 4);
-    assert_eq!(
-        index.select_blocks(None, None, None).unwrap(),
-        vec![0, 1, 2, 3]
-    );
-    assert_eq!(
-        index.select_blocks(Some(&[0..4]), None, None).unwrap(),
-        vec![0, 1]
-    );
-    assert_eq!(
-        index
-            .select_blocks(Some(&[0..1, 1..4]), None, None)
-            .unwrap(),
-        vec![0, 1]
-    );
-    assert!(index.select_blocks(Some(&[0..2]), None, None).is_err());
-    assert!(
-        index
-            .select_blocks(Some(&[1..2]), Some((9, 10)), Some((999, 1000)))
-            .is_err()
-    );
-    assert!(
-        index
-            .select_blocks(Some(&[0..4, 3..7]), None, None)
-            .is_err()
-    );
-    assert!(index.select_blocks(Some(&[0..8]), None, None).is_err());
-    assert_eq!(
-        index
-            .select_blocks(None, Some((u64::MAX, u64::MAX)), None)
-            .unwrap(),
-        vec![2, 3]
-    );
-    assert_eq!(
-        index.select_blocks(None, Some((0, 0)), None).unwrap(),
-        Vec::<usize>::new()
-    );
-    assert_eq!(
-        index.select_blocks(None, None, Some((10, 10))).unwrap(),
-        vec![0]
-    );
-    assert!(
-        index
-            .select_blocks(Some(&[]), None, None)
-            .unwrap()
-            .is_empty()
-    );
-}
-
-#[test]
-fn parent_version_checksums_bounds_and_decoder_claims_are_checked() {
-    let blob = fixture();
-    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let footer = test_footer(&blob);
     let bytes = Bytes::copy_from_slice(
         &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
     );
@@ -237,39 +248,25 @@ fn parent_version_checksums_bounds_and_decoder_claims_are_checked() {
     modified[10] ^= 1;
     assert!(decode_index(Bytes::from(modified), &footer, &parent(), &[]).is_err());
     assert!(decode_index(bytes.clone(), &footer, &parent(), &["value".into()]).is_err());
-    let mut end = blob[blob.len() - FOOTER_LEN..].to_vec();
-    end[8..12].copy_from_slice(&(VERSION + 1).to_le_bytes());
-    assert!(read_footer(&end, blob.len() as u64).is_err());
-    end = blob[blob.len() - FOOTER_LEN..].to_vec();
-    end[16..24].copy_from_slice(&u64::MAX.to_le_bytes());
-    assert!(read_footer(&end, blob.len() as u64).is_err());
-    assert!(read_footer(&end[..63], blob.len() as u64).is_err());
-    let index = index(&blob, &[]).unwrap();
-    let b = &index.blocks.block(0);
-    let range = b.payload_range();
-    let payload = &blob[range.start as usize..range.end as usize];
-    let mut corrupt = payload.to_vec();
-    corrupt[0] ^= 1;
-    assert!(decode_block(&corrupt, b).is_err());
-    assert!(decode_block(&payload[..payload.len() - 1], b).is_err());
-    let mut claim = b.clone();
-    claim.max_timestamp += 1;
-    assert!(decode_block(payload, &claim).is_err());
-    claim = b.clone();
-    claim.strictly_increasing = true;
-    assert!(decode_block(payload, &claim).is_err());
-    claim = b.clone();
-    claim.row_count = (MAX_BLOCK_ROWS + 1) as u32;
-    assert!(decode_block(payload, &claim).is_err());
+}
+
+fn expanded_metadata_batch(encoded: &crate::compact::CompactMetadata<'_>) -> Result<RecordBatch> {
+    let schema = encoded.schema();
+    let batch = encoded.compact_batch(&(0..schema.fields().len()).collect::<Vec<_>>())?;
+    let columns = batch
+        .columns()
+        .iter()
+        .zip(schema.fields())
+        .map(|(column, field)| arrow::compute::cast(column, field.data_type()))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(RecordBatch::try_new(schema, columns)?)
 }
 
 fn replace_column(blob: &[u8], column: usize, value: ArrayRef) -> Vec<u8> {
-    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let footer = test_footer(blob);
     let raw = &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize];
     let encoded = crate::compact::CompactMetadata::parse(raw).unwrap();
-    let old = encoded
-        .batch(&(0..encoded.schema().fields().len()).collect::<Vec<_>>())
-        .unwrap();
+    let old = expanded_metadata_batch(&encoded).unwrap();
     let mut columns = old.columns().to_vec();
     columns[column] = value;
     let batch = RecordBatch::try_new(old.schema(), columns).unwrap();
@@ -277,14 +274,13 @@ fn replace_column(blob: &[u8], column: usize, value: ArrayRef) -> Vec<u8> {
     let mut result = blob[..footer.metadata_range.start as usize].to_vec();
     result.extend_from_slice(&meta);
     let mut end = blob[blob.len() - FOOTER_LEN..].to_vec();
-    end[24..32].copy_from_slice(&(meta.len() as u64).to_le_bytes());
-    end[32..].copy_from_slice(&checksum(&meta));
+    end[16..24].copy_from_slice(&(meta.len() as u64).to_le_bytes());
     result.extend_from_slice(&end);
     result
 }
 
 #[test]
-fn valid_checksum_does_not_hide_invalid_directory() {
+fn completed_footer_does_not_hide_invalid_directory() {
     let blob = fixture();
     let corrupt = replace_column(&blob, 2, Arc::new(UInt32Array::from(vec![0, 2, 2, 1])));
     assert!(index(&corrupt, &[]).is_err());
@@ -300,41 +296,36 @@ fn valid_checksum_does_not_hide_invalid_directory() {
         Arc::new(UInt32Array::from(vec![u32::MAX, 1, 1, 1])),
     );
     assert!(index(&corrupt, &[]).is_err());
+    let bad_rows = replace_column(&blob, 2, Arc::new(UInt32Array::from(vec![2, 2, 2, 2])));
+    assert!(index(&bad_rows, &[]).is_err());
+    let parsed = index(&blob, &[]).unwrap();
+    let mut offsets: Vec<_> = parsed
+        .blocks
+        .iter()
+        .map(|block| block.block_offset)
+        .collect();
+    offsets[1] += 1;
+    assert!(
+        index(
+            &replace_column(&blob, 5, Arc::new(UInt64Array::from(offsets))),
+            &[]
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn changed_labels_order_schema_and_row_totals_fail_closed() {
     let mut input = rows();
     input[1].3 = Some("");
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     assert!(writer.write(&batch(&input)).is_err());
     assert!(writer.finish().is_err());
     let mut input = rows();
     input[2].1 = 9;
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     assert!(writer.write(&batch(&input)).is_err());
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     writer.write(&batch(&rows()[..3])).unwrap();
     assert!(writer.finish().is_err());
     let other = Arc::new(
@@ -344,35 +335,12 @@ fn changed_labels_order_schema_and_row_totals_fail_closed() {
             .with_metadata(HashMap::from([("semantic".into(), "changed".into())])),
     );
     let changed = RecordBatch::try_new(other, batch(&rows()).columns().to_vec()).unwrap();
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     assert!(writer.write(&changed).is_err());
 }
 
 #[test]
-fn paths_and_supported_schema_are_generic_but_strict() {
-    assert_eq!(
-        sidecar_path("files/o/metrics/m/2026/09/18/07/custom=x/indexed-v1-a.parquet").as_deref(),
-        Some("files/o/midx/m/2026/09/18/07/custom=x/indexed-v1-a.midx")
-    );
-    assert_eq!(
-        sidecar_path("files/o/metrics/m/2026/09/18/07/custom=x/indexed-v1-a.vortex").as_deref(),
-        Some("files/o/midx/m/2026/09/18/07/custom=x/indexed-v1-a.midx")
-    );
-    for key in [
-        "files/o/metrics/m/2026/09/18/07/indexed-v1-a.unknown",
-        "files/o/logs/m/2026/09/18/07/indexed-v1-a.parquet",
-        "files/o/metrics/m/2026/09/18/07/hash-sorted-v1-a.parquet",
-        "files/o/metrics/m/2026/09/18/../indexed-v1-a.parquet",
-    ] {
-        assert!(sidecar_path(key).is_none());
-    }
+fn supported_schema_excludes_per_point_columns() {
     assert_eq!(
         identity_label_columns(schema().as_ref()).unwrap(),
         vec!["label_a", "label_b"]
@@ -380,8 +348,36 @@ fn paths_and_supported_schema_are_generic_but_strict() {
     for name in ["start_time", "flag", "trace_id", "exemplars"] {
         let mut fields = schema().fields().to_vec();
         fields.push(Arc::new(Field::new(name, DataType::Utf8, true)));
-        assert!(!is_supported_schema(&Schema::new(fields)));
+        let schema = Schema::new(fields);
+        assert!(is_supported_schema(&schema));
+        assert_eq!(
+            identity_label_columns(&schema).unwrap(),
+            ["label_a", "label_b"]
+        );
     }
+}
+
+#[test]
+fn per_point_columns_do_not_block_index_or_change_series_labels() {
+    let input = batch(&rows());
+    let mut fields = input.schema().fields().to_vec();
+    fields.push(Arc::new(Field::new("start_time", DataType::Int64, false)));
+    fields.push(Arc::new(Field::new("flag", DataType::Utf8, true)));
+    let schema = Arc::new(Schema::new(fields));
+    let mut columns = input.columns().to_vec();
+    columns.push(Arc::new(Int64Array::from_iter_values(
+        0..input.num_rows() as i64,
+    )));
+    columns.push(Arc::new(StringArray::from_iter_values(
+        (0..input.num_rows()).map(|i| if i % 2 == 0 { "a" } else { "b" }),
+    )));
+    let input = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
+    let mut writer = BlockWriter::new_pending(Vec::new(), Arc::clone(&schema), 2).unwrap();
+    writer.write(&input).unwrap();
+    let blob = writer.finish_for_vortex(parent(), schema).unwrap();
+    let decoded = index(&blob, &["label_a", "label_b"]).unwrap();
+    assert_eq!(decoded.labels.schema().fields().len(), 2);
+    assert_eq!(decoded_rows(&blob, &decoded).len(), input.num_rows());
 }
 
 #[test]
@@ -392,73 +388,26 @@ fn projected_labels_do_not_retain_unrequested_large_buffers() {
     let mut columns = input.columns().to_vec();
     columns[3] = Arc::new(StringArray::from(vec![Some(large.as_str()); values.len()]));
     let input = RecordBatch::try_new(schema(), columns).unwrap();
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     writer.write(&input).unwrap();
     let blob = writer.finish().unwrap();
-    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let footer = test_footer(&blob);
     let metadata_bytes = (footer.metadata_range.end - footer.metadata_range.start) as usize;
     let index = index(&blob, &["label_b"]).unwrap();
     assert!(metadata_bytes < 100_000);
     assert!(
-        index.estimated_heap_size() < 32_000,
+        index.labels.get_array_memory_size() < 32_000,
         "projected labels pin a large unrequested allocation"
     );
 }
 
 #[test]
-fn binary_range_selection_handles_disjoint_endpoints_and_partial_series() {
-    let blob = fixture();
-    let index = index(&blob, &[]).unwrap();
-    assert_eq!(
-        index
-            .select_blocks(Some(&[0..4, 4..7]), None, None)
-            .unwrap(),
-        vec![0, 1, 2, 3]
-    );
-    assert_eq!(
-        index.select_blocks(Some(&[4..7]), None, None).unwrap(),
-        vec![2, 3]
-    );
-    assert!(index.select_blocks(Some(&[2..4]), None, None).is_err());
-    assert!(index.select_blocks(Some(&[4..6]), None, None).is_err());
-    assert!(
-        index
-            .select_blocks(Some(&[0..4, 6..7]), None, None)
-            .is_err()
-    );
-    assert!(
-        index
-            .select_blocks(Some(&[4..7, 0..4]), None, None)
-            .is_err()
-    );
-    assert!(
-        index
-            .select_blocks(None, Some((2, 1)), None)
-            .unwrap()
-            .is_empty()
-    );
-    assert_eq!(
-        index
-            .select_blocks(Some(&[0..4]), Some((u64::MAX, u64::MAX)), None)
-            .unwrap(),
-        Vec::<usize>::new()
-    );
-}
-
-#[test]
-fn excessive_compressed_length_and_capacity_classification() {
+fn excessive_compressed_length_is_rejected() {
     let blob = fixture();
     let index = index(&blob, &[]).unwrap();
     let mut block = index.blocks.block(0).clone();
-    let range = block.payload_range();
-    block.payload_len =
+    let range = block.block_range();
+    block.block_length =
         u32::try_from(max_compressed_block_len(block.row_count).unwrap() + 1).unwrap();
     let error = decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap_err();
     assert!(
@@ -466,15 +415,15 @@ fn excessive_compressed_length_and_capacity_classification() {
             .to_string()
             .contains("compressed block length exceeds")
     );
-    let mut lengths: Vec<_> = index.blocks.iter().map(|b| b.payload_len).collect();
-    let delta = block.payload_len - lengths[0];
-    lengths[0] = block.payload_len;
+    let mut lengths: Vec<_> = index.blocks.iter().map(|b| b.block_length).collect();
+    let delta = block.block_length - lengths[0];
+    lengths[0] = block.block_length;
     let changed = replace_column(&blob, 6, Arc::new(UInt32Array::from(lengths)));
     let offsets: Vec<_> = index
         .blocks
         .iter()
         .enumerate()
-        .map(|(i, b)| b.payload_offset + if i == 0 { 0 } else { u64::from(delta) })
+        .map(|(i, b)| b.block_offset + if i == 0 { 0 } else { u64::from(delta) })
         .collect();
     let changed = replace_column(&changed, 5, Arc::new(UInt64Array::from(offsets)));
     let old_end = changed.len() - FOOTER_LEN;
@@ -482,8 +431,8 @@ fn excessive_compressed_length_and_capacity_classification() {
     padded.extend(std::iter::repeat_n(0, delta as usize));
     padded.extend_from_slice(&changed[range.end as usize..old_end]);
     let mut footer = changed[old_end..].to_vec();
-    let start = u64::from_le_bytes(footer[16..24].try_into().unwrap()) + u64::from(delta);
-    footer[16..24].copy_from_slice(&start.to_le_bytes());
+    let start = u64::from_le_bytes(footer[8..16].try_into().unwrap()) + u64::from(delta);
+    footer[8..16].copy_from_slice(&start.to_le_bytes());
     padded.extend_from_slice(&footer);
     let error = crate::tests::index(&padded, &[]).unwrap_err();
     assert!(
@@ -491,24 +440,12 @@ fn excessive_compressed_length_and_capacity_classification() {
             .to_string()
             .contains("compressed block length exceeds")
     );
-    let limit = capacity(false, "MAX_BLOCKS").unwrap_err();
-    assert!(is_format_limit_error(&limit));
-    assert!(is_format_limit_error(&limit.context("builder")));
-    let ordinary = anyhow!("checksum mismatch");
-    assert!(!is_format_limit_error(&ordinary));
 }
 
 #[test]
 fn duplicates_across_chunk_boundary_remain_exact_and_visible() {
     let input = batch(&rows());
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        1,
-    )
-    .unwrap();
+    let mut writer = test_writer(1);
     writer.write(&input).unwrap();
     let blob = writer.finish().unwrap();
     let index = index(&blob, &[]).unwrap();
@@ -531,14 +468,7 @@ fn long_view_backing_buffers_and_real_writer_capacity_limit() {
         7
     ]));
     let input = RecordBatch::try_new(schema(), columns).unwrap();
-    let mut writer = BlockWriter::new(
-        Vec::new(),
-        schema(),
-        vec!["label_a".into(), "label_b".into()],
-        parent(),
-        2,
-    )
-    .unwrap();
+    let mut writer = test_writer(2);
     writer.write(&input).unwrap();
     let blob = writer.finish().unwrap();
     let decoded = index(&blob, &["label_b"]).unwrap();
@@ -555,13 +485,16 @@ fn long_view_backing_buffers_and_real_writer_capacity_limit() {
         labels.push(name);
     }
     let too_wide = Arc::new(Schema::new(fields));
-    assert!(is_format_limit_error(
-        &identity_label_columns(too_wide.as_ref()).unwrap_err()
-    ));
+    assert!(
+        identity_label_columns(too_wide.as_ref())
+            .unwrap_err()
+            .to_string()
+            .contains("MAX_LABEL_COLUMNS")
+    );
     let error = BlockWriter::new(Vec::new(), too_wide, labels, parent(), 2)
         .err()
         .unwrap();
-    assert!(is_format_limit_error(&error));
+    assert!(error.to_string().contains("MAX_LABEL_COLUMNS"));
 }
 
 #[test]
@@ -606,7 +539,7 @@ fn lossless_transform_preserves_extreme_timestamps_resets_and_all_float_bits() {
         .unwrap();
         writer.write(&batch(&rows)).unwrap();
         let blob = writer.finish().unwrap();
-        let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+        let footer = test_footer(&blob);
         let index = decode_index(
             Bytes::copy_from_slice(
                 &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
@@ -616,167 +549,17 @@ fn lossless_transform_preserves_extreme_timestamps_resets_and_all_float_bits() {
             &[],
         )
         .unwrap();
-        let mut actual = Vec::new();
-        for block in &index.blocks {
-            let range = block.payload_range();
-            let decoded =
-                decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap();
-            actual.extend(decoded.timestamps.into_iter().zip(decoded.value_bits));
-        }
-        assert_eq!(actual, timestamp.into_iter().zip(bits).collect::<Vec<_>>());
-        let mut old_footer = blob[blob.len() - FOOTER_LEN..].to_vec();
-        old_footer[..8].copy_from_slice(b"UNKNOWN!");
-        old_footer[8..12].copy_from_slice(&1u32.to_le_bytes());
-        assert!(read_footer(&old_footer, blob.len() as u64).is_err());
-    }
-}
-
-fn linear_selection_reference(
-    index: &Index,
-    input: Option<&[std::ops::Range<usize>]>,
-    hashes: Option<(u64, u64)>,
-    time: Option<(i64, i64)>,
-) -> Result<Vec<usize>> {
-    let mut ranges: Vec<std::ops::Range<usize>> = Vec::new();
-    match input {
-        None => ranges.push(0..index.parent.rows as usize),
-        Some(input) => {
-            for range in input {
-                ensure!(
-                    range.start < range.end && range.end <= index.parent.rows as usize,
-                    "bounds"
-                );
-                if let Some(last) = ranges.last_mut() {
-                    ensure!(last.end <= range.start, "order");
-                    if last.end == range.start {
-                        last.end = range.end;
-                        continue;
-                    }
-                }
-                ranges.push(range.clone());
-            }
-        }
-    }
-    let mut boundaries: Vec<_> = index
-        .blocks
-        .iter()
-        .enumerate()
-        .filter(|(i, block)| *i == 0 || index.blocks.block(*i - 1).hash != block.hash)
-        .map(|(_, block)| block.row_start as usize)
-        .collect();
-    boundaries.push(index.parent.rows as usize);
-    for range in &ranges {
-        ensure!(
-            boundaries.contains(&range.start) && boundaries.contains(&range.end),
-            "partial series"
+        assert_eq!(
+            decoded_rows(&blob, &index),
+            rows.iter().map(|r| (r.0, r.1, r.2)).collect::<Vec<_>>()
         );
     }
-    Ok(index
-        .blocks
-        .iter()
-        .enumerate()
-        .filter(|(_, block)| {
-            ranges.iter().any(|range| {
-                range.start as u64 <= block.row_start
-                    && block.row_start + u64::from(block.row_count) <= range.end as u64
-            }) && hashes.is_none_or(|(lo, hi)| lo <= block.hash && block.hash <= hi)
-                && time.is_none_or(|(lo, hi)| {
-                    lo <= hi && lo <= block.max_timestamp && block.min_timestamp <= hi
-                })
-        })
-        .map(|(i, _)| i)
-        .collect())
-}
-
-#[test]
-fn dense_row_lookup_matches_independent_series_range_reference() {
-    let index = index(&fixture(), &[]).unwrap();
-    let mut selections = vec![None, Some(Vec::new())];
-    for start in 0..=8 {
-        for end in 0..=8 {
-            selections.push(Some(vec![start..end]));
-            selections.push(Some(vec![0..start, end..7]));
-        }
-    }
-    for ranges in selections {
-        for hashes in [
-            None,
-            Some((0, 0)),
-            Some((1, 1)),
-            Some((u64::MAX, u64::MAX)),
-            Some((2, 1)),
-        ] {
-            for time in [
-                None,
-                Some((10, 10)),
-                Some((i64::MIN, i64::MAX)),
-                Some((26, 27)),
-                Some((2, 1)),
-            ] {
-                let expected = linear_selection_reference(&index, ranges.as_deref(), hashes, time);
-                let actual = index.select_blocks(ranges.as_deref(), hashes, time);
-                assert_eq!(
-                    actual.is_ok(),
-                    expected.is_ok(),
-                    "ranges={ranges:?}, hash={hashes:?}, time={time:?}"
-                );
-                if let Ok(expected) = expected {
-                    assert_eq!(actual.unwrap(), expected);
-                }
-            }
-        }
-    }
-}
-
-#[test]
-fn compact_row_lookup_shares_one_immutable_base_and_counts_actual_storage() {
-    let index = index(&fixture(), &[]).unwrap();
-    assert_eq!(index.estimated_directory_size(), 4 * 72 + 1);
-    let other = index.project(&[]).unwrap();
-    assert!(Arc::ptr_eq(&index.base, &other.base));
-    assert_eq!(
-        other.select_blocks(Some(&[4..7]), None, None).unwrap(),
-        vec![2, 3]
-    );
-}
-
-#[test]
-fn dense_row_lookup_rejects_descriptor_divergence_and_partial_series_before_pruning() {
-    let blob = fixture();
-    for endpoint in [0, 2] {
-        let mut starts = vec![0, 2, 4, 6];
-        starts[endpoint] += 1;
-        let corrupt = replace_column(&blob, 1, Arc::new(UInt64Array::from(starts)));
-        assert!(index(&corrupt, &[]).is_err());
-    }
-    let corrupt = replace_column(&blob, 2, Arc::new(UInt32Array::from(vec![2, 2, 2, 2])));
-    assert!(index(&corrupt, &[]).is_err());
-    let index = crate::tests::index(&blob, &[]).unwrap();
-    for ranges in [
-        vec![1..4],
-        vec![0..3],
-        vec![2..4],
-        vec![4..6],
-        vec![0..4, 6..7],
-    ] {
-        assert!(
-            index
-                .select_blocks(Some(&ranges), Some((2, 1)), Some((2, 1)))
-                .is_err()
-        );
-    }
-    assert_eq!(
-        index
-            .select_blocks(Some(&[0..2, 2..4]), None, None)
-            .unwrap(),
-        vec![0, 1]
-    );
 }
 
 #[test]
 fn compact_metadata_rejects_truncation_corruption_and_excessive_claims() {
     let compact = fixture();
-    let footer = read_footer(&compact[compact.len() - FOOTER_LEN..], compact.len() as u64).unwrap();
+    let footer = test_footer(&compact);
     let metadata =
         &compact[footer.metadata_range.start as usize..footer.metadata_range.end as usize];
     for n in 0..metadata.len() {
@@ -790,9 +573,9 @@ fn compact_metadata_rejects_truncation_corruption_and_excessive_claims() {
     for target in ["rows", "section"] {
         let mut h = header.clone();
         if target == "rows" {
-            h["rows"] = (MAX_BLOCKS + 1).into();
+            h["rows"] = usize::MAX.into();
         } else {
-            h["sections"][0]["raw"] = (MAX_METADATA_BYTES + 1).into();
+            h["sections"][0]["raw"] = usize::MAX.into();
         }
         let encoded = serde_json::to_vec(&h).unwrap();
         let mut bad = b"O2META01".to_vec();
@@ -804,16 +587,14 @@ fn compact_metadata_rejects_truncation_corruption_and_excessive_claims() {
 }
 
 #[test]
-fn compact_encoder_classifies_capacity_for_optional_format_fallback() {
+fn compact_encoder_accepts_large_metadata_header() {
     let blob = fixture();
-    let footer = read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64).unwrap();
+    let footer = test_footer(&blob);
     let encoded = crate::compact::CompactMetadata::parse(
         &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
     )
     .unwrap();
-    let original = encoded
-        .batch(&(0..encoded.schema().fields().len()).collect::<Vec<_>>())
-        .unwrap();
+    let original = expanded_metadata_batch(&encoded).unwrap();
     let mut metadata = original.schema().metadata().clone();
     metadata.insert("large".into(), "x".repeat(1024 * 1024));
     let schema = Arc::new(Schema::new_with_metadata(
@@ -821,35 +602,21 @@ fn compact_encoder_classifies_capacity_for_optional_format_fallback() {
         metadata,
     ));
     let oversized = RecordBatch::try_new(schema, original.columns().to_vec()).unwrap();
-    let error = crate::compact::encode(&oversized).unwrap_err();
-    assert!(is_format_limit_error(&error));
+    let bytes = crate::compact::encode(&oversized).unwrap();
+    assert!(crate::compact::CompactMetadata::parse(&bytes).is_ok());
 }
 
 #[test]
 fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
-    use parquet::{
-        arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder},
-        file::properties::WriterProperties,
-    };
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     let input = batch(&rows());
-    let mut parquet = Vec::new();
-    let props = WriterProperties::builder()
-        .set_max_row_group_row_count(Some(3))
-        .build();
-    let mut writer = ArrowWriter::try_new(&mut parquet, input.schema(), Some(props)).unwrap();
-    writer.write(&input).unwrap();
-    writer.close().unwrap();
-    let original = Bytes::from(parquet);
-    let parent = ParentIdentity {
+    let original = parquet_bytes(&input, 3);
+    let parent = ParentMetadata {
         compressed_size: original.len() as u64,
         ..parent()
     };
     let container = build_from_parquet(original.clone(), parent.clone()).unwrap();
-    let footer = read_footer(
-        &container[container.len() - FOOTER_LEN..],
-        container.len() as u64,
-    )
-    .unwrap();
+    let footer = test_footer(&container);
     let parsed = decode_index(
         Bytes::copy_from_slice(
             &container[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
@@ -862,13 +629,10 @@ fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
     assert_eq!(footer.version, VERSION);
     assert_eq!(parsed.row_group_size, Some(3));
     assert_eq!(parsed.source_schema, input.schema());
-    let mut actual = Vec::new();
-    for block in &parsed.blocks {
-        let range = block.payload_range();
-        let decoded =
-            decode_block(&container[range.start as usize..range.end as usize], &block).unwrap();
-        actual.extend(decoded.timestamps.into_iter().zip(decoded.value_bits));
-    }
+    let actual = decoded_rows(&container, &parsed)
+        .into_iter()
+        .map(|(_, t, v)| (t, v))
+        .collect::<Vec<_>>();
     assert_eq!(
         actual,
         rows().iter().map(|r| (r.1, r.2)).collect::<Vec<_>>()
@@ -893,17 +657,13 @@ fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
 }
 
 #[test]
-fn pending_writer_requires_real_parent_and_verifies_final_parquet_identity() {
-    use parquet::arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder};
+fn pending_writer_requires_source_metadata_and_verifies_final_parquet_rows() {
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     let input = batch(&rows());
-    let mut data = Vec::new();
-    let mut parquet = ArrowWriter::try_new(&mut data, input.schema(), None).unwrap();
-    parquet.write(&input).unwrap();
-    parquet.close().unwrap();
-    let bytes = Bytes::from(data);
+    let bytes = parquet_bytes(&input, 3);
     let reader = ParquetRecordBatchReaderBuilder::try_new(bytes.clone()).unwrap();
     let metadata = reader.metadata().as_ref().clone();
-    let parent = ParentIdentity {
+    let parent = ParentMetadata {
         compressed_size: bytes.len() as u64,
         ..parent()
     };
@@ -922,7 +682,7 @@ fn pending_writer_requires_real_parent_and_verifies_final_parquet_identity() {
             .is_err()
     );
     let mut wrong = parent.clone();
-    wrong.object_key = "not-a-metrics-parent".into();
+    wrong.compressed_size = 0;
     assert!(
         pending()
             .finish_for_parquet(wrong, metadata.clone())
@@ -932,4 +692,254 @@ fn pending_writer_requires_real_parent_and_verifies_final_parquet_identity() {
         .finish_for_parquet(parent.clone(), metadata)
         .unwrap();
     assert_eq!(encoded, build_from_parquet(bytes, parent).unwrap());
+}
+
+#[test]
+fn v2_footer_and_numeric_parent_have_no_key_or_checksum_columns() {
+    let blob = fixture();
+    let end = &blob[blob.len() - FOOTER_LEN..];
+    assert_eq!(FOOTER_LEN, 32);
+    assert_eq!(&end[..4], &2u32.to_le_bytes());
+    assert_eq!(&end[4..8], &[0; 4]);
+    assert_eq!(&end[24..], b"O2MIDX02");
+    let footer = read_footer(end, blob.len() as u64).unwrap();
+    assert_eq!(
+        u64::from_le_bytes(end[8..16].try_into().unwrap()),
+        footer.payload_end
+    );
+    assert_eq!(
+        u64::from_le_bytes(end[16..24].try_into().unwrap()),
+        footer.metadata_range.end - footer.metadata_range.start
+    );
+    let metadata = crate::compact::CompactMetadata::parse(
+        &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+    )
+    .unwrap();
+    let schema = metadata.schema();
+    assert_eq!(schema.fields().len(), 8 + 2);
+    assert!(
+        schema
+            .fields()
+            .iter()
+            .all(|field| !field.name().contains("checksum"))
+    );
+    let parent: serde_json::Value = serde_json::from_str(&schema.metadata()[PARENT_KEY]).unwrap();
+    assert_eq!(
+        parent,
+        serde_json::json!({"rows": 7, "compressed_size": 123})
+    );
+}
+
+#[test]
+fn terminal_footer_rejects_truncation_and_invalid_structure() {
+    let blob = fixture();
+    for length in 0..blob.len() {
+        let truncated = &blob[..length];
+        let suffix = &truncated[length.saturating_sub(FOOTER_LEN)..];
+        assert!(read_footer(suffix, length as u64).is_err());
+    }
+    for (range, bytes) in [
+        (0..4, 1u32.to_le_bytes().to_vec()),
+        (4..8, 1u32.to_le_bytes().to_vec()),
+        (8..16, u64::MAX.to_le_bytes().to_vec()),
+        (16..24, 0u64.to_le_bytes().to_vec()),
+        (16..24, u64::MAX.to_le_bytes().to_vec()),
+        (24..32, b"INCOMPLT".to_vec()),
+    ] {
+        let mut invalid = blob[blob.len() - FOOTER_LEN..].to_vec();
+        invalid[range].copy_from_slice(&bytes);
+        assert!(read_footer(&invalid, blob.len() as u64).is_err());
+    }
+    assert!(read_footer(&blob[blob.len() - FOOTER_LEN..], blob.len() as u64 + 1).is_err());
+}
+
+#[test]
+fn completion_marker_is_last_and_write_or_flush_errors_propagate() {
+    let complete = fixture();
+    let footer = test_footer(&complete);
+    for (fail_after, fail_flush) in [
+        (footer.metadata_range.start as usize + 1, usize::MAX),
+        (complete.len() - 9, usize::MAX),
+        (complete.len() - 4, usize::MAX),
+        (usize::MAX, 1),
+        (usize::MAX, 2),
+        (usize::MAX, usize::MAX),
+    ] {
+        let state = Arc::new(std::sync::Mutex::new(WriteState::default()));
+        let output = FailureWriter {
+            state: Arc::clone(&state),
+            fail_after,
+            fail_flush,
+        };
+        let mut writer = BlockWriter::new(
+            output,
+            schema(),
+            vec!["label_a".into(), "label_b".into()],
+            parent(),
+            2,
+        )
+        .unwrap();
+        writer.write(&batch(&rows())).unwrap();
+        let result = writer.finish();
+        let observed = state.lock().unwrap();
+        if fail_after == usize::MAX && fail_flush == usize::MAX {
+            assert!(result.is_ok());
+            assert_eq!(observed.bytes, complete);
+            assert_eq!(observed.flush_has_marker, [false, true]);
+        } else {
+            assert!(result.is_err());
+            if fail_flush != 2 {
+                assert!(!observed.bytes.ends_with(MAGIC));
+            }
+        }
+    }
+}
+
+#[test]
+fn vortex_finalizer_preserves_schema_without_row_groups() {
+    let input = batch(&rows());
+    let mut writer = BlockWriter::new_pending(Vec::new(), input.schema(), 2).unwrap();
+    writer.write(&input).unwrap();
+    let encoded = writer.finish_for_vortex(parent(), input.schema()).unwrap();
+    let decoded = index(&encoded, &["label_a", "label_b"]).unwrap();
+    assert_eq!(decoded.parent, parent());
+    assert_eq!(decoded.row_group_size, None);
+    assert_eq!(decoded.source_schema, input.schema());
+    assert_eq!(
+        decoded_rows(&encoded, &decoded),
+        rows().iter().map(|r| (r.0, r.1, r.2)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    let directory = tempfile::tempdir().unwrap();
+    let data_path = directory.path().join("indexed-v1-before.parquet");
+    let midx_path = directory.path().join("indexed-v1-before.midx");
+    let input = batch(&rows());
+    let original = parquet_bytes(&input, 3);
+    std::fs::write(&data_path, &original).unwrap();
+    let source = ParentMetadata {
+        rows: input.num_rows() as u64,
+        compressed_size: original.len() as u64,
+    };
+    std::fs::write(&midx_path, build_from_parquet(original, source).unwrap()).unwrap();
+    let moved = directory.path().join("moved");
+    std::fs::create_dir(&moved).unwrap();
+    let moved_data = moved.join("indexed-v1-after.parquet");
+    let moved_index = moved.join("indexed-v1-after.midx");
+    std::fs::rename(data_path, &moved_data).unwrap();
+    std::fs::rename(midx_path, &moved_index).unwrap();
+    let source =
+        ParquetRecordBatchReaderBuilder::try_new(Bytes::from(std::fs::read(&moved_data).unwrap()))
+            .unwrap();
+    let expected = ParentMetadata {
+        rows: source.metadata().file_metadata().num_rows() as u64,
+        compressed_size: std::fs::metadata(moved_data).unwrap().len(),
+    };
+    let blob = std::fs::read(moved_index).unwrap();
+    let footer = test_footer(&blob);
+    let parsed = decode_index(
+        Bytes::copy_from_slice(
+            &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+        ),
+        &footer,
+        &expected,
+        &["label_a".into()],
+    )
+    .unwrap();
+    assert_eq!(parsed.parent, expected);
+    assert_eq!(parsed.source_schema, input.schema());
+    assert_eq!(
+        parsed
+            .blocks
+            .iter()
+            .map(|block| u64::from(block.row_count))
+            .sum::<u64>(),
+        input.num_rows() as u64
+    );
+}
+
+#[test]
+fn vortex_finalizer_rejects_invalid_source_metadata() {
+    let input = batch(&rows());
+    let pending = || {
+        let mut writer = BlockWriter::new_pending(Vec::new(), input.schema(), 2).unwrap();
+        writer.write(&input).unwrap();
+        writer
+    };
+    let changed = Arc::new(
+        input
+            .schema()
+            .as_ref()
+            .clone()
+            .with_metadata(HashMap::from([(
+                "semantic".to_owned(),
+                "changed".to_owned(),
+            )])),
+    );
+    assert!(pending().finish_for_vortex(parent(), changed).is_err());
+    let zero = ParentMetadata {
+        rows: 0,
+        compressed_size: 123,
+    };
+    assert!(pending().finish_for_vortex(zero, input.schema()).is_err());
+}
+
+#[test]
+fn sample_payload_requires_one_complete_frame() {
+    let blob = fixture();
+    let parsed = index(&blob, &[]).unwrap();
+    let mut block = parsed.blocks.block(0);
+    let range = block.block_range();
+    let original = &blob[range.start as usize..range.end as usize];
+    let mut trailing = original.to_vec();
+    trailing.push(0);
+    block.block_length = trailing.len() as u32;
+    assert!(decode_block(&trailing, &block).is_err());
+    block.block_length = (original.len() - 1) as u32;
+    assert!(decode_block(&original[..original.len() - 1], &block).is_err());
+}
+
+#[test]
+#[ignore = "Exercises a directory with over one million blocks"]
+fn more_than_one_million_blocks_roundtrip() {
+    let rows = 1_000_001usize;
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("__hash__", DataType::UInt64, false),
+        Field::new("_timestamp", DataType::Int64, false),
+        Field::new("value", DataType::Float64, false),
+    ]));
+    let batch = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(UInt64Array::from(vec![7; rows])),
+            Arc::new(Int64Array::from_iter_values(0..rows as i64)),
+            Arc::new(Float64Array::from(vec![1.; rows])),
+        ],
+    )
+    .unwrap();
+    let parent = ParentMetadata {
+        rows: rows as u64,
+        compressed_size: 100,
+    };
+    let mut writer = BlockWriter::new(Vec::new(), schema, vec![], parent.clone(), 1).unwrap();
+    writer.write(&batch).unwrap();
+    let bytes = writer.finish().unwrap();
+    let footer = test_footer(&bytes);
+    let metadata = Bytes::copy_from_slice(
+        &bytes[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+    );
+    let index = decode_index(metadata, &footer, &parent, &[]).unwrap();
+    assert_eq!(index.blocks.len(), rows);
+    for (i, block) in index.blocks.iter().enumerate() {
+        assert_eq!(block.hash, 7);
+        let range = block.block_range();
+        let decoded =
+            decode_block(&bytes[range.start as usize..range.end as usize], &block).unwrap();
+        assert_eq!(decoded.timestamps, vec![i as i64]);
+        assert_eq!(decoded.value_bits, vec![1f64.to_bits()]);
+    }
+    eprintln!("one series, {} blocks, {} MIDX bytes", rows, bytes.len());
 }

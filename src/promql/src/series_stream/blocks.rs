@@ -36,16 +36,14 @@ use config::{
         },
         stream::{FileKey, FileSelection},
     },
-    metrics::metrics_index_blocks_cache::{
-        CacheMetrics, CacheRecorder, EvictionReason, LookupResult, METRICS, RejectionReason,
-    },
+    metrics::metrics_index_blocks_cache::{CacheMetrics, METRICS},
     utils::hash::gxhash,
 };
 use datafusion::error::DataFusionError;
 use futures::{StreamExt, stream};
 use hashbrown::{HashMap, HashSet};
 use hashlink::LruCache;
-use metrics_block::{BlockDecoder, DecodedBlockRef, Index, ParentIdentity};
+use metrics_block::{BlockDecoder, DecodedBlockRef, Index, ParentMetadata};
 use tokio::{
     sync::{OwnedSemaphorePermit, Semaphore},
     task::{JoinHandle, JoinSet},
@@ -68,6 +66,22 @@ static FILE_LOADS: LazyLock<Arc<loads::LoadRegistry>> =
     LazyLock::new(|| Arc::new(loads::LoadRegistry::default()));
 static INDEX_CACHE: LazyLock<Mutex<IndexCache>> =
     LazyLock::new(|| Mutex::new(IndexCache::new(METRICS.clone())));
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct ParentIdentity {
+    object_key: String,
+    rows: u64,
+    compressed_size: u64,
+}
+
+impl ParentIdentity {
+    fn metadata(&self) -> ParentMetadata {
+        ParentMetadata {
+            rows: self.rows,
+            compressed_size: self.compressed_size,
+        }
+    }
+}
 
 struct BlockingMetadata<T> {
     handle: JoinHandle<Result<T>>,
@@ -138,7 +152,6 @@ struct CachedIndex {
 struct IndexCache {
     entries: LruCache<CacheKey, (Arc<CachedIndex>, CacheWeight)>,
     bytes: usize,
-    components: [usize; 3],
     limit: usize,
     metrics: CacheMetrics,
 }
@@ -148,42 +161,32 @@ impl IndexCache {
         Self {
             entries: LruCache::new_unbounded(),
             bytes: 0,
-            components: [0; 3],
             limit: 0,
             metrics,
         }
     }
 
     fn trim(&mut self, limit: usize) {
-        self.update(|cache, recorder| {
-            cache.limit = limit;
-            cache.evict_until_fit(limit, recorder, EvictionReason::LimitShrink);
-        });
+        self.limit = limit;
+        self.evict_until_fit(limit);
     }
 
     fn get(&mut self, key: &CacheKey) -> Option<Arc<CachedIndex>> {
-        self.update(|cache, recorder| {
-            if cache.limit == 0 {
-                recorder.lookup(LookupResult::Disabled);
-                return None;
-            }
-            let entry = cache.entries.get(key).map(|entry| Arc::clone(&entry.0));
-            recorder.lookup(if entry.is_some() {
-                LookupResult::Hit
-            } else {
-                LookupResult::Miss
-            });
-            entry
-        })
+        if self.limit == 0 {
+            return None;
+        }
+        let entry = self.entries.get(key).map(|entry| Arc::clone(&entry.0));
+        if entry.is_some() {
+            self.metrics.hits.inc();
+        }
+        entry
     }
 
     fn remove(&mut self, key: &CacheKey) {
-        self.update(|cache, recorder| {
-            if let Some((_, weight)) = cache.entries.remove(key) {
-                cache.subtract(weight);
-                recorder.invalidated(weight.total);
-            }
-        });
+        if let Some((_, weight)) = self.entries.remove(key) {
+            self.bytes = self.bytes.saturating_sub(weight.total);
+            self.metrics.used.set(self.bytes as f64);
+        }
     }
 
     fn peek(&self, key: &CacheKey) -> Option<Arc<CachedIndex>> {
@@ -206,88 +209,54 @@ impl IndexCache {
         index: Arc<CachedIndex>,
         limit: usize,
     ) -> Result<Arc<CachedIndex>> {
-        self.update(|cache, recorder| {
-            cache.limit = limit;
-            if limit == 0 {
-                recorder.rejected(RejectionReason::Disabled);
-                return Ok(index);
-            }
-            let index = if let Some(existing) = cache
-                .peek(&key)
-                .filter(|existing| existing.binding == index.binding)
-            {
-                Arc::new(CachedIndex {
-                    index: Arc::new(existing.index.merge_columns(&index.index)?),
-                    binding: index.binding.clone(),
-                })
-            } else {
-                index
-            };
-            let weight = CacheWeight::new(&key, &index);
-            if weight.total > limit {
-                recorder.rejected(RejectionReason::Oversize);
-                return Ok(index);
-            }
-            let previous =
-                cache
-                    .entries
-                    .insert(key, (Arc::clone(&index), weight))
-                    .map(|(_, old)| {
-                        cache.subtract(old);
-                        old.total
-                    });
-            cache.bytes = cache.bytes.saturating_add(weight.total);
-            for (total, amount) in cache.components.iter_mut().zip(weight.components) {
-                *total = total.saturating_add(amount);
-            }
-            recorder.admitted(weight.total, previous);
-            cache.evict_until_fit(limit, recorder, EvictionReason::Capacity);
-            Ok(index)
-        })
+        self.limit = limit;
+        if limit == 0 {
+            return Ok(index);
+        }
+        let index = if let Some(existing) = self
+            .peek(&key)
+            .filter(|existing| existing.binding == index.binding)
+        {
+            Arc::new(CachedIndex {
+                index: Arc::new(existing.index.merge_columns(&index.index)?),
+                binding: index.binding.clone(),
+            })
+        } else {
+            index
+        };
+        let weight = CacheWeight::new(&key, &index);
+        if weight.total > limit {
+            return Ok(index);
+        }
+        if let Some((_, old)) = self.entries.insert(key, (Arc::clone(&index), weight)) {
+            self.bytes = self.bytes.saturating_sub(old.total);
+        }
+        self.bytes = self.bytes.saturating_add(weight.total);
+        self.evict_until_fit(limit);
+        Ok(index)
     }
 
-    fn evict_until_fit(
-        &mut self,
-        limit: usize,
-        recorder: &mut CacheRecorder,
-        reason: EvictionReason,
-    ) {
+    fn evict_until_fit(&mut self, limit: usize) {
         while self.bytes > limit {
             let Some((_, (_, weight))) = self.entries.remove_lru() else {
                 break;
             };
-            self.subtract(weight);
-            recorder.evicted(weight.total, reason);
+            self.bytes = self.bytes.saturating_sub(weight.total);
+            self.metrics.evictions.inc();
         }
-    }
-
-    fn subtract(&mut self, weight: CacheWeight) {
-        self.bytes = self.bytes.saturating_sub(weight.total);
-        for (total, amount) in self.components.iter_mut().zip(weight.components) {
-            *total = total.saturating_sub(amount);
-        }
-    }
-
-    fn update<T>(&mut self, update: impl FnOnce(&mut Self, &mut CacheRecorder) -> T) -> T {
-        let metrics = self.metrics.clone();
-        metrics.update(|recorder| {
-            let result = update(self, recorder);
-            recorder.resident(self.limit, self.bytes, self.entries.len(), self.components);
-            result
-        })
+        self.metrics.used.set(self.bytes as f64);
     }
 }
 
 impl Default for IndexCache {
     fn default() -> Self {
-        Self::new(CacheMetrics::new(0))
+        Self::new(CacheMetrics::default())
     }
 }
 
 #[derive(Clone, Copy)]
 struct CacheWeight {
     total: usize,
-    components: [usize; 3],
 }
 
 impl CacheWeight {
@@ -300,16 +269,7 @@ impl CacheWeight {
             .saturating_add(key.account.capacity())
             .saturating_add(key.parent.object_key.capacity())
             .saturating_add(8 * std::mem::size_of::<usize>());
-        let directory = index.index.estimated_directory_size().min(total);
-        let labels = index
-            .index
-            .labels
-            .get_array_memory_size()
-            .min(total - directory);
-        Self {
-            total,
-            components: [directory, labels, total - directory - labels],
-        }
+        Self { total }
     }
 }
 
@@ -565,7 +525,7 @@ impl FileCursor {
                 tokio::task::yield_now().await;
             }
             let block = &self.file.index.blocks.block(block_id);
-            let payload = mapping.payload(block.payload_range())?;
+            let payload = mapping.payload(block.block_range())?;
             stats.mapped_blocks += 1;
             stats.mapped_payload_bytes += payload.len() as u64;
             let decoded = decoder.decode(payload, block)?;
@@ -577,7 +537,12 @@ impl FileCursor {
             let mut end = self.next;
             let mut bytes = 0usize;
             while end < self.selected.len() && end - self.next < PREFETCH_BLOCKS {
-                let size = self.file.index.blocks.block(self.selected[end]).payload_len as usize;
+                let size = self
+                    .file
+                    .index
+                    .blocks
+                    .block(self.selected[end])
+                    .block_length as usize;
                 if end > self.next && bytes.saturating_add(size) > PREFETCH_BYTES {
                     break;
                 }
@@ -587,7 +552,7 @@ impl FileCursor {
             let ids = &self.selected[self.next..end];
             let ranges = ids
                 .iter()
-                .map(|id| self.file.index.blocks.block(*id).payload_range())
+                .map(|id| self.file.index.blocks.block(*id).block_range())
                 .collect::<Vec<_>>();
             let read_plan = plan_coalesced_ranges(
                 &ranges,
@@ -860,7 +825,7 @@ pub(super) async fn prepare(
             "duplicate block parent"
         );
         ensure!(
-            matches!(file.selection, Some(FileSelection::RowRanges(_))),
+            scan.unfiltered || matches!(file.selection, Some(FileSelection::RowRanges(_))),
             "exact row-range selection required"
         );
     }
@@ -904,13 +869,16 @@ pub(super) async fn prepare(
         .iter()
         .zip(loaded)
         .map(|(source, file)| {
-            let Some(FileSelection::RowRanges(ranges)) = &source.selection else {
-                unreachable!()
+            let ranges = match &source.selection {
+                Some(FileSelection::RowRanges(ranges)) => Some(Arc::clone(ranges)),
+                None if scan.unfiltered => None,
+                _ => unreachable!("selection was validated"),
             };
-            let ranges = Arc::clone(ranges);
             async move {
                 tokio::task::yield_now().await;
-                let ids = file.index.select_blocks(Some(&ranges), None, None)?;
+                let ids =
+                    file.index
+                        .select_blocks(ranges.as_deref().map(Vec::as_slice), None, None)?;
                 ensure!(
                     ids.windows(2).all(|pair| pair[0] < pair[1]),
                     "block selection is not unique and ordered"
@@ -1133,11 +1101,9 @@ fn load_opened_local_index_with(
             Bytes::copy_from_slice(bytes)
         } else {
             let length = usize::try_from(range.end - range.start)?;
-            ensure!(
-                length <= metrics_block::MAX_METADATA_BYTES,
-                "block metadata exceeds format limit"
-            );
-            let mut bytes = vec![0; length];
+            let mut bytes = Vec::new();
+            bytes.try_reserve_exact(length)?;
+            bytes.resize(length, 0);
             local.file.read_exact_at(&mut bytes, range.start)?;
             Bytes::from(bytes)
         };
@@ -1194,8 +1160,12 @@ async fn load_index_cached(
         parent.rows > 0 && parent.compressed_size > 0,
         "invalid block parent identity"
     );
-    let sidecar =
-        metrics_block::sidecar_path(&file.key).context("unsupported block parent layout")?;
+    ensure!(
+        file.meta.mindex_size > 0,
+        "block sidecar size is not recorded"
+    );
+    let sidecar = config::meta::promql::blocks::metrics_index_path(&file.key)
+        .context("unsupported block parent layout")?;
     let key = CacheKey {
         account: file.account.clone(),
         parent: parent.clone(),
@@ -1259,20 +1229,42 @@ async fn load_entry(
         return Ok((cached.unwrap(), None));
     }
     let location = sidecar.into();
-    let size = infra::cache::storage::head(&file.account, &location)
-        .await?
-        .size;
+    let mut size = u64::try_from(file.meta.mindex_size)?;
     ensure!(
         size >= metrics_block::FOOTER_LEN as u64,
         "short block sidecar"
     );
-    let bytes = infra::cache::storage::get_range(
+    let first = infra::cache::storage::get_range(
         &file.account,
         &location,
         size - metrics_block::FOOTER_LEN as u64..size,
     )
-    .await?;
-    let (binding, footer) = SidecarBinding::parse(size, &bytes)?;
+    .await
+    .map_err(anyhow::Error::from)
+    .and_then(|bytes| SidecarBinding::parse(size, &bytes));
+    let (binding, footer) = match first {
+        Ok(parsed) => parsed,
+        Err(error) => {
+            let actual = infra::cache::storage::head(&file.account, &location)
+                .await?
+                .size;
+            if actual == size {
+                return Err(error);
+            }
+            size = actual;
+            ensure!(
+                size >= metrics_block::FOOTER_LEN as u64,
+                "short block sidecar"
+            );
+            let bytes = infra::cache::storage::get_range(
+                &file.account,
+                &location,
+                size - metrics_block::FOOTER_LEN as u64..size,
+            )
+            .await?;
+            SidecarBinding::parse(size, &bytes)?
+        }
+    };
     if let Some(cached) = &cached {
         ensure!(
             cached.binding == binding,
@@ -1305,7 +1297,7 @@ fn decode_cached_metadata(
             metrics_block::decode_additional_labels(metadata, footer, &cached.index, &missing)?;
         cached.index.merge_columns(&additional)?
     } else {
-        metrics_block::decode_index(metadata, footer, parent, labels)?
+        metrics_block::decode_index(metadata, footer, &parent.metadata(), labels)?
     };
     validate_projected_labels(&index, labels)?;
     Ok(Arc::new(CachedIndex {
@@ -1482,7 +1474,7 @@ async fn validate_partition(
                 if block.max_timestamp >= window.0 && block.min_timestamp <= window.1 {
                     selected.push(id);
                     result.selected_blocks += 1;
-                    result.selected_bytes += u64::from(block.payload_len);
+                    result.selected_bytes += u64::from(block.block_length);
                 }
             }
             tokio::task::yield_now().await;
@@ -1669,7 +1661,9 @@ mod tests {
                 store
                     .inner
                     .put_opts(
-                        &metrics_block::sidecar_path(&file.key).unwrap().into(),
+                        &config::meta::promql::blocks::metrics_index_path(&file.key)
+                            .unwrap()
+                            .into(),
                         Bytes::from(bytes.clone()).into(),
                         PutOptions::default(),
                     )
@@ -1692,6 +1686,7 @@ mod tests {
         fn scan(&self, files: impl IntoIterator<Item = FileKey>) -> MetricsBlockScan {
             MetricsBlockScan {
                 table_name: "m".into(),
+                unfiltered: false,
                 files: files
                     .into_iter()
                     .map(|mut file| {
@@ -1822,8 +1817,14 @@ mod tests {
             rows: records as u64,
             compressed_size: 123,
         };
-        let mut writer =
-            BlockWriter::new(Vec::new(), batch.schema(), label_columns, parent, 2).unwrap();
+        let mut writer = BlockWriter::new(
+            Vec::new(),
+            batch.schema(),
+            label_columns,
+            parent.metadata(),
+            2,
+        )
+        .unwrap();
         writer.write(&batch).unwrap();
         let bytes = writer.finish().unwrap();
         let mut file = FileKey::new(
@@ -1833,6 +1834,7 @@ mod tests {
             FileMeta {
                 records: records as i64,
                 compressed_size: 123,
+                mindex_size: bytes.len() as i64,
                 min_ts,
                 max_ts,
                 ..Default::default()
@@ -2072,8 +2074,7 @@ mod tests {
                 &bytes[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
             ),
             &footer,
-            &ParentIdentity {
-                object_key: key.key.clone(),
+            &ParentMetadata {
                 rows: 6,
                 compressed_size: 123,
             },
@@ -2082,7 +2083,7 @@ mod tests {
         .unwrap();
         assert_eq!(index.blocks.len(), 3);
         // The gap is read but its unselected payload must never be decoded.
-        bytes[index.blocks.block(1).payload_offset as usize] ^= 1;
+        bytes[index.blocks.block(1).block_offset as usize] ^= 1;
         key.with_selection(
             FileSelection::RowRanges(Arc::new(vec![0..2, 4..6])),
             Some(131072),
@@ -2580,11 +2581,11 @@ mod tests {
                 &bytes[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
             ),
             &footer,
-            &parent,
+            &parent.metadata(),
             &["group".into()],
         )
         .unwrap();
-        bytes[index.blocks.block(0).payload_offset as usize] ^= 1;
+        bytes[index.blocks.block(0).block_offset as usize] ^= 1;
         let fixture = Fixture::new(&[(key.clone(), bytes)], false).await;
         let prepared = prepare(
             &fixture.scan([key]),
@@ -2696,7 +2697,9 @@ mod tests {
                 infra::storage::LocalFile {
                     file,
                     meta: ObjectMeta {
-                        location: metrics_block::sidecar_path(&self.key.key).unwrap().into(),
+                        location: config::meta::promql::blocks::metrics_index_path(&self.key.key)
+                            .unwrap()
+                            .into(),
                         last_modified: chrono::Utc::now(),
                         size,
                         e_tag: None,
@@ -2804,7 +2807,8 @@ mod tests {
                         let disk = disks
                             .iter()
                             .find(|disk| {
-                                metrics_block::sidecar_path(&disk.key.key).as_ref()
+                                config::meta::promql::blocks::metrics_index_path(&disk.key.key)
+                                    .as_ref()
                                     == Some(&sidecar)
                             })
                             .unwrap();
@@ -2959,7 +2963,7 @@ mod tests {
             std::fs::remove_file(&disk.path).unwrap();
             let block = &entry.index.blocks.block(0);
             let decoded =
-                metrics_block::decode_block(mapping.payload(block.payload_range()).unwrap(), block)
+                metrics_block::decode_block(mapping.payload(block.block_range()).unwrap(), block)
                     .unwrap();
             assert_eq!(
                 decoded.value_bits,
@@ -2971,31 +2975,36 @@ mod tests {
         }
 
         #[test]
-        fn same_size_changed_footer_and_invalid_files_reject_before_mapping() {
+        fn changed_footer_and_invalid_files_reject_before_mapping() {
             let data = file(&[(1, 10, 1.0, Some("alpha")), (1, 20, 2.0, Some("alpha"))]);
             let disk = DiskFixture::new(&data);
             let (entry, map) =
                 load_opened_local_index(disk.open(), None, &disk.parent(), &["group".into()])
                     .unwrap();
             drop(map);
-            let mut writer =
-                BlockWriter::new(Vec::new(), schema(), vec!["group".into()], disk.parent(), 2)
-                    .unwrap();
+            let mut writer = BlockWriter::new(
+                Vec::new(),
+                schema(),
+                vec!["group".into()],
+                disk.parent().metadata(),
+                2,
+            )
+            .unwrap();
             writer
                 .write(&batch(&[
-                    (1, 10, 1.0, Some("bravo")),
-                    (1, 20, 2.0, Some("bravo")),
+                    (1, 10, 1.0, Some("bravo-longer")),
+                    (1, 20, 2.0, Some("bravo-longer")),
                 ]))
                 .unwrap();
             let replacement = writer.finish().unwrap();
-            assert_eq!(replacement.len(), disk.original.len());
+            assert_ne!(replacement.len(), disk.original.len());
             disk.replace(&replacement);
             let result = load_opened_local_index_with(
                 disk.open(),
                 Some(entry),
                 &disk.parent(),
                 &["group".into()],
-                |_, _, _| panic!("identity mismatch must precede mmap"),
+                |_, _, _| panic!("changed footer must precede mmap"),
             );
             assert!(
                 result
@@ -3112,7 +3121,7 @@ mod tests {
             assert!(map.payload(0..map.payload_end).is_ok());
             drop(map);
             let mut invalid = disk.original.clone();
-            invalid[entry.index.blocks.block(0).payload_offset as usize] ^= 1;
+            invalid[entry.index.blocks.block(0).block_offset as usize] ^= 1;
             disk.replace(&invalid);
             let (cached, map) = load_opened_local_index(
                 disk.open(),
@@ -3124,7 +3133,7 @@ mod tests {
             let map = map.unwrap();
             let block = &cached.index.blocks.block(0);
             assert!(
-                metrics_block::decode_block(map.payload(block.payload_range()).unwrap(), block)
+                metrics_block::decode_block(map.payload(block.block_range()).unwrap(), block)
                     .is_err()
             );
         }
@@ -3250,7 +3259,7 @@ mod tests {
     }
 
     fn observed_cache() -> (IndexCache, prometheus::Registry) {
-        let metrics = CacheMetrics::new(0);
+        let metrics = CacheMetrics::default();
         let registry = prometheus::Registry::new();
         registry.register(Box::new(metrics.clone())).unwrap();
         (IndexCache::new(metrics), registry)
@@ -3275,7 +3284,7 @@ mod tests {
                         [footer.metadata_range.start as usize..footer.metadata_range.end as usize],
                 ),
                 &footer,
-                &parent,
+                &parent.metadata(),
                 &["group".into()],
             )
             .unwrap(),
@@ -3297,25 +3306,13 @@ mod tests {
                 .strip_prefix("zo_metrics_index_blocks_cache_")
                 .unwrap();
             for metric in family.get_metric() {
-                assert!(metric.get_label().iter().all(|label| {
-                    [
-                        "cluster",
-                        "instance",
-                        "role",
-                        "component",
-                        "result",
-                        "reason",
-                    ]
-                    .contains(&label.name())
-                }));
-                let label = metric
-                    .get_label()
-                    .iter()
-                    .find(|label| ["component", "result", "reason"].contains(&label.name()));
-                let name = label.map_or_else(
-                    || name.to_owned(),
-                    |label| format!("{name}:{}", label.value()),
+                assert!(
+                    metric
+                        .get_label()
+                        .iter()
+                        .all(|label| { ["cluster", "instance", "role"].contains(&label.name()) })
                 );
+                let name = name.to_owned();
                 let value = if metric.gauge.is_some() {
                     metric.gauge.as_ref().unwrap().value()
                 } else {
@@ -3325,28 +3322,7 @@ mod tests {
                 assert!(values.insert(name, value).is_none());
             }
         }
-        assert_eq!(
-            values["accounted_bytes:directory"]
-                + values["accounted_bytes:labels"]
-                + values["accounted_bytes:other"],
-            values["used_bytes"]
-        );
-        assert_eq!(
-            values["admitted_bytes_total"]
-                - values["replaced_bytes_total"]
-                - values["evicted_bytes_total:capacity"]
-                - values["evicted_bytes_total:limit_shrink"]
-                - values["invalidated_bytes_total"],
-            values["used_bytes"]
-        );
-        assert_eq!(
-            values["admissions_total"]
-                - values["replacements_total"]
-                - values["evictions_total:capacity"]
-                - values["evictions_total:limit_shrink"]
-                - values["invalidations_total"],
-            values["entries"]
-        );
+        assert_eq!(values.len(), 3);
         values
     }
 
@@ -3365,12 +3341,6 @@ mod tests {
             .unwrap();
         let first = cache_snapshot(&registry);
         assert_eq!(first["used_bytes"], weight.total as f64);
-        for (name, bytes) in ["directory", "labels", "other"]
-            .into_iter()
-            .zip(weight.components)
-        {
-            assert_eq!(first[&format!("accounted_bytes:{name}")], bytes as f64);
-        }
         cache
             .insert(b.clone(), Arc::clone(&entry), weight.total * 2)
             .unwrap();
@@ -3381,34 +3351,20 @@ mod tests {
         assert!(cache.get(&b).is_none());
         assert!(cache.get(&a).is_some());
         cache.insert(a.clone(), entry, weight.total * 2).unwrap();
+        assert_eq!(
+            cache_snapshot(&registry)["used_bytes"],
+            (weight.total * 2) as f64
+        );
+        assert_eq!(cache_snapshot(&registry)["evictions_total"], 1.0);
         cache.remove(&c);
+        assert_eq!(cache_snapshot(&registry)["used_bytes"], weight.total as f64);
+        assert_eq!(cache_snapshot(&registry)["evictions_total"], 1.0);
         cache.remove(&c);
         cache.trim(weight.total - 1);
         let values = cache_snapshot(&registry);
-        for name in [
-            "used_bytes",
-            "entries",
-            "accounted_bytes:directory",
-            "accounted_bytes:labels",
-            "accounted_bytes:other",
-        ] {
-            assert_eq!(values[name], 0.0);
-        }
-        assert_eq!(values["lookups_total:hit"], 2.0);
-        assert_eq!(values["lookups_total:miss"], 2.0);
-        assert_eq!(values["admissions_total"], 4.0);
-        assert_eq!(values["admitted_bytes_total"], (weight.total * 4) as f64);
-        assert_eq!(values["replacements_total"], 1.0);
-        assert_eq!(values["replaced_bytes_total"], weight.total as f64);
-        assert_eq!(values["evictions_total:capacity"], 1.0);
-        assert_eq!(values["evicted_bytes_total:capacity"], weight.total as f64);
-        assert_eq!(values["evictions_total:limit_shrink"], 1.0);
-        assert_eq!(
-            values["evicted_bytes_total:limit_shrink"],
-            weight.total as f64
-        );
-        assert_eq!(values["invalidations_total"], 1.0);
-        assert_eq!(values["invalidated_bytes_total"], weight.total as f64);
+        assert_eq!(values["used_bytes"], 0.0);
+        assert_eq!(values["hits_total"], 2.0);
+        assert_eq!(values["evictions_total"], 2.0);
     }
 
     #[test]
@@ -3424,17 +3380,12 @@ mod tests {
             .insert(key.clone(), Arc::clone(&entry), weight.total - 1)
             .unwrap();
         let values = cache_snapshot(&registry);
-        assert_eq!(values["admission_rejections_total:disabled"], 1.0);
-        assert_eq!(values["admission_rejections_total:oversize"], 1.0);
-        assert_eq!(values["lookups_total:disabled"], 1.0);
-        assert_eq!(values["lookups_total:miss"], 1.0);
-        assert_eq!(values["admissions_total"], 0.0);
+        assert!(values.values().all(|value| *value == 0.0));
         cache.insert(key, entry, weight.total).unwrap();
         cache.trim(0);
         let reset = cache_snapshot(&registry);
-        assert_eq!(reset["limit_bytes"], 0.0);
         assert_eq!(reset["used_bytes"], 0.0);
-        assert_eq!(reset["entries"], 0.0);
+        assert_eq!(reset["evictions_total"], 1.0);
         let (_, registry) = observed_cache();
         assert!(
             cache_snapshot(&registry)
@@ -3473,12 +3424,10 @@ mod tests {
             }
         });
         let values = cache_snapshot(&registry);
-        assert_eq!(values["admissions_total"], 400.0);
-        assert_eq!(values["lookups_total:hit"], 400.0);
-        assert_eq!(values["invalidations_total"], 80.0);
-        assert!(values["evictions_total:capacity"] >= 1.0);
-        assert!(values["entries"] <= 3.0);
-        assert!(values["used_bytes"] <= values["limit_bytes"]);
+        assert_eq!(values["hits_total"], 400.0);
+        assert!(values["evictions_total"] >= 1.0);
+        assert!(values["used_bytes"] <= (weight.total * 3) as f64);
+        assert_eq!(values["used_bytes"], cache.lock().unwrap().bytes as f64);
     }
 
     #[tokio::test]
@@ -3500,11 +3449,8 @@ mod tests {
         cache.lock().unwrap().trim(0);
         let values = cache_snapshot(&registry);
         assert_eq!(values["used_bytes"], 0.0);
-        assert_eq!(values["entries"], 0.0);
-        assert_eq!(
-            values["evicted_bytes_total:limit_shrink"],
-            weight.total as f64
-        );
+        assert_eq!(values["evictions_total"], 1.0);
+        assert_eq!(values["hits_total"], 1.0);
         assert!(weak.upgrade().is_some());
         task.abort();
         assert!(task.await.unwrap_err().is_cancelled());
@@ -3531,7 +3477,7 @@ mod tests {
                         [footer.metadata_range.start as usize..footer.metadata_range.end as usize],
                 ),
                 &footer,
-                &parent,
+                &parent.metadata(),
                 &["group".into()],
             )
             .unwrap(),

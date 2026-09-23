@@ -17,6 +17,8 @@ const STREAM = 'alerts_p0_stream';
 const SINK = 'alerts_notify_sink'; // dogfood destination target — this instance's own ingest
 const TMPL = 'auto_p0_tmpl';
 const DEST = 'auto_p0_dest';
+// In-flight cap for batch alert creation — see createChildAlerts.
+const CREATE_CONCURRENCY = 4;
 
 /** Unique, human-readable name so parallel/repeat runs never collide. */
 const uniq = (p) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -134,13 +136,19 @@ async function getCompositeReferences(page, alertId) {
  *
  * The ten-child cap and the server-side child-limit cases both need more
  * children than is tolerable to create one await at a time, so these are
- * issued concurrently and resolved against a single list read.
+ * issued concurrently and resolved against a single list read. Concurrency is
+ * capped because a whole batch at once is what a shared deployment refuses: on
+ * the alpha cloud org, eleven simultaneous creates from one worker (while the
+ * other workers are doing the same) lost one to a connection timeout, which
+ * rejects out of the batch before the status check below can report anything.
  */
 async function createChildAlerts(page, prefix, count) {
   const names = Array.from({ length: count }, (_, i) => uniq(`${prefix}_${i}`));
-  const responses = await Promise.all(
-    names.map((name) => createAlert(page, simpleAlert(name))),
-  );
+  const responses = [];
+  for (let i = 0; i < names.length; i += CREATE_CONCURRENCY) {
+    const batch = names.slice(i, i + CREATE_CONCURRENCY);
+    responses.push(...(await Promise.all(batch.map((name) => createAlert(page, simpleAlert(name))))));
+  }
 
   // Fail here, loudly, rather than handing back {id: undefined}. An undefined
   // id flows into a composite expression as the literal string "{undefined}"
@@ -331,6 +339,15 @@ async function ingest(page, stream, rows) {
   return api(page, 'post', `${urls().v1}/${stream}/_json`, rows);
 }
 
+/**
+ * Delete a stream by name. `delete_all` stays false so a scheduled alert that
+ * references the stream is left orphaned — which is exactly what the chart
+ * error-state spec needs to make `generate_sql` fail on the detail page.
+ */
+async function deleteStream(page, stream, type = 'logs') {
+  return api(page, 'delete', `${urls().v1}/streams/${stream}?type=${type}`);
+}
+
 /** Per-group state of a multi-alert (empty list on a simple alert). */
 async function getAlertGroups(page, alertId) {
   const r = await api(page, 'get', `${urls().v2}/alerts/${alertId}/groups`);
@@ -395,6 +412,6 @@ module.exports = {
   createAlert, listAlerts, findAlertId, getAlert, deleteAlerts,
   seedAlertFixtures, seedAlertFixturesOnce,
   listAlertsInFolder, findAlertIdInFolder, deleteAlertInFolder, deleteAlertFolder,
-  createAlertFolder, ingest, getAlertGroups, getAlertTransitions,
+  createAlertFolder, ingest, deleteStream, getAlertGroups, getAlertTransitions,
   waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,
 };

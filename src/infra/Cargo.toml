@@ -24,6 +24,7 @@ hashbrown.workspace = true
 hashlink.workspace = true
 itertools.workspace = true
 log.workspace = true
+metrics_block.workspace = true
 async-nats.workspace = true
 object_store.workspace = true
 parking_lot.workspace = true
@@ -41,11 +42,13 @@ sea-orm-migration.workspace = true
 reqwest.workspace = true
 url.workspace = true
 tonic.workspace = true
+tonic-tracing-opentelemetry.workspace = true
+tower.workspace = true
 opentelemetry.workspace = true
-tracing-opentelemetry.workspace = true
 proto.workspace = true
 
 [dev-dependencies]
 collapse.workspace = true
 sea-orm = { workspace = true, features = ["mock"] }
 tempfile.workspace = true
+tracing-subscriber.workspace = true

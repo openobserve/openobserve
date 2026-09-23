@@ -71,7 +71,9 @@ impl SharedCacheFixture {
         self.storage
             .inner
             .put_opts(
-                &metrics_block::sidecar_path(&self.file.key).unwrap().into(),
+                &config::meta::promql::blocks::metrics_index_path(&self.file.key)
+                    .unwrap()
+                    .into(),
                 Bytes::from(bytes).into(),
                 PutOptions::default(),
             )
@@ -130,13 +132,12 @@ fn labeled_file() -> (FileKey, Vec<u8>) {
 }
 
 fn replacement(file: &FileKey) -> Vec<u8> {
-    let batch = labeled_batch("new");
+    let batch = labeled_batch("replacement-value-with-a-different-length-2026");
     let mut writer = BlockWriter::new(
         Vec::new(),
         batch.schema(),
         vec!["group".into(), "zone".into(), "instance".into()],
-        ParentIdentity {
-            object_key: file.key.clone(),
+        ParentMetadata {
             rows: file.meta.records as u64,
             compressed_size: file.meta.compressed_size as u64,
         },
@@ -177,7 +178,7 @@ async fn same_file_concurrent_projections_share_directory_and_columns() {
             views[b].index.labels.column(0)
         ));
     }
-    assert_eq!(fixture.metrics()["entries"], 1.0);
+    assert_eq!(fixture.cache.lock().unwrap().entries.len(), 1);
     assert!(fixture.storage.metadata_calls.load(Ordering::SeqCst) <= 9);
     assert_eq!(fixture.storage.calls.load(Ordering::SeqCst), 0);
     fixture.assert_idle();
@@ -214,7 +215,7 @@ async fn projection_churn_keeps_one_file_and_releases_unrequested_columns_on_evi
         assert_eq!(fixture.metrics()["used_bytes"], retained);
     }
     assert_eq!(fixture.storage.metadata_calls.load(Ordering::SeqCst), reads);
-    assert_eq!(fixture.metrics()["entries"], 1.0);
+    assert_eq!(fixture.cache.lock().unwrap().entries.len(), 1);
     drop(all);
     fixture.cache.lock().unwrap().trim(0);
     assert_eq!(fixture.metrics()["used_bytes"], 0.0);
@@ -241,10 +242,9 @@ async fn oversized_growth_preserves_admitted_subset_and_zero_budget_drops_it() {
         Some("old-unique-instance-00001000")
     );
     let values = fixture.metrics();
-    assert_eq!(values["entries"], 1.0);
+    assert_eq!(fixture.cache.lock().unwrap().entries.len(), 1);
     assert_eq!(values["used_bytes"], group_size as f64);
-    assert_eq!(values["admission_rejections_total:oversize"], 1.0);
-    assert_eq!(values["replacements_total"], 0.0);
+    assert_eq!(values["evictions_total"], 0.0);
     let cached = fixture.load(&["group"], group_size).await.unwrap();
     assert!(Arc::ptr_eq(
         group.index.labels.column(0),
@@ -258,8 +258,7 @@ async fn oversized_growth_preserves_admitted_subset_and_zero_budget_drops_it() {
     assert!(!Arc::ptr_eq(&group.index.base, &disabled.index.base));
     let values = fixture.metrics();
     assert_eq!(values["used_bytes"], 0.0);
-    assert_eq!(values["evictions_total:limit_shrink"], 1.0);
-    assert_eq!(values["admission_rejections_total:disabled"], 1.0);
+    assert_eq!(values["evictions_total"], 1.0);
     fixture.assert_idle();
 }
 
@@ -284,7 +283,7 @@ async fn cancelled_owner_wakes_follower_and_removes_inflight_state() {
         view.index.label_value(3, "zone").unwrap(),
         Some("old-zone-3")
     );
-    assert_eq!(fixture.metrics()["admissions_total"], 1.0);
+    assert_eq!(fixture.cache.lock().unwrap().entries.len(), 1);
     fixture.assert_idle();
 }
 
@@ -305,13 +304,13 @@ async fn failed_owner_propagates_to_followers_and_a_valid_retry_recovers() {
     for task in tasks {
         assert!(task.await.unwrap().is_err());
     }
-    assert_eq!(fixture.metrics()["admissions_total"], 0.0);
+    assert!(fixture.cache.lock().unwrap().entries.is_empty());
     fixture.assert_idle();
     fixture.replace(replacement(&fixture.file)).await;
     let view = fixture.load(&["zone"], 1024 * 1024).await.unwrap();
     assert_eq!(
         view.index.label_value(3, "zone").unwrap(),
-        Some("new-zone-3")
+        Some("replacement-value-with-a-different-length-2026-zone-3")
     );
     fixture.assert_idle();
 }
@@ -322,7 +321,8 @@ async fn additional_columns_reject_replaced_sidecar_without_mixing_old_and_new_v
     let old = fixture.load(&["group"], 1024 * 1024).await.unwrap();
     fixture.replace(replacement(&fixture.file)).await;
     assert!(fixture.load(&["zone"], 1024 * 1024).await.is_err());
-    assert_eq!(fixture.metrics()["invalidations_total"], 1.0);
+    assert_eq!(fixture.metrics()["evictions_total"], 0.0);
+    assert_eq!(fixture.metrics()["hits_total"], 1.0);
     assert_eq!(fixture.metrics()["used_bytes"], 0.0);
     let new = fixture.load(&["group", "zone"], 1024 * 1024).await.unwrap();
     assert!(!Arc::ptr_eq(&old.index.base, &new.index.base));
@@ -332,17 +332,17 @@ async fn additional_columns_reject_replaced_sidecar_without_mixing_old_and_new_v
     );
     assert_eq!(
         new.index.label_value(2, "group").unwrap(),
-        Some("new-group-2")
+        Some("replacement-value-with-a-different-length-2026-group-2")
     );
     assert_eq!(
         new.index.label_value(3, "zone").unwrap(),
-        Some("new-zone-3")
+        Some("replacement-value-with-a-different-length-2026-zone-3")
     );
     fixture.assert_idle();
 }
 
 #[tokio::test]
-async fn aggregate_growth_evicts_an_entire_other_file_and_reconciles_components() {
+async fn aggregate_growth_evicts_an_entire_other_file_and_reconciles_bytes() {
     let fixture = SharedCacheFixture::new(false).await;
     let other = SharedCacheFixture::new(false).await;
     let all = fixture
@@ -370,14 +370,14 @@ async fn aggregate_growth_evicts_an_entire_other_file_and_reconciles_components(
     let weak_other_base = Arc::downgrade(&other_view.index.base);
     assert!(!Arc::ptr_eq(&other_view.index.base, &group.index.base));
     drop(other_view);
-    assert_eq!(fixture.metrics()["entries"], 2.0);
+    assert_eq!(fixture.cache.lock().unwrap().entries.len(), 2);
     let grown = fixture.load(&["instance"], limit).await.unwrap();
     assert!(Arc::ptr_eq(&group.index.base, &grown.index.base));
     assert!(weak_other_base.upgrade().is_none());
     let values = fixture.metrics();
-    assert_eq!(values["entries"], 1.0);
-    assert_eq!(values["evictions_total:capacity"], 1.0);
+    assert_eq!(fixture.cache.lock().unwrap().entries.len(), 1);
+    assert_eq!(values["evictions_total"], 2.0);
     assert_eq!(values["used_bytes"], full_size as f64);
-    assert!(values["used_bytes"] <= values["limit_bytes"]);
+    assert!(values["used_bytes"] <= limit as f64);
     fixture.assert_idle();
 }

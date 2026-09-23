@@ -60,9 +60,11 @@ openobserve-api-common.workspace = true
 openobserve-mcp.workspace = true
 axum.workspace = true
 axum-server.workspace = true
+axum-tracing-opentelemetry.workspace = true
 tower.workspace = true
 tower-http.workspace = true
 http.workspace = true
+http-body.workspace = true
 http-body-util.workspace = true
 anyhow.workspace = true
 base64.workspace = true
@@ -78,6 +80,7 @@ regex.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+snap.workspace = true
 time.workspace = true
 tokio.workspace = true
 url.workspace = true
@@ -89,4 +92,6 @@ futures-util.workspace = true
 
 [dev-dependencies]
 base64.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 zstd.workspace = true

@@ -55,11 +55,15 @@ pub enum MergedFile {
         data_path: tempfile::TempPath,
         meta: FileMeta,
     },
+    /// Closed-hour output whose schema cannot be indexed.
+    MetricsIndexedNoIndex {
+        data_path: tempfile::TempPath,
+        meta: FileMeta,
+    },
     /// Finalized indexed metrics output spooled to local disk.
     MetricsIndexed {
         data_path: tempfile::TempPath,
         metrics_index_path: tempfile::TempPath,
-        object_key: Option<String>,
         meta: FileMeta,
     },
 }
@@ -70,6 +74,7 @@ impl MergedFile {
             Self::Standard { .. } | Self::StandardFile { .. } => None,
             Self::MetricsHashSorted { .. } => Some(MetricsFileLayout::HashSorted),
             Self::MetricsHashMerged { .. } => Some(MetricsFileLayout::HashMerged),
+            Self::MetricsIndexedNoIndex { .. } => Some(MetricsFileLayout::Indexed),
             Self::MetricsIndexed { .. } => Some(MetricsFileLayout::Indexed),
         }
     }
@@ -80,26 +85,6 @@ impl MergedFile {
             Some(layout) => layout.file_name(id, file_format),
             None => format!("{id}{}", file_format.extension()),
         }
-    }
-
-    pub fn file_key(&self, prefix: &str, id: &str, file_format: FileFormat) -> Result<String> {
-        if let Self::MetricsIndexed {
-            object_key: Some(key),
-            ..
-        } = self
-        {
-            if key
-                .rsplit_once('/')
-                .is_none_or(|(bound_prefix, _)| bound_prefix != prefix)
-                || !key.ends_with(file_format.extension())
-            {
-                return Err(DataFusionError::Execution(
-                    "indexed output destination changed after parent binding".into(),
-                ));
-            }
-            return Ok(key.clone());
-        }
-        Ok(format!("{prefix}/{}", self.file_name(id, file_format)))
     }
 
     /// Mark an existing object key when this is a metrics-specific layout.
@@ -118,6 +103,7 @@ impl MergedFile {
             }
             Self::StandardFile { .. }
             | Self::MetricsHashMerged { .. }
+            | Self::MetricsIndexedNoIndex { .. }
             | Self::MetricsIndexed { .. } => Err(DataFusionError::Execution(
                 "ingester cannot consume compactor spooled output".to_string(),
             )),
@@ -133,21 +119,19 @@ impl MergedFile {
                 Ok((data, meta, None))
             }
             Self::StandardFile { data_path, meta }
-            | Self::MetricsHashMerged { data_path, meta } => {
+            | Self::MetricsHashMerged { data_path, meta }
+            | Self::MetricsIndexedNoIndex { data_path, meta } => {
                 Ok((tokio::fs::read(&data_path).await?, meta, None))
             }
             Self::MetricsIndexed {
                 data_path,
                 metrics_index_path,
                 meta,
-                object_key,
             } => {
                 let data = tokio::fs::read(&data_path).await?;
-                if object_key.is_some()
-                    && (meta.compressed_size <= 0 || meta.compressed_size as usize != data.len())
-                {
+                if meta.compressed_size <= 0 || meta.compressed_size as usize != data.len() {
                     return Err(DataFusionError::Execution(
-                        "bound Parquet size changed before upload".into(),
+                        "completed source size changed before upload".into(),
                     ));
                 }
                 Ok((data, meta, Some(metrics_index_path)))

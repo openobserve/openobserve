@@ -13,6 +13,7 @@ const OSS: ShortcutCapabilities = {
   incidentsEnabled: false,
   modelPricingEnabled: false,
   rbacEnabled: false,
+  aiEnabled: false,
 };
 const ENTERPRISE: ShortcutCapabilities = {
   isEnterprise: true,
@@ -22,6 +23,7 @@ const ENTERPRISE: ShortcutCapabilities = {
   incidentsEnabled: true,
   modelPricingEnabled: true,
   rbacEnabled: true,
+  aiEnabled: true,
 };
 const CLOUD: ShortcutCapabilities = {
   isEnterprise: false,
@@ -31,6 +33,7 @@ const CLOUD: ShortcutCapabilities = {
   incidentsEnabled: true,
   modelPricingEnabled: true,
   rbacEnabled: true,
+  aiEnabled: true,
 };
 
 /** Mirrors ShortcutCheatsheet: a page shows unless its gate rejects the caps. */
@@ -48,6 +51,15 @@ function visibleModuleTitles(caps: ShortcutCapabilities): string[] {
   return SHORTCUT_MODULES.filter((m) => m.pages.some((p) => pages.has(p))).map(
     (m) => m.title ?? m.titleKey,
   );
+}
+
+/** Entry-level gate, mirroring ShortcutCheatsheet: an entry shows unless its own gate rejects the caps. */
+function entryVisible(id: string, caps: ShortcutCapabilities): boolean {
+  for (const g of SHORTCUT_REGISTRY) {
+    const e = g.shortcuts.find((s) => s.id === id);
+    if (e) return !e.visible || e.visible(caps);
+  }
+  throw new Error(`entry ${id} not registered`);
 }
 
 const GATED_IN_OSS = [
@@ -175,5 +187,23 @@ describe("shortcut cheatsheet OSS gating", () => {
     expect(entNonMeta.has("shortcuts.pages.runningQueries")).toBe(false);
     const cloudNonMeta = visiblePages({ ...CLOUD, isMetaOrg: false });
     expect(cloudNonMeta.has("shortcuts.pages.orgManagement")).toBe(false);
+  });
+});
+
+describe("aiChatToggle entry visibility", () => {
+  it("is hidden on OSS (the shortcut is never registered there)", () => {
+    expect(entryVisible("aiChatToggle", OSS)).toBe(false);
+  });
+
+  it("is hidden on cloud — the AI chat shortcut is enterprise-only", () => {
+    expect(entryVisible("aiChatToggle", CLOUD)).toBe(false);
+  });
+
+  it("is hidden on enterprise when ai_enabled is off (the handler no-ops)", () => {
+    expect(entryVisible("aiChatToggle", { ...ENTERPRISE, aiEnabled: false })).toBe(false);
+  });
+
+  it("is shown only on enterprise with ai_enabled on", () => {
+    expect(entryVisible("aiChatToggle", ENTERPRISE)).toBe(true);
   });
 });

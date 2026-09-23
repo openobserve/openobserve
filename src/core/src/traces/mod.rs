@@ -68,6 +68,7 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::{
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
+        otlp::otlp_error_response,
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext},
     },
@@ -454,7 +455,12 @@ pub async fn otlp_proto(
         Ok(v) => v,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid proto: org_id: {org_id}, error: {e}");
-            return Ok(MetaHttpResponse::bad_request(format!("Invalid proto: {e}")));
+            return Ok(otlp_error_response(
+                OtlpRequestType::HttpProtobuf,
+                http::StatusCode::BAD_REQUEST,
+                3, // INVALID_ARGUMENT
+                format!("Invalid proto: {e}"),
+            ));
         }
     };
     match handle_otlp_request(
@@ -482,7 +488,8 @@ pub async fn otlp_json(
     in_stream_name: Option<&str>,
     user: IngestUser,
 ) -> Result<HttpResponse, Error> {
-    let request = match serde_json::from_slice::<ExportTraceServiceRequest>(body.as_ref()) {
+    let request = match json::from_slice_lenient_floats::<ExportTraceServiceRequest>(body.as_ref())
+    {
         Ok(req) => req,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid json: {e}");
@@ -1130,14 +1137,8 @@ pub async fn handle_otlp_request(
     .await
     {
         log::error!("Error while writing traces: {e}");
-        // Check if this is a schema validation error (InvalidData)
-        let status_code = if e.kind() == std::io::ErrorKind::InvalidData {
-            http::StatusCode::BAD_REQUEST
-        } else {
-            http::StatusCode::INTERNAL_SERVER_ERROR
-        };
         return Ok(MetaHttpResponse::error_with_header(
-            status_code,
+            trace_write_error_status(&e),
             format!("error while writing trace data: {e}"),
         ));
     }
@@ -1491,14 +1492,8 @@ pub async fn ingest_json(
     .await
     {
         log::error!("Error while writing traces: {e}");
-        // Check if this is a schema validation error (InvalidData)
-        let status_code = if e.kind() == std::io::ErrorKind::InvalidData {
-            http::StatusCode::BAD_REQUEST
-        } else {
-            http::StatusCode::INTERNAL_SERVER_ERROR
-        };
         return Ok(MetaHttpResponse::error_with_header(
-            status_code,
+            trace_write_error_status(&e),
             format!("error while writing trace data: {e}"),
         ));
     }
@@ -1580,6 +1575,19 @@ fn format_response(
                 .into_response())
         }
     }
+}
+
+/// Schema rejections are tagged `InvalidData`; a failed WAL write carries the ingestion error.
+fn trace_write_error_status(e: &Error) -> http::StatusCode {
+    if e.kind() == std::io::ErrorKind::InvalidData {
+        return http::StatusCode::BAD_REQUEST;
+    }
+    e.get_ref()
+        .and_then(|inner| inner.downcast_ref::<infra::errors::Error>())
+        .map_or(
+            http::StatusCode::INTERNAL_SERVER_ERROR,
+            crate::ingestion::write_error_status,
+        )
 }
 
 async fn write_traces_by_stream(
@@ -1786,7 +1794,7 @@ async fn write_traces(
     .await
     .map_err(|e| {
         log::error!("Error while writing traces: {e}");
-        std::io::Error::other(e.to_string())
+        std::io::Error::other(e)
     })?;
 
     // only one trigger per request; notification/db work must not block ingestion
@@ -1842,6 +1850,38 @@ mod tests {
 
     use super::span_duration_micros;
     use crate::ingestion::grpc::get_val_for_attr;
+
+    #[test]
+    fn test_otlp_json_decodes_non_canonical_doubles() {
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            common::v1::{KeyValue, any_value::Value},
+        };
+
+        let body = br#"{"resourceSpans":[{"resource":{"attributes":[{"key":"ratio","value":{"doubleValue":0.10}}]},"scopeSpans":[{"scope":{"name":"s"},"spans":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"eee19b7ec3c1b174","name":"op","kind":2,"startTimeUnixNano":"1789000000000000001","endTimeUnixNano":"1789000000000000002","attributes":[{"key":"a","value":{"doubleValue":1e0}}],"events":[{"timeUnixNano":"1789000000000000001","name":"e","attributes":[{"key":"b","value":{"doubleValue":1.50}}]}],"links":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"eee19b7ec3c1b175","attributes":[{"key":"c","value":{"doubleValue":-2.5E-3}}]}]}]}]}]}"#;
+        assert!(config::utils::json::from_slice::<ExportTraceServiceRequest>(body).is_err());
+
+        let request: ExportTraceServiceRequest =
+            config::utils::json::from_slice_lenient_floats(body).unwrap();
+        let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
+        let resource_spans = &request.resource_spans[0];
+        let resource = resource_spans.resource.as_ref().unwrap();
+        assert_eq!(
+            value(&resource.attributes[0]),
+            Some(Value::DoubleValue(0.1))
+        );
+        let span = &resource_spans.scope_spans[0].spans[0];
+        assert_eq!(span.start_time_unix_nano, 1_789_000_000_000_000_001);
+        assert_eq!(value(&span.attributes[0]), Some(Value::DoubleValue(1.0)));
+        assert_eq!(
+            value(&span.events[0].attributes[0]),
+            Some(Value::DoubleValue(1.5))
+        );
+        assert_eq!(
+            value(&span.links[0].attributes[0]),
+            Some(Value::DoubleValue(-0.0025))
+        );
+    }
 
     #[test]
     fn test_get_val_for_attr() {
@@ -3281,5 +3321,30 @@ mod tests {
         for kind in [0, 1] {
             assert!(super::derive_service_graph_fields(kind, lookup).is_empty());
         }
+    }
+
+    #[test]
+    fn test_trace_write_error_status() {
+        use super::trace_write_error_status;
+
+        let schema = std::io::Error::new(std::io::ErrorKind::InvalidData, "too many columns");
+        assert_eq!(
+            trace_write_error_status(&schema),
+            http::StatusCode::BAD_REQUEST
+        );
+        let overload = std::io::Error::other(infra::errors::Error::ResourceError(
+            "write queue full".to_string(),
+        ));
+        assert_eq!(
+            trace_write_error_status(&overload),
+            http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        let fault = std::io::Error::other(infra::errors::Error::IngestionError(
+            "disk failure".to_string(),
+        ));
+        assert_eq!(
+            trace_write_error_status(&fault),
+            http::StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }

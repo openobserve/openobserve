@@ -275,6 +275,8 @@ pub struct StreamSummary {
     pub total_storage_size: f64,
     pub total_compressed_size: f64,
     pub total_index_size: f64,
+    #[serde(default)]
+    pub total_mindex_size: f64,
 }
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
@@ -470,6 +472,14 @@ fn default_claim_parser_function() -> String {
     "".to_string()
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
+pub struct DomainOrgMapping {
+    pub domain: String,
+    pub org_id: String,
+    pub base_role: String,
+    pub user_group: Option<String>,
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -501,6 +511,8 @@ pub struct OrganizationSettingPayload {
     pub claim_parser_function: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -540,6 +552,9 @@ pub struct OrganizationSetting {
     pub cross_links: Vec<config::meta::stream::CrossLink>,
     #[serde(default)]
     pub org_storage_enabled: bool,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub domain_org_mappings: Vec<DomainOrgMapping>,
 }
 
 impl Default for OrganizationSetting {
@@ -573,6 +588,8 @@ impl Default for OrganizationSetting {
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: Vec::new(),
         }
     }
 }
@@ -1442,6 +1459,7 @@ mod tests {
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             cross_links: None,
+            domain_org_mappings: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1518,6 +1536,8 @@ mod tests {
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1546,6 +1566,8 @@ mod tests {
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
