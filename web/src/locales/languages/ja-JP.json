@@ -10945,7 +10945,8 @@
       "scorers": "スコアラー",
       "scoreConfigs": "スコア構成",
       "remoteTasks": "リモートタスク",
-      "playground": "プレイグラウンド"
+      "playground": "プレイグラウンド",
+      "prompts": "プロンプト"
     },
     "subtitle": {
       "llmInsights": "LLM トラフィック全体のレイテンシー、エラー、トークン、コストを追跡します",
@@ -11406,6 +11407,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "インラインプロンプト",
+          "prompt_ref": "管理プロンプト",
           "remote": "リモート",
           "sdk": "SDK"
         },

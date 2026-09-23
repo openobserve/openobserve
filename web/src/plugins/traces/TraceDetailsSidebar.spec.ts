@@ -24,16 +24,22 @@ const {
   mockNavigateToLogs,
   mockNavigateToCorrelatedLogs,
   mockToast,
+  mockPromptResolve,
 } = vi.hoisted(() => ({
   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
   mockBuildQueryDetails: vi.fn().mockReturnValue({}),
   mockNavigateToLogs: vi.fn(),
   mockNavigateToCorrelatedLogs: vi.fn(),
+  mockPromptResolve: vi.fn(),
   mockToast: vi.fn(),
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
+}));
+
+vi.mock("@/services/llm-prompts.service", () => ({
+  default: { resolve: mockPromptResolve },
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
@@ -2039,6 +2045,44 @@ describe("TraceDetailsSidebar", async () => {
       expect(
         llmWrapper.find('[data-test="trace-details-sidebar-evaluate-span-btn"]').exists(),
       ).toBe(true);
+    });
+
+    it("resolves Prompt attribution by name and routes with the stable entity ID", async () => {
+      mockPromptResolve.mockResolvedValueOnce({
+        prompt: { entityId: "prompt-entity-1", name: "support-answer" },
+        version: { version: 3 },
+        label: null,
+      });
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      const attributed = mountSidebar({
+        span: {
+          ...mockLLMSpan,
+          gen_ai_prompt_name: "support-answer",
+          gen_ai_prompt_version: "3",
+          gen_ai_prompt_label: "production",
+        },
+      });
+      await flushPromises();
+
+      const chip = attributed.find(
+        '[data-test="trace-details-sidebar-prompt-attribution"]',
+      );
+      expect(chip.text()).toContain("support-answer@v3 · production");
+      await chip.trigger("click");
+      expect(mockPromptResolve).toHaveBeenCalledWith("test-org", {
+        name: "support-answer",
+        version: 3,
+      });
+      expect(push).toHaveBeenCalledWith({
+        name: "aiPrompts",
+        query: {
+          org_identifier: "test-org",
+          selected: "prompt-entity-1",
+          version: "3",
+        },
+      });
+      attributed.unmount();
+      push.mockRestore();
     });
 
     it("hides evaluation with the Preview tab for an ordinary span", () => {

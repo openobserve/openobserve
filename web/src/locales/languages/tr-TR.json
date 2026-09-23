@@ -10945,7 +10945,8 @@
       "scorers": "Gol Sahipleri",
       "scoreConfigs": "Puan Yapılandırmaları",
       "remoteTasks": "Uzak Görevler",
-      "playground": "Oyun Alanı"
+      "playground": "Oyun Alanı",
+      "prompts": "İstemler"
     },
     "subtitle": {
       "llmInsights": "LLM trafiğiniz genelinde gecikmeyi, hataları, belirteçleri ve maliyeti izleyin",
@@ -11406,6 +11407,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "Satır İçi Prompt",
+          "prompt_ref": "Yönetilen İstem",
           "remote": "Uzak",
           "sdk": "SDK"
         },

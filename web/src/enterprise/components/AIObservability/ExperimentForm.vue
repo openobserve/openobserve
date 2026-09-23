@@ -302,6 +302,100 @@
                 </div>
               </template>
 
+              <template v-else-if="taskType === 'prompt_ref'">
+                <OFormSelect
+                  name="promptId"
+                  :label="raw('Managed Prompt')"
+                  :options="promptOptions"
+                  :placeholder="raw('Select a Prompt')"
+                  searchable
+                  required
+                  data-test="ai-experiment-form-prompt-select"
+                />
+                <div class="flex flex-wrap items-end gap-3">
+                  <OFormSelect
+                    name="promptSelectionMode"
+                    :label="raw('Resolve by')"
+                    :options="promptSelectionModeOptions"
+                    class="w-40"
+                    data-test="ai-experiment-form-prompt-mode"
+                  />
+                  <OFormInput
+                    v-if="promptSelectionMode === 'label'"
+                    name="promptLabel"
+                    :label="raw('Label')"
+                    :placeholder="raw('production')"
+                    class="min-w-0 flex-1"
+                    data-test="ai-experiment-form-prompt-label"
+                  />
+                  <OFormSelect
+                    v-else
+                    name="promptVersion"
+                    :label="raw('Version')"
+                    :options="promptVersionOptions"
+                    class="min-w-0 flex-1"
+                    data-test="ai-experiment-form-prompt-version"
+                  />
+                  <OButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    :loading="resolvingPrompt"
+                    :disabled="!promptId"
+                    @click="resolvePromptSelection"
+                  >
+                    Resolve
+                  </OButton>
+                </div>
+                <div
+                  v-if="resolvedPrompt"
+                  class="rounded-default border-status-success-text bg-status-success-bg border px-3 py-2 text-xs"
+                  data-test="ai-experiment-form-prompt-pin"
+                >
+                  Immutable pin: {{ resolvedPrompt.prompt.name }}@v{{ resolvedPrompt.version.version }}
+                  <span class="text-text-secondary font-mono"> · {{ resolvedPrompt.prompt.entityId }}</span>
+                </div>
+                <OFormSelect
+                  name="providerId"
+                  :label="t('aiObservability.experiments.provider')"
+                  :options="providerOptions"
+                  :placeholder="t('aiObservability.experiments.form.providerPlaceholder')"
+                  searchable
+                  required
+                  data-test="ai-experiment-form-prompt-provider"
+                  @update:model-value="onProviderChange"
+                />
+                <div class="flex flex-wrap items-start gap-4">
+                  <div class="min-w-0 flex-1">
+                    <OFormSelect
+                      name="model"
+                      :label="raw('Model override')"
+                      :options="modelOptions"
+                      :placeholder="raw('Use Prompt model or Provider default')"
+                      searchable
+                      creatable
+                      clearable
+                      :disabled="!providerSelected"
+                      :help-text="raw(promptModelOverride ? 'Overrides the managed Prompt model.' : 'Using the managed Prompt model.')"
+                      data-test="ai-experiment-form-prompt-model"
+                    />
+                  </div>
+                  <div class="w-48 shrink-0">
+                    <OFormInput
+                      name="temperature"
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      :label="raw('Temperature override')"
+                      :help-text="raw(promptTemperatureOverride ? 'Overrides Prompt parameters.' : 'Using Prompt parameters.')"
+                      data-test="ai-experiment-form-prompt-temperature"
+                    />
+                  </div>
+                </div>
+              </template>
+
+
               <!-- A remote task is pinned by `name@version`, so the only things
                    left to choose are the two overrides the API accepts. -->
               <template v-else>
@@ -496,6 +590,10 @@ import llmExperimentsService, {
   type ExperimentPreview,
   type LlmExperiment,
 } from "@/services/llm-experiments.service";
+import llmPromptsService, {
+  type Prompt,
+  type ResolvedPrompt,
+} from "@/services/llm-prompts.service";
 import onlineEvalsService, { type Provider, type Scorer } from "@/services/online-evals.service";
 import {
   defaultModelOf,
@@ -534,6 +632,10 @@ const preview = ref<ExperimentPreview | null>(null);
 const previewing = ref(false);
 const previewFailed = ref(false);
 const previewErrorMessage = ref("");
+const prompts = ref<Prompt[]>([]);
+const resolvedPrompt = ref<ResolvedPrompt | null>(null);
+const resolvingPrompt = ref(false);
+let promptResolveRequest = 0;
 const previewRequests = createPreviewRequestGate();
 const nextIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
 const idempotencyKey = ref(nextIdempotencyKey());
@@ -584,6 +686,13 @@ const datasetSelected = computed(() => !!datasetId.value);
 const providerSelected = computed(() => !!providerId.value);
 const taskType = form.useStore((state: any) => state.values.taskType as string);
 const taskRef = form.useStore((state: any) => String(state.values.taskRef ?? ""));
+const promptId = form.useStore((state: any) => String(state.values.promptId ?? ""));
+const promptSelectionMode = form.useStore((state: any) =>
+  String(state.values.promptSelectionMode ?? "label"),
+);
+const promptLabel = form.useStore((state: any) => String(state.values.promptLabel ?? "production"));
+const promptVersion = form.useStore((state: any) => String(state.values.promptVersion ?? ""));
+const model = form.useStore((state: any) => String(state.values.model ?? ""));
 
 const remoteTasks = ref<RemoteTask[]>([]);
 const loadingRemoteTasks = ref(false);
@@ -593,6 +702,11 @@ const taskTypeOptions = computed(() => [
     label: t("aiObservability.experiments.form.taskTypeInline"),
     value: "inline_prompt",
     subLabel: t("aiObservability.experiments.form.taskTypeInlineHelp"),
+  },
+  {
+    label: raw("Managed Prompt"),
+    value: "prompt_ref",
+    subLabel: raw("Pin an immutable managed Prompt version."),
   },
   {
     label: t("aiObservability.experiments.form.taskTypeRemote"),
@@ -614,6 +728,79 @@ const remoteTaskOptions = computed(() =>
       subLabel: raw(task.endpoint),
     })),
 );
+const promptSelectionModeOptions = [
+  { label: raw("Label"), value: "label" },
+  { label: raw("Version"), value: "version" },
+];
+const promptOptions = computed(() =>
+  prompts.value
+    .filter((prompt) => prompt.status === "active")
+    .map((prompt) => ({
+      label: raw(prompt.name),
+      value: prompt.entityId,
+      subLabel: raw(`latest v${prompt.latestVersion}`),
+    })),
+);
+const promptVersionOptions = computed(() => {
+  const selected = prompts.value.find((prompt) => prompt.entityId === promptId.value);
+  if (!selected) return [];
+  return Array.from({ length: selected.latestVersion }, (_, index) => {
+    const version = selected.latestVersion - index;
+    return { label: raw(`v${version}`), value: String(version) };
+  });
+});
+const promptModelOverride = computed(
+  () =>
+    Boolean(resolvedPrompt.value) &&
+    Boolean(model.value) &&
+    model.value !== (resolvedPrompt.value?.version.config.model ?? ""),
+);
+const promptTemperatureOverride = computed(() => {
+  const base = resolvedPrompt.value?.version.config.params?.temperature;
+  return resolvedPrompt.value != null && Number(temperature.value) !== Number(base ?? 0);
+});
+
+async function loadPrompts() {
+  if (!orgId.value) return;
+  try {
+    prompts.value = await llmPromptsService.list(orgId.value);
+  } catch {
+    prompts.value = [];
+  }
+}
+
+async function resolvePromptSelection() {
+  const selected = prompts.value.find((prompt) => prompt.entityId === promptId.value);
+  if (!selected) {
+    resolvedPrompt.value = null;
+    return;
+  }
+  const request = ++promptResolveRequest;
+  resolvingPrompt.value = true;
+  try {
+    const resolved = await llmPromptsService.resolve(orgId.value, {
+      name: selected.name,
+      ...(promptSelectionMode.value === "label"
+        ? { label: promptLabel.value.trim() || "production" }
+        : { version: Number(promptVersion.value) }),
+    });
+    if (request !== promptResolveRequest) return;
+    resolvedPrompt.value = resolved;
+    form.setFieldValue("promptId", resolved.prompt.entityId);
+    form.setFieldValue("promptVersion", String(resolved.version.version));
+    if (!model.value) form.setFieldValue("model", resolved.version.config.model ?? "");
+    const baseTemperature = resolved.version.config.params?.temperature;
+    if (typeof baseTemperature === "number") {
+      form.setFieldValue("temperature", baseTemperature);
+    }
+  } catch {
+    if (request !== promptResolveRequest) return;
+    resolvedPrompt.value = null;
+  } finally {
+    if (request === promptResolveRequest) resolvingPrompt.value = false;
+  }
+}
+
 
 const selectedRemoteTask = computed(
   () => remoteTasks.value.find((task) => task.taskRef === taskRef.value) ?? null,
@@ -656,9 +843,10 @@ const selectedDatasetVersion = computed(() =>
 // reporting a failure the user did not cause.
 const previewReady = computed(() => {
   if (!datasetId.value) return false;
-  // Gating a remote task on the inline fields would leave the rail permanently
-  // empty, since a remote task has neither a provider nor a prompt.
   if (taskType.value === "remote") return taskRef.value.includes("@");
+  if (taskType.value === "prompt_ref") {
+    return Boolean(providerId.value && resolvedPrompt.value && Number(promptVersion.value) > 0);
+  }
   return !!providerId.value && !!String(userPrompt.value ?? "").trim();
 });
 const datasetLabel = computed(() =>
@@ -759,10 +947,35 @@ function remoteOverrides(values: ExperimentForm) {
   };
   return Object.keys(overrides).length ? overrides : null;
 }
+function promptOverrides(values: ExperimentForm) {
+  const base = resolvedPrompt.value?.version.config;
+  if (!base) return null;
+  const overrides: NonNullable<
+    Extract<ExperimentCreatePayload["task"], { type: "prompt_ref" }>["paramsOverrides"]
+  > = {};
+  const requestedModel = values.model.trim();
+  if (requestedModel && requestedModel !== (base.model ?? "")) overrides.model = requestedModel;
+  const requestedTemperature = Number(values.temperature);
+  const baseTemperature = Number(base.params?.temperature ?? 0);
+  if (Number.isFinite(requestedTemperature) && requestedTemperature !== baseTemperature) {
+    overrides.params = { temperature: requestedTemperature };
+  }
+  return Object.keys(overrides).length ? overrides : null;
+}
+
 
 function buildTask(values: ExperimentForm): ExperimentCreatePayload["task"] {
   if (values.taskType === "remote") {
     return { type: "remote", taskRef: values.taskRef, overrides: remoteOverrides(values) };
+  }
+  if (values.taskType === "prompt_ref") {
+    return {
+      type: "prompt_ref",
+      id: values.promptId,
+      version: Number(values.promptVersion),
+      providerId: values.providerId,
+      paramsOverrides: promptOverrides(values),
+    };
   }
   const messages = [
     ...(values.systemPrompt.trim()
@@ -875,9 +1088,15 @@ async function runPreview() {
 // not. Every trigger here is a click, so there is nothing to debounce — the
 // request gate inside runPreview is what keeps a slow response from landing on
 // top of a newer one.
-watch([datasetId, trialCount, scorerIds, sources, taskType, taskRef], runPreview, {
-  deep: true,
-});
+watch(
+  [datasetId, trialCount, scorerIds, sources, taskType, taskRef, promptVersion, providerId],
+  runPreview,
+  { deep: true },
+);
+watch(
+  [promptId, promptSelectionMode, promptLabel, promptVersion],
+  resolvePromptSelection,
+);
 
 onBeforeRouteLeave((to, _from, next) => {
   if (allowLeave || !isDirty.value) {
@@ -907,9 +1126,8 @@ onMounted(async () => {
     toast({ variant: "error", message: t("aiObservability.experiments.loadError") });
     return;
   }
-  // Separate and best-effort: the registry is only needed if the operator picks
-  // a remote task, so a registry that is unreachable must not block the form.
-  void loadRemoteTasks();
+  // Registry reads are best-effort until their task type is selected.
+  await Promise.all([loadRemoteTasks(), loadPrompts()]);
   if (cloning.value) await loadCloneSource();
   const preselected = providers.value.find((p) => p.isDefault ?? p.is_default);
   if (preselected && !providerId.value) form.setFieldValue("providerId", preselected.id);

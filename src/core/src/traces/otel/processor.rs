@@ -55,6 +55,8 @@ struct SpanExtractions {
     user_id: Option<String>,
     session_id: Option<String>,
     prompt_name: Option<String>,
+    prompt_version: Option<i64>,
+    prompt_label: Option<String>,
     completion_start_time: Option<i64>,
     tool_name: Option<String>,
     tool_call_id: Option<String>,
@@ -204,7 +206,7 @@ impl OtelIngestionProcessor {
         let session_id = self
             .metadata_extractor
             .extract_session_id(span_attributes, resource_attributes);
-        let prompt_name = self.prompt_extractor.extract_name(span_attributes);
+        let prompt = self.prompt_extractor.extract(span_attributes);
         let completion_start_time = span_attributes
             .get(LangfuseAttributes::COMPLETION_START_TIME)
             .and_then(|v| parse_timestamp_micro_from_value(v).ok().map(|(ts, _)| ts));
@@ -235,7 +237,9 @@ impl OtelIngestionProcessor {
             cost,
             user_id,
             session_id,
-            prompt_name,
+            prompt_name: prompt.name,
+            prompt_version: prompt.version,
+            prompt_label: prompt.label,
             completion_start_time,
             tool_name,
             tool_call_id,
@@ -502,19 +506,31 @@ impl OtelIngestionProcessor {
             insert_if_absent(span_attributes, GenAiAttributes::USAGE_COST, json::json!(v));
         }
 
-        if let Some(ref uid) = extracted.user_id {
+        if let Some(uid) = &extracted.user_id {
             span_attributes.insert(OtelAttributes::USER_ID.to_string(), json::json!(uid));
         }
 
-        if let Some(ref sid) = extracted.session_id {
+        if let Some(sid) = &extracted.session_id {
             span_attributes.insert(
                 GenAiAttributes::CONVERSATION_ID.to_string(),
                 json::json!(sid),
             );
         }
 
-        if let Some(ref pname) = extracted.prompt_name {
+        if let Some(pname) = &extracted.prompt_name {
             span_attributes.insert(GenAiAttributes::PROMPT_NAME.to_string(), json::json!(pname));
+        }
+        if let Some(version) = extracted.prompt_version {
+            span_attributes.insert(
+                GenAiAttributes::PROMPT_VERSION.to_string(),
+                json::json!(version),
+            );
+        }
+        if let Some(label) = &extracted.prompt_label {
+            span_attributes.insert(
+                GenAiAttributes::PROMPT_LABEL.to_string(),
+                json::json!(label),
+            );
         }
 
         // TTFT: convert microseconds → Float64 seconds.
@@ -1070,6 +1086,45 @@ mod tests {
         assert!(span_attrs.contains_key("langfuse.observation.metadata.tool.id"));
         assert!(span_attrs.contains_key("langfuse.observation.type"));
         assert!(span_attrs.contains_key("operation_name"));
+    }
+
+    #[test]
+    fn process_span_normalizes_structured_prompt_attribution() {
+        let processor = OtelIngestionProcessor::new();
+        let mut span_attrs = HashMap::from([
+            (
+                LangfuseAttributes::PROMPT_NAME.to_string(),
+                json::json!("support-answer"),
+            ),
+            (
+                LangfuseAttributes::PROMPT_VERSION.to_string(),
+                json::json!("3"),
+            ),
+            (
+                LangfuseAttributes::PROMPT_LABEL.to_string(),
+                json::json!("production"),
+            ),
+            (
+                "gen_ai.prompt.variable.customer".to_string(),
+                json::json!("must-not-be-normalized"),
+            ),
+        ]);
+
+        processor.process_span(&mut span_attrs, &HashMap::new(), None, &[]);
+
+        assert_eq!(
+            span_attrs.get(GenAiAttributes::PROMPT_NAME),
+            Some(&json::json!("support-answer"))
+        );
+        assert_eq!(
+            span_attrs.get(GenAiAttributes::PROMPT_VERSION),
+            Some(&json::json!(3))
+        );
+        assert_eq!(
+            span_attrs.get(GenAiAttributes::PROMPT_LABEL),
+            Some(&json::json!("production"))
+        );
+        assert!(!span_attrs.contains_key("gen_ai_prompt_variable_customer"));
     }
 
     #[test]

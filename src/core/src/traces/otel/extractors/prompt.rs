@@ -21,110 +21,187 @@ use config::utils::json;
 
 use crate::traces::otel::attributes::{GenAiAttributes, LangfuseAttributes};
 
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct PromptAttribution {
+    pub name: Option<String>,
+    pub version: Option<i64>,
+    pub label: Option<String>,
+}
+
 pub struct PromptExtractor;
 
 impl PromptExtractor {
-    /// Extract prompt name from AI SDK metadata
-    pub fn extract_name(&self, attributes: &HashMap<String, json::Value>) -> Option<String> {
-        // Check Gen-AI attributes first
-        if let Some(value) = attributes.get(GenAiAttributes::PROMPT_NAME) {
-            return value.as_str().map(|s| s.to_string());
+    pub fn extract(&self, attributes: &HashMap<String, json::Value>) -> PromptAttribution {
+        PromptAttribution {
+            name: string_with_fallback(
+                attributes,
+                GenAiAttributes::PROMPT_NAME,
+                LangfuseAttributes::PROMPT_NAME,
+            ),
+            version: version_with_fallback(
+                attributes,
+                GenAiAttributes::PROMPT_VERSION,
+                LangfuseAttributes::PROMPT_VERSION,
+            ),
+            label: string_with_fallback(
+                attributes,
+                GenAiAttributes::PROMPT_LABEL,
+                LangfuseAttributes::PROMPT_LABEL,
+            ),
         }
-
-        // Check Langfuse attributes (support both dot and underscore formats)
-        if let Some(value) = attributes.get(LangfuseAttributes::PROMPT_NAME) {
-            return value.as_str().map(|s| s.to_string());
-        }
-
-        None
     }
+}
+
+fn string_with_fallback(
+    attributes: &HashMap<String, json::Value>,
+    official: &str,
+    fallback: &str,
+) -> Option<String> {
+    match attributes.get(official) {
+        Some(value) => value.as_str().map(ToString::to_string),
+        None => attributes
+            .get(fallback)
+            .and_then(json::Value::as_str)
+            .map(ToString::to_string),
+    }
+}
+
+fn version_with_fallback(
+    attributes: &HashMap<String, json::Value>,
+    official: &str,
+    fallback: &str,
+) -> Option<i64> {
+    match attributes.get(official) {
+        Some(value) => parse_version(value),
+        None => attributes.get(fallback).and_then(parse_version),
+    }
+}
+
+fn parse_version(value: &json::Value) -> Option<i64> {
+    let version = match value {
+        json::Value::Number(value) => value.as_i64()?,
+        json::Value::String(value)
+            if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) =>
+        {
+            value.parse().ok()?
+        }
+        _ => return None,
+    };
+    (version > 0).then_some(version)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
 
     #[test]
-    fn test_extract_prompt_name_from_gen_ai_attribute() {
-        let mut attrs = HashMap::new();
-        attrs.insert(
-            "gen_ai.prompt.name".to_string(),
-            config::utils::json::json!("my_prompt"),
+    fn extracts_structured_official_prompt_attribution() {
+        let attrs = HashMap::from([
+            (
+                GenAiAttributes::PROMPT_NAME.to_string(),
+                json::json!("support-answer"),
+            ),
+            (GenAiAttributes::PROMPT_VERSION.to_string(), json::json!(3)),
+            (
+                GenAiAttributes::PROMPT_LABEL.to_string(),
+                json::json!("production"),
+            ),
+        ]);
+
+        assert_eq!(
+            PromptExtractor.extract(&attrs),
+            PromptAttribution {
+                name: Some("support-answer".to_string()),
+                version: Some(3),
+                label: Some("production".to_string()),
+            }
         );
-        let result = PromptExtractor.extract_name(&attrs);
-        assert_eq!(result, Some("my_prompt".to_string()));
     }
 
     #[test]
-    fn test_extract_prompt_name_from_langfuse_attribute() {
-        let mut attrs = HashMap::new();
-        attrs.insert(
-            "langfuse.observation.prompt.name".to_string(),
-            config::utils::json::json!("langfuse_prompt"),
+    fn official_fields_take_precedence_over_langfuse_aliases() {
+        let attrs = HashMap::from([
+            (
+                GenAiAttributes::PROMPT_NAME.to_string(),
+                json::json!("official"),
+            ),
+            (
+                LangfuseAttributes::PROMPT_NAME.to_string(),
+                json::json!("legacy"),
+            ),
+            (
+                GenAiAttributes::PROMPT_VERSION.to_string(),
+                json::json!("4"),
+            ),
+            (
+                LangfuseAttributes::PROMPT_VERSION.to_string(),
+                json::json!("2"),
+            ),
+            (
+                GenAiAttributes::PROMPT_LABEL.to_string(),
+                json::json!("candidate"),
+            ),
+            (
+                LangfuseAttributes::PROMPT_LABEL.to_string(),
+                json::json!("production"),
+            ),
+        ]);
+
+        assert_eq!(
+            PromptExtractor.extract(&attrs),
+            PromptAttribution {
+                name: Some("official".to_string()),
+                version: Some(4),
+                label: Some("candidate".to_string()),
+            }
         );
-        let result = PromptExtractor.extract_name(&attrs);
-        assert_eq!(result, Some("langfuse_prompt".to_string()));
     }
 
     #[test]
-    fn test_extract_prompt_name_gen_ai_takes_priority_over_langfuse() {
-        let mut attrs = HashMap::new();
-        attrs.insert(
-            "gen_ai.prompt.name".to_string(),
-            config::utils::json::json!("gen_ai_prompt"),
+    fn falls_back_to_symmetrical_langfuse_aliases() {
+        let attrs = HashMap::from([
+            (
+                LangfuseAttributes::PROMPT_NAME.to_string(),
+                json::json!("legacy"),
+            ),
+            (
+                LangfuseAttributes::PROMPT_VERSION.to_string(),
+                json::json!("7"),
+            ),
+            (
+                LangfuseAttributes::PROMPT_LABEL.to_string(),
+                json::json!("staging"),
+            ),
+        ]);
+
+        assert_eq!(
+            PromptExtractor.extract(&attrs),
+            PromptAttribution {
+                name: Some("legacy".to_string()),
+                version: Some(7),
+                label: Some("staging".to_string()),
+            }
         );
-        attrs.insert(
-            "langfuse.observation.prompt.name".to_string(),
-            config::utils::json::json!("langfuse_prompt"),
-        );
-        let result = PromptExtractor.extract_name(&attrs);
-        assert_eq!(result, Some("gen_ai_prompt".to_string()));
     }
 
     #[test]
-    fn test_extract_prompt_name_absent_returns_none() {
-        let result = PromptExtractor.extract_name(&HashMap::new());
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_extract_non_string_gen_ai_returns_none() {
-        let mut attrs = HashMap::new();
-        attrs.insert(
-            "gen_ai.prompt.name".to_string(),
-            config::utils::json::json!(42),
-        );
-        let result = PromptExtractor.extract_name(&attrs);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_extract_non_string_gen_ai_blocks_langfuse_fallback() {
-        // When gen_ai key exists but is non-string, extract_name returns None
-        // without falling through to the langfuse key.
-        let mut attrs = HashMap::new();
-        attrs.insert(
-            "gen_ai.prompt.name".to_string(),
-            config::utils::json::json!(true),
-        );
-        attrs.insert(
-            "langfuse.observation.prompt.name".to_string(),
-            config::utils::json::json!("fallback_prompt"),
-        );
-        let result = PromptExtractor.extract_name(&attrs);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_extract_non_string_langfuse_returns_none() {
-        let mut attrs = HashMap::new();
-        attrs.insert(
-            "langfuse.observation.prompt.name".to_string(),
-            config::utils::json::json!(null),
-        );
-        let result = PromptExtractor.extract_name(&attrs);
-        assert!(result.is_none());
+    fn rejects_malformed_or_non_positive_versions_without_alias_fallback() {
+        for value in [
+            json::json!(0),
+            json::json!(-1),
+            json::json!(1.5),
+            json::json!("0"),
+            json::json!("-2"),
+            json::json!("v3"),
+        ] {
+            let attrs = HashMap::from([
+                (GenAiAttributes::PROMPT_VERSION.to_string(), value),
+                (
+                    LangfuseAttributes::PROMPT_VERSION.to_string(),
+                    json::json!("9"),
+                ),
+            ]);
+            assert_eq!(PromptExtractor.extract(&attrs).version, None);
+        }
     }
 }

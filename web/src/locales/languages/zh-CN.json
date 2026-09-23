@@ -10945,7 +10945,8 @@
       "scorers": "评分器",
       "scoreConfigs": "分数配置",
       "remoteTasks": "远程任务",
-      "playground": "试验场"
+      "playground": "试验场",
+      "prompts": "提示词"
     },
     "subtitle": {
       "llmInsights": "跟踪 LLM 流量的延迟、错误、Token 和成本",
@@ -11406,6 +11407,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "内联提示",
+          "prompt_ref": "托管提示词",
           "remote": "远程",
           "sdk": "SDK"
         },

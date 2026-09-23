@@ -259,6 +259,7 @@
             @copy="copyOutput(variant.id, SINGLE_ROW_KEY)"
             @add-to-messages="addOutputToMessages(variant.id)"
             @create-experiment="createExperiment(variant.id)"
+            @save-as-prompt="openSaveAsPrompt(variant.id)"
           />
         </div>
       </div>
@@ -287,6 +288,15 @@
       :creating="sharing"
       @confirm="onShareConfirmed"
     />
+
+    <SaveAsPromptDialog
+      v-model:open="savePromptOpen"
+      :org-id="orgId"
+      :payload="savePromptPayload"
+      :config="savePromptConfig"
+      type="chat"
+      source="playground"
+    />
   </OPageLayout>
 </template>
 
@@ -310,6 +320,8 @@ import PlaygroundShareDialog from "@/enterprise/components/AIObservability/Playg
 import useBreakpoint from "@/composables/useBreakpoint";
 import PlaygroundVariableBar from "@/enterprise/components/AIObservability/PlaygroundVariableBar.vue";
 import PlaygroundVariantColumn from "@/enterprise/components/AIObservability/PlaygroundVariantColumn.vue";
+import SaveAsPromptDialog from "@/views/AIObservability/SaveAsPromptDialog.vue";
+import type { PromptConfig } from "@/services/llm-prompts.service";
 import onlineEvalsService, { type Provider, type Scorer } from "@/services/online-evals.service";
 import { entityId } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import llmDatasetsService, {
@@ -346,10 +358,13 @@ import {
   type PlaygroundCell,
   type PlaygroundDraft,
   type PlaygroundResults,
+  type PlaygroundMessage,
+  type PlaygroundRole,
   type PlaygroundTool,
   type PlaygroundVariant,
 } from "./playgroundDraft";
 import { takeHandoff } from "./playgroundHandoff";
+import { takePromptPlaygroundHandoff } from "@/views/AIObservability/promptPlaygroundHandoff";
 import { aiExperimentCreateRoute } from "./experimentRoutes";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useHorizontalOverflow } from "@/composables/useHorizontalOverflow";
@@ -380,6 +395,34 @@ const sampleOpen = ref(false);
 const sampleStepping = ref(false);
 const shareOpen = ref(false);
 const sharing = ref(false);
+const savePromptOpen = ref(false);
+const savePromptVariant = ref<PlaygroundVariant | null>(null);
+const savePromptPayload = computed(() =>
+  (savePromptVariant.value?.messages ?? []).map((message) => ({
+    role: message.role,
+    content: message.content,
+  })),
+);
+const savePromptConfig = computed<PromptConfig>(() => {
+  const variant = savePromptVariant.value;
+  if (!variant) return { model: null, params: null, tools: null, responseFormat: null };
+  const temperature = Number(variant.temperature);
+  return {
+    model: variant.model || null,
+    params: Number.isFinite(temperature) ? { temperature } : null,
+    tools: variant.tools.map((tool) => ({
+      type: "function",
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: parsePromptJson(tool.parameters) ?? {},
+      },
+    })),
+    responseFormat: variant.responseSchema
+      ? parsePromptJson(variant.responseSchema)
+      : null,
+  };
+});
 
 /** The snapshot this bench descends from — the link it was opened on, or the
  *  last one shared from it. Sent as the parent so lineage forms a chain. */
@@ -551,28 +594,87 @@ function seedDefaultProvider() {
   if (!preferred) return;
   for (const variant of draft.variants) {
     if (variant.providerId) continue;
-    variant.providerId = preferred.id;
-    variant.model = preferred.defaultModel ?? preferred.default_model ?? "";
+    const supporting = variant.model
+      ? providers.value.find((provider) =>
+          (provider.availableModels ?? provider.available_models ?? []).includes(variant.model),
+        )
+      : null;
+    const selected = supporting ?? preferred;
+    variant.providerId = selected.id;
+    if (!variant.model) variant.model = selected.defaultModel ?? selected.default_model ?? "";
   }
 }
 
+function promptRole(value: unknown): PlaygroundRole {
+  return value === "system" || value === "assistant" || value === "tool" ? value : "user";
+}
+
+function promptMessages(payload: unknown): PlaygroundMessage[] {
+  if (typeof payload === "string") {
+    return [{ id: playgroundId("message"), role: "user", content: payload }];
+  }
+  if (!Array.isArray(payload)) return [];
+  return payload.flatMap((entry): PlaygroundMessage[] => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    return [{
+      id: playgroundId("message"),
+      role: promptRole("role" in entry ? entry.role : "user"),
+      content: String("content" in entry ? (entry.content ?? "") : ""),
+    }];
+  });
+}
+
+function promptTools(value: unknown): PlaygroundTool[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): PlaygroundTool[] => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const candidate =
+      "function" in entry &&
+      entry.function &&
+      typeof entry.function === "object" &&
+      !Array.isArray(entry.function)
+        ? entry.function
+        : entry;
+    const name = "name" in candidate ? String(candidate.name ?? "") : "";
+    if (!name) return [];
+    const description =
+      "description" in candidate ? String(candidate.description ?? "") : "";
+    const parameters = "parameters" in candidate ? candidate.parameters : {};
+    return [{ name, description, parameters: JSON.stringify(parameters ?? {}, null, 2) }];
+  });
+}
+
 /**
- * Loads the conversation Trace Details stashed for us. Everything arrives as
- * ordinary editable content — the whole point of the entry is to change the
- * call and re-run it, so nothing is pinned readonly.
+ * Loads a trace or managed Prompt into a fresh editable fork. Prompt content
+ * stays in one-shot session storage and never appears in browser history.
  */
 function applyHandoff() {
-  if (String(route.query.from ?? "") !== "span") return;
+  const source = String(route.query.from ?? "");
+  if (source === "prompt") {
+    const handoff = takePromptPlaygroundHandoff();
+    if (!handoff) return;
+    const variant = emptyVariant();
+    variant.messages = promptMessages(handoff.payload);
+    variant.model = handoff.config.model ?? "";
+    const params = handoff.config.params;
+    variant.temperature =
+      params && typeof params.temperature === "number" ? String(params.temperature) : "";
+    variant.tools = promptTools(handoff.config.tools);
+    variant.responseSchema =
+      handoff.config.responseFormat == null
+        ? null
+        : JSON.stringify(handoff.config.responseFormat, null, 2);
+    Object.assign(draft, starterDraft());
+    draft.variants = [variant];
+    draft.provenance = { type: "prompt", label: raw(handoff.provenance.label) };
+    return;
+  }
+  if (source !== "span") return;
   const handoff = takeHandoff();
   if (!handoff) return;
   const variant = emptyVariant();
   variant.messages = handoff.messages;
-  // Provider and model are left to seedDefaultProvider: the trace's model may
-  // not exist on any provider configured here.
   variant.temperature = handoff.temperature;
-  // A fresh draft, not a merge: the imported call is the subject of the bench,
-  // and leaving a restored session's variants beside it would silently compare
-  // the trace against whatever the user last had open.
   Object.assign(draft, starterDraft());
   draft.variants = [variant];
   draft.provenance = {
@@ -1115,6 +1217,21 @@ function goToProviders() {
 
 /** The one durable exit. Everything the experiment form needs travels in the
  *  query, so the handoff survives a full page load. */
+function parsePromptJson(value: string): unknown | null {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function openSaveAsPrompt(variantId: string) {
+  const variant = draft.variants.find((candidate) => candidate.id === variantId);
+  if (!variant) return;
+  savePromptVariant.value = variant;
+  savePromptOpen.value = true;
+}
+
 function createExperiment(variantId: string) {
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
   if (!variant) return;

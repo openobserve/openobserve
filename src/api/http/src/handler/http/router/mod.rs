@@ -57,7 +57,7 @@ use {
     openobserve_api_management::request::{
         ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
         domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall, playground,
-        providers, remote_tasks, score_configs, scorers, service_streams, workflows,
+        prompts, providers, remote_tasks, score_configs, scorers, service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -99,6 +99,7 @@ pub fn cors_layer() -> CorsLayer {
             header::AUTHORIZATION,
             header::ACCEPT,
             header::CONTENT_TYPE,
+            header::HeaderName::from_static("idempotency-key"),
             header::HeaderName::from_static("stream-name"),
             header::HeaderName::from_static("organization"),
             header::HeaderName::from_static("traceparent"),
@@ -389,18 +390,19 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
     }
 }
 
-/// Whether this request's body carries a Remote Task secret in plaintext.
+/// Whether this request's body carries a plaintext secret.
 ///
-/// `audit_middleware` records request bodies verbatim, so the create call and
-/// every write under `auth`, `headers`, or `signing` has to be redacted —
-/// otherwise the audit trail becomes a second, unencrypted copy of the secret
-/// store.
+/// `audit_middleware` records request bodies verbatim. Remote Task secret
+/// writes and the Prompt webhook secret write must never reach that trail.
 #[cfg(feature = "enterprise")]
-fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
+fn is_secret_write(method: &Method, path: &str) -> bool {
     if matches!(method, &Method::GET | &Method::HEAD | &Method::OPTIONS) {
         return false;
     }
     let segments = path.split('/').collect::<Vec<_>>();
+    if method == Method::PUT && segments.ends_with(&["prompts", "settings", "secret"]) {
+        return true;
+    }
     let Some(tasks) = segments.iter().position(|segment| *segment == "tasks") else {
         return false;
     };
@@ -470,8 +472,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         let mut response = next.run(request).await;
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = if is_remote_task_secret_write(&http_method, &path) {
-                "[REDACTED: remote task secret write]".to_string()
+            let body = if is_secret_write(&http_method, &path) {
+                "[REDACTED: secret write]".to_string()
             } else if path.ends_with("/settings/logo") {
                 general_purpose::STANDARD.encode(&request_body)
             } else {
@@ -1196,6 +1198,17 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "enterprise")]
     {
         router = router
+            .route("/{org_id}/prompts", get(prompts::list_prompts).post(prompts::create_prompt))
+            .route("/{org_id}/prompts/match", post(prompts::match_prompts))
+            .route("/{org_id}/prompts/resolve", get(prompts::resolve_prompt))
+            .route("/{org_id}/prompts/settings", get(prompts::get_prompt_settings).put(prompts::update_prompt_settings))
+            .route("/{org_id}/prompts/settings/secret", put(prompts::update_prompt_secret))
+            .route("/{org_id}/prompts/{entity_id}/archive", post(prompts::archive_prompt))
+            .route("/{org_id}/prompts/{entity_id}/versions/{version}", get(prompts::get_prompt_version))
+            .route("/{org_id}/prompts/{entity_id}/versions", get(prompts::list_prompt_versions).post(prompts::create_prompt_version))
+            .route("/{org_id}/prompts/{entity_id}/activity", get(prompts::list_prompt_activity))
+            .route("/{org_id}/prompts/{entity_id}/labels/{label}", put(prompts::move_prompt_label).delete(prompts::delete_prompt_label))
+            .route("/{org_id}/prompts/{entity_id}", get(prompts::get_prompt).patch(prompts::update_prompt))
             // Gen-AI agent mapping and registry are enterprise, independent of Online Evaluations.
             .route("/{org_id}/settings/gen_ai/agent_mapping", get(gen_ai::get_agent_mapping).put(gen_ai::save_agent_mapping))
             .route("/{org_id}/settings/gen_ai/agent_registry", delete(gen_ai::clear_agent_registry))
@@ -2199,23 +2212,25 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
-    fn audit_redacts_every_remote_task_secret_write_body() {
+    fn audit_redacts_every_secret_write_body() {
         for (method, path) in [
             (Method::POST, "api/org/tasks"),
             (Method::POST, "api/org/tasks/test"),
             (Method::PUT, "api/org/tasks/task-1/auth"),
             (Method::PUT, "api/org/tasks/task-1/headers/x-api-key/secret"),
             (Method::POST, "api/org/tasks/task-1/signing/rotate"),
+            (Method::PUT, "api/org/prompts/settings/secret"),
         ] {
-            assert!(is_remote_task_secret_write(&method, path));
+            assert!(is_secret_write(&method, path));
         }
-        assert!(!is_remote_task_secret_write(
-            &Method::GET,
-            "api/org/tasks/task-1"
-        ));
-        assert!(!is_remote_task_secret_write(
+        assert!(!is_secret_write(&Method::GET, "api/org/tasks/task-1"));
+        assert!(!is_secret_write(
             &Method::POST,
             "api/org/tasks/task-1/test_run"
+        ));
+        assert!(!is_secret_write(
+            &Method::GET,
+            "api/org/prompts/settings/secret"
         ));
     }
 

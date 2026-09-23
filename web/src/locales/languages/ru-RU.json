@@ -10933,7 +10933,8 @@
       "scorers": "Оценщики",
       "scoreConfigs": "Конфигурации оценок",
       "remoteTasks": "Удаленные задачи",
-      "playground": "Песочница"
+      "playground": "Песочница",
+      "prompts": "Промпты"
     },
     "subtitle": {
       "llmInsights": "Отслеживайте задержку, ошибки, токены и стоимость вашего трафика LLM",
@@ -11394,6 +11395,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "Встроенный промпт",
+          "prompt_ref": "Управляемый промпт",
           "remote": "Удалённый",
           "sdk": "SDK"
         },

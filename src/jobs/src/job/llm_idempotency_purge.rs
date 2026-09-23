@@ -28,17 +28,8 @@ pub fn run() {
         log::debug!("[LLM_IDEMPOTENCY_PURGE] not a scheduler node, skipping");
         return;
     }
-    if !o2_enterprise::enterprise::common::config::get_config()
-        .llm_eval_config
-        .enabled
-    {
-        log::debug!("[LLM_IDEMPOTENCY_PURGE] LLM evaluations disabled, skipping");
-        return;
-    }
-
     spawn_pausable_job!("llm_idempotency_purge", PURGE_INTERVAL_SECS, {
-        match o2_enterprise::enterprise::llm_evaluations::idempotency::purge_expired_records().await
-        {
+        match infra::idempotency::purge_expired_records().await {
             Ok(0) => log::debug!("[LLM_IDEMPOTENCY_PURGE] nothing had lapsed"),
             Ok(removed) => {
                 log::info!("[LLM_IDEMPOTENCY_PURGE] removed {removed} lapsed record(s)")

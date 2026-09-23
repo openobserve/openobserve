@@ -574,7 +574,27 @@ pub async fn list_experiments(
         .as_deref()
         .map(str::trim)
         .filter(|id| !id.is_empty());
-    let experiments = match experiments::list(&org_id, dataset_id).await {
+    let prompt_id = query
+        .prompt_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+    let content_hash = query
+        .content_hash
+        .as_deref()
+        .map(str::trim)
+        .filter(|hash| !hash.is_empty());
+    let experiments = match experiments::list_filtered(
+        &org_id,
+        experiments::ExperimentListFilter {
+            dataset_id,
+            prompt_id,
+            prompt_version: query.prompt_version,
+            content_hash,
+        },
+    )
+    .await
+    {
         Ok(experiments) => experiments
             .into_iter()
             .filter(|experiment| {

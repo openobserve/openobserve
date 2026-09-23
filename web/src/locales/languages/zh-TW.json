@@ -10940,7 +10940,8 @@
       "scorers": "評分器",
       "scoreConfigs": "評分設定",
       "remoteTasks": "遠端任務",
-      "playground": "遊樂場"
+      "playground": "遊樂場",
+      "prompts": "提示詞"
     },
     "subtitle": {
       "llmInsights": "追蹤您 LLM 流量的延遲、錯誤、令牌和成本",
@@ -11401,6 +11402,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "內嵌提示",
+          "prompt_ref": "託管提示詞",
           "remote": "遠端",
           "sdk": "SDK"
         },

@@ -46,6 +46,10 @@ pub struct Model {
     /// When early deletion started. A marked row is unavailable to every read
     /// while asynchronous cleanup finishes.
     pub deleted_at: Option<i64>,
+    pub prompt_id: Option<String>,
+    pub prompt_name: Option<String>,
+    pub prompt_version: Option<i32>,
+    pub prompt_content_hash: Option<String>,
     pub created_by: String,
     pub created_at: i64,
 }

@@ -37,6 +37,24 @@
         {{ t("aiObservability.experiments.detail.retryFailed") }}
       </OButton>
       <OButton
+        v-if="detail?.experiment.task.type === 'inline_prompt'"
+        size="sm"
+        variant="outline"
+        data-test="ai-experiment-detail-save-prompt"
+        @click="savePromptOpen = true"
+      >
+        Save as Prompt
+      </OButton>
+      <OButton
+        v-else-if="detail?.experiment.task.type === 'prompt_ref'"
+        size="sm"
+        variant="outline"
+        data-test="ai-experiment-detail-open-prompt"
+        @click="openManagedPrompt"
+      >
+        Open Prompt
+      </OButton>
+      <OButton
         size="sm"
         variant="outline"
         :disabled="!detail"
@@ -293,6 +311,16 @@
       @trace="openTrace"
       @score-trace="openScoreTrace"
     />
+
+    <SaveAsPromptDialog
+      v-if="inlinePromptTask"
+      v-model:open="savePromptOpen"
+      :org-id="orgId"
+      :payload="inlinePromptTask.messages"
+      :config="inlinePromptConfig"
+      type="chat"
+      source="ui"
+    />
   </OPageLayout>
 </template>
 
@@ -338,6 +366,9 @@ import llmExperimentsService, {
   type ExperimentRowDetail,
 } from "@/services/llm-experiments.service";
 import ExperimentRowDetailDrawer from "@/enterprise/components/AIObservability/ExperimentRowDetailDrawer.vue";
+import SaveAsPromptDialog from "@/views/AIObservability/SaveAsPromptDialog.vue";
+import { aiPromptsRoute } from "@/views/AIObservability/promptRoutes";
+import type { PromptConfig } from "@/services/llm-prompts.service";
 import {
   aiExperimentCompareRoute,
   aiExperimentCreateRoute,
@@ -366,6 +397,17 @@ const loading = ref(false);
 const rowsLoading = ref(false);
 const acting = ref(false);
 const comparePickerOpen = ref(false);
+const savePromptOpen = ref(false);
+const inlinePromptTask = computed(() => {
+  const task = detail.value?.experiment.task;
+  return task?.type === "inline_prompt" ? task : null;
+});
+const inlinePromptConfig = computed<PromptConfig>(() => ({
+  model: inlinePromptTask.value?.model ?? null,
+  params: inlinePromptTask.value?.params ?? null,
+  tools: null,
+  responseFormat: null,
+}));
 const RESULTS_PAGE_SIZE = 100;
 const resultRows = ref<ExperimentResultRow[]>([]);
 const rowSearch = ref("");
@@ -519,6 +561,17 @@ const visibleRows = computed(() => {
 const failedSlotCount = computed(
   () => detail.value?.results.aggregateSummary?.incompleteTaskSlots ?? 0,
 );
+
+function openManagedPrompt() {
+  const task = detail.value?.experiment.task;
+  if (task?.type !== "prompt_ref") return;
+  router.push(
+    aiPromptsRoute(orgId.value, {
+      entityId: task.id,
+      version: task.version,
+    }),
+  );
+}
 
 // Built as parts rather than one interpolated sentence so a task without a
 // model simply drops that segment instead of rendering a dash.

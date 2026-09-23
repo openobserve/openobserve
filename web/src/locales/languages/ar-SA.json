@@ -10933,7 +10933,8 @@
       "scorers": "المسجلون",
       "scoreConfigs": "إعدادات النقاط",
       "remoteTasks": "المهام عن بعد",
-      "playground": "الملعب"
+      "playground": "الملعب",
+      "prompts": "المطالبات"
     },
     "subtitle": {
       "llmInsights": "تتبّع التأخير والأخطاء والرموز والتكلفة عبر حركة LLM لديك",
@@ -11394,6 +11395,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "التعليمات المضمنة",
+          "prompt_ref": "مطالبة مُدارة",
           "remote": "البعيد",
           "sdk": "SDK"
         },
