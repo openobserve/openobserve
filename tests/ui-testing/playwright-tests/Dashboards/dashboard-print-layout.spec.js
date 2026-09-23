@@ -1,3 +1,4 @@
+import * as crypto from "crypto";
 import { test, expect, navigateToBase } from "../utils/enhanced-baseFixtures.js";
 import testLogger from "../utils/test-logger.js";
 import PageManager from "../../pages/page-manager.js";
@@ -49,7 +50,7 @@ test.describe("Dashboard Print Layout testcases", () => {
     "should enter print mode via the toolbar button and render the print layout",
     { tag: ["@dashboard-print-layout", "@all", "@P0"] },
     async ({ page }) => {
-      const title = `PrintLayout_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const title = `PrintLayout_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`;
       const { dashboardId, folderId } = await pm.apiCleanup.createDashboardWithStackedPanels(title, 4);
       apiDashboard = { dashboardId, folderId };
 
@@ -75,7 +76,7 @@ test.describe("Dashboard Print Layout testcases", () => {
     "should exit print mode and clear the print layout",
     { tag: ["@dashboard-print-layout", "@all", "@P0"] },
     async ({ page }) => {
-      const title = `PrintLayoutExit_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const title = `PrintLayoutExit_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`;
       const { dashboardId, folderId } = await pm.apiCleanup.createDashboardWithStackedPanels(title, 4);
       apiDashboard = { dashboardId, folderId };
 
@@ -100,7 +101,7 @@ test.describe("Dashboard Print Layout testcases", () => {
     "should enter print mode via the ?print=true URL and persist across reload",
     { tag: ["@dashboard-print-layout", "@all", "@P1"] },
     async ({ page }) => {
-      const title = `PrintLayoutUrl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const title = `PrintLayoutUrl_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`;
       const { dashboardId, folderId } = await pm.apiCleanup.createDashboardWithStackedPanels(title, 4);
       apiDashboard = { dashboardId, folderId };
 
@@ -142,7 +143,7 @@ test.describe("Dashboard Print Layout testcases", () => {
     "should show the print-capture readiness flag once panels finish loading",
     { tag: ["@dashboard-print-layout", "@all", "@P1"] },
     async ({ page }) => {
-      const title = `PrintLayoutReady_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const title = `PrintLayoutReady_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`;
       const { dashboardId, folderId } = await pm.apiCleanup.createDashboardWithStackedPanels(title, 4);
       apiDashboard = { dashboardId, folderId };
 
