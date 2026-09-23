@@ -33,7 +33,10 @@ const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "test-org" } },
 });
 
-const providers = [{ id: "p1", name: "Provider 1", providerType: "openai" }];
+const providers = [
+  { id: "p1", name: "Provider 1", providerType: "openai" },
+  { id: "p2", name: "Decisions", providerType: "systemone" },
+];
 const scoreConfigs = [{ id: "sc1", name: "faithfulness", dataType: "numeric" }];
 
 function createWrapper(props: Record<string, any> = {}) {
@@ -152,6 +155,24 @@ describe("ScorerFormPage", () => {
     const [, payload] = (onlineEvalsService.scorers.create as any).mock.calls[0];
     expect(payload.scorer.producesScoreConfigId).toBeNull();
     expect(wrapper.emitted("saved")).toBeTruthy();
+  });
+
+  // A decision model returns only the score; the backend refuses reasoning or metadata for it.
+  it("drops reasoning and extra fields for a decision-model provider", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "my-scorer");
+    setField(wrapper, "extraMetadataFields", [{ name: "why", type: "string", description: "" }]);
+    setField(wrapper, "providerId", "p2");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="scorer-form-decision-provider-note"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="scorer-form-include-reasoning"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="scorer-form-extra-field-add"]').exists()).toBe(false);
+
+    await submit(wrapper);
+    const [, payload] = (onlineEvalsService.scorers.create as any).mock.calls[0];
+    expect(payload.scorer.params.include_reasoning).toBe(false);
+    expect(payload.scorer.params.extra_metadata_fields).toBeUndefined();
   });
 
   it("rejects duplicate extra-metadata field names", async () => {

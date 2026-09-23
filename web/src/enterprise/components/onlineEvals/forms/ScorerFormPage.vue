@@ -201,7 +201,14 @@
               </div>
 
               <div class="flex flex-col gap-3.5">
+                <small
+                  v-if="decisionProvider"
+                  class="text-2xs text-text-secondary block"
+                  data-test="scorer-form-decision-provider-note"
+                  >{{ t("onlineEvals.scorer.decisionProviderNote") }}</small
+                >
                 <OFormCheckbox
+                  v-else
                   name="includeReasoning"
                   class="scorer-extras__toggle"
                   data-test="scorer-form-include-reasoning"
@@ -221,7 +228,7 @@
                 <!-- "(Optional)" reads inline in the label, like every other
                  optional field in the app — not as a separate uppercase badge
                  on its own line. -->
-                <div class="flex flex-col gap-0.5">
+                <div v-if="!decisionProvider" class="flex flex-col gap-0.5">
                   <strong class="text-xs font-semibold">{{
                     t("onlineEvals.scorer.extraFieldsLabel")
                   }}</strong>
@@ -231,7 +238,7 @@
                 </div>
 
                 <div
-                  v-if="formValues.extraMetadataFields.length"
+                  v-if="!decisionProvider && formValues.extraMetadataFields.length"
                   class="border-border-default rounded-default bg-card-bg flex flex-col gap-1.5 border px-2.5 py-2"
                   data-test="scorer-form-extra-fields"
                 >
@@ -282,6 +289,7 @@
 
                 <div class="flex justify-between gap-3">
                   <OButton
+                    v-if="!decisionProvider"
                     variant="ghost-primary"
                     size="xs"
                     :disabled="formValues.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
@@ -697,6 +705,7 @@ import {
   resolvedEndpointOf,
   valueOf,
 } from "../utils/evalEntity";
+import { isDecisionOnlyProvider } from "@/services/llm-playground.service";
 import { extractTemplateVariables, formatTemplateVariable, showError } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
@@ -788,7 +797,7 @@ function buildScorerTestPayload() {
         params: {
           provider_id: formValues.value.providerId,
           ...(formValues.value.model.trim() ? { model: formValues.value.model.trim() } : {}),
-          include_reasoning: formValues.value.includeReasoning,
+          include_reasoning: includeReasoning.value,
           ...(cleanedExtraFields.value.length
             ? { extra_metadata_fields: cleanedExtraFields.value }
             : {}),
@@ -891,8 +900,12 @@ function cleanExtraFields(fields: ExtraMetadataFieldRow[]): ExtraMetadataField[]
     }));
 }
 
+// A decision provider returns only the score, whatever was set before switching to it.
 const cleanedExtraFields = computed<ExtraMetadataField[]>(() =>
-  cleanExtraFields(formValues.value.extraMetadataFields),
+  decisionProvider.value ? [] : cleanExtraFields(formValues.value.extraMetadataFields),
+);
+const includeReasoning = computed(
+  () => !decisionProvider.value && formValues.value.includeReasoning,
 );
 
 // Builds the remote `auth` / `params` from a SOURCE object — the live `form`
@@ -1009,7 +1022,7 @@ async function previewOutputSchema() {
       ...(formValues.value.pinScoreConfigVersion && formValues.value.producesScoreConfigVersion
         ? { producesScoreConfigVersion: Number(formValues.value.producesScoreConfigVersion) }
         : {}),
-      includeReasoning: formValues.value.includeReasoning,
+      includeReasoning: includeReasoning.value,
       extraMetadataFields: cleanedExtraFields.value,
     });
     const schema = (data as any)?.outputSchema ?? (data as any)?.output_schema ?? data;
@@ -1093,6 +1106,7 @@ const selectedHealthy = computed(() => {
 const selectedProvider = computed(
   () => props.providers.find((p) => p.id === formValues.value.providerId) || null,
 );
+const decisionProvider = computed(() => isDecisionOnlyProvider(selectedProvider.value));
 
 const promptVariables = computed(() => extractTemplateVariables(formValues.value.template || ""));
 
@@ -1274,7 +1288,7 @@ async function save(value: ScorerForm) {
           ? Number(value.producesScoreConfigVersion)
           : null,
     };
-    const extraFields = cleanExtraFields(value.extraMetadataFields);
+    const extraFields = decisionProvider.value ? [] : cleanExtraFields(value.extraMetadataFields);
     const scorerPayload: Record<string, any> = isLlmJudge
       ? {
           type: "llm_judge",
@@ -1283,7 +1297,7 @@ async function save(value: ScorerForm) {
           params: {
             provider_id: value.providerId,
             ...(value.model.trim() ? { model: value.model.trim() } : {}),
-            include_reasoning: value.includeReasoning,
+            include_reasoning: !decisionProvider.value && value.includeReasoning,
             ...(extraFields.length ? { extra_metadata_fields: extraFields } : {}),
           },
         }
