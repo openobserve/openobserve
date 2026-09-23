@@ -590,7 +590,7 @@ test.describe('Email destinations and distribution lists', () => {
   // These share ONE inbox, so they clear and count against common state. Nested
   // serial keeps them in a single worker and in order; the Tier A cases above
   // never touch the sink and stay parallel.
-  // Every test that SENDS mail belongs here too, even one that never reads the sink: a send from a parallel worker lands in the same inbox and is counted by whichever delivery case is mid-assertion (ML-04's "Expected: 1, Received: 2").
+  // Every test that SENDS mail belongs here too, even one that never reads the sink: a send from a parallel worker lands in the same inbox and is counted by whichever delivery case is mid-assertion (ML-04's delivery count).
   test.describe('delivery', () => {
     test.describe.configure({ mode: 'serial' });
 
@@ -638,9 +638,15 @@ test.describe('Email destinations and distribution lists', () => {
     await pm.alertDestinationsPage.clickTest();
     await sink.waitForCount(1);
 
-    // The regression guarded here is one message PER RECIPIENT, whose extra copy lands milliseconds later, so a count read the instant the first message arrives cannot tell it from a second still in flight — settle first.
+    // The sink counts DELIVERIES, and the CI relay forwards one message per envelope recipient, so two recipients must settle at two — not one.
+    // The guarded regression is one message PER RECIPIENT, whose duplicate copy lands milliseconds after the first, so the count may only be read once it stops moving.
     const settled = await sink.countAfterSettle();
-    expect(settled, 'one message, not one per recipient').toBe(1);
+    expect(settled, 'each recipient gets exactly one delivery').toBe(2);
+
+    // A per-recipient send also totals two, so only the shared To: proves both travelled in one message.
+    const msg = await sink.latest();
+    expect(msg.to.sort(), 'both recipients addressed on one message')
+      .toEqual([ORG_USER.toLowerCase(), RCPT_ACCOUNT.toLowerCase()].sort());
   });
 
   // ══ TIER C — requires a real distribution list ═══════════════════════════

@@ -327,6 +327,8 @@ export class AlertsPage {
 
             // Evaluation-history retries cell (AlertEvaluationHistory.vue)
             alertDetailsHistoryRetriesCell: '[data-test="alerts-alertevaluationhistory-retries"]',
+            // A real data row: the table shell can render rows that carry no evaluation cells.
+            alertDetailsHistoryDataRow: '[data-test="alerts-alertevaluationhistory-table"] tbody tr:has([data-test="alerts-alertevaluationhistory-status"])',
 
             // Section tab strip (AlertSectionTabs.vue) — header tab switcher
             alertSectionTabs: '[data-test="alert-section-tabs"]',
@@ -440,6 +442,11 @@ export class AlertsPage {
 
     getAlertHistoryRowsLocator() {
         return this.page.locator(this.locators.alertDetailsHistoryTable + ' tbody tr');
+    }
+
+    /** Rows that actually carry an evaluation — the table shell can render rows without one. */
+    getAlertHistoryDataRowLocator() {
+        return this.page.locator(this.locators.alertDetailsHistoryDataRow);
     }
 
     // --- Sentinel POM getters (relocated from regression specs) ---
@@ -1463,13 +1470,20 @@ export class AlertsPage {
         testLogger.info('Evaluation history Retries column and cells present');
     }
 
-    /** Reload the detail page until the evaluation-history table has >=1 data row — its fetch is single-shot on load, so a lagging row leaves headers but no cells. */
-    async waitForEvaluationHistoryRow({ attempts = 6 } = {}) {
-        const row = this.getAlertHistoryRowsLocator().first();
+    /** Wait for a real DATA row in the evaluation history — returns whether one appeared, so the caller can say that rather than a missing cell. */
+    async waitForEvaluationHistoryRow({ attempts = 8 } = {}) {
+        const row = this.getAlertHistoryDataRowLocator().first();
+        const refresh = this.page.locator(this.locators.alertDetailsRefreshButton).first();
         for (let i = 0; i < attempts; i++) {
-            if (await row.isVisible({ timeout: 5000 }).catch(() => false)) return;
-            await this.page.reload({ waitUntil: 'networkidle' }).catch(() => {});
+            if (await row.isVisible({ timeout: 5000 }).catch(() => false)) return true;
+            // The history fetch is single-shot on load, so re-issue it; a reload is the fallback when the toolbar is absent.
+            if (await refresh.isVisible().catch(() => false)) {
+                await refresh.click().catch(() => {});
+            } else {
+                await this.page.reload({ waitUntil: 'networkidle' }).catch(() => {});
+            }
         }
+        return await row.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**
