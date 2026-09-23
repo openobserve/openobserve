@@ -47,6 +47,10 @@ export class PasswordPolicyPage {
     // ── Lockout preview ────────────────────────────────────────────────────────
     this.lockoutPreview = '[data-test="settings-password-policy-lockout-preview"]';
 
+    // ── Empty states (enterprise page mounted but unusable) ────────────────────
+    this.notAdminEmptyState = '[data-test="password-policy-not-admin-empty-state"]';
+    this.loadErrorEmptyState = '[data-test="password-policy-load-error-empty-state"]';
+
     // ── Native inputs (OFormInput has no data-test, so target by name) ─────────
     this.minLengthInput = `${this.minLengthRow} input[name="min_length"]`;
     this.maxLengthInput = `${this.maxLengthRow} input[name="max_length"]`;
@@ -63,8 +67,10 @@ export class PasswordPolicyPage {
 
   /**
    * Navigate straight to the password-policy sub-route in the _meta org (the only
-   * org the page renders in). Returns true when the form mounts, false otherwise so
-   * callers can gate the suite to a clean SKIP on a non-enterprise/OSS build.
+   * org the page renders in). Returns true when the form mounts, and false when the
+   * page is absent (a non-enterprise/OSS build redirects to general settings). The
+   * enterprise page mounting but failing to load, denying access, or not rendering
+   * the min-length row is a real failure, so those throw instead of skipping.
    */
   async navigateToPasswordPolicy() {
     const baseUrl = process.env["ZO_BASE_URL"] || "http://localhost:5080";
@@ -74,6 +80,15 @@ export class PasswordPolicyPage {
       await this.page.locator(this.minLengthRow).waitFor({ state: "visible", timeout: 20000 });
       return true;
     } catch {
+      if (await this.page.locator(this.form).isVisible()) {
+        throw new Error("Password Policy form mounted but the min-length row did not render");
+      }
+      if (await this.page.locator(this.loadErrorEmptyState).isVisible()) {
+        throw new Error("Password Policy page failed to load its policy (load-error state)");
+      }
+      if (await this.page.locator(this.notAdminEmptyState).isVisible()) {
+        throw new Error("Password Policy page denied access (not-admin state)");
+      }
       return false;
     }
   }
