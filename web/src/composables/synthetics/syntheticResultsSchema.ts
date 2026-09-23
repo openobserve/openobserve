@@ -1106,9 +1106,8 @@ const TABLE = `"${SYNTHETIC_RESULTS_STREAM}"`;
  * `evidence_by_step`. Those are JSON blob columns; on a 5000-row aggregation
  * one of them was ~20 MB of duplicated payload.
  *
- * Blob columns belong to the single-row detail query only
- * (`buildRunDetailSql` / `buildProtocolRunDetailSql` use `SELECT *`
- * deliberately — one row).
+ * Blob columns belong to the single-row detail query only: `buildRunDetailSql` names columns
+ * explicitly (see `RUN_DETAIL_COLUMNS`); `buildProtocolRunDetailSql` uses `SELECT *`.
  *
  * `buildRunsWithStepsSql` is the one intentional exception: it needs
  * `last_attempt_steps` and `retry_history` to tally per-step stats. It still
@@ -1710,6 +1709,7 @@ const RUN_DETAIL_COLUMNS: { field: string; alias: string; fallback: string }[] =
   { field: "retry_step_ids", alias: "retry_step_ids", fallback: "''" },
   { field: "last_attempt_steps", alias: "last_attempt_steps", fallback: "''" },
   { field: "recorded_steps", alias: "recorded_steps", fallback: "''" },
+  { field: "start_load", alias: "start_load", fallback: "''" },
 ];
 
 /** run/execution WHERE clauses restricted to fields that exist in the schema.

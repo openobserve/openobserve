@@ -157,6 +157,11 @@ describe("syntheticResultsSchema query builders", () => {
     expect(sql).not.toContain(`${SYNTHETIC_FIELDS.executionId} = 'exec-1'`);
   });
 
+  it("run detail projects start_load, so the drawer's row 0 is not read only via the retry_history copy", () => {
+    const sql = buildRunDetailSql("mon-1", "run-1", "exec-1", null);
+    expect(sql).toContain("start_load as start_load");
+  });
+
   it("ERROR_SOURCE covers the control-plane sources the stream can carry", () => {
     expect(ERROR_SOURCE.dispatch).toBe("dispatch");
     expect(ERROR_SOURCE.quota).toBe("quota");
