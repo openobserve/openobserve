@@ -6,6 +6,7 @@ import { ref } from "vue";
 import { describe, expect, it, vi } from "vitest";
 import en from "@/locales/languages/en-US.json";
 import type { EvalTargetScope } from "@/services/online-evals.service";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import JobPreviewPanel from "./JobPreviewPanel.vue";
 
 vi.mock("../../composables/useJobMatchedTargets", () => ({
@@ -48,5 +49,14 @@ describe("JobPreviewPanel", () => {
     expect(text).toContain(title);
     expect(text).toContain("37");
     expect(text).toContain(matchedSuffix);
+  });
+
+  it("does not use the info icon for the Summary card, which has no tooltip", () => {
+    const iconNames = mountPreview("span")
+      .findAllComponents(OIcon)
+      .map((icon) => icon.props("name"));
+
+    expect(iconNames).toContain("fact-check");
+    expect(iconNames).not.toContain("info");
   });
 });

@@ -299,6 +299,8 @@ const columns = computed(() =>
       // shared COL.type (180) is wider than needed — trim it back so the flex
       // `name` column reclaims the width (matching the Scorers table).
       size: 120,
+      // Fits the widest badge ("Categorical") so resizing can't clip it.
+      minSize: 104,
       meta: { align: "left" },
     },
     {
