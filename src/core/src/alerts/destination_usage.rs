@@ -16,57 +16,44 @@
 use config::meta::alerts::alert::ListAlertsParams;
 use db::alerts::destinations::DestinationError;
 use infra::db::get_orm_client_ro;
+use strum::{EnumIter, IntoEnumIterator};
+
+/// Names shown per consumer kind in the refusal message before it switches to "and N more".
+const MAX_NAMES_SHOWN: usize = 5;
 
 /// A system whose rows name an alert destination by string rather than by a foreign key.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum DestinationConsumer {
     Alert,
     CompositeAlert,
     Pipeline,
-    SyntheticMonitor,
+    SyntheticCheck,
     OncallPolicy,
     OncallTeamChannel,
     #[cfg(feature = "enterprise")]
     Workflow,
     #[cfg(feature = "enterprise")]
     AnomalyDetection,
+    #[cfg(feature = "enterprise")]
+    IncidentIntegration,
 }
 
 impl DestinationConsumer {
-    #[cfg(feature = "enterprise")]
-    const ALL: [Self; 8] = [
-        Self::Alert,
-        Self::CompositeAlert,
-        Self::Pipeline,
-        Self::SyntheticMonitor,
-        Self::OncallPolicy,
-        Self::OncallTeamChannel,
-        Self::Workflow,
-        Self::AnomalyDetection,
-    ];
-    #[cfg(not(feature = "enterprise"))]
-    const ALL: [Self; 6] = [
-        Self::Alert,
-        Self::CompositeAlert,
-        Self::Pipeline,
-        Self::SyntheticMonitor,
-        Self::OncallPolicy,
-        Self::OncallTeamChannel,
-    ];
-
     /// Singular/plural label for the refusal message, e.g. "1 alert" / "2 alerts".
     fn count_label(self, count: usize) -> String {
         let (one, many) = match self {
             Self::Alert => ("alert", "alerts"),
             Self::CompositeAlert => ("composite alert", "composite alerts"),
             Self::Pipeline => ("pipeline", "pipelines"),
-            Self::SyntheticMonitor => ("synthetic monitor", "synthetic monitors"),
+            Self::SyntheticCheck => ("synthetic check", "synthetic checks"),
             Self::OncallPolicy => ("escalation policy", "escalation policies"),
             Self::OncallTeamChannel => ("team channel", "team channels"),
             #[cfg(feature = "enterprise")]
             Self::Workflow => ("workflow", "workflows"),
             #[cfg(feature = "enterprise")]
             Self::AnomalyDetection => ("anomaly detection config", "anomaly detection configs"),
+            #[cfg(feature = "enterprise")]
+            Self::IncidentIntegration => ("incident integration", "incident integrations"),
         };
         format!("{count} {}", if count == 1 { one } else { many })
     }
@@ -81,22 +68,32 @@ pub struct DestinationUse {
     pub folder_id: Option<String>,
 }
 
-/// Every reference to `name`; `usage_for` has no wildcard arm, so a missed consumer won't compile.
+/// Every reference to `name`, across every consumer — the full breakdown, for the display path.
 pub async fn destination_usage(
     org_id: &str,
     name: &str,
 ) -> Result<Vec<DestinationUse>, DestinationError> {
     let mut uses = Vec::new();
-    for consumer in DestinationConsumer::ALL {
+    for consumer in DestinationConsumer::iter() {
         uses.extend(usage_for(consumer, org_id, name).await?);
     }
     Ok(uses)
 }
 
+/// For the delete path: stops at the first match, so bulk delete avoids hundreds of full scans.
+pub async fn first_use(org_id: &str, name: &str) -> Result<Vec<DestinationUse>, DestinationError> {
+    for consumer in DestinationConsumer::iter() {
+        let found = usage_for(consumer, org_id, name).await?;
+        if !found.is_empty() {
+            return Ok(found);
+        }
+    }
+    Ok(Vec::new())
+}
+
 /// The `delete` refusal message: per-kind counts and names, e.g. `'x' is used by 1 alert (a)`.
 pub fn usage_message(name: &str, uses: &[DestinationUse]) -> String {
-    let parts: Vec<String> = DestinationConsumer::ALL
-        .into_iter()
+    let parts: Vec<String> = DestinationConsumer::iter()
         .filter_map(|consumer| {
             let names: Vec<&str> = uses
                 .iter()
@@ -107,12 +104,23 @@ pub fn usage_message(name: &str, uses: &[DestinationUse]) -> String {
                 format!(
                     "{} ({})",
                     consumer.count_label(names.len()),
-                    names.join(", ")
+                    shown_names(&names)
                 )
             })
         })
         .collect();
     format!("'{name}' is used by {}", join_with_and(&parts))
+}
+
+/// Caps the listed names at `MAX_NAMES_SHOWN`, appending "and N more" — the count stays exact.
+fn shown_names(names: &[&str]) -> String {
+    let extra = names.len().saturating_sub(MAX_NAMES_SHOWN);
+    let shown = names[..names.len().min(MAX_NAMES_SHOWN)].join(", ");
+    if extra > 0 {
+        format!("{shown} and {extra} more")
+    } else {
+        shown
+    }
 }
 
 /// `["a", "b", "c"] -> "a, b and c"` — no Oxford comma, matching the refusal message's shape.
@@ -135,6 +143,7 @@ fn decode_err(context: &str, e: serde_json::Error) -> DestinationError {
     DestinationError::InfraError(infra::errors::Error::Message(format!("{context}: {e}")))
 }
 
+/// No wildcard arm plus `EnumIter`-derived iteration: a missed consumer can't compile silently.
 async fn usage_for(
     consumer: DestinationConsumer,
     org_id: &str,
@@ -144,13 +153,15 @@ async fn usage_for(
         DestinationConsumer::Alert => alert_usage(org_id, name).await,
         DestinationConsumer::CompositeAlert => composite_alert_usage(org_id, name).await,
         DestinationConsumer::Pipeline => pipeline_usage(org_id, name).await,
-        DestinationConsumer::SyntheticMonitor => synthetic_monitor_usage(org_id, name).await,
+        DestinationConsumer::SyntheticCheck => synthetic_check_usage(org_id, name).await,
         DestinationConsumer::OncallPolicy => oncall_policy_usage(org_id, name).await,
         DestinationConsumer::OncallTeamChannel => oncall_team_channel_usage(org_id, name).await,
         #[cfg(feature = "enterprise")]
         DestinationConsumer::Workflow => workflow_usage(org_id, name).await,
         #[cfg(feature = "enterprise")]
         DestinationConsumer::AnomalyDetection => anomaly_detection_usage(org_id, name).await,
+        #[cfg(feature = "enterprise")]
+        DestinationConsumer::IncidentIntegration => incident_integration_usage(org_id, name).await,
     }
 }
 
@@ -212,7 +223,7 @@ async fn pipeline_usage(org_id: &str, name: &str) -> Result<Vec<DestinationUse>,
 }
 
 /// Uses `list_referencing_destination`, which fails closed, not `list`, which skips a bad row.
-async fn synthetic_monitor_usage(
+async fn synthetic_check_usage(
     org_id: &str,
     name: &str,
 ) -> Result<Vec<DestinationUse>, DestinationError> {
@@ -222,7 +233,7 @@ async fn synthetic_monitor_usage(
     Ok(checks
         .into_iter()
         .map(|check| DestinationUse {
-            consumer: DestinationConsumer::SyntheticMonitor,
+            consumer: DestinationConsumer::SyntheticCheck,
             id: check.id,
             name: check.name,
             folder_id: Some(check.folder_id),
@@ -230,7 +241,7 @@ async fn synthetic_monitor_usage(
         .collect())
 }
 
-/// Escalation policies have no name of their own; `team_id` is the closest identifying field.
+/// Fails open on a corrupt row: `to_policy` swallows bad JSON, unlike this module's other arms.
 async fn oncall_policy_usage(
     org_id: &str,
     name: &str,
@@ -248,7 +259,7 @@ async fn oncall_policy_usage(
         .collect())
 }
 
-/// The team channel overrides the policy's list when set; checking both is the safe superset.
+/// Fails open on a corrupt row: `to_channel` swallows bad JSON, unlike this module's other arms.
 async fn oncall_team_channel_usage(
     org_id: &str,
     name: &str,
@@ -325,6 +336,25 @@ async fn anomaly_detection_usage(
         }
     }
     Ok(uses)
+}
+
+/// Read at notify time as `base_destinations`; deleting one silently un-notifies future incidents.
+#[cfg(feature = "enterprise")]
+async fn incident_integration_usage(
+    org_id: &str,
+    name: &str,
+) -> Result<Vec<DestinationUse>, DestinationError> {
+    let integrations = infra::table::incident_integrations::list_by_org(org_id).await?;
+    Ok(integrations
+        .into_iter()
+        .filter(|i| i.destinations.iter().any(|d| d == name))
+        .map(|i| DestinationUse {
+            consumer: DestinationConsumer::IncidentIntegration,
+            id: i.id,
+            name: i.name,
+            folder_id: None,
+        })
+        .collect())
 }
 
 #[cfg(test)]
@@ -468,7 +498,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore] // requires the local sqlite infra to be initialized
-    async fn test_synthetic_monitor_arm_refuses() {
+    async fn test_synthetic_check_arm_refuses() {
         let org_id = "test_org_du_synthetic";
         let name = "du-dest-synthetic";
         let conn = get_orm_client_rw().await;
@@ -485,7 +515,7 @@ mod tests {
 
         let uses = destination_usage(org_id, name).await.unwrap();
         assert_eq!(uses.len(), 1);
-        assert_eq!(uses[0].consumer, DestinationConsumer::SyntheticMonitor);
+        assert_eq!(uses[0].consumer, DestinationConsumer::SyntheticCheck);
     }
 
     #[tokio::test]
@@ -581,6 +611,47 @@ mod tests {
         let name = "du-dest-unused";
         let uses = destination_usage(org_id, name).await.unwrap();
         assert!(uses.is_empty());
+    }
+
+    /// `first_use` stops at the first match, unlike the full `destination_usage` scan.
+    #[tokio::test]
+    #[ignore] // requires the local sqlite/coordinator infra to be initialized
+    async fn test_first_use_stops_at_the_first_match() {
+        let org_id = "test_org_du_firstuse";
+        let name = "du-dest-firstuse";
+        ensure_default_folder(org_id).await;
+        let alert_conn = get_orm_client_rw().await;
+        let alert = test_alert("du-firstuse-alert", name);
+        infra::table::alerts::create(alert_conn, org_id, "default", alert, false)
+            .await
+            .unwrap();
+
+        let check_conn = get_orm_client_rw().await;
+        let check = Synthetic {
+            name: "du-firstuse-check".to_string(),
+            check_type: SyntheticType::Http,
+            target: "https://example.com".to_string(),
+            destinations: vec![name.to_string()],
+            ..Default::default()
+        };
+        infra::table::synthetics_checks::create(check_conn, org_id, check, false)
+            .await
+            .unwrap();
+
+        let full = destination_usage(org_id, name).await.unwrap();
+        assert_eq!(
+            full.len(),
+            2,
+            "both consumers should show up in the full scan"
+        );
+
+        let first = first_use(org_id, name).await.unwrap();
+        assert_eq!(
+            first.len(),
+            1,
+            "the delete path should stop at the first match"
+        );
+        assert_eq!(first[0].consumer, DestinationConsumer::Alert);
     }
 
     /// Seeds a real `NodeData::Destination` node so this exercises `workflow_usage`'s match, not an
@@ -685,17 +756,47 @@ mod tests {
         assert_eq!(uses[0].consumer, DestinationConsumer::AnomalyDetection);
     }
 
+    /// The ninth consumer: incident integrations page nobody once the destination is gone.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    #[ignore] // requires the local sqlite infra to be initialized, and the enterprise feature
+    async fn test_incident_integration_arm_refuses() {
+        let org_id = "test_org_du_incident";
+        let name = "du-dest-incident";
+        let now = 1_000_000;
+        let record = infra::table::incident_integrations::IncidentIntegrationRecord {
+            id: "du-incident-1".to_string(),
+            org_id: org_id.to_string(),
+            name: "du-incident".to_string(),
+            source_type: "auto".to_string(),
+            token: infra::table::incident_integrations::generate_token(),
+            enabled: true,
+            config: serde_json::json!({}),
+            destinations: vec![name.to_string()],
+            created_by: "test@example.com".to_string(),
+            created_at: now,
+            updated_at: now,
+        };
+        infra::table::incident_integrations::add(&record)
+            .await
+            .unwrap();
+
+        let uses = incident_integration_usage(org_id, name).await.unwrap();
+        assert_eq!(uses.len(), 1);
+        assert_eq!(uses[0].consumer, DestinationConsumer::IncidentIntegration);
+    }
+
     #[test]
     fn test_usage_message_orders_and_counts_by_consumer_kind() {
         let uses = vec![
             DestinationUse {
-                consumer: DestinationConsumer::SyntheticMonitor,
+                consumer: DestinationConsumer::SyntheticCheck,
                 id: "s1".to_string(),
                 name: "s1".to_string(),
                 folder_id: None,
             },
             DestinationUse {
-                consumer: DestinationConsumer::SyntheticMonitor,
+                consumer: DestinationConsumer::SyntheticCheck,
                 id: "s2".to_string(),
                 name: "s2".to_string(),
                 folder_id: None,
@@ -715,7 +816,23 @@ mod tests {
         ];
         assert_eq!(
             usage_message("pagerduty-prod", &uses),
-            "'pagerduty-prod' is used by 1 alert (a1), 2 synthetic monitors (s1, s2) and 1 escalation policy (team1)"
+            "'pagerduty-prod' is used by 1 alert (a1), 2 synthetic checks (s1, s2) and 1 escalation policy (team1)"
+        );
+    }
+
+    #[test]
+    fn test_usage_message_caps_names_and_counts_the_rest() {
+        let uses: Vec<DestinationUse> = (1..=7)
+            .map(|i| DestinationUse {
+                consumer: DestinationConsumer::Alert,
+                id: format!("a{i}"),
+                name: format!("a{i}"),
+                folder_id: None,
+            })
+            .collect();
+        assert_eq!(
+            usage_message("x", &uses),
+            "'x' is used by 7 alerts (a1, a2, a3, a4, a5 and 2 more)"
         );
     }
 

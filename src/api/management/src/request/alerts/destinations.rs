@@ -470,7 +470,8 @@ pub async fn list_destinations(
     operation_id = "DeleteAlertDestination",
     summary = "Delete alert destination",
     description = "Removes an alert destination configuration from the organization. The destination must not be in use by \
-                   any active alerts or pipelines before deletion. Once deleted, any alerts previously configured to use \
+                   any alert, pipeline, synthetic check, escalation policy, team channel, composite alert, workflow, or \
+                   anomaly detection config before deletion. Once deleted, any alerts previously configured to use \
                    this destination will need to be updated with alternative notification methods to continue functioning.",
     security(
         ("Authorization"= [])
@@ -506,7 +507,8 @@ pub async fn delete_destination(Path((org_id, name)): Path<(String, String)>) ->
     operation_id = "DeleteAlertDestinationBulk",
     summary = "Delete multiple alert destination",
     description = "Removes multiple alert destination configuration from the organization. The destinations must not be in use by \
-                   any active alerts or pipelines before deletion. Once deleted, any alerts previously configured to use \
+                   any alert, pipeline, synthetic check, escalation policy, team channel, composite alert, workflow, or \
+                   anomaly detection config before deletion. Once deleted, any alerts previously configured to use \
                    these destination will need to be updated with alternative notification methods to continue functioning.",
     security(
         ("Authorization"= [])

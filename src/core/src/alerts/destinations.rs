@@ -366,7 +366,7 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
-    let uses = super::destination_usage::destination_usage(org_id, name).await?;
+    let uses = super::destination_usage::first_use(org_id, name).await?;
     if !uses.is_empty() {
         return Err(DestinationError::InUse(
             super::destination_usage::usage_message(name, &uses),

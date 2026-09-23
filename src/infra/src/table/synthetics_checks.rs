@@ -339,7 +339,10 @@ pub async fn list_referencing_destination<C: ConnectionTrait>(
         .await?;
     let mut out = Vec::new();
     for m in models {
-        let s = Synthetic::try_from(m)?;
+        let id = m.id.clone();
+        let s = Synthetic::try_from(m).map_err(|e| {
+            errors::Error::Message(format!("synthetic check {id} is unreadable: {e}"))
+        })?;
         if s.destinations.iter().any(|d| d == destination_name) {
             out.push(s);
         }
