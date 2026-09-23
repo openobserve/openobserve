@@ -1474,6 +1474,8 @@
     "sessionReplay": "Repetição da sessão",
     "viewSessionReplay": "Exibir repetição da sessão",
     "playSessionReplay": "Reproduzir repetição da sessão",
+    "noReplayRecordedTitle": "Nenhuma reprodução foi gravada para esta sessão",
+    "noReplayRecordedMessage": "A sessão {id} não tem segmentos de reprodução para exibir.",
     "discoverSessionTitle": "Descubra o Session Replay para entender detalhadamente as interações do usuário",
     "discoverSessionMessage": "O Session Replay captura e reproduz as interações do usuário em seu site ou aplicativo. Isso permite que você analise visualmente como os usuários navegam, onde clicam, o que digitam e como interagem com seu conteúdo.",
     "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",

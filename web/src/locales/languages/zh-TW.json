@@ -1474,6 +1474,8 @@
     "sessionReplay": "工作階段重播",
     "viewSessionReplay": "檢視工作階段重播",
     "playSessionReplay": "播放工作階段重播",
+    "noReplayRecordedTitle": "此工作階段未錄製重播",
+    "noReplayRecordedMessage": "工作階段 {id} 沒有可播放的重播區段。",
     "discoverSessionTitle": "探索工作階段重播以深入了解使用者互動",
     "discoverSessionMessage": "工作階段重播會擷取並重播使用者在網站或應用程式上的互動行為，讓您以視覺化方式檢閱使用者如何瀏覽、在哪裡按下、輸入了什麼，以及如何與內容互動",
     "loadingErrorDetails": "正在擷取錯誤詳細資訊，請稍候。",
