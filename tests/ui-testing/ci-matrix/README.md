@@ -30,6 +30,16 @@ in **both** repos automatically — no more hand-syncing two workflow files.
 
 ## Adding / moving a spec
 
+- **A regression spec** (covers a bug fix / regression scenario, not new-feature
+  coverage): place it under `playwright-tests/RegressionSet/<Feature>/`, matching
+  existing folders (`RegressionSet/Logs`, `RegressionSet/Alerts`,
+  `RegressionSet/Pipelines`, …) — never a bare top-level `playwright-tests/<Feature>/`
+  folder. Then add/extend a shard in `ci_matrix_regression.json` (drives
+  `playwright_bugfix_regression.yml`), following the `"<Feature>-Regression"`
+  testfolder naming pattern with `"actual_folder": "RegressionSet/<Feature>"`.
+  `playwright.config.js`'s `testDir` covers the whole `playwright-tests` tree with no
+  ignore, so an unplaced/unwired spec still silently runs in any full/unsharded sweep
+  instead of through a named, reported shard.
 - **A spec both OSS and ENT run:** edit `ci_matrix.json` only. Add the filename to the
   `run_files` of the right shard (`testfolder`). Done — ENT picks it up on its next run.
 - **An enterprise-only spec:** edit `o2-enterprise/tests/ui-testing/ci-matrix/ci_matrix.ent.json`
