@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+  markSlackInviteDismissed,
   markSlackInviteOffered,
   markSlackInviteResolved,
   shouldOfferSlackInvite,
@@ -25,6 +26,7 @@ const EMAIL = "example@gmail.com";
 const STATE_KEY = `slackCommunityInvite:${EMAIL}`;
 const LEGACY_SEEN_KEY = `communitySlackInviteSeen:${EMAIL}`;
 const DAY2_DELAY_MS = 24 * 60 * 60 * 1000;
+const SNOOZE_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
 
 describe("slackCommunityInvite", () => {
   beforeEach(() => {
@@ -94,6 +96,78 @@ describe("slackCommunityInvite", () => {
       markSlackInviteResolved(EMAIL);
 
       expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
+    });
+  });
+
+  describe("dismissing the standalone invite (cooldown, not permanent)", () => {
+    it("does not show again immediately after a dismissal, even though the day-2 delay already elapsed", () => {
+      localStorage.setItem(
+        STATE_KEY,
+        JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1 }),
+      );
+
+      markSlackInviteDismissed(EMAIL);
+
+      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
+    });
+
+    it("shows again once the snooze period has elapsed after a dismissal", () => {
+      localStorage.setItem(
+        STATE_KEY,
+        JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1 }),
+      );
+      markSlackInviteDismissed(EMAIL);
+
+      // Fast-forward past the snooze window by rewriting shownAt directly.
+      const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
+      localStorage.setItem(
+        STATE_KEY,
+        JSON.stringify({ ...record, shownAt: Date.now() - SNOOZE_DELAY_MS - 1 }),
+      );
+
+      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(true);
+    });
+
+    it("stops asking for good after the max number of standalone prompts is dismissed", () => {
+      localStorage.setItem(
+        STATE_KEY,
+        JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1 }),
+      );
+
+      // Dismiss 1: snoozes.
+      markSlackInviteDismissed(EMAIL);
+      let record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
+      localStorage.setItem(
+        STATE_KEY,
+        JSON.stringify({ ...record, shownAt: Date.now() - SNOOZE_DELAY_MS - 1 }),
+      );
+
+      // Dismiss 2: snoozes again.
+      markSlackInviteDismissed(EMAIL);
+      record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
+      localStorage.setItem(
+        STATE_KEY,
+        JSON.stringify({ ...record, shownAt: Date.now() - SNOOZE_DELAY_MS - 1 }),
+      );
+
+      // Dismiss 3: the third dismissal hits the cap and resolves for good.
+      markSlackInviteDismissed(EMAIL);
+
+      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
+      record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
+      expect(record.status).toBe("resolved");
+    });
+
+    it("does nothing once the invite is already resolved", () => {
+      localStorage.setItem(
+        STATE_KEY,
+        JSON.stringify({ status: "resolved", shownAt: null, dismissCount: 0 }),
+      );
+
+      markSlackInviteDismissed(EMAIL);
+
+      const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
+      expect(record.status).toBe("resolved");
     });
   });
 });
