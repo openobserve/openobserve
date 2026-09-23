@@ -52,7 +52,8 @@ const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5x
 /// but it has legitimate standalone uses and no measured failure behind it.
 const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
 
-/// §4.6: the one statement of the coverage floor, shared by every surface that reports it.
+/// §4.6: the one statement of the coverage floor on the API side. The web form states the same
+/// floor through its own i18n key, so the two must be kept in step by hand.
 const WINDOW_FLOOR_RULE: &str =
     "detection_window_seconds must be at least schedule_interval plus histogram_interval";
 
@@ -140,7 +141,8 @@ pub struct CreateAnomalyConfigRequest {
     /// how wide a swing the level absorbs instead of leaving for the forest to score — and,
     /// because the trailing knot crosses a level step at exactly half this span, it is also
     /// how old a step must be before the fit can see it. Clamped against the histogram
-    /// interval and the training window; the effective value comes back on the response.
+    /// interval and the training window at fit time; the response echoes the stored value, not
+    /// the clamped one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub level_half_width_seconds: Option<i64>,
     pub rcf_num_trees: Option<i32>,
@@ -2209,11 +2211,10 @@ fn validate_origin_aligned_interval(histogram_interval: &str, histogram_secs: i6
         anyhow::bail!(
             "histogram_interval ({}) must divide the date_bin origin of {}s (2001-01-01): it \
              leaves a remainder of {}s, so indexed and unindexed runs would bucket the same rows \
-             onto grids {}s apart",
+             onto grids that do not line up",
             histogram_interval,
             DATE_BIN_ORIGIN_SECS,
             skew,
-            histogram_secs - skew,
         );
     }
     Ok(())

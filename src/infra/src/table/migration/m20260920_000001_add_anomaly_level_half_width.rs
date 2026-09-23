@@ -127,4 +127,25 @@ mod tests {
             r#"ALTER TABLE "anomaly_detection_config" DROP COLUMN "level_half_width_seconds""#
         );
     }
+
+    /// up() and down() must name the same column, or a rollback silently drops the wrong one.
+    #[test]
+    fn up_and_down_agree_on_the_column() {
+        let up = add_column_stmt().to_string(SqliteQueryBuilder);
+        let down = drop_column_stmt().to_string(SqliteQueryBuilder);
+        assert!(up.contains(COLUMN));
+        assert!(down.contains(COLUMN));
+        assert_eq!(down.matches("DROP COLUMN").count(), 1);
+    }
+
+    /// SQLite panics on an ALTER carrying more than one option, so this must stay a single ADD.
+    #[test]
+    fn adds_exactly_one_column() {
+        let sql = add_column_stmt().to_string(SqliteQueryBuilder);
+        assert_eq!(sql.matches("ADD COLUMN").count(), 1);
+        assert_eq!(
+            COLUMN,
+            AnomalyConfig::LevelHalfWidthSeconds.into_iden().to_string()
+        );
+    }
 }

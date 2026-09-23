@@ -23,7 +23,9 @@
 //! The two grids therefore agree only where the interval divides [`DATE_BIN_ORIGIN_SECS`],
 //! which is 11,323 whole days. That agreement is a **coincidence of the origin, not a
 //! guarantee** — the same warning `slo::query` carries — so every consumer reads the constant
-//! from here rather than restating the number, and the tests below fail if the origin moves.
+//! from here rather than restating the number: `rewrite_histogram` for the `date_bin` argument
+//! itself, `merge::downsampling` for the rollup SQL, and the anomaly interval rule for what it
+//! accepts. Move the origin here and all three move together.
 
 /// The literal `rewrite_histogram` passes as `date_bin`'s origin argument.
 pub const ORIGIN_LITERAL: &str = "2001-01-01T00:00:00";
