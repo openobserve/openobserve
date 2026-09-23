@@ -25,8 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <template #subtitle>
-      <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+    <template v-if="!sessionNotFound" #subtitle>
+      <div
+        class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+        data-test="session-viewer-subtitle"
+      >
         <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="language" size="sm" />
           {{ sessionDetails.ip }}
@@ -69,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-    <template #actions>
+    <template v-if="!sessionNotFound" #actions>
       <ShareButton
         data-test="session-viewer-share-link-btn"
         :url="shareUrl"
@@ -77,7 +80,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
       />
     </template>
-    <div class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden">
+    <OEmptyState
+      v-if="sessionNotFound"
+      size="hero"
+      illustration="no-results"
+      :title="t('rum.noReplayRecordedTitle')"
+      :description="t('rum.noReplayRecordedMessage', { id: sessionId })"
+      data-test="session-viewer-no-replay"
+    />
+    <div
+      v-else
+      class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden"
+    >
       <OSplitter
         v-model="splitterSize"
         :limits="[200, 1400]"
@@ -148,6 +162,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
 
@@ -186,6 +201,7 @@ const segmentEvents = ref<any[]>([]);
 // starting, which is exactly the moment the mobile player mounts — that dip is what let
 // the "No session replay available" empty state flash before the segments arrived.
 const segmentsLoading = ref(true);
+const sessionNotFound = ref(false);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -267,6 +283,7 @@ const rawEventsMap = ref<Map<string, any>>(new Map());
 onBeforeMount(async () => {
   sessionId.value = router.currentRoute.value.params.id as string;
   await getSession();
+  if (sessionNotFound.value) return;
   getSessionSegments();
   getSessionEvents();
 });
@@ -373,6 +390,8 @@ const getSession = () => {
       )
       .then((res) => {
         if (res.data.hits.length === 0) {
+          sessionNotFound.value = true;
+          segmentsLoading.value = false;
           return;
         }
 

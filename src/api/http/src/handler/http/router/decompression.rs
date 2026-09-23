@@ -13,52 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Preprocessing middleware for Content-Encoding header to support snappy pass-through.
-//!
-//! This middleware removes `Content-Encoding: snappy` before the request reaches
-//! tower_http's RequestDecompressionLayer (which supports gzip/deflate/brotli/zstd).
-//! This allows handlers like Prometheus remote write to manually decompress snappy data.
+//! Hides `Content-Encoding: snappy` from `RequestDecompressionLayer`, which would answer 415.
 
 use axum::{extract::Request, http::header, middleware::Next, response::Response};
 
-/// Custom header name to preserve original snappy encoding information.
-/// Handlers can check this header to know if they need to decompress snappy data.
-pub const X_ORIGINAL_ENCODING: &str = "x-original-content-encoding";
-
-/// Middleware that preprocesses Content-Encoding header before tower_http decompression.
-///
-/// If Content-Encoding is "snappy":
-/// - Removes the Content-Encoding header (so tower_http doesn't return 415)
-/// - Adds X-Original-Content-Encoding: snappy (so handler knows to decompress)
-///
-/// All other encodings (gzip, deflate, brotli, zstd, identity) pass through unchanged
-/// and are handled by tower_http's RequestDecompressionLayer.
+/// Drops the header only on the routes that decode snappy themselves; the rest keep their 415.
 pub async fn preprocess_encoding_middleware(mut request: Request, next: Next) -> Response {
-    // Check if Content-Encoding is snappy
-    let is_snappy = request
-        .headers()
-        .get(header::CONTENT_ENCODING)
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.eq_ignore_ascii_case("snappy"))
-        .unwrap_or(false);
+    // `remove` drops values this never inspected, so a multi-valued header is left to its 415
+    let only_snappy = {
+        let mut encodings = request.headers().get_all(header::CONTENT_ENCODING).iter();
+        encodings
+            .next()
+            .is_some_and(|v| v.to_str().is_ok_and(|s| s.eq_ignore_ascii_case("snappy")))
+            && encodings.next().is_none()
+    };
 
-    if is_snappy {
-        // Clone the encoding value before modifying headers
-        let encoding_value = request.headers().get(header::CONTENT_ENCODING).cloned();
-
-        // Remove Content-Encoding so tower_http doesn't reject it with 415
+    if only_snappy && is_snappy_capable_route(request.uri().path()) {
         request.headers_mut().remove(header::CONTENT_ENCODING);
-
-        // Preserve original encoding info for handler
-        if let Some(value) = encoding_value {
-            request.headers_mut().insert(
-                axum::http::HeaderName::from_static(X_ORIGINAL_ENCODING),
-                value,
-            );
-        }
     }
 
     next.run(request).await
+}
+
+fn is_snappy_capable_route(path: &str) -> bool {
+    // the `/api` nest and ZO_BASE_URI both shift the prefix, so only the suffix is reliable
+    path.ends_with("/loki/api/v1/push") || path.ends_with("/prometheus/api/v1/write")
 }
 
 #[cfg(test)]
@@ -75,125 +54,174 @@ mod tests {
 
     use super::*;
 
-    async fn echo_headers_handler(req: Request<Body>) -> String {
-        use axum::http::HeaderValue;
+    const LOKI_ROUTE: &str = "/{org_id}/loki/api/v1/push";
+    const LOKI_URI: &str = "/default/loki/api/v1/push";
 
-        let content_encoding = req
-            .headers()
+    async fn echo_encoding_handler(req: Request<Body>) -> String {
+        req.headers()
             .get(header::CONTENT_ENCODING)
-            .and_then(|v: &HeaderValue| v.to_str().ok())
-            .unwrap_or("none");
-        let original_encoding = req
-            .headers()
-            .get(X_ORIGINAL_ENCODING)
-            .and_then(|v: &HeaderValue| v.to_str().ok())
-            .unwrap_or("none");
-        format!(
-            "content-encoding:{},original:{}",
-            content_encoding, original_encoding
-        )
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("none")
+            .to_string()
     }
 
     async fn echo_body_handler(body: Bytes) -> Bytes {
         body
     }
 
-    #[tokio::test]
-    async fn test_snappy_preprocessing() {
+    async fn echo_encoding(route: &str, uri: &str, encoding: Option<&str>) -> String {
         let app = Router::new()
-            .route("/test", post(echo_headers_handler))
+            .route(route, post(echo_encoding_handler))
             .layer(middleware::from_fn(preprocess_encoding_middleware));
 
-        let request = Request::builder()
-            .uri("/test")
-            .method("POST")
-            .header("Content-Encoding", "snappy")
-            .body(Body::from("test"))
-            .unwrap();
+        let mut builder = Request::builder().uri(uri).method("POST");
+        if let Some(encoding) = encoding {
+            builder = builder.header("Content-Encoding", encoding);
+        }
 
-        let response = app.oneshot(request).await.unwrap();
+        let response = app
+            .oneshot(builder.body(Body::from("test")).unwrap())
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-        let body_str = String::from_utf8_lossy(&body);
+        String::from_utf8_lossy(&body).into_owned()
+    }
 
-        // Content-Encoding should be removed, X-Original-Content-Encoding should be set
-        assert_eq!(body_str, "content-encoding:none,original:snappy");
+    fn decompressing_app(route: &str) -> Router {
+        Router::new()
+            .route(route, post(echo_body_handler))
+            .layer(RequestDecompressionLayer::new())
+            .layer(middleware::from_fn(preprocess_encoding_middleware))
+    }
+
+    #[tokio::test]
+    async fn test_snappy_stripped_on_loki_push() {
+        assert_eq!(
+            echo_encoding(LOKI_ROUTE, LOKI_URI, Some("snappy")).await,
+            "none"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_snappy_stripped_on_prometheus_remote_write() {
+        let encoding = echo_encoding(
+            "/{org_id}/prometheus/api/v1/write",
+            "/default/prometheus/api/v1/write",
+            Some("snappy"),
+        )
+        .await;
+        assert_eq!(encoding, "none");
+    }
+
+    #[tokio::test]
+    async fn test_snappy_stripped_when_the_api_prefix_is_not_nested_away() {
+        let encoding = echo_encoding(
+            "/api/{org_id}/loki/api/v1/push",
+            "/api/default/loki/api/v1/push",
+            Some("snappy"),
+        )
+        .await;
+        assert_eq!(encoding, "none");
+    }
+
+    #[tokio::test]
+    async fn test_snappy_stripped_regardless_of_case() {
+        assert_eq!(
+            echo_encoding(LOKI_ROUTE, LOKI_URI, Some("SNAPPY")).await,
+            "none"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_snappy_kept_on_a_route_that_cannot_decode_it() {
+        let encoding = echo_encoding("/{org_id}/v1/logs", "/default/v1/logs", Some("snappy")).await;
+        assert_eq!(encoding, "snappy");
+    }
+
+    #[tokio::test]
+    async fn test_snappy_on_otlp_path_returns_415() {
+        let request = Request::builder()
+            .uri("/default/v1/logs")
+            .method("POST")
+            .header("Content-Type", "application/x-protobuf")
+            .header("Content-Encoding", "snappy")
+            .body(Body::from("snappy bytes"))
+            .unwrap();
+
+        let response = decompressing_app("/{org_id}/v1/logs")
+            .oneshot(request)
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    }
+
+    #[tokio::test]
+    async fn test_multi_valued_encoding_is_left_alone() {
+        for encodings in [["snappy", "gzip"], ["gzip", "snappy"]] {
+            let mut builder = Request::builder().uri(LOKI_URI).method("POST");
+            for encoding in encodings {
+                builder = builder.header("Content-Encoding", encoding);
+            }
+
+            let app = Router::new()
+                .route(LOKI_ROUTE, post(echo_encoding_handler))
+                .layer(middleware::from_fn(preprocess_encoding_middleware));
+            let response = app
+                .oneshot(builder.body(Body::from("test")).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert_eq!(
+                String::from_utf8_lossy(&body),
+                encodings[0],
+                "{encodings:?}"
+            );
+        }
     }
 
     #[tokio::test]
     async fn test_gzip_passthrough() {
-        let app = Router::new()
-            .route("/test", post(echo_headers_handler))
-            .layer(middleware::from_fn(preprocess_encoding_middleware));
+        assert_eq!(
+            echo_encoding(LOKI_ROUTE, LOKI_URI, Some("gzip")).await,
+            "gzip"
+        );
+    }
 
-        let request = Request::builder()
-            .uri("/test")
-            .method("POST")
-            .header("Content-Encoding", "gzip")
-            .body(Body::from("test"))
-            .unwrap();
-
-        let response = app.oneshot(request).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body_str = String::from_utf8_lossy(&body);
-
-        // Content-Encoding should remain unchanged for gzip
-        assert_eq!(body_str, "content-encoding:gzip,original:none");
+    #[tokio::test]
+    async fn test_no_encoding() {
+        assert_eq!(echo_encoding(LOKI_ROUTE, LOKI_URI, None).await, "none");
     }
 
     #[tokio::test]
     async fn test_zstd_request_decompression() {
         let payload = br#"[{"message":"hello"}]"#;
         let compressed = zstd::stream::encode_all(payload.as_slice(), 0).unwrap();
-        let app = Router::new()
-            .route("/test", post(echo_body_handler))
-            .layer(RequestDecompressionLayer::new())
-            .layer(middleware::from_fn(preprocess_encoding_middleware));
 
         let request = Request::builder()
-            .uri("/test")
+            .uri(LOKI_URI)
             .method("POST")
             .header("Content-Type", "application/json")
             .header("Content-Encoding", "zstd")
             .body(Body::from(compressed))
             .unwrap();
 
-        let response = app.oneshot(request).await.unwrap();
+        let response = decompressing_app(LOKI_ROUTE)
+            .oneshot(request)
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
         assert_eq!(body.as_ref(), payload);
-    }
-
-    #[tokio::test]
-    async fn test_no_encoding() {
-        let app = Router::new()
-            .route("/test", post(echo_headers_handler))
-            .layer(middleware::from_fn(preprocess_encoding_middleware));
-
-        let request = Request::builder()
-            .uri("/test")
-            .method("POST")
-            .body(Body::from("test"))
-            .unwrap();
-
-        let response = app.oneshot(request).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body_str = String::from_utf8_lossy(&body);
-
-        assert_eq!(body_str, "content-encoding:none,original:none");
     }
 }

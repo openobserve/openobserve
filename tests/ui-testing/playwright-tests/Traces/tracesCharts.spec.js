@@ -312,26 +312,25 @@ test.describe("Traces Charts testcases", () => {
 
   // ─── P2 — Negative scenarios ─────────────────────────────────────────────────
 
-  test("P2: Charts render no panels before a stream is selected", {
+  test("P2: A full reload auto-selects the default stream instead of the no-stream state", {
     tag: ['@tracesCharts', '@traces', '@negative', '@P2', '@all']
   }, async ({ page }) => {
 
-    // A full reload drops the in-memory stream selection; a sidebar click would keep it.
+    // A full reload drops the in-memory stream selection; loadStreamLists then
+    // falls back to the `default` stream rather than leaving the page empty.
     await pm.tracesPage.navigateToTracesUrl();
     await page.waitForTimeout(3000);
 
     await expect(
       page.locator('[data-test="traces-no-stream-select-stream-card"]'),
-      'The no-stream state must be shown before a stream is picked'
-    ).toBeVisible({ timeout: 15000 });
+      'The no-stream state must not be shown when a default stream exists'
+    ).toBeHidden({ timeout: 15000 });
 
-    const panelCanvases = await page
-      .locator('[data-test="traces-metrics-dashboard"] [data-test-panel-title] canvas')
-      .count();
-    expect(panelCanvases, 'No RED panel may render without a stream').toBe(0);
+    const selectedStream = await pm.tracesPage.getSelectedStreamName();
+    expect(selectedStream, 'The default stream must be selected after a reload').toBe('default');
 
     const panelError = await pm.tracesPage.getMetricsPanelErrorText();
-    expect(panelError, 'An unselected stream must not surface a panel error').toBe('');
+    expect(panelError, 'The auto-selected stream must not surface a panel error').toBe('');
 
     await pm.tracesPage.expectSearchBarVisible();
   });
@@ -383,9 +382,11 @@ test.describe("Traces Charts testcases", () => {
     expect(scriptErrors, `Uncaught script errors: ${scriptErrors.join(' | ')}`).toHaveLength(0);
   });
 
-  // Skipped until o2-enterprise#2643 lands — a rejected query leaves the charts
-  // unmounted even after the editor is emptied and the search succeeds again.
-  test.skip("P0: Charts return once a rejected query is cleared (o2-enterprise#2643)", {
+  // Regression guard for o2-enterprise#2643: a cancelled search's late error
+  // callback used to overwrite errorMsg after a newer search already
+  // succeeded, leaving the charts unmounted forever. Fixed by guarding the
+  // error handler with the same staleness check the data handler already had.
+  test("P0: Charts return once a rejected query is cleared (o2-enterprise#2643)", {
     tag: ['@tracesCharts', '@traces', '@regression', '@P0', '@all']
   }, async ({ page }) => {
 
@@ -397,6 +398,10 @@ test.describe("Traces Charts testcases", () => {
     expect(await pm.tracesPage.isSearchErrorVisible(), 'The query must be rejected').toBeTruthy();
 
     expect(await pm.tracesPage.clearTraceQueryByKeyboard(), 'Editor must end up empty').toBeTruthy();
+    // CodeQueryEditor commits Monaco's content to the app after a 500ms debounce;
+    // clicking Run before that flushes re-submits the query it just replaced.
+    // No real user clears and clicks inside that window.
+    await page.waitForTimeout(600);
     await pm.tracesPage.runQuery();
     await pm.tracesPage.waitForTraceSearchResults();
 

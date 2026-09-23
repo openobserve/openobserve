@@ -34,14 +34,16 @@ use crate::{
     service::{ingestion::get_thread_id, logs},
 };
 
+/// Deprecated: the Loki push endpoint will be removed in a future release.
 #[utoipa::path(
     post,
     path = "/{org_id}/loki/api/v1/push",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionLoki",
-    summary = "Ingest logs via Loki API",
-    description = "Ingests log data using Grafana Loki-compatible API format. Supports both JSON and Protocol Buffers \
+    summary = "Ingest logs via Loki API (deprecated)",
+    description = "This endpoint is deprecated and will be removed in a future release. \
+                   Ingests log data using Grafana Loki-compatible API format. Supports both JSON and Protocol Buffers \
                    content types with optional compression (gzip for JSON, snappy for Protobuf). Stream names are \
                    extracted from the 'stream_name' label in stream metadata. Provides seamless migration path from \
                    Loki deployments to OpenObserve while maintaining API compatibility.",
@@ -157,6 +159,7 @@ fn parse_protobuf_request(
     body: Bytes,
 ) -> Result<loki_rpc::PushRequest, LokiError> {
     let decompressed = match content_encoding {
+        // promtail sends snappy protobuf with no Content-Encoding, so None means snappy
         Some("snappy") | None => snap::raw::Decoder::new()
             .decompress_vec(&body)
             .map_err(|e| LokiError::UnsupportedContentEncoding {
@@ -186,6 +189,25 @@ mod tests {
 
     fn create_valid_loki_json() -> &'static str {
         r#"{"streams":[{"stream":{"service":"test"},"values":[["1701432000000000000","Test message"]]}]}"#
+    }
+
+    fn create_protobuf_push_request() -> Vec<u8> {
+        loki_rpc::PushRequest {
+            streams: vec![loki_rpc::StreamAdapter {
+                labels: r#"{stream_name="test"}"#.to_string(),
+                entries: vec![loki_rpc::EntryAdapter::default()],
+                hash: 0,
+            }],
+        }
+        .encode_to_vec()
+    }
+
+    fn create_snappy_protobuf_body() -> Bytes {
+        Bytes::from(
+            snap::raw::Encoder::new()
+                .compress_vec(&create_protobuf_push_request())
+                .unwrap(),
+        )
     }
 
     #[tokio::test]
@@ -250,5 +272,17 @@ mod tests {
     fn test_parse_json_request_invalid_json_returns_error() {
         let result = parse_json_request(None, Bytes::from("not valid json"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_protobuf_request_snappy_encoding() {
+        let result = parse_protobuf_request(Some("snappy"), create_snappy_protobuf_body());
+        assert_eq!(result.unwrap().streams.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_protobuf_request_no_encoding_is_still_snappy() {
+        let result = parse_protobuf_request(None, create_snappy_protobuf_body());
+        assert_eq!(result.unwrap().streams.len(), 1);
     }
 }

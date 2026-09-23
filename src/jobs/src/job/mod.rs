@@ -524,6 +524,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    #[cfg(feature = "profiling")]
+    tokio::task::spawn(openobserve_core::self_profiles::run());
+
     // telemetry run
     if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
         spawn_pausable_job!(
@@ -1089,6 +1092,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         tokio::task::spawn(anomaly_claim_supervisor());
     }
+    // Every node that serves writes publishes them, not only the scheduler.
+    openobserve_synthetics::service::start_publish_queue();
     if LOCAL_NODE.is_scheduler() {
         // Ungated: synthetics is OSS, and without this an OSS build accepts a
         // check, stores it, and never runs it — the routes would be registered

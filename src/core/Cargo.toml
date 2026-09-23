@@ -41,6 +41,11 @@ vectorscan = [
     "promql-service/vectorscan",
     "stream/vectorscan",
 ]
+profiling = [
+    "dep:jemalloc_pprof",
+    "dep:pprof",
+    "dep:tikv-jemalloc-ctl",
+]
 
 [dependencies]
 db.workspace = true
@@ -127,6 +132,9 @@ openobserve-synthetics.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 futures-util.workspace = true
+jemalloc_pprof = { workspace = true, optional = true }
+pprof = { workspace = true, optional = true }
+tikv-jemalloc-ctl = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false, features = ["rayon"] }
