@@ -406,7 +406,7 @@ describe("runPlayground — live adapter", () => {
 
   it("recognises decision-only providers by either type spelling", () => {
     expect(isDecisionOnlyProvider({ providerType: "systemone" })).toBe(true);
-    expect(isDecisionOnlyProvider({ provider_type: "SystemOne" })).toBe(true);
+    expect(isDecisionOnlyProvider({ provider_type: " SystemOne " })).toBe(true);
     expect(isDecisionOnlyProvider({ providerType: "openai" })).toBe(false);
     expect(isDecisionOnlyProvider(null)).toBe(false);
   });
