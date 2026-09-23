@@ -10956,7 +10956,7 @@
       "versionId": "Version ID",
       "versionLabel": "{name} → v{version}",
       "labelVersion": "{name} · v{version}",
-      "promptVersionReference": "{name}@v{version}",
+      "promptVersionReference": "{name}{'@'}v{version}",
       "versionNumber": "v{version}",
       "versionTransition": "v{from} → v{to}",
       "fromVersion": " · from v{version}",
