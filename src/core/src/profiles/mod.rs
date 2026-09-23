@@ -15,11 +15,8 @@
 
 use std::{collections::HashMap, io::BufReader, sync::Arc};
 
-use axum::{
-    http,
-    response::{IntoResponse, Response as HttpResponse},
-};
-use bytes::{Bytes, BytesMut};
+use axum::{http, response::Response as HttpResponse};
+use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{otlp::OtlpRequestType, self_reporting::usage::UsageType, stream::StreamType},
@@ -48,8 +45,7 @@ use schema::check_for_schema;
 use crate::{
     common::meta::{
         authz::Authz,
-        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-        otlp::otlp_error_response,
+        otlp::{otlp_error_response, otlp_export_response},
         stream::SchemaRecords,
     },
     ingestion::{
@@ -211,7 +207,7 @@ pub async fn otlp_proto(
     )
     .await
     {
-        Ok(v) => Ok(format_http_response(v, OtlpRequestType::HttpProtobuf)),
+        Ok(v) => Ok(otlp_export_response(&v, OtlpRequestType::HttpProtobuf)),
         Err(e) => Ok(map_otlp_handler_error(
             org_id,
             OtlpRequestType::HttpProtobuf,
@@ -262,7 +258,7 @@ pub async fn otlp_json(
     )
     .await
     {
-        Ok(v) => Ok(format_http_response(v, OtlpRequestType::HttpJson)),
+        Ok(v) => Ok(otlp_export_response(&v, OtlpRequestType::HttpJson)),
         Err(e) => Ok(map_otlp_handler_error(org_id, OtlpRequestType::HttpJson, e)),
     }
 }
@@ -481,53 +477,6 @@ fn export_service_response(
     partial_success.error_message = "Some profiles were rejected due to out-of-window timestamps, malformed samples, or empty samples".to_string();
     ExportProfilesServiceResponse {
         partial_success: Some(partial_success),
-    }
-}
-
-/// Serialize an export response using ProtoJSON rules (int64 as decimal string).
-fn export_response_to_proto_json(res: &ExportProfilesServiceResponse) -> json::Value {
-    match &res.partial_success {
-        Some(ps) if ps.rejected_profiles != 0 || !ps.error_message.is_empty() => {
-            let mut partial = json::Map::new();
-            if ps.rejected_profiles != 0 {
-                partial.insert(
-                    "rejectedProfiles".to_string(),
-                    json::Value::String(ps.rejected_profiles.to_string()),
-                );
-            }
-            if !ps.error_message.is_empty() {
-                partial.insert(
-                    "errorMessage".to_string(),
-                    json::Value::String(ps.error_message.clone()),
-                );
-            }
-            json::json!({ "partialSuccess": partial })
-        }
-        _ => json::json!({}),
-    }
-}
-
-fn format_http_response(
-    res: ExportProfilesServiceResponse,
-    req_type: OtlpRequestType,
-) -> HttpResponse {
-    match req_type {
-        OtlpRequestType::HttpJson => (
-            http::StatusCode::OK,
-            [(http::header::CONTENT_TYPE, CONTENT_TYPE_JSON)],
-            json::to_vec(&export_response_to_proto_json(&res)).expect("serialize response"),
-        )
-            .into_response(),
-        _ => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            (
-                http::StatusCode::OK,
-                [(http::header::CONTENT_TYPE, CONTENT_TYPE_PROTO)],
-                out.to_vec(),
-            )
-                .into_response()
-        }
     }
 }
 
@@ -1152,6 +1101,10 @@ mod tests {
     };
 
     use super::*;
+    use crate::common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        otlp::export_response_to_proto_json,
+    };
 
     #[test]
     fn lookup_string_skips_zero_and_empty() {
@@ -2330,28 +2283,28 @@ mod tests {
     }
 
     #[test]
-    fn format_http_response_uses_200_for_partial_success() {
+    fn otlp_export_response_uses_200_for_partial_success() {
         let res = export_service_response(ExportProfilesPartialSuccess {
             rejected_profiles: 1,
             error_message: String::new(),
         });
         assert_eq!(
-            format_http_response(res.clone(), OtlpRequestType::HttpJson).status(),
+            otlp_export_response(&res, OtlpRequestType::HttpJson).status(),
             http::StatusCode::OK
         );
         assert_eq!(
-            format_http_response(res, OtlpRequestType::HttpProtobuf).status(),
+            otlp_export_response(&res, OtlpRequestType::HttpProtobuf).status(),
             http::StatusCode::OK
         );
     }
 
     #[test]
-    fn format_http_response_emits_proto_json_rejected_profiles_string() {
+    fn otlp_export_response_emits_proto_json_rejected_profiles_string() {
         let res = export_service_response(ExportProfilesPartialSuccess {
             rejected_profiles: 1,
             error_message: String::new(),
         });
-        let response = format_http_response(res.clone(), OtlpRequestType::HttpJson);
+        let response = otlp_export_response(&res, OtlpRequestType::HttpJson);
         assert_eq!(
             response.headers().get(http::header::CONTENT_TYPE).unwrap(),
             CONTENT_TYPE_JSON

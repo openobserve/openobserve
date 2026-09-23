@@ -18,9 +18,40 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{meta::otlp::OtlpRequestType, utils::json};
+use opentelemetry_proto::tonic::collector::{
+    logs::v1::ExportLogsServiceResponse, profiles::v1development::ExportProfilesServiceResponse,
+};
 use prost::Message;
 
 use super::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
+
+/// OTLP `Export*ServiceResponse` whose `partial_success` gets a ProtoJSON body.
+pub trait OtlpExportResponse: Message {
+    /// ProtoJSON name of the partial success's rejected-count field.
+    const REJECTED_FIELD: &'static str;
+
+    fn partial_success(&self) -> Option<(i64, &str)>;
+}
+
+impl OtlpExportResponse for ExportLogsServiceResponse {
+    const REJECTED_FIELD: &'static str = "rejectedLogRecords";
+
+    fn partial_success(&self) -> Option<(i64, &str)> {
+        self.partial_success
+            .as_ref()
+            .map(|ps| (ps.rejected_log_records, ps.error_message.as_str()))
+    }
+}
+
+impl OtlpExportResponse for ExportProfilesServiceResponse {
+    const REJECTED_FIELD: &'static str = "rejectedProfiles";
+
+    fn partial_success(&self) -> Option<(i64, &str)> {
+        self.partial_success
+            .as_ref()
+            .map(|ps| (ps.rejected_profiles, ps.error_message.as_str()))
+    }
+}
 
 /// Minimal `google.rpc.Status` for OTLP/HTTP failure bodies.
 #[derive(Clone, PartialEq, Message)]
@@ -64,6 +95,47 @@ pub fn otlp_error_response(
             )
                 .into_response()
         }
+    }
+}
+
+/// OTLP/HTTP requires the response body to use the encoding the request arrived in.
+pub fn otlp_export_response<T: OtlpExportResponse>(res: &T, req_type: OtlpRequestType) -> Response {
+    match req_type {
+        OtlpRequestType::HttpJson => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, CONTENT_TYPE_JSON)],
+            json::to_vec(&export_response_to_proto_json(res)).expect("serialize response"),
+        )
+            .into_response(),
+        _ => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, CONTENT_TYPE_PROTO)],
+            res.encode_to_vec(),
+        )
+            .into_response(),
+    }
+}
+
+/// ProtoJSON rules: int64 as a decimal string, and `partial_success` omitted on a clean success.
+pub fn export_response_to_proto_json<T: OtlpExportResponse>(res: &T) -> json::Value {
+    match res.partial_success() {
+        Some((rejected, error_message)) if rejected != 0 || !error_message.is_empty() => {
+            let mut partial = json::Map::new();
+            if rejected != 0 {
+                partial.insert(
+                    T::REJECTED_FIELD.to_string(),
+                    json::Value::String(rejected.to_string()),
+                );
+            }
+            if !error_message.is_empty() {
+                partial.insert(
+                    "errorMessage".to_string(),
+                    json::Value::String(error_message.to_string()),
+                );
+            }
+            json::json!({ "partialSuccess": partial })
+        }
+        _ => json::json!({}),
     }
 }
 
