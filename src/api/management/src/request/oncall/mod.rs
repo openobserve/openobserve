@@ -2016,6 +2016,48 @@ pub async fn get_prior_causes(
 }
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/responses/{response_id}/report",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "OnCallResponseReport",
+    summary = "The full agent report this page carried",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn get_response_report(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match infra::table::oncall_response_reports::get(&org_id, &response_id).await {
+            // A record with no report is the ordinary case — no agent, or it never answered.
+            Ok(None) => MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Report not found")
+                .into_response(),
+            Ok(Some(report)) => MetaHttpResponse::json(serde_json::json!({
+                "report": report.report,
+                "model": report.model,
+                "generated_at": report.generated_at,
+            })),
+            Err(e) => internal_error("get_response_report", &e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
     post,
     path = "/{org_id}/oncall/responses/{response_id}/acknowledge",
     context_path = "/api",

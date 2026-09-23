@@ -15,15 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  The AI SRE triage gate, per team (C11 — the l0_json block).
+  The AI SRE triage gate, per team (C11 — the l0_json block; I19-I24 — `off`).
 
   What each severity does is said in plain sentences beside the control,
   because the mode names alone ("gate", "only") read as jargon at the moment
-  somebody is deciding whether a P2 will wait 90 seconds. Two of the four are
-  not settings at all: P1 is pinned parallel (holding a critical page behind a
-  model is not a product offer) and P4/P5 are pinned agent-only (they page
-  nobody, so there is no page to hold). The server 400s both; the editor
-  renders them as facts rather than disabled controls pretending to be knobs.
+  somebody is deciding whether a P2 will wait 90 seconds. All four rows are
+  dropdowns now — P1 offers `parallel`/`off`, P2 and P3 offer
+  `gate`/`parallel`/`off`, P4/P5 offer `only`/`off` — and the server 400s
+  anything outside that row's set, so the options list is the validation.
+
+  The "AI triage" switch above the rows is a convenience, not a fifth field:
+  it writes `off` to all four rows (or the published defaults back) and stores
+  nothing of its own — flipping it reads back as "on" the moment any row is
+  not `off`.
 
   The budget is a list of durations rather than a free number: the server
   refuses anything outside 30-600s instead of clamping, and every value an
@@ -33,88 +37,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col gap-4" data-test="oncall-l0-editor">
-    <!-- Per-severity: what happens between a firing and a page, one bordered
-         card so P1's invariant, the editable P2/P3 pair and P4/P5's invariant
-         read as one ladder rather than three unrelated rows. -->
     <div class="flex flex-col gap-2">
-      <OText variant="section" as="div">{{ t("oncall.l0BySeveritySection") }}</OText>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <OText variant="section" as="div">{{ t("oncall.l0BySeveritySection") }}</OText>
+        <OSwitch
+          :model-value="aiTriageOn"
+          :label="t('oncall.l0AiTriageToggle')"
+          size="sm"
+          data-test="oncall-l0-ai-triage-toggle"
+          @update:model-value="(v: unknown) => setAiTriage(!!v)"
+        />
+      </div>
 
       <div class="border-border-default rounded-surface flex flex-col border">
-        <div class="flex flex-wrap items-center gap-2 px-3 py-2" data-test="oncall-l0-p1">
-          <OTag variant="error-soft" size="sm" class="w-14 shrink-0 justify-center">{{
-            raw("P1")
+        <div
+          v-for="row in SEVERITY_ROWS"
+          :key="row.field"
+          class="border-border-default flex flex-wrap items-center gap-2 border-t px-3 py-2 first:border-t-0"
+          :data-test="`oncall-l0-${row.testKey}`"
+        >
+          <OTag :variant="row.variant" size="sm" class="w-14 shrink-0 justify-center">{{
+            raw(row.label)
           }}</OTag>
-          <OText variant="body" as="span">
-            <span class="font-medium">{{ t("oncall.l0P1Lead") }}</span>
-            {{ t("oncall.l0P1Desc") }}
+          <span class="w-48">
+            <OSelect
+              :model-value="draft.mode[row.field]"
+              :options="optionsFor(row.field)"
+              size="sm"
+              :data-test="`oncall-l0-mode-${row.testKey}`"
+              @update:model-value="(v: unknown) => setMode(row.field, v)"
+            />
+          </span>
+          <OText variant="meta">
+            {{ modeSentenceLead(draft.mode[row.field]) }}
+            <span v-if="draft.mode[row.field] === 'gate'" class="font-medium">{{
+              t("oncall.l0GateSentenceBold")
+            }}</span>
           </OText>
         </div>
 
-        <!-- P2 and P3 share one bracket — each keeps its own mode, but the
-             hold budget underneath belongs to the pair, not to either row
-             alone, so it nests under them rather than standing beside P1/P4. -->
-        <div
-          class="border-border-default flex gap-2 border-t px-3 py-2"
-          data-test="oncall-l0-p2-p3"
-        >
-          <OTag variant="warning-soft" size="sm" class="w-14 shrink-0 justify-center self-start">{{
-            raw("P2 · P3")
-          }}</OTag>
-          <div class="flex flex-1 flex-col gap-2">
-            <div
-              v-for="severity in EDITABLE_SEVERITIES"
-              :key="severity"
-              class="flex flex-wrap items-center gap-2"
-              :data-test="`oncall-l0-${severity.toLowerCase()}`"
-            >
-              <OText variant="label" class="w-6 shrink-0">{{ severity }}</OText>
-              <span class="w-48">
-                <OSelect
-                  :model-value="draft.mode[severity]"
-                  :options="modeOptions"
-                  size="sm"
-                  :data-test="`oncall-l0-mode-${severity.toLowerCase()}`"
-                  @update:model-value="(v: unknown) => setMode(severity, v)"
-                />
-              </span>
-              <OText variant="meta">
-                {{ modeSentenceLead(draft.mode[severity]) }}
-                <span v-if="draft.mode[severity] === 'gate'" class="font-medium">{{
-                  t("oncall.l0GateSentenceBold")
-                }}</span>
-              </OText>
-            </div>
-
-            <!-- The hold, and the promise underneath it: fail-open, always. -->
-            <div class="flex flex-wrap items-center gap-2">
-              <OText variant="label" class="w-24 shrink-0">{{ t("oncall.l0BudgetLabel") }}</OText>
-              <span class="w-40">
-                <OSelect
-                  :model-value="draft.triage_budget_seconds"
-                  :options="budgetOptions"
-                  size="sm"
-                  :error="!budgetValid"
-                  :error-message="t('oncall.l0BudgetRange')"
-                  data-test="oncall-l0-budget"
-                  @update:model-value="(v: unknown) => setBudget(v)"
-                />
-              </span>
-              <OText variant="meta">{{ t("oncall.l0FailOpen") }}</OText>
-            </div>
-          </div>
-        </div>
-
-        <div
-          class="border-border-default flex flex-wrap items-center gap-2 border-t px-3 py-2"
-          data-test="oncall-l0-p4"
-        >
-          <OTag variant="default-soft" size="sm" class="w-14 shrink-0 justify-center">{{
-            raw("P4 · P5")
-          }}</OTag>
-          <OText variant="body" as="span">
-            <span class="font-medium">{{ t("oncall.l0P4Lead") }}</span>
-            {{ t("oncall.l0P4Desc") }}
-          </OText>
+        <!-- The hold applies only where a row reads `gate`; shown once, under every row. -->
+        <div class="border-border-default flex flex-wrap items-center gap-2 border-t px-3 py-2">
+          <OText variant="label" class="w-24 shrink-0">{{ t("oncall.l0BudgetLabel") }}</OText>
+          <span class="w-40">
+            <OSelect
+              :model-value="draft.triage_budget_seconds"
+              :options="budgetOptions"
+              size="sm"
+              :error="!budgetValid"
+              :error-message="t('oncall.l0BudgetRange')"
+              data-test="oncall-l0-budget"
+              @update:model-value="(v: unknown) => setBudget(v)"
+            />
+          </span>
+          <OText variant="meta">{{ t("oncall.l0FailOpen") }}</OText>
         </div>
       </div>
     </div>
@@ -185,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, reactive } from "vue";
 
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -206,7 +183,30 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-const EDITABLE_SEVERITIES = ["P2", "P3"] as const;
+/// One row per field of `L0Modes` (C11 §4a), in the order the ladder pages.
+/// `field` is the only thing the template needs to read and write; the rest
+/// is display, kept here rather than computed so a translator's key change
+/// cannot desync it from the row it labels.
+const SEVERITY_ROWS: readonly {
+  field: keyof L0Policy["mode"];
+  testKey: string;
+  label: string;
+  variant: BadgeVariant;
+}[] = [
+  { field: "P1", testKey: "p1", label: "P1", variant: "error-soft" },
+  { field: "P2", testKey: "p2", label: "P2", variant: "warning-soft" },
+  { field: "P3", testKey: "p3", label: "P3", variant: "warning-soft" },
+  { field: "P4", testKey: "p4", label: "P4 · P5", variant: "default-soft" },
+];
+
+/// §4a's matrix, spelled out per row — the same set [`L0Policy::validate`]
+/// enforces server-side, so an option offered here can never be refused.
+const MODES_FOR_FIELD: Record<keyof L0Policy["mode"], readonly L0Mode[]> = {
+  P1: ["parallel", "off"],
+  P2: ["gate", "parallel", "off"],
+  P3: ["gate", "parallel", "off"],
+  P4: ["only", "off"],
+};
 
 /// The durations offered. Every one is inside the range the server accepts, so
 /// picking from this list can never produce a refused save.
@@ -244,16 +244,65 @@ const maxStepOptions = computed(() =>
   [1, 2, 3].map((n) => ({ label: t("oncall.l0MaxStepsOption", { count: n }, n), value: n })),
 );
 
-const modeOptions = computed(() => [
-  { label: t("oncall.l0ModeGate"), value: "gate" },
-  { label: t("oncall.l0ModeParallel"), value: "parallel" },
-  { label: t("oncall.l0ModeOnly"), value: "only" },
-]);
+function modeLabel(mode: L0Mode): I18nText {
+  switch (mode) {
+    case "gate":
+      return t("oncall.l0ModeGate");
+    case "parallel":
+      return t("oncall.l0ModeParallel");
+    case "only":
+      return t("oncall.l0ModeOnly");
+    case "off":
+      return t("oncall.l0ModeOff");
+    default: {
+      const neverMode: never = mode;
+      return neverMode;
+    }
+  }
+}
 
+/// Restricted to the row's own legal set (§4a) — never the full `L0Mode`
+/// union — so a select can never offer a value the server would 400. Called
+/// straight from the template rather than memoised, so a locale switch is
+/// picked up like every other `t()` call here.
+function optionsFor(field: keyof L0Policy["mode"]) {
+  return MODES_FOR_FIELD[field].map((mode) => ({ label: modeLabel(mode), value: mode }));
+}
+
+/// L13: this editor knows the L0 config, not the team's ladder, so the `only`
+/// sentence must not claim nobody is paged — a team with levels at P4/P5 is.
+/// The ladder preview says which, because the server resolved it there.
 function modeSentenceLead(mode: L0Mode): I18nText {
-  if (mode === "gate") return t("oncall.l0GateSentenceLead");
-  if (mode === "parallel") return t("oncall.l0ParallelSentence");
-  return t("oncall.l0OnlySentence");
+  switch (mode) {
+    case "gate":
+      return t("oncall.l0GateSentenceLead");
+    case "parallel":
+      return t("oncall.l0ParallelSentence");
+    case "only":
+      return t("oncall.l0OnlySentence");
+    case "off":
+      return t("oncall.l0OffSentence");
+    default: {
+      const neverMode: never = mode;
+      return neverMode;
+    }
+  }
+}
+
+/// Reads back "on" the moment any row is not `off` — the switch stores
+/// nothing of its own, so this is the only place its state lives.
+const aiTriageOn = computed(() =>
+  (Object.keys(MODES_FOR_FIELD) as (keyof L0Policy["mode"])[]).some(
+    (field) => draft.mode[field] !== "off",
+  ),
+);
+
+function setAiTriage(on: boolean) {
+  const source: L0Policy["mode"] = on
+    ? l0Defaults().mode
+    : { P1: "off", P2: "off", P3: "off", P4: "off" };
+  Object.assign(draft.mode, source);
+  announce();
 }
 
 function announce() {
@@ -266,8 +315,8 @@ function update(patch: Partial<L0Policy>) {
   announce();
 }
 
-function setMode(severity: (typeof EDITABLE_SEVERITIES)[number], value: unknown) {
-  draft.mode[severity] = String(value) as L0Mode;
+function setMode(field: keyof L0Policy["mode"], value: unknown) {
+  draft.mode[field] = String(value) as L0Mode;
   announce();
 }
 
