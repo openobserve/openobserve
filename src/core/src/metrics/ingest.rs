@@ -61,13 +61,13 @@ pub(super) type PipelineInputs<T> = HashMap<String, Vec<(json::Value, T)>>;
 pub(super) type RecordsByStream<T> = HashMap<String, Vec<(json::Map<String, json::Value>, T)>>;
 
 /// Why a stream's buffered records did not come out of its pipelines.
-pub(super) enum PipelineFailure {
+pub(super) enum PipelineFailure<T> {
     MissingInputs {
         message: String,
     },
     Batch {
         stream_name: String,
-        records: usize,
+        sides: Vec<T>,
         message: String,
     },
 }
@@ -86,29 +86,10 @@ pub(super) struct WriteTimings {
 pub(super) async fn run_pipelines<T: Clone>(
     org_id: &str,
     stream_pipelines: &HashMap<String, Vec<ExecutablePipeline>>,
-    inputs: PipelineInputs<T>,
-    user_defined_schema_map: &HashMap<String, Option<HashSet<String>>>,
-    stream_partitioning_map: &mut HashMap<String, Vec<StreamPartition>>,
-) -> (RecordsByStream<T>, Vec<PipelineFailure>) {
-    run_pipelines_with_failure_handler(
-        org_id,
-        stream_pipelines,
-        inputs,
-        user_defined_schema_map,
-        stream_partitioning_map,
-        |_| {},
-    )
-    .await
-}
-
-pub(super) async fn run_pipelines_with_failure_handler<T: Clone>(
-    org_id: &str,
-    stream_pipelines: &HashMap<String, Vec<ExecutablePipeline>>,
     mut inputs: PipelineInputs<T>,
     user_defined_schema_map: &HashMap<String, Option<HashSet<String>>>,
     stream_partitioning_map: &mut HashMap<String, Vec<StreamPartition>>,
-    mut on_batch_failure: impl FnMut(&[T]),
-) -> (RecordsByStream<T>, Vec<PipelineFailure>) {
+) -> (RecordsByStream<T>, Vec<PipelineFailure<T>>) {
     let mut outputs: RecordsByStream<T> = HashMap::new();
     let mut failures = Vec::new();
     for (stream_name, pipelines) in stream_pipelines {
@@ -137,10 +118,9 @@ pub(super) async fn run_pipelines_with_failure_handler<T: Clone>(
                         "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}"
                     );
                     log::error!("{message}");
-                    on_batch_failure(&sides);
                     failures.push(PipelineFailure::Batch {
                         stream_name: stream_name.clone(),
-                        records: records.len(),
+                        sides: sides.clone(),
                         message,
                     });
                     continue;

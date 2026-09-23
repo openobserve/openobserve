@@ -13,107 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-};
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Days};
-use config::{
-    TIMESTAMP_COL_NAME, get_config,
-    meta::{
-        promql::NAME_LABEL,
-        stream::{StreamParams, StreamType},
-    },
-    metrics,
-    utils::{json, schema::format_stream_name},
-};
+use config::{get_config, meta::stream::StreamType, metrics, utils::json};
 
 use super::ingest::RecordsByStream;
-use crate::pipeline::batch_execution::ExecutablePipeline;
 
 const TS_OUT_OF_BOUNDS: &str = "timestamp_out_of_bounds";
-
-/// What a metric's admission needs from the request: pipelines decide where a record lands.
-pub(super) struct TimestampValidator<'a> {
-    pub(super) org_id: &'a str,
-    pub(super) pipelines: &'a mut HashMap<String, Vec<ExecutablePipeline>>,
-    pub(super) policies: &'a mut StreamTimestampPolicyCache,
-    pub(super) rejected_data_points: &'a mut i64,
-    pub(super) error_message: &'a mut String,
-    pub(super) points: &'a mut PointRejectionTracker,
-}
-
-impl TimestampValidator<'_> {
-    pub(super) fn record_rejection(
-        &mut self,
-        id: usize,
-        stream_name: &str,
-        reason: TimestampRejection,
-    ) {
-        if self
-            .points
-            .record_rejection(id, self.org_id, stream_name, reason)
-        {
-            *self.rejected_data_points += 1;
-            *self.error_message = reason.message();
-        }
-    }
-
-    pub(super) async fn input_timestamp_bounds(
-        &mut self,
-        stream_name: &str,
-    ) -> Option<TimestampBounds> {
-        if self.stream_has_pipeline(stream_name).await {
-            None
-        } else {
-            Some(self.policies.get(stream_name).await.bounds)
-        }
-    }
-
-    async fn stream_has_pipeline(&mut self, stream_name: &str) -> bool {
-        if !self.pipelines.contains_key(stream_name) {
-            let stream_param = StreamParams::new(self.org_id, stream_name, StreamType::Metrics);
-            let found = crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
-            self.pipelines.insert(stream_name.to_string(), found);
-        }
-        self.pipelines
-            .get(stream_name)
-            .is_some_and(|v| !v.is_empty())
-    }
-}
-
-#[derive(Default)]
-pub(super) struct PointRejectionTracker {
-    next_id: usize,
-    rejected: HashSet<usize>,
-}
-
-impl PointRejectionTracker {
-    pub(super) fn next_point_id(&mut self) -> usize {
-        let id = self.next_id;
-        self.next_id += 1;
-        id
-    }
-
-    pub(super) fn record_rejection(
-        &mut self,
-        id: usize,
-        org_id: &str,
-        stream_name: &str,
-        reason: TimestampRejection,
-    ) -> bool {
-        if !self.mark_rejected(id) {
-            return false;
-        }
-        reason.count(org_id, stream_name);
-        true
-    }
-
-    pub(super) fn mark_rejected(&mut self, id: usize) -> bool {
-        self.rejected.insert(id)
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct TimestampBounds {
@@ -163,8 +70,59 @@ impl TimestampRejection {
             ),
         }
     }
+}
 
-    fn count(&self, org_id: &str, stream_name: &str) {
+/// Each destination stream's bounds, resolved once per request against the request's start.
+pub(super) struct TimestampBoundsCache {
+    org_id: String,
+    now: i64,
+    by_stream: HashMap<String, TimestampBounds>,
+}
+
+impl TimestampBoundsCache {
+    pub(super) fn new(org_id: &str, now: i64) -> Self {
+        Self {
+            org_id: org_id.to_string(),
+            now,
+            by_stream: HashMap::new(),
+        }
+    }
+
+    pub(super) async fn get(&mut self, stream_name: &str) -> TimestampBounds {
+        if let Some(bounds) = self.by_stream.get(stream_name) {
+            return *bounds;
+        }
+        let retention_days =
+            infra::schema::get_settings(&self.org_id, stream_name, StreamType::Metrics)
+                .await
+                .map(|s| s.data_retention)
+                .filter(|days| *days > 0)
+                .unwrap_or_else(|| get_config().compact.data_retention_days);
+        let bounds = TimestampBounds::new(self.now, retention_days);
+        self.by_stream.insert(stream_name.to_string(), bounds);
+        bounds
+    }
+}
+
+/// Identifies a request's input points so one expanded into several records is refused once.
+#[derive(Default)]
+pub(super) struct PointRejectionTracker {
+    next_id: usize,
+    rejected: HashSet<usize>,
+}
+
+impl PointRejectionTracker {
+    pub(super) fn next_point_id(&mut self) -> usize {
+        let id = self.next_id;
+        self.next_id += 1;
+        id
+    }
+
+    /// `true` the first time a point is refused for its timestamp, which is when it is counted.
+    pub(super) fn record_rejection(&mut self, id: usize, org_id: &str, stream_name: &str) -> bool {
+        if !self.mark_rejected(id) {
+            return false;
+        }
         metrics::INGEST_ERRORS
             .with_label_values(&[
                 org_id,
@@ -173,143 +131,27 @@ impl TimestampRejection {
                 TS_OUT_OF_BOUNDS,
             ])
             .inc();
+        true
+    }
+
+    pub(super) fn mark_rejected(&mut self, id: usize) -> bool {
+        self.rejected.insert(id)
     }
 }
 
-pub(super) struct StreamTimestampPolicyCache {
-    org_id: String,
-    now: i64,
-    by_stream: HashMap<String, StreamTimestampPolicy>,
-    deleting_by_stream: HashMap<String, bool>,
-}
-
-impl StreamTimestampPolicyCache {
-    pub(super) fn new(org_id: &str, now: i64) -> Self {
-        Self {
-            org_id: org_id.to_string(),
-            now,
-            by_stream: HashMap::new(),
-            deleting_by_stream: HashMap::new(),
-        }
-    }
-
-    pub(super) fn is_deleting(&mut self, stream_name: &str) -> bool {
-        // check if stream is deleting from cache
-        *self
-            .deleting_by_stream
-            .entry(stream_name.to_string())
-            .or_insert_with(|| {
-                db::compact::retention::is_deleting_stream(
-                    &self.org_id,
-                    StreamType::Metrics,
-                    stream_name,
-                    None,
-                )
-            })
-    }
-
-    pub(super) async fn get(&mut self, stream_name: &str) -> StreamTimestampPolicy {
-        if let Some(policy) = self.by_stream.get(stream_name) {
-            return *policy;
-        }
-        let retention_days =
-            infra::schema::get_settings(&self.org_id, stream_name, StreamType::Metrics)
-                .await
-                .map(|s| s.data_retention)
-                .filter(|days| *days > 0)
-                .unwrap_or_else(|| get_config().compact.data_retention_days);
-        let policy = StreamTimestampPolicy {
-            bounds: TimestampBounds::new(self.now, retention_days),
-        };
-        self.by_stream.insert(stream_name.to_string(), policy);
-        policy
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(super) struct StreamTimestampPolicy {
-    pub(super) bounds: TimestampBounds,
-}
-
-pub(super) async fn filter_valid_points<'point, 'stream, T>(
-    points: &'point [T],
-    validator: &mut TimestampValidator<'_>,
-    mut parse_point: impl FnMut(&'point T) -> Option<(Cow<'stream, str>, i64)>,
-) -> Vec<&'point T> {
-    let mut valid = Vec::with_capacity(points.len());
-    let mut common_bounds = None;
-    for point in points {
-        let Some((stream_name, timestamp)) = parse_point(point) else {
-            continue;
-        };
-        let bounds = match &stream_name {
-            Cow::Borrowed(name) => match common_bounds {
-                Some((cached_name, bounds)) if cached_name == *name => bounds,
-                _ => {
-                    let bounds = validator.input_timestamp_bounds(name).await;
-                    common_bounds = Some((*name, bounds));
-                    bounds
-                }
-            },
-            Cow::Owned(name) => validator.input_timestamp_bounds(name).await,
-        };
-        match bounds.map(|bounds| bounds.check(timestamp)) {
-            Some(Err(reason)) => {
-                let id = validator.points.next_point_id();
-                validator.record_rejection(id, &stream_name, reason);
-            }
-            _ => valid.push(point),
-        }
-    }
-    valid
-}
-
-pub(super) async fn filter_record_groups(
-    groups: Vec<Vec<json::Value>>,
-    validator: &mut TimestampValidator<'_>,
-) -> Vec<(json::Value, usize)> {
-    let mut admitted = Vec::new();
-    for group in groups {
-        let id = validator.points.next_point_id();
-        for record in group {
-            let stream_name = format_stream_name(
-                record
-                    .get(NAME_LABEL)
-                    .and_then(json::Value::as_str)
-                    .unwrap_or_default()
-                    .to_string(),
-            );
-            if validator.stream_has_pipeline(&stream_name).await {
-                admitted.push((record, id));
-                continue;
-            }
-            let timestamp = record.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64);
-            let bounds = validator.policies.get(&stream_name).await.bounds;
-            match timestamp.map(|ts| bounds.check(ts)) {
-                Some(Err(reason)) => validator.record_rejection(id, &stream_name, reason),
-                _ => admitted.push((record, id)),
-            }
-        }
-    }
-    admitted
-}
-
+/// Drops pipeline outputs outside their destination's bounds, timed by `point_timestamp`.
 pub(super) async fn filter_pipeline_outputs<T>(
     outputs: &mut RecordsByStream<T>,
-    policies: &mut StreamTimestampPolicyCache,
-    points: &mut PointRejectionTracker,
-    point_timestamp: impl Fn(&json::Map<String, json::Value>, &T) -> (usize, Option<i64>),
-    mut on_reject: impl FnMut(TimestampRejection),
+    bounds: &mut TimestampBoundsCache,
+    point_timestamp: impl Fn(&json::Map<String, json::Value>, &T) -> Option<i64>,
+    mut reject: impl FnMut(&T, &str, TimestampRejection),
 ) {
     for (stream_name, records) in outputs.iter_mut() {
-        let bounds = policies.get(stream_name).await.bounds;
+        let stream_bounds = bounds.get(stream_name).await;
         records.retain(|(record, side)| {
-            let (id, timestamp) = point_timestamp(record, side);
-            match timestamp.map(|ts| bounds.check(ts)) {
+            match point_timestamp(record, side).map(|ts| stream_bounds.check(ts)) {
                 Some(Err(reason)) => {
-                    if points.record_rejection(id, &policies.org_id, stream_name, reason) {
-                        on_reject(reason);
-                    }
+                    reject(side, stream_name, reason);
                     false
                 }
                 _ => true,
@@ -323,7 +165,7 @@ pub(super) async fn filter_pipeline_outputs<T>(
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::stream::StreamSettings;
+    use config::{TIMESTAMP_COL_NAME, meta::stream::StreamSettings};
 
     use super::*;
 
@@ -331,63 +173,12 @@ mod tests {
     const DAY: i64 = 86_400_000_000;
 
     #[tokio::test]
-    async fn filter_plain_samples_uses_each_destination_and_skips_missing_values() {
-        let org = "plain_timestamp_samples";
-        let mut policies = StreamTimestampPolicyCache::new(org, NOW);
-        for (stream, days) in [("recent", 1), ("archive", 30)] {
-            policies.by_stream.insert(
-                stream.to_string(),
-                StreamTimestampPolicy {
-                    bounds: TimestampBounds::new(NOW, days),
-                },
-            );
-        }
-        let mut pipelines = HashMap::from([
-            ("recent".to_string(), vec![]),
-            ("archive".to_string(), vec![]),
-        ]);
-        let mut points = PointRejectionTracker::default();
-        let mut rejected = 0;
-        let mut message = String::new();
-        let future = NOW + get_config().limit.ingest_allowed_in_future_micro + 1;
-        let samples = [
-            ("recent", Some(NOW)),
-            ("archive", Some(NOW - 10 * DAY)),
-            ("recent", Some(NOW - 10 * DAY)),
-            ("recent", Some(future)),
-            ("missing", None),
-        ];
-        let mut validator = TimestampValidator {
-            org_id: org,
-            pipelines: &mut pipelines,
-            policies: &mut policies,
-            rejected_data_points: &mut rejected,
-            error_message: &mut message,
-            points: &mut points,
-        };
-        let valid = filter_valid_points(&samples, &mut validator, |sample| {
-            Some((Cow::Borrowed(sample.0), sample.1?))
-        })
-        .await;
-        assert_eq!(valid, vec![&samples[0], &samples[1]]);
-        assert_eq!(rejected, 2);
-        assert_eq!(message, TimestampRejection::Future.message());
-        assert!(!pipelines.contains_key("missing"));
-    }
-
-    #[tokio::test]
     async fn pipeline_filter_uses_side_timestamp_instead_of_json_timestamp() {
         let org = "side_timestamp_samples";
-        let mut policies = StreamTimestampPolicyCache::new(org, NOW);
-        policies.by_stream.insert(
-            "destination".to_string(),
-            StreamTimestampPolicy {
-                bounds: TimestampBounds::new(NOW, 1),
-            },
-        );
-        let mut points = PointRejectionTracker::default();
-        let valid_id = points.next_point_id();
-        let rejected_id = points.next_point_id();
+        let mut bounds = TimestampBoundsCache::new(org, NOW);
+        bounds
+            .by_stream
+            .insert("destination".to_string(), TimestampBounds::new(NOW, 1));
         let future = NOW + get_config().limit.ingest_allowed_in_future_micro + 1;
         let record = |timestamp| {
             json::json!({"_timestamp": timestamp})
@@ -398,18 +189,17 @@ mod tests {
         let mut outputs = HashMap::from([(
             "destination".to_string(),
             vec![
-                (record(future), (valid_id, NOW)),
-                (record(NOW), (rejected_id, future)),
-                (record(NOW), (rejected_id, future)),
+                (record(future), NOW),
+                (record(NOW), future),
+                (record(NOW), future),
             ],
         )]);
         let mut rejections = Vec::new();
         filter_pipeline_outputs(
             &mut outputs,
-            &mut policies,
-            &mut points,
-            |_record, &(id, timestamp)| (id, Some(timestamp)),
-            |reason| rejections.push(reason),
+            &mut bounds,
+            |_record, &timestamp| Some(timestamp),
+            |&timestamp, stream, reason| rejections.push((timestamp, stream.to_string(), reason)),
         )
         .await;
         assert_eq!(outputs["destination"].len(), 1);
@@ -417,48 +207,16 @@ mod tests {
             outputs["destination"][0].0[TIMESTAMP_COL_NAME],
             json::json!(future)
         );
-        assert_eq!(outputs["destination"][0].1, (valid_id, NOW));
-        assert_eq!(rejections, vec![TimestampRejection::Future]);
+        let refused = (
+            future,
+            "destination".to_string(),
+            TimestampRejection::Future,
+        );
+        assert_eq!(rejections, vec![refused.clone(), refused]);
     }
 
     #[tokio::test]
-    async fn empty_metrics_only_check_deletion_without_loading_retention() {
-        let org = "empty_metrics_no_retention_lookup";
-        let mut policies = StreamTimestampPolicyCache::new(org, NOW);
-        let mut pipelines = HashMap::new();
-        let mut points = PointRejectionTracker::default();
-        let mut rejected = 0;
-        let mut message = String::new();
-        for stream in ["empty_gauge", "no_recorded_value", "nan", "empty_histogram"] {
-            assert!(!policies.is_deleting(stream));
-            let mut validator = TimestampValidator {
-                org_id: org,
-                pipelines: &mut pipelines,
-                policies: &mut policies,
-                rejected_data_points: &mut rejected,
-                error_message: &mut message,
-                points: &mut points,
-            };
-            let samples = [()];
-            assert!(
-                filter_valid_points(&samples, &mut validator, |_| None)
-                    .await
-                    .is_empty()
-            );
-            assert!(
-                filter_record_groups(vec![vec![]], &mut validator)
-                    .await
-                    .is_empty()
-            );
-        }
-        assert!(policies.by_stream.is_empty());
-        assert_eq!(policies.deleting_by_stream.len(), 4);
-        assert!(pipelines.is_empty());
-        assert_eq!(rejected, 0);
-    }
-
-    #[tokio::test]
-    async fn destination_policy_uses_global_fallback_and_request_cache() {
+    async fn destination_bounds_use_global_fallback_and_request_cache() {
         let org = "otlp_policy_cache";
         for (stream, days) in [("fallback", 0), ("cached", 30)] {
             infra::schema::put_stream_settings(
@@ -470,16 +228,13 @@ mod tests {
             )
             .await;
         }
-        let mut policies = StreamTimestampPolicyCache::new(org, NOW);
+        let mut bounds = TimestampBoundsCache::new(org, NOW);
         let expected = TimestampBounds::new(NOW, config::get_config().compact.data_retention_days);
-        let fallback = policies.get("fallback").await.bounds;
+        let fallback = bounds.get("fallback").await;
         for timestamp in [0, NOW - 10 * DAY, NOW, i64::MAX] {
             assert_eq!(fallback.check(timestamp), expected.check(timestamp));
         }
-        assert_eq!(
-            policies.get("cached").await.bounds.check(NOW - 10 * DAY),
-            Ok(())
-        );
+        assert_eq!(bounds.get("cached").await.check(NOW - 10 * DAY), Ok(()));
         infra::schema::put_stream_settings(
             format!("{org}/metrics/cached"),
             Arc::new(StreamSettings {
@@ -488,17 +243,10 @@ mod tests {
             }),
         )
         .await;
+        assert_eq!(bounds.get("cached").await.check(NOW - 10 * DAY), Ok(()));
+        let mut next_request = TimestampBoundsCache::new(org, NOW);
         assert_eq!(
-            policies.get("cached").await.bounds.check(NOW - 10 * DAY),
-            Ok(())
-        );
-        let mut next_request = StreamTimestampPolicyCache::new(org, NOW);
-        assert_eq!(
-            next_request
-                .get("cached")
-                .await
-                .bounds
-                .check(NOW - 10 * DAY),
+            next_request.get("cached").await.check(NOW - 10 * DAY),
             Err(TimestampRejection::Retention(1))
         );
     }
@@ -509,24 +257,11 @@ mod tests {
         let first = points.next_point_id();
         let second = points.next_point_id();
         assert_ne!(first, second);
-        assert!(points.record_rejection(
-            first,
-            "admission_identity",
-            "a",
-            TimestampRejection::Future
-        ));
-        assert!(!points.record_rejection(
-            first,
-            "admission_identity",
-            "b",
-            TimestampRejection::Retention(1)
-        ));
-        assert!(points.record_rejection(
-            second,
-            "admission_identity",
-            "b",
-            TimestampRejection::Future
-        ));
+        assert!(points.record_rejection(first, "admission_identity", "a"));
+        assert!(!points.record_rejection(first, "admission_identity", "b"));
+        assert!(!points.mark_rejected(first));
+        assert!(points.mark_rejected(second));
+        assert!(!points.record_rejection(second, "admission_identity", "b"));
     }
 
     #[test]

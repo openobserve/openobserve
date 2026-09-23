@@ -459,14 +459,14 @@ pub async fn ingest(
     for failure in failures {
         if let PipelineFailure::Batch {
             stream_name,
-            records,
+            sides,
             message,
         } = failure
         {
             let stream_status = stream_status_map
                 .entry(stream_name.clone())
                 .or_insert_with(|| StreamStatus::new(&stream_name));
-            stream_status.status.failed += records as u32;
+            stream_status.status.failed += sides.len() as u32;
             stream_status.status.error = message;
         }
     }

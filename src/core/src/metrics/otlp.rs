@@ -59,8 +59,7 @@ use super::{
     ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream},
     native_histogram,
     timestamp_validation::{
-        self, PointRejectionTracker, StreamTimestampPolicyCache, TimestampValidator,
-        filter_record_groups,
+        self, PointRejectionTracker, TimestampBounds, TimestampBoundsCache, TimestampRejection,
     },
 };
 use crate::{
@@ -122,10 +121,10 @@ impl PointLabels {
     }
 }
 
-/// A metric's data, as JSON records or as number data points not yet turned into records.
+/// A metric's data, as each data point's JSON records or as number data points not yet records.
 enum MetricRecords<'a> {
-    Json(Vec<(json::Value, usize)>),
-    NumberPoints(Vec<&'a NumberDataPoint>),
+    Json(Vec<Vec<json::Value>>),
+    NumberPoints(&'a [NumberDataPoint]),
 }
 
 impl MetricRecords<'_> {
@@ -133,7 +132,9 @@ impl MetricRecords<'_> {
     fn is_empty(&self) -> bool {
         match self {
             Self::Json(records) => records.is_empty(),
-            Self::NumberPoints(points) => points.is_empty(),
+            Self::NumberPoints(points) => !points
+                .iter()
+                .any(|point| number_point_value(point).is_some()),
         }
     }
 }
@@ -231,7 +232,7 @@ pub async fn handle_otlp_request(
 
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let mut policies = StreamTimestampPolicyCache::new(org_id, started_at);
+    let mut timestamp_bounds = TimestampBoundsCache::new(org_id, started_at);
 
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
@@ -258,6 +259,8 @@ pub async fn handle_otlp_request(
     // gauge and sum streams nothing downstream needs as JSON go straight to arrow
     let mut columnar_streams: HashMap<String, Option<ColumnarStream>> = HashMap::new();
 
+    // check if stream is deleting from cache
+    let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
 
     for resource_metric in &request.resource_metrics {
@@ -269,19 +272,24 @@ pub async fn handle_otlp_request(
                 let metric_name = format_stream_name(metric.name.to_string());
 
                 // check stream if it is deleting
-                if policies.is_deleting(&metric_name) {
+                let is_deleting = match stream_delete_status.get(&metric_name) {
+                    Some(v) => *v,
+                    None => {
+                        let flag = db::compact::retention::is_deleting_stream(
+                            org_id,
+                            StreamType::Metrics,
+                            &metric_name,
+                            None,
+                        );
+                        stream_delete_status.insert(metric_name.clone(), flag);
+                        flag
+                    }
+                };
+
+                if is_deleting {
                     skipped_records += 1;
                     continue;
                 }
-                let mut validator = TimestampValidator {
-                    org_id,
-
-                    pipelines: &mut stream_executable_pipelines,
-                    policies: &mut policies,
-                    rejected_data_points: &mut partial_success.rejected_data_points,
-                    error_message: &mut partial_success.error_message,
-                    points: &mut point_rejections,
-                };
 
                 let mut rec = json::json!({});
                 if let Some(res) = &resource_metric.resource {
@@ -303,52 +311,32 @@ pub async fn handle_otlp_request(
                     Some(data) => match data {
                         Data::Gauge(gauge) => {
                             prepare_gauge(metadata, &mut prom_meta);
-                            MetricRecords::NumberPoints(
-                                filter_number_points(
-                                    &gauge.data_points,
-                                    &metric_name,
-                                    &mut validator,
-                                )
-                                .await,
-                            )
+                            MetricRecords::NumberPoints(&gauge.data_points)
                         }
                         Data::Sum(sum) => {
                             prepare_sum(&mut rec, sum, metadata, &mut prom_meta);
-                            MetricRecords::NumberPoints(
-                                filter_number_points(
-                                    &sum.data_points,
-                                    &metric_name,
-                                    &mut validator,
-                                )
-                                .await,
-                            )
+                            MetricRecords::NumberPoints(&sum.data_points)
                         }
-                        Data::Histogram(hist) => MetricRecords::Json(
-                            filter_record_groups(
-                                process_histogram(&mut rec, hist, metadata, &mut prom_meta),
-                                &mut validator,
-                            )
-                            .await,
-                        ),
-                        Data::ExponentialHistogram(exp_hist) => MetricRecords::Json(
-                            filter_record_groups(
-                                process_exponential_histogram(
-                                    &mut rec,
-                                    exp_hist,
-                                    metadata,
-                                    &mut prom_meta,
-                                ),
-                                &mut validator,
-                            )
-                            .await,
-                        ),
-                        Data::Summary(summary) => MetricRecords::Json(
-                            filter_record_groups(
-                                process_summary(&rec, summary, metadata, &mut prom_meta),
-                                &mut validator,
-                            )
-                            .await,
-                        ),
+                        Data::Histogram(hist) => MetricRecords::Json(process_histogram(
+                            &mut rec,
+                            hist,
+                            metadata,
+                            &mut prom_meta,
+                        )),
+                        Data::ExponentialHistogram(exp_hist) => {
+                            MetricRecords::Json(process_exponential_histogram(
+                                &mut rec,
+                                exp_hist,
+                                metadata,
+                                &mut prom_meta,
+                            ))
+                        }
+                        Data::Summary(summary) => MetricRecords::Json(process_summary(
+                            &rec,
+                            summary,
+                            metadata,
+                            &mut prom_meta,
+                        )),
                     },
                     None => {
                         // a flattened oneof that fails to deserialize turns into
@@ -410,35 +398,25 @@ pub async fn handle_otlp_request(
                 )
                 .await;
 
-                // update schema metadata
-                if !schema_exists.has_metrics_metadata {
-                    if !prom_meta.contains_key(METADATA_LABEL) {
-                        prom_meta.insert(
-                            METADATA_LABEL.to_string(),
-                            json::to_string(&Metadata::new(&metric_name)).unwrap(),
-                        );
-                    }
-                    log::info!(
-                        "Metadata for stream {org_id}/metrics/{metric_name} needs to be updated"
-                    );
-                    if let Err(e) = db::schema::update_setting(
-                        org_id,
-                        &metric_name,
-                        StreamType::Metrics,
-                        prom_meta,
-                    )
-                    .await
-                    {
-                        log::error!(
-                            "Failed to set metadata for metric: {metric_name} with error: {e}"
-                        );
-                    }
-                }
-
-                let records = match records {
-                    MetricRecords::Json(records) => records,
+                let mut admitted = false;
+                let records: Vec<(json::Value, usize)> = match records {
+                    MetricRecords::Json(groups) => groups
+                        .into_iter()
+                        .flat_map(|group| {
+                            let id = point_rejections.next_point_id();
+                            group.into_iter().map(move |record| (record, id))
+                        })
+                        .collect(),
                     MetricRecords::NumberPoints(points) => {
-                        let columnar =
+                        let columnar = if stream_has_pipeline(
+                            org_id,
+                            &metric_name,
+                            &mut stream_executable_pipelines,
+                        )
+                        .await
+                        {
+                            None
+                        } else {
                             columnar_streams
                                 .entry(metric_name.clone())
                                 .or_insert_with(|| {
@@ -451,15 +429,34 @@ pub async fn handle_otlp_request(
                                         &stream_alerts_map,
                                         &stream_partitioning_map,
                                     )
-                                });
-                        let records = number_records_for_write_path(
-                            columnar.as_mut(),
-                            &rec,
-                            &points,
-                            stream_executable_pipelines
-                                .get(&metric_name)
-                                .map(Vec::as_slice),
-                        );
+                                })
+                                .as_mut()
+                        };
+                        let records = match columnar {
+                            Some(columnar) => {
+                                let bounds = timestamp_bounds.get(&metric_name).await;
+                                let (records, appended) = append_number_points(
+                                    columnar,
+                                    &rec,
+                                    points,
+                                    bounds,
+                                    |reason| {
+                                        let id = point_rejections.next_point_id();
+                                        reject_point(
+                                            &mut partial_success,
+                                            &mut point_rejections,
+                                            org_id,
+                                            id,
+                                            &metric_name,
+                                            reason,
+                                        );
+                                    },
+                                );
+                                admitted |= appended;
+                                records
+                            }
+                            None => number_point_records(&rec, points),
+                        };
                         records
                             .into_iter()
                             .map(|record| (record, point_rejections.next_point_id()))
@@ -474,6 +471,46 @@ pub async fn handle_otlp_request(
                     let local_metric_name = format_stream_name(
                         rec.get(NAME_LABEL).unwrap().as_str().unwrap().to_string(),
                     );
+
+                    // get stream pipeline -- for the stream this record actually lands in, which
+                    // is not always the metric's own name: a histogram's rows all carry a
+                    // `_count` / `_sum` / `_bucket` name and none carry the base. Registering the
+                    // base here anyway would leave a stream in stream_executable_pipelines with
+                    // no buffered inputs, and the loop at the end of this function reports that
+                    // as a bug on every export request.
+                    if !stream_executable_pipelines.contains_key(&local_metric_name) {
+                        let stream_param =
+                            StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
+                        let pipeline_params =
+                            crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
+                        stream_executable_pipelines
+                            .insert(local_metric_name.clone(), pipeline_params);
+                    }
+
+                    let has_pipeline = stream_executable_pipelines
+                        .get(&local_metric_name)
+                        .is_some_and(|v| !v.is_empty());
+
+                    // a pipeline can route the record elsewhere, so its outputs are checked instead
+                    if !has_pipeline
+                        && let Some(timestamp) =
+                            rec.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64)
+                        && let Err(reason) = timestamp_bounds
+                            .get(&local_metric_name)
+                            .await
+                            .check(timestamp)
+                    {
+                        reject_point(
+                            &mut partial_success,
+                            &mut point_rejections,
+                            org_id,
+                            point_id,
+                            &local_metric_name,
+                            reason,
+                        );
+                        continue;
+                    }
+                    admitted = true;
 
                     if local_metric_name != metric_name {
                         // check for schema
@@ -516,26 +553,8 @@ pub async fn handle_otlp_request(
                         .await;
                     }
 
-                    // get stream pipeline -- for the stream this record actually lands in, which
-                    // is not always the metric's own name: a histogram's rows all carry a
-                    // `_count` / `_sum` / `_bucket` name and none carry the base. Registering the
-                    // base here anyway would leave a stream in stream_executable_pipelines with
-                    // no buffered inputs, and the loop at the end of this function reports that
-                    // as a bug on every export request.
-                    if !stream_executable_pipelines.contains_key(&local_metric_name) {
-                        let stream_param =
-                            StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
-                        let pipeline_params =
-                            crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
-                        stream_executable_pipelines
-                            .insert(local_metric_name.clone(), pipeline_params);
-                    }
-
                     // ready to be buffered for downstream processing
-                    if stream_executable_pipelines
-                        .get(&local_metric_name)
-                        .is_some_and(|v| !v.is_empty())
-                    {
+                    if has_pipeline {
                         stream_pipeline_inputs
                             .entry(local_metric_name)
                             .or_default()
@@ -554,6 +573,31 @@ pub async fn handle_otlp_request(
                             .push((local_val, point_id));
                     }
                 }
+
+                // update schema metadata; with every point refused it would create an empty stream
+                if admitted && !schema_exists.has_metrics_metadata {
+                    if !prom_meta.contains_key(METADATA_LABEL) {
+                        prom_meta.insert(
+                            METADATA_LABEL.to_string(),
+                            json::to_string(&Metadata::new(&metric_name)).unwrap(),
+                        );
+                    }
+                    log::info!(
+                        "Metadata for stream {org_id}/metrics/{metric_name} needs to be updated"
+                    );
+                    if let Err(e) = db::schema::update_setting(
+                        org_id,
+                        &metric_name,
+                        StreamType::Metrics,
+                        prom_meta,
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "Failed to set metadata for metric: {metric_name} with error: {e}"
+                        );
+                    }
+                }
             }
         }
     }
@@ -563,15 +607,12 @@ pub async fn handle_otlp_request(
         log::warn!("[METRICS:OTLP] Skipped {skipped_records} records due to streams being deleted");
     }
 
-    let (mut pipeline_outputs, failures) = ingest::run_pipelines_with_failure_handler(
+    let (mut pipeline_outputs, failures) = ingest::run_pipelines(
         org_id,
         &stream_executable_pipelines,
         stream_pipeline_inputs,
         &user_defined_schema_map,
         &mut stream_partitioning_map,
-        |point_ids| {
-            count_pipeline_failed_points(point_ids, &mut point_rejections, &mut partial_success);
-        },
     )
     .await;
     for failure in failures {
@@ -579,14 +620,16 @@ pub async fn handle_otlp_request(
             PipelineFailure::MissingInputs { message } => {
                 partial_success.error_message = message;
             }
-            PipelineFailure::Batch { message, .. } => {
+            PipelineFailure::Batch { sides, message, .. } => {
+                count_pipeline_failed_points(&sides, &mut point_rejections, &mut partial_success);
                 partial_success.error_message = message;
             }
         }
     }
     filter_otlp_pipeline_outputs(
+        org_id,
         &mut pipeline_outputs,
-        &mut policies,
+        &mut timestamp_bounds,
         &mut point_rejections,
         &mut partial_success,
     )
@@ -768,27 +811,34 @@ fn number_point_records<'a>(
     records
 }
 
-fn number_records_for_write_path(
-    columnar: Option<&mut ColumnarStream>,
-    rec: &json::Value,
-    points: &[&NumberDataPoint],
-    pipelines: Option<&[ExecutablePipeline]>,
-) -> Vec<json::Value> {
-    match (columnar, pipelines) {
-        // An earlier override-only metric can cache a builder before the base pipeline is known.
-        (Some(columnar), Some([])) => append_number_points(columnar, rec, points.iter().copied()),
-        _ => number_point_records(rec, points.iter().copied()),
+/// Whether the stream has a pipeline; only absence is cached, as a registered one needs inputs.
+async fn stream_has_pipeline(
+    org_id: &str,
+    stream_name: &str,
+    stream_executable_pipelines: &mut HashMap<String, Vec<ExecutablePipeline>>,
+) -> bool {
+    if let Some(pipelines) = stream_executable_pipelines.get(stream_name) {
+        return !pipelines.is_empty();
     }
+    let stream_param = StreamParams::new(org_id, stream_name, StreamType::Metrics);
+    let pipelines = crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
+    if !pipelines.is_empty() {
+        return true;
+    }
+    stream_executable_pipelines.insert(stream_name.to_string(), pipelines);
+    false
 }
 
-/// Writes number data points straight to arrow, returning JSON records for those it cannot take.
-fn append_number_points<'a>(
+/// Writes number points straight to arrow; returns JSON records for the rest and if it wrote any.
+fn append_number_points(
     columnar: &mut ColumnarStream,
     rec: &json::Value,
-    data_points: impl IntoIterator<Item = &'a NumberDataPoint>,
-) -> Vec<serde_json::Value> {
+    data_points: &[NumberDataPoint],
+    bounds: TimestampBounds,
+    mut reject: impl FnMut(TimestampRejection),
+) -> (Vec<serde_json::Value>, bool) {
     let Some(base_labels) = columnar_base_labels(rec) else {
-        return number_point_records(rec, data_points);
+        return (number_point_records(rec, data_points), false);
     };
     let mut scratch = PointLabels {
         labels: base_labels.clone(),
@@ -796,11 +846,20 @@ fn append_number_points<'a>(
         index: HashMap::new(),
         base_overwritten: false,
     };
-    let rejected: Vec<&NumberDataPoint> = data_points
-        .into_iter()
-        .filter(|point| !append_number_point(columnar, &base_labels, point, &mut scratch))
-        .collect();
-    number_point_records(rec, rejected)
+    let mut appended = false;
+    let mut json_points = Vec::new();
+    for point in data_points {
+        // a point without a value writes no record on either path
+        let Some(value) = number_point_value(point) else {
+            continue;
+        };
+        match append_number_point(columnar, &base_labels, point, value, bounds, &mut scratch) {
+            Ok(true) => appended = true,
+            Ok(false) => json_points.push(point),
+            Err(reason) => reject(reason),
+        }
+    }
+    (number_point_records(rec, json_points), appended)
 }
 
 /// The labels every record of a metric starts from, `None` if one is not a plain string label.
@@ -817,22 +876,20 @@ fn columnar_base_labels(rec: &json::Value) -> Option<Vec<(String, String)>> {
         .collect()
 }
 
-/// Appends one data point exactly as its JSON record would be written; `false` if it cannot be.
+/// Appends one data point exactly as its JSON record would be written; `Ok(false)` if it cannot be.
 fn append_number_point(
     columnar: &mut ColumnarStream,
     base_labels: &[(String, String)],
     data_point: &NumberDataPoint,
+    value: f64,
+    bounds: TimestampBounds,
     scratch: &mut PointLabels,
-) -> bool {
-    // a point without a value writes no record on either path
-    let Some(value) = number_point_value(data_point) else {
-        return true;
-    };
+) -> Result<bool, TimestampRejection> {
     let Ok(timestamp) = i64::try_from(data_point.time_unix_nano / 1000) else {
-        return false;
+        return Ok(false);
     };
     if !data_point.exemplars.is_empty() {
-        return false;
+        return Ok(false);
     }
 
     scratch.reset(base_labels);
@@ -840,14 +897,14 @@ fn append_number_point(
         let name = format_label_name_cow(&attr.key);
         // `__name__` would move the record to another stream and `exemplars` is dropped from it
         if !name.is_ascii() || name == NAME_LABEL || name == EXEMPLARS_LABEL {
-            return false;
+            return Ok(false);
         }
         let value = match attr.value.as_ref().and_then(|v| v.value.as_ref()) {
             Some(AnyValueKind::StringValue(s)) => Cow::Borrowed(s.as_str()),
             // flattening turns a nested value into other columns, an unset one hashes as empty
             _ => match get_val(&attr.value.as_ref()) {
                 json::Value::String(s) => Cow::Owned(s),
-                _ => return false,
+                _ => return Ok(false),
             },
         };
         scratch.push(base_labels.len(), &name, &value);
@@ -862,48 +919,27 @@ fn append_number_point(
 
     let labels = scratch.labels();
     let Some(label_bytes) = columnar.resolve_columns(labels) else {
-        return false;
+        return Ok(false);
     };
+    bounds.check(timestamp)?;
     let hash = super::signature_of_label_pairs(labels, METRICS_HASH_EXCLUDED_LABELS);
     columnar.append(labels, label_bytes, value, timestamp, hash);
-    true
+    Ok(true)
 }
 
-async fn filter_number_points<'a>(
-    points: &'a [NumberDataPoint],
-    metric_name: &str,
-    validator: &mut TimestampValidator<'_>,
-) -> Vec<&'a NumberDataPoint> {
-    timestamp_validation::filter_valid_points(points, validator, |point| {
-        number_point_value(point)?;
-        Some((
-            resolve_number_point_stream(point, metric_name),
-            (point.time_unix_nano / 1000) as i64,
-        ))
-    })
-    .await
-}
-
-fn resolve_number_point_stream<'a>(point: &NumberDataPoint, metric_name: &'a str) -> Cow<'a, str> {
-    point
-        .attributes
-        .iter()
-        .rev()
-        .find(|attr| format_label_name_cow(&attr.key) == NAME_LABEL)
-        .map(|attr| {
-            let value = get_val(&attr.value.as_ref());
-            let name = match value {
-                json::Value::String(name) => name,
-                value => flatten_record(json::json!({NAME_LABEL: value}))
-                    .expect("a metric name label is wrapped in an object")
-                    .get(NAME_LABEL)
-                    .and_then(json::Value::as_str)
-                    .unwrap_or_default()
-                    .to_string(),
-            };
-            Cow::Owned(format_stream_name(name))
-        })
-        .unwrap_or(Cow::Borrowed(metric_name))
+/// Counts a timestamp refusal once per input point, however many records the point expanded into.
+fn reject_point(
+    partial_success: &mut ExportMetricsPartialSuccess,
+    points: &mut PointRejectionTracker,
+    org_id: &str,
+    id: usize,
+    stream_name: &str,
+    reason: TimestampRejection,
+) {
+    if points.record_rejection(id, org_id, stream_name) {
+        partial_success.rejected_data_points += 1;
+        partial_success.error_message = reason.message();
+    }
 }
 
 fn count_pipeline_failed_points(
@@ -919,24 +955,18 @@ fn count_pipeline_failed_points(
 }
 
 async fn filter_otlp_pipeline_outputs(
+    org_id: &str,
     outputs: &mut RecordsByStream<usize>,
-    policies: &mut StreamTimestampPolicyCache,
+    bounds: &mut TimestampBoundsCache,
     points: &mut PointRejectionTracker,
     partial_success: &mut ExportMetricsPartialSuccess,
 ) {
     timestamp_validation::filter_pipeline_outputs(
         outputs,
-        policies,
-        points,
-        |record, id| {
-            (
-                *id,
-                record.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64),
-            )
-        },
-        |reason| {
-            partial_success.rejected_data_points += 1;
-            partial_success.error_message = reason.message();
+        bounds,
+        |record, _| record.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64),
+        |&id, stream_name, reason| {
+            reject_point(partial_success, points, org_id, id, stream_name, reason);
         },
     )
     .await;
@@ -1360,12 +1390,12 @@ mod tests {
         use config::meta::{pipeline::Pipeline, stream::StreamSettings};
         use opentelemetry_proto::tonic::common::v1::{AnyValue, any_value};
 
-        use super::{super::super::timestamp_validation::TimestampRejection, *};
+        use super::*;
 
         const NOW: i64 = 1_700_000_000_000_000;
         const DAY: i64 = 86_400_000_000;
 
-        async fn policies(org: &str, streams: &[(&str, i64)]) -> StreamTimestampPolicyCache {
+        async fn bounds(org: &str, streams: &[(&str, i64)]) -> TimestampBoundsCache {
             for (stream, days) in streams {
                 infra::schema::put_stream_settings(
                     format!("{org}/metrics/{stream}"),
@@ -1376,7 +1406,7 @@ mod tests {
                 )
                 .await;
             }
-            StreamTimestampPolicyCache::new(org, NOW)
+            TimestampBoundsCache::new(org, NOW)
         }
 
         fn point(timestamp: i64, name: Option<&str>) -> NumberDataPoint {
@@ -1417,36 +1447,7 @@ mod tests {
             ExecutablePipeline::new(&pipeline).await.unwrap()
         }
 
-        #[tokio::test]
-        async fn repeated_metric_revalidates_cached_columnar_pipeline_eligibility() {
-            let org = "otlp_late_pipeline";
-            let source = StreamParams::new(org, "base", StreamType::Metrics);
-            let configured = pipeline("base", &["archive"]).await;
-            crate::cache::STREAM_EXECUTABLE_PIPELINES
-                .write()
-                .await
-                .insert(source.clone(), vec![configured]);
-            let mut policies = policies(org, &[("base", 30), ("archive", 30)]).await;
-            let mut pipelines = HashMap::from([("archive".to_string(), vec![])]);
-            let mut partial = ExportMetricsPartialSuccess::default();
-            let mut points = PointRejectionTracker::default();
-            let rec = json!({"__name__": "base"});
-            let first = [point(NOW, Some("archive"))];
-            let admitted = filter_number_points(
-                &first,
-                "base",
-                &mut TimestampValidator {
-                    org_id: org,
-
-                    pipelines: &mut pipelines,
-                    policies: &mut policies,
-                    rejected_data_points: &mut partial.rejected_data_points,
-                    error_message: &mut partial.error_message,
-                    points: &mut points,
-                },
-            )
-            .await;
-            assert!(!pipelines.contains_key("base"));
+        fn base_columnar() -> ColumnarStream {
             let schema = Schema::new(vec![
                 Field::new(NAME_LABEL, DataType::Utf8, true),
                 Field::new("start_time", DataType::Utf8, true),
@@ -1455,317 +1456,87 @@ mod tests {
                 Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
                 Field::new(HASH_LABEL, DataType::UInt64, true),
             ]);
-            let schemas = HashMap::from([("base".to_string(), SchemaCache::new(schema))]);
-            let mut cached = columnar::columnar_stream_for(
-                org,
-                "base",
-                &schemas,
-                &pipelines,
-                &HashMap::new(),
-                &HashMap::new(),
-                &HashMap::new(),
-            );
-            assert!(cached.is_some());
-            let first_records = number_records_for_write_path(
-                cached.as_mut(),
-                &rec,
-                &admitted,
-                pipelines.get("base").map(Vec::as_slice),
-            );
-            assert_eq!(first_records.len(), 1);
-            let later = [point(
-                NOW + config::get_config().limit.ingest_allowed_in_future_micro + 1,
-                None,
-            )];
-            let admitted = filter_number_points(
-                &later,
-                "base",
-                &mut TimestampValidator {
-                    org_id: org,
+            ColumnarStream::for_schema(&schema).unwrap()
+        }
 
-                    pipelines: &mut pipelines,
-                    policies: &mut policies,
-                    rejected_data_points: &mut partial.rejected_data_points,
-                    error_message: &mut partial.error_message,
-                    points: &mut points,
+        #[tokio::test]
+        async fn columnar_points_are_refused_against_the_metric_bounds() {
+            let mut bounds = bounds("otlp_columnar_bounds", &[("base", 30)]).await;
+            let base = bounds.get("base").await;
+            let future = NOW + config::get_config().limit.ingest_allowed_in_future_micro;
+            let boundary = (NOW - 30 * DAY) / DAY * DAY;
+            let input = [
+                point(NOW, None),
+                point(boundary, None),
+                point(future, None),
+                point(boundary - 1, None),
+                point(future + 1, None),
+                // another stream's bounds apply, once its record reaches the write loop
+                point(boundary - 1, Some("archive")),
+                NumberDataPoint {
+                    value: Some(number_data_point::Value::AsDouble(f64::NAN)),
+                    ..point(future + 1, None)
                 },
-            )
-            .await;
-            assert_eq!(admitted.len(), 1);
-            assert_eq!(pipelines["base"].len(), 1);
-            let records = number_records_for_write_path(
-                cached.as_mut(),
-                &rec,
-                &admitted,
-                pipelines.get("base").map(Vec::as_slice),
+            ];
+            let mut columnar = base_columnar();
+            let mut rejections = Vec::new();
+            let (records, appended) = append_number_points(
+                &mut columnar,
+                &json!({"__name__": "base"}),
+                &input,
+                base,
+                |reason| rejections.push(reason),
+            );
+            assert!(appended);
+            assert_eq!(
+                rejections,
+                vec![
+                    TimestampRejection::Retention(30),
+                    TimestampRejection::Future
+                ]
             );
             assert_eq!(records.len(), 1);
-            assert!(
-                cached
-                    .unwrap()
-                    .into_entries(org, "base")
-                    .unwrap()
-                    .is_empty()
+            assert_eq!(records[0][NAME_LABEL], json!("archive"));
+            let written = batch_rows(columnar.into_entries("org", "base").unwrap());
+            assert_eq!(written.len(), 3);
+
+            let mut columnar = base_columnar();
+            let (records, appended) = append_number_points(
+                &mut columnar,
+                &json!({"__name__": "base"}),
+                &input[3..5],
+                base,
+                |_| {},
             );
-            let inputs = HashMap::from([(
+            assert!(!appended && records.is_empty());
+        }
+
+        #[tokio::test]
+        async fn only_a_missing_pipeline_is_cached_for_the_columnar_decision() {
+            let org = "otlp_base_pipeline";
+            let source = StreamParams::new(org, "base", StreamType::Metrics);
+            crate::cache::STREAM_EXECUTABLE_PIPELINES
+                .write()
+                .await
+                .insert(source.clone(), vec![pipeline("base", &["archive"]).await]);
+            let mut pipelines = HashMap::new();
+            assert!(stream_has_pipeline(org, "base", &mut pipelines).await);
+            assert!(!pipelines.contains_key("base"));
+            assert!(!stream_has_pipeline(org, "plain", &mut pipelines).await);
+            assert!(pipelines["plain"].is_empty());
+            pipelines.insert(
                 "base".to_string(),
-                records
-                    .into_iter()
-                    .map(|record| (record, points.next_point_id()))
-                    .collect(),
-            )]);
-            let mut partitions = HashMap::from([("archive".to_string(), vec![])]);
-            let (mut outputs, failures) =
-                ingest::run_pipelines(org, &pipelines, inputs, &HashMap::new(), &mut partitions)
-                    .await;
-            assert!(failures.is_empty());
-            assert_eq!(outputs["archive"].len(), 1);
-            filter_otlp_pipeline_outputs(&mut outputs, &mut policies, &mut points, &mut partial)
-                .await;
-            assert!(outputs.is_empty());
-            assert_eq!(partial.rejected_data_points, 1);
+                vec![pipeline("base", &["archive"]).await],
+            );
+            assert!(stream_has_pipeline(org, "base", &mut pipelines).await);
             crate::cache::STREAM_EXECUTABLE_PIPELINES
                 .write()
                 .await
                 .remove(&source);
         }
 
-        #[tokio::test]
-        async fn array_name_override_uses_flattened_destination_policy_and_pipeline() {
-            use opentelemetry_proto::tonic::common::v1::ArrayValue;
-
-            let org = "otlp_array_name";
-            let mut policies = policies(org, &[("base", 30), ("_archive_", 30), ("", 1)]).await;
-            let mut pipelines = ["base", "_archive_", ""]
-                .into_iter()
-                .map(|name| (name.to_string(), vec![]))
-                .collect::<HashMap<_, _>>();
-            let mut partial = ExportMetricsPartialSuccess::default();
-            let mut points = PointRejectionTracker::default();
-            let mut old = point(NOW - 10 * DAY, Some("archive"));
-            old.attributes[0].value = Some(AnyValue {
-                value: Some(any_value::Value::ArrayValue(ArrayValue {
-                    values: vec![AnyValue {
-                        value: Some(any_value::Value::StringValue("archive".to_string())),
-                    }],
-                })),
-            });
-            let input = [
-                old.clone(),
-                NumberDataPoint {
-                    time_unix_nano: (NOW
-                        + config::get_config().limit.ingest_allowed_in_future_micro
-                        + 1) as u64
-                        * 1000,
-                    ..old
-                },
-            ];
-            let records = number_point_records(&json!({"__name__": "base"}), &input);
-            let flattened = flatten_record(records[0].clone()).unwrap();
-            let destination =
-                format_stream_name(flattened[NAME_LABEL].as_str().unwrap().to_string());
-            assert_eq!(destination, "_archive_");
-            assert_eq!(resolve_number_point_stream(&input[0], "base"), destination);
-            let admitted = filter_number_points(
-                &input,
-                "base",
-                &mut TimestampValidator {
-                    org_id: org,
-
-                    pipelines: &mut pipelines,
-                    policies: &mut policies,
-                    rejected_data_points: &mut partial.rejected_data_points,
-                    error_message: &mut partial.error_message,
-                    points: &mut points,
-                },
-            )
-            .await;
-            assert_eq!(admitted, vec![&input[0]]);
-            assert_eq!(partial.rejected_data_points, 1);
-            pipelines.insert(destination, vec![pipeline("_archive_", &["routed"]).await]);
-            let admitted = filter_number_points(
-                &input,
-                "base",
-                &mut TimestampValidator {
-                    org_id: org,
-
-                    pipelines: &mut pipelines,
-                    policies: &mut policies,
-                    rejected_data_points: &mut partial.rejected_data_points,
-                    error_message: &mut partial.error_message,
-                    points: &mut points,
-                },
-            )
-            .await;
-            assert_eq!(admitted, input.iter().collect::<Vec<_>>());
-            assert_eq!(partial.rejected_data_points, 1);
-        }
-
-        #[tokio::test]
-        async fn number_destination_bounds_and_backfill() {
-            let org = "otlp_number_bounds";
-            let mut policies = policies(org, &[("base", 1), ("archive", 30)]).await;
-            let mut pipelines = HashMap::from([
-                ("base".to_string(), vec![]),
-                ("archive".to_string(), vec![]),
-            ]);
-            let mut partial = ExportMetricsPartialSuccess::default();
-            let mut points = PointRejectionTracker::default();
-            let future = NOW + config::get_config().limit.ingest_allowed_in_future_micro;
-            let boundary = (NOW - 30 * DAY) / DAY * DAY;
-            let input = [
-                point(NOW - 10 * DAY, Some("archive")),
-                point(NOW - 10 * DAY, None),
-                point(boundary, Some("archive")),
-                point(boundary - 1, Some("archive")),
-                point(future, None),
-                point(future + 1, None),
-            ];
-            let admitted = filter_number_points(
-                &input,
-                "base",
-                &mut TimestampValidator {
-                    org_id: org,
-
-                    pipelines: &mut pipelines,
-                    policies: &mut policies,
-                    rejected_data_points: &mut partial.rejected_data_points,
-                    error_message: &mut partial.error_message,
-                    points: &mut points,
-                },
-            )
-            .await;
-            assert_eq!(admitted, vec![&input[0], &input[2], &input[4]]);
-            assert_eq!(partial.rejected_data_points, 3);
-        }
-
-        #[tokio::test]
-        async fn number_destination_pipeline_controls_admission() {
-            let org = "otlp_destination_pipeline";
-            let mut policies = policies(org, &[("base", 1), ("routed", 1)]).await;
-            let mut pipelines = HashMap::from([
-                ("base".to_string(), vec![]),
-                (
-                    "routed".to_string(),
-                    vec![pipeline("routed", &["archive"]).await],
-                ),
-            ]);
-            let mut partial = ExportMetricsPartialSuccess::default();
-            let mut points = PointRejectionTracker::default();
-            let input = [
-                point(NOW - 10 * DAY, Some("routed")),
-                point(NOW - 10 * DAY, None),
-            ];
-            let admitted = filter_number_points(
-                &input,
-                "base",
-                &mut TimestampValidator {
-                    org_id: org,
-
-                    pipelines: &mut pipelines,
-                    policies: &mut policies,
-                    rejected_data_points: &mut partial.rejected_data_points,
-                    error_message: &mut partial.error_message,
-                    points: &mut points,
-                },
-            )
-            .await;
-            assert_eq!(admitted, vec![&input[0]]);
-            assert_eq!(partial.rejected_data_points, 1);
-            pipelines.remove("routed");
-            pipelines.insert(
-                "base".to_string(),
-                vec![pipeline("base", &["archive"]).await],
-            );
-            pipelines.insert("routed".to_string(), vec![]);
-            let admitted = filter_number_points(
-                &input,
-                "base",
-                &mut TimestampValidator {
-                    org_id: org,
-
-                    pipelines: &mut pipelines,
-                    policies: &mut policies,
-                    rejected_data_points: &mut partial.rejected_data_points,
-                    error_message: &mut partial.error_message,
-                    points: &mut points,
-                },
-            )
-            .await;
-            assert_eq!(admitted, vec![&input[1]]);
-            assert_eq!(partial.rejected_data_points, 2);
-        }
-
-        #[tokio::test]
-        async fn empty_and_nonrecording_points_do_not_register_pipelines() {
-            let stream = StreamParams::new("otlp_empty", "base", StreamType::Metrics);
-            crate::cache::STREAM_EXECUTABLE_PIPELINES
-                .write()
-                .await
-                .insert(stream.clone(), vec![pipeline("base", &["archive"]).await]);
-            let mut policies = StreamTimestampPolicyCache::new("otlp_empty", NOW);
-            let mut pipelines = HashMap::new();
-            let mut partial = ExportMetricsPartialSuccess::default();
-            let mut points = PointRejectionTracker::default();
-            let input = [
-                NumberDataPoint {
-                    value: Some(number_data_point::Value::AsDouble(f64::NAN)),
-                    ..point(NOW + DAY, None)
-                },
-                NumberDataPoint {
-                    flags: DataPointFlags::NoRecordedValueMask as u32,
-                    ..point(NOW + DAY, None)
-                },
-            ];
-            let mut validator = TimestampValidator {
-                org_id: "otlp_empty",
-
-                pipelines: &mut pipelines,
-                policies: &mut policies,
-                rejected_data_points: &mut partial.rejected_data_points,
-                error_message: &mut partial.error_message,
-                points: &mut points,
-            };
-            assert!(
-                filter_number_points(&[], "base", &mut validator)
-                    .await
-                    .is_empty()
-            );
-            assert!(
-                filter_number_points(&input, "base", &mut validator)
-                    .await
-                    .is_empty()
-            );
-            assert!(
-                filter_record_groups(vec![vec![]], &mut validator)
-                    .await
-                    .is_empty()
-            );
-            assert!(pipelines.is_empty());
-            assert_eq!(partial, ExportMetricsPartialSuccess::default());
-            crate::cache::STREAM_EXECUTABLE_PIPELINES
-                .write()
-                .await
-                .remove(&stream);
-        }
-
-        #[tokio::test]
-        async fn histogram_and_summary_rejections_count_original_points() {
-            let org = "otlp_expanded_rejections";
-            let mut policies = policies(
-                org,
-                &[
-                    ("metric_count", 1),
-                    ("metric_sum", 1),
-                    ("metric_bucket", 1),
-                    ("metric", 1),
-                ],
-            )
-            .await;
-            let mut pipelines = ["metric_count", "metric_sum", "metric_bucket", "metric"]
-                .into_iter()
-                .map(|name| (name.to_string(), vec![]))
-                .collect();
+        #[test]
+        fn histogram_and_summary_rejections_count_original_points() {
             let mut partial = ExportMetricsPartialSuccess::default();
             let mut points = PointRejectionTracker::default();
             let timestamp = (NOW - 10 * DAY) as u64 * 1000;
@@ -1793,63 +1564,59 @@ mod tests {
                 ),
             ];
             assert!(groups.iter().all(|group| group.len() > 1));
-            let admitted = filter_record_groups(
-                groups,
-                &mut TimestampValidator {
-                    org_id: org,
-
-                    pipelines: &mut pipelines,
-                    policies: &mut policies,
-                    rejected_data_points: &mut partial.rejected_data_points,
-                    error_message: &mut partial.error_message,
-                    points: &mut points,
-                },
-            )
-            .await;
-            assert!(admitted.is_empty());
+            for group in groups {
+                let id = points.next_point_id();
+                for record in group {
+                    reject_point(
+                        &mut partial,
+                        &mut points,
+                        "otlp_expanded_rejections",
+                        id,
+                        record[NAME_LABEL].as_str().unwrap(),
+                        TimestampRejection::Retention(1),
+                    );
+                }
+            }
             assert_eq!(partial.rejected_data_points, 2);
+            assert_eq!(
+                partial.error_message,
+                TimestampRejection::Retention(1).message()
+            );
         }
 
         #[tokio::test]
         async fn pipeline_fanout_and_direct_rejections_share_point_identity() {
             let org = "otlp_pipeline";
-            let mut policies = policies(org, &[("direct", 1), ("short", 1), ("archive", 30)]).await;
-            let mut pipelines = HashMap::from([
-                ("direct".to_string(), vec![]),
-                (
-                    "routed".to_string(),
-                    vec![pipeline("routed", &["short", "archive"]).await],
-                ),
-            ]);
+            let mut bounds = bounds(org, &[("short", 1), ("archive", 30)]).await;
+            let pipelines = HashMap::from([(
+                "routed".to_string(),
+                vec![pipeline("routed", &["short", "archive"]).await],
+            )]);
             let mut partial = ExportMetricsPartialSuccess::default();
             let mut points = PointRejectionTracker::default();
             let old = NOW - 10 * DAY;
-            let record = |name: &str, timestamp| json!({"__name__": name, "_timestamp": timestamp, "value": 1.0});
-            let admitted = filter_record_groups(
+            let future = NOW + config::get_config().limit.ingest_allowed_in_future_micro + 1;
+            let record =
+                |timestamp| json!({"__name__": "routed", "_timestamp": timestamp, "value": 1.0});
+            let expanded = points.next_point_id();
+            let late = points.next_point_id();
+            // the expanded point already lost a record bound for a stream without a pipeline
+            reject_point(
+                &mut partial,
+                &mut points,
+                org,
+                expanded,
+                "direct",
+                TimestampRejection::Retention(1),
+            );
+            let inputs = HashMap::from([(
+                "routed".to_string(),
                 vec![
-                    vec![
-                        record("direct", old),
-                        record("routed", old),
-                        record("routed", old),
-                    ],
-                    vec![record(
-                        "routed",
-                        NOW + config::get_config().limit.ingest_allowed_in_future_micro + 1,
-                    )],
+                    (record(old), expanded),
+                    (record(old), expanded),
+                    (record(future), late),
                 ],
-                &mut TimestampValidator {
-                    org_id: org,
-
-                    pipelines: &mut pipelines,
-                    policies: &mut policies,
-                    rejected_data_points: &mut partial.rejected_data_points,
-                    error_message: &mut partial.error_message,
-                    points: &mut points,
-                },
-            )
-            .await;
-            assert_eq!(partial.rejected_data_points, 1);
-            let inputs = HashMap::from([("routed".to_string(), admitted)]);
+            )]);
             let mut partitions = HashMap::from([
                 ("short".to_string(), vec![]),
                 ("archive".to_string(), vec![]),
@@ -1859,7 +1626,7 @@ mod tests {
                     .await;
             assert!(failures.is_empty());
             assert_eq!(outputs.values().map(Vec::len).sum::<usize>(), 6);
-            filter_otlp_pipeline_outputs(&mut outputs, &mut policies, &mut points, &mut partial)
+            filter_otlp_pipeline_outputs(org, &mut outputs, &mut bounds, &mut points, &mut partial)
                 .await;
             assert_eq!(partial.rejected_data_points, 2);
             assert_eq!(outputs.len(), 1);
@@ -1867,7 +1634,7 @@ mod tests {
             assert!(
                 outputs["archive"]
                     .iter()
-                    .all(|(record, _)| record.len() == 3)
+                    .all(|(record, id)| record.len() == 3 && *id == expanded)
             );
         }
 
@@ -1875,7 +1642,7 @@ mod tests {
         async fn pipeline_batch_failures_share_rejection_counts_with_timestamp_filters() {
             for batch_first in [false, true] {
                 let org = "otlp_failed_point_identity";
-                let mut policies = policies(org, &[("expired", 1)]).await;
+                let mut bounds = bounds(org, &[("expired", 1)]).await;
                 let mut tracker = PointRejectionTracker::default();
                 let first = tracker.next_point_id();
                 let second = tracker.next_point_id();
@@ -1898,8 +1665,9 @@ mod tests {
                     );
                 }
                 filter_otlp_pipeline_outputs(
+                    org,
                     &mut outputs,
-                    &mut policies,
+                    &mut bounds,
                     &mut tracker,
                     &mut partial,
                 )
@@ -2563,6 +2331,10 @@ mod tests {
         rows
     }
 
+    fn unbounded() -> TimestampBounds {
+        TimestampBounds::new(i64::MAX, 0)
+    }
+
     #[test]
     fn test_append_number_points_writes_what_the_json_path_would() {
         use opentelemetry_proto::tonic::common::v1::{KeyValueList, any_value::Value as Any};
@@ -2670,7 +2442,8 @@ mod tests {
         fields.push(Field::new(HASH_LABEL, DataType::UInt64, true));
         let mut columnar = ColumnarStream::for_schema(&Arc::new(Schema::new(fields))).unwrap();
 
-        let rejected: Vec<json::Value> = append_number_points(&mut columnar, &rec, &points)
+        let (rejected, _) = append_number_points(&mut columnar, &rec, &points, unbounded(), |_| {});
+        let rejected: Vec<json::Value> = rejected
             .into_iter()
             .map(|record| flatten_record(record).unwrap())
             .collect();
@@ -2714,7 +2487,8 @@ mod tests {
         ];
         let mut columnar = ColumnarStream::for_schema(&Arc::new(Schema::new(fields))).unwrap();
 
-        let rejected: Vec<json::Value> = append_number_points(&mut columnar, &rec, &points)
+        let (rejected, _) = append_number_points(&mut columnar, &rec, &points, unbounded(), |_| {});
+        let rejected: Vec<json::Value> = rejected
             .into_iter()
             .map(|record| flatten_record(record).unwrap())
             .collect();
