@@ -1779,7 +1779,8 @@ fn validate_level_half_width(half_width_seconds: i64) -> Result<()> {
     }
     if half_width_seconds > ONE_YEAR_SECONDS {
         anyhow::bail!(
-            "level_half_width_seconds must be at most {ONE_YEAR_SECONDS} (one year); the level              window must fit inside the training window"
+            "level_half_width_seconds must be at most {ONE_YEAR_SECONDS} (one year); the \
+             level window must fit inside the training window"
         );
     }
     Ok(())
@@ -4382,6 +4383,45 @@ mod tests {
 
     // ── P0.4: the interval rule as a shared pure seam ───────────────────────
 
+    /// `level_half_width_seconds` reaches the enterprise fit: the trainer maps it through
+    /// `level_half_width_us` into `SeasonalBaseline::fit`, so a stored value that the create
+    /// path rejects can never get there. These pin the boundary create actually enforces.
+    mod level_half_width_rule {
+        use super::*;
+
+        #[test]
+        fn a_non_null_half_width_inside_the_bound_is_accepted() {
+            for seconds in [1_i64, 3_600, 86_400, 365 * 86_400] {
+                assert!(
+                    validate_level_half_width(seconds).is_ok(),
+                    "{seconds}s is within one year and must be accepted"
+                );
+            }
+        }
+
+        #[test]
+        fn a_non_positive_half_width_is_rejected() {
+            for seconds in [0_i64, -1, -86_400] {
+                assert!(
+                    validate_level_half_width(seconds).is_err(),
+                    "{seconds}s cannot describe a level window"
+                );
+            }
+        }
+
+        #[test]
+        fn a_half_width_past_one_year_is_rejected() {
+            let err = validate_level_half_width(365 * 86_400 + 1)
+                .expect_err("one second past a year must not be stored");
+            let msg = err.to_string();
+            assert!(msg.contains("31536000"), "the bound must be stated: {msg}");
+            assert!(
+                !msg.contains("  "),
+                "the message must not carry a broken line continuation: {msg:?}"
+            );
+        }
+    }
+
     mod interval_pair_rule {
         use super::*;
 
@@ -4645,10 +4685,11 @@ mod tests {
         }
 
         /// Mutation shape 2: histogram alone, conflicting with the UNCHANGED stored schedule.
+        /// 8m is on the date_bin grid, so the ratio rule is what fires, not the origin rule.
         #[test]
         fn rejects_changing_histogram_alone_into_a_conflict() {
             let req = UpdateAnomalyConfigRequest {
-                histogram_interval: Some("7m".to_string()),
+                histogram_interval: Some("8m".to_string()),
                 ..Default::default()
             };
             let err = update_result(req).unwrap_err().to_string();
