@@ -929,14 +929,7 @@ pub async fn get_label_values(
         return Ok(label_values);
     }
 
-    let metric_name = match opt_metric_name {
-        Some(name) => name,
-        None => {
-            // HACK: in the ideal world we would have queried all the metric streams
-            // and collected label names from them.
-            return Ok(vec![]);
-        }
-    };
+    let metric_name = label_values_metric_name(selector.as_ref())?;
 
     let schema = infra::schema::get(org_id, &metric_name, stream_type)
         .await
@@ -1019,6 +1012,27 @@ pub async fn get_label_values(
     label_values.sort();
     label_values.dedup();
     Ok(label_values)
+}
+
+pub fn label_values_metric_name(selector: Option<&parser::VectorSelector>) -> Result<String> {
+    let metric_name = selector
+        .filter(|sel| sel.matchers.or_matchers.is_empty())
+        .and_then(|sel| {
+            sel.name.clone().or_else(|| {
+                sel.matchers
+                    .matchers
+                    .iter()
+                    .find(|m| m.name == NAME_LABEL && m.op == MatchOp::Equal && !m.value.is_empty())
+                    .map(|m| m.value.clone())
+            })
+        })
+        .filter(|name| !name.is_empty());
+    metric_name.ok_or_else(|| {
+        Error::Message(
+            "match[] must specify a single metric name for label values, e.g. match[]=up; querying all metrics streams is not supported"
+                .to_owned(),
+        )
+    })
 }
 
 pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
@@ -1569,5 +1583,46 @@ mod tests {
             Some(&json::json!(recomputed))
         );
         assert_eq!(json_data[1].0.get(HASH_LABEL), Some(&json::json!(7_u64)));
+    }
+
+    #[test]
+    fn test_label_values_metric_name() {
+        assert!(label_values_metric_name(None).is_err());
+        for matcher in [
+            r#"{job="prometheus"}"#,
+            r#"{__name__=~"up.*"}"#,
+            r#"{__name__!="up",job="prometheus"}"#,
+            r#"{__name__!~"up.*",job="prometheus"}"#,
+            r#"{__name__="",job="prometheus"}"#,
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(matcher).unwrap() else {
+                panic!("expected vector selector");
+            };
+            assert!(
+                label_values_metric_name(Some(&selector)).is_err(),
+                "{matcher}"
+            );
+        }
+        for matcher in [
+            "up",
+            r#"up{job="prometheus"}"#,
+            r#"{__name__="up"}"#,
+            r#"{__name__=~"up.*",__name__="up"}"#,
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(matcher).unwrap() else {
+                panic!("expected vector selector");
+            };
+            assert_eq!(
+                label_values_metric_name(Some(&selector)).unwrap(),
+                "up",
+                "{matcher}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_label_values_requires_metric() {
+        let result = get_label_values("default", "job".to_owned(), None, 0, 1).await;
+        assert!(result.unwrap_err().to_string().contains("match[]"));
     }
 }

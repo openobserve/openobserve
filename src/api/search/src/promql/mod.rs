@@ -1088,7 +1088,7 @@ async fn labels(
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
     summary = "Get label values",
-    description = "Returns all possible values for a specific label name within the specified time range. Optionally filter by series selector to get values for specific metrics. Essential for building filters and understanding label cardinality.",
+    description = "Returns values for a label within the specified time range. Labels other than __name__ require match[] to specify a single metric name; queries across all metrics streams return 400.",
     security(
         ("Authorization"= [])
     ),
@@ -1107,6 +1107,7 @@ async fn labels(
                "prometheus"
             ]
         })),
+        (status = 400, description = "Invalid parameters or match[] does not specify a single metric", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1164,18 +1165,19 @@ pub async fn label_values(
         start,
         end,
     } = req;
-    let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
-        Ok(v) => v,
-        Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
-                    e, None,
-                )),
-            )
-                .into_response();
-        }
-    };
+    let (selector, start, end) =
+        match validate_label_values_params(&label_name, matcher, start, end) {
+            Ok(v) => v,
+            Err(e) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e, None,
+                    )),
+                )
+                    .into_response();
+            }
+        };
     match metrics::prom::get_label_values(&org_id, label_name, selector, start, end).await {
         Ok(resp) => (
             StatusCode::OK,
@@ -1194,6 +1196,19 @@ pub async fn label_values(
                 .into_response()
         }
     }
+}
+
+fn validate_label_values_params(
+    label_name: &str,
+    matcher: Option<String>,
+    start: Option<String>,
+    end: Option<String>,
+) -> Result<(Option<parser::VectorSelector>, i64, i64), String> {
+    let (selector, start, end) = validate_metadata_params(matcher, start, end)?;
+    if label_name != config::meta::promql::NAME_LABEL {
+        metrics::prom::label_values_metric_name(selector.as_ref()).map_err(|e| e.to_string())?;
+    }
+    Ok((selector, start, end))
 }
 
 fn validate_metadata_params(
@@ -1726,7 +1741,53 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
 mod tests {
     use super::*;
 
-    // --- search_timeout ---
+    #[test]
+    fn test_validate_label_values_params() {
+        assert!(validate_label_values_params("__name__", None, None, None).is_ok());
+        assert!(validate_label_values_params("job", None, None, None).is_err());
+        for matcher in [
+            "",
+            r#"{job="prometheus"}"#,
+            r#"{__name__=~"up.*"}"#,
+            r#"{__name__!="up"}"#,
+        ] {
+            assert!(
+                validate_label_values_params("job", Some(matcher.to_owned()), None, None).is_err(),
+                "{matcher}"
+            );
+        }
+        for matcher in ["up", r#"{__name__="up"}"#] {
+            assert!(
+                validate_label_values_params("job", Some(matcher.to_owned()), None, None).is_ok(),
+                "{matcher}"
+            );
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_label_values_missing_metric_returns_bad_request() {
+        let response = label_values(
+            Path(("default".to_owned(), "job".to_owned())),
+            Query(config::meta::promql::RequestLabelValues {
+                matcher: None,
+                start: None,
+                end: None,
+            }),
+            Headers(UserEmail {
+                user_id: "test@example.com".to_owned(),
+            }),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["status"], "error");
+        assert_eq!(body["errorType"], "bad_data");
+        assert!(body["error"].as_str().unwrap().contains("match[]"));
+    }
 
     #[test]
     fn test_search_timeout_none() {
