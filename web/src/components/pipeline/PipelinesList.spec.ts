@@ -985,16 +985,16 @@ describe("PipelinesList", () => {
     it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", () => {
       vi.useFakeTimers();
       wrapper.vm.currentPage = 3;
-      const setPageIndex = vi.fn();
+      const restorePage = vi.fn();
       // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
-      wrapper.vm.oTableRef = { table: { setPageIndex } };
+      wrapper.vm.oTableRef = { restorePage };
 
       wrapper.vm.restorePageIndex();
-      expect(setPageIndex).not.toHaveBeenCalled();
+      expect(restorePage).not.toHaveBeenCalled();
 
       vi.runAllTimers();
 
-      expect(setPageIndex).toHaveBeenCalledWith(2);
+      expect(restorePage).toHaveBeenCalledWith(3);
       vi.useRealTimers();
     });
 
@@ -1017,25 +1017,25 @@ describe("PipelinesList", () => {
       await nextTick();
 
       // Only now, once nothing will re-render and re-bind the ref again, plant the fake — restorePageIndex() reads oTableRef.value lazily when its timer fires, so this still lands in time.
-      const setPageIndex = vi.fn();
-      wrapper.vm.oTableRef = { table: { setPageIndex } };
+      const restorePage = vi.fn();
+      wrapper.vm.oTableRef = { restorePage };
 
       vi.runAllTimers();
 
-      expect(setPageIndex).toHaveBeenCalledWith(2);
+      expect(restorePage).toHaveBeenCalledWith(3);
       vi.useRealTimers();
     });
 
     it("does not reassert the page on an unrelated route-name change (e.g. re-entering pipelines from itself)", async () => {
       wrapper.vm.currentPage = 3;
-      const setPageIndex = vi.fn();
-      wrapper.vm.oTableRef = { table: { setPageIndex } };
+      const restorePage = vi.fn();
+      wrapper.vm.oTableRef = { restorePage };
 
       // Same name twice: the watcher's guard (`newName === oldName`) must skip it.
       mockRouter.currentRoute.value.name = "pipelines";
       await flushPromises();
 
-      expect(setPageIndex).not.toHaveBeenCalled();
+      expect(restorePage).not.toHaveBeenCalled();
     });
 
     it("resets currentPage to 1 when the user explicitly switches tabs", () => {

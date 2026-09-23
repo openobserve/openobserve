@@ -1474,6 +1474,8 @@
     "sessionReplay": "Session Replay",
     "viewSessionReplay": "View Session Replay",
     "playSessionReplay": "Play Session Replay",
+    "noReplayRecordedTitle": "No replay was recorded for this session",
+    "noReplayRecordedMessage": "Session {id} has no replay segments to play.",
     "discoverSessionTitle": "Discover Session Replay to Understand User Interactions in Detail",
     "discoverSessionMessage": "Session Replay captures and replays user interactions on your website or application. This allows you to visually review how users navigate, where they click, what they type, and how they engage with your content",
     "loadingErrorDetails": "Hold on tight, we're fetching error details.",
@@ -13043,10 +13045,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Input from the trace's root span."
+              "trace": "Input from the trace's root chat span.",
+              "session": "The opening question: input from the first trace's root chat span."
             },
             "output": {
-              "trace": "Output from the trace's root span."
+              "trace": "Output from the trace's root chat span.",
+              "session": "The final answer: output from the last trace's root chat span."
             },
             "statistics": {
               "trace": "Trace metrics: span count, duration, LLM and tool calls, errors, tokens, and cost.",
@@ -13058,6 +13062,10 @@
             "steps": {
               "trace": "Spans in time order; the middle is folded when the trace is very long.",
               "session": "Traces in time order, represented as conversation turns."
+            },
+            "tool_calls": {
+              "trace": "Every tool call in the trace, in time order, with its name, input, output, and status.",
+              "session": "Every tool call across the session's traces, in time order, with its name, input, output, and status."
             }
           }
         }
@@ -15166,7 +15174,6 @@
       "syntheticsTokensRefresh": "Refresh token list",
       "aiChatToggle": "Toggle AI chat",
       "aiChatClose": "Close AI chat",
-      "aiChatExpand": "Expand/collapse AI chat",
       "logsSaveView": "Save as saved view",
       "logsExport": "Export results as CSV",
       "tracesCopyUrl": "Copy trace share URL",

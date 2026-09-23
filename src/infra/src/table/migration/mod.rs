@@ -195,6 +195,7 @@ mod m20260916_000001_add_folder_id_to_workflow_drafts;
 mod m20260917_000001_add_env_to_synthetics_jobs;
 mod m20260917_000001_create_llm_experiment_slot_retries;
 mod m20260917_000001_create_synthetics_shared_variables;
+mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -475,6 +476,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
             Box::new(m20260917_000001_create_synthetics_shared_variables::Migration),
             Box::new(m20260917_000001_add_env_to_synthetics_jobs::Migration),
+            Box::new(m20260921_000001_add_input_preview_to_llm_annotation_queue_items::Migration),
         ]
     }
 }
@@ -517,6 +519,10 @@ mod tests {
         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
         (85, "m20260917_000001_create_llm_experiment_slot_retries"),
         (86, "m20260917_000001_create_synthetics_shared_variables"),
+        (
+            87,
+            "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
+        ),
     ];
 
     #[test]
