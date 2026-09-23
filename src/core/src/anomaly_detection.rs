@@ -728,12 +728,7 @@ pub async fn create_config(
             "folder_id".to_string(),
             serde_json::Value::String(folder_name_owned),
         );
-        // Returned rather than refused. Nine of the eighteen shipped interval x window
-        // cells are starved at the default p97 — including 30m/14d and 1h/30d, which train
-        // and serve today — so a hard rejection would break working configurations to
-        // enforce a bar the product has never enforced. The config is stored and trains;
-        // the operator is told, at the moment they can still act on it, instead of finding
-        // out from a log after the first training run.
+        // Returned not refused, since starved shapes serve today — but NO surface reads this key.
         if let Some(warning) = starvation_warning {
             obj.insert(
                 "training_window_warning".to_string(),
@@ -4900,6 +4895,20 @@ mod tests {
                 ..Default::default()
             };
             assert!(validated_detection_window(&req, &stored).is_ok());
+            // Pins that grandfathering is what spared it: touching the histogram on the same
+            // row re-enters the rules, and an off-grid value is then refused.
+            let err = validated_intervals(
+                &UpdateAnomalyConfigRequest {
+                    histogram_interval: Some("7m".to_string()),
+                    ..Default::default()
+                },
+                &stored,
+            )
+            .expect_err("an edit that moves the interval is held to the origin rule");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be what refused it: {err}"
+            );
         }
 
         #[test]
@@ -4996,6 +5005,20 @@ mod tests {
                 ..Default::default()
             };
             assert!(validated_intervals(&req, &stored).is_ok());
+            // Pins that the repair was judged, not waved through: the same edit to another
+            // off-grid value on this fixture must still be refused by the origin rule.
+            let err = validated_intervals(
+                &UpdateAnomalyConfigRequest {
+                    histogram_interval: Some("11m".to_string()),
+                    ..Default::default()
+                },
+                &stored,
+            )
+            .expect_err("11m is off the grid and must not pass as a repair");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be what refused it: {err}"
+            );
         }
 
         /// The other side of the same rule: a row that already violates the coverage floor
