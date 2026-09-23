@@ -229,7 +229,7 @@ pub struct MergeOutput {
     pub file_format: FileFormat,
     /// Parquet compression override (`None` = configured default).
     pub parquet_compression: Option<&'static str>,
-    /// Where a single merged file is built.
+    /// Ordinary single-file merges use this; metrics compaction always writes to disk.
     pub sink: CompactMergeOutput,
 }
 

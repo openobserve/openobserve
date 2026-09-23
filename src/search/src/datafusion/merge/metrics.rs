@@ -20,8 +20,7 @@ use arrow::{
     compute::{max, min},
 };
 use config::{
-    CompactMergeOutput, FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileMeta,
-    utils::parquet::new_parquet_writer,
+    FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileMeta, utils::parquet::new_parquet_writer,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -43,7 +42,7 @@ use vortex::{
 
 use super::{
     MergedFile, append_metadata,
-    metrics_blocks::{Blocks, SourceMetadata, VORTEX_SOURCE_SCHEMA_KEY, verify_vortex_source},
+    metrics_index::{Blocks, SourceMetadata, VORTEX_SOURCE_SCHEMA_KEY, verify_vortex_source},
     new_temp_file,
 };
 use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
@@ -78,7 +77,6 @@ pub(super) struct MetricsOutput {
     pub file_format: FileFormat,
     pub max_file_size: usize,
     pub layout: MetricsFileLayout,
-    pub sink: CompactMergeOutput,
 }
 
 impl MetricsOutput {
@@ -196,60 +194,36 @@ fn series_hashes(batch: &RecordBatch) -> Result<&UInt64Array> {
     Ok(hashes)
 }
 
-enum ParquetSink {
-    Memory(Vec<u8>),
-    Disk {
-        file: tokio::fs::File,
-        path: tempfile::TempPath,
-    },
+struct ParquetSink {
+    file: tokio::fs::File,
+    path: tempfile::TempPath,
 }
 
 impl ParquetSink {
-    fn new(sink: CompactMergeOutput) -> Result<Self> {
-        match sink {
-            CompactMergeOutput::Memory => Ok(Self::Memory(Vec::new())),
-            CompactMergeOutput::Disk => {
-                let (file, path) = new_temp_file()?;
-
-                Ok(Self::Disk { file, path })
-            }
-        }
+    fn new() -> Result<Self> {
+        let (file, path) = new_temp_file()?;
+        Ok(Self { file, path })
     }
 
-    async fn into_path(self) -> Result<(tempfile::TempPath, usize)> {
-        match self {
-            Self::Memory(data) => {
-                let size = data.len();
-                let path = write_temp_file(data).await?;
-
-                Ok((path, size))
-            }
-            Self::Disk { mut file, path } => {
-                file.shutdown().await?;
-                let size = usize::try_from(file.metadata().await?.len())
-                    .map_err(|e| DataFusionError::External(Box::new(e)))?;
-                drop(file);
-                Ok((path, size))
-            }
-        }
+    async fn into_path(mut self) -> Result<(tempfile::TempPath, usize)> {
+        self.file.shutdown().await?;
+        let size = usize::try_from(self.file.metadata().await?.len())
+            .map_err(|e| DataFusionError::External(Box::new(e)))?;
+        drop(self.file);
+        Ok((self.path, size))
     }
 }
 
 impl AsyncFileWriter for ParquetSink {
     fn write(&mut self, bytes: bytes::Bytes) -> BoxFuture<'_, parquet::errors::Result<()>> {
         Box::pin(async move {
-            match self {
-                Self::Memory(data) => data.extend_from_slice(&bytes),
-                Self::Disk { file, .. } => file.write_all(&bytes).await?,
-            }
+            self.file.write_all(&bytes).await?;
             Ok(())
         })
     }
     fn complete(&mut self) -> BoxFuture<'_, parquet::errors::Result<()>> {
         Box::pin(async move {
-            if let Self::Disk { file, .. } = self {
-                file.flush().await?;
-            }
+            self.file.flush().await?;
             Ok(())
         })
     }
@@ -271,12 +245,7 @@ impl ActiveMetricsParquetWriter {
         output: &MetricsOutput,
     ) -> Result<Self> {
         let blocks = output.prepare_blocks(schema, with_index)?;
-        let sink = if with_index {
-            output.sink
-        } else {
-            CompactMergeOutput::Disk
-        };
-        let sink = ParquetSink::new(sink)?;
+        let sink = ParquetSink::new()?;
         let writer = new_parquet_writer(sink, schema, bloom_filter_fields, metadata, false, None);
         Ok(Self {
             writer,
@@ -617,13 +586,6 @@ async fn await_read_task(mut read_task: ReadTask) -> Result<()> {
         .map_err(|e| DataFusionError::External(Box::new(e)))?
 }
 
-async fn write_temp_file(buf: Vec<u8>) -> Result<tempfile::TempPath> {
-    let (mut file, path) = new_temp_file()?;
-    file.write_all(&buf).await?;
-    file.shutdown().await?;
-    Ok(path)
-}
-
 /// The share of the source `original_size` that `records` rows carry.
 fn proportional_original_size(source_meta: &FileMeta, records: i64) -> i64 {
     let estimate = (i128::from(source_meta.original_size.max(0)) * i128::from(records.max(0)))
@@ -717,12 +679,11 @@ mod tests {
         writer.finish_for_parquet(parent, metadata)
     }
 
-    fn block_output(sink: CompactMergeOutput) -> MetricsOutput {
+    fn block_output() -> MetricsOutput {
         MetricsOutput {
             file_format: FileFormat::Parquet,
             max_file_size: 1024 * 1024 * 1024,
             layout: MetricsFileLayout::Indexed,
-            sink,
         }
     }
 
@@ -900,13 +861,8 @@ mod tests {
             "x", "x", "y", "y", "y", "y",
         ]));
         let batch = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
-        for (format, sink) in [FileFormat::Parquet, FileFormat::Vortex]
-            .into_iter()
-            .flat_map(|format| {
-                [CompactMergeOutput::Memory, CompactMergeOutput::Disk].map(|sink| (format, sink))
-            })
-        {
-            let mut output = block_output(sink);
+        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+            let mut output = block_output();
             output.file_format = format;
             let error = produce(&schema, vec![batch.slice(0, 1), batch.slice(1, 5)], output)
                 .await
@@ -917,7 +873,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rotation_preserves_bits_and_fragments_for_both_sinks() {
+    async fn rotation_preserves_bits_and_fragments_on_disk() {
         let schema = block_schema(Some("preserved".into()), false);
         let rows = vec![
             (1, i64::MIN, Some((-0f64).to_bits())),
@@ -929,40 +885,36 @@ mod tests {
             (2, i64::MAX, Some(0x7ff8000000000042)),
             (3, i64::MAX, Some(1)),
         ];
-        for sink in [CompactMergeOutput::Memory, CompactMergeOutput::Disk] {
-            let mut output = block_output(sink);
-            output.max_file_size = 129;
-            let files = produce(
-                &schema,
-                vec![
-                    block_batch(&schema, &rows[..4]),
-                    block_batch(&schema, &rows[4..7]),
-                    block_batch(&schema, &rows[7..]),
-                ],
-                output,
-            )
-            .await
-            .unwrap();
-            assert_eq!(files.len(), 3);
-            check_block_files(files, &rows).await;
-        }
+        let mut output = block_output();
+        output.max_file_size = 129;
+        let files = produce(
+            &schema,
+            vec![
+                block_batch(&schema, &rows[..4]),
+                block_batch(&schema, &rows[4..7]),
+                block_batch(&schema, &rows[7..]),
+            ],
+            output,
+        )
+        .await
+        .unwrap();
+        assert_eq!(files.len(), 3);
+        check_block_files(files, &rows).await;
     }
 
     #[tokio::test]
-    async fn single_pass_crosses_real_row_groups_in_both_sinks() {
+    async fn single_pass_crosses_real_row_groups_on_disk() {
         let schema = block_schema(None, false);
         let rows = (0..PARQUET_MAX_ROW_GROUP_SIZE + 11)
             .map(|i| (1, i as i64, Some((i as f64).to_bits())))
             .collect::<Vec<_>>();
-        for sink in [CompactMergeOutput::Memory, CompactMergeOutput::Disk] {
-            let batches = rows
-                .chunks(8192)
-                .map(|rows| block_batch(&schema, rows))
-                .collect();
-            let files = produce(&schema, batches, block_output(sink)).await.unwrap();
-            assert_eq!(files.len(), 1);
-            check_block_files(files, &rows).await;
-        }
+        let batches = rows
+            .chunks(8192)
+            .map(|rows| block_batch(&schema, rows))
+            .collect();
+        let files = produce(&schema, batches, block_output()).await.unwrap();
+        assert_eq!(files.len(), 1);
+        check_block_files(files, &rows).await;
     }
 
     #[tokio::test]
@@ -1074,7 +1026,7 @@ mod tests {
             super::super::MergeOutput::for_ingester(config::meta::stream::StreamType::Metrics);
         assert_eq!(ingester.file_format, FileFormat::Parquet);
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
-            let mut output = block_output(CompactMergeOutput::Disk);
+            let mut output = block_output();
             output.file_format = format;
             output.layout = MetricsFileLayout::HashMerged;
             let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
@@ -1096,7 +1048,7 @@ mod tests {
             let schema = block_schema(None, true);
             let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
 
-            let mut output = block_output(CompactMergeOutput::Disk);
+            let mut output = block_output();
             output.file_format = format;
             let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
                 .await
@@ -1121,7 +1073,7 @@ mod tests {
         let schema = Arc::new(Schema::new(fields));
         let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
-            let mut output = block_output(CompactMergeOutput::Disk);
+            let mut output = block_output();
             output.file_format = format;
             let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
                 .await
@@ -1136,86 +1088,13 @@ mod tests {
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let schema = block_schema(None, false);
             let rows = [(1, 10, Some(1f64.to_bits())), (2, 20, None)];
-            let mut output = block_output(CompactMergeOutput::Disk);
+            let mut output = block_output();
             output.file_format = format;
             let error = produce(&schema, vec![block_batch(&schema, &rows)], output)
                 .await
                 .err()
                 .expect("invalid samples must fail the merge");
             assert!(error.to_string().contains("nullable samples unsupported"));
-        }
-    }
-
-    #[tokio::test]
-    #[ignore = "Writes over one million series for both storage formats"]
-    async fn million_series_compaction_keeps_every_index() {
-        let schema = block_schema(None, false);
-        let rows = (0..1_000_001u64)
-            .map(|hash| (hash, 10, Some((hash as f64).to_bits())))
-            .collect::<Vec<_>>();
-        for format in [FileFormat::Parquet, FileFormat::Vortex] {
-            let mut output = block_output(CompactMergeOutput::Disk);
-            output.file_format = format;
-            let files = produce(
-                &schema,
-                vec![
-                    block_batch(&schema, &rows[..MAX_SERIES_PER_FILE - 1]),
-                    RecordBatch::new_empty(schema.clone()),
-                    block_batch(&schema, &rows[MAX_SERIES_PER_FILE - 1..]),
-                ],
-                output,
-            )
-            .await
-            .unwrap();
-            assert_eq!(files.len(), 2);
-            let mut seen = 0;
-            for (part, file) in files.into_iter().enumerate() {
-                let (data, meta, path) = file.into_upload_parts().await.unwrap();
-                assert_eq!(meta.records, if part == 0 { 1_000_000 } else { 1 });
-                let samples = sample_rows_for(format, bytes::Bytes::from(data)).await;
-                assert_eq!(samples.as_slice(), &rows[seen..seen + samples.len()]);
-                let encoded = tokio::fs::read(path.expect("every output must retain its MIDX"))
-                    .await
-                    .unwrap();
-                let footer = metrics_block::read_footer(
-                    &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
-                    encoded.len() as u64,
-                )
-                .unwrap();
-                let index = metrics_block::decode_index(
-                    bytes::Bytes::copy_from_slice(
-                        &encoded[footer.metadata_range.start as usize
-                            ..footer.metadata_range.end as usize],
-                    ),
-                    &footer,
-                    &metrics_block::ParentMetadata {
-                        rows: meta.records as u64,
-                        compressed_size: meta.compressed_size as u64,
-                    },
-                    &["tag".into()],
-                )
-                .unwrap();
-                assert_eq!(index.blocks.len(), samples.len());
-                for (block, sample) in index.blocks.iter().zip(&samples) {
-                    assert_eq!(block.hash, sample.0);
-                    let range = block.block_range();
-                    let decoded = metrics_block::decode_block(
-                        &encoded[range.start as usize..range.end as usize],
-                        &block,
-                    )
-                    .unwrap();
-                    assert_eq!(decoded.timestamps, vec![sample.1]);
-                    assert_eq!(decoded.value_bits, vec![sample.2.unwrap()]);
-                }
-                eprintln!(
-                    "{format:?} part={part} rows={} blocks={} midx_bytes={}",
-                    meta.records,
-                    index.blocks.len(),
-                    encoded.len()
-                );
-                seen += samples.len();
-            }
-            assert_eq!(seen, rows.len());
         }
     }
 
@@ -1243,21 +1122,117 @@ mod tests {
             (2, 20, Some(f64::INFINITY.to_bits())),
             (2, 30, Some(f64::NEG_INFINITY.to_bits())),
         ];
-        for sink in [CompactMergeOutput::Memory, CompactMergeOutput::Disk] {
-            let mut output = block_output(sink);
-            output.file_format = FileFormat::Vortex;
-            let file = produce(
-                &schema,
-                vec![
-                    block_batch(&schema, &rows[..2]),
-                    block_batch(&schema, &rows[2..]),
-                ],
-                output,
+        let mut output = block_output();
+        output.file_format = FileFormat::Vortex;
+        let file = produce(
+            &schema,
+            vec![
+                block_batch(&schema, &rows[..2]),
+                block_batch(&schema, &rows[2..]),
+            ],
+            output,
+        )
+        .await
+        .unwrap()
+        .remove(0);
+        let (data, _meta, path) = file.into_upload_parts().await.unwrap();
+        let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
+        let footer = metrics_block::read_footer(
+            &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
+            encoded.len() as u64,
+        )
+        .unwrap();
+        let parent = metrics_block::ParentMetadata {
+            rows: rows.len() as u64,
+            compressed_size: data.len() as u64,
+        };
+        let index = metrics_block::decode_index(
+            bytes::Bytes::copy_from_slice(
+                &encoded[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+            ),
+            &footer,
+            &parent,
+            &["tag".into()],
+        )
+        .unwrap();
+        assert_eq!(index.row_group_size, None);
+        assert_eq!(index.source_schema.as_ref(), schema.as_ref());
+        let mut native_rows = Vec::new();
+        for block in &index.blocks {
+            let range = block.block_range();
+            let decoded = metrics_block::decode_block(
+                &encoded[range.start as usize..range.end as usize],
+                &block,
             )
-            .await
-            .unwrap()
-            .remove(0);
-            let (data, _meta, path) = file.into_upload_parts().await.unwrap();
+            .unwrap();
+            native_rows.extend(
+                decoded
+                    .timestamps
+                    .into_iter()
+                    .zip(decoded.value_bits)
+                    .map(|(t, v)| (block.hash, t, Some(v))),
+            );
+        }
+        assert_eq!(native_rows, rows);
+        let (_, mut reader) = config::utils::parquet::get_recordbatch_reader_from_bytes(
+            FileFormat::Vortex,
+            bytes::Bytes::from(data.clone()),
+        )
+        .await
+        .unwrap();
+        let mut stored_rows = Vec::new();
+        while let Some(batch) = reader.try_next().await.unwrap() {
+            let hashes = batch
+                .column_by_name(HASH_LABEL)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .unwrap();
+            let times = batch
+                .column_by_name(TIMESTAMP_COL_NAME)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap();
+            let values = batch
+                .column_by_name(VALUE_LABEL)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<Float64Array>()
+                .unwrap();
+            stored_rows.extend((0..batch.num_rows()).map(|i| {
+                (
+                    hashes.value(i),
+                    times.value(i),
+                    Some(values.value(i).to_bits()),
+                )
+            }));
+        }
+        assert_eq!(stored_rows, rows);
+    }
+
+    #[tokio::test]
+    async fn single_pass_vortex_splits_data_and_native_indexes_at_batch_boundaries() {
+        let schema = block_schema(None, false);
+        let rows = (0..20)
+            .map(|i| ((i / 5) as u64, i, Some((i as f64).to_bits())))
+            .collect::<Vec<_>>();
+        let mut output = block_output();
+        output.file_format = FileFormat::Vortex;
+        output.max_file_size = 129;
+        let files = produce(
+            &schema,
+            rows.chunks(7).map(|r| block_batch(&schema, r)).collect(),
+            output,
+        )
+        .await
+        .unwrap();
+        assert_eq!(files.len(), 3);
+        let mut actual = Vec::new();
+        for file in files {
+            let (data, meta, path) = file.into_upload_parts().await.unwrap();
+            let stored =
+                sample_rows_for(FileFormat::Vortex, bytes::Bytes::from(data.clone())).await;
             let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
             let footer = metrics_block::read_footer(
                 &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
@@ -1265,7 +1240,7 @@ mod tests {
             )
             .unwrap();
             let parent = metrics_block::ParentMetadata {
-                rows: rows.len() as u64,
+                rows: meta.records as u64,
                 compressed_size: data.len() as u64,
             };
             let index = metrics_block::decode_index(
@@ -1279,127 +1254,26 @@ mod tests {
             )
             .unwrap();
             assert_eq!(index.row_group_size, None);
-            assert_eq!(index.source_schema.as_ref(), schema.as_ref());
-            let mut native_rows = Vec::new();
+            let mut native = Vec::new();
             for block in &index.blocks {
                 let range = block.block_range();
-                let decoded = metrics_block::decode_block(
+                let payload = metrics_block::decode_block(
                     &encoded[range.start as usize..range.end as usize],
                     &block,
                 )
                 .unwrap();
-                native_rows.extend(
-                    decoded
+                native.extend(
+                    payload
                         .timestamps
                         .into_iter()
-                        .zip(decoded.value_bits)
+                        .zip(payload.value_bits)
                         .map(|(t, v)| (block.hash, t, Some(v))),
                 );
             }
-            assert_eq!(native_rows, rows);
-            let (_, mut reader) = config::utils::parquet::get_recordbatch_reader_from_bytes(
-                FileFormat::Vortex,
-                bytes::Bytes::from(data.clone()),
-            )
-            .await
-            .unwrap();
-            let mut stored_rows = Vec::new();
-            while let Some(batch) = reader.try_next().await.unwrap() {
-                let hashes = batch
-                    .column_by_name(HASH_LABEL)
-                    .unwrap()
-                    .as_any()
-                    .downcast_ref::<UInt64Array>()
-                    .unwrap();
-                let times = batch
-                    .column_by_name(TIMESTAMP_COL_NAME)
-                    .unwrap()
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap();
-                let values = batch
-                    .column_by_name(VALUE_LABEL)
-                    .unwrap()
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap();
-                stored_rows.extend((0..batch.num_rows()).map(|i| {
-                    (
-                        hashes.value(i),
-                        times.value(i),
-                        Some(values.value(i).to_bits()),
-                    )
-                }));
-            }
-            assert_eq!(stored_rows, rows);
+            assert_eq!(native, stored);
+            actual.extend(stored);
         }
-    }
-
-    #[tokio::test]
-    async fn single_pass_vortex_splits_data_and_native_indexes_at_batch_boundaries() {
-        let schema = block_schema(None, false);
-        let rows = (0..20)
-            .map(|i| ((i / 5) as u64, i, Some((i as f64).to_bits())))
-            .collect::<Vec<_>>();
-        for sink in [CompactMergeOutput::Memory, CompactMergeOutput::Disk] {
-            let mut output = block_output(sink);
-            output.file_format = FileFormat::Vortex;
-            output.max_file_size = 129;
-            let files = produce(
-                &schema,
-                rows.chunks(7).map(|r| block_batch(&schema, r)).collect(),
-                output,
-            )
-            .await
-            .unwrap();
-            assert_eq!(files.len(), 3);
-            let mut actual = Vec::new();
-            for file in files {
-                let (data, meta, path) = file.into_upload_parts().await.unwrap();
-                let stored =
-                    sample_rows_for(FileFormat::Vortex, bytes::Bytes::from(data.clone())).await;
-                let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
-                let footer = metrics_block::read_footer(
-                    &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
-                    encoded.len() as u64,
-                )
-                .unwrap();
-                let parent = metrics_block::ParentMetadata {
-                    rows: meta.records as u64,
-                    compressed_size: data.len() as u64,
-                };
-                let index = metrics_block::decode_index(
-                    bytes::Bytes::copy_from_slice(
-                        &encoded[footer.metadata_range.start as usize
-                            ..footer.metadata_range.end as usize],
-                    ),
-                    &footer,
-                    &parent,
-                    &["tag".into()],
-                )
-                .unwrap();
-                assert_eq!(index.row_group_size, None);
-                let mut native = Vec::new();
-                for block in &index.blocks {
-                    let range = block.block_range();
-                    let payload = metrics_block::decode_block(
-                        &encoded[range.start as usize..range.end as usize],
-                        &block,
-                    )
-                    .unwrap();
-                    native.extend(
-                        payload
-                            .timestamps
-                            .into_iter()
-                            .zip(payload.value_bits)
-                            .map(|(t, v)| (block.hash, t, Some(v))),
-                    );
-                }
-                assert_eq!(native, stored);
-                actual.extend(stored);
-            }
-            assert_eq!(actual, rows);
-        }
+        assert_eq!(actual, rows);
     }
 
     #[tokio::test]
@@ -1440,7 +1314,6 @@ mod tests {
                 file_format: FileFormat::Parquet,
                 max_file_size: 200,
                 layout: MetricsFileLayout::HashMerged,
-                sink: CompactMergeOutput::Disk,
             },
             rx,
             tokio::spawn(async { Ok(()) }),
@@ -1535,7 +1408,6 @@ mod tests {
                 file_format,
                 max_file_size,
                 layout: MetricsFileLayout::Indexed,
-                sink: CompactMergeOutput::Disk,
             },
             rx,
             tokio::spawn(async { Ok(()) }),
@@ -1673,7 +1545,7 @@ mod tests {
         let observed = path.to_path_buf();
         drop(file);
         let file = tokio::fs::File::from_std(std::fs::File::open(&path).unwrap());
-        let mut sink = ParquetSink::Disk { file, path };
+        let mut sink = ParquetSink { file, path };
         let result = async {
             AsyncFileWriter::write(&mut sink, bytes::Bytes::from_static(b"data")).await?;
             AsyncFileWriter::complete(&mut sink).await
