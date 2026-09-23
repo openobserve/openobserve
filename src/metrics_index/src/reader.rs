@@ -48,7 +48,7 @@ pub(super) async fn load_metrics_index_file(
     index_size: i64,
     labels: IndexLabels,
 ) -> Result<MetricsIndexData> {
-    let parent = metrics_block::ParentMetadata {
+    let parent = crate::block::ParentMetadata {
         rows: u64::try_from(parent_rows)
             .map_err(|error| DataFusionError::External(error.into()))?,
         compressed_size: u64::try_from(parent_size)
@@ -139,7 +139,7 @@ pub(super) fn evaluate_metrics_index(
 async fn load_block_metadata(
     account: &str,
     path: &str,
-    parent: metrics_block::ParentMetadata,
+    parent: crate::block::ParentMetadata,
     index_size: i64,
     format: config::FileFormat,
     labels: IndexLabels,
@@ -173,7 +173,7 @@ async fn load_block_metadata(
             .await
             .map_err(|error| DataFusionError::External(Box::new(error)))?;
     tokio::task::spawn_blocking(move || {
-        let index = metrics_block::decode_index(metadata, &footer, &parent, &labels.requested)
+        let index = crate::block::decode_index(metadata, &footer, &parent, &labels.requested)
             .map_err(|error| DataFusionError::External(error.into()))?;
         metrics_block_index_data(&index, format, &labels.flat)
     })
@@ -181,20 +181,19 @@ async fn load_block_metadata(
     .map_err(|error| DataFusionError::External(Box::new(error)))?
 }
 
-async fn read_block_footer(account: &str, path: &str, size: u64) -> Result<metrics_block::Footer> {
+async fn read_block_footer(account: &str, path: &str, size: u64) -> Result<crate::block::Footer> {
     let start = size
-        .checked_sub(metrics_block::FOOTER_LEN as u64)
+        .checked_sub(crate::block::FOOTER_LEN as u64)
         .ok_or_else(|| DataFusionError::Execution("Truncated MIDX footer".into()))?;
     let location = path.into();
     let bytes = infra::cache::storage::get_range(account, &location, start..size)
         .await
         .map_err(|error| DataFusionError::External(Box::new(error)))?;
-    metrics_block::read_footer(&bytes, size)
-        .map_err(|error| DataFusionError::External(error.into()))
+    crate::block::read_footer(&bytes, size).map_err(|error| DataFusionError::External(error.into()))
 }
 
 fn metrics_block_index_data(
-    index: &metrics_block::Index,
+    index: &crate::block::Index,
     format: config::FileFormat,
     flat_labels: &[String],
 ) -> Result<MetricsIndexData> {
@@ -296,7 +295,7 @@ mod tests {
             false,
         );
         let mut writer =
-            metrics_block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
+            crate::block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
         writer.write(&batch).unwrap();
         let bytes = match format {
             config::FileFormat::Parquet => {
@@ -312,7 +311,7 @@ mod tests {
                 let metadata = parquet.finish().await.unwrap();
                 file.meta.compressed_size = i64::try_from(parquet.bytes_written()).unwrap();
                 writer.finish_for_parquet(
-                    metrics_block::ParentMetadata {
+                    crate::block::ParentMetadata {
                         rows: 6,
                         compressed_size: file.meta.compressed_size as u64,
                     },
@@ -320,7 +319,7 @@ mod tests {
                 )
             }
             config::FileFormat::Vortex => writer.finish_for_vortex(
-                metrics_block::ParentMetadata {
+                crate::block::ParentMetadata {
                     rows: 6,
                     compressed_size: 123,
                 },

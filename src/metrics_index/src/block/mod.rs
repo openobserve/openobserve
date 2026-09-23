@@ -29,43 +29,31 @@ use arrow::{
     array::{Array, DictionaryArray, LargeStringArray, RecordBatch, StringArray, StringViewArray},
     datatypes::{DataType, Schema, SchemaRef, UInt8Type, UInt16Type, UInt32Type},
 };
+pub use config::meta::promql::blocks::{
+    MIDX_FOOTER_LEN as FOOTER_LEN, MIDX_VERSION as VERSION, MidxFooter as Footer,
+};
+use config::meta::promql::{
+    METRICS_HASH_EXCLUDED_LABELS, blocks::MIDX_FOOTER_MAGIC, is_metrics_hash_excluded_label,
+};
 pub use directory::{BlockDirectory, BlockIter};
 pub use reader::{BlockDecoder, decode_additional_labels, decode_block, decode_index, read_footer};
 use serde::{Deserialize, Serialize};
 pub use writer::BlockWriter;
 
-pub const VERSION: u32 = 2;
-pub const FOOTER_LEN: usize = 32;
 pub const MAX_BLOCK_ROWS: usize = 8192;
 pub const MAX_LABEL_COLUMNS: usize = 128;
-const MAGIC: &[u8; 8] = b"O2MIDX02";
+const MAGIC: &[u8; 8] = MIDX_FOOTER_MAGIC;
 const DIRECTORY_FIELDS: usize = 8;
 const PARENT_KEY: &str = "o2:midx_parent";
 const SCHEMA_KEY: &str = "o2:midx_source_schema";
 const LABELS_KEY: &str = "o2:midx_labels";
 pub const ROW_GROUP_SIZE_KEY: &str = "o2:midx_row_group_size";
 const VERSION_KEY: &str = "o2:midx_version";
-const NON_IDENTITY: &[&str] = &[
-    "exemplars",
-    "is_monotonic",
-    "trace_id",
-    "span_id",
-    "_all",
-    "start_time",
-    "flag",
-];
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ParentMetadata {
     pub rows: u64,
     pub compressed_size: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Footer {
-    pub version: u32,
-    pub metadata_range: Range<u64>,
-    pub payload_end: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -359,7 +347,7 @@ pub fn max_compressed_block_len(row_count: u32) -> Result<usize> {
 
 pub fn identity_label_columns(schema: &Schema) -> Result<Vec<String>> {
     capacity(
-        schema.fields().len() <= MAX_LABEL_COLUMNS + 3 + NON_IDENTITY.len(),
+        schema.fields().len() <= MAX_LABEL_COLUMNS + METRICS_HASH_EXCLUDED_LABELS.len(),
         "MAX_LABEL_COLUMNS",
     )?;
     let mut names = HashSet::new();
@@ -383,14 +371,11 @@ pub fn identity_label_columns(schema: &Schema) -> Result<Vec<String>> {
     let mut labels = Vec::new();
     for field in schema.fields() {
         let name = field.name().as_str();
-        if ["__hash__", "_timestamp", "value"].contains(&name) {
-            continue;
-        }
         ensure!(
             !name.starts_with("__oo_midx_"),
             "reserved metadata label name"
         );
-        if NON_IDENTITY.contains(&name) {
+        if is_metrics_hash_excluded_label(name) {
             continue;
         }
         ensure!(

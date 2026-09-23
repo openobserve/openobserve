@@ -290,7 +290,9 @@ async fn cancelled_owner_wakes_follower_and_removes_inflight_state() {
 #[tokio::test(flavor = "current_thread")]
 async fn failed_owner_propagates_to_followers_and_a_valid_retry_recovers() {
     let fixture = SharedCacheFixture::new(true).await;
-    fixture.replace(vec![0; metrics_block::FOOTER_LEN]).await;
+    fixture
+        .replace(vec![0; metrics_index::block::FOOTER_LEN])
+        .await;
     let mut tasks = Vec::new();
     for label in ["group", "zone", "instance"] {
         let fixture = Arc::clone(&fixture);

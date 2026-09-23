@@ -24,7 +24,7 @@ use arrow::{
 };
 use bytes::Bytes;
 
-use crate::*;
+use super::*;
 
 type Row = (u64, i64, u64, Option<&'static str>, Option<&'static str>);
 
@@ -64,7 +64,7 @@ impl std::io::Write for FailureWriter {
 
 fn build_from_parquet(
     bytes: bytes::Bytes,
-    parent: crate::ParentMetadata,
+    parent: super::ParentMetadata,
 ) -> anyhow::Result<Vec<u8>> {
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     anyhow::ensure!(
@@ -75,8 +75,8 @@ fn build_from_parquet(
     let schema = builder.schema().clone();
     let metadata = builder.metadata().as_ref().clone();
     let mut writer =
-        crate::BlockWriter::new_pending(Vec::new(), schema.clone(), crate::MAX_BLOCK_ROWS)?;
-    for batch in builder.with_batch_size(crate::MAX_BLOCK_ROWS).build()? {
+        super::BlockWriter::new_pending(Vec::new(), schema.clone(), super::MAX_BLOCK_ROWS)?;
+    for batch in builder.with_batch_size(super::MAX_BLOCK_ROWS).build()? {
         let batch = batch?;
         let batch = RecordBatch::try_new(schema.clone(), batch.columns().to_vec())?;
         writer.write(&batch)?;
@@ -250,7 +250,7 @@ fn numeric_parent_and_projection_are_validated() {
     assert!(decode_index(bytes.clone(), &footer, &parent(), &["value".into()]).is_err());
 }
 
-fn expanded_metadata_batch(encoded: &crate::compact::CompactMetadata<'_>) -> Result<RecordBatch> {
+fn expanded_metadata_batch(encoded: &super::compact::CompactMetadata<'_>) -> Result<RecordBatch> {
     let schema = encoded.schema();
     let batch = encoded.compact_batch(&(0..schema.fields().len()).collect::<Vec<_>>())?;
     let columns = batch
@@ -265,12 +265,12 @@ fn expanded_metadata_batch(encoded: &crate::compact::CompactMetadata<'_>) -> Res
 fn replace_column(blob: &[u8], column: usize, value: ArrayRef) -> Vec<u8> {
     let footer = test_footer(blob);
     let raw = &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize];
-    let encoded = crate::compact::CompactMetadata::parse(raw).unwrap();
+    let encoded = super::compact::CompactMetadata::parse(raw).unwrap();
     let old = expanded_metadata_batch(&encoded).unwrap();
     let mut columns = old.columns().to_vec();
     columns[column] = value;
     let batch = RecordBatch::try_new(old.schema(), columns).unwrap();
-    let meta = crate::compact::encode(&batch).unwrap();
+    let meta = super::compact::encode(&batch).unwrap();
     let mut result = blob[..footer.metadata_range.start as usize].to_vec();
     result.extend_from_slice(&meta);
     let mut end = blob[blob.len() - FOOTER_LEN..].to_vec();
@@ -434,7 +434,7 @@ fn excessive_compressed_length_is_rejected() {
     let start = u64::from_le_bytes(footer[8..16].try_into().unwrap()) + u64::from(delta);
     footer[8..16].copy_from_slice(&start.to_le_bytes());
     padded.extend_from_slice(&footer);
-    let error = crate::tests::index(&padded, &[]).unwrap_err();
+    let error = super::tests::index(&padded, &[]).unwrap_err();
     assert!(
         error
             .to_string()
@@ -563,7 +563,7 @@ fn compact_metadata_rejects_truncation_corruption_and_excessive_claims() {
     let metadata =
         &compact[footer.metadata_range.start as usize..footer.metadata_range.end as usize];
     for n in 0..metadata.len() {
-        assert!(crate::compact::CompactMetadata::parse(&metadata[..n]).is_err());
+        assert!(super::compact::CompactMetadata::parse(&metadata[..n]).is_err());
     }
     let mut corrupt = compact.clone();
     corrupt[footer.metadata_range.start as usize + 8] ^= 1;
@@ -582,7 +582,7 @@ fn compact_metadata_rejects_truncation_corruption_and_excessive_claims() {
         bad.extend_from_slice(&(encoded.len() as u32).to_le_bytes());
         bad.extend_from_slice(&encoded);
         bad.extend_from_slice(&metadata[12 + header_len..]);
-        assert!(crate::compact::CompactMetadata::parse(&bad).is_err());
+        assert!(super::compact::CompactMetadata::parse(&bad).is_err());
     }
 }
 
@@ -590,7 +590,7 @@ fn compact_metadata_rejects_truncation_corruption_and_excessive_claims() {
 fn compact_encoder_accepts_large_metadata_header() {
     let blob = fixture();
     let footer = test_footer(&blob);
-    let encoded = crate::compact::CompactMetadata::parse(
+    let encoded = super::compact::CompactMetadata::parse(
         &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
     )
     .unwrap();
@@ -602,8 +602,8 @@ fn compact_encoder_accepts_large_metadata_header() {
         metadata,
     ));
     let oversized = RecordBatch::try_new(schema, original.columns().to_vec()).unwrap();
-    let bytes = crate::compact::encode(&oversized).unwrap();
-    assert!(crate::compact::CompactMetadata::parse(&bytes).is_ok());
+    let bytes = super::compact::encode(&oversized).unwrap();
+    assert!(super::compact::CompactMetadata::parse(&bytes).is_ok());
 }
 
 #[test]
@@ -711,7 +711,7 @@ fn v2_footer_and_numeric_parent_have_no_key_or_checksum_columns() {
         u64::from_le_bytes(end[16..24].try_into().unwrap()),
         footer.metadata_range.end - footer.metadata_range.start
     );
-    let metadata = crate::compact::CompactMetadata::parse(
+    let metadata = super::compact::CompactMetadata::parse(
         &blob[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
     )
     .unwrap();

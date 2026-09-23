@@ -6,6 +6,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+anyhow.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
 bytes.workspace = true
@@ -15,11 +16,14 @@ futures.workspace = true
 hashlink.workspace = true
 infra.workspace = true
 log.workspace = true
-metrics_block.workspace = true
-promql.workspace = true
+parquet.workspace = true
 promql-parser.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
+zstd.workspace = true
 
 [dev-dependencies]
 object_store.workspace = true
 regex.workspace = true
+tempfile.workspace = true

@@ -26,7 +26,7 @@ use arrow::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{DIRECTORY_FIELDS, MAX_LABEL_COLUMNS, label_value};
+use super::{DIRECTORY_FIELDS, MAX_LABEL_COLUMNS, label_value};
 
 const MAGIC: &[u8; 8] = b"O2META01";
 
@@ -518,11 +518,11 @@ mod adaptive_tests {
                 &DataType::Dictionary(Box::new(width), Box::new(DataType::Utf8))
             );
             assert_eq!(
-                crate::label_value(decoded.as_ref(), cardinality - 1).unwrap(),
+                crate::block::label_value(decoded.as_ref(), cardinality - 1).unwrap(),
                 Some(values[cardinality - 1].as_str())
             );
             assert_eq!(
-                crate::label_value(decoded.as_ref(), cardinality * 2).unwrap(),
+                crate::block::label_value(decoded.as_ref(), cardinality * 2).unwrap(),
                 None
             );
             assert!(decoded.get_array_memory_size() < source.get_array_memory_size());
@@ -555,8 +555,8 @@ mod adaptive_tests {
             );
             for row in 0..source.len() {
                 assert_eq!(
-                    crate::label_value(source.as_ref(), row).unwrap(),
-                    crate::label_value(decoded.as_ref(), row).unwrap()
+                    crate::block::label_value(source.as_ref(), row).unwrap(),
+                    crate::block::label_value(decoded.as_ref(), row).unwrap()
                 );
             }
         }

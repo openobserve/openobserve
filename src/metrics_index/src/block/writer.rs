@@ -32,7 +32,7 @@ use parquet::{
     file::metadata::ParquetMetaData,
 };
 
-use crate::*;
+use super::*;
 
 pub struct BlockWriter<W: Write> {
     output: W,
@@ -117,7 +117,7 @@ impl<W: Write> BlockWriter<W> {
         self.flush_block()?;
         self.current_labels.clear();
         let batch = self.metadata_batch()?;
-        let metadata = crate::compact::encode(&batch)?;
+        let metadata = super::compact::encode(&batch)?;
         let metadata_len = u64::try_from(metadata.len())?;
         let mut footer = [0u8; FOOTER_LEN];
         footer[..4].copy_from_slice(&VERSION.to_le_bytes());
@@ -176,7 +176,7 @@ impl<W: Write> BlockWriter<W> {
             validate_parent(parent)?;
         }
         capacity(
-            schema.fields().len() <= MAX_LABEL_COLUMNS + 3 + NON_IDENTITY.len(),
+            schema.fields().len() <= MAX_LABEL_COLUMNS + METRICS_HASH_EXCLUDED_LABELS.len(),
             "MAX_LABEL_COLUMNS",
         )?;
         ensure!(
@@ -216,8 +216,8 @@ impl<W: Write> BlockWriter<W> {
         for label in &label_columns {
             ensure!(seen.insert(label.clone()), "duplicate label column");
             ensure!(
-                !["__hash__", "_timestamp", "value"].contains(&label.as_str()),
-                "sample column cannot be an identity label"
+                !is_metrics_hash_excluded_label(label),
+                "hash-excluded column cannot be an identity label"
             );
             let index = schema.index_of(label)?;
             ensure!(

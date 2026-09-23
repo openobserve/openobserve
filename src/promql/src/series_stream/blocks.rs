@@ -43,7 +43,7 @@ use datafusion::error::DataFusionError;
 use futures::{StreamExt, stream};
 use hashbrown::{HashMap, HashSet};
 use hashlink::LruCache;
-use metrics_block::{BlockDecoder, DecodedBlockRef, Index, ParentMetadata};
+use metrics_index::block::{BlockDecoder, DecodedBlockRef, Index, ParentMetadata};
 use tokio::{
     sync::{OwnedSemaphorePermit, Semaphore},
     task::{JoinHandle, JoinSet},
@@ -128,13 +128,13 @@ struct CacheKey {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct SidecarBinding {
     size: u64,
-    footer: [u8; metrics_block::FOOTER_LEN],
+    footer: [u8; metrics_index::block::FOOTER_LEN],
     payload_end: u64,
 }
 
 impl SidecarBinding {
-    fn parse(size: u64, bytes: &[u8]) -> Result<(Self, metrics_block::Footer)> {
-        let footer = metrics_block::read_footer(bytes, size)?;
+    fn parse(size: u64, bytes: &[u8]) -> Result<(Self, metrics_index::block::Footer)> {
+        let footer = metrics_index::block::read_footer(bytes, size)?;
         let binding = Self {
             size,
             footer: bytes.try_into().context("invalid block footer length")?,
@@ -1011,7 +1011,7 @@ fn validate_projected_labels(index: &Index, labels: &[String]) -> Result<()> {
 #[cfg(all(unix, target_pointer_width = "64"))]
 fn checked_mapping_len(size: u64) -> Result<usize> {
     ensure!(
-        size >= metrics_block::FOOTER_LEN as u64,
+        size >= metrics_index::block::FOOTER_LEN as u64,
         "short block sidecar"
     );
     let size = usize::try_from(size)?;
@@ -1059,10 +1059,11 @@ fn load_opened_local_index_with(
     let size = metadata.len();
     ensure!(size == local.meta.size, "opened block sidecar size changed");
     let len = checked_mapping_len(size)?;
-    let mut footer_bytes = [0; metrics_block::FOOTER_LEN];
-    local
-        .file
-        .read_exact_at(&mut footer_bytes, size - metrics_block::FOOTER_LEN as u64)?;
+    let mut footer_bytes = [0; metrics_index::block::FOOTER_LEN];
+    local.file.read_exact_at(
+        &mut footer_bytes,
+        size - metrics_index::block::FOOTER_LEN as u64,
+    )?;
     let (binding, footer) = SidecarBinding::parse(size, &footer_bytes)?;
     if let Some(cached) = &cached {
         ensure!(
@@ -1073,7 +1074,7 @@ fn load_opened_local_index_with(
     let mapping = match map(&local.file, len, binding.payload_end) {
         Ok(mapping) => {
             ensure!(
-                mapping.data.get(len - metrics_block::FOOTER_LEN..)
+                mapping.data.get(len - metrics_index::block::FOOTER_LEN..)
                     == Some(binding.footer.as_slice()),
                 "mapped block sidecar footer changed"
             );
@@ -1148,7 +1149,7 @@ async fn load_index_cached(
     limit: usize,
 ) -> Result<Arc<LoadedFile>> {
     ensure!(
-        labels.len() <= metrics_block::MAX_LABEL_COLUMNS,
+        labels.len() <= metrics_index::block::MAX_LABEL_COLUMNS,
         "too many requested block labels"
     );
     let parent = ParentIdentity {
@@ -1231,13 +1232,13 @@ async fn load_entry(
     let location = sidecar.into();
     let mut size = u64::try_from(file.meta.mindex_size)?;
     ensure!(
-        size >= metrics_block::FOOTER_LEN as u64,
+        size >= metrics_index::block::FOOTER_LEN as u64,
         "short block sidecar"
     );
     let first = infra::cache::storage::get_range(
         &file.account,
         &location,
-        size - metrics_block::FOOTER_LEN as u64..size,
+        size - metrics_index::block::FOOTER_LEN as u64..size,
     )
     .await
     .map_err(anyhow::Error::from)
@@ -1253,13 +1254,13 @@ async fn load_entry(
             }
             size = actual;
             ensure!(
-                size >= metrics_block::FOOTER_LEN as u64,
+                size >= metrics_index::block::FOOTER_LEN as u64,
                 "short block sidecar"
             );
             let bytes = infra::cache::storage::get_range(
                 &file.account,
                 &location,
-                size - metrics_block::FOOTER_LEN as u64..size,
+                size - metrics_index::block::FOOTER_LEN as u64..size,
             )
             .await?;
             SidecarBinding::parse(size, &bytes)?
@@ -1285,7 +1286,7 @@ async fn load_entry(
 
 fn decode_cached_metadata(
     metadata: Bytes,
-    footer: &metrics_block::Footer,
+    footer: &metrics_index::block::Footer,
     parent: &ParentIdentity,
     labels: &[String],
     cached: Option<Arc<CachedIndex>>,
@@ -1293,11 +1294,15 @@ fn decode_cached_metadata(
 ) -> Result<Arc<CachedIndex>> {
     let index = if let Some(cached) = cached {
         let missing = cached.index.missing_labels(labels)?;
-        let additional =
-            metrics_block::decode_additional_labels(metadata, footer, &cached.index, &missing)?;
+        let additional = metrics_index::block::decode_additional_labels(
+            metadata,
+            footer,
+            &cached.index,
+            &missing,
+        )?;
         cached.index.merge_columns(&additional)?
     } else {
-        metrics_block::decode_index(metadata, footer, &parent.metadata(), labels)?
+        metrics_index::block::decode_index(metadata, footer, &parent.metadata(), labels)?
     };
     validate_projected_labels(&index, labels)?;
     Ok(Arc::new(CachedIndex {
@@ -1511,7 +1516,7 @@ mod tests {
         prelude::{SessionConfig, SessionContext, col},
     };
     use futures::stream::BoxStream;
-    use metrics_block::BlockWriter;
+    use metrics_index::block::BlockWriter;
     use object_store::{
         CopyOptions, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
         PutMultipartOptions, PutOptions, PutPayload, PutResult, path::Path,
@@ -2064,12 +2069,12 @@ mod tests {
             (3, 10, 9.0, Some("last")),
             (3, 20, 10.0, Some("last")),
         ]);
-        let footer = metrics_block::read_footer(
-            &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
+        let footer = metrics_index::block::read_footer(
+            &bytes[bytes.len() - metrics_index::block::FOOTER_LEN..],
             bytes.len() as u64,
         )
         .unwrap();
-        let index = metrics_block::decode_index(
+        let index = metrics_index::block::decode_index(
             Bytes::copy_from_slice(
                 &bytes[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
             ),
@@ -2566,8 +2571,8 @@ mod tests {
     #[tokio::test]
     async fn corrupt_payload_fails_after_preflight_instead_of_falling_back() {
         let (key, mut bytes) = file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]);
-        let footer = metrics_block::read_footer(
-            &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
+        let footer = metrics_index::block::read_footer(
+            &bytes[bytes.len() - metrics_index::block::FOOTER_LEN..],
             bytes.len() as u64,
         )
         .unwrap();
@@ -2576,7 +2581,7 @@ mod tests {
             rows: 2,
             compressed_size: 123,
         };
-        let index = metrics_block::decode_index(
+        let index = metrics_index::block::decode_index(
             Bytes::copy_from_slice(
                 &bytes[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
             ),
@@ -2710,7 +2715,7 @@ mod tests {
             fn binding(&self) -> SidecarBinding {
                 SidecarBinding::parse(
                     self.original.len() as u64,
-                    &self.original[self.original.len() - metrics_block::FOOTER_LEN..],
+                    &self.original[self.original.len() - metrics_index::block::FOOTER_LEN..],
                 )
                 .unwrap()
                 .0
@@ -2962,9 +2967,11 @@ mod tests {
             disk.replace(&other.1);
             std::fs::remove_file(&disk.path).unwrap();
             let block = &entry.index.blocks.block(0);
-            let decoded =
-                metrics_block::decode_block(mapping.payload(block.block_range()).unwrap(), block)
-                    .unwrap();
+            let decoded = metrics_index::block::decode_block(
+                mapping.payload(block.block_range()).unwrap(),
+                block,
+            )
+            .unwrap();
             assert_eq!(
                 decoded.value_bits,
                 vec![(-0.0f64).to_bits(), 5.0f64.to_bits()]
@@ -3133,8 +3140,11 @@ mod tests {
             let map = map.unwrap();
             let block = &cached.index.blocks.block(0);
             assert!(
-                metrics_block::decode_block(map.payload(block.block_range()).unwrap(), block)
-                    .is_err()
+                metrics_index::block::decode_block(
+                    map.payload(block.block_range()).unwrap(),
+                    block
+                )
+                .is_err()
             );
         }
 
@@ -3274,11 +3284,11 @@ mod tests {
         };
         let (binding, footer) = SidecarBinding::parse(
             bytes.len() as u64,
-            &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
+            &bytes[bytes.len() - metrics_index::block::FOOTER_LEN..],
         )
         .unwrap();
         let index = Arc::new(
-            metrics_block::decode_index(
+            metrics_index::block::decode_index(
                 Bytes::copy_from_slice(
                     &bytes
                         [footer.metadata_range.start as usize..footer.metadata_range.end as usize],
@@ -3465,13 +3475,13 @@ mod tests {
             rows: 1,
             compressed_size: 123,
         };
-        let footer = metrics_block::read_footer(
-            &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
+        let footer = metrics_index::block::read_footer(
+            &bytes[bytes.len() - metrics_index::block::FOOTER_LEN..],
             bytes.len() as u64,
         )
         .unwrap();
         let index = Arc::new(
-            metrics_block::decode_index(
+            metrics_index::block::decode_index(
                 Bytes::copy_from_slice(
                     &bytes
                         [footer.metadata_range.start as usize..footer.metadata_range.end as usize],
@@ -3491,7 +3501,7 @@ mod tests {
             index,
             binding: SidecarBinding::parse(
                 bytes.len() as u64,
-                &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
+                &bytes[bytes.len() - metrics_index::block::FOOTER_LEN..],
             )
             .unwrap()
             .0,

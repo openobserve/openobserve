@@ -232,11 +232,11 @@ async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Erro
             }
         }
         FileType::Midx => {
-            if bytes.len() < metrics_block::FOOTER_LEN {
+            if bytes.len() < config::meta::promql::blocks::MIDX_FOOTER_LEN {
                 return Err(anyhow::anyhow!("invalid metrics index file"));
             }
-            metrics_block::read_footer(
-                &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
+            config::meta::promql::blocks::read_midx_footer(
+                &bytes[bytes.len() - config::meta::promql::blocks::MIDX_FOOTER_LEN..],
                 bytes.len() as u64,
             )?;
         }
@@ -527,36 +527,17 @@ mod tests {
 
     #[tokio::test]
     async fn validate_midx_checks_current_footer() {
-        use arrow::{
-            array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
-            datatypes::{DataType, Field, Schema},
-        };
-        let schema = std::sync::Arc::new(Schema::new(vec![
-            Field::new("__hash__", DataType::UInt64, false),
-            Field::new("_timestamp", DataType::Int64, false),
-            Field::new("value", DataType::Float64, false),
-        ]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                std::sync::Arc::new(UInt64Array::from(vec![1, 1])),
-                std::sync::Arc::new(Int64Array::from(vec![10, 20])),
-                std::sync::Arc::new(Float64Array::from(vec![1.0, 2.0])),
-            ],
-        )
-        .unwrap();
-        let mut writer =
-            metrics_block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
-        writer.write(&batch).unwrap();
-        let bytes = writer
-            .finish_for_vortex(
-                metrics_block::ParentMetadata {
-                    rows: 2,
-                    compressed_size: 123,
-                },
-                schema,
-            )
-            .unwrap();
+        use config::meta::promql::blocks::{MIDX_FOOTER_LEN, MIDX_FOOTER_MAGIC, MIDX_VERSION};
+        let mut bytes = b"sample-block".to_vec();
+        let metadata_offset = bytes.len() as u64;
+        let metadata = b"O2META01";
+        bytes.extend_from_slice(metadata);
+        let mut footer = [0; MIDX_FOOTER_LEN];
+        footer[..4].copy_from_slice(&MIDX_VERSION.to_le_bytes());
+        footer[8..16].copy_from_slice(&metadata_offset.to_le_bytes());
+        footer[16..24].copy_from_slice(&(metadata.len() as u64).to_le_bytes());
+        footer[24..].copy_from_slice(MIDX_FOOTER_MAGIC);
+        bytes.extend_from_slice(&footer);
 
         assert!(validate_file(&bytes, FileType::Midx).await.is_ok());
         assert!(

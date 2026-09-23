@@ -25,7 +25,7 @@ use arrow::{
 };
 use bytes::Bytes;
 
-use crate::*;
+use super::*;
 
 pub struct BlockDecoder {
     decoder: zstd::bulk::Decompressor<'static>,
@@ -142,34 +142,7 @@ impl BlockDecoder {
 }
 
 pub fn read_footer(bytes: &[u8], file_size: u64) -> Result<Footer> {
-    ensure!(
-        bytes.len() == FOOTER_LEN && file_size >= FOOTER_LEN as u64,
-        "invalid footer length"
-    );
-    let version = read_u32(bytes, 0)?;
-    ensure!(
-        version == VERSION && &bytes[24..] == MAGIC,
-        "unsupported block-index version/magic"
-    );
-    ensure!(
-        read_u32(bytes, 4)? == 0,
-        "unsupported block-index reserved field"
-    );
-    let offset = read_u64(bytes, 8)?;
-    let length = read_u64(bytes, 16)?;
-    ensure!(length > 0, "metadata size limit");
-    let end = offset
-        .checked_add(length)
-        .context("metadata range overflow")?;
-    ensure!(
-        end.checked_add(FOOTER_LEN as u64) == Some(file_size),
-        "metadata/footer outside file bounds"
-    );
-    Ok(Footer {
-        version,
-        metadata_range: offset..end,
-        payload_end: offset,
-    })
+    config::meta::promql::blocks::read_midx_footer(bytes, file_size)
 }
 
 pub fn decode_index(
@@ -225,7 +198,7 @@ fn decode_index_inner(
         footer.version == VERSION && footer.metadata_range.start == footer.payload_end,
         "invalid metadata footer"
     );
-    let compact = crate::compact::CompactMetadata::parse(&metadata)?;
+    let compact = super::compact::CompactMetadata::parse(&metadata)?;
     let schema = compact.schema();
     ensure!(
         schema.fields().len() <= DIRECTORY_FIELDS + MAX_LABEL_COLUMNS,
@@ -257,7 +230,7 @@ fn decode_index_inner(
             .context("missing source schema")?,
     )?;
     ensure!(
-        source_schema.fields().len() <= MAX_LABEL_COLUMNS + 3 + NON_IDENTITY.len(),
+        source_schema.fields().len() <= MAX_LABEL_COLUMNS + METRICS_HASH_EXCLUDED_LABELS.len(),
         "source schema too large"
     );
     let label_names: Vec<String> =
@@ -447,7 +420,7 @@ fn decode_directory(
         .downcast_ref::<BooleanArray>()
         .context("strict type")?;
     let mut blocks =
-        crate::directory::DirectoryBuilder::new(count, parent.rows, footer.payload_end);
+        super::directory::DirectoryBuilder::new(count, parent.rows, footer.payload_end);
     let mut next_row = 0u64;
     let mut next_offset = 0u64;
     let mut previous: Option<(u64, i64)> = None;
@@ -515,26 +488,6 @@ fn decode_directory(
         "directory does not tile source rows and payload"
     );
     Ok(blocks.finish())
-}
-
-fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
-    let end = offset.checked_add(4).context("integer offset overflow")?;
-    Ok(u32::from_le_bytes(
-        bytes
-            .get(offset..end)
-            .context("truncated integer")?
-            .try_into()?,
-    ))
-}
-
-fn read_u64(bytes: &[u8], offset: usize) -> Result<u64> {
-    let end = offset.checked_add(8).context("integer offset overflow")?;
-    Ok(u64::from_le_bytes(
-        bytes
-            .get(offset..end)
-            .context("truncated integer")?
-            .try_into()?,
-    ))
 }
 
 #[cfg(test)]

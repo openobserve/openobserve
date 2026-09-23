@@ -12,7 +12,7 @@ enterprise = ["dep:o2_enterprise"]
 [dependencies]
 anyhow.workspace = true
 bytes.workspace = true
-metrics_block.workspace = true
+metrics_index.workspace = true
 ahash.workspace = true
 async-recursion.workspace = true
 async-trait.workspace = true
