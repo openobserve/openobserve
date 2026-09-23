@@ -172,7 +172,7 @@ version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5d307320b3181d6d7954e663bd7c774a838b8220fe0593c86d9fb09f498b4b"
 dependencies = [
- "gimli",
+ "gimli 0.32.3",
 ]
 
 [[package]]
@@ -2609,6 +2609,7 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "opentelemetry",
+ "opentelemetry-proto",
  "parking_lot 0.12.5",
  "prost 0.14.4",
  "reqwest 0.13.4",
@@ -4777,6 +4778,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fallible-iterator"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
+
+[[package]]
 name = "fancy-regex"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5001,6 +5008,20 @@ checksum = "e076045bb43dac435333ed5f04caf35c7463631d0dae2deb2638d94dd0a5b872"
 dependencies = [
  "lazy_static",
  "num",
+]
+
+[[package]]
+name = "framehop"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09a5a3f0acb82df800ca3aa50c0d60d286c5d13d4cfc3114b3a9663f13b032fe"
+dependencies = [
+ "arrayvec",
+ "cfg-if",
+ "fallible-iterator",
+ "gimli 0.31.1",
+ "macho-unwind-info",
+ "pe-unwind-info",
 ]
 
 [[package]]
@@ -5232,6 +5253,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "gimli"
+version = "0.31.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
+dependencies = [
+ "fallible-iterator",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -5936,6 +5967,7 @@ dependencies = [
  "hashlink 0.11.1",
  "itertools 0.14.0",
  "log",
+ "metrics_block",
  "object_store",
  "opentelemetry",
  "parking_lot 0.12.5",
@@ -6767,6 +6799,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "macho-unwind-info"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb4bdc8b0ce69932332cf76d24af69c3a155242af95c226b2ab6c2e371ed1149"
+dependencies = [
+ "thiserror 2.0.19",
+ "zerocopy",
+ "zerocopy-derive",
+]
+
+[[package]]
 name = "macro_rules_attribute"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6866,6 +6909,15 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "memmap2"
+version = "0.5.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83faa42c0a078c393f6b29d5db232d8be22776a891f8f56e5284faee4a20b327"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "memmap2"
 version = "0.9.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0"
@@ -6883,6 +6935,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics_block"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "parquet",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "zstd",
+]
+
+[[package]]
 name = "metrics_index"
 version = "0.1.0"
 dependencies = [
@@ -6895,6 +6962,8 @@ dependencies = [
  "hashlink 0.11.1",
  "infra",
  "log",
+ "metrics_block",
+ "object_store",
  "promql",
  "promql-parser",
  "regex",
@@ -7591,6 +7660,16 @@ dependencies = [
 
 [[package]]
 name = "object"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21158b2c33aa6d4561f1c0a6ea283ca92bc54802a93b263e910746d679a7eb53"
+dependencies = [
+ "flate2",
+ "memchr",
+]
+
+[[package]]
+name = "object"
 version = "0.37.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff76201f031d8863c38aa7f905eca4f53abbfa15f609db4277d44cd8938f33fe"
@@ -7797,7 +7876,6 @@ dependencies = [
  "ingester",
  "ingestion-common",
  "itertools 0.14.0",
- "jemalloc_pprof",
  "jsonwebtoken",
  "lettre",
  "log",
@@ -7824,7 +7902,6 @@ dependencies = [
  "parking_lot 0.12.5",
  "parquet",
  "pin-project-lite",
- "pprof",
  "prettytable-rs",
  "prometheus",
  "promql-parser",
@@ -7862,8 +7939,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.19",
  "tiktoken-rs",
- "tikv-jemalloc-ctl",
- "tikv-jemalloc-sys",
  "tikv-jemallocator",
  "time",
  "tokio",
@@ -7984,6 +8059,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.17.1",
  "http 1.5.0",
+ "http-body 1.1.0",
  "http-body-util",
  "infra",
  "ingestion-common",
@@ -8005,6 +8081,7 @@ dependencies = [
  "search",
  "serde",
  "serde_json",
+ "snap",
  "stream",
  "time",
  "tokio",
@@ -8071,7 +8148,6 @@ dependencies = [
  "infra",
  "ingester",
  "itertools 0.14.0",
- "jemalloc_pprof",
  "log",
  "mime",
  "o2_dex",
@@ -8086,7 +8162,6 @@ dependencies = [
  "openobserve-sourcemaps",
  "openobserve-synthetics",
  "opentelemetry",
- "pprof",
  "promql-service",
  "regex",
  "reqwest 0.13.4",
@@ -8097,8 +8172,6 @@ dependencies = [
  "serde_json",
  "stream",
  "svix-ksuid",
- "tikv-jemalloc-ctl",
- "tikv-jemalloc-sys",
  "time",
  "tokio",
  "tracing",
@@ -8248,6 +8321,7 @@ dependencies = [
  "ingestion-common",
  "itertools 0.14.0",
  "itoa",
+ "jemalloc_pprof",
  "jsonwebtoken",
  "lettre",
  "log",
@@ -8263,6 +8337,7 @@ dependencies = [
  "opentelemetry-proto",
  "parking_lot 0.12.5",
  "plotters",
+ "pprof",
  "prometheus",
  "promql",
  "promql-parser",
@@ -8286,6 +8361,7 @@ dependencies = [
  "svix-ksuid",
  "thiserror 2.0.19",
  "tiktoken-rs",
+ "tikv-jemalloc-ctl",
  "time",
  "tokio",
  "tonic",
@@ -8853,6 +8929,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pe-unwind-info"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "500fa4cdeacd98997c5865e3d0d1cb8fe7e9d7d75ecc775e07989a433a9a9a59"
+dependencies = [
+ "arrayvec",
+ "bitflags 2.13.1",
+ "thiserror 2.0.19",
+ "zerocopy",
+ "zerocopy-derive",
+]
+
+[[package]]
 name = "peeking_take_while"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9179,10 +9268,13 @@ dependencies = [
  "backtrace",
  "cfg-if",
  "findshlibs",
+ "framehop",
  "inferno 0.11.21",
  "libc",
  "log",
+ "memmap2 0.5.10",
  "nix 0.26.4",
+ "object 0.29.0",
  "once_cell",
  "protobuf",
  "protobuf-codegen",
@@ -11234,6 +11326,7 @@ dependencies = [
  "log",
  "md5",
  "memchr",
+ "metrics_block",
  "metrics_index",
  "o2_enterprise",
  "object_store",
@@ -12345,7 +12438,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "332615d90111d8eeaf86a84dc9bbe9f65d0d8c5cf11b4caccedc37754eb0dcfd"
 dependencies = [
  "debugid",
- "memmap2",
+ "memmap2 0.9.11",
  "stable_deref_trait",
  "uuid",
 ]
@@ -12499,7 +12592,7 @@ dependencies = [
  "lru",
  "lz4_flex 0.13.1",
  "measure_time",
- "memmap2",
+ "memmap2 0.9.11",
  "once_cell",
  "oneshot",
  "rayon",

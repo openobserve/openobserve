@@ -1940,12 +1940,7 @@ pub fn service_routes() -> Router {
             );
     }
 
-    // Apply middlewares in order: preprocessing -> decompression -> cors -> server header -> auth
-    // -> password policy -> audit -> blocked orgs
-    // NOTE: Preprocessing middleware removes Content-Encoding: snappy
-    // header before tower_http sees it. This prevents 415 errors while allowing handlers to
-    // manually decompress snappy data. tower_http's RequestDecompressionLayer handles gzip,
-    // deflate, brotli, and zstd.
+    // Snappy preprocessing sits outside RequestDecompressionLayer, which rejects snappy with 415.
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
@@ -1973,41 +1968,29 @@ pub fn service_routes() -> Router {
 
 /// Create other service routes (AWS, GCP, RUM)
 pub fn other_service_routes() -> Router {
-    // AWS routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let aws_routes = Router::new()
         .route(
             "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
         .layer(middleware::from_fn(aws_auth_middleware))
-        .layer(RequestDecompressionLayer::new())
-        .layer(middleware::from_fn(
-            decompression::preprocess_encoding_middleware,
-        ));
+        .layer(RequestDecompressionLayer::new());
 
-    // GCP routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let gcp_routes = Router::new()
         .route(
             "/{org_id}/{stream_name}/_sub",
             post(logs::ingest::handle_gcp_request),
         )
         .layer(middleware::from_fn(gcp_auth_middleware))
-        .layer(RequestDecompressionLayer::new())
-        .layer(middleware::from_fn(
-            decompression::preprocess_encoding_middleware,
-        ));
+        .layer(RequestDecompressionLayer::new());
 
-    // RUM routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let rum_routes = Router::new()
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
-        .layer(RequestDecompressionLayer::new())
-        .layer(middleware::from_fn(
-            decompression::preprocess_encoding_middleware,
-        ));
+        .layer(RequestDecompressionLayer::new());
 
     Router::new()
         .nest("/aws", aws_routes)
@@ -2046,12 +2029,8 @@ pub fn splunk_collector_routes() -> Router {
         // Applied innermost so it caps the DECOMPRESSED body: `.layer` wraps
         // outermost-last, so everything below this runs before it.
         .layer(DefaultBodyLimit::max(hec_collector::hec_max_body_bytes()))
-        // Root-level routers inherit nothing from `service_routes`, so the
-        // decompression pair has to be re-applied here.
+        // Root-level routers inherit nothing from `service_routes`, hence the repeated layer.
         .layer(RequestDecompressionLayer::new())
-        .layer(middleware::from_fn(
-            decompression::preprocess_encoding_middleware,
-        ))
         // Outermost, so the 10 MiB cap is measured on the wire before any
         // decompression can amplify an unauthenticated body.
         .layer(middleware::from_fn(hec_collector::wire_body_limit_middleware))
@@ -2553,6 +2532,34 @@ mod tests {
             app.oneshot(req).await.unwrap().status(),
             StatusCode::UNAUTHORIZED
         );
+    }
+
+    // only the real tree catches a snappy strip reordered inside the decompression layer
+    #[tokio::test]
+    async fn snappy_is_not_rejected_by_the_decompression_layer() {
+        let app = Router::new().nest("/api", service_routes());
+        let snappy_post = |uri: &str| {
+            Request::builder()
+                .method(Method::POST)
+                .uri(uri)
+                .header(header::CONTENT_ENCODING, "snappy")
+                .body(Body::from("snappy bytes"))
+                .unwrap()
+        };
+
+        for uri in [
+            "/api/default/loki/api/v1/push",
+            "/api/default/prometheus/api/v1/write",
+            "/api/default/v1/logs",
+        ] {
+            let status = app
+                .clone()
+                .oneshot(snappy_post(uri))
+                .await
+                .unwrap()
+                .status();
+            assert_ne!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE, "{uri}");
+        }
     }
 
     // ── unauthenticated /config bootstrap ─────────────────────────────────

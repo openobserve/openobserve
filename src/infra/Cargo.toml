@@ -24,6 +24,7 @@ hashbrown.workspace = true
 hashlink.workspace = true
 itertools.workspace = true
 log.workspace = true
+metrics_block.workspace = true
 async-nats.workspace = true
 object_store.workspace = true
 parking_lot.workspace = true

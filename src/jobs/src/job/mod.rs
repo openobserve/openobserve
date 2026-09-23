@@ -531,6 +531,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    #[cfg(feature = "profiling")]
+    tokio::task::spawn(openobserve_core::self_profiles::run());
+
     // telemetry run
     if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
         spawn_pausable_job!(

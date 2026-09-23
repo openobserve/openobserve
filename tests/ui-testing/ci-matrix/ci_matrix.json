@@ -22,6 +22,7 @@
       "alerts-clone-dialog.spec.js",
       "alerts-composite-preview.spec.js",
       "alerts-composite-detail.spec.js",
+      "alerts-evaluation-chart.spec.js",
       "alerts-chart-error-state.spec.js"
     ],
     "disabled": [
@@ -98,7 +99,8 @@
       "dashboard-multi-sql.spec.js",
       "crossLinkMultiStream.spec.js",
       "dashboards-form-validation.spec.js",
-      "dashboard-refresh-without-cache.spec.js"
+      "dashboard-refresh-without-cache.spec.js",
+      "dashboard-print-layout.spec.js"
     ],
     "disabled": [
       {
@@ -251,6 +253,7 @@
       "datetime-picker-copy-paste.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "connectDataSourcePopup.spec.js",
+      "otableSelectCell.spec.js",
       "theme.spec.js"
     ],
     "disabled": []
@@ -318,8 +321,7 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js",
-      "logsRefreshCacheDropdown.spec.js"
+      "timezoneDisplay.spec.js"
     ],
     "disabled": [
       {
