@@ -8611,6 +8611,13 @@
     "groups": "ec2b699f100bfc7d",
     "groupsDesc": "a4ce21bd285c93ae",
     "groupsPage": {
+      "assignBannerDone": "11a6767d5674c7e4",
+      "assignBannerText": "78d60ce8f360a2fc",
+      "assignBtn": "9fd728c66c9a256b",
+      "assignColumn": "8ece895c9b32c643",
+      "assignError": "d9abd7faa2aa61e2",
+      "assignSuccess": "75010fb7f4d00e54",
+      "assignedBadge": "8191888dd97cae12",
       "bulkDelete": {
         "impact": "3a552d5988d131f1"
       },
@@ -8748,6 +8755,13 @@
     "roles": "c25337055464f8d3",
     "rolesDesc": "19de2cc80fa9d166",
     "rolesPage": {
+      "assignBannerDone": "11a6767d5674c7e4",
+      "assignBannerText": "0b4016a09c6694c3",
+      "assignBtn": "9fd728c66c9a256b",
+      "assignColumn": "8ece895c9b32c643",
+      "assignError": "bfb3ce0ba72524f2",
+      "assignSuccess": "810779be07674982",
+      "assignedBadge": "8191888dd97cae12",
       "bulkDelete": {
         "impact": "fbd802f7bae4c946"
       },
@@ -14865,6 +14879,9 @@
       "groups": {
         "label": "03043c4e63de4410"
       },
+      "identifier": {
+        "label": "9b10587f84a2c374"
+      },
       "name": {
         "help": "ef9e1907c333c185",
         "label": "ab6640361e028a46",
@@ -14883,6 +14900,7 @@
       "col": {
         "created": "d70b9e24bca26b40",
         "identifier": "9b10587f84a2c374",
+        "roles": "c25337055464f8d3",
         "token": "d2089be672953d11"
       }
     },
@@ -14911,18 +14929,18 @@
       "addToGroup": "32d5c8e3f80061b5",
       "addToRole": "ef0757ff778b37eb",
       "applying": "b6c3437d5fd07dae",
-      "copyHint": "c54578b69d3428ce",
+      "copyHint": "d97c796050dfd9dc",
       "curl": "addc90cfd45b0f45",
       "done": "11a6767d5674c7e4",
       "env": "0a32650ed9b934f0",
       "failedGroups": "f6148910eb8a24ea",
       "failedHint": "1166b694d70a0439",
       "failedRoles": "c3389ccb851986ed",
-      "grantedGroups": "a0370b2301130a5f",
-      "grantedRoles": "a31cf1cc5857e277",
+      "groupsAssignedLabel": "2708cbb7b8cd8d34",
       "header": "ba5caa4285a84d88",
       "nextStepGrant": "5237ce64f551db37",
       "nextStepOss": "5a59a60cfddafe6f",
+      "rolesAssignedLabel": "f07357c606117bda",
       "step1Title": "b4c3f8e22a846bda"
     },
     "update": "a4a7598d4e753d1d",

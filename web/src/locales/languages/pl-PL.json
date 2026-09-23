@@ -2031,11 +2031,11 @@
       "addToGroup": "Dodaj do grupy użytkowników",
       "addToRole": "Przypisz rolę",
       "step1Title": "Skopiuj swój token",
-      "copyHint": "Skopiuj ten token teraz — nie będziesz mógł go ponownie zobaczyć.",
+      "copyHint": "To jedyny moment, w którym zobaczysz ten token. Skopiuj go lub pobierz teraz — nie będzie można go pobrać ponownie.",
       "done": "Gotowe",
       "applying": "Stosowanie przyznanych dostępu…",
-      "grantedRoles": "Przypisane role: {roles}",
-      "grantedGroups": "Dodano do grup użytkowników: {groups}",
+      "rolesAssignedLabel": "Przypisane role",
+      "groupsAssignedLabel": "Dodano do grup użytkowników",
       "failedRoles": "Nie można przypisać ról: {roles}",
       "failedGroups": "Nie można dodać do grup użytkowników: {groups}",
       "failedHint": "Możesz je przyznać później ze stron Role i Grupy użytkowników."
@@ -2045,6 +2045,9 @@
         "label": "Nazwa konta serwisowego",
         "placeholder": "np. ingest-bot",
         "help": "Małe litery, cyfry i myślniki. Zapisane jako name{suffix}"
+      },
+      "identifier": {
+        "label": "Identyfikator"
       },
       "roles": {
         "label": "Przypisz role",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Identyfikator",
+        "roles": "Role",
         "token": "Token",
         "created": "Utworzono"
       }
@@ -2186,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Wszyscy użytkownicy i konta serwisowe powiązane z tymi rolami stracą dostęp."
-      }
+      },
+      "assignColumn": "Przypisz",
+      "assignBtn": "Dodaj",
+      "assignedBadge": "Przypisano",
+      "assignBannerText": "Dodaj {member} do roli — kliknij Dodaj obok roli poniżej.",
+      "assignBannerDone": "Gotowe",
+      "assignSuccess": "Dodano {member} do roli \"{role}\".",
+      "assignError": "Nie udało się dodać konta do tej roli. Spróbuj ponownie."
     },
     "group": {
       "name": {
@@ -2217,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Członkowie tych grup stracą role przyznane przez nie."
-      }
+      },
+      "assignColumn": "Przypisz",
+      "assignBtn": "Dodaj",
+      "assignedBadge": "Przypisano",
+      "assignBannerText": "Dodaj {member} do grupy użytkowników — kliknij Dodaj obok grupy poniżej.",
+      "assignBannerDone": "Gotowe",
+      "assignSuccess": "Dodano {member} do grupy \"{group}\".",
+      "assignError": "Nie udało się dodać konta do tej grupy. Spróbuj ponownie."
     },
     "appGroups": {
       "deleteGroupTitle": "Usuń grupę",

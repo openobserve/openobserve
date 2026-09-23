@@ -2031,11 +2031,11 @@
       "addToGroup": "Zu einer Benutzergruppe hinzufügen",
       "addToRole": "Eine Rolle zuweisen",
       "step1Title": "Kopiere dein Token",
-      "copyHint": "Kopieren Sie dieses Token jetzt — Sie werden es nicht mehr sehen können.",
+      "copyHint": "Dies ist das einzige Mal, dass Sie dieses Token sehen. Kopieren oder laden Sie es jetzt herunter – es kann nicht erneut abgerufen werden.",
       "done": "Erledigt",
       "applying": "Zugriffsberechtigungen werden angewendet…",
-      "grantedRoles": "Rollen zugewiesen: {roles}",
-      "grantedGroups": "Zu Benutzergruppen hinzugefügt: {groups}",
+      "rolesAssignedLabel": "Zugewiesene Rollen",
+      "groupsAssignedLabel": "Zu Benutzergruppen hinzugefügt",
       "failedRoles": "Rollen konnten nicht zugewiesen werden: {roles}",
       "failedGroups": "Konnte nicht zu Benutzergruppen hinzugefügt werden: {groups}",
       "failedHint": "Sie können diese später auf den Seiten 'Rollen' und 'Benutzergruppen' gewähren."
@@ -2045,6 +2045,9 @@
         "label": "Dienstkontoname",
         "placeholder": "z.B. ingest-bot",
         "help": "Kleinbuchstaben, Zahlen und Bindestriche. Gespeichert als name{suffix}"
+      },
+      "identifier": {
+        "label": "Bezeichner"
       },
       "roles": {
         "label": "Rollen zuweisen",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Kennung",
+        "roles": "Rollen",
         "token": "Wertmarke",
         "created": "Erstellt"
       }
@@ -2186,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Alle Benutzer und Dienstkonten, die an diese Rollen gebunden sind, verlieren den Zugriff."
-      }
+      },
+      "assignColumn": "Zuweisen",
+      "assignBtn": "Hinzufügen",
+      "assignedBadge": "Zugewiesen",
+      "assignBannerText": "Fügen Sie {member} einer Rolle hinzu – klicken Sie unten neben einer Rolle auf Hinzufügen.",
+      "assignBannerDone": "Fertig",
+      "assignSuccess": "{member} wurde zur Rolle \"{role}\" hinzugefügt.",
+      "assignError": "Das Konto konnte dieser Rolle nicht hinzugefügt werden. Bitte versuchen Sie es erneut."
     },
     "group": {
       "name": {
@@ -2217,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Mitglieder dieser Gruppen verlieren die von ihnen gewährten Rollen."
-      }
+      },
+      "assignColumn": "Zuweisen",
+      "assignBtn": "Hinzufügen",
+      "assignedBadge": "Zugewiesen",
+      "assignBannerText": "Fügen Sie {member} einer Benutzergruppe hinzu – klicken Sie unten neben einer Gruppe auf Hinzufügen.",
+      "assignBannerDone": "Fertig",
+      "assignSuccess": "{member} wurde zur Gruppe \"{group}\" hinzugefügt.",
+      "assignError": "Das Konto konnte dieser Gruppe nicht hinzugefügt werden. Bitte versuchen Sie es erneut."
     },
     "appGroups": {
       "deleteGroupTitle": "Gruppe löschen",

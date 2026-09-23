@@ -2031,11 +2031,11 @@
       "addToGroup": "Kullanıcı grubuna ekleme",
       "addToRole": "Bir rol atama",
       "step1Title": "Jetonunuzu kopyalayın",
-      "copyHint": "Bu belirteci şimdi kopyalayın - bir daha göremezsiniz.",
+      "copyHint": "Bu token'ı yalnızca bu kez göreceksiniz. Şimdi kopyalayın veya indirin, tekrar erişilemez.",
       "done": "Bitti",
       "applying": "Erişim izinleri uygulanıyor…",
-      "grantedRoles": "Atanan roller: {roles}",
-      "grantedGroups": "Kullanıcı gruplarına eklendi: {groups}",
+      "rolesAssignedLabel": "Atanan roller",
+      "groupsAssignedLabel": "Kullanıcı gruplarına eklendi",
       "failedRoles": "Roller atanamadı: {roles}",
       "failedGroups": "Kullanıcı gruplarına eklenemedi: {groups}",
       "failedHint": "Bunları daha sonra Roller ve Kullanıcı Grupları sayfalarından verebilirsiniz."
@@ -2045,6 +2045,9 @@
         "label": "Hizmet hesabı adı",
         "placeholder": "ör. ingest-bot",
         "help": "Küçük harfler, rakamlar ve tireler. name{suffix} olarak kaydedilir"
+      },
+      "identifier": {
+        "label": "Tanımlayıcı"
       },
       "roles": {
         "label": "Rolleri ata",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "Tanımlayıcı",
+        "roles": "Roller",
         "token": "Simge",
         "created": "Oluşturuldu"
       }
@@ -2186,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Bu rollere bağlı tüm kullanıcılar ve hizmet hesapları erişimini kaybedecektir."
-      }
+      },
+      "assignColumn": "Ata",
+      "assignBtn": "Ekle",
+      "assignedBadge": "Atandı",
+      "assignBannerText": "{member} kullanıcısını bir role ekleyin — aşağıdaki rolün yanındaki Ekle'ye tıklayın.",
+      "assignBannerDone": "Tamam",
+      "assignSuccess": "{member}, \"{role}\" rolüne eklendi.",
+      "assignError": "Hesap bu role eklenemedi. Lütfen tekrar deneyin."
     },
     "group": {
       "name": {
@@ -2217,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Bu grupların üyeleri kendileri tarafından verilen rolleri kaybedeceklerdir."
-      }
+      },
+      "assignColumn": "Ata",
+      "assignBtn": "Ekle",
+      "assignedBadge": "Atandı",
+      "assignBannerText": "{member} kullanıcısını bir kullanıcı grubuna ekleyin — aşağıdaki grubun yanındaki Ekle'ye tıklayın.",
+      "assignBannerDone": "Tamam",
+      "assignSuccess": "{member}, \"{group}\" grubuna eklendi.",
+      "assignError": "Hesap bu gruba eklenemedi. Lütfen tekrar deneyin."
     },
     "appGroups": {
       "deleteGroupTitle": "Grubu Sil",
