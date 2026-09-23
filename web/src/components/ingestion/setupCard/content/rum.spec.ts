@@ -272,18 +272,18 @@ describe("rumCard builder", () => {
       );
     });
 
-    it("cdn install code contains OO_RUM async loader global name", () => {
+    it("cdn install code contains O2_RUM async loader global name", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
-      expect(cdn.code.raw).toContain("OO_RUM");
+      expect(cdn.code.raw).toContain("O2_RUM");
     });
 
-    it("cdn install code contains OO_LOGS async loader global name", () => {
+    it("cdn install code contains O2_LOGS async loader global name", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
-      expect(cdn.code.raw).toContain("OO_LOGS");
+      expect(cdn.code.raw).toContain("O2_LOGS");
     });
   });
 
@@ -419,18 +419,18 @@ describe("rumCard builder", () => {
       expect(cdn.code.lang).toBe("html");
     });
 
-    it("cdn init code uses OO_RUM.onReady wrapper", () => {
+    it("cdn init code uses O2_RUM.onReady wrapper", () => {
       const card = buildCard();
       const init = card.steps.find((s) => s.id === "init")!;
       const cdn = init.variants!.find((v) => v.id === "cdn")!;
-      expect(cdn.code.raw).toContain("OO_RUM.onReady");
+      expect(cdn.code.raw).toContain("O2_RUM.onReady");
     });
 
-    it("cdn init code uses OO_LOGS.onReady wrapper", () => {
+    it("cdn init code uses O2_LOGS.onReady wrapper", () => {
       const card = buildCard();
       const init = card.steps.find((s) => s.id === "init")!;
       const cdn = init.variants!.find((v) => v.id === "cdn")!;
-      expect(cdn.code.raw).toContain("OO_LOGS.onReady");
+      expect(cdn.code.raw).toContain("O2_LOGS.onReady");
     });
 
     it("cdn init raw code contains insecureHTTP: true for http subs", () => {
