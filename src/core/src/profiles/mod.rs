@@ -49,6 +49,7 @@ use crate::{
     common::meta::{
         authz::Authz,
         http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        otlp::otlp_error_response,
         stream::SchemaRecords,
     },
     ingestion::{
@@ -85,56 +86,6 @@ fn ingestion_gate_error(err: infra::errors::Error) -> ProfilesExportError {
         ProfilesExportError::TrialPeriodExpired(err.to_string())
     } else {
         ProfilesExportError::Unavailable(err.to_string())
-    }
-}
-
-/// Minimal `google.rpc.Status` for OTLP/HTTP failure bodies.
-#[derive(Clone, PartialEq, Message)]
-struct GoogleRpcStatus {
-    #[prost(int32, tag = "1")]
-    code: i32,
-    #[prost(string, tag = "2")]
-    message: String,
-}
-
-/// Format an OTLP/HTTP error response, preserving the request Content-Type.
-///
-/// JSON requests get a ProtoJSON `google.rpc.Status`; protobuf requests get a
-/// binary-encoded Status with `application/x-protobuf`.
-pub fn otlp_error_response(
-    req_type: OtlpRequestType,
-    status: http::StatusCode,
-    rpc_code: i32,
-    message: impl Into<String>,
-) -> HttpResponse {
-    let message = message.into();
-    match req_type {
-        OtlpRequestType::HttpJson => {
-            let body = json::json!({
-                "code": rpc_code,
-                "message": message,
-            });
-            (
-                status,
-                [(http::header::CONTENT_TYPE, CONTENT_TYPE_JSON)],
-                json::to_vec(&body).unwrap_or_default(),
-            )
-                .into_response()
-        }
-        _ => {
-            let rpc = GoogleRpcStatus {
-                code: rpc_code,
-                message,
-            };
-            let mut out = BytesMut::with_capacity(rpc.encoded_len());
-            rpc.encode(&mut out).expect("Out of memory");
-            (
-                status,
-                [(http::header::CONTENT_TYPE, CONTENT_TYPE_PROTO)],
-                out.to_vec(),
-            )
-                .into_response()
-        }
     }
 }
 

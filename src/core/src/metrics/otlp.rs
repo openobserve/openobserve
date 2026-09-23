@@ -60,13 +60,14 @@ use super::{
     native_histogram,
 };
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse, otlp::otlp_error_response, stream::SchemaRecords,
+    },
     ingestion::{
         TriggerAlertData, check_ingestion_allowed,
         grpc::{get_exemplar_val, get_metric_val, get_val},
     },
     pipeline::batch_execution::ExecutablePipeline,
-    profiles::otlp_error_response,
 };
 
 /// A number point's labels, rebuilt per point on top of its metric's base labels.

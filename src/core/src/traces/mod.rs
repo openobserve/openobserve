@@ -68,6 +68,7 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::{
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
+        otlp::otlp_error_response,
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext},
     },
@@ -76,7 +77,6 @@ use crate::{
         evaluate_trigger, get_thread_id, grpc::get_val, write_file,
     },
     logs::IngestJsonData,
-    profiles::otlp_error_response,
     traces::otel::{OtelIngestionProcessor, is_llm_trace},
 };
 
