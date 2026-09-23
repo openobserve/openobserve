@@ -41,6 +41,7 @@ vi.mock("@/services/users", async (importOriginal) => {
       create: vi.fn(),
       update: vi.fn(),
       updateexistinguser: vi.fn(),
+      get: vi.fn(() => Promise.resolve({ data: {} })),
       getUserRoles: vi.fn(() => Promise.resolve({ data: [] })),
     },
   });
