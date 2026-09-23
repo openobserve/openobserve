@@ -366,8 +366,12 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
-    let uses = super::destination_usage::first_use(org_id, name).await?;
-    if !uses.is_empty() {
+    // first_use decides cheaply; only a refusal pays for the full walk to name every blocker.
+    if !super::destination_usage::first_use(org_id, name)
+        .await?
+        .is_empty()
+    {
+        let uses = super::destination_usage::destination_usage(org_id, name).await?;
         return Err(DestinationError::InUse(
             super::destination_usage::usage_message(name, &uses),
         ));
@@ -754,5 +758,118 @@ mod tests {
         // Clean up
         let _ = db::alerts::destinations::delete(org_id, "test_no_template").await;
         let _ = db::alerts::destinations::delete(org_id, "test_empty_template").await;
+    }
+
+    /// A delete blocked by three kinds names all three, not just the one `first_use` stopped at.
+    #[tokio::test]
+    #[ignore] // requires the local sqlite/coordinator infra to be initialized
+    async fn test_delete_names_every_blocker_not_just_the_first() {
+        use config::meta::{
+            alerts::alert::Alert,
+            folder::{Folder, FolderType},
+            synthetics::{Synthetic, SyntheticType},
+        };
+
+        let org_id = "test_org_delete_multi";
+        let name = "du-dest-delete-multi";
+        let folder = Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(org_id, folder, FolderType::Alerts)
+            .await
+            .unwrap();
+
+        let alert_conn = infra::db::get_orm_client_rw().await;
+        let alert: Alert = serde_json::from_value(serde_json::json!({
+            "name": "du-multi-alert",
+            "destinations": [name],
+        }))
+        .unwrap();
+        infra::table::alerts::create(alert_conn, org_id, "default", alert, false)
+            .await
+            .unwrap();
+
+        let check_conn = infra::db::get_orm_client_rw().await;
+        let check = Synthetic {
+            name: "du-multi-check".to_string(),
+            check_type: SyntheticType::Http,
+            target: "https://example.com".to_string(),
+            destinations: vec![name.to_string()],
+            ..Default::default()
+        };
+        infra::table::synthetics_checks::create(check_conn, org_id, check, false)
+            .await
+            .unwrap();
+
+        let team_id = "du-multi-team";
+        let policy = infra::table::oncall_policies::get_or_create(org_id, team_id)
+            .await
+            .unwrap();
+        infra::table::oncall_policies::update_rungs(
+            org_id,
+            team_id,
+            &policy.rungs,
+            Some(&[name.to_string()]),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let err = delete(org_id, name).await.unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("alert"), "should name the alert: {msg}");
+        assert!(
+            msg.contains("synthetic check"),
+            "should name the synthetic check: {msg}"
+        );
+        assert!(
+            msg.contains("escalation policy"),
+            "should name the escalation policy: {msg}"
+        );
+    }
+
+    /// Pure regression for D1, no DB: `usage_message` itself must name every kind it is given.
+    #[test]
+    fn test_usage_message_names_every_consumer_kind_it_is_given() {
+        use crate::alerts::destination_usage::{
+            DestinationConsumer, DestinationUse, usage_message,
+        };
+
+        let uses = vec![
+            DestinationUse {
+                consumer: DestinationConsumer::Alert,
+                id: "a1".to_string(),
+                name: "cpu-hot".to_string(),
+                folder_id: Some("default".to_string()),
+                destination_name: "dest-shared".to_string(),
+            },
+            DestinationUse {
+                consumer: DestinationConsumer::CompositeAlert,
+                id: "c1".to_string(),
+                name: "disk-full".to_string(),
+                folder_id: Some("default".to_string()),
+                destination_name: "dest-shared".to_string(),
+            },
+            DestinationUse {
+                consumer: DestinationConsumer::Pipeline,
+                id: "p1".to_string(),
+                name: "ingest-pipe".to_string(),
+                folder_id: None,
+                destination_name: "dest-shared".to_string(),
+            },
+        ];
+
+        let msg = usage_message("dest-shared", &uses);
+        assert!(msg.contains("cpu-hot"), "should name the alert: {msg}");
+        assert!(
+            msg.contains("disk-full"),
+            "should name the composite alert: {msg}"
+        );
+        assert!(
+            msg.contains("ingest-pipe"),
+            "should name the pipeline: {msg}"
+        );
     }
 }
