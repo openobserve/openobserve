@@ -1350,6 +1350,8 @@
   "rum": {
     "noSessionReplay": "No session replay available",
     "loadingSessionReplay": "Loading session replay…",
+    "sessionReplaySeekLoading": "Loading the selected part of this session…",
+    "sessionReplayTruncated": "This session is too long to load completely. Showing the first {count} segments.",
     "seek": "Seek",
     "sessionMetricsAria": "Session metrics summary",
     "frustration": "{count} Frustration | {count} Frustrations",

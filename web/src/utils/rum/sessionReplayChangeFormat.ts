@@ -223,18 +223,10 @@ export function createRecordConverter(): RecordConverter {
     }
   }
 
-  // Children of a tracked node, or null when that node cannot hold any.
-  //
-  // Node ids are positional, so a mutation can name a parent the stream never established
-  // — a segment dropped in transit, or a stream that opened without a FullSnapshot, both
-  // leave the counter pointing somewhere else. The id then lands on a text or comment
-  // node, which has no `childNodes`, and reading `.length` off it used to throw. That
-  // throw escaped through VideoPlayer's unawaited setupSession() and left the player with
-  // nothing at all, so one unresolvable reference cost the entire replay. Skipping the
-  // single placement degrades far more gracefully.
-  function childNodesOf(tracked: any): any[] | null {
+  // Text and CDATA nodes carry no childNodes, so every read of them must tolerate its absence.
+  function childrenOf(tracked: TrackedNode | undefined): any[] | undefined {
     const children = tracked?.node?.childNodes;
-    return Array.isArray(children) ? children : null;
+    return Array.isArray(children) ? children : undefined;
   }
 
   // Resolve where a node with the given id and insertion point sits in the tree.
@@ -250,28 +242,27 @@ export function createRecordConverter(): RecordConverter {
     if (insertionPoint > 0) {
       // appendChild to (id - insertionPoint)
       const parentId = id - insertionPoint;
-      const parent = nodes.get(parentId);
-      const index = childNodesOf(parent)?.length ?? 0;
-      return { parentId, index };
+      const children = childrenOf(nodes.get(parentId));
+      return { parentId, index: children ? children.length : 0 };
     }
     if (insertionPoint === 0) {
       // insert right after previously-added node (id - 1)
       const prevSiblingId = id - 1;
       const prevSibling = nodes.get(prevSiblingId);
       const parentId = prevSibling ? prevSibling.parentId : -1;
-      const siblings = childNodesOf(nodes.get(parentId));
-      if (!siblings) return { parentId, index: 0 };
-      const idx = siblings.findIndex((c: any) => c.id === prevSiblingId);
-      return { parentId, index: idx === -1 ? siblings.length : idx + 1 };
+      const children = childrenOf(nodes.get(parentId));
+      if (!children) return { parentId, index: 0 };
+      const idx = children.findIndex((c: any) => c.id === prevSiblingId);
+      return { parentId, index: idx === -1 ? children.length : idx + 1 };
     }
     // insertionPoint < 0 : insert before (id + insertionPoint)
     const nextSiblingId = id + insertionPoint;
     const nextSibling = nodes.get(nextSiblingId);
     const parentId = nextSibling ? nextSibling.parentId : -1;
-    const siblings = childNodesOf(nodes.get(parentId));
-    if (!siblings) return { parentId, index: 0 };
-    const idx = siblings.findIndex((c: any) => c.id === nextSiblingId);
-    return { parentId, index: idx === -1 ? siblings.length : idx };
+    const children = childrenOf(nodes.get(parentId));
+    if (!children) return { parentId, index: 0 };
+    const idx = children.findIndex((c: any) => c.id === nextSiblingId);
+    return { parentId, index: idx === -1 ? children.length : idx };
   }
 
   function applyStyleSheetToNode(nodeId: number, sheetIds: number[]) {
@@ -339,7 +330,10 @@ export function createRecordConverter(): RecordConverter {
               documentNode = node;
               nodes.set(id, { node, parentId: -1 });
             } else {
-              childNodesOf(nodes.get(placement.parentId))?.splice(placement.index, 0, node);
+              const children = childrenOf(nodes.get(placement.parentId));
+              if (children) {
+                children.splice(placement.index, 0, node);
+              }
               nodes.set(id, { node, parentId: placement.parentId });
             }
           }
@@ -447,11 +441,11 @@ export function createRecordConverter(): RecordConverter {
             let nextId: number | null = null;
             if (placement !== null) {
               parentId = placement.parentId;
-              const siblings = childNodesOf(nodes.get(parentId));
-              if (siblings) {
-                const sibling = siblings[placement.index];
+              const children = childrenOf(nodes.get(parentId));
+              if (children) {
+                const sibling = children[placement.index];
                 nextId = sibling ? sibling.id : null;
-                siblings.splice(placement.index, 0, node);
+                children.splice(placement.index, 0, node);
               }
             }
             nodes.set(id, { node, parentId });
@@ -472,10 +466,10 @@ export function createRecordConverter(): RecordConverter {
             const parentId = tracked ? tracked.parentId : -1;
             removes.push({ id: nodeId, parentId });
             if (tracked) {
-              const siblings = childNodesOf(nodes.get(parentId));
-              if (siblings) {
-                const idx = siblings.findIndex((c: any) => c.id === nodeId);
-                if (idx !== -1) siblings.splice(idx, 1);
+              const children = childrenOf(nodes.get(parentId));
+              if (children) {
+                const idx = children.findIndex((c: any) => c.id === nodeId);
+                if (idx !== -1) children.splice(idx, 1);
               }
               nodes.delete(nodeId);
             }
@@ -664,4 +658,13 @@ export function hasChangeFormatRecords(records: any[]): boolean {
       (r.type === RecordType.Change ||
         (r.type === RecordType.FullSnapshot && r.format === SnapshotFormatChange)),
   );
+}
+
+// A cold converter has no string table, so Change records before the first snapshot decode to empty strings; classic records are kept.
+export function dropChangesBeforeFirstSnapshot(records: any[]): any[] {
+  const snapshotIndex = records.findIndex(
+    (r) => r && r.type === RecordType.FullSnapshot && r.format === SnapshotFormatChange,
+  );
+  if (snapshotIndex <= 0) return records;
+  return records.filter((r, i) => i >= snapshotIndex || !r || r.type !== RecordType.Change);
 }

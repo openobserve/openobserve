@@ -109,14 +109,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :is-loading="segmentsLoading"
             class="h-full"
           />
-          <VideoPlayer
-            v-else
-            ref="videoPlayerRef"
-            :events="segmentEvents"
-            :segments="segments"
-            :is-loading="!!isLoading.length"
-            class="h-full"
-          />
+          <div v-else class="flex h-full min-h-0 flex-col">
+            <div
+              v-if="segmentNotice"
+              class="bg-card-glass-bg text-text-secondary border-card-glass-border border-b px-3 py-1 text-xs"
+              data-test="session-viewer-segment-notice"
+            >
+              {{ segmentNotice }}
+            </div>
+            <VideoPlayer
+              ref="videoPlayerRef"
+              :events="segmentEvents"
+              :segments="segments"
+              :is-loading="!!isLoading.length"
+              class="min-h-0 flex-1"
+            />
+          </div>
         </template>
         <template #after>
           <PlayerEventsSidebar
@@ -151,7 +159,7 @@ import MobileSessionPlayer from "@/components/rum/MobileSessionPlayer.vue";
 import { isMobileReplaySource } from "@/composables/rum/useMobileSessionReplay";
 import EventDetailDrawer from "@/components/rum/EventDetailDrawer.vue";
 import { cloneDeep } from "lodash-es";
-import { computed, onBeforeMount, ref, watch } from "vue";
+import { computed, onBeforeMount, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -167,9 +175,23 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
 
 import { formatDate } from "@/utils/date";
-import { getUUID } from "@/utils/zincutils";
+import { b64EncodeUnicode, generateTraceContext, getUUID } from "@/utils/zincutils";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import { collapseViewDocuments } from "@/utils/rum/viewDocuments";
+import useHttpStreaming from "@/composables/useStreamingSearch";
+import {
+  selectInitialWindow,
+  snapshotStarts,
+  summarizeManifest,
+  type ManifestEntry,
+  type ManifestSummary,
+} from "@/utils/rum/sessionReplayManifest";
+import { planSeek, type TimeRange } from "@/utils/rum/sessionReplaySeekPlan";
+
+// The backend caps one request at 1000 rows; the page cap only exists to stop a bad response looping forever.
+const SEGMENT_PAGE_SIZE = 1000;
+const MAX_SEGMENT_PAGES = 50;
+const SEGMENT_BATCH = 25;
 
 const defaultEvent = {
   id: "",
@@ -194,14 +216,22 @@ const { t } = useI18nTyped();
 const { shareUrl } = useRum();
 const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload } = useQuery();
-const segments = ref<any[]>([]);
-const segmentEvents = ref<any[]>([]);
+const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+// shallowRef: these hold whole replay segments, and deep reactivity over them is the load cost.
+const segments = shallowRef<any[]>([]);
+const segmentEvents = shallowRef<any[]>([]);
 // Dedicated to the replay-segment fetch, initialised true so the mobile player shows a
 // loading state from first paint. The shared isLoading counter can't be used here: it
 // dips back to 0 in the gap between getSession() resolving and getSessionSegments()
 // starting, which is exactly the moment the mobile player mounts — that dip is what let
 // the "No session replay available" empty state flash before the segments arrived.
 const segmentsLoading = ref(true);
+const manifest = shallowRef<ManifestEntry[]>([]);
+const manifestSummary = ref<ManifestSummary | null>(null);
+const loadedRanges = shallowRef<TimeRange[]>([]);
+const pendingSeek = ref<number | null>(null);
+// Background batches outlive a route change; without this they keep pushing into a dead tree.
+let cancelled = false;
 const sessionNotFound = ref(false);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
@@ -269,6 +299,14 @@ const sessionDetails = ref({
   id: "",
 });
 
+// One line under the player: a seek still waiting on its window, else a manifest cut short.
+const segmentNotice = computed(() => {
+  if (pendingSeek.value !== null) return t("rum.sessionReplaySeekLoading");
+  if (manifestSummary.value?.truncated)
+    return t("rum.sessionReplayTruncated", { count: manifestSummary.value.segmentCount });
+  return "";
+});
+
 const frustrationCount = computed(() => {
   return segmentEvents.value.filter(
     (event: any) => event.frustration_types && event.frustration_types.length > 0,
@@ -280,6 +318,10 @@ const showEventDetailDrawer = ref(false);
 const selectedEvent = ref<any>({});
 const selectedRawEvent = ref<any>({});
 const rawEventsMap = ref<Map<string, any>>(new Map());
+
+onBeforeUnmount(() => {
+  cancelled = true;
+});
 
 onBeforeMount(async () => {
   sessionId.value = router.currentRoute.value.params.id as string;
@@ -416,7 +458,134 @@ const getSession = () => {
   });
 };
 
-const getSessionSegments = () => {
+const buildSegmentRequest = (sql: string, from: number, size: number) => {
+  const req = buildQueryPayload(
+    {
+      from,
+      size,
+      timestamp_column: store.state.zoConfig.timestamp_column,
+      timestamps: {
+        startTime: Number(sessionState.data.selectedSession?.start_time) * 1000 - 300000,
+        endTime: Number(sessionState.data.selectedSession?.end_time) * 1000 + 300000000,
+      },
+      sqlMode: false,
+      currentPage: 0,
+      parsedQuery: null,
+    } as any,
+    t,
+  );
+  // buildQueryPayload encodes its own template SQL, so SQL assigned after it must be re-encoded in base64 mode.
+  req.query.sql = req.encoding === "base64" ? b64EncodeUnicode(sql) : sql;
+  req.query.from = from;
+  req.query.size = size;
+  delete req.aggs;
+  return req;
+};
+
+const runSegmentQuery = (sql: string, from: number, size: number): Promise<any[]> =>
+  new Promise((resolve, reject) => {
+    const hits: any[] = [];
+    let settled = false;
+
+    fetchQueryDataWithHttpStream(
+      {
+        queryReq: buildSegmentRequest(sql, from, size),
+        type: "search",
+        traceId: generateTraceContext()?.traceId || getUUID(),
+        org_id: store.state.selectedOrganization.identifier,
+        pageType: "logs",
+        searchType: "RUM",
+      },
+      {
+        data: (_req: any, response: any) => {
+          if (response?.type === "search_response_hits") {
+            hits.push(...(response.content?.results?.hits ?? []));
+          }
+        },
+        error: (_req: any, response: any) => {
+          if (settled) return;
+          settled = true;
+          reject(new Error(response?.content?.message || "session replay query failed"));
+        },
+        complete: () => {
+          if (settled) return;
+          settled = true;
+          resolve(hits);
+        },
+        // A reset replays the whole stream, so partial hits must be dropped first.
+        reset: () => {
+          hits.length = 0;
+        },
+      },
+    ).catch(reject);
+  });
+
+// A manifest truncated by the per-request size cap corrupts the snapshot-anchor search, so page past it.
+const fetchAllPages = async (sql: string): Promise<{ hits: any[]; complete: boolean }> => {
+  const hits: any[] = [];
+  for (let page = 0; page < MAX_SEGMENT_PAGES; page++) {
+    const batch = await runSegmentQuery(sql, page * SEGMENT_PAGE_SIZE, SEGMENT_PAGE_SIZE);
+    hits.push(...batch);
+    if (batch.length < SEGMENT_PAGE_SIZE) return { hits, complete: true };
+    if (cancelled) break;
+  }
+  return { hits, complete: false };
+};
+
+const manifestSql = () =>
+  `select start, "end", has_full_snapshot, records_count from "_sessionreplay" where ${sqlEquals("session_id", sessionId.value)} order by start asc`;
+
+const bodiesSql = (lo: number, hi: number) =>
+  `select start, "end", segment from "_sessionreplay" where ${sqlEquals("session_id", sessionId.value)} and start >= ${lo} and start <= ${hi} order by start asc`;
+
+// The player can only be fed forward, so every loaded body is appended in start order.
+const appendSegmentBodies = (hits: any[]) => {
+  const bodies = hits
+    .map((hit: any) => {
+      try {
+        return JSON.parse(hit.segment);
+      } catch (error) {
+        console.error("Failed to parse a session replay segment:", error);
+        return null;
+      }
+    })
+    .filter(Boolean);
+
+  if (!bodies.length) return;
+
+  segments.value = [...segments.value, ...bodies];
+  loadedRanges.value = [
+    ...loadedRanges.value,
+    { start: hits[0].start, end: hits[hits.length - 1].end },
+  ];
+};
+
+// Later segments only: an earlier range would decode against converter state that has already moved on.
+const loadRemainingSegments = async (fromIndex: number) => {
+  for (let i = fromIndex; i < manifest.value.length; i += SEGMENT_BATCH) {
+    if (cancelled) return;
+    const batch = manifest.value.slice(i, i + SEGMENT_BATCH);
+    try {
+      const { hits } = await fetchAllPages(
+        bodiesSql(batch[0].start, batch[batch.length - 1].start),
+      );
+      if (cancelled) return;
+      appendSegmentBodies(hits);
+    } catch (error) {
+      console.error("Failed to fetch session replay segments:", error);
+      return;
+    }
+  }
+};
+
+// Absolute time the player must reach first: the forwarded event if the route asks for one, else the session start.
+const initialTarget = () => {
+  const sessionStart = Number(sessionState.data.selectedSession?.start_time) || 0;
+  const relative = Number(forwardToEventTime.value) || 0;
+  return relative > 0 ? sessionStart + relative : sessionStart;
+};
+
+const getSessionSegments = async () => {
   if (!sessionState.data.selectedSession) {
     // No session to fetch a replay for — resolve the loading state so the player can fall
     // through to its empty message instead of spinning forever.
@@ -424,68 +593,30 @@ const getSessionSegments = () => {
     return;
   }
 
-  const queryPayload: any = {
-    from: 0,
-    size: 1000,
-    timestamp_column: store.state.zoConfig.timestamp_column,
-    timestamps: {
-      startTime: Number(sessionState.data.selectedSession?.start_time) * 1000 - 300000,
-      endTime: Number(sessionState.data.selectedSession?.end_time) * 1000 + 300000000,
-    },
-    sqlMode: false,
-    currentPage: 0,
-    parsedQuery: null,
-  };
-
-  const req = buildQueryPayload(queryPayload, t);
-  req.query.sql = `select * from "_sessionreplay" where ${sqlEquals("session_id", sessionId.value)} order by start asc`;
-  delete req.aggs;
   isLoading.value.push(true);
-  searchService
-    .search(
-      {
-        org_identifier: store.state.selectedOrganization.identifier,
-        query: req,
-        page_type: "logs",
-      },
-      "RUM",
-    )
-    .then((res) => {
-      // Skip anything before the first full snapshot — see replayOrigin. Only leading
-      // segments can be dropped here: replayOrigin IS the first snapshot's start, so
-      // every later segment passes.
-      const origin = replayOrigin.value;
-      // const segmentsCopy = [];
-      // const viewIds = [];
-      res.data.hits.forEach((hit: any) => {
-        if (Number(hit.start) < origin) return;
-        segments.value.push(JSON.parse(hit.segment));
-      });
+  try {
+    const { hits, complete } = await fetchAllPages(manifestSql());
+    manifest.value = hits as ManifestEntry[];
+    manifestSummary.value = summarizeManifest(manifest.value, complete);
+    if (cancelled || !manifest.value.length) return;
 
-      // res.data.hits.forEach((hit: any) => {
-      //   if (!viewIds.includes(hit.view_id)) viewIds.push(hit.view_id);
-      // });
+    // Only the window from the nearest full snapshot to the target, so the first frame does not wait on the whole session.
+    const firstWindow = selectInitialWindow(manifest.value, initialTarget());
+    if (!firstWindow) return;
 
-      // // loop over view_id Group ( array of array) segments from view_id and sort each group by start_time
-      // viewIds.forEach((view_id) => {
-      //   const group = res.data.hits
-      //     .filter((hit: any) => hit.view_id === view_id)
-      //     .sort((a, b) => a.start - b.start);
+    const { hits: bodyHits } = await fetchAllPages(bodiesSql(firstWindow.from, firstWindow.to));
+    if (cancelled) return;
+    appendSegmentBodies(bodyHits);
 
-      //   segmentsCopy.push(group.map((hit: any) => JSON.parse(hit.segment)));
-      // });
-
-      // segments.value = segmentsCopy.flat();
-    })
-    .catch((error) => {
-      console.error("Failed to fetch session events:", error);
-    })
-    .finally(() => {
-      isLoading.value.pop();
-      // Segment fetch settled: the mobile player can now decide between the replay and the
-      // empty state without a premature "No session replay available" flash.
-      segmentsLoading.value = false;
-    });
+    void loadRemainingSegments(firstWindow.targetIndex + 1);
+  } catch (error) {
+    console.error("Failed to fetch session replay segments:", error);
+  } finally {
+    isLoading.value.pop();
+    // Segment fetch settled: the mobile player can now decide between the replay and the
+    // empty state without a premature "No session replay available" flash.
+    segmentsLoading.value = false;
+  }
 };
 
 const getSessionEvents = () => {
@@ -582,16 +713,19 @@ const getSessionErrorLogs = () => {
         return hit.date >= Number(sessionState.data.selectedSession.start_time);
       });
 
-      events.forEach((hit: any) => {
+      const errorEvents = events.map((hit: any) => {
         hit.type = "error";
         hit.error_id = getUUID();
         hit.error_message = hit.message;
         // Store raw event data
         rawEventsMap.value.set(hit.error_id, hit);
-        segmentEvents.value.push(formatEvent(hit));
+        return formatEvent(hit);
       });
 
-      segmentEvents.value.sort((a, b) => a.timestamp - b.timestamp);
+      // One assignment: a shallowRef does not react to a push.
+      segmentEvents.value = [...segmentEvents.value, ...errorEvents].sort(
+        (a, b) => a.timestamp - b.timestamp,
+      );
 
       videoPlayerRef.value?.updatePlayerState();
 
@@ -717,6 +851,25 @@ function formatTimeDifference(start_time: number, end_time: number) {
 const getFormattedDate = (timestamp: number) =>
   formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 
+const planSeekForRelativeTime = (relativeTime: number) =>
+  planSeek(
+    (Number(sessionState.data.selectedSession?.start_time) || 0) + relativeTime,
+    loadedRanges.value,
+    snapshotStarts(manifest.value),
+  );
+
+// Retry the seek once the background loader covers it; an unplayable target is left alone.
+watch(loadedRanges, () => {
+  if (pendingSeek.value === null) return;
+  const target = pendingSeek.value;
+  const plan = planSeekForRelativeTime(target);
+  if (plan.status === "needs-fetch") return;
+  pendingSeek.value = null;
+  if (plan.status === "ready") {
+    videoPlayerRef.value?.goto(target, !!videoPlayerRef.value?.playerState?.isPlaying);
+  }
+});
+
 const handleSidebarEvent = (event: string, payload: any) => {
   if (event === "event-click") {
     // Open event detail drawer
@@ -726,6 +879,10 @@ const handleSidebarEvent = (event: string, payload: any) => {
   }
 
   // Always seek to the event time in the video player
-  videoPlayerRef.value.goto(payload.relativeTime, !!videoPlayerRef.value.playerState?.isPlaying);
+  videoPlayerRef.value?.goto(payload.relativeTime, !!videoPlayerRef.value?.playerState?.isPlaying);
+
+  // The seek still happened; this only tracks whether the window behind it is loaded yet.
+  const plan = planSeekForRelativeTime(Number(payload.relativeTime) || 0);
+  pendingSeek.value = plan.status === "needs-fetch" ? Number(payload.relativeTime) || 0 : null;
 };
 </script>

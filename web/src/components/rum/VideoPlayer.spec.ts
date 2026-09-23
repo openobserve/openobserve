@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { defineComponent, shallowRef } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
 import i18n from "@/locales";
@@ -37,23 +38,38 @@ vi.mock("vuex", () => ({
   })),
 }));
 
+// Hoisted so the append assertions can read the same spies the component calls.
+const playerSpies = vi.hoisted(() => ({
+  addEvent: vi.fn(),
+  getCurrentTime: vi.fn(() => 0),
+  destroyReplayer: vi.fn(),
+}));
+
+// A plain function, not an arrow: the component calls `new rrwebPlayer(...)`.
 vi.mock("@openobserve/rrweb-player", () => ({
-  default: vi.fn(() => ({
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    play: vi.fn(),
-    pause: vi.fn(),
-    setSpeed: vi.fn(),
-    toggleSkipInactive: vi.fn(),
-    goto: vi.fn(),
-    getMetaData: vi.fn(() => ({
-      startTime: 1704110400000,
-      endTime: 1704110520000,
-      totalTime: 120000,
-    })),
-    triggerResize: vi.fn(),
-    $set: vi.fn(),
-  })),
+  default: vi.fn(function () {
+    return {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      setSpeed: vi.fn(),
+      toggleSkipInactive: vi.fn(),
+      goto: vi.fn(),
+      getMetaData: vi.fn(() => ({
+        startTime: 1704110400000,
+        endTime: 1704110520000,
+        totalTime: 120000,
+      })),
+      getReplayer: vi.fn(() => ({
+        getCurrentTime: playerSpies.getCurrentTime,
+        destroy: playerSpies.destroyReplayer,
+      })),
+      addEvent: playerSpies.addEvent,
+      triggerResize: vi.fn(),
+      $set: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock("@openobserve/rrweb-player/dist/style.css", () => ({}));
@@ -104,6 +120,17 @@ const mockSegments = [
   },
 ];
 
+// A segment that arrives after the player was built, later than the mocked playhead.
+const laterSegment = {
+  records: [
+    {
+      type: 3,
+      timestamp: 1704110500000,
+      data: { source: 0, adds: [], removes: [], attributes: [], texts: [] },
+    },
+  ],
+};
+
 // ---------------------------------------------------------------------------
 // Mount factory — single source of truth for stubs/plugins
 // ---------------------------------------------------------------------------
@@ -127,6 +154,31 @@ function mountComponent(props: Record<string, any> = {}) {
       },
     },
   });
+}
+
+// Production fills segments by assigning a shallowRef; setProps cannot show that regression.
+function mountWithShallowSegments(initial: any[]) {
+  const segments = shallowRef<any[]>(initial);
+  const Parent = defineComponent({
+    components: { VideoPlayer },
+    setup: () => ({ segments, events: mockEvents }),
+    template: `<VideoPlayer :events="events" :segments="segments" :is-loading="false" />`,
+  });
+
+  const parent = mount(Parent, {
+    global: {
+      plugins: [i18n],
+      provide: { store },
+      stubs: {
+        OIcon: {
+          template: '<i data-test="OIcon" :data-name="name"></i>',
+          props: ["name", "size"],
+        },
+      },
+    },
+  });
+
+  return { parent, segments };
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +423,86 @@ describe("VideoPlayer", () => {
       expect(playerEl.style.width).toMatch(/^\d+px$/);
 
       localWrapper.unmount();
+    });
+
+    it("should build the player when a parent assigns a shallowRef segment list", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      expect(rrwebPlayerMock).not.toHaveBeenCalled();
+
+      segments.value = [...mockSegments];
+      await flushPromises();
+      await parent.vm.$nextTick();
+      await flushPromises();
+
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+
+      parent.unmount();
+    });
+
+    it("should append later segments through addEvent instead of rebuilding the player", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+      playerSpies.addEvent.mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      segments.value = [...mockSegments];
+      await flushPromises();
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+
+      segments.value = [...segments.value, laterSegment];
+      await flushPromises();
+      await parent.vm.$nextTick();
+      await flushPromises();
+
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+      expect(playerSpies.addEvent).toHaveBeenCalledTimes(1);
+      expect(playerSpies.addEvent.mock.calls[0][0]).toMatchObject({
+        type: 3,
+        timestamp: 1704110500000,
+      });
+
+      parent.unmount();
+    });
+
+    it("should skip an appended record that is at or before the playhead", async () => {
+      playerSpies.addEvent.mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      segments.value = [...mockSegments];
+      await flushPromises();
+
+      // Playhead sits past the appended record's timestamp; the player would apply it at once.
+      playerSpies.getCurrentTime.mockReturnValueOnce(20000);
+      const stale = {
+        records: [{ type: 3, timestamp: 1704110410000, data: { source: 3, id: 1, x: 0, y: 0 } }],
+      };
+      segments.value = [...segments.value, stale];
+      await flushPromises();
+      await parent.vm.$nextTick();
+      await flushPromises();
+
+      expect(playerSpies.addEvent).not.toHaveBeenCalled();
+
+      parent.unmount();
+    });
+
+    it("should destroy the replayer before the player on unmount", async () => {
+      playerSpies.destroyReplayer.mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      segments.value = [...mockSegments];
+      await flushPromises();
+
+      parent.unmount();
+
+      expect(playerSpies.destroyReplayer).toHaveBeenCalledTimes(1);
     });
 
     it("should not create a player instance when segments array is empty", async () => {

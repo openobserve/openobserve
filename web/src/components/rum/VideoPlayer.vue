@@ -132,10 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { cloneDeep } from "lodash-es";
 import {
+  markRaw,
   nextTick,
   ref,
+  shallowRef,
   watch,
   type Ref,
   onBeforeUnmount,
@@ -151,7 +152,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
-import { createRecordConverter } from "@/utils/rum/sessionReplayChangeFormat";
+import {
+  createRecordConverter,
+  dropChangesBeforeFirstSnapshot,
+  type RecordConverter,
+} from "@/utils/rum/sessionReplayChangeFormat";
 import { resolveRelativeLinks } from "@/utils/rum/sessionReplayUrls";
 const props = defineProps({
   events: {
@@ -180,13 +185,21 @@ const playerRef = ref<HTMLElement | null>(null);
 
 const playbackBarRef = ref<HTMLElement | null>(null);
 
-const session = ref<any>([]);
+// shallowRef: the converted record list is large and nothing reads it reactively.
+const session = shallowRef<any[]>([]);
 
 const playerContainerRef = ref<HTMLElement | null>(null);
 
 const worker: Ref<Worker | null> = ref(null);
 
 const workerProcessId = ref(0);
+
+// Appended segments must reuse this same converter, in order, or they decode against lost state.
+let runConverter: RecordConverter | null = null;
+// A later batch may carry no Meta record, so the page URL for resolving relative links must outlive one batch.
+let runPageHref: string | undefined;
+let convertedSegmentCount = 0;
+let segmentWork: Promise<unknown> = Promise.resolve();
 
 const sessionWidth = ref(0);
 const sessionHeight = ref(0);
@@ -276,16 +289,20 @@ onBeforeUnmount(() => {
   if (worker.value) {
     worker.value.terminate();
   }
-  // $destroy frees the replayer's events, canvas/iframe, timers, and listeners.
+  // Replayer.destroy() removes its wrapper from the root, so it has to run before $destroy().
   if (player.value) {
     try {
       player.value.pause?.();
+      player.value.getReplayer?.()?.destroy?.();
       player.value.$destroy?.();
     } catch {
       // teardown race — the instance is already gone
     }
     player.value = null;
   }
+  runConverter = null;
+  runPageHref = undefined;
+  convertedSegmentCount = 0;
   rrwebPlayer = null;
 });
 
@@ -328,22 +345,26 @@ function calculatePlayerDimensions(): { width: number; height: number } {
   return { width: playerWidth, height: playerHeight };
 }
 
-const setupSession = async () => {
-  session.value = [];
-  if (!props.segments.length) return;
+// The converter threads node-id and string-table state across one forward-only run, so the same instance must serve every batch of that run.
+const convertSegments = (segments: any[], converter: RecordConverter, cold: boolean) => {
+  const out: any[] = [];
+  let skippedRecords = 0;
 
-  // The SDK v7 serialization emits session-replay snapshots in the compact "Change"
-  // format (FullSnapshot type 2 with format:1 and data:Change[], plus Change records of
-  // type 12). @openobserve/rrweb-player only understands the classic rrweb format, so we
-  // convert here. A single converter instance threads node-id / string-table state across
-  // all records in order (it resets itself on each full snapshot, mirroring the SDK).
-  const recordConverter = createRecordConverter();
-  let pageHref: string | undefined;
-
-  props.segments.forEach((segment: any) => {
+  segments.forEach((segment: any, segmentIndex: number) => {
     const convertedRecords: any[] = [];
-    segment.records.forEach((record: any) => {
-      convertedRecords.push(...recordConverter.convert(cloneDeep(record)));
+    // A cold converter has no string table, so Change records before the run's first snapshot decode to empty strings.
+    const records =
+      cold && segmentIndex === 0
+        ? dropChangesBeforeFirstSnapshot(segment.records ?? [])
+        : (segment.records ?? []);
+    records.forEach((record: any) => {
+      // One unconvertible record must not cost the whole session, so skip it and carry on.
+      try {
+        convertedRecords.push(...converter.convert(record));
+      } catch (e) {
+        skippedRecords++;
+        console.error("Session replay: skipped an unconvertible record", e);
+      }
     });
     convertedRecords.forEach((record: any) => {
       let segCopy = record;
@@ -360,13 +381,13 @@ const setupSession = async () => {
         };
         segCopy = seg;
       }
-      if (segCopy.type === 4) pageHref = segCopy.data?.href;
+      if (segCopy.type === 4) runPageHref = segCopy.data?.href;
       if (segCopy.type === 3 && segCopy.data?.source === 0) {
-        segCopy.data.adds?.forEach((add: any) => resolveRelativeLinks(add.node, pageHref));
+        segCopy.data.adds?.forEach((add: any) => resolveRelativeLinks(add.node, runPageHref));
       }
       try {
         if (segCopy.type === 2 && segCopy.data.node.type === 0) {
-          resolveRelativeLinks(segCopy.data.node, pageHref);
+          resolveRelativeLinks(segCopy.data.node, runPageHref);
           segCopy.data.node.childNodes.forEach((child: any) => {
             if (child.type === 2 && child.tagName === "html") {
               child.childNodes.forEach((_child: any) => {
@@ -396,9 +417,28 @@ const setupSession = async () => {
       } catch (e) {
         console.log(e);
       }
-      session.value.push(segCopy);
+      out.push(segCopy);
     });
   });
+
+  if (skippedRecords) {
+    console.warn(`Session replay: ${skippedRecords} record(s) could not be converted`);
+  }
+
+  return out;
+};
+
+const setupSession = async () => {
+  session.value = [];
+  if (!props.segments.length) return;
+
+  runConverter = null;
+  runPageHref = undefined;
+  convertedSegmentCount = 0;
+
+  const converter = createRecordConverter();
+  const consumed = props.segments.length;
+  session.value = convertSegments(props.segments.slice(0, consumed), converter, true);
 
   // let lastEventTime = 1692884586897;
   // const inactivityThreshold = 5000; // 5 seconds
@@ -433,21 +473,27 @@ const setupSession = async () => {
   await nextTick();
   if (!playerRef.value) return;
   if (player.value) return;
-  player.value = new rrwebPlayer({
-    target: playerRef.value as HTMLElement,
-    props: {
-      events: session.value,
-      UNSAFE_replayCanvas: false,
-      mouseTail: false,
-      autoPlay: false,
-      showController: false,
-      width: playerWidth,
-      height: playerHeight,
-      mutateChildNodes: true,
-      speed: playerState.value.speed,
-      skipInactive: playerState.value.skipInactivity,
-    },
-  });
+  player.value = markRaw(
+    new rrwebPlayer({
+      target: playerRef.value as HTMLElement,
+      props: {
+        events: session.value,
+        UNSAFE_replayCanvas: false,
+        mouseTail: false,
+        autoPlay: false,
+        showController: false,
+        width: playerWidth,
+        height: playerHeight,
+        mutateChildNodes: true,
+        speed: playerState.value.speed,
+        skipInactive: playerState.value.skipInactivity,
+      },
+    }),
+  );
+
+  // Adopt the run only once the player exists; a discarded conversion must not be appended to.
+  runConverter = converter;
+  convertedSegmentCount = consumed;
 
   // events.forEach((event) => {
   //   if (event.type === 2 || event.type === 4) {
@@ -470,6 +516,43 @@ const setupSession = async () => {
   // });
 
   if (!player.value) return;
+  updatePlayerState();
+};
+
+// Re-running setupSession per batch would re-convert the whole session, which is the cost this path exists to avoid.
+const appendSegments = async (newSegments: any[]) => {
+  if (!player.value || !runConverter || !newSegments.length) return;
+
+  const records = convertSegments(newSegments, runConverter, false).sort(
+    (a: any, b: any) => a.timestamp - b.timestamp,
+  );
+
+  // The player applies an event at or before the playhead at once, so this is a conservative proxy for its private baselineTime.
+  const meta = player.value.getMetaData?.();
+  const replayer = player.value.getReplayer?.();
+  const playhead =
+    meta && replayer ? (meta.startTime ?? 0) + (replayer.getCurrentTime?.() ?? 0) : -Infinity;
+
+  let skipped = 0;
+  for (const record of records) {
+    if (record.timestamp <= playhead) {
+      skipped++;
+      continue;
+    }
+    try {
+      player.value.addEvent(record);
+    } catch (e) {
+      skipped++;
+      console.error("Session replay: failed to append a record", e);
+    }
+  }
+
+  if (skipped) {
+    console.warn(`Session replay: ${skipped} appended record(s) were skipped`);
+  }
+
+  // addEvent and the controller's meta refresh both defer through a microtask.
+  await nextTick();
   updatePlayerState();
 };
 
@@ -632,11 +715,21 @@ const processCss = (cssString: string, id: string | number) => {
 };
 
 watch(
-  () => props.segments,
-  (value) => {
-    if (value.length) setupSession();
+  () => props.segments.length,
+  (length) => {
+    if (!length) return;
+    const step = () => {
+      if (!player.value) return setupSession();
+      const pending = props.segments.slice(convertedSegmentCount);
+      convertedSegmentCount = props.segments.length;
+      return appendSegments(pending as any[]);
+    };
+    // Serialised and kept alive on failure: a batch must not convert before the previous one has adopted the run.
+    segmentWork = segmentWork.then(step, step).catch((e) => {
+      console.error("Session replay: segment processing failed", e);
+    });
   },
-  { deep: true, immediate: true },
+  { immediate: true },
 );
 
 defineExpose({

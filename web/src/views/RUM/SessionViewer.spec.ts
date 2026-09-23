@@ -92,6 +92,24 @@ vi.mock("@/services/search", async (importOriginal) => {
   });
 });
 
+// The replay-segment fetches go over HTTP streaming; capture their SQL and answer them here.
+const streaming = vi.hoisted(() => ({
+  sqls: [] as string[],
+  responder: (_sql: string, _from: number): any[] => [],
+}));
+
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: async (data: any, handlers: any) => {
+      const sql = data.queryReq.query.sql as string;
+      streaming.sqls.push(sql);
+      const hits = streaming.responder(sql, data.queryReq.query.from);
+      handlers.data(data, { type: "search_response_hits", content: { results: { hits } } });
+      handlers.complete(data, null);
+    },
+  }),
+}));
+
 vi.mock("@/utils/date", () => ({
   formatDate: vi.fn().mockReturnValue("Jun 04, 2026 12:00:00 +0000"),
 }));
@@ -824,5 +842,92 @@ describe("SessionViewer.vue — repeated view documents", () => {
     } finally {
       search.mockImplementation(defaultImpl!);
     }
+  });
+});
+
+describe("SessionViewer.vue — segment manifest and windowed fetch", () => {
+  const sessionStart = 1692884313968;
+  const manifestRows = [
+    { start: sessionStart, end: sessionStart + 999, has_full_snapshot: true, records_count: 2 },
+    {
+      start: sessionStart + 1000,
+      end: sessionStart + 1999,
+      has_full_snapshot: false,
+      records_count: 1,
+    },
+    {
+      start: sessionStart + 2000,
+      end: sessionStart + 2999,
+      has_full_snapshot: true,
+      records_count: 1,
+    },
+  ];
+
+  function bodyFor(row: any) {
+    return {
+      start: row.start,
+      end: row.end,
+      segment: JSON.stringify({ records: [{ type: 4, timestamp: row.start, data: {} }] }),
+    };
+  }
+
+  beforeEach(() => {
+    streaming.sqls = [];
+    streaming.responder = (sql: string, from: number) => {
+      if (from > 0) return [];
+      if (sql.includes("has_full_snapshot")) return manifestRows;
+      const lo = Number(/start >= (\d+)/.exec(sql)?.[1] ?? 0);
+      const hi = Number(/start <= (\d+)/.exec(sql)?.[1] ?? 0);
+      return manifestRows.filter((row) => row.start >= lo && row.start <= hi).map(bodyFor);
+    };
+  });
+
+  async function mountLoaded() {
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session-abc",
+      query: { start_time: "1692884313968000", end_time: "1692884769270000" },
+    });
+    const wrapper = mountSessionViewer(router);
+    for (let i = 0; i < 12; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    return wrapper;
+  }
+
+  it("lists the manifest without the segment body and without select *", async () => {
+    const wrapper = await mountLoaded();
+
+    const manifestSql = streaming.sqls[0];
+    expect(manifestSql).toContain('select start, "end", has_full_snapshot, records_count from');
+    expect(manifestSql).not.toContain("select *");
+    expect(manifestSql).not.toContain(", segment");
+    wrapper.unmount();
+  });
+
+  it("fetches only the window from the anchor snapshot through the target", async () => {
+    const wrapper = await mountLoaded();
+
+    const windowSql = streaming.sqls[1];
+    expect(windowSql).toContain('select start, "end", segment from');
+    expect(windowSql).toContain(`and start >= ${sessionStart} and start <= ${sessionStart}`);
+    wrapper.unmount();
+  });
+
+  it("loads the remaining segments in the background, later segments only", async () => {
+    const wrapper = await mountLoaded();
+
+    const backgroundSql = streaming.sqls[2];
+    expect(backgroundSql).toContain(
+      `and start >= ${sessionStart + 1000} and start <= ${sessionStart + 2000}`,
+    );
+    expect((wrapper.vm as any).segments).toHaveLength(3);
+    wrapper.unmount();
+  });
+
+  it("orders the loaded segments forward with no earlier range appended", async () => {
+    const wrapper = await mountLoaded();
+
+    const starts = (wrapper.vm as any).loadedRanges.map((range: any) => range.start);
+    expect(starts).toEqual([...starts].sort((a: number, b: number) => a - b));
+    wrapper.unmount();
   });
 });
