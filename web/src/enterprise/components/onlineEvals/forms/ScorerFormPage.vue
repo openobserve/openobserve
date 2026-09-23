@@ -201,14 +201,7 @@
               </div>
 
               <div class="flex flex-col gap-3.5">
-                <small
-                  v-if="decisionProvider"
-                  class="text-2xs text-text-secondary block"
-                  data-test="scorer-form-decision-provider-note"
-                  >{{ t("onlineEvals.scorer.decisionProviderNote") }}</small
-                >
                 <OFormCheckbox
-                  v-else
                   name="includeReasoning"
                   class="scorer-extras__toggle"
                   data-test="scorer-form-include-reasoning"
@@ -228,11 +221,17 @@
                 <!-- "(Optional)" reads inline in the label, like every other
                  optional field in the app — not as a separate uppercase badge
                  on its own line. -->
-                <div v-if="!decisionProvider" class="flex flex-col gap-0.5">
+                <div class="flex flex-col gap-0.5">
                   <strong class="text-xs font-semibold">{{
                     t("onlineEvals.scorer.extraFieldsLabel")
                   }}</strong>
-                  <small class="text-2xs text-text-secondary block">{{
+                  <small
+                    v-if="decisionProvider"
+                    class="text-2xs text-text-secondary block"
+                    data-test="scorer-form-decision-provider-note"
+                    >{{ t("onlineEvals.scorer.decisionProviderNote") }}</small
+                  >
+                  <small v-else class="text-2xs text-text-secondary block">{{
                     t("onlineEvals.scorer.extraFieldsHint")
                   }}</small>
                 </div>
@@ -797,7 +796,7 @@ function buildScorerTestPayload() {
         params: {
           provider_id: formValues.value.providerId,
           ...(formValues.value.model.trim() ? { model: formValues.value.model.trim() } : {}),
-          include_reasoning: includeReasoning.value,
+          include_reasoning: formValues.value.includeReasoning,
           ...(cleanedExtraFields.value.length
             ? { extra_metadata_fields: cleanedExtraFields.value }
             : {}),
@@ -900,12 +899,9 @@ function cleanExtraFields(fields: ExtraMetadataFieldRow[]): ExtraMetadataField[]
     }));
 }
 
-// A decision provider returns only the score, whatever was set before switching to it.
+// A decision provider fills no extra fields, whatever was set before switching to it.
 const cleanedExtraFields = computed<ExtraMetadataField[]>(() =>
   decisionProvider.value ? [] : cleanExtraFields(formValues.value.extraMetadataFields),
-);
-const includeReasoning = computed(
-  () => !decisionProvider.value && formValues.value.includeReasoning,
 );
 
 // Builds the remote `auth` / `params` from a SOURCE object — the live `form`
@@ -1022,7 +1018,7 @@ async function previewOutputSchema() {
       ...(formValues.value.pinScoreConfigVersion && formValues.value.producesScoreConfigVersion
         ? { producesScoreConfigVersion: Number(formValues.value.producesScoreConfigVersion) }
         : {}),
-      includeReasoning: includeReasoning.value,
+      includeReasoning: formValues.value.includeReasoning,
       extraMetadataFields: cleanedExtraFields.value,
     });
     const schema = (data as any)?.outputSchema ?? (data as any)?.output_schema ?? data;
@@ -1297,7 +1293,7 @@ async function save(value: ScorerForm) {
           params: {
             provider_id: value.providerId,
             ...(value.model.trim() ? { model: value.model.trim() } : {}),
-            include_reasoning: !decisionProvider.value && value.includeReasoning,
+            include_reasoning: value.includeReasoning,
             ...(extraFields.length ? { extra_metadata_fields: extraFields } : {}),
           },
         }
