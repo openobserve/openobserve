@@ -117,7 +117,9 @@ fn build_otlp_log_record(
     if let Some(severity) = severity {
         rec["severity"] = severity.into();
     }
-    rec["severity_number"] = log_record.severity_number.into();
+    if log_record.severity_number != 0 {
+        rec["severity_number"] = log_record.severity_number.into();
+    }
 
     rec["body"] = get_val(&log_record.body.as_ref());
     rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
@@ -963,7 +965,7 @@ mod tests {
     }
 
     #[test]
-    fn test_severity_text_derived_from_number_and_number_always_kept() {
+    fn test_severity_text_derived_from_number_and_number_kept_when_set() {
         let build = |severity_number: i32, severity_text: &str| {
             let record = LogRecord {
                 severity_number,
@@ -981,9 +983,13 @@ mod tests {
         assert_eq!(rec["severity"], json::json!("Error"));
         assert_eq!(rec["severity_number"], json::json!(17));
 
+        let rec = build(0, "Error");
+        assert_eq!(rec["severity"], json::json!("Error"));
+        assert!(rec.get("severity_number").is_none());
+
         let rec = build(0, "");
         assert!(rec.get("severity").is_none());
-        assert_eq!(rec["severity_number"], json::json!(0));
+        assert!(rec.get("severity_number").is_none());
     }
 
     use crate::logs::otlp::handle_request;
