@@ -2031,11 +2031,11 @@
       "addToGroup": "أضف إلى مجموعة المستخدمين",
       "addToRole": "تعيين دور",
       "step1Title": "انسخ رمزك",
-      "copyHint": "انسخ هذا الرمز الآن — لن تتمكن من رؤيته مرة أخرى.",
+      "copyHint": "هذه هي المرة الوحيدة التي سترى فيها هذا الرمز. انسخه أو نزّله الآن، فلا يمكن استرداده مرة أخرى.",
       "done": "تم",
       "applying": "التقديم على منح الوصول...",
-      "grantedRoles": "الأدوار المخصصة: {roles}",
-      "grantedGroups": "تمت إضافة مجموعات المستخدمين: {groups}",
+      "rolesAssignedLabel": "الأدوار المعيّنة",
+      "groupsAssignedLabel": "أُضيف إلى مجموعات المستخدمين",
       "failedRoles": "لم أتمكن من تعيين الأدوار: {roles}",
       "failedGroups": "لم أتمكن من الإضافة إلى مجموعات المستخدمين: {groups}",
       "failedHint": "يمكنك منحها لاحقا من صفحات الأدوار ومجموعات المستخدمين."
@@ -2045,6 +2045,9 @@
         "label": "اسم حساب الخدمة",
         "placeholder": "مثلا: ingest-bot",
         "help": "حروف صغيرة، أرقام، وشرطات. محفوظ name{suffix}"
+      },
+      "identifier": {
+        "label": "المُعرّف"
       },
       "roles": {
         "label": "تعيين الأدوار",
@@ -2059,6 +2062,7 @@
     "list": {
       "col": {
         "identifier": "المعرف",
+        "roles": "الأدوار",
         "token": "الرمز",
         "created": "تأسيس"
       }
@@ -2186,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "أي مستخدم وحسابات خدمة مرتبطة بهذه الأدوار سيفقد الوصول."
-      }
+      },
+      "assignColumn": "تعيين",
+      "assignBtn": "إضافة",
+      "assignedBadge": "مُعيَّن",
+      "assignBannerText": "أضف {member} إلى دور — انقر فوق إضافة بجانب أحد الأدوار أدناه.",
+      "assignBannerDone": "تم",
+      "assignSuccess": "تمت إضافة {member} إلى الدور \"{role}\".",
+      "assignError": "تعذّر إضافة الحساب إلى هذا الدور. يُرجى المحاولة مرة أخرى."
     },
     "group": {
       "name": {
@@ -2217,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "أعضاء هذه المجموعات سيفقدون الأدوار التي يمنحونها لهم."
-      }
+      },
+      "assignColumn": "تعيين",
+      "assignBtn": "إضافة",
+      "assignedBadge": "مُعيَّن",
+      "assignBannerText": "أضف {member} إلى مجموعة مستخدمين — انقر فوق إضافة بجانب إحدى المجموعات أدناه.",
+      "assignBannerDone": "تم",
+      "assignSuccess": "تمت إضافة {member} إلى المجموعة \"{group}\".",
+      "assignError": "تعذّر إضافة الحساب إلى هذه المجموعة. يُرجى المحاولة مرة أخرى."
     },
     "appGroups": {
       "deleteGroupTitle": "حذف المجموعة",
@@ -13383,6 +13401,7 @@
       "searchHistoryNotEnabled": "سجل البحث غير مفعل.",
       "enableUsageReporting": "قم بضبط ZO_USAGE_REPORTING_ENABLED على true لتفعيل تقارير الاستخدام.",
       "selectStreamToExtractPatterns": "يرجى اختيار تدفق لاستخراج الأنماط",
+      "patternsUnavailableForMultiStream": "الأنماط غير متاحة عند تحديد عدة جداول. يرجى تحديد جدول واحد.",
       "errorExtractingPatterns": "خطأ في استخراج الأنماط. يرجى المحاولة مرة أخرى.",
       "nameOfPanelRequired": "اسم اللجنة مطلوب",
       "errorsFixAndTryAgain": "هناك بعض الأخطاء، يرجى تصحيحها والمحاولة مرة أخرى",
