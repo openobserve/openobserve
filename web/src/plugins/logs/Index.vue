@@ -848,7 +848,8 @@ export default defineComponent({
       // single-stream API). Reject client-side instead of letting the
       // request fail server-side and leaving the previous single-stream
       // result on screen.
-      if (searchObj.data.stream.selectedStream.length > 1) {
+      if (!searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1) {
+        cancelPatterns();
         clearPatterns();
         showErrorNotification(t("logs.index.patternsUnavailableForMultiStream"));
         return;
