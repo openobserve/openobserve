@@ -22,6 +22,7 @@ import {
   depKindIcon,
   depKindColor,
   consumerBadges,
+  joinWithAnd,
   invalidateDependencyGraphCache,
 } from "@/composables/alerts/useDependencyGraph";
 import type { DepNode } from "@/composables/alerts/useDependencyGraph";
@@ -30,7 +31,6 @@ const graphInputs = vi.hoisted(() => ({
   alerts: vi.fn(async () => ({ data: { list: [] } })),
   destinations: vi.fn(async () => ({ data: [] })),
   templates: vi.fn(async () => ({ data: [] })),
-  usage: vi.fn(async () => ({ data: {} })),
 }));
 
 vi.mock("@/services/alerts", async (importOriginal) => {
@@ -44,7 +44,6 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), {
     default: {
       list: (...a: any[]) => graphInputs.destinations(...a),
-      usage: (...a: any[]) => graphInputs.usage(...a),
     },
   });
 });
@@ -164,9 +163,17 @@ describe("useDependencyGraph.buildGraph", () => {
   });
 
   it("a destination used only by a synthetic check is not an orphan", () => {
-    const { nodes } = buildGraph([], [{ name: "pager", type: "http" }], [], {
-      pager: [{ consumer: "synthetic_check", id: "c1", name: "checkout-journey" }],
-    });
+    const { nodes } = buildGraph(
+      [],
+      [
+        {
+          name: "pager",
+          type: "http",
+          uses: [{ consumer: "synthetic_check", id: "c1", name: "checkout-journey" }],
+        },
+      ],
+      [],
+    );
 
     const pager = byName(nodes, "pager", "destination");
     expect(pager.orphan).toBe(false);
@@ -177,23 +184,27 @@ describe("useDependencyGraph.buildGraph", () => {
   it("sums usageCount across alert AND non-alert consumers", () => {
     const { nodes } = buildGraph(
       [{ alert_id: "a1", name: "cpu", destinations: ["pager"], enabled: true }],
-      [{ name: "pager", type: "http" }],
+      [
+        {
+          name: "pager",
+          type: "http",
+          uses: [{ consumer: "pipeline", id: "p1", name: "ingest-pipe" }],
+        },
+      ],
       [],
-      { pager: [{ consumer: "pipeline", id: "p1", name: "ingest-pipe" }] },
     );
 
     expect(byName(nodes, "pager", "destination").usageCount).toBe(2);
   });
 
-  it("skips 'alert' rows from the usage endpoint — the alerts list already counts them", () => {
+  it("skips 'alert' entries in `uses` — the alerts list already counts them", () => {
     const { nodes } = buildGraph(
       [{ alert_id: "a1", name: "cpu", destinations: ["pager"], enabled: true }],
-      [{ name: "pager", type: "http" }],
+      [{ name: "pager", type: "http", uses: [{ consumer: "alert", id: "a1", name: "cpu" }] }],
       [],
-      { pager: [{ consumer: "alert", id: "a1", name: "cpu" }] },
     );
 
-    // Would be 2 if the alert row were double-counted alongside the alerts-list edge.
+    // Would be 2 if the alert entry were double-counted alongside the alerts-list edge.
     expect(byName(nodes, "pager", "destination").usageCount).toBe(1);
   });
 });
@@ -330,6 +341,26 @@ describe("consumerBadges", () => {
   });
 });
 
+describe("joinWithAnd", () => {
+  it("returns a single part unchanged", () => {
+    expect(joinWithAnd(["1 alert"])).toBe("1 alert");
+  });
+
+  it("joins two parts with 'and'", () => {
+    expect(joinWithAnd(["1 alert", "1 synthetic check"])).toBe("1 alert and 1 synthetic check");
+  });
+
+  it("joins three or more parts with commas and a trailing 'and'", () => {
+    expect(joinWithAnd(["1 alert", "1 pipeline", "1 synthetic check"])).toBe(
+      "1 alert, 1 pipeline and 1 synthetic check",
+    );
+  });
+
+  it("returns an empty string for no parts", () => {
+    expect(joinWithAnd([])).toBe("");
+  });
+});
+
 describe("useDependencyGraph.removeNodeFromGraph", () => {
   const graph = () =>
     buildGraph(
@@ -402,9 +433,17 @@ describe("useDependencyGraph.removeNodeFromGraph", () => {
   });
 
   it("keeps a deleted destination dangling when only a non-alert consumer still names it", () => {
-    const withPipeline = buildGraph([], [{ name: "pager", type: "http" }], [], {
-      pager: [{ consumer: "pipeline", id: "p1", name: "ingest-pipe" }],
-    });
+    const withPipeline = buildGraph(
+      [],
+      [
+        {
+          name: "pager",
+          type: "http",
+          uses: [{ consumer: "pipeline", id: "p1", name: "ingest-pipe" }],
+        },
+      ],
+      [],
+    );
 
     const next = removeNodeFromGraph(withPipeline, "destination:pager");
 
@@ -419,7 +458,6 @@ describe("useDependencyGraph.loadGraph", () => {
     graphInputs.alerts.mock.calls.length,
     graphInputs.destinations.mock.calls.length,
     graphInputs.templates.mock.calls.length,
-    graphInputs.usage.mock.calls.length,
   ];
 
   beforeEach(() => {
@@ -432,7 +470,7 @@ describe("useDependencyGraph.loadGraph", () => {
     await loadGraph("org-a");
     await loadGraph("org-a");
 
-    expect(calls()).toEqual([1, 1, 1, 1]);
+    expect(calls()).toEqual([1, 1, 1]);
   });
 
   // A refresh re-reads the inputs it names; the caller's own list is already fresh.
@@ -443,6 +481,6 @@ describe("useDependencyGraph.loadGraph", () => {
 
     await loadGraph("org-a", ["alerts", "templates"]);
 
-    expect(calls()).toEqual([2, 1, 2, 1]);
+    expect(calls()).toEqual([2, 1, 2]);
   });
 });

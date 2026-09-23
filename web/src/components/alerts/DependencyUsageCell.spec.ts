@@ -82,9 +82,17 @@ describe("DependencyUsageCell", () => {
   });
 
   it("a destination used only by a synthetic check shows that badge, not Unused", async () => {
-    const withCheck = buildGraph([], [{ name: "pager", type: "http" }], [], {
-      pager: [{ consumer: "synthetic_check", id: "c1", name: "checkout-journey" }],
-    });
+    const withCheck = buildGraph(
+      [],
+      [
+        {
+          name: "pager",
+          type: "http",
+          uses: [{ consumer: "synthetic_check", id: "c1", name: "checkout-journey" }],
+        },
+      ],
+      [],
+    );
     const wrapper = mountCell(withCheck, { kind: "destination", name: "pager" });
     await flushPromises();
     expect(wrapper.find('[data-test="used-by-pager-unused"]').exists()).toBe(false);

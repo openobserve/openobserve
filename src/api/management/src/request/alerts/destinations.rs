@@ -409,6 +409,7 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("module" = Option<String>, Query, description = "Destination module filter, none, alert, or pipeline"),
+        ("include_usage" = Option<bool>, Query, description = "When true, each destination carries the consumers that reference it"),
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Destination>)),
@@ -429,6 +430,8 @@ pub async fn list_destinations(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let module = query.get("module").map(|s| s.as_str());
+    // Opt-in, mirroring ListAlerts' `include_dependencies`: off the hot list path by default.
+    let include_usage = query.get("include_usage").is_some_and(|v| v == "true");
 
     let mut _permitted = None;
     // Get List of allowed objects
@@ -455,88 +458,26 @@ pub async fn list_destinations(
 
     match destinations::list(&org_id, module, _permitted).await {
         Ok(data) => {
-            MetaHttpResponse::json(data.into_iter().map(Destination::from).collect::<Vec<_>>())
-        }
-        Err(e) => MetaHttpResponse::bad_request(e),
-    }
-}
-
-/// GetDestinationsUsage
-#[utoipa::path(
-    get,
-    path = "/{org_id}/alerts/destinations/usage",
-    context_path = "/api",
-    tag = "Alerts",
-    operation_id = "GetDestinationsUsage",
-    summary = "Get alert destination usage",
-    description = "Returns, for every destination name referenced anywhere in the organization, the consumers that \
-                   reference it — alerts, pipelines, synthetic checks, escalation policies, team channels, composite \
-                   alerts and, on enterprise builds, workflows, anomaly detection configs and incident integrations. \
-                   One call answers the same question the delete guard checks, for a whole page at once.",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 400, description = "Error",   content_type = "application/json", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
-    )
-)]
-pub async fn get_destinations_usage(
-    Path(org_id): Path<String>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-) -> Response {
-    let mut _permitted: Option<Vec<String>> = None;
-    #[cfg(feature = "enterprise")]
-    {
-        let user_id = &user_email.user_id;
-        match openobserve_api_common::auth::validator::list_objects_for_user(
-            &org_id,
-            user_id,
-            "GET",
-            "destination",
-        )
-        .await
-        {
-            Ok(list) => {
-                _permitted = list;
+            let mut items: Vec<Destination> = data.into_iter().map(Destination::from).collect();
+            if include_usage {
+                // Same all_usage() the delete guard uses, attached only to this response's rows.
+                match destinations::all_usage(&org_id).await {
+                    Ok(mut by_destination) => {
+                        for item in &mut items {
+                            item.uses = Some(
+                                by_destination
+                                    .remove(&item.name)
+                                    .unwrap_or_default()
+                                    .into_iter()
+                                    .map(DestinationUseResponse::from)
+                                    .collect(),
+                            );
+                        }
+                    }
+                    Err(e) => return MetaHttpResponse::bad_request(e),
+                }
             }
-            Err(e) => {
-                return common::meta::http::HttpResponse::forbidden(e.to_string());
-            }
-        }
-    }
-
-    match destinations::all_usage(&org_id).await {
-        Ok(by_destination) => {
-            let permitted = |name: &str| {
-                _permitted.is_none()
-                    || _permitted
-                        .as_ref()
-                        .unwrap()
-                        .contains(&format!("destination:{name}"))
-                    || _permitted
-                        .as_ref()
-                        .unwrap()
-                        .contains(&format!("destination:_all_{org_id}"))
-            };
-            let response: HashMap<String, Vec<DestinationUseResponse>> = by_destination
-                .into_iter()
-                .filter(|(name, _)| permitted(name))
-                .map(|(name, uses)| {
-                    (
-                        name,
-                        uses.into_iter().map(DestinationUseResponse::from).collect(),
-                    )
-                })
-                .collect();
-            MetaHttpResponse::json(response)
+            MetaHttpResponse::json(items)
         }
         Err(e) => MetaHttpResponse::bad_request(e),
     }

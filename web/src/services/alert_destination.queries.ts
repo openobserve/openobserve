@@ -24,9 +24,13 @@ import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
  * can carry webhook Authorization headers and PagerDuty/Opsgenie/ServiceNow
  * keys, so this entry must never gain a persister.
  */
-export const destinationsQuery = (org: string, module?: DestinationModule) =>
+export const destinationsQuery = (
+  org: string,
+  module?: DestinationModule,
+  includeUsage?: boolean,
+) =>
   queryOptions({
-    queryKey: destinationKeys.list(org, module),
+    queryKey: destinationKeys.list(org, module, includeUsage),
     queryFn: async (): Promise<any[]> =>
       (
         await destination.list({
@@ -36,17 +40,10 @@ export const destinationsQuery = (org: string, module?: DestinationModule) =>
           desc: false,
           org_identifier: org,
           module,
+          include_usage: includeUsage,
         })
       ).data ?? [],
     // A catalogue read by every alert form and by pipelines, not alert state — so the normal tier, not the live one.
-    staleTime: NORMAL_STALE_TIME,
-  });
-
-/** Every consumer's references to every destination in the org, for the dependency graph. */
-export const destinationUsageQuery = (org: string) =>
-  queryOptions({
-    queryKey: destinationKeys.usage(org),
-    queryFn: async (): Promise<Record<string, any[]>> => (await destination.usage(org)).data ?? {},
     staleTime: NORMAL_STALE_TIME,
   });
 

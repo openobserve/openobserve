@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
 import { alertDependenciesQuery } from "@/services/alerts.queries";
-import { destinationsQuery, destinationUsageQuery } from "@/services/alert_destination.queries";
+import { destinationsQuery } from "@/services/alert_destination.queries";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import type { I18nKey } from "@/types/i18n";
@@ -63,7 +63,7 @@ export const DEP_CONSUMER_KINDS: DepConsumerKind[] = [
   "incident_integration",
 ];
 
-/** One `GET .../destinations/usage` row — matches `DestinationUseResponse` on the backend. */
+/** One destination `uses` entry — matches `DestinationUseResponse` on the backend. */
 export interface UsageRow {
   consumer: DepConsumerKind | "alert";
   id: string;
@@ -71,16 +71,13 @@ export interface UsageRow {
   folder_id?: string | null;
 }
 
-/** The whole usage endpoint response: destination name → its consumers. */
-export type UsageResponse = Record<string, UsageRow[]>;
-
 /** One entity to focus the graph on (its dependency chain), used by the popup. */
 export type DepFocus = { kind: DepNodeKind; name?: string; alertId?: string };
 
 export type DepRelation = "usage" | "template" | "override";
 
 /** The inputs the graph is built from. */
-export type GraphInput = "alerts" | "destinations" | "templates" | "usage";
+export type GraphInput = "alerts" | "destinations" | "templates";
 
 export interface DepNode {
   /** `${kind}:${name}` — stable across rebuilds; alerts key on their id. */
@@ -92,8 +89,10 @@ export interface DepNode {
   transport?: string;
   /** Total uses across every consumer kind (destinations), or refs (templates). */
   usageCount: number;
-  /** Destination-only: per-kind breakdown behind `usageCount`, from the usage endpoint. */
+  /** Destination-only: per-kind breakdown behind `usageCount`, from its `uses`. */
   consumerCounts?: Partial<Record<DepConsumerKind, number>>;
+  /** Destination-only: the rows behind `consumerCounts`, for the dialog's per-kind sections. */
+  consumerUses?: Partial<Record<DepConsumerKind, UsageRow[]>>;
   /** A destination with no alerts, or a template referenced by nothing. */
   orphan: boolean;
   /**
@@ -155,6 +154,8 @@ export interface DestinationRow {
   name: string;
   type?: string;
   template?: string | null;
+  /** Present when the list was read with `include_usage=true`. */
+  uses?: UsageRow[];
 }
 export interface TemplateRow {
   name: string;
@@ -310,6 +311,12 @@ export function consumerBadges(node: DepNode | null | undefined): ConsumerBadge[
   return out;
 }
 
+/** Joins parts as a natural-language list: "a", "a and b", or "a, b and c". */
+export function joinWithAnd(parts: string[]): string {
+  if (parts.length < 2) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
 /** The focus entity's node plus its chain-neighbour counts, in one pass. */
 export interface FocusSummary {
   node: DepNode | null;
@@ -452,7 +459,6 @@ export function useDependencyGraph() {
     alerts: AlertRow[],
     destinations: DestinationRow[],
     templates: TemplateRow[],
-    usage: UsageResponse = {},
   ): DepGraph => {
     const nodes = new Map<string, DepNode>();
     const edges: DepEdge[] = [];
@@ -499,6 +505,19 @@ export function useDependencyGraph() {
           relation: "template",
         });
       }
+      // Non-alert consumers off the row's `uses` — alerts are counted above with richer data.
+      const counts: Partial<Record<DepConsumerKind, number>> = {};
+      const uses: Partial<Record<DepConsumerKind, UsageRow[]>> = {};
+      for (const use of dst.uses ?? []) {
+        if (use.consumer === "alert") continue;
+        counts[use.consumer] = (counts[use.consumer] ?? 0) + 1;
+        (uses[use.consumer] ??= []).push(use);
+        node.usageCount += 1;
+      }
+      if (Object.keys(counts).length) {
+        node.consumerCounts = counts;
+        node.consumerUses = uses;
+      }
     }
 
     // Alerts are the demand side: each `destinations` name is a usage edge, and an
@@ -539,19 +558,6 @@ export function useDependencyGraph() {
           relation: "override",
         });
       }
-    }
-
-    // The other eight consumers, from the usage endpoint. "alert" rows are skipped —
-    // the alerts list above already counts them with richer data (enabled, folder).
-    for (const [destName, rows] of Object.entries(usage)) {
-      const dst = destinationNode(destName);
-      const counts: Partial<Record<DepConsumerKind, number>> = { ...dst.consumerCounts };
-      for (const row of rows) {
-        if (row.consumer === "alert") continue;
-        counts[row.consumer] = (counts[row.consumer] ?? 0) + 1;
-        dst.usageCount += 1;
-      }
-      if (Object.keys(counts).length) dst.consumerCounts = counts;
     }
 
     // Derive the flag states now that every reference has been counted.
@@ -600,15 +606,13 @@ export function useDependencyGraph() {
     loading.value = true;
     error.value = null;
     try {
-      // All four reads go through the query cache, so the graph reuses whatever
-      // the page it was opened from already fetched. Calling the destination
-      // service directly here used to download the destination list a second
-      // time on the destinations page's own refresh.
+      // All three reads go through the query cache. `includeUsage: true` keys the
+      // destinations read separately from a plain picker fetch (see destinationKeys.list),
+      // so the two never collide even though both cover the same org + module.
       const inputs = {
         alerts: alertDependenciesQuery(org),
-        destinations: destinationsQuery(org, "alert"),
+        destinations: destinationsQuery(org, "alert", true),
         templates: templatesQuery(org),
-        usage: destinationUsageQuery(org),
       };
       for (const name of refetch) {
         await queryClient.invalidateQueries({
@@ -617,14 +621,13 @@ export function useDependencyGraph() {
           refetchType: "none",
         });
       }
-      const [alerts, destinations, templates, usage] = await Promise.all([
+      const [alerts, destinations, templates] = await Promise.all([
         queryClient.fetchQuery(inputs.alerts),
         queryClient.fetchQuery(inputs.destinations),
         queryClient.fetchQuery(inputs.templates),
-        queryClient.fetchQuery(inputs.usage),
       ]);
 
-      graph.value = buildGraph(alerts, destinations, templates, usage);
+      graph.value = buildGraph(alerts, destinations, templates);
       graphCache = { org, graph: graph.value, at: Date.now() };
     } catch (err: any) {
       error.value = err?.response?.data?.message || err?.message || "unknown";

@@ -257,6 +257,9 @@ pub struct Destination {
     /// Optional key-value metadata for the destination.
     #[serde(default)]
     pub metadata: HashMap<String, String>,
+    /// Every consumer referencing this destination; present only when `include_usage=true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uses: Option<Vec<DestinationUseResponse>>,
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]
@@ -319,7 +322,7 @@ pub struct Template {
 }
 
 /// Wire form of `DestinationConsumer`; no wildcard arm, so a new consumer must compile here too.
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DestinationConsumerKind {
     Alert,
@@ -357,8 +360,8 @@ impl From<destination_usage::DestinationConsumer> for DestinationConsumerKind {
     }
 }
 
-/// One consumer's reference to a destination, as returned by `GET .../destinations/usage`.
-#[derive(Serialize, Debug, Clone, ToSchema)]
+/// One consumer's reference to a destination — `Destination.uses`, when `include_usage=true`.
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct DestinationUseResponse {
     pub consumer: DestinationConsumerKind,
     pub id: String,

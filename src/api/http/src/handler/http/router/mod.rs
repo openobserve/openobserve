@@ -1076,7 +1076,6 @@ pub fn service_routes() -> Router {
         // Alert destinations
         .route("/{org_id}/alerts/destinations", get(alerts::destinations::list_destinations).post(alerts::destinations::save_destination))
         .route("/{org_id}/alerts/destinations/prebuilt", get(alerts::destinations::list_prebuilt_destinations))
-        .route("/{org_id}/alerts/destinations/usage", get(alerts::destinations::get_destinations_usage))
         .route("/{org_id}/alerts/destinations/{destination_name}", get(alerts::destinations::get_destination).put(alerts::destinations::update_destination).delete(alerts::destinations::delete_destination))
         .route("/{org_id}/alerts/destinations/test", post(alerts::destinations::test_destination))
         .route("/{org_id}/alerts/destinations/{destination_name}/test_send", post(alerts::destinations::test_send))
