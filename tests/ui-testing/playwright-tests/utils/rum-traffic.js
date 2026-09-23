@@ -78,10 +78,10 @@ function attachCdnAssetTracker(page) {
 async function waitForRumSdkReady(page, timeoutMs = 30000) {
   await page.waitForFunction(
     () =>
-      window.OO_RUM &&
-      typeof window.OO_RUM.getInternalContext === 'function' &&
-      window.OO_LOGS &&
-      typeof window.OO_LOGS.logger === 'object',
+      window.O2_RUM &&
+      typeof window.O2_RUM.getInternalContext === 'function' &&
+      window.O2_LOGS &&
+      typeof window.O2_LOGS.logger === 'object',
     { timeout: timeoutMs },
   );
 }
