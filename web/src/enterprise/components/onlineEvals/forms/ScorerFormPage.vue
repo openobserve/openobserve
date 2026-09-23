@@ -1284,7 +1284,10 @@ async function save(value: ScorerForm) {
           ? Number(value.producesScoreConfigVersion)
           : null,
     };
-    const extraFields = decisionProvider.value ? [] : cleanExtraFields(value.extraMetadataFields);
+    const valueProvider = props.providers.find((p) => p.id === value.providerId);
+    const extraFields = isDecisionOnlyProvider(valueProvider)
+      ? []
+      : cleanExtraFields(value.extraMetadataFields);
     const scorerPayload: Record<string, any> = isLlmJudge
       ? {
           type: "llm_judge",
