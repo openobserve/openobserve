@@ -38,6 +38,7 @@ vectorscan = [
     "search_service/vectorscan",
     "stream/vectorscan",
 ]
+profiling = ["openobserve-core/profiling"]
 
 [dependencies]
 audit.workspace = true
