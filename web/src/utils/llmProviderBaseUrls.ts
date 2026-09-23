@@ -25,4 +25,7 @@ export const DEFAULT_PROVIDER_BASE_URLS: Record<string, string> = {
 /** Providers with no working default: an example shape to guide the user, not a usable value. */
 export const SUGGESTED_PROVIDER_BASE_URLS: Record<string, string> = {
   openai_compatible: "https://your-host/v1",
+  // Served at `/v1/systemone` on TypeSafe and OpenRouter; OpenRouter's
+  // `/alpha/decisions` route is accepted as a full URL too.
+  systemone: "https://openrouter.ai/api/v1",
 };
