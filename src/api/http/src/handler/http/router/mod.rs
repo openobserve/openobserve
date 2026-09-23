@@ -797,13 +797,28 @@ pub fn service_routes() -> Router {
     router = router.route("/{org_id}/config", get(status::zo_config));
     // Users
     // Reading one member returns their lockout counters, which only an enterprise build has.
-    let user_record = post(users::add_user_to_org)
-        .put(users::update)
-        .delete(users::delete);
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        router = router.route(
+            "/{org_id}/users/{email_id}",
+            post(users::add_user_to_org)
+                .put(users::update)
+                .delete(users::delete),
+        );
+    }
     #[cfg(feature = "enterprise")]
-    let user_record = user_record.get(users::get);
+    {
+        router = router.route(
+            "/{org_id}/users/{email_id}",
+            post(users::add_user_to_org)
+                .put(users::update)
+                .delete(users::delete)
+                .get(users::get),
+        );
+    }
+
     router = router.route("/{org_id}/users", get(users::list).post(users::save))
-        .route("/{org_id}/users/{email_id}", user_record)
         .route("/{org_id}/users/bulk", delete(users::delete_bulk))
         .route("/{org_id}/users/roles", get(users::list_roles))
         .route("/invites", get(users::list_invitations))
