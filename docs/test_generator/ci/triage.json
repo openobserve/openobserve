@@ -1,0 +1,35 @@
+{
+  "feature_slug": "password-policy",
+  "feature_title": "Password Policy",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "passwordPolicy.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/passwordPolicy.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/PasswordPolicy.vue",
+    "web/src/components/settings/PasswordPolicy.schema.ts",
+    "web/src/components/common/UpdatePasswordDialog.vue",
+    "web/src/components/common/PasswordRequirementList.vue",
+    "web/src/components/common/PasswordExpiryBanner.vue",
+    "web/src/components/login/Login.vue",
+    "web/src/components/iam/users/AddUser.vue",
+    "web/src/composables/usePasswordComplexity.ts",
+    "web/src/composables/usePasswordExpiryWarning.ts",
+    "web/src/services/passwordPolicy.ts",
+    "web/src/utils/passwordComplexity.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The change spans both open-source and enterprise-owned paths. OSS paths include src/api/... (http handler, management request password_policy), src/config/src/meta/system_settings.rs, src/db/src/password_policy.rs, src/infra/src/table/..., and the web/src/** password-policy UI. Enterprise paths include o2_enterprise/src/enterprise/password_policy/ (enforcement, history, lockout, meta, validate, mod) and o2_openfga/src/meta/route_permissions.rs. This is a linked OSS+ENT sister pair, so edition is 'both'.",
+    "skip": "Not skipped. feature_hint.txt and trigger_comment.txt are empty (no tests-added label, no skip comment), and the change is clearly user-facing — it adds a Settings password-policy page plus login/add-user/update-password validation and an expiry banner in web/src/**, so it is not docs-only or CI-only.",
+    "e2e": "E2E is warranted: the diff adds and alters user-exercisable UI flows, including the Settings → Password Policy page (PasswordPolicy.vue), password requirement feedback on Login.vue and AddUser.vue, the UpdatePasswordDialog and PasswordRequirementList, and a PasswordExpiryBanner. These are new/changed interactions and validation paths that need behavior verification.",
+    "area": "Area is GeneralTests because the bulk of the UI changes live under web/src/components/settings/ (with supporting common/login/IAM-user components), and the closest sibling specs — settings-form-validation, login-form-validation, iam-form-validation, usersOrg — all live under tests/ui-testing/playwright-tests/GeneralTests/. There is no dedicated Settings shard in the matrix.",
+    "group": "playwright_group is GeneralTests because password policy is a general security/settings feature, analogous to the settings/security specs already in that shard (theme-management, cipherKeys, logoManagement, languageTranslation). If that shard is at capacity, GeneralTests-Forms (which already holds settings-form-validation.spec.js) is the nearest fallback.",
+    "existing_tests": "No Playwright E2E specs in the diff — no files under tests/ui-testing/playwright-tests/ were changed. The .spec.ts files under web/src/** (PasswordRequirementList.spec.ts, UpdatePasswordDialog.spec.ts, Login.spec.ts, passwordComplexity.spec.ts, etc.) are Vitest unit tests, not E2E coverage, and tests/integration_test.rs is a Rust test — neither counts as existing E2E coverage."
+  }
+}

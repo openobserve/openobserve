@@ -1,0 +1,7 @@
+[
+  { "title": "should render the password policy form with all sections", "action": "new", "verifies": "the Settings > Password Policy form mounts and renders fields across all five sections" },
+  { "title": "should show a validation error when max length is below min length", "action": "new", "verifies": "the max-length-below-min-length cross-field rule surfaces a footer error on submit" },
+  { "title": "should show a validation error when rotation warning days exceed rotation days", "action": "new", "verifies": "the rotation-warning-days-exceed-rotation-days cross-field rule surfaces a footer error on submit" },
+  { "title": "should reveal the special character set input only when require special is enabled", "action": "new", "verifies": "the special character set input renders only while require-special is on" },
+  { "title": "should reveal the lockout preview and enable duration controls when threshold is set", "action": "new", "verifies": "setting a lockout threshold reveals the preview and enables the duration controls" }
+]
