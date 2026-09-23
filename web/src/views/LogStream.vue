@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
                 class="no-border o2-search-input min-w-0 flex-1 max-md:min-w-40"
-                :placeholder="t('logStream.search')"  
+                :placeholder="t('logStream.search')"
                 :debounce="300"
               />
             </div>
