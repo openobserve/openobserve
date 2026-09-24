@@ -26,7 +26,7 @@ use base64::Engine;
 use common::meta::user::AuthTokensExt;
 use common::meta::user::{AuthTokens, UserOrgRole};
 use config::{
-    meta::user::UserRole,
+    meta::{feature::Feature, user::UserRole},
     utils::{hash::try_get_passcode_hash, json},
 };
 use lru::LruCache;
@@ -266,6 +266,8 @@ pub struct AuthExtractor {
     pub use_all_org: bool,
     pub use_self_context: bool,
     pub use_self_parent: bool,
+    /// License features the route requires; checked even when `bypass_check` is set.
+    pub feature: Option<&'static [Feature]>,
 }
 
 impl AuthExtractor {
@@ -282,6 +284,7 @@ impl AuthExtractor {
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         }
     }
 }
@@ -376,6 +379,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature: None,
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
@@ -404,6 +408,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature: None,
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
@@ -447,6 +452,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature: None,
                 });
             }
         };
@@ -467,6 +473,7 @@ where
                 use_all_org: false,
                 use_self_context: false,
                 use_self_parent: false,
+                feature: resolved.feature,
             });
         }
 
@@ -485,6 +492,7 @@ where
             use_all_org: resolved.use_all_org,
             use_self_context: resolved.use_self_context,
             use_self_parent: resolved.use_self_parent,
+            feature: resolved.feature,
         })
     }
 
@@ -523,6 +531,7 @@ where
                 use_all_org: false,
                 use_self_context: false,
                 use_self_parent: false,
+                feature: None,
             });
         }
 
@@ -580,6 +589,7 @@ fn opamp_extractor(
         use_all_org: false,
         use_self_context: false,
         use_self_parent: false,
+        feature: None,
     })
 }
 
@@ -793,6 +803,7 @@ pub async fn check_permissions(
                 use_all_org,
                 use_self_context,
                 use_self_parent,
+                feature: None,
             },
             user.role,
             user.is_external,
