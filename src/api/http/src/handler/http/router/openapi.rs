@@ -378,6 +378,8 @@ use crate::{
             openobserve_api_management::models::destinations::Destination,
             openobserve_api_management::models::destinations::DestinationType,
             openobserve_api_management::models::destinations::Template,
+            openobserve_api_management::models::destinations::DestinationUseResponse,
+            openobserve_api_management::models::destinations::DestinationConsumerKind,
             // Alerts
             openobserve_api_management::models::alerts::requests::CreateAlertRequestBody,
             openobserve_api_management::models::alerts::requests::UpdateAlertRequestBody,

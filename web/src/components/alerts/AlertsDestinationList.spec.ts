@@ -245,6 +245,14 @@ describe("AlertsDestinationList", () => {
       expect(destinationService.list).toHaveBeenCalled();
     });
 
+    it("asks for include_usage, so its own request shares the dependency graph's cache entry", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(destinationService.list).toHaveBeenCalledWith(
+        expect.objectContaining({ include_usage: true }),
+      );
+    });
+
     it("calls templateService.list on mount", async () => {
       wrapper = mountComponent();
       await flushPromises();
