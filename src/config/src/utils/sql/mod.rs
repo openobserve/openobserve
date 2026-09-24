@@ -53,3 +53,15 @@ pub const AGGREGATE_UDF_LIST: [&str; 17] = [
     "approx_topk",
     "approx_topk_distinct",
 ];
+
+pub fn quote_identifier(value: &str) -> String {
+    format!("\"{}\"", value.replace('"', "\"\""))
+}
+
+pub fn quote_sql_string(value: &str) -> String {
+    format!("'{}'", escape_sql_string(value))
+}
+
+pub fn escape_sql_string(value: &str) -> String {
+    value.replace('\'', "''")
+}

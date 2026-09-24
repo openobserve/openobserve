@@ -84,6 +84,7 @@ pub mod session {
     use serde_json::Value;
 
     use crate::TIMESTAMP_COL_NAME;
+    pub use crate::utils::sql::{escape_sql_string, quote_identifier, quote_sql_string};
 
     pub const SESSION_ID_COLUMNS: &[&str] = &[
         "session_id",
@@ -176,18 +177,6 @@ pub mod session {
             ingest_cutoff_predicate(ingest_cutoff_us),
             quote_identifier(TIMESTAMP_COL_NAME),
         )
-    }
-
-    pub fn quote_identifier(value: &str) -> String {
-        format!("\"{}\"", value.replace('"', "\"\""))
-    }
-
-    pub fn quote_sql_string(value: &str) -> String {
-        format!("'{}'", escape_sql_string(value))
-    }
-
-    pub fn escape_sql_string(value: &str) -> String {
-        value.replace('\'', "''")
     }
 
     #[cfg(test)]
