@@ -2169,13 +2169,16 @@ describe("CreateBrowserTest", () => {
     it("falls back to the default when the chosen environment disappears", async () => {
       wrapper = await mountTemplatedCheck(["prod"]);
       await chooseReplayEnvironment(wrapper, "stg");
-      mockServiceListEnvironments.mockResolvedValue({
-        data: orgEnvironments().filter((env) => env.id !== "stg"),
-      });
-
       // A promotion from the variables panel is one of the host's shared-list refreshes.
       journeyStub(wrapper).vm.$emit("toggle-variables-panel");
       await flushPromises();
+      wrapper.findComponent({ name: "CheckVariablesPanel" }).vm.$emit("promoted", "OTHER");
+      await flushPromises();
+      expect(replayMenu(wrapper).props("selectedId")).toBe("stg");
+
+      mockServiceListEnvironments.mockResolvedValue({
+        data: orgEnvironments().filter((env) => env.id !== "stg"),
+      });
       wrapper.findComponent({ name: "CheckVariablesPanel" }).vm.$emit("promoted", "OTHER");
       await flushPromises();
       await replay(wrapper, [{ action: "navigate", url: "{{BASE_URL}}/login" }]);
@@ -2277,6 +2280,13 @@ describe("CreateBrowserTest", () => {
       expect(replayedVariables()).toContainEqual({ name: "API_KEY", value: "k" });
       expect(errorToasts()).toHaveLength(0);
       expect(secretsDialogOpen(wrapper)).toBe(false);
+
+      mockRecorderReplay.mockClear();
+      await replayJourney(wrapper);
+
+      expect(secretsDialogOpen(wrapper)).toBe(false);
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      expect(replayedVariables()).toContainEqual({ name: "API_KEY", value: "k" });
     });
 
     it("writes to the environment the replay was started in, even if the selector changes while the dialog is open", async () => {
@@ -2292,6 +2302,7 @@ describe("CreateBrowserTest", () => {
 
       expect(mockServiceCreateEnvironmentVariable).toHaveBeenCalledTimes(1);
       expect(mockServiceCreateEnvironmentVariable.mock.calls[0][1]).toBe("stg");
+      expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://stg.test/login");
     });
 
     it("asks for the next missing name only after the first dialog closes", async () => {
@@ -2356,6 +2367,18 @@ describe("CreateBrowserTest", () => {
       expect(mockReplayUpTo).toHaveBeenCalledTimes(1);
       expect(mockReplayUpTo).toHaveBeenCalledWith(2);
       expect(missingDialogOpen(wrapper)).toBe(false);
+    });
+
+    it("replays a prefix that does not use the missing name without asking for it", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], {
+        journey: [typeStep("s1", "a"), typeStep("s2", "b"), typeStep("s3", "{{API_KEY}}")],
+      });
+
+      journeyStub(wrapper).vm.$emit("replay-up-to", 2);
+      await flushPromises();
+
+      expect(missingDialogOpen(wrapper)).toBe(false);
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
     });
 
     it("offers no Replay anyway when the Starting URL needs the value", async () => {

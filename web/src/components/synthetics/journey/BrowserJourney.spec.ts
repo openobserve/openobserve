@@ -2811,11 +2811,13 @@ describe("BrowserJourney variables panel toggle", () => {
     wrapper = mountToolbar({ variablesPanelOpen: true });
     expect(toggleIconOf(wrapper)).toBe("data-object");
     expect(wrapper.find(TOGGLE).attributes("aria-pressed")).toBe("true");
+    expect(wrapper.find(TOGGLE).attributes("active")).toBe("true");
     wrapper.unmount();
 
     wrapper = mountToolbar({ variablesPanelOpen: false });
     expect(toggleIconOf(wrapper)).toBe("data-object");
     expect(wrapper.find(TOGGLE).attributes("aria-pressed")).toBe("false");
+    expect(wrapper.find(TOGGLE).attributes("active")).toBe("false");
   });
 });
 
@@ -3669,7 +3671,7 @@ describe("BrowserJourney typed secrets", () => {
     wrapper = mountSecrets({
       replayPhase: "failed",
       stepResults: new Map([pass("s1"), pass("s2"), fail("s3")] as any),
-      typedSecretReport: { names: ["PASSWORD"], stepByName: { PASSWORD: [2] } },
+      typedSecretReport: { names: ["PASSWORD"], stepByName: { PASSWORD: [1, 2] } },
       replayEnvironmentLabel: "QA",
     });
 
@@ -3845,6 +3847,7 @@ describe("BrowserJourney toolbar while recording", () => {
     expect(mockT).toHaveBeenCalledWith("synthetics.journey.recordingIn", {
       environment: "Staging",
     });
+    expect(wrapper.text()).toContain("synthetics.journey.recordingIn");
   });
 
   it("the Starting URL pill is disabled while recording", async () => {
@@ -3857,6 +3860,10 @@ describe("BrowserJourney toolbar while recording", () => {
 
     await startRecording(wrapper);
 
+    expect(pill().attributes("data-locked")).toBe("true");
+    wrapper.unmount();
+
+    wrapper = mountToolbar({ readonly: true }, { "start-pill": slot });
     expect(pill().attributes("data-locked")).toBe("true");
   });
 });
