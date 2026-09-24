@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, hash_map::Entry};
 
 use config::meta::promql::{
     NAME_LABEL,
@@ -26,14 +26,48 @@ use rayon::prelude::*;
 use crate::binary::scalar_binary_operations;
 
 // DROP_METRIC_BIN_OP if the operation is one of these, drop the metric __name__
-pub const DROP_METRIC_BIN_OP: [u8; 6] = [
+pub const DROP_METRIC_BIN_OP: [u8; 7] = [
     token::T_ADD,
     token::T_SUB,
     token::T_DIV,
     token::T_MUL,
     token::T_POW,
     token::T_MOD,
+    token::T_ATAN2,
 ];
+
+/// The "one"-side series sharing a matching signature, indexed by timestamp.
+struct OneSideGroup {
+    labels: Vec<Labels>,
+    samples: HashMap<i64, (usize, f64)>,
+}
+
+impl OneSideGroup {
+    fn new(series: Vec<RangeValue>, side: &str) -> Result<Self> {
+        let mut labels: Vec<Labels> = Vec::with_capacity(series.len());
+        let mut samples = HashMap::with_capacity(series.first().map_or(0, |s| s.samples.len()));
+        for (idx, range) in series.into_iter().enumerate() {
+            for sample in &range.samples {
+                if let Some((other, _)) = samples.insert(sample.timestamp, (idx, sample.value)) {
+                    return Err(DataFusionError::Execution(format!(
+                        "found duplicate series for the match group on the {side} hand-side of the operation: [{}, {}];many-to-many matching not allowed: matching labels must be unique on one side",
+                        format_labels(&labels[other]),
+                        format_labels(&range.labels),
+                    )));
+                }
+            }
+            labels.push(range.labels);
+        }
+        Ok(Self { labels, samples })
+    }
+}
+
+/// Samples of one "many"-side series matched against one "one"-side series.
+struct MatchedSeries {
+    /// Key under which two matches may not share a timestamp.
+    unique_key: u64,
+    range: RangeValue,
+}
 
 /// Implement the operation between a matrix and a float.
 ///
@@ -209,10 +243,6 @@ fn vector_arithmetic_operators(
     left: Vec<RangeValue>,
     right: Vec<RangeValue>,
 ) -> Result<Value> {
-    let operator = expr.op.id();
-    let return_bool = expr.return_bool();
-    let comparison_operator = expr.op.is_comparison_operator();
-
     let is_matching_on = expr.is_matching_on();
     let matching_labels: Vec<String> = expr
         .modifier
@@ -231,62 +261,159 @@ fn vector_arithmetic_operators(
         }
     };
 
+    let card = expr.modifier.as_ref().map(|modifier| &modifier.card);
     // group_right makes the lhs the "one" side, so the rhs series drive the output
-    let one_to_many = matches!(
-        expr.modifier.as_ref().map(|modifier| &modifier.card),
-        Some(VectorMatchCardinality::OneToMany(_))
-    );
-    let (many, one) = if one_to_many {
-        (right, left)
+    let one_to_many = matches!(card, Some(VectorMatchCardinality::OneToMany(_)));
+    let one_to_one = card.is_none_or(|card| *card == VectorMatchCardinality::OneToOne);
+    let (many, one, one_side) = if one_to_many {
+        (right, left, "left")
     } else {
-        (left, right)
+        (left, right, "right")
     };
 
-    let one_sig: HashMap<u64, RangeValue> = one
+    let mut one_series: HashMap<u64, Vec<RangeValue>> = HashMap::new();
+    for (signature, range) in one
         .into_par_iter()
         .map(|range| (match_signature(&range.labels), range))
-        .collect();
-
-    let output: Vec<RangeValue> = many
+        .collect::<Vec<_>>()
+    {
+        one_series.entry(signature).or_default().push(range);
+    }
+    let one_groups: HashMap<u64, OneSideGroup> = one_series
         .into_par_iter()
-        .filter_map(|mut range| {
-            let one_range = one_sig.get(&match_signature(&range.labels))?;
-            let one_values: HashMap<i64, f64> = one_range
-                .samples
-                .iter()
-                .map(|s| (s.timestamp, s.value))
-                .collect();
+        .map(|(signature, series)| Ok((signature, OneSideGroup::new(series, one_side)?)))
+        .collect::<Result<_>>()?;
 
-            let new_samples: Vec<Sample> = range
-                .samples
-                .iter()
-                .filter_map(|sample| {
-                    let one_value = *one_values.get(&sample.timestamp)?;
-                    let (lhs, rhs) = if one_to_many {
-                        (one_value, sample.value)
-                    } else {
-                        (sample.value, one_value)
-                    };
-                    scalar_binary_operations(operator, lhs, rhs, return_bool, comparison_operator)
-                        .ok()
-                        .map(|value| Sample {
-                            timestamp: sample.timestamp,
-                            value,
+    let matched: Vec<MatchedSeries> = many
+        .into_par_iter()
+        .flat_map_iter(|range| {
+            let signature = match_signature(&range.labels);
+            match one_groups.get(&signature) {
+                Some(group) => {
+                    let pairs = match_series(expr, &range, group, one_to_many, &matching_labels);
+                    pairs
+                        .into_iter()
+                        .map(|range| MatchedSeries {
+                            unique_key: if one_to_one {
+                                signature
+                            } else {
+                                range.labels.signature()
+                            },
+                            range,
                         })
-                })
-                .collect();
-
-            if new_samples.is_empty() {
-                return None;
+                        .collect()
+                }
+                None => vec![],
             }
-            let labels = std::mem::take(&mut range.labels);
-            range.labels = result_labels(expr, labels, &one_range.labels, &matching_labels);
-            range.samples = new_samples;
-            Some(range)
         })
         .collect();
 
-    Ok(Value::Matrix(output))
+    Ok(Value::Matrix(merge_matched_series(matched, one_to_one)?))
+}
+
+/// Applies the operator to one "many"-side series, split by the "one"-side series each step
+/// matched.
+fn match_series(
+    expr: &BinaryExpr,
+    range: &RangeValue,
+    group: &OneSideGroup,
+    one_to_many: bool,
+    matching_labels: &[String],
+) -> Vec<RangeValue> {
+    let operator = expr.op.id();
+    let return_bool = expr.return_bool();
+    let comparison_operator = expr.op.is_comparison_operator();
+
+    let mut per_one_series: Vec<(usize, Vec<Sample>)> = vec![];
+    for sample in &range.samples {
+        let Some(&(idx, one_value)) = group.samples.get(&sample.timestamp) else {
+            continue;
+        };
+        let (lhs, rhs) = if one_to_many {
+            (one_value, sample.value)
+        } else {
+            (sample.value, one_value)
+        };
+        let Ok(value) =
+            scalar_binary_operations(operator, lhs, rhs, return_bool, comparison_operator)
+        else {
+            continue;
+        };
+        let sample = Sample {
+            timestamp: sample.timestamp,
+            value,
+        };
+        match per_one_series.iter_mut().find(|(i, _)| *i == idx) {
+            Some((_, samples)) => samples.push(sample),
+            None => per_one_series.push((idx, vec![sample])),
+        }
+    }
+
+    per_one_series
+        .into_iter()
+        .map(|(idx, samples)| RangeValue {
+            labels: result_labels(
+                expr,
+                range.labels.clone(),
+                &group.labels[idx],
+                matching_labels,
+            ),
+            samples,
+            exemplars: range.exemplars.clone(),
+            time_window: range.time_window.clone(),
+        })
+        .collect()
+}
+
+/// Rejects ambiguous matches at a timestamp and merges results that end up with the same labels.
+fn merge_matched_series(matched: Vec<MatchedSeries>, one_to_one: bool) -> Result<Vec<RangeValue>> {
+    let mut by_key: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matched.len());
+    for (idx, series) in matched.iter().enumerate() {
+        by_key.entry(series.unique_key).or_default().push(idx);
+    }
+    for indexes in by_key.values().filter(|indexes| indexes.len() > 1) {
+        let mut timestamps = HashSet::new();
+        for &idx in indexes {
+            let range = &matched[idx].range;
+            if range
+                .samples
+                .iter()
+                .any(|s| !timestamps.insert(s.timestamp))
+            {
+                return Err(DataFusionError::Execution(if one_to_one {
+                    format!(
+                        "multiple matches for labels {}: many-to-one matching must be explicit (group_left/group_right)",
+                        format_labels(&range.labels)
+                    )
+                } else {
+                    format!(
+                        "multiple matches for labels {}: grouping labels must ensure unique matches",
+                        format_labels(&range.labels)
+                    )
+                }));
+            }
+        }
+    }
+
+    let mut output: Vec<RangeValue> = Vec::with_capacity(matched.len());
+    let mut merged = vec![false; matched.len()];
+    let mut by_labels: HashMap<u64, usize> = HashMap::with_capacity(matched.len());
+    for MatchedSeries { range, .. } in matched {
+        match by_labels.entry(range.labels.signature()) {
+            Entry::Occupied(entry) => {
+                output[*entry.get()].samples.extend(range.samples);
+                merged[*entry.get()] = true;
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(output.len());
+                output.push(range);
+            }
+        }
+    }
+    for (range, _) in output.iter_mut().zip(merged).filter(|(_, merged)| *merged) {
+        range.samples.sort_unstable_by_key(|s| s.timestamp);
+    }
+    Ok(output)
 }
 
 /// Output labels of a matched pair, following Prometheus' `resultMetric`.
@@ -323,6 +450,14 @@ fn result_labels(
         labels.sort();
     }
     labels
+}
+
+fn format_labels(labels: &Labels) -> String {
+    let pairs: Vec<String> = labels
+        .iter()
+        .map(|label| format!("{}=\"{}\"", label.name, label.value))
+        .collect();
+    format!("{{{}}}", pairs.join(", "))
 }
 
 /// Implement binary operations between two matrices
@@ -744,16 +879,41 @@ mod tests {
         }
     }
 
-    fn eval_bin_op(query: &str, left: Vec<RangeValue>, right: Vec<RangeValue>) -> Vec<RangeValue> {
+    fn try_eval_bin_op(
+        query: &str,
+        left: Vec<RangeValue>,
+        right: Vec<RangeValue>,
+    ) -> Result<Vec<RangeValue>> {
         let promql_parser::parser::Expr::Binary(expr) =
             promql_parser::parser::parse(query).unwrap()
         else {
             panic!("not a binary expression: {query}");
         };
-        match vector_bin_op(&expr, left, right).unwrap() {
-            Value::Matrix(matrix) => matrix,
+        match vector_bin_op(&expr, left, right)? {
+            Value::Matrix(matrix) => Ok(matrix),
             other => panic!("expected a matrix, got {other:?}"),
         }
+    }
+
+    fn eval_bin_op(query: &str, left: Vec<RangeValue>, right: Vec<RangeValue>) -> Vec<RangeValue> {
+        try_eval_bin_op(query, left, right).unwrap()
+    }
+
+    fn range_at(samples: &[(i64, f64)], labels: Vec<(&str, &str)>) -> RangeValue {
+        let mut range = create_test_range_value(vec![], labels);
+        range.samples = samples
+            .iter()
+            .map(|&(timestamp, value)| Sample { timestamp, value })
+            .collect();
+        range
+    }
+
+    fn sample_pairs(range: &RangeValue) -> Vec<(i64, f64)> {
+        range
+            .samples
+            .iter()
+            .map(|s| (s.timestamp, s.value))
+            .collect()
     }
 
     fn label_pairs(range: &RangeValue) -> Vec<(String, String)> {
@@ -903,5 +1063,91 @@ mod tests {
                 (pairs(&[("instance", "b"), ("job", "db")]), 20.0),
             ]
         );
+    }
+
+    #[test]
+    fn test_one_side_series_changing_over_time_all_match() {
+        let left = vec![range_at(&[(1, 10.0), (2, 20.0)], vec![("job", "api")])];
+        let right = vec![
+            range_at(&[(1, 2.0)], vec![("instance", "x"), ("job", "api")]),
+            range_at(&[(2, 4.0)], vec![("instance", "y"), ("job", "api")]),
+        ];
+        let result = eval_bin_op("a / ignoring (instance) group_left b", left, right);
+        assert_eq!(result.len(), 1);
+        assert_eq!(label_pairs(&result[0]), pairs(&[("job", "api")]));
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 5.0), (2, 5.0)]);
+    }
+
+    #[test]
+    fn test_one_side_duplicate_at_same_timestamp_errors() {
+        let left = vec![range_at(&[(1, 10.0)], vec![("job", "api")])];
+        let right = vec![
+            range_at(&[(1, 2.0)], vec![("instance", "x"), ("job", "api")]),
+            range_at(&[(1, 4.0)], vec![("instance", "y"), ("job", "api")]),
+        ];
+        let err = try_eval_bin_op("a / ignoring (instance) group_left b", left, right)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("many-to-many matching not allowed"), "{err}");
+    }
+
+    #[test]
+    fn test_one_to_one_many_matches_at_same_timestamp_errors() {
+        let left = vec![
+            range_at(&[(1, 3.0)], vec![("code", "200"), ("job", "api")]),
+            range_at(&[(1, 1.0)], vec![("code", "500"), ("job", "api")]),
+        ];
+        let right = vec![range_at(&[(1, 4.0)], vec![("job", "api")])];
+        let err = try_eval_bin_op("a + ignoring (code) b", left, right)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("many-to-one matching must be explicit"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn test_one_to_one_matches_at_different_timestamps_merge() {
+        let left = vec![
+            range_at(&[(2, 1.0)], vec![("code", "500"), ("job", "api")]),
+            range_at(&[(1, 3.0)], vec![("code", "200"), ("job", "api")]),
+        ];
+        let right = vec![range_at(&[(1, 4.0), (2, 4.0)], vec![("job", "api")])];
+        let result = eval_bin_op("a + ignoring (code) b", left, right);
+        assert_eq!(result.len(), 1);
+        assert_eq!(label_pairs(&result[0]), pairs(&[("job", "api")]));
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 7.0), (2, 5.0)]);
+    }
+
+    #[test]
+    fn test_group_left_duplicate_output_at_same_timestamp_errors() {
+        let left = vec![
+            range_at(&[(1, 3.0)], vec![("code", "200"), ("job", "api")]),
+            range_at(&[(1, 1.0)], vec![("code", "500"), ("job", "api")]),
+        ];
+        let right = vec![range_at(&[(1, 4.0)], vec![("job", "api")])];
+        let err = try_eval_bin_op("a / ignoring (code) group_left (code) b", left, right)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("grouping labels must ensure unique matches"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn test_atan2_drops_metric_name() {
+        let left = vec![range_at(
+            &[(1, 1.0)],
+            vec![("__name__", "a"), ("code", "200"), ("job", "api")],
+        )];
+        let right = vec![range_at(
+            &[(1, 1.0)],
+            vec![("__name__", "b"), ("job", "api")],
+        )];
+        let result = eval_bin_op("a atan2 ignoring (code) b", left, right);
+        assert_eq!(result.len(), 1);
+        assert_eq!(label_pairs(&result[0]), pairs(&[("job", "api")]));
     }
 }
