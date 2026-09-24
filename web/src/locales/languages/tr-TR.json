@@ -7966,7 +7966,18 @@
     "enabled": "Etkin",
     "paused": "Duraklatıldı",
     "impactTemplate": "{destinations} · {alerts} tarafından kullanılıyor",
-    "impactDestination": "Kullanan: {alerts}"
+    "impactDestination": "{consumers} tarafından kullanılıyor",
+    "impactUnused": "Kullanılmıyor",
+    "noConsumers": "Kullanan yok.",
+    "countCompositeAlert": "{count} bileşik uyarı | {count} bileşik uyarı",
+    "countPipeline": "{count} boru hattı | {count} boru hattı",
+    "countSyntheticCheck": "{count} sentetik kontrol | {count} sentetik kontrol",
+    "countOncallPolicy": "{count} eskalasyon politikası | {count} eskalasyon politikası",
+    "countOncallTeamChannel": "{count} ekip kanalı | {count} ekip kanalı",
+    "countWorkflow": "{count} iş akışı | {count} iş akışı",
+    "countAnomalyDetection": "{count} anomali dedektörü | {count} anomali dedektörü",
+    "countIncidentIntegration": "{count} olay entegrasyonu | {count} olay entegrasyonu",
+    "sectionOtherConsumers": "Ayrıca kullananlar"
   },
   "alert_library": {
     "header": "Uyarı Kitaplığı",

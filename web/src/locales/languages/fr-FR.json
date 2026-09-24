@@ -7966,7 +7966,18 @@
     "enabled": "Activé",
     "paused": "En pause",
     "impactTemplate": "Utilisé par {destinations} · {alerts}",
-    "impactDestination": "Utilisé par {alerts}"
+    "impactDestination": "Utilisé par {consumers}",
+    "impactUnused": "Non utilisé",
+    "noConsumers": "Aucun consommateur.",
+    "countCompositeAlert": "{count} alerte composite | {count} alertes composites",
+    "countPipeline": "{count} canalisation | {count} canalisations",
+    "countSyntheticCheck": "{count} contrôle synthétique | {count} contrôles synthétiques",
+    "countOncallPolicy": "{count} politique d'escalade | {count} politiques d'escalade",
+    "countOncallTeamChannel": "{count} canal d'équipe | {count} canaux d'équipe",
+    "countWorkflow": "{count} workflow | {count} workflows",
+    "countAnomalyDetection": "{count} détecteur d'anomalies | {count} détecteurs d'anomalies",
+    "countIncidentIntegration": "{count} intégration d'incident | {count} intégrations d'incident",
+    "sectionOtherConsumers": "Aussi utilisé par"
   },
   "alert_library": {
     "header": "Bibliothèque d'alertes",

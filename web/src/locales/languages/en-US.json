@@ -7966,7 +7966,18 @@
     "enabled": "Enabled",
     "paused": "Paused",
     "impactTemplate": "Used by {destinations} · {alerts}",
-    "impactDestination": "Used by {alerts}"
+    "impactDestination": "Used by {consumers}",
+    "impactUnused": "Not used",
+    "noConsumers": "No consumers.",
+    "countCompositeAlert": "{count} composite alert | {count} composite alerts",
+    "countPipeline": "{count} pipeline | {count} pipelines",
+    "countSyntheticCheck": "{count} synthetic check | {count} synthetic checks",
+    "countOncallPolicy": "{count} escalation policy | {count} escalation policies",
+    "countOncallTeamChannel": "{count} team channel | {count} team channels",
+    "countWorkflow": "{count} workflow | {count} workflows",
+    "countAnomalyDetection": "{count} anomaly detector | {count} anomaly detectors",
+    "countIncidentIntegration": "{count} incident integration | {count} incident integrations",
+    "sectionOtherConsumers": "Also used by"
   },
   "alert_library": {
     "header": "Alert Library",

@@ -8359,6 +8359,7 @@ dependencies = [
  "snap",
  "sqlparser",
  "stream",
+ "strum 0.28.0",
  "svix-ksuid",
  "thiserror 2.0.19",
  "tiktoken-rs",

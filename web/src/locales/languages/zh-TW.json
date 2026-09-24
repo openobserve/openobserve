@@ -7961,7 +7961,18 @@
     "enabled": "已啟用",
     "paused": "已暫停",
     "impactTemplate": "由 {destinations} · {alerts} 使用",
-    "impactDestination": "由 {alerts} 使用"
+    "impactDestination": "由 {consumers} 使用",
+    "impactUnused": "未使用",
+    "noConsumers": "沒有使用方。",
+    "countCompositeAlert": "{count} 個複合警示 | {count} 個複合警示",
+    "countPipeline": "{count} 個管線 | {count} 個管線",
+    "countSyntheticCheck": "{count} 個合成檢查 | {count} 個合成檢查",
+    "countOncallPolicy": "{count} 個升級政策 | {count} 個升級政策",
+    "countOncallTeamChannel": "{count} 個團隊頻道 | {count} 個團隊頻道",
+    "countWorkflow": "{count} 個工作流程 | {count} 個工作流程",
+    "countAnomalyDetection": "{count} 個異常偵測器 | {count} 個異常偵測器",
+    "countIncidentIntegration": "{count} 個事件整合 | {count} 個事件整合",
+    "sectionOtherConsumers": "也用於"
   },
   "alert_library": {
     "header": "警示庫",
