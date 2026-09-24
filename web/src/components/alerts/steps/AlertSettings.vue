@@ -313,7 +313,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
             <OTooltip :content="t('alerts.alertSettings.notifyOnRecoveryTooltip')" side="right" />
           </div>
-          <OFormSwitch name="notify_on_recovery" data-test="alert-notify-on-recovery-toggle" />
+          <div class="flex flex-col gap-1">
+            <OFormSwitch name="notify_on_recovery" data-test="alert-notify-on-recovery-toggle" />
+            <div
+              v-if="formData?.notify_on_recovery"
+              class="text-text-secondary text-xs"
+              data-test="alert-notify-on-recovery-hint"
+            >
+              {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
+            </div>
+          </div>
         </div>
 
         <!-- Always shown: the hold delays on-call and incident closure too, not

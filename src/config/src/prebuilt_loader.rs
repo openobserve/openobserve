@@ -192,7 +192,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
     // Return built-in configuration with templates embedded
     // This ensures the system works even if the JSON file is missing
     PrebuiltDestinationsConfig {
-        revision: 1,
+        revision: 2,
         destinations: vec![
             PrebuiltDestinationConfig {
                 id: "slack".to_string(),
@@ -212,7 +212,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_slack".to_string(),
-                    body: r#"{"text": "🚨 Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"text": "[{alert_status}] {alert_name}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -229,7 +229,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 endpoint: None,
                 template: TemplateConfig {
                     name: "prebuilt_email".to_string(),
-                    body: "<h2>🚨 Alert: {alert_name}</h2>".to_string(),
+                    body: "<h2>[{alert_status}] {alert_name}</h2>".to_string(),
                     title: Some("OpenObserve Alert: {alert_name}".to_string()),
                 },
                 credential_fields: vec![],
@@ -253,7 +253,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_msteams".to_string(),
-                    body: r#"{"@type": "MessageCard", "text": "🚨 Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"@type": "MessageCard", "text": "[{alert_status}] {alert_name}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -277,7 +277,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_pagerduty".to_string(),
-                    body: r#"{"payload": {"summary": "OpenObserve Alert: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#.to_string(),
+                    body: r#"{"payload": {"summary": "OpenObserve [{alert_status}]: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -301,7 +301,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_discord".to_string(),
-                    body: r#"{"content": "🚨 Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"content": "[{alert_status}] {alert_name}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -349,7 +349,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_opsgenie".to_string(),
-                    body: r#"{"message": "Alert: {alert_name}", "priority": "{credential_priority}"}"#.to_string(),
+                    body: r#"{"message": "[{alert_status}] {alert_name}", "priority": "{credential_priority}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -373,7 +373,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_servicenow".to_string(),
-                    body: r#"{"short_description": "Alert: {alert_name}", "assignment_group": "{credential_assignmentGroup}"}"#.to_string(),
+                    body: r#"{"short_description": "[{alert_status}] {alert_name}", "assignment_group": "{credential_assignmentGroup}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -727,6 +727,36 @@ mod tests {
             assert!(
                 !d.template.body.contains("{alert_time}"),
                 "dangling {{alert_time}} in builtin body: {}",
+                d.id
+            );
+        }
+    }
+
+    #[test]
+    /// Every template OpenObserve ships must be able to say a recovery IS one.
+    ///
+    /// These are CUSTOM bodies: nothing can be injected into the author's raw
+    /// JSON safely, so a body without `{alert_status}` renders a resolve
+    /// byte-identical to the firing. A user who picks a prebuilt destination
+    /// and turns recovery on would be refused at save for something they did
+    /// not write.
+    #[test]
+    fn every_shipped_prebuilt_template_can_announce_a_recovery() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../config/prebuilt-destinations.json"
+        );
+        let cfg: PrebuiltDestinationsConfig =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        for d in &cfg.destinations {
+            assert!(
+                d.template.body.contains("{alert_status}"),
+                "prebuilt '{}' cannot say a recovery is a recovery",
+                d.id
+            );
+            assert!(
+                !d.template.body.contains("\"firing\""),
+                "prebuilt '{}' hardcodes a status that lies on recovery",
                 d.id
             );
         }

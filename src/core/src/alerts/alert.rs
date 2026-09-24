@@ -304,6 +304,10 @@ pub enum AlertError {
     NegativePendingPeriod,
     #[error("Alert keep_firing_for must be between 0 and {KEEP_FIRING_FOR_MAX_SECS} seconds")]
     KeepFiringForOutOfRange,
+    #[error(
+        "template '{template}' has no {{alert_status}}, so its recovery message would read exactly like a new firing — add {{alert_status}} to it, or turn off notify_on_recovery"
+    )]
+    RecoveryTemplateCannotSayResolved { template: String },
     #[error("Error in multi alert grouping: {0}")]
     MultiAlertGroupingError(String),
 }
@@ -374,6 +378,44 @@ pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder,
 // Sync (unlike its async AlertError-returning neighbours, whose futures hide
 // the size from this lint); boxing the error is not worth the churn here.
 #[allow(clippy::result_large_err)]
+/// Refuse a recovery notification that could not say it was one.
+///
+/// A CONTENT template is safe whatever the author wrote: the renderer labels a
+/// recovered level "RECOVERED" in green on its own. A CUSTOM template is the
+/// author's raw body and nothing can be injected into it safely, so without
+/// `{alert_status}` its recovery renders byte-identical to a firing — which
+/// reads as a re-page, at the exact moment somebody is hoping to stand down.
+///
+/// Refused at save rather than stored, for the same reason a malformed runbook
+/// link is: the moment it is read is the one moment nobody can debug it.
+async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), AlertError> {
+    if !alert.notify_on_recovery {
+        return Ok(());
+    }
+
+    let mut checked: Vec<Template> = Vec::new();
+    if let Some(name) = alert.template.as_ref().filter(|n| !n.is_empty())
+        && let Ok(t) = db::alerts::templates::get(org_id, name).await
+    {
+        checked.push(t);
+    } else {
+        for dest_name in alert.destinations.iter() {
+            if let Ok((_, Some(t))) = destinations::get_with_template(org_id, dest_name).await {
+                checked.push(t);
+            }
+        }
+    }
+
+    for template in checked {
+        if template.kind == TemplateKind::Custom && !template.body.contains("{alert_status}") {
+            return Err(AlertError::RecoveryTemplateCannotSayResolved {
+                template: template.name,
+            });
+        }
+    }
+    Ok(())
+}
+
 fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
     config::meta::alerts::grouping::validate_multi_alert(
         &alert.query_condition,
@@ -805,6 +847,8 @@ async fn prepare_alert(
     }
 
     validate_multi_alert_config(alert)?;
+
+    validate_recovery_templates(org_id, alert).await?;
 
     // PromQL carries a third threshold family: the condition value baked into
     // the query. Its warning needs the same §4.5 direction check, measured
@@ -4467,6 +4511,28 @@ mod send_path_tests {
 
 #[cfg(test)]
 mod tests {
+
+    /// A recovery that cannot say it is one is worse than no recovery at all.
+    ///
+    /// CUSTOM templates are the author's raw body — nothing can be injected
+    /// into arbitrary JSON safely — so without `{alert_status}` the resolve
+    /// renders byte-identical to the firing and reads as a re-page. CONTENT
+    /// templates need no such rule: the renderer labels a recovered level
+    /// "RECOVERED" in green whatever the author wrote.
+    #[test]
+    fn a_custom_template_without_alert_status_cannot_announce_a_recovery() {
+        let says_nothing = "{\"text\": \"Alert: {alert_name}\"}";
+        let says_status = "{\"text\": \"[{alert_status}] {alert_name}\"}";
+
+        assert!(
+            !says_nothing.contains("{alert_status}"),
+            "this is the shape we refuse"
+        );
+        assert!(
+            says_status.contains("{alert_status}"),
+            "and the shape we accept"
+        );
+    }
 
     /// The ceiling exists for a units mistake, not a policy one.
     ///
