@@ -19,6 +19,8 @@ use datafusion::error::{DataFusionError, Result};
 pub(crate) fn vector(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let value = match data {
         Value::Float(f) => f,
+        // a range-evaluated scalar is already the one label-less series with a sample per step
+        Value::Matrix(matrix) if matrix.len() == 1 => return Ok(Value::Matrix(matrix)),
         _ => {
             return Err(DataFusionError::Plan(
                 "Unexpected input. Expected: \"vector(s scalar)\"".into(),

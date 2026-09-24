@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
-use config::{meta::promql::value::Value, utils::time::parse_i64_to_timestamp_micros};
+use config::{
+    meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value},
+    utils::time::parse_i64_to_timestamp_micros,
+};
 use datafusion::error::Result;
 
 pub(crate) fn minute(data: Value) -> Result<Value> {
@@ -62,10 +65,26 @@ pub(crate) fn days_in_month(data: Value) -> Result<Value> {
 }
 
 pub(crate) fn timestamp(data: Value) -> Result<Value> {
-    super::map_samples(data, "timestamp", |sample| {
-        // Convert timestamp from microseconds to seconds for all samples
-        (sample.timestamp / 1_000_000) as f64
-    })
+    super::map_samples(data, "timestamp", |sample| seconds(sample.timestamp))
+}
+
+/// https://prometheus.io/docs/prometheus/latest/querying/functions/#time
+pub(crate) fn time(eval_ctx: &EvalContext) -> Value {
+    if eval_ctx.is_instant() {
+        return Value::Float(seconds(eval_ctx.start));
+    }
+    // a range-evaluated scalar is one label-less series with a sample per step
+    Value::Matrix(vec![RangeValue::new(
+        Labels::default(),
+        eval_ctx
+            .timestamps()
+            .into_iter()
+            .map(|timestamp| Sample::new(timestamp, seconds(timestamp))),
+    )])
+}
+
+fn seconds(micros: i64) -> f64 {
+    micros as f64 / 1_000_000.0
 }
 
 /// Given a timestamp, get the component from it
@@ -80,8 +99,6 @@ fn exec(data: Value, op: impl Fn(&DateTime<Utc>) -> u32 + Sync) -> Result<Value>
 
 #[cfg(test)]
 mod tests {
-    use config::meta::promql::value::{RangeValue, Sample};
-
     use super::*;
 
     #[test]
