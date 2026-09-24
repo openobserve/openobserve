@@ -19,8 +19,9 @@ const PageManager = require("../../pages/page-manager.js");
  *   - deleting an alert from inside the dialog decrements the parent count in place.
  *
  * Data fixtures use the existing pm.apiCleanup helpers (see the setup contract);
- * every test seeds its own uniquely-named folder/destination/template/stream and
- * tears them down in afterEach, so the suite stays fully parallel-safe.
+ * every test seeds its own uniquely-named resources — a folder/destination/template/
+ * stream for in-use destinations, or just a template + destination for the orphan
+ * case — and tears them down in afterEach, so the suite stays fully parallel-safe.
  */
 
 // Unique per-test seed prefix. Tests run in parallel against a shared org, so
