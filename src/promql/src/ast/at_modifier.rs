@@ -16,8 +16,9 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{AtModifier, Expr, Function, FunctionArgs, Offset, VectorSelector};
+use promql_parser::parser::{AtModifier, Expr, Offset};
 
+use super::timestamp_selector::timestamp_selector;
 use crate::{adjust_start_end, utils::offset_micros};
 
 /// Functions whose value follows the evaluation timestamp, so a pinned argument does not pin them.
@@ -136,14 +137,13 @@ pub(crate) fn pin(expr: &Expr) -> Result<Pin> {
             let param = agg.param.as_deref().map_or(Ok(Pin::Neutral), pin)?;
             pin(&agg.expr)?.merge(param)
         }
-        Expr::Call(call) if TIME_DEPENDENT_FUNCS.contains(&call.func.name) => {
-            match timestamp_selector(&call.func, &call.args) {
-                // the sample times a pinned selector reads are the same on every step
-                Some(vs) => selector_pin(&vs.at)?,
-                None => Pin::Varies,
-            }
-        }
         Expr::Call(call) => {
+            if let Some(selector) = timestamp_selector(&call.func, &call.args) {
+                return selector_pin(&selector.at);
+            }
+            if TIME_DEPENDENT_FUNCS.contains(&call.func.name) {
+                return Ok(Pin::Varies);
+            }
             let mut merged = Pin::Neutral;
             for arg in &call.args.args {
                 merged = merged.merge(pin(arg)?);
@@ -151,27 +151,6 @@ pub(crate) fn pin(expr: &Expr) -> Result<Pin> {
             merged
         }
     })
-}
-
-/// The instant selector under `timestamp(...)`, which reads sample times instead of step times.
-pub(crate) fn timestamp_selector<'a>(
-    func: &Function,
-    args: &'a FunctionArgs,
-) -> Option<&'a VectorSelector> {
-    if func.name != "timestamp" {
-        return None;
-    }
-    let [arg] = args.args.as_slice() else {
-        return None;
-    };
-    let mut arg: &Expr = arg;
-    while let Expr::Paren(paren) = arg {
-        arg = &paren.expr;
-    }
-    match arg {
-        Expr::VectorSelector(vs) => Some(vs),
-        _ => None,
-    }
 }
 
 /// Turns every resolved `@` into the offset that reads the same samples from `reference`.
@@ -349,25 +328,6 @@ mod tests {
         assert_eq!(pin_of("timestamp(a @ 1600000000)").unwrap(), Pin::At(T));
         assert_eq!(pin_of("timestamp(((a @ 1600000000)))").unwrap(), Pin::At(T));
         assert_eq!(pin_of("timestamp(a)").unwrap(), Pin::Varies);
-    }
-
-    #[test]
-    fn test_timestamp_selector_sees_through_parens_only() {
-        let selector_of = |query: &str| match parser::parse(query).unwrap() {
-            Expr::Call(call) => timestamp_selector(&call.func, &call.args).map(|vs| vs.to_string()),
-            other => panic!("{query} is not a call: {other:?}"),
-        };
-        assert_eq!(
-            selector_of("timestamp(((a{b=\"c\"})))").as_deref(),
-            Some("a{b=\"c\"}")
-        );
-        assert_eq!(
-            selector_of("timestamp(a offset 1m)").as_deref(),
-            Some("a offset 1m")
-        );
-        assert_eq!(selector_of("timestamp(-a)"), None);
-        assert_eq!(selector_of("timestamp(sum(a))"), None);
-        assert_eq!(selector_of("abs(a)"), None);
     }
 
     #[test]

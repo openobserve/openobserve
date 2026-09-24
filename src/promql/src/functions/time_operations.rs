@@ -13,34 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
-
 use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
 use config::{
     meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value},
     utils::time::parse_i64_to_timestamp_micros,
 };
 use datafusion::error::Result;
-
-use super::RangeFunc;
-
-/// `timestamp()` of an instant selector: the time of the last sample in the lookback window.
-pub(crate) struct SampleTimestampFunc {
-    /// The selector's offset, which the streamed samples were moved forward by.
-    pub(crate) offset: i64,
-}
-
-impl RangeFunc for SampleTimestampFunc {
-    fn name(&self) -> &'static str {
-        "timestamp"
-    }
-
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        samples
-            .last()
-            .map(|sample| sample_seconds(sample.timestamp - self.offset))
-    }
-}
 
 pub(crate) fn minute(data: Value) -> Result<Value> {
     exec(data, Timelike::minute)
@@ -87,13 +65,15 @@ pub(crate) fn days_in_month(data: Value) -> Result<Value> {
 }
 
 pub(crate) fn timestamp(data: Value) -> Result<Value> {
-    super::map_samples(data, "timestamp", |sample| sample_seconds(sample.timestamp))
+    super::map_samples(data, "timestamp", |sample| {
+        timestamp_seconds(sample.timestamp)
+    })
 }
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#time
 pub(crate) fn time(eval_ctx: &EvalContext) -> Value {
     if eval_ctx.is_instant() {
-        return Value::Float(sample_seconds(eval_ctx.start));
+        return Value::Float(timestamp_seconds(eval_ctx.start));
     }
     // a range-evaluated scalar is one label-less series with a sample per step
     Value::Matrix(vec![RangeValue::new(
@@ -101,12 +81,12 @@ pub(crate) fn time(eval_ctx: &EvalContext) -> Value {
         eval_ctx
             .timestamps()
             .into_iter()
-            .map(|timestamp| Sample::new(timestamp, sample_seconds(timestamp))),
+            .map(|timestamp| Sample::new(timestamp, timestamp_seconds(timestamp))),
     )])
 }
 
 /// A microsecond timestamp in seconds, at the millisecond precision Prometheus keeps.
-pub(crate) fn sample_seconds(micros: i64) -> f64 {
+pub(crate) fn timestamp_seconds(micros: i64) -> f64 {
     micros.div_euclid(1_000) as f64 / 1_000.0
 }
 
@@ -151,15 +131,6 @@ mod tests {
         };
         let values: Vec<f64> = series[0].samples.iter().map(|s| s.value).collect();
         assert_eq!(values, [1_000_003.7, 1_000_003.7]);
-    }
-
-    #[test]
-    fn test_sample_timestamp_func_reads_the_last_sample_before_its_offset() {
-        let func = SampleTimestampFunc { offset: 30_000_000 };
-        let samples = [Sample::new(40_000_000, 1.0), Sample::new(63_700_000, 2.0)];
-        let range = Duration::from_secs(300);
-        assert_eq!(func.exec(&samples, 70_000_000, &range), Some(33.7));
-        assert_eq!(func.exec(&[], 70_000_000, &range), None);
     }
 
     #[test]

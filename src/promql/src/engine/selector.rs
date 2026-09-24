@@ -49,10 +49,35 @@ pub(super) type SelectorContexts = Vec<(SessionContext, Arc<Schema>, ScanStats, 
 
 /// What an instant selection emits at each step for the sample it picks there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Selected {
+pub(super) enum SelectorOutput {
     Value,
     /// The sample's own time in seconds, as `timestamp()` of a selector reads it.
-    SampleTime,
+    SampleTimestamp,
+}
+
+impl SelectorOutput {
+    pub(super) fn project(self, sample: &Sample) -> Option<f64> {
+        // A stale marker ends the series; selecting an older sample would resurrect it.
+        if sample.value.to_bits() == 0x7ff0_0000_0000_0002 {
+            return None;
+        }
+        Some(match self {
+            Self::Value => sample.value,
+            Self::SampleTimestamp => functions::timestamp_seconds(sample.timestamp),
+        })
+    }
+
+    pub(super) fn keep_metric_name(self) -> bool {
+        self == Self::Value
+    }
+
+    fn labels(self, labels: Labels) -> Labels {
+        if self.keep_metric_name() {
+            labels
+        } else {
+            labels.without_metric_name()
+        }
+    }
 }
 
 impl Engine {
@@ -98,7 +123,7 @@ impl Engine {
     pub(super) async fn exec_vector_selector(
         &mut self,
         vs: &VectorSelector,
-        selected: Selected,
+        selected: SelectorOutput,
     ) -> Result<Value> {
         let data = match self.try_streaming_instant_selector(vs, selected).await? {
             Some(data) => data,
@@ -122,7 +147,7 @@ impl Engine {
         &mut self,
         selector: &VectorSelector,
         ctxs: Option<SelectorContexts>,
-        selected: Selected,
+        selected: SelectorOutput,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
@@ -170,22 +195,12 @@ impl Engine {
                     None
                 };
 
-                // Add the matched sample (already validated to be within range)
-                if let Some(sample) = match_sample {
-                    // Use eval_ts as the timestamp for the selected sample
-                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                    let value = match selected {
-                        Selected::Value => sample.value,
-                        Selected::SampleTime => functions::sample_seconds(sample.timestamp),
-                    };
+                if let Some(value) = match_sample.and_then(|sample| selected.project(sample)) {
                     selected_samples.push(Sample::new(eval_ts, value));
                 }
             }
 
-            let labels = match selected {
-                Selected::Value => metric.labels,
-                Selected::SampleTime => metric.labels.without_metric_name(),
-            };
+            let labels = selected.labels(metric.labels);
             (keep_sampleless || !selected_samples.is_empty()).then_some(RangeValue {
                 labels,
                 samples: selected_samples,
@@ -722,7 +737,7 @@ mod tests {
         };
 
         engine
-            .eval_vector_selector(&selector, None, Selected::Value)
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
             .await
             .unwrap();
 
@@ -763,7 +778,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_vector_selector(&selector, None, Selected::Value)
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();
@@ -801,7 +816,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_vector_selector(&selector, None, Selected::Value)
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();
@@ -839,7 +854,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_vector_selector(&selector, None, Selected::Value)
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();
@@ -914,7 +929,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_vector_selector(&selector, None, Selected::Value)
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
             .await;
 
         assert!(result.is_err(), "expected an error, not a panic");
@@ -1076,7 +1091,7 @@ mod tests {
         };
 
         let values = engine
-            .eval_vector_selector(&selector, None, Selected::Value)
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
             .await
             .unwrap();
         assert_eq!(values.len(), 1);
