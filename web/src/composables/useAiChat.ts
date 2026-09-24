@@ -1,6 +1,6 @@
 import store from "@/stores";
 import { contextRegistry, createDefaultContextProvider } from "@/composables/contextProviders";
-import { generateTraceContext } from "@/utils/zincutils";
+import { generateTraceContext, getUUIDv7 } from "@/utils/zincutils";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
 
 let contextHandler: any;
@@ -148,6 +148,9 @@ const useAiChat = () => {
       // Add session ID header if provided for linking API calls within a chat session
       if (sessionId) {
         headers["x-o2-assistant-session-id"] = sessionId;
+        // With server-side chat persistence the server recognizes a repeated
+        // turn id instead of running the model twice for one message.
+        headers["x-o2-assistant-turn-id"] = getUUIDv7();
       }
 
       // Configure fetch options with abort signal for request cancellation
@@ -261,8 +264,98 @@ const useAiChat = () => {
     contextRegistry.register("default", defaultProvider);
   };
 
+  /**
+   * Ask the server to stop the turn running in a chat session.
+   *
+   * With server-side chat persistence the turn is owned by an OpenObserve
+   * background task rather than by the browser's request: aborting the fetch
+   * closes our view of the stream, but generation continues. This is what
+   * actually stops it. Whatever was produced up to that point stays saved.
+   *
+   * Fire-and-forget by design — the Stop button must not wait on the network.
+   */
+  const cancelAiChat = async (org_id: string, sessionId: string) => {
+    const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats/${sessionId}/cancel`;
+    return fetch(url, {
+      method: "POST",
+      credentials: "include",
+      // The tab may be closing right after this; keepalive lets the browser
+      // finish sending it anyway.
+      keepalive: true,
+      headers: {
+        "x-o2-assistant-session-id": sessionId,
+      },
+    });
+  };
+
+  // --- Server-side chat history (`/api/{org}/ai/chats`) ---------------------
+
+  const chatsUrl = (org_id: string, sessionId?: string) =>
+    `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats` +
+    (sessionId ? `/${encodeURIComponent(sessionId)}` : "");
+
+  const chatsRequest = async (url: string, init: RequestInit = {}) => {
+    const response = await fetch(url, {
+      credentials: "include",
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init.headers || {}) },
+    });
+    if (!response.ok) {
+      const error: Error & { status?: number } = new Error(
+        `Chat history request failed (${response.status})`,
+      );
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  };
+
+  /** One page of the caller's stored conversations, most recent first. */
+  const listServerChats = (org_id: string, limit = 100, cursor?: string) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (cursor) params.set("cursor", cursor);
+    return chatsRequest(`${chatsUrl(org_id)}?${params}`);
+  };
+
+  /** A stored conversation; `not_modified` when `knownSeq` is still current. */
+  const getServerChat = (org_id: string, sessionId: string, knownSeq?: number) => {
+    const query = knownSeq === undefined ? "" : `?known_seq=${knownSeq}`;
+    return chatsRequest(`${chatsUrl(org_id, sessionId)}${query}`);
+  };
+
+  const renameServerChat = (org_id: string, sessionId: string, title: string) =>
+    chatsRequest(chatsUrl(org_id, sessionId), {
+      method: "PATCH",
+      body: JSON.stringify({ title }),
+    });
+
+  const deleteServerChat = (org_id: string, sessionId: string) =>
+    chatsRequest(chatsUrl(org_id, sessionId), { method: "DELETE" });
+
+  const deleteAllServerChats = (org_id: string) =>
+    chatsRequest(chatsUrl(org_id), { method: "DELETE" });
+
+  /** The server-side persistence backend for `useChatHistory`. */
+  const chatHistoryServer = () => ({
+    enabled: () =>
+      !!store.state.zoConfig?.ai_enabled && !!store.state.zoConfig?.ai_chat_persistence_enabled,
+    list: (orgId: string, limit: number) => listServerChats(orgId, limit),
+    get: (orgId: string, sessionId: string, knownSeq?: number) =>
+      getServerChat(orgId, sessionId, knownSeq),
+    rename: renameServerChat,
+    remove: deleteServerChat,
+    removeAll: deleteAllServerChats,
+  });
+
   return {
     fetchAiChat,
+    cancelAiChat,
+    chatHistoryServer,
+    listServerChats,
+    getServerChat,
+    renameServerChat,
+    deleteServerChat,
+    deleteAllServerChats,
     submitFeedback,
     registerAiChatHandler,
     removeAiChatHandler,

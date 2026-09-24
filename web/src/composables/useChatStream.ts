@@ -52,7 +52,7 @@ import type {
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { getUUIDv7 } from "@/utils/zincutils";
 
-const { fetchAiChat } = useAiChat();
+const { fetchAiChat, cancelAiChat } = useAiChat();
 // Module scope is safe: the controller closes over module-level singleton state.
 const { promptForConsent } = usePaidOverageConsent();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -175,6 +175,12 @@ export function useChatStream(options: UseChatStreamOptions) {
 
   const cancelCurrentRequest = async () => {
     if (currentAbortController.value) {
+      // With server-side chat persistence the turn outlives this request, so aborting alone would leave it running; fire-and-forget.
+      if (currentSessionId.value) {
+        cancelAiChat(store.state.selectedOrganization.identifier, currentSessionId.value).catch(
+          (e: unknown) => console.debug("AI chat cancel request failed", e),
+        );
+      }
       currentAbortController.value.abort();
       currentAbortController.value = null;
 
