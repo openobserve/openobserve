@@ -27,7 +27,8 @@ use datafusion::{
 
 use crate::layout::METRICS_INDEX_ROW_COUNT;
 
-/// Label plus directory regions up to this size are read whole, like object_store coalescing.
+/// Label and directory regions up to this total are fetched in one read instead of per column.
+/// 1 MiB is object_store's coalescing gap: below it, one more request costs more than the bytes.
 const SMALL_METADATA_BYTES: u64 = 1024 * 1024;
 
 pub(super) struct MetricsIndexData {
