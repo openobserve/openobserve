@@ -56,7 +56,13 @@ export class AlertDestinationsPage {
         this.importJsonFileTab = '[data-test="tab-import_json_file"]';
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
-        this.destinationInUseMessage = 'Destination is currently used by alert:';
+        // Backend message shape: "'name' is used by 2 synthetic checks (a, b), 1 escalation
+        // policy (t) and 1 alert (my-alert)" — the delete path names only the FIRST blocking
+        // kind it finds (it short-circuits), but the parser below handles every kind anyway.
+        this.destinationInUseMessage = 'is used by';
+        // OToast error message (preferred over getByText('is used by') to dodge strict-mode
+        // collisions and text appearing elsewhere on the page).
+        this.errorToastMessage = '[data-test-variant="error"] [data-test="o-toast-message"]';
         this.nextPageButton = '[data-test="alert-destinations-list-next-btn"]';
         // Search input is an OInput wrapper; inner native input uses `-field` suffix for fill/click
         this.destinationListSearchInputField = '[data-test="destination-list-search-input-field"]';
@@ -471,6 +477,50 @@ export class AlertDestinationsPage {
         await this.page.locator(this.addDestinationButton).waitFor({ state: 'visible', timeout: 30000 });
     }
 
+    /**
+     * Deep-link straight to the destinations list with a given `page` query param,
+     * exercising AlertsDestinationList's URL-restored `currentPage` on a cold mount.
+     * @param {number} page
+     */
+    async gotoDestinationsWithPageParam(page) {
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const orgIdentifier = process.env.ORGNAME || 'default';
+        await this.page.goto(
+            `${baseUrl}/web/alert-destinations?org_identifier=${orgIdentifier}&page=${page}`,
+            { waitUntil: 'domcontentloaded' }
+        );
+        await this.waitForDestinationListReady();
+    }
+
+    // ==================== LIST PAGINATION (OTable pagination bar) ====================
+
+    async clickNextPage() {
+        const nextPageBtn = this.page.locator('[data-test="o2-table-next-page-btn"]');
+        await nextPageBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await nextPageBtn.click();
+    }
+
+    async getPaginationInfoText() {
+        const text = await this.page.locator('[data-test="o2-table-pagination-info"]').textContent().catch(() => null);
+        return (text || '').replace(/\s+/g, ' ').trim();
+    }
+
+    async expectPaginationInfoToMatch(pattern) {
+        await expect
+            .poll(async () => await this.getPaginationInfoText(), { timeout: 20000 })
+            .toMatch(pattern);
+    }
+
+    async expectUrlHasPageParam(pageValue) {
+        await expect.poll(() => this.page.url(), { timeout: 15000 }).toContain(`page=${pageValue}`);
+    }
+
+    async expectAtLeastOneListRow() {
+        await expect(
+            this.page.locator('[data-test^="o2-table-row-"]').first(),
+        ).toBeVisible({ timeout: 20000 });
+    }
+
     /** @param {string} destinationName @param {string} url @param {string} templateName */
     async createDestination(destinationName, url, templateName) {
         await this.navigateToDestinations();
@@ -835,42 +885,62 @@ export class AlertDestinationsPage {
         await deleteButton.click();
         await this.page.locator(this.confirmButton).click();
 
-        // Check if "Destination is currently used by alert" message appears
-        try {
-            const inUseMessage = await this.page.getByText(this.destinationInUseMessage).textContent({ timeout: 3000 });
+        // Check if the "'name' is used by ..." error toast appears; a real timeout here (element
+        // never shows) means the delete went through, which is the only case this should swallow.
+        const errorToast = this.page.locator(this.errorToastMessage).filter({ hasText: this.destinationInUseMessage });
+        const isBlocked = await errorToast.first().isVisible({ timeout: 3000 }).catch(() => false);
 
-            // Extract alert name from message: "Destination is currently used by alert: Automation_Alert_3Igfv"
-            const match = inUseMessage.match(/alert:\s*(.+)$/);
-            if (match && match[1]) {
-                const alertName = match[1].trim();
-                testLogger.warn('Destination in use by alert, deleting alert first', { destinationName, alertName });
+        if (isBlocked) {
+            const inUseMessage = await errorToast.first().textContent();
 
-                // Close the error dialog
-                const closeBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
-                if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-                    await closeBtn.click();
-                } else {
-                    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-                }
-                await this.page.waitForTimeout(500);
+            // Every "N kind (name1, name2, ...)" segment in the message. Splitting names on ", "
+            // breaks if a name itself contains a comma or a closing paren — an accepted limit of
+            // this parser, not a claim about the backend's contract.
+            const blockerPattern = /(\d+)\s+([a-z][a-z ]*?)s?\s*\(([^)]*)\)/gi;
+            const blockers = [...inUseMessage.matchAll(blockerPattern)].map((m) => ({
+                kind: m[2].trim().toLowerCase(),
+                names: m[3].split(',').map((s) => s.trim()).filter(Boolean),
+            }));
 
-                // Navigate to alerts and delete the alert
-                await this.alertsPage.searchAndDeleteAlert(alertName);
-
-                // Navigate back to destinations
-                await this.navigateToDestinations();
-                await this.page.waitForTimeout(1000);
-
-                // Search for the destination again
-                await this.searchDestinations(destinationName);
-
-                // Retry deleting the destination
-                await deleteButton.waitFor({ state: 'visible', timeout: 5000 });
-                await deleteButton.click();
-                await this.page.locator(this.confirmButton).click();
+            // Close the error toast/dialog before doing anything else, clearable or not.
+            const closeBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+            if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await closeBtn.click();
+            } else {
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
             }
-        } catch (e) {
-            // No "in use" message, deletion was successful
+            await this.page.waitForTimeout(500);
+
+            // This helper only knows how to clear alerts; any other blocker kind (synthetic
+            // check, pipeline, escalation policy, team channel, composite alert, workflow,
+            // anomaly detection config) — or a message it could not parse at all — fails loudly
+            // instead of silently reporting success.
+            const unclearable = blockers.filter((b) => !b.kind.startsWith('alert'));
+            if (blockers.length === 0 || unclearable.length > 0) {
+                throw new Error(
+                    `Destination "${destinationName}" is still in use and this helper cannot clear it: ${inUseMessage}`
+                );
+            }
+
+            const alertNames = blockers.flatMap((b) => b.names);
+            testLogger.warn('Destination in use by alert(s), deleting them first', { destinationName, alertNames });
+
+            // Navigate to alerts and delete every blocking alert
+            for (const alertName of alertNames) {
+                await this.alertsPage.searchAndDeleteAlert(alertName);
+            }
+
+            // Navigate back to destinations
+            await this.navigateToDestinations();
+            await this.page.waitForTimeout(1000);
+
+            // Search for the destination again
+            await this.searchDestinations(destinationName);
+
+            // Retry deleting the destination
+            await deleteButton.waitFor({ state: 'visible', timeout: 5000 });
+            await deleteButton.click();
+            await this.page.locator(this.confirmButton).click();
         }
 
         await this.page.waitForTimeout(1000);
