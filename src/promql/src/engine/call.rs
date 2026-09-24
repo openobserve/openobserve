@@ -24,9 +24,9 @@ use promql_parser::parser::{
     Expr as PromExpr, Function, FunctionArgs, MatrixSelector, value::ValueType,
 };
 
-use super::Engine;
+use super::{Engine, selector::Selected};
 use crate::{
-    ast::at_modifier::{Pin, pin},
+    ast::at_modifier::{Pin, pin, timestamp_selector},
     functions::{self, Func, RangeFunc, SingleArgFunc},
 };
 
@@ -44,6 +44,9 @@ impl Engine {
         if func_name == Func::Time {
             self.ensure_args_len(args, 0, "Invalid args passed to the function")?;
             return Ok(Value::Float((self.eval_ctx.start / 1_000_000) as f64));
+        }
+        if let Some(vs) = timestamp_selector(func, args) {
+            return self.exec_vector_selector(vs, Selected::SampleTime).await;
         }
 
         let start = std::time::Instant::now();

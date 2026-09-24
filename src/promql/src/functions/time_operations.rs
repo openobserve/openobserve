@@ -13,9 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
-use config::{meta::promql::value::Value, utils::time::parse_i64_to_timestamp_micros};
+use config::{
+    meta::promql::value::{Sample, Value},
+    utils::time::parse_i64_to_timestamp_micros,
+};
 use datafusion::error::Result;
+
+use super::RangeFunc;
+
+/// `timestamp()` of an instant selector: the time of the last sample in the lookback window.
+pub(crate) struct SampleTimestampFunc {
+    /// The selector's offset, which the streamed samples were moved forward by.
+    pub(crate) offset: i64,
+}
+
+impl RangeFunc for SampleTimestampFunc {
+    fn name(&self) -> &'static str {
+        "timestamp"
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        samples
+            .last()
+            .map(|sample| sample_seconds(sample.timestamp - self.offset))
+    }
+}
 
 pub(crate) fn minute(data: Value) -> Result<Value> {
     exec(data, Timelike::minute)
@@ -62,10 +87,12 @@ pub(crate) fn days_in_month(data: Value) -> Result<Value> {
 }
 
 pub(crate) fn timestamp(data: Value) -> Result<Value> {
-    super::map_samples(data, "timestamp", |sample| {
-        // Convert timestamp from microseconds to seconds for all samples
-        (sample.timestamp / 1_000_000) as f64
-    })
+    super::map_samples(data, "timestamp", |sample| sample_seconds(sample.timestamp))
+}
+
+/// A microsecond timestamp in seconds, at the millisecond precision Prometheus keeps.
+pub(crate) fn sample_seconds(micros: i64) -> f64 {
+    micros.div_euclid(1_000) as f64 / 1_000.0
 }
 
 /// Given a timestamp, get the component from it
@@ -80,7 +107,7 @@ fn exec(data: Value, op: impl Fn(&DateTime<Utc>) -> u32 + Sync) -> Result<Value>
 
 #[cfg(test)]
 mod tests {
-    use config::meta::promql::value::{RangeValue, Sample};
+    use config::meta::promql::value::{Labels, RangeValue};
 
     use super::*;
 
@@ -95,6 +122,31 @@ mod tests {
         assert!(matches!(day_of_year(Value::None).unwrap(), Value::None));
         assert!(matches!(days_in_month(Value::None).unwrap(), Value::None));
         assert!(matches!(timestamp(Value::None).unwrap(), Value::None));
+    }
+
+    #[test]
+    fn test_timestamp_keeps_milliseconds() {
+        let data = Value::Matrix(vec![RangeValue::new(
+            Labels::default(),
+            vec![
+                Sample::new(1_000_003_700_000, 1.0),
+                Sample::new(1_000_003_700_999, 1.0),
+            ],
+        )]);
+        let Value::Matrix(series) = timestamp(data).unwrap() else {
+            panic!("expected a matrix");
+        };
+        let values: Vec<f64> = series[0].samples.iter().map(|s| s.value).collect();
+        assert_eq!(values, [1_000_003.7, 1_000_003.7]);
+    }
+
+    #[test]
+    fn test_sample_timestamp_func_reads_the_last_sample_before_its_offset() {
+        let func = SampleTimestampFunc { offset: 30_000_000 };
+        let samples = [Sample::new(40_000_000, 1.0), Sample::new(63_700_000, 2.0)];
+        let range = Duration::from_secs(300);
+        assert_eq!(func.exec(&samples, 70_000_000, &range), Some(33.7));
+        assert_eq!(func.exec(&[], 70_000_000, &range), None);
     }
 
     #[test]
