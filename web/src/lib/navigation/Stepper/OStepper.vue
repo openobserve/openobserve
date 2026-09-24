@@ -9,12 +9,14 @@ import type {
 } from "./OStepper.types";
 import { computed, provide, reactive } from "vue";
 import { STEPPER_CONTEXT_KEY, STEPPER_REGISTER_KEY } from "./OStepper.types";
-import type { Component } from "vue";
+import type { Component, VNodeChild } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
+
+const StepDescription = (p: { render: () => unknown }) => p.render() as VNodeChild;
 
 const props = withDefaults(defineProps<OStepperProps>(), {
   orientation: "horizontal",
@@ -137,7 +139,7 @@ function triggerClasses(step: StepRegistration): string {
     >
       <template v-for="(step, index) in sortedSteps" :key="step.name">
         <!-- Step trigger (indicator circle + title) -->
-        <div role="listitem" class="flex shrink-0 flex-col items-center">
+        <div role="listitem" class="flex shrink-0 flex-col items-start">
           <button
             type="button"
             :class="triggerClasses(step)"
@@ -181,6 +183,10 @@ function triggerClasses(step: StepRegistration): string {
               </span>
             </span>
           </button>
+          <!-- Outside the button: a disabled trigger can be neither hovered nor focused. -->
+          <div v-if="step.slots.description" class="ps-12">
+            <StepDescription :render="step.slots.description" />
+          </div>
         </div>
 
         <!-- Connector line between consecutive steps -->

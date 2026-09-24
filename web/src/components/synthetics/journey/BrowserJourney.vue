@@ -39,6 +39,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import JourneyStepCount from "./JourneyStepCount.vue";
 import JourneySteps from "./JourneySteps.vue";
 import JourneySuggestions from "./JourneySuggestions.vue";
 import {
@@ -139,7 +140,7 @@ const props = defineProps<{
   variablesPanelOpen?: boolean;
   /** This journey's own check id — forwarded to `SubtestPicker` to exclude self-reference. */
   ownCheckId?: string;
-  /** Executed step count of this journey: the picker's delta, the executed badge and the cap notice. */
+  /** Executed step count of this journey: the picker's delta and the cap notice. */
   ownStepCount?: number;
   /** Configured run-time allowance for this journey, in ms — forwarded to `SubtestPicker`. */
   journeyBudgetMs?: number;
@@ -1315,7 +1316,6 @@ const overCap = computed(
   () => props.ownStepCount !== undefined && props.ownStepCount > maxSteps.value,
 );
 const ownStepTotal = computed(() => props.modelValue.filter((s) => s.action !== "subtest").length);
-const hasReference = computed(() => props.modelValue.some((s) => s.action === "subtest"));
 /** One entry per reference row in journey order — the same child twice runs twice. */
 const capChildren = computed(() =>
   props.modelValue
@@ -1533,21 +1533,14 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           data-test="synthetics-journey-select-all"
           @update:model-value="toggleSelectAll()"
         />
-        <div class="flex">
-          <h3 class="text-text-heading me-0 text-base font-semibold">
-            {{ t("synthetics.journey.steps") }}
-          </h3>
-          <OBadge variant="default" size="sm" class="ms-1">{{ modelValue.length }}</OBadge>
-          <OBadge
-            v-if="hasReference && ownStepCount !== undefined"
-            :variant="overCap ? 'error' : 'default'"
-            size="sm"
-            class="ms-1"
-            data-test="synthetics-journey-executed-badge"
-          >
-            {{ t("synthetics.journey.subtest.executedBadge", { count: ownStepCount }) }}
-          </OBadge>
-        </div>
+        <JourneyStepCount
+          :steps="modelValue"
+          :children="childrenCache"
+          :limit="maxSteps"
+          class="md:hidden"
+          data-test="synthetics-journey-toolbar-step-count"
+        />
+        <h3 class="sr-only">{{ t("synthetics.journey.steps") }}</h3>
 
         <JourneySuggestions
           v-if="!readonly"

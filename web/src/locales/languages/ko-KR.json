@@ -14255,7 +14255,6 @@
         "progressAria": "하위 단계 {total}개 중 {done}개 완료",
         "raiseBudget": "실행이 중단되기 시작하면 이 테스트의 실행 시간 허용치를 늘리세요.",
         "stepsBadge": "{count}개 단계",
-        "executedBadge": "{count}개 실행",
         "undefinedVariable": "\"{name}\"이(가) 이 테스트에 정의되지 않은 {variable}을(를) 사용합니다.",
         "undefinedVariableAction": "변수에 추가"
       }

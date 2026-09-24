@@ -14255,7 +14255,6 @@
         "progressAria": "اكتمل {done} من {total} خطوات فرعية",
         "raiseBudget": "قم بزيادة وقت التشغيل المسموح به لهذا الاختبار إذا بدأ يُقطع قبل اكتماله.",
         "stepsBadge": "{count} خطوة | {count} خطوات",
-        "executedBadge": "{count} منفذة",
         "undefinedVariable": "يستخدم \"{name}\" المتغير {variable} الذي لا يعرّفه هذا الاختبار.",
         "undefinedVariableAction": "أضفه ضمن المتغيرات"
       }

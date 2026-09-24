@@ -14255,7 +14255,6 @@
         "progressAria": "{total} 个子步骤中已完成 {done} 个",
         "raiseBudget": "如果此测试开始被中断，请提高其运行时长限制。",
         "stepsBadge": "{count} 个步骤",
-        "executedBadge": "执行 {count} 个",
         "undefinedVariable": "“{name}”使用了此测试未定义的 {variable}。",
         "undefinedVariableAction": "在“变量”中添加"
       }

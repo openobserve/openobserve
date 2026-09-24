@@ -14255,7 +14255,6 @@
         "progressAria": "Завершено {done} из {total} под-шагов",
         "raiseBudget": "Увеличьте допустимое время выполнения этого теста, если его начнут прерывать.",
         "stepsBadge": "{count} шаг | {count} шагов",
-        "executedBadge": "{count} выполняется",
         "undefinedVariable": "\"{name}\" использует {variable}, которую этот тест не определяет.",
         "undefinedVariableAction": "Добавьте её в разделе Переменные"
       }

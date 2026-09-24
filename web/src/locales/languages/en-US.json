@@ -14218,6 +14218,13 @@
       "stepNamePurposePlaceholder": "Sign in with valid credentials",
       "stepNumberAria": "Step {number} {state}",
       "steps": "Steps",
+      "stepCount": {
+        "caption": "{count} step | {count} steps",
+        "captionWithSubtests": "{steps} steps (including {count} subtest) | {steps} steps (including {count} subtests)",
+        "tooltip": "{breakdown}. This test executes {count} of the {limit} allowed.",
+        "tooltipOwn": "{count} step in this test | {count} steps in this test",
+        "tooltipSubtest": "{count} from \"{name}\""
+      },
       "stop": "Stop",
       "stopping": "Stopping…",
       "timeoutBelowDefaultWarning": "Below the {default} ms default for this step. A timeout shorter than the application's real response time is the most common cause of false failures.",
@@ -14234,7 +14241,6 @@
         "lastRunUnknown": "Time impact unknown — this test has not completed a run yet.",
         "raiseBudget": "Raise this test's run-time allowance if it starts being cut short.",
         "stepsBadge": "{count} step | {count} steps",
-        "executedBadge": "{count} executed",
         "ignoredEnv": "Its Starting URL, variables, auth and cookies are ignored here — the parent's apply.",
         "noAccess": "You don't have access to \"{name}\", so its steps can't be shown here.",
         "noAccessToast": "You don't have access to one of the tests this test references.",

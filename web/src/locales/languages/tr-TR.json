@@ -14255,7 +14255,6 @@
         "progressAria": "{total} alt adımdan {done} tanesi tamamlandı",
         "raiseBudget": "Kesilmeye başlarsa bu testin çalışma süresi sınırını artırın.",
         "stepsBadge": "{count} adım",
-        "executedBadge": "{count} yürütülen",
         "undefinedVariable": "\"{name}\", bu testin tanımlamadığı {variable} değişkenini kullanıyor.",
         "undefinedVariableAction": "Değişkenler altında ekleyin"
       }

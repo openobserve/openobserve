@@ -14255,7 +14255,6 @@
         "progressAria": "{done} de {total} subpassos concluídos",
         "raiseBudget": "Aumente o tempo de execução permitido deste teste se ele começar a ser interrompido.",
         "stepsBadge": "{count} passo | {count} passos",
-        "executedBadge": "{count} executados",
         "undefinedVariable": "\"{name}\" usa {variable}, que este teste não define.",
         "undefinedVariableAction": "Adicioná-la em Variáveis"
       }

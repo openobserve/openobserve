@@ -14255,7 +14255,6 @@
         "progressAria": "{total} 個中 {done} 個のサブステップが完了",
         "raiseBudget": "途中で打ち切られるようになったら、このテストの実行時間の許容値を増やしてください。",
         "stepsBadge": "{count} ステップ",
-        "executedBadge": "{count} 実行",
         "undefinedVariable": "「{name}」は、このテストで定義されていない {variable} を使用しています。",
         "undefinedVariableAction": "変数に追加する"
       }

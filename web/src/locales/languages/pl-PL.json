@@ -14255,7 +14255,6 @@
         "progressAria": "Ukończono {done} z {total} podkroków",
         "raiseBudget": "Zwiększ dozwolony czas działania tego testu, jeśli zacznie być przerywany.",
         "stepsBadge": "{count} krok | {count} kroków",
-        "executedBadge": "{count} wykonywanych",
         "undefinedVariable": "\"{name}\" używa {variable}, której ten test nie definiuje.",
         "undefinedVariableAction": "Dodaj ją w sekcji Zmienne"
       }

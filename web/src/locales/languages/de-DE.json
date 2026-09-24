@@ -14255,7 +14255,6 @@
         "progressAria": "{done} von {total} Unterschritten abgeschlossen",
         "raiseBudget": "Erhöhen Sie das Laufzeit-Budget dieses Tests, falls er abgebrochen wird.",
         "stepsBadge": "{count} Schritt | {count} Schritte",
-        "executedBadge": "{count} ausgeführt",
         "undefinedVariable": "\"{name}\" verwendet {variable}, das dieser Test nicht definiert.",
         "undefinedVariableAction": "Unter Variablen hinzufügen"
       }

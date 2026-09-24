@@ -14255,7 +14255,6 @@
         "progressAria": "{done} van {total} substappen voltooid",
         "raiseBudget": "Verhoog de toegestane looptijd van deze test als hij wordt afgebroken.",
         "stepsBadge": "{count} stap | {count} stappen",
-        "executedBadge": "{count} uitgevoerd",
         "undefinedVariable": "\"{name}\" gebruikt {variable}, die deze test niet definieert.",
         "undefinedVariableAction": "Toevoegen onder Variabelen"
       }

@@ -14255,7 +14255,6 @@
         "progressAria": "Hoàn thành {done} trong {total} bước con",
         "raiseBudget": "Hãy tăng thời gian chạy cho phép của bài test này nếu nó bắt đầu bị cắt ngắn.",
         "stepsBadge": "{count} bước",
-        "executedBadge": "{count} được thực thi",
         "undefinedVariable": "\"{name}\" dùng {variable}, mà bài test này không định nghĩa.",
         "undefinedVariableAction": "Thêm nó trong mục Biến"
       }

@@ -111,6 +111,7 @@ import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
 import ExtractSubtestDialog from "@/components/synthetics/journey/ExtractSubtestDialog.vue";
 import MissingValueDialog from "@/components/synthetics/journey/MissingValueDialog.vue";
 import JourneyStartPill from "@/components/synthetics/journey/JourneyStartPill.vue";
+import JourneyStepCount from "@/components/synthetics/journey/JourneyStepCount.vue";
 import ReplayEnvironmentMenu from "@/components/synthetics/journey/ReplayEnvironmentMenu.vue";
 import ReplaySecretsDialog from "@/components/synthetics/journey/ReplaySecretsDialog.vue";
 import JourneyUsedByPopover from "@/components/synthetics/journey/JourneyUsedByPopover.vue";
@@ -1987,6 +1988,15 @@ function onClearResults() {
             :done="journeyStepDone"
             class="h-full!"
           >
+            <template #description>
+              <JourneyStepCount
+                :steps="check.journey"
+                :children="childrenCache"
+                :limit="maxSteps"
+                class="max-md:hidden"
+                data-test="synthetics-journey-stepper-step-count"
+              />
+            </template>
             <!-- Journey editor + Variables panel; the steps list scrolls in its
                  own region so the panel stays pinned. -->
             <OSplitter
