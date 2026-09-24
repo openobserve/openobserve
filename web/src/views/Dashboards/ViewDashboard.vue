@@ -351,7 +351,7 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import { useRouter } from "vue-router";
+import { onBeforeRouteLeave, useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { useRoute } from "vue-router";
@@ -1764,6 +1764,11 @@ export default defineComponent({
 
     onMounted(() => {
       isFullscreen.value = false;
+    });
+
+    // printMode hides the app shell globally, so leaving by browser Back (not ✕) must still clear it.
+    onBeforeRouteLeave(() => {
+      if (store.state.printMode) setPrint(false);
     });
 
     const currentTimeObjPerPanel = ref({});
