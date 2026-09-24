@@ -13,21 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// On-call keeps its metrics in their own file: the set is a coherent story
-// about one subsystem, and reading it as a block is the only way to see that
-// the bad outcomes are all covered.
-pub mod oncall;
-
-use std::{collections::HashMap, sync::LazyLock as Lazy};
+use std::sync::LazyLock as Lazy;
 
 use prometheus::{
-    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge,
-    IntGaugeVec, Opts, Registry, TextEncoder,
+    CounterVec, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    Opts, Registry,
 };
 
-pub const NAMESPACE: &str = "zo";
-const HELP_SUFFIX: &str =
-    "Please include 'organization, 'stream type', and 'stream' labels for this metric.";
+use super::{HELP_SUFFIX, NAMESPACE, create_const_labels};
 
 // http latency
 pub static HTTP_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -897,23 +890,6 @@ pub static QUERY_PARQUET_CACHE_RATIO_NODE: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// query cache ratio for metrics
-pub static QUERY_METRICS_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "query_metrics_cache_ratio",
-            "Querier metrics cache ratio.".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .buckets(vec![
-            0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.0,
-        ])
-        .const_labels(create_const_labels()),
-        &["organization"],
-    )
-    .expect("Metric created")
-});
-
 // query parquet metadata cache stats
 pub static QUERY_PARQUET_METADATA_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -1689,32 +1665,6 @@ pub static NODE_CONSISTENT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// promql series label cache metrics
-pub static QUERY_METRICS_LABEL_CACHE_HIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "query_metrics_label_cache_hit_count",
-            "promql series label cache hit count".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization"],
-    )
-    .expect("Metric created")
-});
-pub static QUERY_METRICS_LABEL_CACHE_MISS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "query_metrics_label_cache_miss_count",
-            "promql series label cache miss count".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization"],
-    )
-    .expect("Metric created")
-});
-
 // query disk cache metrics
 pub static QUERY_DISK_CACHE_HIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -1929,59 +1879,6 @@ pub static TANTIVY_RESULT_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
         Opts::new(
             "tantivy_result_cache_hits_total",
             "Total number of hit of tantivy result cache",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-// metrics for metrics index selection cache
-pub static METRICS_INDEX_SELECTION_CACHE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "metrics_index_selection_cache_memory_usage",
-            "Total memory usage (bytes) of metrics index selection cache",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-pub static METRICS_INDEX_SELECTION_CACHE_GC_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "metrics_index_selection_cache_gc_total",
-            "Total number of GC of metrics index selection cache",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-pub static METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "metrics_index_selection_cache_requests_total",
-            "Total number of search of metrics index selection cache",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-pub static METRICS_INDEX_SELECTION_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "metrics_index_selection_cache_hits_total",
-            "Total number of hit of metrics index selection cache",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -2602,7 +2499,7 @@ pub static INGEST_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-fn register_metrics(registry: &Registry) {
+pub(crate) fn register(registry: &Registry) {
     // http latency
     registry
         .register(Box::new(HTTP_INCOMING_REQUESTS.clone()))
@@ -2786,9 +2683,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_PARQUET_CACHE_RATIO_NODE.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(QUERY_METRICS_CACHE_RATIO.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_PARQUET_METADATA_CACHE_FILES.clone()))
@@ -3008,14 +2902,6 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(NODE_CONSISTENT_HASH.clone()))
         .expect("Metric registered");
 
-    // promql series label cache metrics
-    registry
-        .register(Box::new(QUERY_METRICS_LABEL_CACHE_HIT_COUNT.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(QUERY_METRICS_LABEL_CACHE_MISS_COUNT.clone()))
-        .expect("Metric registered");
-
     // query disk cache metrics
     registry
         .register(Box::new(QUERY_DISK_CACHE_HIT_COUNT.clone()))
@@ -3070,22 +2956,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
-        .expect("Metric registered");
-
-    // metrics for metrics index selection cache
-    registry
-        .register(Box::new(METRICS_INDEX_SELECTION_CACHE_MEMORY_USAGE.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(METRICS_INDEX_SELECTION_CACHE_GC_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(
-            METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL.clone(),
-        ))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(METRICS_INDEX_SELECTION_CACHE_HITS_TOTAL.clone()))
         .expect("Metric registered");
 
     // metrics for generic bytes cache
@@ -3229,232 +3099,12 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(EVAL_SCHEDULER_WATERMARK_LAG_SECONDS.clone()))
         .expect("Metric registered");
-
-    // on-call paging and escalation
-    oncall::register(registry);
-}
-
-pub fn create_const_labels() -> HashMap<String, String> {
-    let cfg = crate::config::get_config();
-    let mut labels = HashMap::new();
-    labels.insert("cluster".to_string(), cfg.common.cluster_name.clone());
-    labels.insert("instance".to_string(), cfg.common.instance_name.clone());
-    labels.insert("role".to_string(), cfg.common.node_role.clone());
-    labels
-}
-
-pub fn gather() -> String {
-    let registry = prometheus::default_registry();
-    let mut buffer = vec![];
-    TextEncoder::new()
-        .encode(&registry.gather(), &mut buffer)
-        .unwrap();
-    String::from_utf8(buffer).unwrap()
-}
-
-pub fn init() {
-    register_metrics(prometheus::default_registry());
 }
 
 #[cfg(test)]
 mod tests {
-    use prometheus::Registry;
 
     use super::*;
-
-    // -----------------------------------------------------------------------
-    // create_const_labels
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_create_const_labels_returns_three_keys() {
-        let labels = create_const_labels();
-        assert!(labels.contains_key("cluster"), "should have 'cluster' key");
-        assert!(
-            labels.contains_key("instance"),
-            "should have 'instance' key"
-        );
-        assert!(labels.contains_key("role"), "should have 'role' key");
-        assert_eq!(labels.len(), 3);
-    }
-
-    #[test]
-    fn test_create_const_labels_values_are_strings() {
-        let labels = create_const_labels();
-        // Values must be valid (non-panicking) strings
-        for (k, v) in &labels {
-            let _ = format!("{k}={v}");
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // gather
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_gather_returns_string() {
-        // Should not panic; may be empty if no metrics were recorded yet
-        let output = gather();
-        // Result is valid UTF-8 (already guaranteed by the impl)
-        let _ = output.len();
-    }
-
-    // -----------------------------------------------------------------------
-    // register_metrics — use a private registry to avoid conflicts with the
-    // global prometheus registry (which may be shared across test runs).
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_register_metrics_to_private_registry() {
-        let registry = Registry::new();
-        // Should not panic
-        register_metrics(&registry);
-        // After registration the registry should expose metrics
-        let gathered = registry.gather();
-        assert!(
-            !gathered.is_empty(),
-            "private registry should have metrics after register_metrics"
-        );
-    }
-
-    #[test]
-    fn test_register_metrics_twice_to_same_registry_panics() {
-        // The internal `.expect("Metric registered")` means a second
-        // register to the *same* registry will panic.  We verify the first
-        // registration succeeds cleanly.
-        let registry = Registry::new();
-        register_metrics(&registry);
-        let gathered = registry.gather();
-        assert!(!gathered.is_empty());
-    }
-
-    // -----------------------------------------------------------------------
-    // Force-initialise every LazyLock static so the coverage tool sees the
-    // closure bodies as executed.  We clone each one (cheap — Arc clone for
-    // the underlying metric) to touch the lazy initialiser.
-    // -----------------------------------------------------------------------
-
-    /// Every step-billing metric must be REGISTERED, not merely declared: a
-    /// missing `register_metrics` line compiles and yields a metric that is never
-    /// scraped, indistinguishable on a dashboard from zero — the healthy value
-    /// for A2-A5. Registering a second time and requiring `AlreadyReg` is the
-    /// only assertion that distinguishes "registered" from "exists", because a
-    /// label-less `MetricVec` gathers as an empty family either way.
-    #[test]
-    fn synthetics_step_billing_metrics_are_registered() {
-        use prometheus::core::Collector;
-
-        let registry = Registry::new();
-        register_metrics(&registry);
-
-        let declared: Vec<(&str, Box<dyn Collector>)> = vec![
-            (
-                "SYNTHETICS_STEPS_TOTAL",
-                Box::new(SYNTHETICS_STEPS_TOTAL.clone()),
-            ),
-            (
-                "SYNTHETICS_BROWSER_MS_TOTAL",
-                Box::new(SYNTHETICS_BROWSER_MS_TOTAL.clone()),
-            ),
-            (
-                "SYNTHETICS_STEP_CLAMP_TOTAL",
-                Box::new(SYNTHETICS_STEP_CLAMP_TOTAL.clone()),
-            ),
-            (
-                "SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL",
-                Box::new(SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.clone()),
-            ),
-            (
-                "USAGE_ENQUEUE_FAILURES_TOTAL",
-                Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()),
-            ),
-            (
-                "TRIAL_QUOTA_FLUSH_DROPS_TOTAL",
-                Box::new(TRIAL_QUOTA_FLUSH_DROPS_TOTAL.clone()),
-            ),
-            (
-                "METERING_OFFSET_AGE_SECONDS",
-                Box::new(METERING_OFFSET_AGE_SECONDS.clone()),
-            ),
-            (
-                "METERING_BILLING_ROWS",
-                Box::new(METERING_BILLING_ROWS.clone()),
-            ),
-            (
-                "METERING_CYCLES_TOTAL",
-                Box::new(METERING_CYCLES_TOTAL.clone()),
-            ),
-        ];
-
-        for (name, collector) in declared {
-            assert!(
-                matches!(
-                    registry.register(collector),
-                    Err(prometheus::Error::AlreadyReg)
-                ),
-                "{name} is declared but `register_metrics` never registers it, so it is never \
-                 scraped and reads as a permanent zero",
-            );
-        }
-    }
-
-    /// The names are the alert contract. §9B.2's queries are written against
-    /// these strings, and they live outside this repository, so a rename here
-    /// silently breaks A1-A7 with nothing failing on either side.
-    #[test]
-    fn the_step_billing_metric_names_are_the_ones_the_alerts_query() {
-        use prometheus::core::Collector;
-
-        for (metric, expected) in [
-            (
-                SYNTHETICS_STEPS_TOTAL.desc()[0].fq_name.as_str(),
-                "zo_synthetics_steps_total",
-            ),
-            (
-                SYNTHETICS_BROWSER_MS_TOTAL.desc()[0].fq_name.as_str(),
-                "zo_synthetics_browser_ms_total",
-            ),
-            (
-                SYNTHETICS_STEP_CLAMP_TOTAL.desc()[0].fq_name.as_str(),
-                "zo_synthetics_step_clamp_total",
-            ),
-            (
-                SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.desc()[0]
-                    .fq_name
-                    .as_str(),
-                "zo_synthetics_step_zero_fallback_total",
-            ),
-            (
-                USAGE_ENQUEUE_FAILURES_TOTAL.desc()[0].fq_name.as_str(),
-                "zo_usage_enqueue_failures_total",
-            ),
-            (
-                TRIAL_QUOTA_FLUSH_DROPS_TOTAL.desc()[0].fq_name.as_str(),
-                "zo_trial_quota_flush_drops_total",
-            ),
-            (
-                METERING_OFFSET_AGE_SECONDS.desc()[0].fq_name.as_str(),
-                "zo_metering_offset_age_seconds",
-            ),
-            (
-                METERING_BILLING_ROWS.desc()[0].fq_name.as_str(),
-                "zo_metering_billing_rows",
-            ),
-            (
-                METERING_CYCLES_TOTAL.desc()[0].fq_name.as_str(),
-                "zo_metering_cycles_total",
-            ),
-        ] {
-            assert_eq!(metric, expected);
-        }
-
-        // §4.3's ratio is one division over one metric only while both halves
-        // are label values of the SAME counter, or the alert stops joining.
-        assert_eq!(
-            SYNTHETICS_STEPS_TOTAL.desc()[0].variable_labels,
-            vec!["organization".to_string(), "event".to_string()],
-        );
-    }
 
     #[test]
     fn test_statics_synthetics_step_billing() {
@@ -3548,7 +3198,6 @@ mod tests {
         let _ = QUERY_DISK_METRICS_CACHE_USED_BYTES.clone();
         let _ = QUERY_PARQUET_CACHE_RATIO.clone();
         let _ = QUERY_PARQUET_CACHE_RATIO_NODE.clone();
-        let _ = QUERY_METRICS_CACHE_RATIO.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_FILES.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_USED_BYTES.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL.clone();
@@ -3658,10 +3307,6 @@ mod tests {
         let _ = TANTIVY_RESULT_CACHE_GC_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_REQUESTS_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_HITS_TOTAL.clone();
-        let _ = METRICS_INDEX_SELECTION_CACHE_MEMORY_USAGE.clone();
-        let _ = METRICS_INDEX_SELECTION_CACHE_GC_TOTAL.clone();
-        let _ = METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL.clone();
-        let _ = METRICS_INDEX_SELECTION_CACHE_HITS_TOTAL.clone();
         let _ = BYTES_CACHE_MEMORY_SIZE.clone();
         let _ = BYTES_CACHE_ENTRY_COUNT.clone();
         let _ = BYTES_CACHE_GC_TIME.clone();
@@ -3673,63 +3318,5 @@ mod tests {
         let _ = TOKIO_RUNTIME_WORKER_METRICS.clone();
         let _ = TOKIO_RUNTIME_WORKER_DURATION_SECONDS.clone();
         let _ = TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS.clone();
-    }
-
-    #[test]
-    fn test_statics_self_reporting() {
-        let _ = SELF_REPORTING_DROPPED_TRIGGERS.clone();
-        let _ = SELF_REPORTING_TIMEOUT_ERRORS.clone();
-        let _ = SELF_REPORTING_QUEUE_DEPTH.clone();
-    }
-
-    // -----------------------------------------------------------------------
-    // Verify NAMESPACE constant
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_namespace_constant() {
-        assert_eq!(NAMESPACE, "zo");
-    }
-
-    // -----------------------------------------------------------------------
-    // Verify metric names via the gathered output from a private registry
-    // -----------------------------------------------------------------------
-
-    #[test]
-    #[ignore]
-    fn test_gathered_output_contains_expected_metric_names() {
-        let registry = Registry::new();
-        register_metrics(&registry);
-
-        let encoder = prometheus::TextEncoder::new();
-        let mut buf = vec![];
-        encoder.encode(&registry.gather(), &mut buf).unwrap();
-        let output = String::from_utf8(buf).unwrap();
-
-        assert!(output.contains("zo_http_incoming_requests"));
-        assert!(output.contains("zo_ingest_records"));
-        assert!(output.contains("zo_storage_original_bytes"));
-        assert!(output.contains("zo_node_up"));
-    }
-
-    #[test]
-    fn test_gathered_output_contains_namespace_prefix() {
-        let registry = Registry::new();
-        register_metrics(&registry);
-
-        let encoder = prometheus::TextEncoder::new();
-        let mut buf = vec![];
-        encoder.encode(&registry.gather(), &mut buf).unwrap();
-        let output = String::from_utf8(buf).unwrap();
-
-        // Every metric family line should carry the "zo_" namespace
-        for line in output.lines() {
-            if line.starts_with("# HELP ") || line.starts_with("# TYPE ") {
-                assert!(
-                    line.contains("zo_"),
-                    "metric line missing 'zo_' namespace: {line}"
-                );
-            }
-        }
     }
 }
