@@ -15,7 +15,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gt } from "@/types/i18n";
-import useSyntheticsRecorder, { isExtensionOutdated } from "./useSyntheticsRecorder";
+import useSyntheticsRecorder, {
+  isExtensionOutdated,
+  UnresolvedVariableError,
+} from "./useSyntheticsRecorder";
 import type { BrowserStep, WireStep } from "@/types/synthetics";
 
 // ── Bridge test helpers ───────────────────────────────────────────────────
@@ -1584,6 +1587,21 @@ describe("useSyntheticsRecorder", () => {
       expect(r.isReplaying.value).toBe(false);
       expect(r.replayPhase.value).toBe("idle");
       expect(getLastCommand()?.action).not.toBe("replay");
+    });
+
+    it("throws an UnresolvedVariableError carrying the name", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const typed = [{ id: "s2_c1", action: "type", selector: "#q", value: "{{X}}" } as WireStep];
+      const promise = r.replay(typed, "https://app.test/x");
+      const caught = promise.catch((err: unknown) => err);
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true, passed: true });
+      const err = await caught;
+
+      expect(err).toBeInstanceOf(UnresolvedVariableError);
+      expect((err as { variableName?: string }).variableName).toBe("X");
+      expect((err as Error).message).toBe("unresolved variable {{X}}");
     });
 
     it("stops a restore with a prefix placeholder and no variables before any state change", async () => {

@@ -32,6 +32,10 @@ const {
   mockServiceListGlobalVariables,
   mockServiceDelete,
   mockServiceReferencedBy,
+  mockServiceCreateEnvironmentVariable,
+  mockServiceUpdateEnvironmentVariable,
+  mockServiceCreateGlobalVariable,
+  mockServiceUpdateGlobalVariable,
   mockRouterPush,
   mockRouterReplace,
   mockToast,
@@ -59,6 +63,10 @@ const {
   mockServiceReferencedBy: vi.fn().mockResolvedValue({
     data: { references: [], hidden_reference_count: 0 },
   }),
+  mockServiceCreateEnvironmentVariable: vi.fn().mockResolvedValue({ data: {} }),
+  mockServiceUpdateEnvironmentVariable: vi.fn().mockResolvedValue({ data: {} }),
+  mockServiceCreateGlobalVariable: vi.fn().mockResolvedValue({ data: {} }),
+  mockServiceUpdateGlobalVariable: vi.fn().mockResolvedValue({ data: {} }),
   mockRouterPush: vi.fn(),
   mockRouterReplace: vi.fn(),
   mockToast: vi.fn(() => vi.fn()),
@@ -126,6 +134,10 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
       listEnvironments: mockServiceListEnvironments,
       listGlobalVariables: mockServiceListGlobalVariables,
       referencedBy: mockServiceReferencedBy,
+      createEnvironmentVariable: mockServiceCreateEnvironmentVariable,
+      updateEnvironmentVariable: mockServiceUpdateEnvironmentVariable,
+      createGlobalVariable: mockServiceCreateGlobalVariable,
+      updateGlobalVariable: mockServiceUpdateGlobalVariable,
     },
   });
 });
@@ -207,6 +219,10 @@ import { syntheticsKeys } from "@/services/synthetics.querykeys";
 const mockRevealCapNotice = vi.fn();
 // Exposed by the real BrowserJourney; the host calls it once the child is created.
 const mockReplaceRangeWithSubtest = vi.fn();
+// Exposed by the real BrowserJourney; the host's "Replay anyway" goes through it.
+const mockReplayUpTo = vi.fn();
+// Every open/close of the missing-value dialog stub, so a test can see that one closed before the next opened.
+const missingDialogLog: string[] = [];
 
 const baseStubs = {
   OPageHeader: {
@@ -268,11 +284,18 @@ const baseStubs = {
     },
   },
   BrowserJourney: {
-    template: '<div data-test="synthetics-browser-journey" />',
+    // Renders the host's slots, so the view-owned toolbar parts can be found.
+    template:
+      '<div data-test="synthetics-browser-journey"><slot name="start-pill" :locked="false" /><slot name="replay-menu" :disabled="false" /></div>',
     props: [
       "modelValue",
       "fieldIssues",
       "startUrl",
+      "startUrlTemplate",
+      "replayEnvironmentLabel",
+      "secretNames",
+      "usesTypedSecrets",
+      "typedSecretReport",
       "extensionReady",
       "autoRecord",
       "replayPhase",
@@ -293,6 +316,39 @@ const baseStubs = {
     methods: {
       revealCapNotice: mockRevealCapNotice,
       replaceRangeWithSubtest: (...args: unknown[]) => mockReplaceRangeWithSubtest(...args),
+      replayUpTo: (...args: unknown[]) => mockReplayUpTo(...args),
+    },
+  },
+  MissingValueDialog: {
+    name: "MissingValueDialog",
+    template: '<div data-test="synthetics-missing-value-dialog-stub" :data-open="open" />',
+    props: [
+      "open",
+      "name",
+      "environmentName",
+      "isGlobal",
+      "steps",
+      "sharedByChecks",
+      "canReplayAnyway",
+      "existingKind",
+      "onSubmit",
+    ],
+    emits: ["update:open", "replay-anyway"],
+    computed: {
+      state(): string {
+        return (this as any).open ? (this as any).name : "closed";
+      },
+    },
+    watch: {
+      state(value: string) {
+        missingDialogLog.push(value);
+      },
+    },
+    mounted() {
+      missingDialogLog.push((this as any).state);
+    },
+    unmounted() {
+      missingDialogLog.push("closed");
     },
   },
   // Renders nothing of its own: the host's orchestration is driven through the `onSubmit` prop.
@@ -405,6 +461,68 @@ async function mountCreateAtConfigure(name = "Brand New Check") {
   return w;
 }
 
+// Shared-variable rows and environments as the list endpoints return them.
+const variable = (
+  name: string,
+  value?: string,
+  kind: "plain" | "secret" = "plain",
+  extra: Record<string, unknown> = {},
+) => ({
+  id: name,
+  name,
+  kind,
+  value,
+  has_value: true,
+  description: "",
+  example: "",
+  tags: [],
+  used_by_checks: 0,
+  created_at: 0,
+  updated_at: 0,
+  ...extra,
+});
+const environment = (id: string, variables: unknown[], is_global = false, checks_count = 0) => ({
+  id,
+  name: id,
+  description: "",
+  is_global,
+  created_at: 0,
+  updated_at: 0,
+  checks_count,
+  variables,
+});
+/** Global, prod and stg; stg is shared by 3 checks and holds a stored PASSWORD secret. */
+const orgEnvironments = (stgExtra: unknown[] = []) => [
+  environment("global", [], true),
+  environment("prod", [variable("BASE_URL", "https://prod.test")]),
+  environment(
+    "stg",
+    [
+      variable("BASE_URL", "https://stg.test"),
+      variable("PASSWORD", undefined, "secret"),
+      ...stgExtra,
+    ],
+    false,
+    3,
+  ),
+];
+const unsetApiKeySecret = variable("API_KEY", undefined, "secret", {
+  id: "var-api",
+  has_value: false,
+  description: "Partner key",
+  example: "pk_test",
+  tags: ["billing"],
+});
+const typeStep = (id: string, value: string): BrowserStep => ({
+  id,
+  action: "type",
+  name: `Fill ${id}`,
+  value,
+  locator: { candidates: [{ kind: "css", value: `#${id}` }] },
+});
+const toWire = (steps: BrowserStep[]) =>
+  steps.map((s) => ({ id: s.id, action: s.action, value: s.value }));
+
 describe("CreateBrowserTest", () => {
   let wrapper: VueWrapper;
 
@@ -421,6 +539,14 @@ describe("CreateBrowserTest", () => {
       data: { references: [], hidden_reference_count: 0 },
     });
     mockReplaceRangeWithSubtest.mockReset();
+    mockReplayUpTo.mockReset();
+    missingDialogLog.length = 0;
+    mockServiceCreateEnvironmentVariable.mockResolvedValue({ data: {} });
+    mockServiceUpdateEnvironmentVariable.mockResolvedValue({ data: {} });
+    mockServiceCreateGlobalVariable.mockResolvedValue({ data: {} });
+    mockServiceUpdateGlobalVariable.mockResolvedValue({ data: {} });
+    mockServiceListGlobalVariables.mockResolvedValue({ data: [] });
+    mockRecorderReplay.mockResolvedValue({});
     mockGetFoldersListByType.mockResolvedValue([]);
     // Re-primed here because clearAllMocks keeps implementations — a test that
     // resolves the probe true must not leak into the next one.
@@ -1669,45 +1795,34 @@ describe("CreateBrowserTest", () => {
 
   describe("Journey step — replay", () => {
     const journeyStub = (w: VueWrapper) =>
-      w.findComponent('[data-test="synthetics-browser-journey"]');
-    const variable = (name: string, value?: string, kind: "plain" | "secret" = "plain") => ({
-      id: name,
-      name,
-      kind,
-      value,
-      has_value: true,
-      description: "",
-      example: "",
-      tags: [],
-      used_by_checks: 0,
-      created_at: 0,
-      updated_at: 0,
-    });
-    const environment = (id: string, variables: unknown[], is_global = false) => ({
-      id,
-      name: id,
-      description: "",
-      is_global,
-      created_at: 0,
-      updated_at: 0,
-      checks_count: 0,
-      variables,
-    });
+      w.findComponent('[data-test="synthetics-browser-journey"]') as VueWrapper<any>;
+    const missingDialog = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-missing-value-dialog-stub"]') as VueWrapper<any>;
+    const missingDialogOpen = (w: VueWrapper) =>
+      missingDialog(w).exists() && missingDialog(w).props("open") === true;
+    const submitMissing = (w: VueWrapper, values: { value: string; secret: boolean }) =>
+      (missingDialog(w).props("onSubmit") as (v: unknown) => Promise<void>)(values);
+    const replayedVariables = (call = 0) =>
+      mockRecorderReplay.mock.calls[call]?.[2] as { name: string; value: string }[];
+    const errorToasts = () =>
+      mockToast.mock.calls.filter(
+        (call) => (call as unknown as [{ variant?: string }])[0]?.variant === "error",
+      );
 
     /** Mounts an edit of a templated check pinned to `environments`, with the org's three tiers loaded. */
-    async function mountTemplatedCheck(environments: string[]) {
-      mockServiceListEnvironments.mockResolvedValue({
-        data: [
-          environment("global", [], true),
-          environment("prod", [variable("BASE_URL", "https://prod.test")]),
-          environment("stg", [
-            variable("BASE_URL", "https://stg.test"),
-            variable("PASSWORD", undefined, "secret"),
-          ]),
-        ],
-      });
+    async function mountTemplatedCheck(
+      environments: string[],
+      extra: Record<string, unknown> = {},
+      envs: unknown[] = orgEnvironments(),
+    ) {
+      mockServiceListEnvironments.mockResolvedValue({ data: envs });
+      return mountLoadedCheck(environments, extra);
+    }
+
+    /** Same check, leaving the environment list to the case. */
+    async function mountLoadedCheck(environments: string[], extra: Record<string, unknown> = {}) {
       mockServiceGet.mockResolvedValue({
-        data: { name: "Login", url: "{{BASE_URL}}/login", environments, journey: [] },
+        data: { name: "Login", url: "{{BASE_URL}}/login", environments, journey: [], ...extra },
       });
       const w = mountPage({ editId: "check-123" });
       await flushPromises();
@@ -1720,8 +1835,19 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
     }
 
+    /** Replays the loaded journey; the wire mapper keeps each step's id and text. */
+    async function replayJourney(w: VueWrapper) {
+      journeyStub(w).vm.$emit("replay");
+      await flushPromises();
+    }
+
     beforeEach(() => {
       mockRecorderReplay.mockClear();
+      mockJourneyToWireSteps.mockImplementation(((steps: BrowserStep[]) => toWire(steps)) as any);
+    });
+
+    afterEach(() => {
+      mockJourneyToWireSteps.mockImplementation(() => []);
     });
 
     it("should replay against the check's first pinned environment", async () => {
@@ -1743,22 +1869,290 @@ describe("CreateBrowserTest", () => {
       expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://prod.test/login");
     });
 
-    it("should replay at once with a referenced secret left literal, and never prompt", async () => {
-      wrapper = await mountTemplatedCheck(["stg"]);
+    it("does not start a replay when a step needs a stored secret, and says why", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{PASSWORD}}")] });
 
-      await replay(wrapper, [{ action: "fill", value: "{{PASSWORD}}" }]);
+      await replayJourney(wrapper);
 
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: expect.stringMatching(/PASSWORD.*stg/),
+        }),
+      );
+    });
+
+    it("opens the missing-value dialog instead of replaying when a variable has no value", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{API_KEY}}")] });
+
+      await replayJourney(wrapper);
+
+      expect(missingDialogOpen(wrapper)).toBe(true);
+      expect(missingDialog(wrapper).props("name")).toBe("API_KEY");
+      expect(missingDialog(wrapper).props("environmentName")).toBe("stg");
+      expect(missingDialog(wrapper).props("isGlobal")).toBe(false);
+      expect(missingDialog(wrapper).props("steps")).toEqual([1]);
+      expect(missingDialog(wrapper).props("sharedByChecks")).toBe(3);
+      expect(missingDialog(wrapper).props("existingKind")).toBeNull();
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("saves the typed value into the replay environment and replays", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{API_KEY}}")] });
+      await replayJourney(wrapper);
+      mockServiceListEnvironments.mockClear();
+      mockServiceListEnvironments.mockResolvedValue({
+        data: orgEnvironments([variable("API_KEY", "k")]),
+      });
+
+      await submitMissing(wrapper, { value: "k", secret: false });
+      await flushPromises();
+
+      expect(mockServiceCreateEnvironmentVariable).toHaveBeenCalledWith("default", "stg", {
+        name: "API_KEY",
+        value: "k",
+        kind: "plain",
+      });
+      expect(mockServiceListEnvironments).toHaveBeenCalled();
       expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
-      expect(mockRecorderReplay.mock.calls[0]?.[0]).toEqual([
-        { action: "fill", value: "{{PASSWORD}}" },
-      ]);
-      expect(wrapper.findComponent({ name: "ReplaySecretPrompt" }).exists()).toBe(false);
+      expect(replayedVariables()).toContainEqual({ name: "API_KEY", value: "k" });
+      expect(missingDialogOpen(wrapper)).toBe(false);
+    });
+
+    it("updates an existing row with its description, example and tags, and without a kind", async () => {
+      wrapper = await mountTemplatedCheck(
+        ["stg"],
+        { journey: [typeStep("s1", "{{API_KEY}}")] },
+        orgEnvironments([unsetApiKeySecret]),
+      );
+      await replayJourney(wrapper);
+
+      await submitMissing(wrapper, { value: "k", secret: true });
+      await flushPromises();
+
+      expect(mockServiceCreateEnvironmentVariable).not.toHaveBeenCalled();
+      expect(mockServiceUpdateEnvironmentVariable).toHaveBeenCalledTimes(1);
+      const [org, env, id, body] = mockServiceUpdateEnvironmentVariable.mock.calls[0];
+      expect([org, env, id]).toEqual(["default", "stg", "var-api"]);
+      expect(body).toStrictEqual({
+        name: "API_KEY",
+        value: "k",
+        description: "Partner key",
+        example: "pk_test",
+        tags: ["billing"],
+      });
+    });
+
+    it("locks Store as a secret to the existing row's kind", async () => {
+      wrapper = await mountTemplatedCheck(
+        ["stg"],
+        { journey: [typeStep("s1", "{{API_KEY}}")] },
+        orgEnvironments([unsetApiKeySecret]),
+      );
+
+      await replayJourney(wrapper);
+
+      expect(missingDialogOpen(wrapper)).toBe(true);
+      expect(missingDialog(wrapper).props("existingKind")).toBe("secret");
+    });
+
+    it("replays a value stored as a secret without asking for it again", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{API_KEY}}")] });
+      await replayJourney(wrapper);
+      mockServiceListEnvironments.mockResolvedValue({
+        data: orgEnvironments([variable("API_KEY", undefined, "secret")]),
+      });
+
+      await submitMissing(wrapper, { value: "k", secret: true });
+      await flushPromises();
+
+      expect(mockServiceCreateEnvironmentVariable).toHaveBeenCalledWith("default", "stg", {
+        name: "API_KEY",
+        value: "k",
+        kind: "secret",
+      });
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      expect(replayedVariables()).toContainEqual({ name: "API_KEY", value: "k" });
+      expect(errorToasts()).toHaveLength(0);
+    });
+
+    it("writes to the environment the replay was started in, even if the selector changes while the dialog is open", async () => {
+      wrapper = await mountTemplatedCheck(["stg", "prod"], {
+        journey: [typeStep("s1", "{{API_KEY}}")],
+      });
+      await replayJourney(wrapper);
+      expect(missingDialogOpen(wrapper)).toBe(true);
+
+      // No selector before Phase 3: the default rule follows the pinned list.
+      (wrapper.vm as any).check.environments = ["prod"];
+      await flushPromises();
+      await submitMissing(wrapper, { value: "k", secret: false });
+      await flushPromises();
+
+      expect(mockServiceCreateEnvironmentVariable).toHaveBeenCalledTimes(1);
+      expect(mockServiceCreateEnvironmentVariable.mock.calls[0][1]).toBe("stg");
+    });
+
+    it("asks for the next missing name only after the first dialog closes", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], {
+        journey: [typeStep("s1", "{{API_KEY}}"), typeStep("s2", "{{TOKEN}}")],
+      });
+      await replayJourney(wrapper);
+      expect(missingDialog(wrapper).props("name")).toBe("API_KEY");
+      mockServiceListEnvironments.mockResolvedValue({
+        data: orgEnvironments([variable("API_KEY", "k")]),
+      });
+
+      await submitMissing(wrapper, { value: "k", secret: false });
+      await flushPromises();
+
+      expect(missingDialogOpen(wrapper)).toBe(true);
+      expect(missingDialog(wrapper).props("name")).toBe("TOKEN");
+      const changes = missingDialogLog.filter((v, i, all) => i === 0 || v !== all[i - 1]);
+      expect(changes.slice(changes.indexOf("API_KEY"))).toEqual(["API_KEY", "closed", "TOKEN"]);
+      const open = wrapper
+        .findAllComponents('[data-test="synthetics-missing-value-dialog-stub"]')
+        .filter((d) => (d as VueWrapper<any>).props("open") === true);
+      expect(open).toHaveLength(1);
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("keeps the dialog open and shows the server message when saving fails", async () => {
+      const failure = { response: { status: 403, data: { message: "You cannot edit stg" } } };
+      mockServiceCreateEnvironmentVariable.mockRejectedValue(failure);
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        wrapper = await mountTemplatedCheck(["stg"], {
+          journey: [typeStep("s1", "{{API_KEY}}")],
+        });
+        await replayJourney(wrapper);
+
+        await submitMissing(wrapper, { value: "k", secret: false }).catch(() => undefined);
+        await flushPromises();
+
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({ variant: "error", message: "You cannot edit stg" }),
+        );
+        expect(missingDialogOpen(wrapper)).toBe(true);
+        expect(mockRecorderReplay).not.toHaveBeenCalled();
+        expect(consoleError.mock.calls.flat()).not.toContain(failure);
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("Replay anyway replays up to the step before the first use", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], {
+        journey: [typeStep("s1", "a"), typeStep("s2", "b"), typeStep("s3", "{{API_KEY}}")],
+      });
+      await replayJourney(wrapper);
+      expect(missingDialog(wrapper).props("steps")).toEqual([3]);
+      expect(missingDialog(wrapper).props("canReplayAnyway")).toBe(true);
+
+      missingDialog(wrapper).vm.$emit("replay-anyway");
+      await flushPromises();
+
+      expect(mockReplayUpTo).toHaveBeenCalledTimes(1);
+      expect(mockReplayUpTo).toHaveBeenCalledWith(2);
+      expect(missingDialogOpen(wrapper)).toBe(false);
+    });
+
+    it("offers no Replay anyway when the Starting URL needs the value", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], {
+        url: "{{API_KEY}}/login",
+        journey: [typeStep("s1", "a"), typeStep("s2", "b")],
+      });
+
+      await replayJourney(wrapper);
+
+      expect(missingDialogOpen(wrapper)).toBe(true);
+      expect(missingDialog(wrapper).props("steps")).toContain(0);
+      expect(missingDialog(wrapper).props("canReplayAnyway")).toBe(false);
+    });
+
+    it("waits for the shared lists before deciding a value is missing", async () => {
+      let resolveEnvironments!: (value: unknown) => void;
+      mockServiceListEnvironments.mockReturnValue(
+        new Promise((resolve) => {
+          resolveEnvironments = resolve;
+        }),
+      );
+      wrapper = await mountLoadedCheck(["stg"], { journey: [typeStep("s1", "{{API_KEY}}")] });
+
+      await replayJourney(wrapper);
+
+      expect(missingDialogOpen(wrapper)).toBe(false);
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+
+      resolveEnvironments({ data: orgEnvironments([variable("API_KEY", "k")]) });
+      await flushPromises();
+
+      expect(missingDialogOpen(wrapper)).toBe(false);
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      expect(replayedVariables()).toContainEqual({ name: "API_KEY", value: "k" });
+    });
+
+    it("replays as today, without the missing-value dialog, when the environment list is refused", async () => {
+      mockServiceListEnvironments.mockRejectedValue({ response: { status: 403 } });
+      wrapper = await mountLoadedCheck(["stg"], { journey: [typeStep("s1", "{{API_KEY}}")] });
+
+      await replayJourney(wrapper);
+
+      expect(missingDialogOpen(wrapper)).toBe(false);
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows an error when the extension refuses the replay command", async () => {
+      mockRecorderReplay.mockRejectedValue(new Error("The extension refused the replay"));
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "hello")] });
+
+      await replayJourney(wrapper);
+
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: "The extension refused the replay",
+        }),
+      );
+    });
+
+    it("shows an error when a subtest cannot be loaded for replay", async () => {
+      const subtestStep: BrowserStep = {
+        id: "s1",
+        action: "subtest",
+        name: "Log in (shared)",
+        subtest: { id: "login-test", name: "Login" },
+      };
+      mockServiceListEnvironments.mockResolvedValue({ data: orgEnvironments() });
+      mockServiceGet.mockImplementation(async (_org: string, id: string) => {
+        if (id === "check-123") {
+          return {
+            data: {
+              name: "Login",
+              url: "{{BASE_URL}}/login",
+              environments: ["stg"],
+              journey: [subtestStep],
+            },
+          };
+        }
+        throw new Error("child unavailable");
+      });
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+      mockToast.mockClear();
+
+      await replayJourney(wrapper);
+
+      expect(errorToasts()).toHaveLength(1);
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
     });
 
     it("should hand the journey the resolved starting URL for recording", async () => {
       wrapper = await mountTemplatedCheck(["stg"]);
 
       expect(journeyStub(wrapper).props("startUrl")).toBe("https://stg.test/login");
+      expect(journeyStub(wrapper).props("startUrlTemplate")).toBe("{{BASE_URL}}/login");
     });
   });
 
@@ -2082,11 +2476,16 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
     }
 
-    it("passes the check's variables to the journey, so record paths can resolve the Starting URL", async () => {
-      const variables = [{ name: "baseUrl", value: "example.com" }];
-      wrapper = await mountEditWith({ variables });
+    it("passes the replay environment's values to the journey for recording", async () => {
+      mockServiceListEnvironments.mockResolvedValue({ data: orgEnvironments() });
+      wrapper = await mountEditWith({
+        environments: ["stg"],
+        variables: [{ name: "USER", value: "alice" }],
+      });
 
-      expect(journeyStub(wrapper).props("variables")).toEqual(variables);
+      const variables = journeyStub(wrapper).props("variables");
+      expect(variables).toContainEqual({ name: "BASE_URL", value: "https://stg.test" });
+      expect(variables).toContainEqual({ name: "USER", value: "alice" });
     });
 
     it("tells Configure the Starting URL is not opened when the first Step navigates", async () => {
@@ -2160,6 +2559,22 @@ describe("CreateBrowserTest", () => {
         "default",
         "check-123",
         expect.objectContaining({ url: "https://example.com/edited" }),
+        "folder-1",
+      );
+    });
+
+    it("keeps the placeholder when row 0 is edited", async () => {
+      wrapper = await mountEditWith({ journey: [click] });
+
+      journeyStub(wrapper).vm.$emit("update:startUrl", "{{BASE_URL}}/x");
+      await flushPromises();
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).toHaveBeenCalledWith(
+        "default",
+        "check-123",
+        expect.objectContaining({ url: "{{BASE_URL}}/x" }),
         "folder-1",
       );
     });

@@ -3203,6 +3203,93 @@ describe("BrowserJourney Starting URL variables", () => {
   });
 });
 
+describe("BrowserJourney recording with an unresolved value", () => {
+  let wrapper: VueWrapper;
+
+  const RECORD_ERROR = '[data-test="synthetics-journey-record-error"]';
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+    mockT.mockClear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  // The real recorder refuses an unbound placeholder before it touches the bridge.
+  async function recordOn(startUrl: string, props: Record<string, unknown> = {}) {
+    wrapper = mountJourney({
+      modelValue: [],
+      extensionReady: true,
+      startUrl,
+      variables: [],
+      replayEnvironmentLabel: "QA",
+      ...props,
+    });
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await flushPromises();
+  }
+
+  it("names the variable and environment when recording cannot resolve a value", async () => {
+    await recordOn("https://{{API_KEY}}/x");
+
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replayValues.recordUnresolved", {
+      name: "API_KEY",
+      environment: "QA",
+    });
+    const banner = wrapper.find(RECORD_ERROR);
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toBe("synthetics.journey.replayValues.recordUnresolved");
+    expect(banner.text()).not.toContain("unresolved variable");
+  });
+
+  it("says a stored secret is unreadable when recording needs one", async () => {
+    await recordOn("https://app.test/{{PASSWORD}}", { secretNames: new Set(["PASSWORD"]) });
+
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replayValues.secretUnreadable", {
+      name: "PASSWORD",
+      environment: "QA",
+    });
+    expect(mockT).not.toHaveBeenCalledWith(
+      "synthetics.journey.replayValues.recordUnresolved",
+      expect.anything(),
+    );
+    expect(wrapper.find(RECORD_ERROR).text()).toBe(
+      "synthetics.journey.replayValues.secretUnreadable",
+    );
+  });
+});
+
+describe("BrowserJourney replayUpTo", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("replayUpTo replays the first N steps", () => {
+    wrapper = mountJourney({
+      modelValue: [
+        { id: "s1", action: "navigate", name: "Open", value: "https://app.test/" },
+        { id: "s2", action: "click", name: "Sign in", selector: "#go" },
+        { id: "s3", action: "click", name: "Cart", selector: "#cart" },
+      ],
+    });
+
+    const vm = wrapper.vm as unknown as { replayUpTo?: (n: number) => void };
+    expect(typeof vm.replayUpTo).toBe("function");
+    vm.replayUpTo!(2);
+
+    expect(wrapper.emitted("replay-up-to")).toEqual([[2]]);
+    expect(wrapper.emitted("replay")).toBeFalsy();
+  });
+});
+
 // Surfaces the start row and its edit channel, so the skip rule is assertable without the table.
 const JourneyStepsStubWithStartRow = {
   props: ["data", "mode", "selectedIds", "expandedIds", "startRow"],
@@ -3329,6 +3416,16 @@ describe("BrowserJourney ghost row 0", () => {
   });
 
   // Configure → row 0: the Starting URL is a prop, so the row follows it.
+  it("shows the Starting URL as written, with its placeholder", () => {
+    wrapper = mountWithStartRow({
+      modelValue: [click("s1", "Sign in")],
+      startUrl: "https://stg.test/x",
+      startUrlTemplate: "{{BASE_URL}}/x",
+    });
+
+    expect(startRowProp(wrapper)).toMatchObject({ value: "{{BASE_URL}}/x" });
+  });
+
   it("follows Configure's Starting URL", async () => {
     wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in")] });
 
