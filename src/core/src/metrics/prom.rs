@@ -1030,7 +1030,11 @@ fn metadata_sql(
 #[cfg(feature = "vectorscan")]
 async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [PendingRecord]) {
     if json_data.is_empty()
-        || config::meta::self_reporting::redaction::is_self_reporting_stream(stream_name)
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(
+            org_id,
+            stream_name,
+            config::meta::stream::StreamType::Metrics,
+        )
     {
         return;
     }

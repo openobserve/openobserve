@@ -231,7 +231,11 @@ pub(super) async fn apply_redaction<T>(
     records: &mut [(json::Map<String, json::Value>, T)],
 ) {
     if records.is_empty()
-        || config::meta::self_reporting::redaction::is_self_reporting_stream(stream_name)
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(
+            org_id,
+            stream_name,
+            config::meta::stream::StreamType::Metrics,
+        )
     {
         return;
     }

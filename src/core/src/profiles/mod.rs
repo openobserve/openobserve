@@ -470,7 +470,11 @@ async fn apply_redaction(
     records: &mut Vec<json::Map<String, json::Value>>,
 ) {
     if records.is_empty()
-        || config::meta::self_reporting::redaction::is_self_reporting_stream(stream_name)
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(
+            org_id,
+            stream_name,
+            StreamType::Profiles,
+        )
     {
         return;
     }

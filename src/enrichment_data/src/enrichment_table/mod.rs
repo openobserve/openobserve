@@ -143,6 +143,9 @@ pub async fn save_enrichment_data(
         stream_schema_map.remove(&stream_name);
     }
 
+    // Taken before redaction: a dropped field is a redaction outcome, not a schema change.
+    let schema_probe: Option<json::Map<String, json::Value>> = payload.first().cloned();
+
     apply_redaction(org_id, &stream_name, &mut payload).await;
 
     let mut records = vec![];
@@ -169,11 +172,18 @@ pub async fn save_enrichment_data(
     }
 
     // disallow schema change for enrichment tables
-    let value_iter = record_vals.iter().take(1).cloned().collect::<Vec<_>>();
+    let mut probe = schema_probe.unwrap_or_default();
+    if !probe.is_empty() {
+        probe.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number(timestamp.into()),
+        );
+    }
+    let probe_ref = vec![&probe];
     let inferred_schema = infer_json_schema_from_map(
         &stream_name,
         StreamType::EnrichmentTables,
-        value_iter.into_iter(),
+        probe_ref.into_iter(),
     )
     .map_err(|_e| std::io::Error::other("Error inferring schema"))?;
     let db_schema = stream_schema_map
@@ -489,7 +499,11 @@ pub(crate) async fn apply_redaction(
 ) {
     #[cfg(feature = "vectorscan")]
     {
-        if config::meta::self_reporting::redaction::is_self_reporting_stream(_stream_name) {
+        if config::meta::self_reporting::redaction::is_self_reporting_stream(
+            _org_id,
+            _stream_name,
+            config::meta::stream::StreamType::EnrichmentTables,
+        ) {
             return;
         }
         // Enrichment rows genuinely carry no timestamp; a real zero would claim a 1970 window.

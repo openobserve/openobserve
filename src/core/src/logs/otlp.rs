@@ -732,7 +732,11 @@ pub async fn handle_request(
         match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
             Ok(pattern_manager) => {
                 for (stream, data) in json_data_by_stream.iter_mut() {
-                    if config::meta::self_reporting::redaction::is_self_reporting_stream(stream) {
+                    if config::meta::self_reporting::redaction::is_self_reporting_stream(
+                        org_id,
+                        stream,
+                        StreamType::Logs,
+                    ) {
                         continue;
                     }
                     let before = super::snapshot_derived_sources(&data.0);

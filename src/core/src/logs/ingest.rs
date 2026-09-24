@@ -114,8 +114,12 @@ fn is_blocked_internal_rollup_write(
 
 /// Keyed on the destination: gRPC relabels forwarded customer writes as `InternalGrpc`.
 #[cfg(any(feature = "vectorscan", test))]
-fn should_apply_sdr(stream_name: &str) -> bool {
-    !config::meta::self_reporting::redaction::is_self_reporting_stream(stream_name)
+fn should_apply_sdr(org_id: &str, stream_name: &str) -> bool {
+    !config::meta::self_reporting::redaction::is_self_reporting_stream(
+        org_id,
+        stream_name,
+        StreamType::Logs,
+    )
 }
 
 pub async fn ingest(
@@ -136,20 +140,10 @@ pub async fn ingest(
     #[cfg(feature = "vectorscan")]
     let pattern_manager = match get_pattern_manager().await {
         Ok(manager) => Some(manager),
-        Err(_) if !should_apply_sdr(in_stream_name) => None,
+        Err(_) if !should_apply_sdr(org_id, in_stream_name) => None,
         Err(e) => {
+            // Reported once the destination streams and their records are known, below.
             log::error!("[LOGS:JSON] failed to get pattern manager for SDR redaction: {e}");
-            crate::self_reporting::redaction_evidence::publish_scan_unavailable(
-                &config::meta::self_reporting::redaction::EvidenceScope::new(
-                    org_id,
-                    in_stream_name,
-                    StreamType::Logs,
-                ),
-                config::meta::self_reporting::redaction::FailPosture::Open,
-                0,
-                config::meta::self_reporting::redaction::DataWindow::default(),
-            )
-            .await;
             None
         }
     };
@@ -643,9 +637,33 @@ pub async fn ingest(
     drop(user_defined_schema_map);
 
     #[cfg(feature = "vectorscan")]
+    if pattern_manager.is_none() {
+        // One row per destination stream: a pipeline fans a request out to several.
+        for (stream, data) in json_data_by_stream.iter() {
+            if !should_apply_sdr(org_id, stream) {
+                continue;
+            }
+            let records = &data.0;
+            crate::self_reporting::redaction_evidence::publish_scan_unavailable(
+                &config::meta::self_reporting::redaction::EvidenceScope::new(
+                    org_id,
+                    stream,
+                    StreamType::Logs,
+                ),
+                config::meta::self_reporting::redaction::FailPosture::Open,
+                records.len() as u64,
+                config::meta::self_reporting::redaction::DataWindow::from_timestamps(
+                    records.iter().map(|(ts, _)| *ts),
+                ),
+            )
+            .await;
+        }
+    }
+
+    #[cfg(feature = "vectorscan")]
     if let Some(pattern_manager) = pattern_manager.as_ref() {
         for (stream, data) in json_data_by_stream.iter_mut() {
-            if !should_apply_sdr(stream) {
+            if !should_apply_sdr(org_id, stream) {
                 continue;
             }
             let before = super::snapshot_derived_sources(&data.0);
@@ -1530,16 +1548,22 @@ mod tests {
 
     #[test]
     fn test_should_apply_sdr_exempts_only_self_reporting_streams() {
+        for stream in [REDACTION_EVIDENCE_STREAM, USAGE_STREAM, TRIGGERS_STREAM] {
+            assert!(
+                !should_apply_sdr("any_org", stream),
+                "{stream} is per-org and must not be scanned in any org"
+            );
+        }
         for stream in [
-            REDACTION_EVIDENCE_STREAM,
-            USAGE_STREAM,
             AUDIT_STREAM,
-            TRIGGERS_STREAM,
             ERROR_STREAM,
             STATS_STREAM,
             DATA_RETENTION_USAGE_STREAM,
         ] {
-            assert!(!should_apply_sdr(stream), "{stream} must not be scanned");
+            assert!(
+                !should_apply_sdr(config::META_ORG_ID, stream),
+                "{stream} must not be scanned in the meta org"
+            );
         }
     }
 
@@ -1547,7 +1571,22 @@ mod tests {
     fn test_should_apply_sdr_scans_customer_streams() {
         // The gRPC funnel stamps InternalGrpc on these too, and they carry customer data.
         for stream in ["default", "app_logs", "_o2_service_graph", "k8s_events"] {
-            assert!(should_apply_sdr(stream), "{stream} must be scanned");
+            assert!(should_apply_sdr("acme", stream), "{stream} must be scanned");
+        }
+    }
+
+    #[test]
+    fn a_customer_stream_named_like_a_meta_only_one_is_still_scanned() {
+        for stream in [
+            AUDIT_STREAM,
+            ERROR_STREAM,
+            STATS_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
+        ] {
+            assert!(
+                should_apply_sdr("acme", stream),
+                "acme/{stream} is customer data and must be scanned"
+            );
         }
     }
 

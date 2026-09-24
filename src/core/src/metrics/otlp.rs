@@ -579,20 +579,12 @@ pub async fn handle_otlp_request(
         #[cfg(feature = "vectorscan")]
         let json_data = {
             let mut json_data = json_data;
-            let before: Vec<u64> = json_data
-                .iter()
-                .map(|(record, _)| {
-                    super::signature_without_labels(record, METRICS_HASH_EXCLUDED_LABELS)
-                })
-                .collect();
             ingest::apply_redaction(org_id, &local_metric_name, &mut json_data).await;
-            // Rehashing an untouched UDS record forks its series identity: the hash predates trim.
-            for (prior, (record, _)) in before.into_iter().zip(json_data.iter_mut()) {
+            // Every row, or one batch carries two hash formulas and splits a series in two.
+            for (record, _) in json_data.iter_mut() {
                 let redacted =
                     super::signature_without_labels(record, METRICS_HASH_EXCLUDED_LABELS);
-                if redacted != prior {
-                    record.insert(HASH_LABEL.to_string(), json::Value::Number(redacted.into()));
-                }
+                record.insert(HASH_LABEL.to_string(), json::Value::Number(redacted.into()));
             }
             json_data
         };

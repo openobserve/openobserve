@@ -15,11 +15,13 @@
 
 //! Beside the queue, not in `openobserve-core`, so crates outside the log path can report a scan.
 
+use std::sync::{LazyLock, Mutex};
+
 use config::{
     meta::{
         self_reporting::{
             ReportingData,
-            redaction::{DataWindow, EvidenceScope, GapReason, RedactionEvidence},
+            redaction::{DataWindow, EvidenceScope, GapAccumulator, GapReason, RedactionEvidence},
         },
         stream::StreamType,
     },
@@ -27,6 +29,10 @@ use config::{
     utils::json::{Map, Value},
 };
 use tokio::sync::mpsc::error::TrySendError;
+
+// Coalesced, because a flood of gap rows during an overflow guarantees its own loss.
+static PENDING_GAPS: LazyLock<Mutex<GapAccumulator>> =
+    LazyLock::new(|| Mutex::new(GapAccumulator::default()));
 
 /// Record that the pattern manager was unavailable, so a zero is not read as "clean".
 pub async fn publish_scan_unavailable(
@@ -60,6 +66,25 @@ pub fn record_gap(scope: &EvidenceScope, reason: GapReason, dropped_rows: u64) {
     metrics::SDR_EVIDENCE_DROPPED_TOTAL
         .with_label_values(&[&scope.org_id, &reason.to_string()])
         .inc_by(dropped_rows);
+    // A counter is not the audit artifact; the stream needs a row saying what it lost.
+    let Ok(mut pending) = PENDING_GAPS.lock() else {
+        log::error!("[SDR-EVIDENCE] gap accumulator poisoned; {dropped_rows} rows unrecorded");
+        return;
+    };
+    pending.record(
+        scope,
+        reason,
+        dropped_rows,
+        config::utils::time::now_micros(),
+    );
+}
+
+/// Takes the gaps recorded since the last call, for a caller about to enqueue rows anyway.
+pub fn drain_pending_gaps() -> Vec<RedactionEvidence> {
+    let Ok(mut pending) = PENDING_GAPS.lock() else {
+        return Vec::new();
+    };
+    pending.drain()
 }
 
 /// The enterprise engine enqueues its own rows, so it has to bump this counter itself.
@@ -74,6 +99,8 @@ pub fn count_regions(scope: &EvidenceScope, row: &RedactionEvidence) {
 }
 
 fn enqueue_rows(scope: &EvidenceScope, rows: Vec<RedactionEvidence>) {
+    let mut rows = rows;
+    rows.extend(drain_pending_gaps());
     for row in rows {
         count_regions(scope, &row);
         let reason = match super::try_enqueue(ReportingData::Redaction(Box::new(row))) {

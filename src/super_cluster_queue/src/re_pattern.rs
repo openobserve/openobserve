@@ -123,6 +123,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         return Ok(());
                     }
 
+                    // Taken before the degrade, so the row keeps the policy the author wrote.
+                    let wire_policies: Vec<String> =
+                        update.add.iter().map(|item| item.policy.clone()).collect();
+
                     // Node-to-node, not user input: rejecting here would wedge the queue.
                     db::re_pattern::degrade_unsupported_policies(
                         &org,
@@ -135,7 +139,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         .add
                         .clone()
                         .into_iter()
-                        .map(|item| PatternAssociationEntry {
+                        .zip(wire_policies)
+                        .map(|(item, wire_policy)| PatternAssociationEntry {
                             id: 0,
                             org: org.to_string(),
                             stream: stream.to_string(),
@@ -143,7 +148,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                             field: item.field,
                             pattern_id: item.pattern_id,
                             policy: PatternPolicy::from(&item.policy),
-                            policy_repr: Some(item.policy),
+                            policy_repr: Some(wire_policy),
                             apply_at: ApplyPolicy::from(item.apply_at),
                         })
                         .collect();

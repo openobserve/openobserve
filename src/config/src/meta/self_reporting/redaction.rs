@@ -507,17 +507,20 @@ struct PendingGap {
 }
 
 /// True for streams the platform writes itself, whose scan evidence would feed the next scan.
-pub fn is_self_reporting_stream(stream_name: &str) -> bool {
-    matches!(
-        stream_name,
-        REDACTION_EVIDENCE_STREAM
-            | USAGE_STREAM
-            | AUDIT_STREAM
-            | TRIGGERS_STREAM
-            | ERROR_STREAM
-            | STATS_STREAM
-            | DATA_RETENTION_USAGE_STREAM
-    )
+pub fn is_self_reporting_stream(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
+    // Every self-reporting writer uses Logs, so any other type is a customer stream by that name.
+    if stream_type != StreamType::Logs {
+        return false;
+    }
+    match stream_name {
+        // Written into the customer's own org, so these are exempt wherever they appear.
+        REDACTION_EVIDENCE_STREAM | USAGE_STREAM | TRIGGERS_STREAM => true,
+        // Written only to the meta org; the same name under a customer org is their data.
+        AUDIT_STREAM | ERROR_STREAM | STATS_STREAM | DATA_RETENTION_USAGE_STREAM => {
+            org_id == crate::META_ORG_ID
+        }
+        _ => false,
+    }
 }
 
 /// Identity of the pattern set in effect, for callers that cannot yet supply per-pattern policies.
@@ -570,6 +573,54 @@ fn sorted_labels<I: IntoIterator<Item = String>>(labels: I) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_customer_stream_named_like_a_meta_only_one_is_not_exempt() {
+        for stream in [
+            AUDIT_STREAM,
+            ERROR_STREAM,
+            STATS_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
+        ] {
+            assert!(
+                !is_self_reporting_stream("acme", stream, StreamType::Logs),
+                "acme/{stream} is customer data"
+            );
+            assert!(
+                is_self_reporting_stream(crate::META_ORG_ID, stream, StreamType::Logs),
+                "_meta/{stream} is written by the platform"
+            );
+        }
+    }
+
+    #[test]
+    fn a_per_org_self_reporting_stream_is_exempt_in_every_org() {
+        for stream in [REDACTION_EVIDENCE_STREAM, USAGE_STREAM, TRIGGERS_STREAM] {
+            assert!(is_self_reporting_stream("acme", stream, StreamType::Logs));
+            assert!(is_self_reporting_stream(
+                crate::META_ORG_ID,
+                stream,
+                StreamType::Logs
+            ));
+        }
+    }
+
+    #[test]
+    fn only_logs_can_be_a_self_reporting_stream() {
+        // No self-reporting writer uses another type, so the name alone must not exempt.
+        for stype in [
+            StreamType::Metrics,
+            StreamType::Traces,
+            StreamType::EnrichmentTables,
+        ] {
+            assert!(!is_self_reporting_stream(
+                crate::META_ORG_ID,
+                USAGE_STREAM,
+                stype
+            ));
+            assert!(!is_self_reporting_stream("acme", ERROR_STREAM, stype));
+        }
+    }
+
     use super::*;
 
     fn rule(name: &str, body: &str, policy: &str) -> PatternRule {
