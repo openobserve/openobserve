@@ -406,7 +406,13 @@ export function createRecordConverter(): RecordConverter {
     delete out.format;
     out.type = RecordType.FullSnapshot;
     out.data = {
-      node: documentNode ?? { type: NodeType.Document, childNodes: [], id: 0 },
+      // Emit a copy. `documentNode` stays the converter's live tree: every later Change
+      // record in this view mutates it in place (children spliced in/out, attributes and
+      // text rewritten). The caller converts a whole session before playback starts, so
+      // handing out the live tree would replay each view in its final state.
+      node: documentNode
+        ? structuredClone(documentNode)
+        : { type: NodeType.Document, childNodes: [], id: 0 },
       initialOffset,
     };
     return out;
@@ -450,7 +456,11 @@ export function createRecordConverter(): RecordConverter {
             }
             nodes.set(id, { node, parentId });
             // Emit the node with empty children; descendants arrive as their own adds.
-            const emitted = { ...node, childNodes: [] };
+            // Copy `attributes` too: the tracked node keeps receiving Attribute changes,
+            // and a shared object would rewrite this add with attributes it only gets later.
+            const emitted = node.attributes
+              ? { ...node, attributes: { ...node.attributes }, childNodes: [] }
+              : { ...node, childNodes: [] };
             adds.push({ parentId, nextId, node: emitted });
           }
           break;

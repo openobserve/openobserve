@@ -273,6 +273,65 @@ describe("sessionReplayChangeFormat", () => {
     });
   });
 
+  describe("emitted records are snapshots, not live views", () => {
+    // VideoPlayer converts every record of a session before it builds the player. If an
+    // emitted record shares objects with the converter's internal tree, every later Change
+    // rewrites it, so each view replays in its final state: nodes added later are already
+    // in the FullSnapshot, removed nodes are missing from it, and a node added mid-view
+    // already carries the attributes it only got just before it was removed.
+    it("keeps a full snapshot unchanged by later mutations", () => {
+      const converter = createRecordConverter();
+      // document(0) > BODY(1) > DIV(2, class=a) > #text(3, "old")
+      const [snapshot] = converter.convert(
+        fullSnapshot([
+          [
+            ADD_NODE,
+            [null, "#document"],
+            [1, "BODY"],
+            [1, "DIV", ["class", "a"]],
+            [1, "#text", "old"],
+          ],
+        ]),
+      );
+
+      converter.convert({
+        type: 12,
+        timestamp: 2000,
+        data: [
+          [ADD_NODE, [3, "SPAN"]], // id4 appended to BODY(1)
+          [ATTRIBUTE, [2, ["class", "b"]]],
+          [TEXT, [3, "new"]],
+        ],
+      });
+      converter.convert({ type: 12, timestamp: 3000, data: [[REMOVE_NODE, 2]] });
+
+      const body = snapshot.data.node.childNodes[0];
+      expect(body.childNodes.map((n: any) => n.id)).toEqual([2]);
+      const div = body.childNodes[0];
+      expect(div.attributes).toEqual({ class: "a" });
+      expect(div.childNodes[0].textContent).toBe("old");
+    });
+
+    it("keeps an added node's attributes as they were when it was added", () => {
+      const converter = createRecordConverter();
+      converter.convert(fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"]]]));
+
+      // id2 appended to BODY(1), then its class changes before it is removed.
+      const [added] = converter.convert({
+        type: 12,
+        timestamp: 2000,
+        data: [[ADD_NODE, [1, "DIV", ["class", "panel"]]]],
+      });
+      converter.convert({
+        type: 12,
+        timestamp: 3000,
+        data: [[ATTRIBUTE, [2, ["class", "panel closing"]]]],
+      });
+
+      expect(added.data.adds[0].node.attributes).toEqual({ class: "panel" });
+    });
+  });
+
   describe("passthrough + helpers", () => {
     it("returns classic records unchanged", () => {
       const meta = { type: 4, timestamp: 1, data: { width: 100, height: 200 } };
