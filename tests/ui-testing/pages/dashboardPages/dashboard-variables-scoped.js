@@ -2789,4 +2789,113 @@ export default class DashboardVariablesScoped {
     ]);
     return new URL(request.url());
   }
+
+  /**
+   * Get the "Select All"/"All" separator inside a variable's popover. The master
+   * row renders above this divider only while the values query has populated options.
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSelectAllSeparatorLocator(variableName) {
+    return this.getVariablePopoverLocator(variableName).locator(
+      '[data-test="dashboard-variable-all-separator"]'
+    );
+  }
+
+  /**
+   * Get the multi-select "Select All" master checkbox. It is the only
+   * `role="checkbox"` in the popover: the master row lives in OSelect's
+   * #before-options slot above the option list, and each option renders an
+   * aria-hidden indicator rather than a real checkbox.
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSelectAllCheckboxLocator(variableName) {
+    return this.getVariablePopoverLocator(variableName).locator('[role="checkbox"]');
+  }
+
+  /**
+   * Get the single-select "All" master row (plain text, no checkbox) inside a
+   * variable's popover.
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableAllTextLocator(variableName) {
+    return this.getVariablePopoverLocator(variableName).getByText("All", { exact: true });
+  }
+
+  /**
+   * Open a variable's dropdown and wait for its "Select All"/"All" master row to
+   * render (the separator below it turns visible once options hydrate). Retries the
+   * open because freshly-ingested values can lag indexing, and the master row is
+   * gated on options existing.
+   * @param {string} variableName - Variable name
+   * @param {Object} options - Options
+   * @param {number} options.timeout - Overall budget in ms (default: 30000)
+   */
+  async openVariableSelectAllDropdown(variableName, options = {}) {
+    const { timeout = 30000 } = options;
+    const trigger = this.getVariableTriggerLocator(variableName);
+    const popover = this.getVariablePopoverLocator(variableName);
+    const separator = this.getVariableSelectAllSeparatorLocator(variableName);
+
+    await expect
+      .poll(
+        async () => {
+          if (await separator.isVisible().catch(() => false)) return true;
+          if (!(await popover.isVisible().catch(() => false))) {
+            await trigger.click().catch(() => {});
+          }
+          await popover.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+          return await separator.isVisible().catch(() => false);
+        },
+        { timeout, intervals: [500, 1000, 1500, 2000, 2000] }
+      )
+      .toBe(true);
+  }
+
+  /**
+   * Toggle the multi-select "Select All" master checkbox (selects all, or clears
+   * when already all-selected).
+   * @param {string} variableName - Variable name
+   */
+  async toggleVariableSelectAll(variableName) {
+    await this.getVariableSelectAllCheckboxLocator(variableName).first().click();
+  }
+
+  /**
+   * Click the single-select "All" master row.
+   * @param {string} variableName - Variable name
+   */
+  async clickVariableAll(variableName) {
+    await this.getVariableAllTextLocator(variableName).click();
+  }
+
+  /**
+   * Individually select every option in an open multi-select variable's popover,
+   * skipping any already checked (a fresh query_values variable pre-selects its
+   * first option). Multi-select defers the model emit to popup-hide, so the popover
+   * stays open and each click just toggles that option's checkbox.
+   * @param {string} variableName - Variable name
+   */
+  async selectEveryOptionIndividually(variableName) {
+    const options = this.getVariableInnerOption(variableName);
+    const count = await options.count();
+    for (let i = 0; i < count; i++) {
+      const option = options.nth(i);
+      const isChecked = (await option.locator('[data-select-checkbox] svg').count()) > 0;
+      if (!isChecked) {
+        await option.click();
+      }
+    }
+  }
+
+  /**
+   * Click a single option in an open multi-select variable's popover by index.
+   * @param {string} variableName - Variable name
+   * @param {number} index - 0-based option index
+   */
+  async clickVariableOptionByIndex(variableName, index) {
+    await this.getVariableInnerOption(variableName).nth(index).click();
+  }
 }
