@@ -14283,6 +14283,27 @@
         "globalWarning": "Global values apply to every check. The value is saved now and used by all of them; it does not wait for Save & Exit.",
         "replayAnyway": "Replay anyway",
         "saveAndReplay": "Save & replay"
+      },
+      "startPill": {
+        "urlAria": "Starting URL: {url}. Edit",
+        "editUrl": "Edit Starting URL",
+        "editEnvironments": "Change environments",
+        "noUrl": "Set a Starting URL",
+        "urlTitle": "Starting URL",
+        "urlHelp": "Opened before step 1. Use a variable to change it per environment.",
+        "opensIn": "Opens in this test's environments:",
+        "inGlobalOnly": "in Global only",
+        "inOne": "in {name}",
+        "inCount": "in {count} environment | in {count} environments",
+        "summaryGlobalOnly": "Global only",
+        "summaryOne": "{name}",
+        "summaryCount": "{count} environment | {count} environments",
+        "envAria": "Environments: {summary}. Change",
+        "envTitle": "Test environments",
+        "envHelp": "Saved with the test. Each scheduled run executes once per environment and location, and opens:",
+        "noAccess": "No access",
+        "capLine": "{count} of {cap} · Global values always apply",
+        "replayNote": "Replay uses the environment on the Replay button."
       }
     },
     "labels": {

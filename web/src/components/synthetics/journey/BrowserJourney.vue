@@ -42,7 +42,7 @@ import {
 } from "@/utils/synthetics/journeySuggestions";
 // Chrome UI element names stay in English in every locale — they name the
 // actual Chrome interface the user is looking at.
-import { CHROME_UI_LABELS, DEFAULT_TEST_ID_ATTR, START_LOAD_STEP_ID } from "@/constants/synthetics";
+import { CHROME_UI_LABELS, DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
 import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
@@ -57,7 +57,6 @@ import {
   translateStepId,
   loadChildren,
   expandJourney,
-  opensStartingUrl,
   undefinedPlaceholders,
   type ChildJourney,
   type ExpansionMap,
@@ -68,8 +67,6 @@ const props = defineProps<{
   readonly?: boolean;
   /** The resolved Starting URL the recorder opens. */
   startUrl?: string;
-  /** The check's Starting URL as written; row 0 shows and edits it. */
-  startUrlTemplate?: string;
   /** Where replay and recording resolve values, named for messages. */
   replayEnvironmentLabel?: I18nText;
   /** Names that resolve only to a stored secret the browser cannot read. */
@@ -158,8 +155,6 @@ const { t } = useI18nTyped();
 
 const emit = defineEmits<{
   "update:modelValue": [value: BrowserStep[]];
-  /** Row 0's URL edit: the host's `check.url` is the one value both views read. */
-  "update:startUrl": [value: string];
   "clear-results": [];
   replay: [];
   /**
@@ -1389,17 +1384,6 @@ const executedTotal = computed(() => {
   return rows.filter((s) => s.action !== "subtest").length + children.length;
 });
 
-/** Row 0 — the Starting URL as a navigate-shaped row — exactly when the run opens it (skip rule A1). */
-const startRow = computed<BrowserStep | null>(() =>
-  opensStartingUrl(props.modelValue, childrenCache.value)
-    ? {
-        id: START_LOAD_STEP_ID,
-        action: "navigate",
-        value: props.startUrlTemplate ?? props.startUrl ?? "",
-      }
-    : null,
-);
-
 // ── Row status color: red left border for rows with validation errors ──────
 function getRowStatusColor(row: BrowserStep): string | undefined {
   const hasSelectorErr = selectorErrors.value.has(row.id);
@@ -1468,6 +1452,11 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         v-if="!readonly"
         :suggestions="suggestions"
         @action="onSuggestionAction"
+      />
+
+      <slot
+        name="start-pill"
+        :locked="!!readonly || isRecording || isReplayLocked || isRestoring"
       />
 
       <OInput
@@ -2072,8 +2061,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       :selected-ids="selectedStepIds"
       :expanded-ids="expandedStepIds"
       :get-row-status-color="getRowStatusColor"
-      :start-row="startRow"
-      @update:start-url="(url: string) => emit('update:startUrl', url)"
       @update:data="handleRowReorder"
       @update:selected-ids="handleUpdateSelected"
       @update:expanded-ids="handleUpdateExpanded"

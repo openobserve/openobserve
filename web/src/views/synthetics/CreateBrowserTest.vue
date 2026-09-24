@@ -107,6 +107,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
 import ExtractSubtestDialog from "@/components/synthetics/journey/ExtractSubtestDialog.vue";
 import MissingValueDialog from "@/components/synthetics/journey/MissingValueDialog.vue";
+import JourneyStartPill from "@/components/synthetics/journey/JourneyStartPill.vue";
 import type { ExtractForm } from "@/components/synthetics/journey/ExtractSubtestDialog.schema";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import CheckVariablesPanel from "@/components/synthetics/configure/CheckVariablesPanel.vue";
@@ -1815,7 +1816,6 @@ function onClearResults() {
                     ref="journeyRef"
                     v-model="check.journey"
                     :start-url="replayInputsForCheck.url"
-                    :start-url-template="check.url"
                     :replay-environment-label="replayEnvironmentLabel"
                     :secret-names="replaySecretNames"
                     :known-variables="knownVariableNames"
@@ -1840,12 +1840,6 @@ function onClearResults() {
                     :missing-child-ids="missingChildIds"
                     :expansion-map="expansionMap"
                     class="h-full!"
-                    @update:start-url="
-                      (url: string) => {
-                        check.url = url;
-                        isDirty = true;
-                      }
-                    "
                     @toggle-variables-panel="variablesPanelOpen = !variablesPanelOpen"
                     @open-child="onOpenChild"
                     @replay="onReplay"
@@ -1855,7 +1849,20 @@ function onClearResults() {
                     @clear-results="onClearResults"
                     @auto-record-consumed="autoRecord = false"
                     @selection-changed="journeySelectionState = $event"
-                  />
+                  >
+                    <template #start-pill="{ locked }">
+                      <JourneyStartPill
+                        :url="check.url"
+                        :environments="sharedEnvironments"
+                        :selected-ids="check.environments ?? []"
+                        :check-variables="check.variables ?? []"
+                        :globals="sharedGlobals"
+                        :disabled="locked"
+                        @update:url="onConfigureUpdate({ ...check, url: $event })"
+                        @update:selected-ids="onConfigureUpdate({ ...check, environments: $event })"
+                      />
+                    </template>
+                  </BrowserJourney>
                 </div>
               </template>
               <template #separator>

@@ -34,7 +34,7 @@ export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 </script>
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed, ref, useId } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -45,7 +45,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
 import { ACTION_ICONS, stepActionLabelKey } from "@/constants/synthetics";
@@ -137,8 +136,6 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   "update:data": [value: TData[]];
-  /** Row 0's URL edit — the check's Starting URL, which the host owns. */
-  "update:start-url": [value: string];
   "update:selected-ids": [ids: string[]];
   "update:expanded-ids": [ids: string[]];
   "row-click": [row: TData, event: MouseEvent];
@@ -402,10 +399,8 @@ function handleUpdateExpanded(ids: string[]) {
   emit("update:expanded-ids", ids);
 }
 
-const startUrlInputId = useId();
-
-/** Preview mode is a child's definition run inside the parent's page, so it has no row 0. */
-const showStartRow = computed(() => !!props.startRow && props.mode !== "preview");
+/** Only results show row 0; the editor's Starting URL lives in the toolbar pill. */
+const showStartRow = computed(() => !!props.startRow && props.mode === "results");
 
 const startRowStatusColor = computed(() =>
   props.startRow ? props.getRowStatusColor?.(props.startRow) || undefined : undefined,
@@ -454,51 +449,30 @@ const startRowColspan = computed(
     <template v-if="showStartRow" #body-start>
       <tr data-test="synthetics-journey-start-row" :data-status-color="startRowStatusColor">
         <td :colspan="startRowColspan" class="border-table-row-divider border-b px-3">
-          <div :class="['flex items-center gap-2', isEditor ? 'py-1.5' : 'py-2']">
-            <template v-if="isEditor">
-              <span class="w-6 shrink-0" aria-hidden="true" />
-              <span class="bg-tabs-active-bg rounded-default flex shrink-0 items-center p-1">
-                <OIcon name="language" size="sm" class="text-tabs-active-text" aria-hidden="true" />
-              </span>
-              <label :for="startUrlInputId" class="text-text-body shrink-0 text-sm">
-                {{ t("synthetics.journey.startRowLabel") }}
-              </label>
-              <OInput
-                :id="startUrlInputId"
-                :model-value="startRow!.value ?? ''"
-                :readonly="readonly || isLocked"
-                size="sm"
-                :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
-                class="min-w-0 flex-1"
-                data-test="synthetics-journey-start-url-input"
-                @update:model-value="(v: string | number) => emit('update:start-url', String(v))"
-              />
-            </template>
-            <template v-else>
-              <div class="flex w-11 shrink-0 items-center justify-center">
-                <span :class="dotClass(getDotState(startRow!))" aria-hidden="true" />
-              </div>
-              <div
-                class="rounded-default border-border-default bg-surface-subtle flex h-12 w-18 shrink-0 items-center justify-center overflow-hidden border"
+          <div class="flex items-center gap-2 py-2">
+            <div class="flex w-11 shrink-0 items-center justify-center">
+              <span :class="dotClass(getDotState(startRow!))" aria-hidden="true" />
+            </div>
+            <div
+              class="rounded-default border-border-default bg-surface-subtle flex h-12 w-18 shrink-0 items-center justify-center overflow-hidden border"
+            >
+              <slot name="screenshot-thumb" :row="startRow!">
+                <OIcon name="image" size="xs" class="text-text-secondary" />
+              </slot>
+            </div>
+            <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span class="text-text-body truncate text-sm">{{ startRow!.name }}</span>
+              <span
+                v-if="startRow!.error"
+                class="text-status-error-text truncate font-mono text-xs"
+                :title="startRow!.error"
               >
-                <slot name="screenshot-thumb" :row="startRow!">
-                  <OIcon name="image" size="xs" class="text-text-secondary" />
-                </slot>
-              </div>
-              <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span class="text-text-body truncate text-sm">{{ startRow!.name }}</span>
-                <span
-                  v-if="startRow!.error"
-                  class="text-status-error-text truncate font-mono text-xs"
-                  :title="startRow!.error"
-                >
-                  {{ startRow!.error }}
-                </span>
-              </div>
-              <span class="text-text-secondary shrink-0 font-mono text-xs tabular-nums">
-                {{ startRow!.durStr ?? "" }}
+                {{ startRow!.error }}
               </span>
-            </template>
+            </div>
+            <span class="text-text-secondary shrink-0 font-mono text-xs tabular-nums">
+              {{ startRow!.durStr ?? "" }}
+            </span>
           </div>
         </td>
       </tr>

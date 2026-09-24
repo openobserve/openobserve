@@ -103,3 +103,17 @@ export function classifyReplayNames(
     return { name, state: "missing" as const, steps };
   });
 }
+
+/** The Starting URL each environment opens, Global values under its own. */
+export function environmentStartUrls(
+  url: string,
+  checkVariables: { name: string; value: string }[],
+  environments: SyntheticsEnvironment[],
+  globals: SyntheticsVariable[],
+  ids: string[],
+): { id: string; url: string }[] {
+  return ids.map((id) => ({
+    id,
+    url: replayInputs(url, checkVariables, sharedPlainValues(environments, globals, id)).url,
+  }));
+}
