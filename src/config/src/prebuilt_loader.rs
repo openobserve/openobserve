@@ -732,7 +732,6 @@ mod tests {
         }
     }
 
-    #[test]
     /// Every template OpenObserve ships must be able to say a recovery IS one.
     ///
     /// These are CUSTOM bodies: nothing can be injected into the author's raw
