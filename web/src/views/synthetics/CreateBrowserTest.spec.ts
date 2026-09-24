@@ -47,6 +47,7 @@ const {
   mockGetFoldersListByType,
   mockRoute,
   mockOnBeforeRouteUpdate,
+  mockBreakpoint,
 } = vi.hoisted(() => ({
   mockServiceGetLocations: vi.fn().mockResolvedValue({
     data: { locations: [], browsers: [], devices: [] },
@@ -87,7 +88,22 @@ const {
   mockRoute: { params: {} as Record<string, string>, query: {} as Record<string, string> },
   // Captures the guard the view registers for a same-record navigation (parent → child id).
   mockOnBeforeRouteUpdate: vi.fn(),
+  // Read once per mount; a case sets it before mounting to lay the page out as a phone.
+  mockBreakpoint: { mobile: false },
 }));
+
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => mockBreakpoint.mobile),
+      isTablet: computed(() => false),
+      isDesktop: computed(() => !mockBreakpoint.mobile),
+      mdUp: computed(() => !mockBreakpoint.mobile),
+      lgUp: computed(() => !mockBreakpoint.mobile),
+    }),
+  };
+});
 
 vi.mock("vue-router", () => ({
   useRoute: () => mockRoute,
@@ -580,6 +596,7 @@ describe("CreateBrowserTest", () => {
     });
     mockReplaceRangeWithSubtest.mockReset();
     mockReplayUpTo.mockReset();
+    mockBreakpoint.mobile = false;
     missingDialogLog.length = 0;
     mockServiceCreateEnvironmentVariable.mockResolvedValue({ data: {} });
     mockServiceUpdateEnvironmentVariable.mockResolvedValue({ data: {} });
@@ -1722,6 +1739,36 @@ describe("CreateBrowserTest", () => {
 
       expect(leaveAsks()).toBe(true);
       expect(wrapper.find('[data-test="synthetics-create-unsaved-dialog"]').exists()).toBe(true);
+    });
+  });
+
+  describe("phone layout", () => {
+    const subtitle = (w: VueWrapper) =>
+      w.findComponent(pageLayoutStubs.OPageLayout).props("subtitle") as string;
+
+    async function mountUsedBy(hidden: number) {
+      mockGetFoldersListByType.mockResolvedValue([{ folderId: "folder-1", name: "Checkout" }]);
+      mockServiceReferencedBy.mockResolvedValue({
+        data: {
+          references: [{ id: "p1", name: "One", folder_id: "f1" }],
+          hidden_reference_count: hidden,
+        },
+      });
+      return mountValidEdit();
+    }
+
+    it("on a phone the used-by count moves into the subtitle", async () => {
+      wrapper = await mountUsedBy(0);
+      expect(subtitle(wrapper)).toBe("Checkout");
+      wrapper.unmount();
+
+      mockBreakpoint.mobile = true;
+      wrapper = await mountUsedBy(0);
+      expect(subtitle(wrapper)).toBe("Checkout · used by 1 test");
+      wrapper.unmount();
+
+      wrapper = await mountUsedBy(2);
+      expect(subtitle(wrapper)).toBe("Checkout · used by 3 tests");
     });
   });
 

@@ -56,6 +56,21 @@ vi.mock("@/services/synthetics", () => ({
   },
 }));
 
+// Mutable per case, so phone layout tests can switch while every other test stays desktop.
+const mockViewport = vi.hoisted(() => ({ mdUp: true, lgUp: true }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !mockViewport.mdUp),
+      isTablet: computed(() => mockViewport.mdUp && !mockViewport.lgUp),
+      isDesktop: computed(() => mockViewport.lgUp),
+      mdUp: computed(() => mockViewport.mdUp),
+      lgUp: computed(() => mockViewport.lgUp),
+    }),
+  };
+});
+
 import { resetManager } from "@/lib/vue-shortcut-manager";
 import BrowserJourney from "./BrowserJourney.vue";
 
@@ -4603,5 +4618,135 @@ describe("BrowserJourney extract range", () => {
     await select(wrapper, ["mid", "zeta"]);
 
     expect(lastSelection(wrapper)).toEqual({ count: 2, isRecording: false, ids: ["zeta", "mid"] });
+  });
+});
+
+describe("BrowserJourney toolbar on a phone", () => {
+  let wrapper: VueWrapper;
+  let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
+
+  const MENU = '[data-test="synthetics-journey-toolbar-menu"]';
+  const MENU_ADD_STEP = '[data-test="synthetics-journey-toolbar-menu-add-step"]';
+  const MENU_ADD_SUBTEST = '[data-test="synthetics-journey-toolbar-menu-add-subtest"]';
+  const MENU_REPLAY = '[data-test="synthetics-journey-toolbar-menu-replay"]';
+  const MENU_RECORD = '[data-test="synthetics-journey-toolbar-menu-record"]';
+  const DESKTOP_CONTROLS = [
+    '[data-test="synthetics-journey-add-step-btn"]',
+    '[data-test="synthetics-journey-add-menu-trigger"]',
+    '[data-test="synthetics-journey-replay-btn"]',
+    '[data-test="synthetics-journey-record-btn"]',
+  ];
+  const TOGGLE = '[data-test="synthetics-journey-toggle-variables-btn"]';
+
+  const OTooltipWithContentStub = {
+    props: ["content"],
+    template: '<div :data-tooltip="content" />',
+  };
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test/" },
+    { id: "s2", action: "click", name: "Sign in", selector: "#login" },
+  ] as any[];
+
+  beforeEach(() => {
+    mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
+    originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    mockViewport.mdUp = true;
+    mockViewport.lgUp = true;
+    Element.prototype.scrollIntoView = originalScrollIntoView;
+    mockStoreState.zoConfig = {};
+    vi.restoreAllMocks();
+  });
+
+  function mountAt(viewport: "phone" | "tablet" | "desktop") {
+    mockViewport.mdUp = viewport !== "phone";
+    mockViewport.lgUp = viewport === "desktop";
+    const w = mount(BrowserJourney, {
+      props: {
+        modelValue: journey,
+        replayPhase: "idle",
+        variablesPanelOpen: false,
+        "onUpdate:modelValue": (steps: BrowserStep[]) => w.setProps({ modelValue: steps }),
+      },
+      global: { stubs: { ...STUBS, OTooltip: OTooltipWithContentStub } },
+    }) as VueWrapper;
+    return w;
+  }
+
+  function hasClassUpTo(w: VueWrapper, selector: string, cls: string): boolean {
+    let el: Element | null = w.find(selector).element;
+    while (el && el !== w.element.parentElement) {
+      if (el.classList.contains(cls)) return true;
+      el = el.parentElement;
+    }
+    return false;
+  }
+
+  // The layout switch is the behaviour: absent, or hidden by the breakpoint class.
+  const hiddenOnPhone = (w: VueWrapper, selector: string) =>
+    !w.find(selector).exists() || hasClassUpTo(w, selector, "max-md:hidden");
+  const hiddenFromMdUp = (w: VueWrapper, selector: string) =>
+    !w.find(selector).exists() || hasClassUpTo(w, selector, "md:hidden");
+
+  it("on a phone, Add, Replay and Record are in the toolbar menu, with Replay and Record unavailable and the reason shown", () => {
+    wrapper = mountAt("phone");
+
+    expect(wrapper.find(MENU).exists()).toBe(true);
+    expect(wrapper.find(MENU_ADD_STEP).exists()).toBe(true);
+    expect(wrapper.find(MENU_ADD_SUBTEST).exists()).toBe(true);
+    for (const sel of [MENU_REPLAY, MENU_RECORD]) {
+      const item = wrapper.find(sel);
+      expect(item.exists(), `${sel} missing`).toBe(true);
+      expect(item.attributes("disabled"), `${sel} is available`).toBeDefined();
+      expect(item.text()).toContain("synthetics.journey.needsDesktopRecorder");
+    }
+    for (const sel of DESKTOP_CONTROLS) {
+      expect(hiddenOnPhone(wrapper, sel), `${sel} still shows on a phone`).toBe(true);
+    }
+  });
+
+  it("on a phone, the toolbar menu trigger has a name and a tooltip", () => {
+    wrapper = mountAt("phone");
+
+    expect(wrapper.find(MENU).exists()).toBe(true);
+    const label = wrapper.find(MENU).attributes("aria-label");
+    expect(label).toBeTruthy();
+    const tooltips = wrapper.findAll("[data-tooltip]").map((t) => t.attributes("data-tooltip"));
+    expect(tooltips).toContain(label);
+  });
+
+  it("on a phone, adding a step from the toolbar menu works", async () => {
+    wrapper = mountAt("phone");
+
+    expect(wrapper.find(MENU_ADD_STEP).exists()).toBe(true);
+    await wrapper.find(MENU_ADD_STEP).trigger("click");
+    await flushPromises();
+
+    const steps = (wrapper.props() as Record<string, unknown>).modelValue as BrowserStep[];
+    expect(steps).toHaveLength(3);
+  });
+
+  it("on a phone, the variables toggle is still in the toolbar", () => {
+    wrapper = mountAt("phone");
+
+    expect(wrapper.find(TOGGLE).exists()).toBe(true);
+    expect(hiddenOnPhone(wrapper, TOGGLE)).toBe(false);
+  });
+
+  it("on tablet and desktop, no phone-only toolbar items are rendered", () => {
+    for (const viewport of ["tablet", "desktop"] as const) {
+      wrapper = mountAt(viewport);
+
+      expect(hiddenFromMdUp(wrapper, MENU), `toolbar menu shows on ${viewport}`).toBe(true);
+      for (const sel of DESKTOP_CONTROLS) {
+        expect(wrapper.find(sel).exists(), `${sel} missing on ${viewport}`).toBe(true);
+      }
+      wrapper.unmount();
+    }
   });
 });
