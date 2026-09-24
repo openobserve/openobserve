@@ -40,25 +40,34 @@ pub const DROP_METRIC_BIN_OP: [u8; 7] = [
 struct OneSideGroup {
     labels: Vec<Labels>,
     samples: HashMap<i64, (usize, f64)>,
+    /// Timestamps where two series of the group have samples, with the indexes of both series.
+    duplicates: Vec<(i64, usize, usize)>,
 }
 
 impl OneSideGroup {
-    fn new(series: Vec<RangeValue>, side: &str) -> Result<Self> {
+    fn new(series: Vec<RangeValue>) -> Self {
         let mut labels: Vec<Labels> = Vec::with_capacity(series.len());
         let mut samples = HashMap::with_capacity(series.first().map_or(0, |s| s.samples.len()));
+        let mut duplicates = vec![];
         for (idx, range) in series.into_iter().enumerate() {
+            labels.push(range.labels);
             for sample in &range.samples {
-                if let Some((other, _)) = samples.insert(sample.timestamp, (idx, sample.value)) {
-                    return Err(DataFusionError::Execution(format!(
-                        "found duplicate series for the match group on the {side} hand-side of the operation: [{}, {}];many-to-many matching not allowed: matching labels must be unique on one side",
-                        format_labels(&labels[other]),
-                        format_labels(&range.labels),
-                    )));
+                match samples.entry(sample.timestamp) {
+                    Entry::Occupied(entry) => {
+                        let (other, _) = *entry.get();
+                        duplicates.push((sample.timestamp, other, idx));
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert((idx, sample.value));
+                    }
                 }
             }
-            labels.push(range.labels);
         }
-        Ok(Self { labels, samples })
+        Self {
+            labels,
+            samples,
+            duplicates,
+        }
     }
 }
 
@@ -281,8 +290,9 @@ fn vector_arithmetic_operators(
     }
     let one_groups: HashMap<u64, OneSideGroup> = one_series
         .into_par_iter()
-        .map(|(signature, series)| Ok((signature, OneSideGroup::new(series, one_side)?)))
-        .collect::<Result<_>>()?;
+        .map(|(signature, series)| (signature, OneSideGroup::new(series)))
+        .collect();
+    check_one_side_duplicates(&one_groups, &many, one_side)?;
 
     let matched: Vec<MatchedSeries> = many
         .into_par_iter()
@@ -365,6 +375,35 @@ fn match_series(
         .collect()
 }
 
+/// Rejects "one"-side duplicates only at steps where the "many" side has samples.
+fn check_one_side_duplicates(
+    groups: &HashMap<u64, OneSideGroup>,
+    many: &[RangeValue],
+    side: &str,
+) -> Result<()> {
+    if groups.values().all(|group| group.duplicates.is_empty()) {
+        return Ok(());
+    }
+    let many_timestamps: HashSet<i64> = many
+        .iter()
+        .flat_map(|range| range.samples.iter().map(|s| s.timestamp))
+        .collect();
+    for group in groups.values() {
+        if let Some(&(_, first, second)) = group
+            .duplicates
+            .iter()
+            .find(|(timestamp, ..)| many_timestamps.contains(timestamp))
+        {
+            return Err(DataFusionError::Execution(format!(
+                "found duplicate series for the match group on the {side} hand-side of the operation: [{}, {}];many-to-many matching not allowed: matching labels must be unique on one side",
+                format_labels(&group.labels[first]),
+                format_labels(&group.labels[second]),
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Rejects ambiguous matches at a timestamp and merges results that end up with the same labels.
 fn merge_matched_series(matched: Vec<MatchedSeries>, one_to_one: bool) -> Result<Vec<RangeValue>> {
     let mut by_key: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matched.len());
@@ -412,6 +451,17 @@ fn merge_matched_series(matched: Vec<MatchedSeries>, one_to_one: bool) -> Result
     }
     for (range, _) in output.iter_mut().zip(merged).filter(|(_, merged)| *merged) {
         range.samples.sort_unstable_by_key(|s| s.timestamp);
+        // on(__name__) matches can collide after the metric name is dropped
+        if range
+            .samples
+            .windows(2)
+            .any(|pair| pair[0].timestamp == pair[1].timestamp)
+        {
+            return Err(DataFusionError::Execution(format!(
+                "vector cannot contain metrics with the same labelset {}",
+                format_labels(&range.labels)
+            )));
+        }
     }
     Ok(output)
 }
@@ -1149,5 +1199,56 @@ mod tests {
         let result = eval_bin_op("a atan2 ignoring (code) b", left, right);
         assert_eq!(result.len(), 1);
         assert_eq!(label_pairs(&result[0]), pairs(&[("job", "api")]));
+    }
+
+    #[test]
+    fn test_outputs_with_same_labels_at_same_timestamp_error() {
+        let series = || {
+            vec![
+                range_at(&[(1, 1.0)], vec![("__name__", "a"), ("job", "x")]),
+                range_at(&[(1, 2.0)], vec![("__name__", "b"), ("job", "x")]),
+            ]
+        };
+        let err = try_eval_bin_op(
+            r#"{__name__=~"a|b"} + on (__name__, job) {__name__=~"a|b"}"#,
+            series(),
+            series(),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("same labelset"), "{err}");
+    }
+
+    #[test]
+    fn test_one_side_series_with_repeated_timestamp_errors_without_panic() {
+        let left = vec![range_at(&[(1, 1.0)], vec![("job", "x")])];
+        let right = vec![range_at(&[(1, 1.0), (1, 2.0)], vec![("job", "x")])];
+        let err = try_eval_bin_op("a + on (job) b", left, right)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("many-to-many matching not allowed"), "{err}");
+    }
+
+    #[test]
+    fn test_one_side_duplicates_ignored_where_many_side_is_empty() {
+        let right = || {
+            vec![
+                range_at(
+                    &[(1, 1.0), (2, 1.0)],
+                    vec![("instance", "i1"), ("job", "x")],
+                ),
+                range_at(&[(2, 1.0)], vec![("instance", "i2"), ("job", "x")]),
+            ]
+        };
+        let left = vec![range_at(&[(1, 5.0)], vec![("job", "x")])];
+        let result = eval_bin_op("a + on (job) b", left, right());
+        assert_eq!(result.len(), 1);
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 6.0)]);
+
+        let left = vec![range_at(&[(1, 5.0), (2, 5.0)], vec![("job", "x")])];
+        let err = try_eval_bin_op("a + on (job) b", left, right())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("many-to-many matching not allowed"), "{err}");
     }
 }
