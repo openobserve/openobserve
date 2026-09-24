@@ -303,7 +303,7 @@ async fn search_in_cluster(
         query_data: _,
         label_selector: _,
     } = req.query.as_ref().unwrap();
-    if start != end && is_root_subquery(&ast) {
+    if rejects_root_subquery(&ast, start != end, query_exemplars) {
         return Err(Error::ErrorCode(ErrorCodes::InvalidParams(
             "invalid expression type \"range vector\" for range query, must be Scalar or instant Vector".to_string(),
         )));
@@ -581,7 +581,12 @@ async fn search_in_cluster(
     Ok(values)
 }
 
-/// Whether the query answers with a subquery's own samples, which sit off any range query's grid.
+/// Whether a range query would answer with a subquery's own samples, which sit off its grid.
+fn rejects_root_subquery(expr: &parser::Expr, is_range: bool, query_exemplars: bool) -> bool {
+    // exemplars only read the selectors, never the root expression
+    is_range && !query_exemplars && is_root_subquery(expr)
+}
+
 fn is_root_subquery(expr: &parser::Expr) -> bool {
     match expr {
         parser::Expr::Paren(paren) => is_root_subquery(&paren.expr),
@@ -807,6 +812,14 @@ mod tests {
                 "{query}"
             );
         }
+    }
+
+    #[test]
+    fn test_rejects_root_subquery_only_in_range_sample_queries() {
+        let expr = parser::parse("up[5m:1m]").unwrap();
+        assert!(rejects_root_subquery(&expr, true, false));
+        assert!(!rejects_root_subquery(&expr, false, false));
+        assert!(!rejects_root_subquery(&expr, true, true));
     }
 
     #[tokio::test]
