@@ -217,7 +217,8 @@ where
     F: Fn(String, i64) -> Fut,
     Fut: Future<Output = Result<Vec<InstantValue>, anyhow::Error>>,
 {
-    let range_secs = ((end - start) / 1_000_000).max(1);
+    // Range selectors are left-open; one extra second keeps the rollup sample sitting at `start`.
+    let range_secs = ((end - start) / 1_000_000).max(1) + 1;
     let plan = plan_queries(filter, range_secs, start, end).map_err(anyhow::Error::msg)?;
     let (results, degraded) = settle_plan(run_plan(&plan, run).await)?;
     let (input, mut meta) = assemble(results, filter.agent_env.as_deref())?;
@@ -1189,6 +1190,7 @@ mod tests {
         assert_eq!(queries.len(), 15);
         assert!(input.node_only_services);
         assert!(queries.iter().all(|(q, _)| !q.contains('{')));
+        assert!(queries.iter().all(|(q, _)| !q.contains("[60s]")));
         assert_eq!(
             queries
                 .iter()
@@ -1196,26 +1198,26 @@ mod tests {
                 .count(),
             3
         );
-        assert!(queries.contains(&(q_requests("", false, 60), 1_060_000_000)));
+        assert!(queries.contains(&(q_requests("", false, 61), 1_060_000_000)));
 
         let (queries, input) = issued(&filter(Some("default"), None)).await;
         assert_eq!(queries.len(), 17);
         assert!(input.node_only_services);
-        assert!(queries.contains(&(q_server_count(M, 60), 1_060_000_000)));
-        assert!(queries.contains(&(q_org_server_count(60), 1_060_000_000)));
+        assert!(queries.contains(&(q_server_count(M, 61), 1_060_000_000)));
+        assert!(queries.contains(&(q_org_server_count(61), 1_060_000_000)));
 
         let (queries, input) = issued(&filter(None, Some("prod"))).await;
         assert_eq!(queries.len(), 17);
         assert!(!input.node_only_services);
-        assert!(queries.contains(&(q_requests(ENV, true, 60), 1_060_000_000)));
-        assert!(queries.contains(&(q_server_count("", 60), 1_060_000_000)));
-        assert!(queries.contains(&(q_org_inbound(60), 1_060_000_000)));
-        assert!(queries.contains(&(q_client_quantile(0.5, ENV, true, 60), 1_000_000_000)));
+        assert!(queries.contains(&(q_requests(ENV, true, 61), 1_060_000_000)));
+        assert!(queries.contains(&(q_server_count("", 61), 1_060_000_000)));
+        assert!(queries.contains(&(q_org_inbound(61), 1_060_000_000)));
+        assert!(queries.contains(&(q_client_quantile(0.5, ENV, true, 61), 1_000_000_000)));
 
         let (queries, input) = issued(&filter(Some("default"), Some("prod"))).await;
         assert_eq!(queries.len(), 17);
         assert!(!input.node_only_services);
-        assert!(queries.contains(&(q_instances(BOTH, true, 60), 1_060_000_000)));
+        assert!(queries.contains(&(q_instances(BOTH, true, 61), 1_060_000_000)));
         assert!(queries.contains(&(q_processed(M), 1_060_000_000)));
 
         assert!(

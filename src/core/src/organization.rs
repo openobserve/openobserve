@@ -203,19 +203,6 @@ pub async fn get_passcode(
     get_passcode_inner(org_id, user_id, false).await
 }
 
-/// Read a service account's own API token.
-///
-/// Unlike [`get_passcode`], this never returns the org-level "default"
-/// ingestion token (`o2oi_`-prefixed). A service account authenticates as
-/// itself and is authorized by its assigned role/group — its token is its own
-/// credential, not the org-wide ingestion token.
-pub async fn get_service_account_passcode(
-    org_id: Option<&str>,
-    user_id: &str,
-) -> Result<IngestionPasscode, anyhow::Error> {
-    get_passcode_inner(org_id, user_id, true).await
-}
-
 async fn get_passcode_inner(
     org_id: Option<&str>,
     user_id: &str,

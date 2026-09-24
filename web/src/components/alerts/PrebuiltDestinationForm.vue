@@ -138,11 +138,20 @@ limitations under the License.
     <!-- Email Fields -->
     <template v-if="destinationType === 'email'">
       <div class="w-1/2 py-1">
-        <OFormInput
+        <!-- Recipients must be real accounts, so they are picked rather than
+             typed: the options come from the org's users and service accounts,
+             rendered as two header groups in one flat option list. -->
+        <OFormSelect
           name="credentials.recipients"
-          data-test="email-recipients-input"
+          data-test="email-recipients-select"
           :label="t('alerts.prebuiltDestinations.emailRecipients')"
           required
+          multiple
+          searchable
+          :options="emailRecipientOptions"
+          labelKey="label"
+          valueKey="value"
+          :loading="isLoadingRecipients"
           :helpText="t('alerts.prebuiltDestinations.emailRecipientsHelp')"
           tabindex="0"
         />
@@ -215,13 +224,17 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
-import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { computed, onMounted, ref, watch } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import SlackWebhookFields from "./SlackWebhookFields.vue";
+import { useStore } from "vuex";
+import usersService from "@/services/users";
+import serviceAccountsService from "@/services/service_accounts";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 
 // Presentational only: renders the active type's credential OForm* fields into
 // the parent AddDestination form (they carry `name="credentials.<key>"` and
@@ -229,7 +242,7 @@ import SlackWebhookFields from "./SlackWebhookFields.vue";
 // parent schema (AddDestination.schema → makePrebuiltDestinationSchema), so this
 // component owns no form, no schema, and no v-model — the single source of truth
 // is the parent form's `credentials` sub-object.
-defineProps({
+const props = defineProps({
   destinationType: {
     type: String,
     required: true,
@@ -247,6 +260,86 @@ defineProps({
 defineEmits(["preview", "test"]);
 
 const { t } = useI18nTyped();
+const store = useStore();
+
+// ── Email recipients picker ───────────────────────────────────────────────
+// Only real accounts can receive alert emails, so the field offers the org's
+// users and service accounts as grouped options instead of free text. Fetched
+// lazily on first email render and refetched when the organization changes.
+
+const emailUserEmails = ref<string[]>([]);
+const emailServiceAccountEmails = ref<string[]>([]);
+const isLoadingRecipients = ref(false);
+const recipientsFetchedFor = ref<string | null>(null);
+
+const fetchEmailRecipients = async () => {
+  const org = store.state.selectedOrganization.identifier as string;
+  isLoadingRecipients.value = true;
+  try {
+    const [usersRes, saRes] = await Promise.all([
+      usersService.orgUsers(org),
+      serviceAccountsService.list(org),
+    ]);
+    const toEmails = (payload: unknown): string[] => {
+      const list = Array.isArray(payload) ? payload : [];
+      return list
+        .map((item: any) => item?.email)
+        .filter((email: unknown): email is string => Boolean(email));
+    };
+    emailUserEmails.value = toEmails(usersRes.data?.data ?? usersRes.data);
+    emailServiceAccountEmails.value = toEmails(saRes.data?.data ?? saRes.data);
+    recipientsFetchedFor.value = org;
+  } catch {
+    // A failed fetch leaves the picker empty rather than breaking the form; the
+    // required-field rule still stops an empty destination being saved.
+    emailUserEmails.value = [];
+    emailServiceAccountEmails.value = [];
+  } finally {
+    isLoadingRecipients.value = false;
+  }
+};
+
+onMounted(() => {
+  if (props.destinationType === "email") void fetchEmailRecipients();
+});
+
+watch(
+  () => store.state.selectedOrganization.identifier,
+  (org) => {
+    if (props.destinationType === "email" && recipientsFetchedFor.value !== org) {
+      void fetchEmailRecipients();
+    }
+  },
+);
+
+// One flat list: a non-selectable header per account kind, then its emails.
+// OSelect renders `header: true` entries as group labels.
+const emailRecipientOptions = computed<SelectOption[]>(() => {
+  const users = emailUserEmails.value.map((email) => ({
+    label: raw(email),
+    value: email,
+  }));
+  const serviceAccounts = emailServiceAccountEmails.value.map((email) => ({
+    label: raw(email),
+    value: email,
+  }));
+  const options: SelectOption[] = [];
+  if (users.length) {
+    options.push({
+      label: t("alerts.prebuiltDestinations.emailRecipientsGroupUsers"),
+      header: true,
+    });
+    options.push(...users);
+  }
+  if (serviceAccounts.length) {
+    options.push({
+      label: t("alerts.prebuiltDestinations.emailRecipientsGroupServiceAccounts"),
+      header: true,
+    });
+    options.push(...serviceAccounts);
+  }
+  return options;
+});
 
 // PagerDuty severity options — computed so the labels re-resolve on locale change.
 const severityOptions = computed(() => [
