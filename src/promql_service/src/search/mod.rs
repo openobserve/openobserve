@@ -338,7 +338,7 @@ async fn search_in_cluster(
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
                 let cache_ratio = (new_start - start) as f64 / (end - start) as f64;
-                config::metrics::QUERY_METRICS_CACHE_RATIO
+                config::metrics::promql::QUERY_METRICS_CACHE_RATIO
                     .with_label_values(&[&req.org_id])
                     .observe(cache_ratio);
                 log::info!(
