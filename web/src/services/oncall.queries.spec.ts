@@ -15,14 +15,21 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
-import { oncallTeamsQuery, routingConfigQuery } from "./oncall.queries";
+import {
+  oncallTeamsQuery,
+  pagedResponsesQuery,
+  responsesQuery,
+  routingConfigQuery,
+} from "./oncall.queries";
 import { oncallKeys } from "./oncall.querykeys";
 import oncallService from "./oncall";
 
 vi.mock("./oncall", () => ({
+  RESPONSE_PAGE_LIMIT: 200,
   default: {
     listTeams: vi.fn().mockResolvedValue({ data: [{ id: "t1", name: "Payments" }] }),
     getRoutingConfig: vi.fn().mockResolvedValue({ data: { default_team_id: "t1" } }),
+    listResponses: vi.fn().mockResolvedValue({ data: [{ id: "r1" }] }),
   },
 }));
 
@@ -86,5 +93,42 @@ describe("routingConfigQuery", () => {
   it("reads null for an org that never nominated a catch-all", async () => {
     vi.mocked(oncallService.getRoutingConfig).mockResolvedValueOnce({ data: undefined } as any);
     await expect(queryClient.fetchQuery(routingConfigQuery(ORG))).resolves.toBeNull();
+  });
+});
+
+describe("the team page's pages and the Pages list", () => {
+  // What the team page asks for, and what Pages asks for with that team picked.
+  const FILTERS = { team_id: "t1", include_resolved: true };
+
+  beforeEach(() => {
+    queryClient.clear();
+    vi.mocked(oncallService.listResponses).mockClear();
+  });
+
+  it("keep separate entries, so neither is handed the other's shape", async () => {
+    await queryClient.fetchQuery(responsesQuery(ORG, FILTERS));
+    const walk = await queryClient.fetchQuery(pagedResponsesQuery(ORG, FILTERS));
+    const list = await queryClient.fetchQuery(responsesQuery(ORG, FILTERS));
+
+    expect(walk).toEqual({ rows: [{ id: "r1" }], truncated: false });
+    expect(list).toEqual([{ id: "r1" }]);
+    expect(oncallService.listResponses).toHaveBeenCalledTimes(2);
+  });
+
+  it("both expire with the scope a page write drops", async () => {
+    await queryClient.fetchQuery(responsesQuery(ORG, FILTERS));
+    await queryClient.fetchQuery(pagedResponsesQuery(ORG, FILTERS));
+
+    await queryClient.invalidateQueries({
+      queryKey: oncallKeys.responsesAll(ORG),
+      refetchType: "none",
+    });
+
+    expect(queryClient.getQueryState(responsesQuery(ORG, FILTERS).queryKey)?.isInvalidated).toBe(
+      true,
+    );
+    expect(
+      queryClient.getQueryState(pagedResponsesQuery(ORG, FILTERS).queryKey)?.isInvalidated,
+    ).toBe(true);
   });
 });

@@ -242,7 +242,7 @@ export const pagedResponsesQuery = (
   maxPages = 3,
 ) =>
   queryOptions({
-    queryKey: oncallKeys.responses(org, filters),
+    queryKey: oncallKeys.pagedResponses(org, filters),
     queryFn: async (): Promise<{ rows: OnCallResponse[]; truncated: boolean }> => {
       const rows: OnCallResponse[] = [];
       for (let page = 0; page < maxPages; page++) {

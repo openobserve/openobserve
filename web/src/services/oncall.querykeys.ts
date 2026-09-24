@@ -92,6 +92,9 @@ export const oncallKeys = {
   responsesAll: (org: string) => orgKey(org, "oncall", "responses"),
   responses: (org: string, filters: Record<string, unknown> = {}) =>
     orgKey(org, "oncall", "responses", "list", stableFilters(filters)),
+  /** Its own segment: the walk stores `{rows, truncated}`, and `responses` with equal filters stores a bare list. */
+  pagedResponses: (org: string, filters: Record<string, unknown> = {}) =>
+    orgKey(org, "oncall", "responses", "paged", stableFilters(filters)),
   response: (org: string, responseId: string) => orgKey(org, "oncall", "responses", responseId),
   responseProgress: (org: string, responseId: string) =>
     orgKey(org, "oncall", "responses", responseId, "progress"),
