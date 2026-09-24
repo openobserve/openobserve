@@ -31,8 +31,40 @@ import { ref } from "vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
+import type { I18nKey } from "@/types/i18n";
 
-export type DepNodeKind = "template" | "destination" | "alert";
+/** `template`/`destination` are graph-native; the rest are consumers the P0 delete guard checks. */
+export type DepNodeKind =
+  | "template"
+  | "destination"
+  | "alert"
+  | "composite_alert"
+  | "pipeline"
+  | "synthetic_check"
+  | "workflow"
+  | "anomaly_detection"
+  | "incident_integration";
+
+/** A destination's non-alert consumer kinds, in the order badges render. */
+export type DepConsumerKind = Exclude<DepNodeKind, "template" | "destination" | "alert">;
+
+/** Every non-alert consumer kind — the one place this list is spelled out. */
+export const DEP_CONSUMER_KINDS: DepConsumerKind[] = [
+  "composite_alert",
+  "pipeline",
+  "synthetic_check",
+  "workflow",
+  "anomaly_detection",
+  "incident_integration",
+];
+
+/** One destination `uses` entry — matches `DestinationUseResponse` on the backend. */
+export interface UsageRow {
+  consumer: DepConsumerKind | "alert";
+  id: string;
+  name: string;
+  folder_id?: string | null;
+}
 
 /** One entity to focus the graph on (its dependency chain), used by the popup. */
 export type DepFocus = { kind: DepNodeKind; name?: string; alertId?: string };
@@ -47,8 +79,12 @@ export interface DepNode {
   name: string;
   /** Destination/template transport kind (http | email | sns | action). */
   transport?: string;
-  /** Destinations: how many alerts deliver to it. Templates: dest + override refs. */
+  /** Total uses across every consumer kind (destinations), or refs (templates). */
   usageCount: number;
+  /** Destination-only: per-kind breakdown behind `usageCount`, from its `uses`. */
+  consumerCounts?: Partial<Record<DepConsumerKind, number>>;
+  /** Destination-only: the rows behind `consumerCounts`, for the dialog's per-kind sections. */
+  consumerUses?: Partial<Record<DepConsumerKind, UsageRow[]>>;
   /** A destination with no alerts, or a template referenced by nothing. */
   orphan: boolean;
   /**
@@ -110,6 +146,8 @@ export interface DestinationRow {
   name: string;
   type?: string;
   template?: string | null;
+  /** Present when the list was read with `include_usage=true`. */
+  uses?: UsageRow[];
 }
 export interface TemplateRow {
   name: string;
@@ -234,6 +272,41 @@ export const depKindColor = (node: Pick<DepNode, "kind" | "orphan" | "missing">)
       : "text-text-secondary";
 };
 
+// The one place a consumer kind maps to its count-badge i18n key.
+const CONSUMER_LABEL_KEYS: Record<DepConsumerKind, I18nKey> = {
+  composite_alert: "alert_dependencies.countCompositeAlert",
+  pipeline: "alert_dependencies.countPipeline",
+  synthetic_check: "alert_dependencies.countSyntheticCheck",
+  workflow: "alert_dependencies.countWorkflow",
+  anomaly_detection: "alert_dependencies.countAnomalyDetection",
+  incident_integration: "alert_dependencies.countIncidentIntegration",
+};
+
+export const depConsumerLabelKey = (kind: DepConsumerKind): I18nKey => CONSUMER_LABEL_KEYS[kind];
+
+export interface ConsumerBadge {
+  kind: DepConsumerKind;
+  count: number;
+  labelKey: I18nKey;
+}
+
+// Shared by the cell and the impact dialog, so they can never list different blockers.
+export function consumerBadges(node: DepNode | null | undefined): ConsumerBadge[] {
+  const counts = node?.consumerCounts ?? {};
+  const out: ConsumerBadge[] = [];
+  for (const kind of DEP_CONSUMER_KINDS) {
+    const count = counts[kind];
+    if (count) out.push({ kind, count, labelKey: depConsumerLabelKey(kind) });
+  }
+  return out;
+}
+
+/** Joins parts as a natural-language list: "a", "a and b", or "a, b and c". */
+export function joinWithAnd(parts: string[]): string {
+  if (parts.length < 2) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
 /** The focus entity's node plus its chain-neighbour counts, in one pass. */
 export interface FocusSummary {
   node: DepNode | null;
@@ -275,7 +348,8 @@ export function removeNodeFromGraph(graph: DepGraph, nodeId: string): DepGraph {
 
   const edges = graph.edges.filter((e) => !ownedByDeletedRow(e));
 
-  // usageCount is one per outgoing edge, so the surviving edges re-derive it.
+  // usageCount is one per outgoing edge, plus the non-alert consumers folded onto
+  // a destination directly (no edge exists for those — see buildGraph).
   const outgoing = new Map<string, number>();
   const referenced = new Set<string>();
   for (const e of edges) {
@@ -283,6 +357,9 @@ export function removeNodeFromGraph(graph: DepGraph, nodeId: string): DepGraph {
     referenced.add(e.source);
     referenced.add(e.target);
   }
+  const otherConsumerCount = (n: DepNode) =>
+    Object.values(n.consumerCounts ?? {}).reduce((a, b) => a + b, 0);
+  for (const n of graph.nodes) if (otherConsumerCount(n)) referenced.add(n.id);
 
   // A dangling node exists only because something pointed at it, so it leaves with
   // the last reference — a rebuild would never invent it again.
@@ -291,7 +368,7 @@ export function removeNodeFromGraph(graph: DepGraph, nodeId: string): DepGraph {
       n.id === nodeId || (n.missing && n.kind !== "alert") ? referenced.has(n.id) : true,
     )
     .map((n) => {
-      const usageCount = outgoing.get(n.id) ?? 0;
+      const usageCount = (outgoing.get(n.id) ?? 0) + otherConsumerCount(n);
       const missing = n.id === nodeId ? true : n.missing;
       const orphan = n.kind !== "alert" && !missing && usageCount === 0;
       return n.id === nodeId
@@ -418,6 +495,19 @@ export function useDependencyGraph() {
           relation: "template",
         });
       }
+      // Non-alert consumers off the row's `uses` — alerts are counted above with richer data.
+      const counts: Partial<Record<DepConsumerKind, number>> = {};
+      const uses: Partial<Record<DepConsumerKind, UsageRow[]>> = {};
+      for (const use of dst.uses ?? []) {
+        if (use.consumer === "alert") continue;
+        counts[use.consumer] = (counts[use.consumer] ?? 0) + 1;
+        (uses[use.consumer] ??= []).push(use);
+        node.usageCount += 1;
+      }
+      if (Object.keys(counts).length) {
+        node.consumerCounts = counts;
+        node.consumerUses = uses;
+      }
     }
 
     // Alerts are the demand side: each `destinations` name is a usage edge, and an
@@ -529,6 +619,7 @@ export function useDependencyGraph() {
           desc: false,
           org_identifier: org,
           module: "alert",
+          include_usage: true,
         }),
         templateService.list({ org_identifier: org }),
       ]);

@@ -7615,7 +7615,16 @@
     "enabled": "Đã bật",
     "paused": "Đã tạm dừng",
     "impactTemplate": "Được sử dụng bởi {destinations} · {alerts}",
-    "impactDestination": "Được sử dụng bởi {alerts}"
+    "impactDestination": "Được sử dụng bởi {consumers}",
+    "impactUnused": "Không được sử dụng",
+    "noConsumers": "Không có đối tượng sử dụng.",
+    "countCompositeAlert": "{count} cảnh báo tổng hợp | {count} cảnh báo tổng hợp",
+    "countPipeline": "{count} pipeline | {count} pipeline",
+    "countSyntheticCheck": "{count} kiểm tra Synthetics | {count} kiểm tra Synthetics",
+    "countWorkflow": "{count} quy trình làm việc | {count} quy trình làm việc",
+    "countAnomalyDetection": "{count} bộ phát hiện bất thường | {count} bộ phát hiện bất thường",
+    "countIncidentIntegration": "{count} tích hợp sự cố | {count} tích hợp sự cố",
+    "sectionOtherConsumers": "Cũng được sử dụng bởi"
   },
   "alert_library": {
     "header": "Thư viện cảnh báo",

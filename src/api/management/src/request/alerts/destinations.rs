@@ -37,7 +37,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::ssrf_guard::SsrfGuard},
-    models::destinations::{Destination, DestinationType},
+    models::destinations::{Destination, DestinationType, DestinationUseResponse},
     request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
@@ -409,6 +409,7 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("module" = Option<String>, Query, description = "Destination module filter, none, alert, or pipeline"),
+        ("include_usage" = Option<bool>, Query, description = "When true, each destination carries the consumers that reference it"),
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Destination>)),
@@ -429,6 +430,8 @@ pub async fn list_destinations(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let module = query.get("module").map(|s| s.as_str());
+    // Opt-in, mirroring ListAlerts' `include_dependencies`: off the hot list path by default.
+    let include_usage = query.get("include_usage").is_some_and(|v| v == "true");
 
     let mut _permitted = None;
     // Get List of allowed objects
@@ -455,7 +458,26 @@ pub async fn list_destinations(
 
     match destinations::list(&org_id, module, _permitted).await {
         Ok(data) => {
-            MetaHttpResponse::json(data.into_iter().map(Destination::from).collect::<Vec<_>>())
+            let mut items: Vec<Destination> = data.into_iter().map(Destination::from).collect();
+            if include_usage {
+                // Same all_usage() the delete guard uses, attached only to this response's rows.
+                match destinations::all_usage(&org_id).await {
+                    Ok(mut by_destination) => {
+                        for item in &mut items {
+                            item.uses = Some(
+                                by_destination
+                                    .remove(&item.name)
+                                    .unwrap_or_default()
+                                    .into_iter()
+                                    .map(DestinationUseResponse::from)
+                                    .collect(),
+                            );
+                        }
+                    }
+                    Err(e) => return MetaHttpResponse::bad_request(e),
+                }
+            }
+            MetaHttpResponse::json(items)
         }
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -470,7 +492,8 @@ pub async fn list_destinations(
     operation_id = "DeleteAlertDestination",
     summary = "Delete alert destination",
     description = "Removes an alert destination configuration from the organization. The destination must not be in use by \
-                   any active alerts or pipelines before deletion. Once deleted, any alerts previously configured to use \
+                   any alert, pipeline, synthetic check, composite alert, workflow, or \
+                   anomaly detection config before deletion. Once deleted, any alerts previously configured to use \
                    this destination will need to be updated with alternative notification methods to continue functioning.",
     security(
         ("Authorization"= [])
@@ -506,7 +529,8 @@ pub async fn delete_destination(Path((org_id, name)): Path<(String, String)>) ->
     operation_id = "DeleteAlertDestinationBulk",
     summary = "Delete multiple alert destination",
     description = "Removes multiple alert destination configuration from the organization. The destinations must not be in use by \
-                   any active alerts or pipelines before deletion. Once deleted, any alerts previously configured to use \
+                   any alert, pipeline, synthetic check, composite alert, workflow, or \
+                   anomaly detection config before deletion. Once deleted, any alerts previously configured to use \
                    these destination will need to be updated with alternative notification methods to continue functioning.",
     security(
         ("Authorization"= [])
@@ -769,17 +793,11 @@ mod tests {
 
     // 409 Conflict
     #[test]
-    fn test_used_by_alert_is_conflict() {
+    fn test_in_use_is_conflict() {
         assert_eq!(
-            status(DestinationError::UsedByAlert("my-alert".to_string())),
-            StatusCode::CONFLICT
-        );
-    }
-
-    #[test]
-    fn test_used_by_pipeline_is_conflict() {
-        assert_eq!(
-            status(DestinationError::UsedByPipeline("my-pipeline".to_string())),
+            status(DestinationError::InUse(
+                "'x' is used by 1 alert".to_string()
+            )),
             StatusCode::CONFLICT
         );
     }

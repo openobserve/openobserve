@@ -7615,7 +7615,16 @@
     "enabled": "Abilitato",
     "paused": "In pausa",
     "impactTemplate": "Usato da {destinations} · {alerts}",
-    "impactDestination": "Usato da {alerts}"
+    "impactDestination": "Utilizzato da {consumers}",
+    "impactUnused": "Non utilizzato",
+    "noConsumers": "Nessun consumatore.",
+    "countCompositeAlert": "{count} avviso composito | {count} avvisi compositi",
+    "countPipeline": "{count} pipeline | {count} pipeline",
+    "countSyntheticCheck": "{count} controllo sintetico | {count} controlli sintetici",
+    "countWorkflow": "{count} workflow | {count} workflow",
+    "countAnomalyDetection": "{count} rilevatore di anomalie | {count} rilevatori di anomalie",
+    "countIncidentIntegration": "{count} integrazione di incidenti | {count} integrazioni di incidenti",
+    "sectionOtherConsumers": "Utilizzato anche da"
   },
   "alert_library": {
     "header": "Libreria di avvisi",

@@ -7615,7 +7615,16 @@
     "enabled": "Включено",
     "paused": "Приостановлено",
     "impactTemplate": "Используется {destinations} · {alerts}",
-    "impactDestination": "Используется {alerts}"
+    "impactDestination": "Используется в {consumers}",
+    "impactUnused": "Не используется",
+    "noConsumers": "Нет потребителей.",
+    "countCompositeAlert": "{count} составное оповещение | {count} составных оповещений",
+    "countPipeline": "{count} конвейер | {count} конвейеров",
+    "countSyntheticCheck": "{count} синтетическая проверка | {count} синтетических проверок",
+    "countWorkflow": "{count} рабочий процесс | {count} рабочих процессов",
+    "countAnomalyDetection": "{count} детектор аномалий | {count} детекторов аномалий",
+    "countIncidentIntegration": "{count} интеграция с инцидентами | {count} интеграций с инцидентами",
+    "sectionOtherConsumers": "Также используется в"
   },
   "alert_library": {
     "header": "Библиотека оповещений",

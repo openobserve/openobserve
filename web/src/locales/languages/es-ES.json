@@ -7615,7 +7615,16 @@
     "enabled": "Habilitado",
     "paused": "Pausado",
     "impactTemplate": "Utilizado por {destinations} · {alerts}",
-    "impactDestination": "Usado por {alerts}"
+    "impactDestination": "Usado por {consumers}",
+    "impactUnused": "Sin usar",
+    "noConsumers": "Sin consumidores.",
+    "countCompositeAlert": "{count} alerta compuesta | {count} alertas compuestas",
+    "countPipeline": "{count} tubería | {count} tuberías",
+    "countSyntheticCheck": "{count} comprobación sintética | {count} comprobaciones sintéticas",
+    "countWorkflow": "{count} flujo de trabajo | {count} flujos de trabajo",
+    "countAnomalyDetection": "{count} detector de anomalías | {count} detectores de anomalías",
+    "countIncidentIntegration": "{count} integración de incidentes | {count} integraciones de incidentes",
+    "sectionOtherConsumers": "También usado por"
   },
   "alert_library": {
     "header": "Biblioteca de alertas",

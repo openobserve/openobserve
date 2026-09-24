@@ -7615,7 +7615,16 @@
     "enabled": "已启用",
     "paused": "已暂停",
     "impactTemplate": "被 {destinations} · {alerts} 使用",
-    "impactDestination": "被 {alerts} 使用"
+    "impactDestination": "被 {consumers} 使用",
+    "impactUnused": "未使用",
+    "noConsumers": "无使用方。",
+    "countCompositeAlert": "{count} 个复合告警 | {count} 个复合告警",
+    "countPipeline": "{count} 条流水线 | {count} 条流水线",
+    "countSyntheticCheck": "{count} 个合成检查 | {count} 个合成检查",
+    "countWorkflow": "{count} 个工作流 | {count} 个工作流",
+    "countAnomalyDetection": "{count} 个异常检测器 | {count} 个异常检测器",
+    "countIncidentIntegration": "{count} 个事件集成 | {count} 个事件集成",
+    "sectionOtherConsumers": "还被以下使用"
   },
   "alert_library": {
     "header": "告警库",

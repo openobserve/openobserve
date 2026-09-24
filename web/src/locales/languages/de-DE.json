@@ -7615,7 +7615,16 @@
     "enabled": "Aktiviert",
     "paused": "Pausiert",
     "impactTemplate": "Verwendet von {destinations} · {alerts}",
-    "impactDestination": "Verwendet von {alerts}"
+    "impactDestination": "Verwendet von {consumers}",
+    "impactUnused": "Nicht verwendet",
+    "noConsumers": "Keine Konsumenten.",
+    "countCompositeAlert": "{count} zusammengesetzte Warnmeldung | {count} zusammengesetzte Warnmeldungen",
+    "countPipeline": "{count} Rohrleitung | {count} Rohrleitungen",
+    "countSyntheticCheck": "{count} synthetische Prüfung | {count} synthetische Prüfungen",
+    "countWorkflow": "{count} Workflow | {count} Workflows",
+    "countAnomalyDetection": "{count} Anomalie-Detektor | {count} Anomalie-Detektoren",
+    "countIncidentIntegration": "{count} Vorfall-Integration | {count} Vorfall-Integrationen",
+    "sectionOtherConsumers": "Wird auch verwendet von"
   },
   "alert_library": {
     "header": "Alarm-Bibliothek",

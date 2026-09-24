@@ -7615,7 +7615,16 @@
     "enabled": "有効",
     "paused": "一時停止",
     "impactTemplate": "使用中: {destinations} · {alerts}",
-    "impactDestination": "使用元 {alerts}"
+    "impactDestination": "{consumers} が使用中",
+    "impactUnused": "未使用",
+    "noConsumers": "コンシューマーがありません。",
+    "countCompositeAlert": "{count} 件の複合アラート | {count} 件の複合アラート",
+    "countPipeline": "{count} 件のパイプライン | {count} 件のパイプライン",
+    "countSyntheticCheck": "{count} 件の合成チェック | {count} 件の合成チェック",
+    "countWorkflow": "{count} 件のワークフロー | {count} 件のワークフロー",
+    "countAnomalyDetection": "{count} 件の異常検知器 | {count} 件の異常検知器",
+    "countIncidentIntegration": "{count} 件のインシデント連携 | {count} 件のインシデント連携",
+    "sectionOtherConsumers": "その他の使用元"
   },
   "alert_library": {
     "header": "アラートライブラリ",
