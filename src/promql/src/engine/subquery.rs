@@ -20,12 +20,11 @@ use std::sync::Arc;
 
 use config::meta::promql::value::{EvalContext, RangeValue, TimeWindow, Value};
 use datafusion::error::{DataFusionError, Result};
-use infra::errors::ErrorCodes;
 use promql_parser::parser::{Expr as PromExpr, SubqueryExpr};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use super::Engine;
-use crate::{DEFAULT_SUBQUERY_STEP, exec::PromqlContext, micros, utils::offset_micros};
+use crate::{ast::subquery_grid::subquery_grid, exec::PromqlContext, utils::offset_micros};
 
 impl Engine {
     /// A subquery as a range function reads it: its samples moved forward by its offset.
@@ -58,17 +57,9 @@ impl Engine {
     }
 
     async fn eval_subquery(&mut self, sq: &SubqueryExpr) -> Result<Vec<RangeValue>> {
-        let (start, end, step) = subquery_grid(&self.eval_ctx, sq);
+        let (start, end, step) = subquery_grid(self.eval_ctx.start, self.eval_ctx.end, sq);
         if start > end {
             return Ok(vec![]);
-        }
-        let steps = (end - start) / step + 1;
-        let max_points = config::get_config().limit.metrics_max_points_per_series as i64;
-        if steps > max_points {
-            return Err(ErrorCodes::InvalidParams(format!(
-                "subquery evaluates {steps} steps per series, more than the {max_points} allowed by ZO_METRICS_MAX_POINTS_PER_SERIES; use a larger subquery step"
-            ))
-            .into());
         }
 
         let child_ctx = Arc::new(PromqlContext {
@@ -100,20 +91,6 @@ impl Engine {
             .for_each(|series| series.time_window = Some(window.clone()));
         Ok(series)
     }
-}
-
-/// The subquery's `(start, end, step)` for the evaluated range, as Prometheus evaluates it.
-fn subquery_grid(outer: &EvalContext, sq: &SubqueryExpr) -> (i64, i64, i64) {
-    let step = micros(
-        sq.step
-            .filter(|step| !step.is_zero())
-            .unwrap_or(DEFAULT_SUBQUERY_STEP),
-    );
-    let offset = offset_micros(&sq.offset);
-    // the grid sits on absolute multiples of the step, so every range and worker sees the same one
-    let first = outer.start - offset - micros(sq.range);
-    let start = (first.div_euclid(step) + 1) * step;
-    (start, outer.end - offset, step)
 }
 
 fn matrix_or_none(series: Vec<RangeValue>) -> Value {
@@ -167,40 +144,6 @@ mod tests {
             .iter()
             .map(|sample| (sample.timestamp, sample.value))
             .collect()
-    }
-
-    fn grid(query: &str, start: i64, end: i64) -> (i64, i64, i64) {
-        let PromExpr::Subquery(sq) = parser::parse(query).unwrap() else {
-            panic!("{query}: expected a subquery");
-        };
-        subquery_grid(&EvalContext::new(start, end, MINUTE, "t".into()), &sq)
-    }
-
-    #[test]
-    fn test_subquery_grid_aligns_to_absolute_step_multiples() {
-        // the left edge of the window is open, so an aligned edge is not a step
-        assert_eq!(grid("up[10m:1m]", T, T), (T - 9 * MINUTE, T, MINUTE));
-        assert_eq!(
-            grid("up[10m:1m]", T + 30 * SECOND, T + 90 * SECOND),
-            (T - 9 * MINUTE, T + 90 * SECOND, MINUTE)
-        );
-        assert_eq!(
-            grid("up[10m:1m] offset 5m", T, T),
-            (T - 14 * MINUTE, T - 5 * MINUTE, MINUTE)
-        );
-        assert_eq!(
-            grid("up[10m:1m] offset -5m", T, T),
-            (T - 4 * MINUTE, T + 5 * MINUTE, MINUTE)
-        );
-        assert_eq!(grid("up[10m:7m]", T, T), (T - 3 * MINUTE, T, 7 * MINUTE));
-        // an omitted step falls back to the default evaluation interval
-        assert_eq!(
-            grid("up[5m:]", T + SECOND, T + SECOND),
-            (T - 4 * MINUTE, T + SECOND, MINUTE)
-        );
-        // a window shorter than the step may hold no step at all
-        let (start, end, _) = grid("up[30s:1m]", T + 40 * SECOND, T + 40 * SECOND);
-        assert!(start > end);
     }
 
     #[tokio::test]
@@ -309,15 +252,5 @@ mod tests {
                 .unwrap();
             assert!(matches!(value, Value::None), "{query}: {value:?}");
         }
-    }
-
-    #[tokio::test]
-    async fn test_subquery_step_count_is_bounded() {
-        let max = config::get_config().limit.metrics_max_points_per_series as u64;
-        let query = format!("count_over_time(vector(1)[{}s:1s])", max + 1);
-        let err = eval(&query, T, T, MINUTE).await.unwrap_err().to_string();
-        assert!(err.contains("ZO_METRICS_MAX_POINTS_PER_SERIES"), "{err}");
-        let query = format!("count_over_time(vector(1)[{max}s:1s])");
-        assert_eq!(samples(&query, T, T, MINUTE).await, vec![(T, max as f64)]);
     }
 }

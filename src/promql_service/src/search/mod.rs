@@ -43,7 +43,7 @@ use promql::{
     DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end,
     ast::{
         at_modifier::resolve_query, result_order::top_level_sort_descending,
-        selector_window::selector_window,
+        selector_window::selector_window, subquery_grid::max_subquery_steps,
     },
     micros,
 };
@@ -317,6 +317,18 @@ async fn search_in_cluster(
     let use_cache = cacheable && req.use_cache && start != end;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step);
+    let max_points = if cfg.limit.metrics_max_points_per_series > 0 {
+        cfg.limit.metrics_max_points_per_series
+    } else {
+        DEFAULT_MAX_POINTS_PER_SERIES
+    };
+    // checked over the whole range, so the answer does not depend on how workers split it
+    let subquery_steps = max_subquery_steps(&ast, start, end);
+    if !query_exemplars && subquery_steps > max_points as i64 {
+        return Err(Error::ErrorCode(ErrorCodes::InvalidParams(format!(
+            "subquery evaluates {subquery_steps} steps per series, more than the {max_points} allowed by ZO_METRICS_MAX_POINTS_PER_SERIES; use a larger subquery step"
+        ))));
+    }
 
     log::info!(
         "[trace_id {trace_id}] promql->search->start: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",
@@ -372,11 +384,6 @@ async fn search_in_cluster(
         return Ok(values);
     }
 
-    let max_points = if cfg.limit.metrics_max_points_per_series > 0 {
-        cfg.limit.metrics_max_points_per_series
-    } else {
-        DEFAULT_MAX_POINTS_PER_SERIES
-    };
     if (end - start) / step > max_points as i64 {
         return Err(Error::ErrorCode(ErrorCodes::InvalidParams(
             "too many points per series must be returned on the given, you can change the limit by ZO_METRICS_MAX_POINTS_PER_SERIES".to_string(),
