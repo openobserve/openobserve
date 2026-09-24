@@ -13,14 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Settings → Password Policy E2E tests.
-//
-// The page is enterprise + meta-org gated (settings/index.vue `visible: isEnt && meta`),
-// so every test navigates directly to the password_policy route in the _meta org and
-// gates to a clean SKIP when the form does not mount (OSS build). All assertions below
-// exercise deterministic, client-side behaviour (render, cross-field validation,
-// conditional rendering) — no policy writes, so tests stay fully parallel and do not
-// mutate instance-wide state.
+// Enterprise + meta-org gated Password Policy page; skips on OSS, asserts client-side only (no writes).
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
