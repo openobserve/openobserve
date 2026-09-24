@@ -238,6 +238,19 @@ export class IamPage {
 
     }
 
+    /**
+     * Copies the raw service-account token from the reveal dialog and returns it,
+     * stripping any "Basic " prefix. Mirrors the clipboard read used in
+     * GeneralTests/ingestionTokens.spec.js (the reveal dialog's copy button writes
+     * the raw `serviceToken`, not the Basic credential).
+     */
+    async captureServiceAccountToken() {
+        await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+        await this.clickCopyToken();
+        const token = await this.page.evaluate(() => navigator.clipboard.readText());
+        return (token || '').replace(/^Basic\s+/i, '');
+    }
+
 
 
     async clickServiceAccountPopUpClosed() {
