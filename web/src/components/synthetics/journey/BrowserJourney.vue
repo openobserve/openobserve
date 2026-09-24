@@ -738,6 +738,7 @@ defineExpose({
   validateStepSelectors: validateJourneySteps,
   revealCapNotice,
   replayUpTo,
+  requestReplay,
 });
 
 /**

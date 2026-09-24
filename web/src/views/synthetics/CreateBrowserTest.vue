@@ -1362,8 +1362,14 @@ const replayEnvironmentOverride = ref<string | undefined>();
 /** Replay resolves one environment: the menu's choice while it is still listed, else the default rule. */
 const replayEnvironmentId = computed(() => {
   const chosen = replayEnvironmentOverride.value;
-  if (chosen !== undefined && (chosen === GLOBAL_ONLY || namedEnvironment(chosen))) return chosen;
-  return defaultReplayEnvironmentId(check.value.environments ?? [], sharedEnvironments.value);
+  const fallback = defaultReplayEnvironmentId(
+    check.value.environments ?? [],
+    sharedEnvironments.value,
+  );
+  // Global is listed only while no readable environment is pinned, so only then can it stay chosen.
+  const listed =
+    chosen === GLOBAL_ONLY ? fallback === GLOBAL_ONLY : !!namedEnvironment(chosen ?? "");
+  return chosen !== undefined && listed ? chosen : fallback;
 });
 
 const replayMenuOptions = computed(() =>
@@ -1548,6 +1554,8 @@ let nextReplayEnvId: string | undefined;
 
 /** Expanded before shipping, so the runner never sees `subtest`; `expansionMap` folds results back. */
 async function runReplay(journey: BrowserStep[]) {
+  const envOverride = nextReplayEnvId;
+  nextReplayEnvId = undefined;
   expansionMap.value = undefined;
   let wire: WireStep[];
   let map: ExpansionMap;
@@ -1563,8 +1571,7 @@ async function runReplay(journey: BrowserStep[]) {
   }
   if (wire.length === 0) return;
   await sharedListsSettled();
-  const envId = nextReplayEnvId ?? replayEnvironmentId.value;
-  nextReplayEnvId = undefined;
+  const envId = envOverride ?? replayEnvironmentId.value;
   gateReplay({ journey, wire, map, envId, supplied: secrets.valuesFor(envId) });
 }
 
@@ -1726,7 +1733,7 @@ async function onSecretsSubmit(values: Record<string, string>) {
   await nextTick();
   if (!prompt.pending) {
     nextReplayEnvId = prompt.envId;
-    onReplay();
+    journeyRef.value?.requestReplay();
     return;
   }
   prompt.pending.supplied = { ...prompt.pending.supplied, ...values };

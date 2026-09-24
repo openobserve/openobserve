@@ -3405,6 +3405,38 @@ describe("BrowserJourney recording with an unresolved value", () => {
   });
 });
 
+describe("BrowserJourney requestReplay", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("a whole replay requested by the host counts every step, after a prefix replay", async () => {
+    wrapper = mountJourney({
+      modelValue: [
+        { id: "s1", action: "navigate", name: "Open", value: "https://app.test/" },
+        { id: "s2", action: "click", name: "Sign in", selector: "#go" },
+        { id: "s3", action: "click", name: "Cart", selector: "#cart" },
+      ],
+    });
+    const vm = wrapper.vm as unknown as {
+      replayUpTo: (n: number) => void;
+      requestReplay?: () => void;
+    };
+    vm.replayUpTo(2);
+    expect(typeof vm.requestReplay).toBe("function");
+    vm.requestReplay!();
+    await wrapper.setProps({ replayPhase: "running" });
+
+    expect(wrapper.emitted("replay")).toHaveLength(1);
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replayProgress", {
+      current: 0,
+      total: 3,
+    });
+  });
+});
+
 describe("BrowserJourney replayUpTo", () => {
   let wrapper: VueWrapper;
 

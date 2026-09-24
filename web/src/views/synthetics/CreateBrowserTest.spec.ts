@@ -237,6 +237,8 @@ const mockRevealCapNotice = vi.fn();
 const mockReplaceRangeWithSubtest = vi.fn();
 // Exposed by the real BrowserJourney; the host's "Replay anyway" goes through it.
 const mockReplayUpTo = vi.fn();
+// Exposed by the real BrowserJourney; the host's "Save & re-run" goes through it.
+const mockRequestReplay = vi.fn();
 // Every open/close of the missing-value dialog stub, so a test can see that one closed before the next opened.
 const missingDialogLog: string[] = [];
 
@@ -333,6 +335,7 @@ const baseStubs = {
       revealCapNotice: mockRevealCapNotice,
       replaceRangeWithSubtest: (...args: unknown[]) => mockReplaceRangeWithSubtest(...args),
       replayUpTo: (...args: unknown[]) => mockReplayUpTo(...args),
+      requestReplay: (...args: unknown[]) => mockRequestReplay(...args),
     },
   },
   JourneyStartPill: {
@@ -596,6 +599,7 @@ describe("CreateBrowserTest", () => {
     });
     mockReplaceRangeWithSubtest.mockReset();
     mockReplayUpTo.mockReset();
+    mockRequestReplay.mockReset();
     mockBreakpoint.mobile = false;
     missingDialogLog.length = 0;
     mockServiceCreateEnvironmentVariable.mockResolvedValue({ data: {} });
@@ -2177,6 +2181,21 @@ describe("CreateBrowserTest", () => {
       expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://prod.test/login");
     });
 
+    it("drops a Global choice once the test pins a readable environment", async () => {
+      wrapper = await mountTemplatedCheck([]);
+      await chooseReplayEnvironment(wrapper, "");
+      expect(replayMenu(wrapper).props("selectedId")).toBe("");
+
+      (
+        wrapper.findComponent('[data-test="synthetics-journey-start-pill-stub"]') as VueWrapper<any>
+      ).vm.$emit("update:selected-ids", ["prod"]);
+      await flushPromises();
+      await replay(wrapper, [{ action: "navigate", url: "{{BASE_URL}}/login" }]);
+
+      expect(replayMenu(wrapper).props("selectedId")).toBe("prod");
+      expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://prod.test/login");
+    });
+
     it("falls back to the default when the chosen environment disappears", async () => {
       wrapper = await mountTemplatedCheck(["prod"]);
       await chooseReplayEnvironment(wrapper, "stg");
@@ -2396,6 +2415,26 @@ describe("CreateBrowserTest", () => {
 
       expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
       expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://stg.test/login");
+    });
+
+    it("a Replay anyway that stops early does not pin the next replay to its environment", async () => {
+      wrapper = await mountTemplatedCheck(["stg", "prod"], {
+        journey: [typeStep("s1", "a"), typeStep("s2", "b"), typeStep("s3", "{{API_KEY}}")],
+      });
+      await replayJourney(wrapper);
+      await chooseReplayEnvironment(wrapper, "prod");
+      missingDialog(wrapper).vm.$emit("replay-anyway");
+      await flushPromises();
+      mockJourneyToWireSteps.mockReturnValueOnce([]);
+      journeyStub(wrapper).vm.$emit("replay-up-to", 2);
+      await flushPromises();
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+
+      journeyStub(wrapper).vm.$emit("replay-up-to", 2);
+      await flushPromises();
+
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://prod.test/login");
     });
 
     it("replays a prefix that does not use the missing name without asking for it", async () => {
@@ -2644,6 +2683,10 @@ describe("CreateBrowserTest", () => {
       await (secretsDialog(wrapper).props("onSubmit") as (v: unknown) => Promise<void> | void)({
         PASSWORD: "p2",
       });
+      await flushPromises();
+      expect(mockRequestReplay).toHaveBeenCalledTimes(1);
+      expect(mockRequestReplay).toHaveBeenCalledWith();
+      journeyStub(wrapper).vm.$emit("replay");
       await flushPromises();
 
       expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
