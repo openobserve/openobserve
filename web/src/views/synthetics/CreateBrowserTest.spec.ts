@@ -239,6 +239,8 @@ const mockReplaceRangeWithSubtest = vi.fn();
 const mockReplayUpTo = vi.fn();
 // Exposed by the real BrowserJourney; the host's "Save & re-run" goes through it.
 const mockRequestReplay = vi.fn();
+// Exposed by the real BrowserJourney; the host returns focus through it when the panel closes.
+const mockFocusVariablesToggle = vi.fn();
 // Every open/close of the missing-value dialog stub, so a test can see that one closed before the next opened.
 const missingDialogLog: string[] = [];
 
@@ -338,6 +340,7 @@ const baseStubs = {
       replaceRangeWithSubtest: (...args: unknown[]) => mockReplaceRangeWithSubtest(...args),
       replayUpTo: (...args: unknown[]) => mockReplayUpTo(...args),
       requestReplay: (...args: unknown[]) => mockRequestReplay(...args),
+      focusVariablesToggle: () => mockFocusVariablesToggle(),
     },
   },
   JourneyStartPill: {
@@ -2136,6 +2139,19 @@ describe("CreateBrowserTest", () => {
       expect(panel(wrapper).exists()).toBe(false);
       expect(journeyStub(wrapper).props("variablesPanelOpen")).toBe(false);
       expect(splitter(wrapper).props("modelValue")).toBe(100);
+    });
+
+    it("closes the panel on its close event and returns focus to the variables toggle", async () => {
+      wrapper = await mountValidEdit();
+      await toggleFromToolbar(wrapper);
+      mockFocusVariablesToggle.mockClear();
+
+      wrapper.findComponent({ name: "CheckVariablesPanel" }).vm.$emit("close");
+      await flushPromises();
+
+      expect(panel(wrapper).exists()).toBe(false);
+      expect(journeyStub(wrapper).props("variablesPanelOpen")).toBe(false);
+      expect(mockFocusVariablesToggle).toHaveBeenCalledTimes(1);
     });
   });
 

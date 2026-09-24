@@ -205,6 +205,28 @@ describe("CheckVariablesPanel", () => {
       expect(wrapper.find(sel("-empty")).exists()).toBe(false);
       expect(wrapper.find(sel("-add-variable-btn")).exists()).toBe(true);
     });
+
+    it("the header ends with a Close variables button that emits close", async () => {
+      wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
+
+      const close = wrapper
+        .findAllComponents(OButtonStub)
+        .find((b) => b.attributes("data-test") === "synthetics-check-variables-panel-close-btn");
+      expect(close).toBeDefined();
+      expect(close!.props("variant")).toBe("ghost");
+      expect(close!.props("size")).toBe("icon-xs-sq");
+      expect(close!.props("iconLeft")).toBe("close");
+      expect(close!.attributes("aria-label")).toBe("Close variables");
+      expect(close!.classes()).toContain("ms-auto");
+      const headerRow = close!.element.parentElement!;
+      expect(headerRow.querySelector("h3")).not.toBeNull();
+      expect(headerRow.lastElementChild).toBe(close!.element);
+      const tips = wrapper.findAllComponents(OTooltipStub).map((c) => c.props("content"));
+      expect(tips).toContain("Close variables");
+
+      await close!.trigger("click");
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
   });
 
   // ── Add flow ──────────────────────────────────────────────────────────────

@@ -1222,6 +1222,13 @@ describe("BrowserJourney add menu and step filter", () => {
     expect(currentSteps(wrapper)).toHaveLength(4);
   });
 
+  it("the + and the Add arrow use the split-segment size", () => {
+    wrapper = mountToolbar();
+
+    expect(wrapper.find(ADD_STEP).attributes("size")).toBe("icon-sm-split");
+    expect(wrapper.find(ADD_MENU).attributes("size")).toBe("icon-sm-split");
+  });
+
   it("the add menu arrow has a name and a tooltip; the menu offers Step and Subtest; Subtest adds a subtest row", async () => {
     wrapper = mountToolbar();
 
@@ -2733,9 +2740,10 @@ describe("BrowserJourney variables panel toggle", () => {
     template: '<div :data-tooltip="content" />',
   };
 
-  function mountToolbar(props: Record<string, unknown> = {}) {
+  function mountToolbar(props: Record<string, unknown> = {}, attach = false) {
     return mount(BrowserJourney, {
       props: { modelValue: [], ...props },
+      attachTo: attach ? document.body : undefined,
       global: {
         stubs: { ...STUBS, OIcon: OIconWithNameStub, OTooltip: OTooltipWithContentStub },
       },
@@ -2751,12 +2759,13 @@ describe("BrowserJourney variables panel toggle", () => {
     vi.restoreAllMocks();
   });
 
-  it("should render the toggle as the icon-only panel-collapse button", () => {
+  it("renders the toggle as an outline sm button with the variables icon", () => {
     wrapper = mountToolbar({ variablesPanelOpen: false });
 
     const toggle = wrapper.find(TOGGLE);
-    expect(toggle.attributes("variant")).toBe("panel-collapse");
-    expect(toggle.attributes("size")).toBe("icon-toolbar");
+    expect(toggle.attributes("variant")).toBe("outline");
+    expect(toggle.attributes("size")).toBe("sm");
+    expect(toggle.attributes("icon-left")).toBe("data-object");
     expect(toggle.text()).toBe("");
   });
 
@@ -2818,17 +2827,29 @@ describe("BrowserJourney variables panel toggle", () => {
     for (const call of emitted) expect(call).toEqual([]);
   });
 
-  it("the variables toggle shows the variables icon and stays pressed while the panel is open", () => {
+  it("the variables toggle turns outline-primary and pressed while the panel is open, with no active prop", () => {
     wrapper = mountToolbar({ variablesPanelOpen: true });
     expect(toggleIconOf(wrapper)).toBe("data-object");
+    expect(wrapper.find(TOGGLE).attributes("variant")).toBe("outline-primary");
     expect(wrapper.find(TOGGLE).attributes("aria-pressed")).toBe("true");
-    expect(wrapper.find(TOGGLE).attributes("active")).toBe("true");
+    expect(wrapper.find(TOGGLE).attributes("active")).toBeUndefined();
     wrapper.unmount();
 
     wrapper = mountToolbar({ variablesPanelOpen: false });
     expect(toggleIconOf(wrapper)).toBe("data-object");
+    expect(wrapper.find(TOGGLE).attributes("variant")).toBe("outline");
     expect(wrapper.find(TOGGLE).attributes("aria-pressed")).toBe("false");
-    expect(wrapper.find(TOGGLE).attributes("active")).toBe("false");
+    expect(wrapper.find(TOGGLE).attributes("active")).toBeUndefined();
+  });
+
+  it("focusVariablesToggle moves focus to the variables toggle", async () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false }, true);
+    const vm = wrapper.vm as unknown as { focusVariablesToggle?: () => void };
+
+    expect(typeof vm.focusVariablesToggle).toBe("function");
+    vm.focusVariablesToggle?.();
+    await flushPromises();
+    expect(document.activeElement).toBe(wrapper.find(TOGGLE).element);
   });
 });
 

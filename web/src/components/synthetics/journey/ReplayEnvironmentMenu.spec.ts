@@ -173,6 +173,15 @@ describe("ReplayEnvironmentMenu", () => {
     expect(wrapper.get(TRIGGER).attributes("disabled")).toBeDefined();
   });
 
+  it("the arrow uses the split-segment size", () => {
+    wrapper = mountMenu();
+    const classes = wrapper.get(TRIGGER).classes();
+    expect(classes).toContain("h-[2.125rem]");
+    expect(classes).toContain("w-8");
+    expect(classes).toContain("p-0");
+    expect(classes).not.toContain("ps-3");
+  });
+
   it("says the choice is for this session only", () => {
     wrapper = mountMenu();
     expect(wrapper.text()).toContain("Replay and record in");

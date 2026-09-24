@@ -76,11 +76,13 @@ const GLOBALS = [plain("BASE_URL", "https://global.test")];
 const sel = (suffix: string) => `[data-test="synthetics-journey-start-pill${suffix}"]`;
 const URL_HALF = sel("-url");
 const ENVS_HALF = sel("-envs");
+const ENVS_COUNT = sel("-envs-count");
 const URL_INPUT_FIELD = sel("-url-input-field");
 const URL_INPUT_ERROR = sel("-url-input-error");
 
-function mountPill(props: Record<string, unknown> = {}) {
+function mountPill(props: Record<string, unknown> = {}, attrs: Record<string, unknown> = {}) {
   return mount(JourneyStartPill, {
+    attrs,
     props: {
       url: "{{BASE_URL}}/login",
       environments: ENVIRONMENTS,
@@ -126,28 +128,86 @@ describe("JourneyStartPill", () => {
   it("shows the URL as written, with its variables", () => {
     wrapper = mountPill();
     const half = wrapper.get(URL_HALF);
-    expect(half.text()).toContain("Opens");
     expect(half.text()).toContain("{{BASE_URL}}/login");
     expect(half.text()).not.toContain("https://");
   });
 
-  it("shows in Global only / in the single environment's name / in N environments", () => {
-    wrapper = mountPill({ selectedIds: [] });
-    expect(wrapper.get(ENVS_HALF).text()).toContain("in Global only");
-    wrapper.unmount();
+  it("renders two separate controls, not a button group, and keeps the host's classes on the root", () => {
+    wrapper = mountPill({}, { class: "max-md:order-last max-md:basis-full" });
 
-    wrapper = mountPill({ selectedIds: ["env-prod"] });
-    expect(wrapper.get(ENVS_HALF).text()).toContain("in Production");
-    expect(wrapper.get(ENVS_HALF).text()).not.toContain("environment");
+    expect(wrapper.findComponent({ name: "OButtonGroup" }).exists()).toBe(false);
+    const root = wrapper.element as HTMLElement;
+    expect(root.tagName).toBe("DIV");
+    expect([...root.classList]).toEqual(
+      expect.arrayContaining([
+        "flex",
+        "items-center",
+        "gap-2",
+        "max-md:order-last",
+        "max-md:basis-full",
+      ]),
+    );
+    expect(root.contains(wrapper.get(URL_HALF).element)).toBe(true);
+    expect(root.contains(wrapper.get(ENVS_HALF).element)).toBe(true);
+  });
+
+  it("the URL button shows no Opens label and no pencil", () => {
+    wrapper = mountPill();
+    const half = wrapper.get(URL_HALF);
+
+    expect(half.text()).not.toContain("Opens");
+    expect(half.find('[data-icon="edit"]').exists()).toBe(false);
+    expect(half.find('[data-icon="language"]').exists()).toBe(true);
+  });
+
+  it("the URL button is not monospaced; the popover input is", async () => {
+    wrapper = mountPill();
+    const half = wrapper.get(URL_HALF);
+
+    expect(half.classes()).not.toContain("font-mono");
+    expect(half.findAll(".font-mono")).toHaveLength(0);
+
+    await openUrl(wrapper);
+    expect(wrapper.get(URL_INPUT_FIELD).element.closest(".font-mono")).not.toBeNull();
+  });
+
+  it("the Environments button shows its label and a count badge: 0 with none, N with N, locked ids counted", () => {
+    wrapper = mountPill({ selectedIds: [] });
+    expect(wrapper.get(ENVS_HALF).text()).toContain("Environments");
+    expect(wrapper.get(ENVS_HALF).text()).not.toContain("Global");
+    expect(wrapper.get(`${ENVS_HALF} ${ENVS_COUNT}`).text()).toBe("0");
+    const badge = wrapper.findComponent({ name: "OBadge" });
+    expect(badge.props("variant")).toBe("default");
+    expect(badge.props("size")).toBe("sm");
     wrapper.unmount();
 
     wrapper = mountPill({ selectedIds: ["env-prod", "env-stg"] });
-    expect(wrapper.get(ENVS_HALF).text()).toContain("in 2 environments");
+    expect(wrapper.get(ENVS_COUNT).text()).toBe("2");
+    expect(wrapper.get(ENVS_HALF).text()).not.toContain("Production");
+    wrapper.unmount();
+
+    wrapper = mountPill({ selectedIds: ["env-prod", "env-hidden"] });
+    expect(wrapper.get(ENVS_COUNT).text()).toBe("2");
+    expect(wrapper.get(ENVS_HALF).text()).not.toContain("env-hidden");
   });
 
-  it("shows the id for a single selected environment the user cannot read", () => {
-    wrapper = mountPill({ selectedIds: ["env-hidden"] });
-    expect(wrapper.get(ENVS_HALF).text()).toContain("in env-hidden");
+  it("the Environments aria-label is plural: none, 1 selected, N selected", () => {
+    wrapper = mountPill({ selectedIds: [] });
+    expect(wrapper.get(ENVS_HALF).attributes("aria-label")).toBe(
+      "Environments: none, Global values only. Change",
+    );
+    wrapper.unmount();
+
+    wrapper = mountPill({ selectedIds: ["env-prod"] });
+    expect(wrapper.get(ENVS_HALF).attributes("aria-label")).toBe(
+      "Environments: 1 selected. Change",
+    );
+    wrapper.unmount();
+
+    wrapper = mountPill({ selectedIds: ["env-prod", "env-stg", "env-hidden"] });
+    expect(wrapper.get(ENVS_HALF).attributes("aria-label")).toBe(
+      "Environments: 3 selected. Change",
+    );
   });
 
   it("lists the URL each selected environment opens", async () => {
@@ -228,27 +288,22 @@ describe("JourneyStartPill", () => {
     expect(wrapper.find(URL_INPUT_FIELD).exists()).toBe(true);
   });
 
-  it("Apply emits the new environment list; Cancel discards the draft", async () => {
+  it("each checkbox change emits the new list at once, with no Cancel or Apply", async () => {
     wrapper = mountPill({ selectedIds: ["env-prod"] });
     await openEnvs(wrapper);
     expect(checkbox(wrapper, sel("-env-Production")).attributes("aria-checked")).toBe("true");
     expect(checkbox(wrapper, sel("-env-Staging")).attributes("aria-checked")).toBe("false");
-
-    await checkbox(wrapper, sel("-env-Staging")).trigger("click");
-    await click(wrapper, sel("-envs-apply"));
-
-    expect(wrapper.emitted("update:selected-ids")).toEqual([[["env-prod", "env-stg"]]]);
     expect(wrapper.find(sel("-envs-apply")).exists()).toBe(false);
-
-    await openEnvs(wrapper);
-    await checkbox(wrapper, sel("-env-Production")).trigger("click");
-    await click(wrapper, sel("-envs-cancel"));
-
-    expect(wrapper.emitted("update:selected-ids")).toHaveLength(1);
     expect(wrapper.find(sel("-envs-cancel")).exists()).toBe(false);
 
-    await openEnvs(wrapper);
-    expect(checkbox(wrapper, sel("-env-Production")).attributes("aria-checked")).toBe("true");
+    await checkbox(wrapper, sel("-env-Staging")).trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("update:selected-ids")).toEqual([[["env-prod", "env-stg"]]]);
+    expect(wrapper.find(sel("-env-Staging")).exists()).toBe(true);
+
+    await checkbox(wrapper, sel("-env-Production")).trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("update:selected-ids")?.[1]).toEqual([[]]);
   });
 
   it("disables unchecked environments at the cap of 5", async () => {
@@ -266,7 +321,13 @@ describe("JourneyStartPill", () => {
     expect(wrapper.text()).toContain("5 of 5 · Global values always apply");
 
     await checkbox(wrapper, sel("-env-EnvA")).trigger("click");
+    expect(wrapper.emitted("update:selected-ids")).toEqual([
+      [["env-B", "env-C", "env-D", "env-E"]],
+    ]);
+    await wrapper.setProps({ selectedIds: ["env-B", "env-C", "env-D", "env-E"] });
+    await flushPromises();
     expect(checkbox(wrapper, sel("-env-EnvF")).attributes("disabled")).toBeUndefined();
+    expect(wrapper.text()).toContain("4 of 5 · Global values always apply");
   });
 
   it("shows a selected environment the user cannot read as locked, with No access, and never removes it", async () => {
@@ -281,7 +342,7 @@ describe("JourneyStartPill", () => {
     expect(box.attributes("disabled")).toBeDefined();
 
     await checkbox(wrapper, sel("-env-Staging")).trigger("click");
-    await click(wrapper, sel("-envs-apply"));
+    await flushPromises();
 
     const emitted = wrapper.emitted("update:selected-ids")![0][0] as string[];
     expect(emitted).toHaveLength(3);
@@ -295,14 +356,14 @@ describe("JourneyStartPill", () => {
       "Starting URL: {{BASE_URL}}/login. Edit",
     );
     expect(wrapper.get(ENVS_HALF).attributes("aria-label")).toBe(
-      "Environments: 2 environments. Change",
+      "Environments: 2 selected. Change",
     );
 
     const tips = wrapper
       .findAllComponents(OTooltipStub)
       .map((c) => c.props("content") as string | undefined);
     expect(tips).toContain("Edit Starting URL");
-    expect(tips.filter((c) => !!c).length).toBeGreaterThanOrEqual(2);
+    expect(tips).toContain("Change environments");
   });
 
   it("disabled while locked", async () => {
@@ -314,6 +375,6 @@ describe("JourneyStartPill", () => {
     await openUrl(wrapper);
     await openEnvs(wrapper);
     expect(wrapper.find(URL_INPUT_FIELD).exists()).toBe(false);
-    expect(wrapper.find(sel("-envs-apply")).exists()).toBe(false);
+    expect(wrapper.find(sel("-env-Production")).exists()).toBe(false);
   });
 });
