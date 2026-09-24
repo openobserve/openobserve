@@ -34,7 +34,7 @@ use crate::series_stream::SeriesStream;
 async fn evaluate_partitions<SourceFuture, Stream, Output, EvalFuture>(
     sources: Vec<SourceFuture>,
     eval: &Arc<RangeExpr>,
-    evaluate: impl Fn(Stream, Arc<RangeExpr>) -> EvalFuture + Copy + Send + 'static,
+    evaluate: impl Fn(Stream, Arc<RangeExpr>) -> EvalFuture + Clone + Send + 'static,
 ) -> Result<(impl ExactSizeIterator<Item = Output>, usize)>
 where
     SourceFuture: Future<Output = Result<Stream>> + Send + 'static,
@@ -44,6 +44,7 @@ where
 {
     let parts = sources.into_iter().map(|source| {
         let eval = Arc::clone(eval);
+        let evaluate = evaluate.clone();
         async move {
             let source = source.await?;
             evaluate(source, eval).await

@@ -181,6 +181,11 @@ function buildResourceSpans(serviceName, spans, extraResourceAttrs = []) {
         attr('service.name', serviceName),
         attr('service.version', config.version),
         attr('environment', config.environment),
+        // Resource-level k8s identity lands on the stream as service_k8s_pod_name /
+        // service_k8s_node_name, which is what generates the panel's Pods and Nodes
+        // resource tabs. The span-level k8sAttrs below do not carry the service_ prefix.
+        attr('k8s.pod.name', `${serviceName}-0`),
+        attr('k8s.node.name', 'node-1'),
         ...extraResourceAttrs,
       ],
     },

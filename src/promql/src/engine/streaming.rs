@@ -66,7 +66,7 @@ impl Engine {
             return Ok(None);
         };
         let streamed = self
-            .stream_fused_agg(&scan, modifier, func.clone(), op, range)
+            .stream_fused_agg(&scan, modifier, func.clone(), op.clone(), range)
             .await?;
         if let Some(value) = streamed {
             log::info!(
@@ -165,7 +165,7 @@ impl Engine {
     ) -> Result<Option<Value>> {
         self.stream_scan_guarded(scan, |ctx, schema| async move {
             let Some(label_cols) =
-                LabelColumns::for_op(op, modifier, schema, &scan.label_selector, func.name())
+                LabelColumns::for_op(&op, modifier, schema, &scan.label_selector, func.name())
             else {
                 return Ok(None);
             };
@@ -346,7 +346,7 @@ mod tests {
     use tokio::sync::oneshot;
 
     use super::*;
-    use crate::{engine::tests::*, exec::PromqlContext};
+    use crate::{engine::tests::*, exec::PromqlContext, scalar_param::ScalarParam};
 
     const SECOND: i64 = 1_000_000;
     const BASE: i64 = 1_000 * SECOND;
@@ -712,7 +712,8 @@ mod tests {
             Some(param) => Some(engine.exec_expr(param).await.unwrap()),
             None => None,
         };
-        let agg_op = AggOp::new(&op, param).unwrap();
+        let k = param.and_then(|param| ScalarParam::from_value(param, &engine.eval_ctx));
+        let agg_op = AggOp::new(&op, k).unwrap();
         agg_op
             .eval_aggregate(&modifier, input, &engine.eval_ctx)
             .unwrap()
@@ -1087,6 +1088,31 @@ mod tests {
                     "{query}, streams {streams}"
                 );
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_per_step_rank_limit_streams_like_the_generic_fold() {
+        // k is 0, 1 and 2 on the three steps
+        for op in ["topk", "bottomk"] {
+            let query = format!("{op}((time() - 1060) / 60, sum_over_time(m[1m]))");
+            let generic = eval_query(provider(false, false), 30, &query)
+                .await
+                .unwrap();
+            let streamed = eval_query(provider(true, false), 30, &query).await.unwrap();
+            let mut per_step = std::collections::BTreeMap::new();
+            for (_, samples) in canonical(generic.clone()) {
+                for (timestamp, _) in samples {
+                    *per_step.entry(timestamp).or_insert(0) += 1;
+                }
+            }
+            let expected = [(BASE + 120 * SECOND, 1), (BASE + 180 * SECOND, 2)];
+            assert_eq!(
+                per_step.into_iter().collect::<Vec<_>>(),
+                expected,
+                "{query}"
+            );
+            assert_same_matrix(generic, streamed, &query);
         }
     }
 
