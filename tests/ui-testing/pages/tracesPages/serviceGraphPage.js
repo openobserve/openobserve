@@ -59,6 +59,11 @@ export class ServiceGraphPage {
     this.nodesTable = '[data-test="service-graph-side-panel-nodes-table"]';
     this.podsPanel = '[data-test="service-graph-side-panel-pods"]';
     this.podsTable = '[data-test="service-graph-side-panel-pods-table"]';
+    // OTable marks headers o2-table-th-<id> and body cells o2-table-cell-<id>.
+    this.tableHeaderPrefix = 'thead th[data-test^="o2-table-th-"]';
+    this.tableHeader = (columnId) => `thead th[data-test="o2-table-th-${columnId}"]`;
+    this.tableCell = (columnId) => `tbody td[data-test="o2-table-cell-${columnId}"]`;
+    this.nodePanelTabPrefix = '[data-test^="service-graph-node-panel-tab-"]';
 
     // ===== TELEMETRY CORRELATION (Metrics tab) =====
     this.metricsTab = '[data-test="service-graph-node-panel-tab-metrics"]';
@@ -508,28 +513,32 @@ export class ServiceGraphPage {
 
   // ===== SIDE PANEL TABLES (Operations / resource tabs) =====
 
-  /** OTable marks headers o2-table-th-<id> and body cells o2-table-cell-<id>. */
-  _tableColumnHeader(tableSelector, columnId) {
-    return this.page.locator(`${tableSelector} thead th[data-test="o2-table-th-${columnId}"]`);
-  }
-
   async getOperationsColumnIds() {
-    const headers = this.page.locator(`${this.operationsTable} thead th[data-test^="o2-table-th-"]`);
-    const ids = await headers.evaluateAll((nodes) =>
-      nodes.map((n) => (n.getAttribute('data-test') || '').replace('o2-table-th-', '')),
-    );
-    return ids.filter((id) => id && id !== '__spacer__');
+    return await this.getResourceTableColumnIds(this.operationsTable);
   }
 
   async sortOperationsByColumn(columnId) {
-    await this._tableColumnHeader(this.operationsTable, columnId).click();
-    await this.page.waitForTimeout(500);
+    const previousOrder = (await this.getOperationsColumnText('operation')).join('|');
+    await this.page.locator(`${this.operationsTable} ${this.tableHeader(columnId)}`).click();
+    // The re-sort is a client-side computed, so wait for the rendered order to
+    // change rather than guessing a settle time. Data whose keys are all equal
+    // legitimately keeps its order, and the caller's assertions still hold.
+    await this.page
+      .waitForFunction(
+        ([selector, previous]) => {
+          const rows = [...document.querySelectorAll(selector)].map((c) => c.innerText.trim());
+          return rows.length > 0 && rows.join('|') !== previous;
+        },
+        [`${this.operationsTable} ${this.tableCell('operation')}`, previousOrder],
+        { timeout: 10000 },
+      )
+      .catch(() => {});
   }
 
   /** Text of one operations column, top to bottom, for comparing row order. */
   async getOperationsColumnText(columnId) {
     return await this.page
-      .locator(`${this.operationsTable} tbody td[data-test="o2-table-cell-${columnId}"]`)
+      .locator(`${this.operationsTable} ${this.tableCell(columnId)}`)
       .evaluateAll((cells) => cells.map((c) => c.innerText.trim()));
   }
 
@@ -540,14 +549,14 @@ export class ServiceGraphPage {
    */
   async getOperationsDurationRatios(columnId) {
     return await this.page
-      .locator(`${this.operationsTable} tbody td[data-test="o2-table-cell-${columnId}"] [role="progressbar"]`)
+      .locator(`${this.operationsTable} ${this.tableCell(columnId)} [role="progressbar"]`)
       .evaluateAll((bars) => bars.map((b) => Number(b.getAttribute('aria-valuenow'))));
   }
 
   /** Resource tabs are generated per OTEL workload, so the set varies by data. */
   async getSidePanelTabIds() {
     return await this.page
-      .locator('[data-test^="service-graph-node-panel-tab-"]')
+      .locator(this.nodePanelTabPrefix)
       .evaluateAll((nodes) =>
         nodes.map((n) => (n.getAttribute('data-test') || '').replace('service-graph-node-panel-tab-', '')),
       );
@@ -563,7 +572,7 @@ export class ServiceGraphPage {
 
   async getResourceTableColumnIds(tableSelector) {
     const ids = await this.page
-      .locator(`${tableSelector} thead th[data-test^="o2-table-th-"]`)
+      .locator(`${tableSelector} ${this.tableHeaderPrefix}`)
       .evaluateAll((nodes) =>
         nodes.map((n) => (n.getAttribute('data-test') || '').replace('o2-table-th-', '')),
       );
