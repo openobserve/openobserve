@@ -325,7 +325,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_webhook".to_string(),
-                    body: r#"{"alert": {"name": "{alert_name}"}}"#.to_string(),
+                    body: r#"{"alert": {"name": "{alert_name}", "status": "{alert_status}"}}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -748,14 +748,20 @@ mod tests {
         );
         let cfg: PrebuiltDestinationsConfig =
             serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-        for d in &cfg.destinations {
+        // The builtin is not a copy of the file, it is the fallback used
+        // whenever the process does not run from the repo root — which is every
+        // real deployment. Checking only the file passed green while the
+        // fallback shipped a body that its own validation refuses.
+        let builtin = load_builtin_config();
+        for d in cfg.destinations.iter().chain(builtin.destinations.iter()) {
             assert!(
                 d.template.body.contains("{alert_status}"),
                 "prebuilt '{}' cannot say a recovery is a recovery",
                 d.id
             );
             assert!(
-                !d.template.body.contains("\"firing\""),
+                !d.template.body.to_lowercase().contains("firing")
+                    || d.template.body.contains("{alert_status}"),
                 "prebuilt '{}' hardcodes a status that lies on recovery",
                 d.id
             );

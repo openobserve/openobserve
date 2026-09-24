@@ -7423,7 +7423,7 @@
       },
       "notifyOnRecovery": "Notify on recovery",
       "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
-      "notifyOnRecoveryTemplateHint": "Your template must include {alert_status}, or the recovery message will look like a new alert.",
+      "notifyOnRecoveryTemplateHint": "Your template must include {'{'}alert_status{'}'}, or the recovery message will look like a new alert.",
       "keepFiringFor": "Keep firing for",
       "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
       "keepFiringForInvalid": "Enter 0 or more seconds",
