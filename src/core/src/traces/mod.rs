@@ -1110,6 +1110,13 @@ pub async fn handle_otlp_request(
         match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
             Ok(pattern_manager) => {
                 for (stream, data) in json_data_by_stream.iter_mut() {
+                    if config::meta::self_reporting::redaction::is_self_reporting_stream(
+                        org_id,
+                        stream,
+                        StreamType::Traces,
+                    ) {
+                        continue;
+                    }
                     if let Err(e) = pattern_manager.process_at_ingestion(
                         org_id,
                         StreamType::Traces,
@@ -1124,6 +1131,15 @@ pub async fn handle_otlp_request(
             }
             Err(e) => {
                 log::error!("[TRACES] failed to get pattern manager for SDR redaction: {e}");
+                crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                    org_id,
+                    StreamType::Traces,
+                    json_data_by_stream
+                        .iter()
+                        .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
+                    config::meta::self_reporting::redaction::FailPosture::Open,
+                )
+                .await;
             }
         }
     }
@@ -1465,6 +1481,13 @@ pub async fn ingest_json(
         match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
             Ok(pattern_manager) => {
                 for (stream, data) in json_data_by_stream.iter_mut() {
+                    if config::meta::self_reporting::redaction::is_self_reporting_stream(
+                        org_id,
+                        stream,
+                        StreamType::Traces,
+                    ) {
+                        continue;
+                    }
                     if let Err(e) = pattern_manager.process_at_ingestion(
                         org_id,
                         StreamType::Traces,
@@ -1479,6 +1502,15 @@ pub async fn ingest_json(
             }
             Err(e) => {
                 log::error!("[TRACES] failed to get pattern manager for SDR redaction: {e}");
+                crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                    org_id,
+                    StreamType::Traces,
+                    json_data_by_stream
+                        .iter()
+                        .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
+                    config::meta::self_reporting::redaction::FailPosture::Open,
+                )
+                .await;
             }
         }
     }

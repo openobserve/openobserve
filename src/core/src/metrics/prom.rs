@@ -519,6 +519,8 @@ pub async fn remote_write(
 
     let step_start = std::time::Instant::now();
     for (stream_name, mut json_data) in json_data_by_stream {
+        #[cfg(feature = "vectorscan")]
+        apply_redaction(org_id, &stream_name, &mut json_data).await;
         finish_identity_columns(&mut json_data);
         let has_uds = matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)));
         let min_timestamp = json_data.iter().map(|(_, ts, _)| *ts).min().unwrap_or(0);
@@ -1021,6 +1023,52 @@ fn metadata_sql(
         sql.push_str(&predicates.join(" AND "));
     }
     sql
+}
+
+/// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
+/// Redacts a stream's pending records and drops the series hash computed from the raw labels.
+#[cfg(feature = "vectorscan")]
+async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [PendingRecord]) {
+    if json_data.is_empty()
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(
+            org_id,
+            stream_name,
+            config::meta::stream::StreamType::Metrics,
+        )
+    {
+        return;
+    }
+    let mut rows: Vec<(i64, json::Map<String, json::Value>)> = json_data
+        .iter_mut()
+        .map(|(record, timestamp, _)| (*timestamp, std::mem::take(record)))
+        .collect();
+    match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+        Ok(pattern_manager) => {
+            if let Err(e) = pattern_manager.process_at_ingestion(
+                org_id,
+                StreamType::Metrics,
+                stream_name,
+                &mut rows,
+            ) {
+                log::error!("[METRICS] error applying SDR patterns for stream {stream_name}: {e}");
+            }
+        }
+        Err(e) => {
+            log::error!("[METRICS] failed to get pattern manager for SDR redaction: {e}");
+            crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                org_id,
+                StreamType::Metrics,
+                std::iter::once((stream_name, rows.as_slice())),
+                config::meta::self_reporting::redaction::FailPosture::Open,
+            )
+            .await;
+        }
+    }
+    for ((record, _, known_hash), (_, redacted)) in json_data.iter_mut().zip(rows) {
+        *record = redacted;
+        // the pre-computed hash identifies the unredacted labels, so it must be recomputed
+        *known_hash = None;
+    }
 }
 
 /// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.

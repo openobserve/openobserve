@@ -120,37 +120,30 @@ test.describe("Logs Regression Bug Fixes", () => {
   // Bug #9996: Page appears blank midway on scroll
   // https://github.com/openobserve/openobserve/issues/9996
   // ==========================================================================
-  // SKIPPED: Timing out in current test environment (selectStream failures)
-  // TODO: Re-enable when environment is stable
-  test.skip("should maintain table visibility during scroll @bug-9996 @P0 @scroll @regression", async ({ page }) => {
-    test.setTimeout(240000); // 4 minutes timeout for slow environments
+  test("should maintain table visibility during scroll @bug-9996 @P0 @scroll @regression", async ({ page }) => {
     testLogger.info('Test: Verify scroll maintains content visibility (Bug #9996)');
 
-    // Navigate directly to logs page with stream and time parameters
-    const fifteenMinsAgo = Date.now() - (15 * 60 * 1000);
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}&stream=e2e_automate&stream_type=logs&from=${fifteenMinsAgo}&to=${Date.now()}`);
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
-
-    // Run query to load data
+    await pm.logsPage.navigateToLogs();
+    await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
-    // STRONG ASSERTION: Table must be visible before scroll
-    await pm.logsPage.expectLogsTableVisible();
-    testLogger.info('✓ Table visible before scroll');
+    // The grid must hold rows before scrolling, or the scroll assertions prove nothing.
+    await pm.logsPage.expectResultsGridSettledWithRows();
 
-    // Scroll multiple times and verify table stays visible
+    const startScrollTop = await pm.logsPage.getResultsScrollTop();
+    expect(startScrollTop, 'results area must expose a scrollable container').not.toBeNull();
+
     for (let i = 0; i < 5; i++) {
-      await page.mouse.wheel(0, 300);
-      await page.waitForTimeout(300);
-      // STRONG ASSERTION: Table must remain visible after each scroll
-      await pm.logsPage.expectLogsTableVisible();
-      testLogger.info(`✓ Table visible after scroll ${i + 1}/5`);
+      await pm.logsPage.scrollResultsGrid();
+      // The reported symptom is a blank grid, so rows are the assertion, not the container.
+      await pm.logsPage.expectResultsGridStillRendersRows();
+      testLogger.info(`Rows still rendered after scroll ${i + 1}/5`);
     }
 
-    testLogger.info('✓ PASSED: Table visible throughout scroll');
+    // Without this the loop would pass on a wheel that never moved the results area.
+    const endScrollTop = await pm.logsPage.getResultsScrollTop();
+    expect(endScrollTop, 'results area must actually scroll, otherwise nothing was tested')
+      .toBeGreaterThan(startScrollTop);
   });
 
   // ==========================================================================
@@ -1430,7 +1423,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   // Bug #10103: Query execution plan open/close shows "No results found"
   // https://github.com/openobserve/openobserve/issues/10103
   // ==========================================================================
-  test.skip("Opening and closing query execution plan should not clear results @bug-10103 @P2 @regression @logsRegression", async ({ page }) => {
+  test("Opening and closing query execution plan should not clear results @bug-10103 @P2 @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: Verify Explain Query close does not break results (Bug #10103)');
 
     await pm.logsPage.navigateToLogs();
@@ -1457,15 +1450,13 @@ test.describe("Logs Regression Bug Fixes", () => {
     await expect(pm.logsPage.getExplainQueryMenuBtnLocator(),
       'Explain Query option should be visible').toBeVisible({ timeout: 3000 });
     await pm.logsPage.clickExplainQuery();
-    await page.waitForTimeout(2000);
-    testLogger.info('Opened Explain Query');
+    // Without this the test passes even when the dialog never opens.
+    await pm.logsPage.expectQueryPlanDialogVisible();
 
-    // Close explain via Escape
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(1500);
+    await pm.logsPage.expectQueryPlanDialogHidden();
 
-    // Bug assertion: results must still be visible after closing Explain Query
-    await pm.logsPage.expectLogsTableVisible();
+    await pm.logsPage.expectResultsGridSettledWithRows();
     testLogger.info('PASSED: Explain Query close does not break results');
   });
 
