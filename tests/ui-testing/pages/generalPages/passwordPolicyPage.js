@@ -21,8 +21,8 @@ export class PasswordPolicyPage {
     this.page = page;
 
     this.form = "#password-policy-form";
-    // OSS redirect target when the enterprise page is absent.
-    this.generalSettingsTab = '[data-test="general-settings-tab"]';
+    // Authenticated app shell; present after the OSS build redirects the gated route home.
+    this.mainNav = '[data-test="navbar-main-nav"]';
 
     this.minLengthRow = '[data-test="settings-password-policy-min-length"]';
     this.maxLengthRow = '[data-test="settings-password-policy-max-length"]';
@@ -87,12 +87,13 @@ export class PasswordPolicyPage {
     if (await visibleWithin(this.notAdminEmptyState)) {
       throw new Error("Password Policy page denied access (not-admin state)");
     }
-    // Skip only on a confirmed OSS build: the route redirected to general settings.
-    if (await visibleWithin(this.generalSettingsTab)) {
+    // Skip only on a confirmed OSS build: the gated route redirected away to the
+    // authenticated app shell (a login redirect or crash would not show the navbar).
+    if (!this.page.url().includes("password_policy") && (await visibleWithin(this.mainNav))) {
       return false;
     }
     throw new Error(
-      "Password Policy route neither rendered nor redirected to general settings — " +
+      "Password Policy route neither rendered nor redirected to the app shell — " +
         `unexpected landing at ${this.page.url()}`,
     );
   }
