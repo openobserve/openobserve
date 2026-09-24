@@ -20,6 +20,7 @@ use config::meta::promql::value::{
     Value,
 };
 use datafusion::error::{DataFusionError, Result};
+use hashbrown::HashMap;
 use rayon::prelude::*;
 use strum::EnumString;
 
@@ -503,6 +504,42 @@ pub(crate) fn set_label(labels: &mut Labels, name: &str, value: &str) {
     labels.sort();
 }
 
+/// Merges series with identical labels; overlapping timestamps are an error, as in Prometheus.
+pub(crate) fn merge_same_labelset(matrix: Vec<RangeValue>) -> Result<Vec<RangeValue>> {
+    if matrix.len() < 2 {
+        return Ok(matrix);
+    }
+    let mut merged: Vec<RangeValue> = Vec::with_capacity(matrix.len());
+    let mut by_signature: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matrix.len());
+    let mut touched = Vec::new();
+    for series in matrix {
+        let slots = by_signature.entry(series.labels.signature()).or_default();
+        let Some(&slot) = slots.iter().find(|&&i| merged[i].labels == series.labels) else {
+            slots.push(merged.len());
+            merged.push(series);
+            continue;
+        };
+        let target = &mut merged[slot];
+        target.samples.extend(series.samples);
+        if let Some(exemplars) = series.exemplars {
+            target.exemplars.get_or_insert_default().extend(exemplars);
+        }
+        touched.push(slot);
+    }
+    touched.sort_unstable();
+    touched.dedup();
+    for slot in touched {
+        let samples = &mut merged[slot].samples;
+        samples.sort_by_key(|sample| sample.timestamp);
+        if samples.windows(2).any(|w| w[0].timestamp == w[1].timestamp) {
+            return Err(DataFusionError::Execution(
+                "vector cannot contain metrics with the same labelset".into(),
+            ));
+        }
+    }
+    Ok(merged)
+}
+
 fn map_samples(data: Value, operation: &str, map: impl Fn(&Sample) -> f64 + Sync) -> Result<Value> {
     match data {
         Value::Matrix(mut matrix) => {
@@ -525,6 +562,52 @@ fn map_samples(data: Value, operation: &str, map: impl Fn(&Sample) -> f64 + Sync
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn range_value(labels: &[(&str, &str)], timestamps: &[i64]) -> RangeValue {
+        RangeValue {
+            labels: labels
+                .iter()
+                .map(|(name, value)| Arc::new(Label::new(*name, *value)))
+                .collect(),
+            samples: timestamps.iter().map(|ts| Sample::new(*ts, 1.0)).collect(),
+            exemplars: None,
+            time_window: None,
+        }
+    }
+
+    #[test]
+    fn test_merge_same_labelset_merges_disjoint_timestamps() {
+        let merged = merge_same_labelset(vec![
+            range_value(&[("job", "x")], &[3000]),
+            range_value(&[("job", "y")], &[1000]),
+            range_value(&[("job", "x")], &[1000, 2000]),
+        ])
+        .unwrap();
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].labels.get_value("job"), "x");
+        let timestamps: Vec<_> = merged[0].samples.iter().map(|s| s.timestamp).collect();
+        assert_eq!(timestamps, vec![1000, 2000, 3000]);
+        assert_eq!(merged[1].labels.get_value("job"), "y");
+    }
+
+    #[test]
+    fn test_merge_same_labelset_rejects_overlapping_timestamps() {
+        let result = merge_same_labelset(vec![
+            range_value(&[("job", "x")], &[1000, 2000]),
+            range_value(&[("job", "x")], &[2000]),
+        ]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_merge_same_labelset_compares_labels_not_only_signature() {
+        let merged = merge_same_labelset(vec![
+            range_value(&[("a", "bc")], &[1000]),
+            range_value(&[("ab", "c")], &[1000]),
+        ])
+        .unwrap();
+        assert_eq!(merged.len(), 2);
+    }
 
     #[test]
     fn test_series_range_matches_independent_window_selection() {

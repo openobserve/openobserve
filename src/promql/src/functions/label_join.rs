@@ -18,7 +18,7 @@ use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
-use super::set_label;
+use super::{merge_same_labelset, set_label};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_join
 pub(crate) fn label_join(
@@ -50,7 +50,7 @@ pub(crate) fn label_join(
                     .join(separator);
                 set_label(&mut range_value.labels, dest_label, &joined);
             });
-            Ok(Value::Matrix(matrix))
+            Ok(Value::Matrix(merge_same_labelset(matrix)?))
         }
         Value::None => Ok(Value::None),
         _ => Err(DataFusionError::Plan(
@@ -145,6 +145,22 @@ mod tests {
     fn test_label_join_empty_result_deletes_dest() {
         let labels = join_labels(&[("dst", "old"), ("job", "api")], "dst", "", &["missing"]);
         assert_eq!(names(&labels), vec!["job"]);
+    }
+
+    #[test]
+    fn test_label_join_duplicate_labelset_with_overlap_returns_err() {
+        let data = Value::Matrix(
+            ["a", "b"]
+                .into_iter()
+                .map(|instance| RangeValue {
+                    labels: vec![Arc::new(Label::new("instance", instance))],
+                    samples: vec![Sample::new(1000, 1.0)],
+                    exemplars: None,
+                    time_window: None,
+                })
+                .collect(),
+        );
+        assert!(label_join(data, "instance", "", vec!["missing".into(), "job".into()]).is_err());
     }
 
     #[test]

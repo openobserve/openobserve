@@ -18,7 +18,7 @@ use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use regex::Regex;
 
-use super::set_label;
+use super::{merge_same_labelset, set_label};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_replace
 pub(crate) fn label_replace(
@@ -48,7 +48,7 @@ pub(crate) fn label_replace(
                 captures.expand(replacement, &mut output);
                 set_label(&mut range_value.labels, dest_label, &output);
             });
-            Ok(Value::Matrix(matrix))
+            Ok(Value::Matrix(merge_same_labelset(matrix)?))
         }
         Value::None => Ok(Value::None),
         _ => Err(DataFusionError::Plan(
@@ -205,6 +205,35 @@ mod tests {
         let data = series(&[("__name__", "old_name"), ("job", "api")]);
         let labels = replace_labels(data, "__name__", "", "job", ".*");
         assert_eq!(labels, pairs(&[("job", "api")]));
+    }
+
+    #[test]
+    fn test_label_replace_duplicate_labelset() {
+        let matrix = |second_ts: i64| {
+            Value::Matrix(vec![
+                RangeValue {
+                    labels: vec![Arc::new(Label::new("instance", "a"))],
+                    samples: vec![Sample::new(1000, 1.0)],
+                    exemplars: None,
+                    time_window: None,
+                },
+                RangeValue {
+                    labels: vec![Arc::new(Label::new("instance", "b"))],
+                    samples: vec![Sample::new(second_ts, 2.0)],
+                    exemplars: None,
+                    time_window: None,
+                },
+            ])
+        };
+        assert!(label_replace(matrix(1000), "instance", "x", "instance", ".*").is_err());
+
+        let Value::Matrix(merged) =
+            label_replace(matrix(2000), "instance", "x", "instance", ".*").unwrap()
+        else {
+            panic!("expected matrix");
+        };
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].samples.len(), 2);
     }
 
     #[test]
