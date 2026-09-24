@@ -295,16 +295,7 @@ pub async fn ensure_db_fields_in_schema(
         .collect();
     if !missing_fields.is_empty() {
         let db_schema = Schema::new(missing_fields);
-        // min_ts MUST be Some: this runs BEFORE the ingest write, so on a
-        // brand-new stream it takes infra::schema::merge's CREATE branch,
-        // where min_ts becomes the schema version's start_dt. A None here
-        // persists a `/schema/{org}/{type}/{stream}` row with start_dt=0,
-        // whose 3-segment key panics db::schema::cache()'s 4-column assert on
-        // every later boot (found live: node failed to restart after the
-        // first db-span ingest into a fresh stream). On the existing-schema
-        // merge branch adding new fields never sets need_new_version, so
-        // Some(now) is a no-op there — same effective behavior as the
-        // gen_ai mirror, which only ever runs on already-created streams.
+        // Adding fields never needs a new version, so Some(now) only stamps a create.
         let now = chrono::Utc::now().timestamp_micros();
         merge(org_id, stream_name, stream_type, &db_schema, Some(now)).await?;
     }
@@ -493,6 +484,18 @@ async fn list_stream_schemas(
         .collect()
 }
 
+/// Splits a listed key into `lead` segments plus its version; a missing one is 0.
+fn split_start_dt(key: &str, lead: usize) -> Option<(Vec<&str>, i64)> {
+    let mut columns: Vec<&str> = key.splitn(lead + 1, '/').collect();
+    let start_dt = if columns.len() > lead {
+        columns.pop()?.parse().ok()?
+    } else {
+        0
+    };
+    (columns.len() == lead && !columns.iter().any(|column| column.is_empty()))
+        .then_some((columns, start_dt))
+}
+
 pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
@@ -514,21 +517,15 @@ pub async fn list(
         HashMap::with_capacity(items.len());
     for (key, val) in items {
         let key = key.strip_prefix(&db_key).unwrap();
-        let (stream_type, stream_name, start_dt) = match stream_type {
-            Some(stream_type) => {
-                let columns = key.split('/').take(2).collect::<Vec<_>>();
-                assert_eq!(columns.len(), 2, "BUG");
-                (stream_type, columns[0].into(), columns[1].parse().unwrap())
-            }
-            None => {
-                let columns = key.split('/').take(3).collect::<Vec<_>>();
-                assert_eq!(columns.len(), 3, "BUG");
-                (
-                    columns[0].into(),
-                    columns[1].into(),
-                    columns[2].parse().unwrap(),
-                )
-            }
+        let parsed = match stream_type {
+            Some(stream_type) => split_start_dt(key, 1)
+                .map(|(columns, start_dt)| (stream_type, columns[0].into(), start_dt)),
+            None => split_start_dt(key, 2)
+                .map(|(columns, start_dt)| (columns[0].into(), columns[1].into(), start_dt)),
+        };
+        let Some((stream_type, stream_name, start_dt)) = parsed else {
+            log::error!("[SCHEMA] skipping malformed schema key: {key}");
+            continue;
         };
         let entry = schemas
             .entry((stream_name, stream_type))
@@ -575,10 +572,14 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("Cache schema got {items_num} items");
     for (i, (key, val)) in items.into_iter().enumerate() {
         let key = key.strip_prefix(db_key).unwrap();
-        let columns = key.split('/').take(4).collect::<Vec<_>>();
-        assert_eq!(columns.len(), 4, "BUG");
+        let Some((columns, start_dt)) = split_start_dt(key, 3) else {
+            log::error!("[SCHEMA] skipping malformed schema key: {key}");
+            continue;
+        };
+        if start_dt == 0 {
+            log::warn!("[SCHEMA] key carries no start_dt, reading it as version 0: {key}");
+        }
         let item_key = format!("{}/{}/{}", columns[0], columns[1], columns[2]);
-        let start_dt: i64 = columns[3].parse().unwrap();
         let entry = schemas.entry(item_key).or_insert(Vec::new());
         entry.push((start_dt, val));
         if i.is_multiple_of(1000) {
@@ -1001,5 +1002,53 @@ mod tests {
         let after_first = fields.clone();
         assert!(!append_db_fields_to_defined_schema_fields(&mut fields));
         assert_eq!(fields, after_first);
+    }
+
+    #[test]
+    fn test_split_start_dt_reads_the_version() {
+        assert_eq!(
+            split_start_dt("default/logs/slo_slices/1790056698540533", 3),
+            Some((vec!["default", "logs", "slo_slices"], 1790056698540533))
+        );
+        assert_eq!(
+            split_start_dt("logs/app/1790056698540533", 2),
+            Some((vec!["logs", "app"], 1790056698540533))
+        );
+        assert_eq!(
+            split_start_dt("app/1790056698540533", 1),
+            Some((vec!["app"], 1790056698540533))
+        );
+        assert_eq!(
+            split_start_dt("default/logs/slo_slices/-5", 3),
+            Some((vec!["default", "logs", "slo_slices"], -5)),
+            "back-dated versions sort before zero and are still valid keys"
+        );
+    }
+
+    #[test]
+    fn test_split_start_dt_reads_a_missing_version_as_zero() {
+        assert_eq!(
+            split_start_dt("default/logs/slo_slices", 3),
+            Some((vec!["default", "logs", "slo_slices"], 0)),
+            "build_key drops a zero start_dt"
+        );
+        assert_eq!(
+            split_start_dt("logs/app", 2),
+            Some((vec!["logs", "app"], 0))
+        );
+        assert_eq!(split_start_dt("app", 1), Some((vec!["app"], 0)));
+    }
+
+    #[test]
+    fn test_split_start_dt_rejects_malformed_keys() {
+        // a non-numeric version, rather than a panic on parse
+        assert_eq!(split_start_dt("default/logs/slo_slices/soon", 3), None);
+        // a stream name carrying a slash lands in the version's place
+        assert_eq!(split_start_dt("default/logs/a/b/123", 3), None);
+        // too few segments
+        assert_eq!(split_start_dt("default/logs", 3), None);
+        assert_eq!(split_start_dt("", 1), None);
+        // an empty segment is not a stream
+        assert_eq!(split_start_dt("default//slo_slices", 3), None);
     }
 }

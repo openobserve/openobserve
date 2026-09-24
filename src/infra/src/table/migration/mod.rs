@@ -200,6 +200,7 @@ mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
 mod m20260922_000001_add_password_policy_columns_to_users;
 mod m20260922_000002_create_user_password_history_table;
 mod m20260922_000003_create_user_auth_state_table;
+mod m20260923_000001_repair_zero_start_dt_schema_rows;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -485,6 +486,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260922_000002_create_user_password_history_table::Migration),
             Box::new(m20260922_000003_create_user_auth_state_table::Migration),
             Box::new(m20260920_000001_add_anomaly_level_half_width::Migration),
+            Box::new(m20260923_000001_repair_zero_start_dt_schema_rows::Migration),
         ]
     }
 }
@@ -533,6 +535,7 @@ mod tests {
         ),
         (88, "m20260922_000003_create_user_auth_state_table"),
         (89, "m20260920_000001_add_anomaly_level_half_width"),
+        (90, "m20260923_000001_repair_zero_start_dt_schema_rows"),
     ];
 
     #[test]
