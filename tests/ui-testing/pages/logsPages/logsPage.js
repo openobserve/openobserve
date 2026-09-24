@@ -508,6 +508,13 @@ export class LogsPage {
         this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
         // useLogsHighlighter marks FTS matches with .log-highlighted inside the result cell.
         this.highlightedMatch = '[data-test="logs-search-result-logs-table"] .log-highlighted';
+        // The "=" icon is revealed on hover over its sidebar field row.
+        this.fieldListItem = (field) => `[data-test="logs-field-list-item-${field}"]`;
+        this.fieldEqualsButton = (field) => `[data-test="log-search-index-list-filter-${field}-field-btn"]`;
+        this.logDetailRow = (field) => `[data-test="log-detail-row-${field}"]`;
+        this.logDetailFieldMenuTrigger = '[data-test="log-details-include-exclude-field-btn"]';
+        this.logDetailAddFieldItem = '[data-test="log-details-add-field-btn"]';
+        this.tableExpandCell = '[data-test="logs-search-result-logs-table"] tbody tr[data-test="o2-table-row-0"] td[data-test="o2-table-expand-cell"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -2049,6 +2056,47 @@ export class LogsPage {
 
     async getHighlightedMatchCount() {
         return await this.page.locator(this.highlightedMatch).count();
+    }
+
+    /** Click a sidebar field's "=" icon; it only renders while its row is hovered. */
+    async addEqualsFilterForField(field) {
+        await this.page.locator(this.fieldListItem(field)).first().hover();
+        const button = this.page.locator(this.fieldEqualsButton(field)).first();
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        await button.click();
+    }
+
+    async expandFirstResultRow() {
+        await this.page.locator(this.tableExpandCell).click();
+        await expect(this.page.locator(this.logDetailRow('_timestamp'))).toBeVisible({ timeout: 15000 });
+    }
+
+    /** First expanded-row field that offers the add/remove action; timestamp never does. */
+    async getFirstActionableDetailField() {
+        const fields = await this.page.locator('[data-test^="log-detail-row-"]').evaluateAll((rows) =>
+            rows.map((r) => (r.getAttribute('data-test') || '').replace('log-detail-row-', '')),
+        );
+        const field = fields.find((f) => f && f !== '_timestamp');
+        if (!field) throw new Error(`no actionable field in the expanded row, saw: ${fields.join(', ')}`);
+        return field;
+    }
+
+    /**
+     * Open one expanded-row field's action menu and read its add/remove label.
+     * The menu is scoped to its own log-detail-row: the timestamp column renders no
+     * add item at all, so an unscoped lookup finds nothing.
+     */
+    async getAddOrRemoveFieldLabel(field) {
+        const row = this.page.locator(this.logDetailRow(field));
+        await row.hover();
+        await row.locator(this.logDetailFieldMenuTrigger).first().click();
+        const item = this.page.locator(this.logDetailAddFieldItem).first();
+        await item.waitFor({ state: 'visible', timeout: 10000 });
+        return (await item.innerText()).trim();
+    }
+
+    async clickAddOrRemoveFieldItem() {
+        await this.page.locator(this.logDetailAddFieldItem).first().click();
     }
 
     async pageNotVisible() {
