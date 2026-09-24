@@ -28,7 +28,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import { environmentStartUrls } from "@/components/synthetics/variables/replayInputs";
+import { environmentStartUrls, GLOBAL_ONLY } from "@/components/synthetics/variables/replayInputs";
 import { namedEnvironments } from "@/components/synthetics/variables/scope";
 import { atEnvironmentCap, lockedEnvironmentIds, toggleEnvironment } from "./startPillRules";
 import { makeStartUrlSchema, type StartUrlForm } from "./JourneyStartPill.schema";
@@ -79,7 +79,7 @@ const opensIn = computed(() => {
       props.checkVariables,
       props.environments,
       props.globals,
-      [""],
+      [GLOBAL_ONLY],
     );
     return [{ id: "global", name: t("synthetics.journey.replayValues.global"), url: global.url }];
   }

@@ -17,10 +17,20 @@ import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/syntheti
 import { placeholderNames, substitutePlaceholders, withDefaultScheme } from "./placeholders";
 import { namedEnvironments } from "./scope";
 
+/** The replay environment id meaning "no named environment": Global values only. */
+export const GLOBAL_ONLY = "" as const;
+
 export interface ReplayNameStatus {
   name: string;
   state: "resolved" | "secret" | "missing";
   steps: number[];
+}
+
+export interface ReplayEnvironmentOption {
+  id: string;
+  name: string;
+  host: string;
+  inTest: boolean;
 }
 
 /** Plain shared values for one environment, its rows over the global ones; a secret hides a plain global. */
@@ -41,12 +51,13 @@ export function sharedPlainValues(
   return values;
 }
 
-/** The check's first pinned environment, else the org's first named one; the selector overrides this later. */
+/** Mirrors the scheduled run: no pinned readable environment resolves Global only. */
 export function defaultReplayEnvironmentId(
   checkEnvironments: string[],
   environments: SyntheticsEnvironment[],
-): string | undefined {
-  return checkEnvironments[0] ?? namedEnvironments(environments)[0]?.id;
+): string {
+  const readable = new Set(namedEnvironments(environments).map((env) => env.id));
+  return checkEnvironments.find((id) => readable.has(id)) ?? GLOBAL_ONLY;
 }
 
 export function mergeReplayVariables(
@@ -116,4 +127,38 @@ export function environmentStartUrls(
     id,
     url: replayInputs(url, checkVariables, sharedPlainValues(environments, globals, id)).url,
   }));
+}
+
+/** The test's readable environments first (Global when it pins none), then the org's others; names are raw. */
+export function replayEnvironmentOptions(
+  url: string,
+  checkVariables: { name: string; value: string }[],
+  environments: SyntheticsEnvironment[],
+  globals: SyntheticsVariable[],
+  selectedIds: string[],
+): ReplayEnvironmentOption[] {
+  const named = namedEnvironments(environments);
+  const inTest = selectedIds.flatMap((id) => named.filter((env) => env.id === id));
+  const rest = named.filter((env) => !inTest.includes(env));
+  const hostOf = (id: string) => {
+    const [{ url: resolved }] = environmentStartUrls(url, checkVariables, environments, globals, [
+      id,
+    ]);
+    try {
+      return new URL(resolved).host;
+    } catch {
+      return resolved;
+    }
+  };
+  const option = (id: string, name: string, test: boolean) => ({
+    id,
+    name,
+    host: hostOf(id),
+    inTest: test,
+  });
+  return [
+    ...(inTest.length === 0 ? [option(GLOBAL_ONLY, "", true)] : []),
+    ...inTest.map((env) => option(env.id, env.name, true)),
+    ...rest.map((env) => option(env.id, env.name, false)),
+  ];
 }

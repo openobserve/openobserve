@@ -25,6 +25,7 @@ import useSyntheticsRecorder, {
 } from "@/composables/useSyntheticsRecorder";
 import { getUUIDv7 } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -968,6 +969,21 @@ function replayUpTo(upTo: number) {
   requestReplay(upTo);
 }
 
+/** Each Replay branch keeps its own guard; a restore or a recording holds the only session a replay could use. */
+const replayDisabled = computed(
+  () =>
+    (isReplayTerminal.value
+      ? isRestoring.value
+      : !!props.readonly || props.modelValue.length === 0 || isRestoring.value) ||
+    isRecording.value,
+);
+
+const replayLabel = computed(() =>
+  props.replayEnvironmentLabel
+    ? t("synthetics.journey.replayEnv.buttonLabel", { environment: props.replayEnvironmentLabel })
+    : t("synthetics.journey.replay"),
+);
+
 function onReplayButtonClick() {
   if (props.extensionReady) {
     requestReplay();
@@ -1498,17 +1514,21 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
 
         <!-- Run replay / Stop / Re-run — positionally stable, same slot -->
         <template v-if="!isRecording">
-          <OButton
-            v-if="replayPhase === 'idle'"
-            variant="outline"
-            size="sm"
-            :disabled="readonly || modelValue.length === 0 || isRestoring"
-            data-test="synthetics-journey-replay-btn"
-            @click="onReplayButtonClick"
-            icon-left="replay"
-          >
-            {{ t("synthetics.journey.replay") }}
-          </OButton>
+          <!-- Re-run after a finished replay is the same button in the same slot. -->
+          <OButtonGroup v-if="replayPhase === 'idle' || isReplayTerminal" radius="sm">
+            <OButton
+              variant="outline"
+              size="sm"
+              :disabled="replayDisabled"
+              data-test="synthetics-journey-replay-btn"
+              @click="onReplayButtonClick"
+              icon-left="replay"
+            >
+              <span class="max-w-40 truncate">{{ replayLabel }}</span>
+              <OTooltip :content="replayLabel" side="bottom" />
+            </OButton>
+            <slot name="replay-menu" :disabled="replayDisabled" />
+          </OButtonGroup>
           <OButton
             v-else-if="replayPhase === 'running'"
             variant="destructive"
@@ -1531,20 +1551,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
             icon-left="stop"
           >
             {{ t("synthetics.journey.stopping") }}
-          </OButton>
-          <!-- Re-run, reached when a previous replay has finished. Carries the same
-               restore guard as the idle branch: it is the same button in the same
-               slot, and a restore holds the only session a replay could use. -->
-          <OButton
-            v-else-if="isReplayTerminal"
-            variant="outline"
-            size="sm"
-            :disabled="isRestoring"
-            data-test="synthetics-journey-replay-btn"
-            @click="onReplayButtonClick"
-            icon-left="replay"
-          >
-            {{ t("synthetics.journey.replay") }}
           </OButton>
         </template>
 

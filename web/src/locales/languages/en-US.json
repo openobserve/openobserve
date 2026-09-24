@@ -14304,6 +14304,14 @@
         "noAccess": "No access",
         "capLine": "{count} of {cap} · Global values always apply",
         "replayNote": "Replay uses the environment on the Replay button."
+      },
+      "replayEnv": {
+        "buttonLabel": "Replay · {environment}",
+        "menuAria": "Replay environment",
+        "menuTitle": "Replay and record in",
+        "sessionOnly": "This session only — not saved with the test.",
+        "notInTest": "Not in this test's environments",
+        "selected": "Selected"
       }
     },
     "labels": {

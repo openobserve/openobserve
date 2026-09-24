@@ -51,6 +51,8 @@ import { buildResolvedGrouped } from "@/components/synthetics/variables/resolved
 import {
   classifyReplayNames,
   defaultReplayEnvironmentId,
+  GLOBAL_ONLY,
+  replayEnvironmentOptions,
   replayInputs,
   sharedPlainValues,
   type ReplayNameStatus,
@@ -108,6 +110,7 @@ import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
 import ExtractSubtestDialog from "@/components/synthetics/journey/ExtractSubtestDialog.vue";
 import MissingValueDialog from "@/components/synthetics/journey/MissingValueDialog.vue";
 import JourneyStartPill from "@/components/synthetics/journey/JourneyStartPill.vue";
+import ReplayEnvironmentMenu from "@/components/synthetics/journey/ReplayEnvironmentMenu.vue";
 import type { ExtractForm } from "@/components/synthetics/journey/ExtractSubtestDialog.schema";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import CheckVariablesPanel from "@/components/synthetics/configure/CheckVariablesPanel.vue";
@@ -1318,21 +1321,35 @@ function onVariablePromoted(name: string) {
   };
 }
 
-/** Written by the environment selector when it lands; until then the default rule decides. */
+/** The Replay menu's choice for this session only: never written to the check. */
 const replayEnvironmentOverride = ref<string | undefined>();
-/** Replay resolves one environment: the override, else the check's first, else the org's first. */
-const replayEnvironmentId = computed(
-  () =>
-    replayEnvironmentOverride.value ??
-    defaultReplayEnvironmentId(check.value.environments ?? [], sharedEnvironments.value),
+/** Replay resolves one environment: the menu's choice while it is still listed, else the default rule. */
+const replayEnvironmentId = computed(() => {
+  const chosen = replayEnvironmentOverride.value;
+  if (chosen !== undefined && (chosen === GLOBAL_ONLY || namedEnvironment(chosen))) return chosen;
+  return defaultReplayEnvironmentId(check.value.environments ?? [], sharedEnvironments.value);
+});
+
+const replayMenuOptions = computed(() =>
+  replayEnvironmentOptions(
+    check.value.url,
+    check.value.variables ?? [],
+    sharedEnvironments.value,
+    sharedGlobals.value,
+    check.value.environments ?? [],
+  ).map((option) =>
+    option.id === GLOBAL_ONLY
+      ? { ...option, name: t("synthetics.journey.replayValues.global") }
+      : option,
+  ),
 );
 
 /** A readable named environment, or undefined for Global. */
-function namedEnvironment(id: string | undefined): SyntheticsEnvironment | undefined {
+function namedEnvironment(id: string): SyntheticsEnvironment | undefined {
   return sharedEnvironments.value.find((env) => env.id === id && !env.is_global);
 }
 
-function environmentLabel(id: string | undefined): I18nText {
+function environmentLabel(id: string): I18nText {
   const env = namedEnvironment(id);
   return env ? raw(env.name) : t("synthetics.journey.replayValues.global");
 }
@@ -1340,7 +1357,7 @@ function environmentLabel(id: string | undefined): I18nText {
 const replayEnvironmentLabel = computed(() => environmentLabel(replayEnvironmentId.value));
 
 /** The url and variables one environment resolves, with `supplied` over its shared values. */
-function replayInputsFor(environmentId: string | undefined, supplied: Record<string, string>) {
+function replayInputsFor(environmentId: string, supplied: Record<string, string>) {
   return replayInputs(check.value.url, check.value.variables ?? [], {
     ...sharedPlainValues(sharedEnvironments.value, sharedGlobals.value, environmentId),
     ...supplied,
@@ -1389,7 +1406,7 @@ const journeyReplayTexts = computed(() => {
 
 function classifyFor(
   texts: ReturnType<typeof replayTexts>,
-  environmentId: string | undefined,
+  environmentId: string,
   supplied: Record<string, string>,
 ): ReplayNameStatus[] {
   return classifyReplayNames(
@@ -1397,7 +1414,7 @@ function classifyFor(
     check.value.variables ?? [],
     sharedEnvironments.value,
     sharedGlobals.value,
-    environmentId ?? "",
+    environmentId,
     supplied,
   );
 }
@@ -1417,7 +1434,7 @@ interface PendingReplay {
   journey: BrowserStep[];
   wire: WireStep[];
   map: ExpansionMap;
-  envId: string | undefined;
+  envId: string;
   supplied: Record<string, string>;
 }
 
@@ -1860,6 +1877,14 @@ function onClearResults() {
                         :disabled="locked"
                         @update:url="onConfigureUpdate({ ...check, url: $event })"
                         @update:selected-ids="onConfigureUpdate({ ...check, environments: $event })"
+                      />
+                    </template>
+                    <template #replay-menu="{ disabled }">
+                      <ReplayEnvironmentMenu
+                        :options="replayMenuOptions"
+                        :selected-id="replayEnvironmentId"
+                        :disabled="disabled"
+                        @update:selected-id="replayEnvironmentOverride = $event"
                       />
                     </template>
                   </BrowserJourney>
