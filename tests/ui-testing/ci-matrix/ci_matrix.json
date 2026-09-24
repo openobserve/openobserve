@@ -237,6 +237,7 @@
       "landingPage.spec.js",
       "datetime-picker-copy-paste.spec.js",
       "dateTime.spec.js",
+      "dateTimeCustomRange.spec.js",
       "otableSelectCell.spec.js",
       "shared-components-form-validation.spec.js",
       "ai-toolsets-form-validation.spec.js",
