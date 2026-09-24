@@ -5,12 +5,15 @@ import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
+import config from "@/aws-exports";
 import SettingsIndex from "./index.vue";
 
-// Mock composables and config with factory functions
+// Settable rather than a fixed `false`: meta-org-only sections cannot be covered otherwise.
+const { isMetaOrgRef } = vi.hoisted(() => ({ isMetaOrgRef: { value: false } }));
+
 vi.mock("@/composables/useIsMetaOrg", () => ({
   default: () => ({
-    isMetaOrg: { value: false },
+    isMetaOrg: isMetaOrgRef,
   }),
 }));
 
@@ -390,6 +393,61 @@ describe("SettingsIndex.vue", () => {
       mockRouter.currentRoute.value.name = "alertDestinations";
       wrapper = createWrapper();
       expect(wrapper.vm.isConstrainedSection).toBe(false);
+    });
+  });
+
+  describe("password policy section", () => {
+    const findEntry = (w: any) =>
+      w.vm.sectionGroups
+        .flatMap((group: any) => group.items)
+        .find((item: any) => item.key === "password_policy");
+
+    afterEach(() => {
+      isMetaOrgRef.value = false;
+      config.isEnterprise = "false";
+      mockRouter.currentRoute.value.name = "settings";
+    });
+
+    it("is offered in the meta org of an enterprise build", () => {
+      config.isEnterprise = "true";
+      isMetaOrgRef.value = true;
+      wrapper = createWrapper();
+
+      expect(findEntry(wrapper)?.visible).toBe(true);
+    });
+
+    it("is hidden outside the meta org", () => {
+      config.isEnterprise = "true";
+      isMetaOrgRef.value = false;
+      wrapper = createWrapper();
+
+      expect(findEntry(wrapper)?.visible).toBe(false);
+    });
+
+    it("is hidden in an OSS build even in the meta org", () => {
+      // The API only exists behind the enterprise feature, so the entry would lead nowhere.
+      config.isEnterprise = "false";
+      isMetaOrgRef.value = true;
+      wrapper = createWrapper();
+
+      expect(findEntry(wrapper)?.visible).toBe(false);
+    });
+
+    it("sends an enterprise non-meta org back to General", () => {
+      config.isEnterprise = "true";
+      isMetaOrgRef.value = false;
+      mockRouter.currentRoute.value.name = "passwordPolicy";
+      mockPush.mockClear();
+      wrapper = createWrapper({ zoConfig: { meta_org: "_meta" } });
+
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ path: "/settings/general" }));
+    });
+
+    it("renders in the centered reading column, like the other form sections", () => {
+      mockRouter.currentRoute.value.name = "passwordPolicy";
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.isConstrainedSection).toBe(true);
     });
   });
 

@@ -78,11 +78,30 @@ function attachCdnAssetTracker(page) {
 async function waitForRumSdkReady(page, timeoutMs = 30000) {
   await page.waitForFunction(
     () =>
-      window.OO_RUM &&
-      typeof window.OO_RUM.getInternalContext === 'function' &&
-      window.OO_LOGS &&
-      typeof window.OO_LOGS.logger === 'object',
+      window.O2_RUM &&
+      typeof window.O2_RUM.getInternalContext === 'function' &&
+      window.O2_LOGS &&
+      typeof window.O2_LOGS.logger === 'object',
     { timeout: timeoutMs },
+  );
+}
+
+/**
+ * As waitForRumSdkReady, but reports readiness instead of throwing.
+ *
+ * For the CDN specs only: a bundle that never initialises is a live-CDN
+ * problem, which this suite treats the same way it already treats a missing
+ * recorder chunk — skipped, not failed. The NPM spec bundles the SDK locally,
+ * so it keeps using the throwing variant, where a failure really is ours.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {number} [timeoutMs=30000]
+ * @returns {Promise<boolean>} whether the real SDK objects appeared in time
+ */
+async function isRumSdkReady(page, timeoutMs = 30000) {
+  return waitForRumSdkReady(page, timeoutMs).then(
+    () => true,
+    () => false,
   );
 }
 
@@ -114,4 +133,5 @@ module.exports = {
   attachBeaconCounter,
   attachCdnAssetTracker,
   waitForRumSdkReady,
+  isRumSdkReady,
 };
