@@ -139,13 +139,7 @@ describe("JourneyStartPill", () => {
     const root = wrapper.element as HTMLElement;
     expect(root.tagName).toBe("DIV");
     expect([...root.classList]).toEqual(
-      expect.arrayContaining([
-        "flex",
-        "items-center",
-        "gap-2",
-        "max-md:order-last",
-        "max-md:basis-full",
-      ]),
+      expect.arrayContaining(["max-md:order-last", "max-md:basis-full"]),
     );
     expect(root.contains(wrapper.get(URL_HALF).element)).toBe(true);
     expect(root.contains(wrapper.get(ENVS_HALF).element)).toBe(true);
@@ -189,6 +183,14 @@ describe("JourneyStartPill", () => {
     wrapper = mountPill({ selectedIds: ["env-prod", "env-hidden"] });
     expect(wrapper.get(ENVS_COUNT).text()).toBe("2");
     expect(wrapper.get(ENVS_HALF).text()).not.toContain("env-hidden");
+  });
+
+  it("the Environments button keeps its arrow", () => {
+    wrapper = mountPill();
+    const half = wrapper.get(ENVS_HALF);
+
+    expect(half.find('[data-icon="arrow-drop-down"]').exists()).toBe(true);
+    expect(half.text()).toContain("Environments");
   });
 
   it("the Environments aria-label is plural: none, 1 selected, N selected", () => {

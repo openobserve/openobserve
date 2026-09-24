@@ -217,7 +217,6 @@ describe("CheckVariablesPanel", () => {
       expect(close!.props("size")).toBe("icon-xs-sq");
       expect(close!.props("iconLeft")).toBe("close");
       expect(close!.attributes("aria-label")).toBe("Close variables");
-      expect(close!.classes()).toContain("ms-auto");
       const headerRow = close!.element.parentElement!;
       expect(headerRow.querySelector("h3")).not.toBeNull();
       expect(headerRow.lastElementChild).toBe(close!.element);

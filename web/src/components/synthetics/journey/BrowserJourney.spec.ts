@@ -1227,6 +1227,13 @@ describe("BrowserJourney add menu and step filter", () => {
 
     expect(wrapper.find(ADD_STEP).attributes("size")).toBe("icon-sm-split");
     expect(wrapper.find(ADD_MENU).attributes("size")).toBe("icon-sm-split");
+    expect(wrapper.find('[data-test="synthetics-journey-replay-btn"]').attributes("size")).toBe(
+      "sm",
+    );
+    for (const segment of [ADD_STEP, ADD_MENU]) {
+      const classes = wrapper.find(segment).classes();
+      expect(classes.filter((c) => /^!?(min-)?h-/.test(c))).toEqual([]);
+    }
   });
 
   it("the add menu arrow has a name and a tooltip; the menu offers Step and Subtest; Subtest adds a subtest row", async () => {

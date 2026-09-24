@@ -18,6 +18,7 @@ import { mount, type VueWrapper } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import en from "@/locales/languages/en-US.json";
 import type { ReplayEnvironmentOption } from "@/components/synthetics/variables/replayInputs";
+import OButton from "@/lib/core/Button/OButton.vue";
 import ReplayEnvironmentMenu from "./ReplayEnvironmentMenu.vue";
 
 const i18n = createI18n({
@@ -175,11 +176,13 @@ describe("ReplayEnvironmentMenu", () => {
 
   it("the arrow uses the split-segment size", () => {
     wrapper = mountMenu();
-    const classes = wrapper.get(TRIGGER).classes();
-    expect(classes).toContain("h-[2.125rem]");
-    expect(classes).toContain("w-8");
-    expect(classes).toContain("p-0");
-    expect(classes).not.toContain("ps-3");
+    const trigger = wrapper
+      .findAllComponents(OButton)
+      .find((b) => b.attributes("data-test") === "synthetics-journey-replay-menu-trigger");
+    expect(trigger?.props("size")).toBe("icon-sm-split");
+    expect(
+      trigger!.classes().filter((c) => /^!?(min-)?h-/.test(c) && c !== "h-[2.125rem]"),
+    ).toEqual([]);
   });
 
   it("says the choice is for this session only", () => {
