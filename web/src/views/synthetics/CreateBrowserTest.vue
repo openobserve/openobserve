@@ -22,7 +22,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, isEqual } from "lodash-es";
 import {
   useRouter,
   useRoute,
@@ -112,6 +112,7 @@ import MissingValueDialog from "@/components/synthetics/journey/MissingValueDial
 import JourneyStartPill from "@/components/synthetics/journey/JourneyStartPill.vue";
 import ReplayEnvironmentMenu from "@/components/synthetics/journey/ReplayEnvironmentMenu.vue";
 import ReplaySecretsDialog from "@/components/synthetics/journey/ReplaySecretsDialog.vue";
+import JourneyUsedByPopover from "@/components/synthetics/journey/JourneyUsedByPopover.vue";
 import { useReplaySecrets } from "@/components/synthetics/journey/useReplaySecrets";
 import type { ExtractForm } from "@/components/synthetics/journey/ExtractSubtestDialog.schema";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
@@ -640,6 +641,10 @@ watch(
     const folderId = check.value.folder;
     if (!folderId || folders.value.some((f) => f.folderId === folderId)) return;
     check.value = { ...check.value, folder: "default" };
+    // The unreachable folder could never be saved back, so the fallback is the baseline, not an edit.
+    if (savedCheck.value?.folder === folderId) {
+      savedCheck.value = { ...savedCheck.value, folder: "default" };
+    }
     validationErrors.value = {
       ...validationErrors.value,
       folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
@@ -719,12 +724,30 @@ const showUnsavedDialog = ref(false);
 let pendingLeavePath: string | null = null;
 let forceLeave = false;
 
+// Create mode only: edit mode compares against the saved check instead.
 watch(
   () => check.value.journey.length,
   (len) => {
-    if (len > 0) isDirty.value = true;
+    if (len > 0 && !props.editId) isDirty.value = true;
   },
 );
+
+// `start` and `tz_offset` are read off the clock when a payload is built, so two builds always differ there.
+function payloadChanged(current: Record<string, unknown>, saved: Record<string, unknown>) {
+  const { start: _start, tz_offset: _tz, ...rest } = current;
+  const { start: _savedStart, tz_offset: _savedTz, ...savedRest } = saved;
+  return !isEqual(rest, savedRest);
+}
+
+/** Edit mode compares against the saved check, so a load is clean and an undone edit clears. */
+const hasUnsavedChanges = computed(() => {
+  if (!props.editId) return isDirty.value;
+  if (!savedCheck.value) return false;
+  return payloadChanged(
+    apiPayload.value,
+    buildCreateBrowserTestPayload(cloneDeep(savedCheck.value)),
+  );
+});
 
 function onConfigureUpdate(val: BrowserCheck) {
   check.value = val;
@@ -770,7 +793,7 @@ const guardUnsavedChanges: NavigationGuard = (to, from, next) => {
     next();
     return;
   }
-  if (!isDirty.value) {
+  if (!hasUnsavedChanges.value) {
     next();
     return;
   }
@@ -786,7 +809,7 @@ onBeforeRouteUpdate((to, from, next) =>
 );
 
 function beforeUnloadHandler(e: BeforeUnloadEvent) {
-  if (!isDirty.value) return;
+  if (!hasUnsavedChanges.value) return;
   // Sync stop the extension before the page goes away
   stopActiveExtension();
   e.preventDefault();
@@ -1032,8 +1055,10 @@ const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
 
 /** Load-time lookup only; the save-time `checkUsageThenSave` asks again on its own. */
 const referencedByState = ref<ReferencedByState>("none");
-/** The passive indicator's number; the tri-state above cannot carry it. */
+/** The header's number; the tri-state above cannot carry it. */
 const referencedByCount = ref(0);
+const referencedByList = ref<{ id: string; name: string; folder_id: string }[]>([]);
+const referencedByHidden = ref(0);
 const showExtractDialog = ref(false);
 
 async function loadReferencedBy(id: string) {
@@ -1041,12 +1066,16 @@ async function loadReferencedBy(id: string) {
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.referencedBy(org, id);
-    const count = (res.data?.references?.length ?? 0) + (res.data?.hidden_reference_count ?? 0);
+    referencedByList.value = res.data?.references ?? [];
+    referencedByHidden.value = res.data?.hidden_reference_count ?? 0;
+    const count = referencedByList.value.length + referencedByHidden.value;
     referencedByCount.value = count;
     referencedByState.value = count > 0 ? "some" : "none";
   } catch (err) {
     console.error("[synthetics] referencedBy lookup failed", err);
     referencedByCount.value = 0;
+    referencedByList.value = [];
+    referencedByHidden.value = 0;
     referencedByState.value = "unknown";
   }
 }
@@ -1758,6 +1787,14 @@ function onClearResults() {
         <BetaBadge />
       </span>
     </template>
+    <template v-if="referencedByCount > 0" #actions>
+      <JourneyUsedByPopover
+        :references="referencedByList"
+        :hidden="referencedByHidden"
+        :folders="folders"
+        :org-identifier="orgIdentifier"
+      />
+    </template>
     <!-- ── Gate phase: URL + name ── -->
     <main v-if="phase === 'gate'" class="flex flex-1 flex-col items-center justify-center">
       <div class="mx-auto w-full max-w-[48rem] px-4 py-4">
@@ -2128,11 +2165,12 @@ function onClearResults() {
               </template>
             </template>
             <span
-              v-if="referencedByCount > 0"
-              class="text-text-secondary text-xs"
-              data-test="synthetics-used-by-indicator"
+              v-if="hasUnsavedChanges"
+              class="text-text-secondary flex items-center gap-2 text-sm"
+              data-test="synthetics-journey-unsaved-indicator"
             >
-              {{ t("synthetics.save.usedByCount", { count: referencedByCount }) }}
+              <span class="bg-accent size-2 shrink-0 rounded-full" aria-hidden="true" />
+              {{ t("common.unsavedChanges") }}
             </span>
             <span class="flex-1" aria-hidden="true" />
 
@@ -2178,6 +2216,14 @@ function onClearResults() {
 
           <!-- Configure step: Cancel | Back + Save -->
           <template v-else-if="currentStep === 2">
+            <span
+              v-if="hasUnsavedChanges"
+              class="text-text-secondary flex items-center gap-2 text-sm"
+              data-test="synthetics-journey-unsaved-indicator"
+            >
+              <span class="bg-accent size-2 shrink-0 rounded-full" aria-hidden="true" />
+              {{ t("common.unsavedChanges") }}
+            </span>
             <span class="flex-1" aria-hidden="true" />
             <OButton
               variant="ghost"

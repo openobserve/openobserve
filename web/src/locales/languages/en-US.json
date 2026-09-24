@@ -14336,6 +14336,11 @@
         "stepHint": "A single action",
         "subtest": "Subtest",
         "subtestHint": "Reuse a shared flow"
+      },
+      "usedBy": {
+        "aria": "Tests that use this one",
+        "help": "They run these steps on their own page. This test's Starting URL, environments and secrets are not used there.",
+        "viewAll": "View all {count} tests"
       }
     },
     "labels": {
