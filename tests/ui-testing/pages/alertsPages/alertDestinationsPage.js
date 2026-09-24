@@ -471,6 +471,50 @@ export class AlertDestinationsPage {
         await this.page.locator(this.addDestinationButton).waitFor({ state: 'visible', timeout: 30000 });
     }
 
+    /**
+     * Deep-link straight to the destinations list with a given `page` query param,
+     * exercising AlertsDestinationList's URL-restored `currentPage` on a cold mount.
+     * @param {number} page
+     */
+    async gotoDestinationsWithPageParam(page) {
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const orgIdentifier = process.env.ORGNAME || 'default';
+        await this.page.goto(
+            `${baseUrl}/web/alert-destinations?org_identifier=${orgIdentifier}&page=${page}`,
+            { waitUntil: 'domcontentloaded' }
+        );
+        await this.waitForDestinationListReady();
+    }
+
+    // ==================== LIST PAGINATION (OTable pagination bar) ====================
+
+    async clickNextPage() {
+        const nextPageBtn = this.page.locator('[data-test="o2-table-next-page-btn"]');
+        await nextPageBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await nextPageBtn.click();
+    }
+
+    async getPaginationInfoText() {
+        const text = await this.page.locator('[data-test="o2-table-pagination-info"]').textContent().catch(() => null);
+        return (text || '').replace(/\s+/g, ' ').trim();
+    }
+
+    async expectPaginationInfoToMatch(pattern) {
+        await expect
+            .poll(async () => await this.getPaginationInfoText(), { timeout: 20000 })
+            .toMatch(pattern);
+    }
+
+    async expectUrlHasPageParam(pageValue) {
+        await expect.poll(() => this.page.url(), { timeout: 15000 }).toContain(`page=${pageValue}`);
+    }
+
+    async expectAtLeastOneListRow() {
+        await expect(
+            this.page.locator('[data-test^="o2-table-row-"]').first(),
+        ).toBeVisible({ timeout: 20000 });
+    }
+
     /** @param {string} destinationName @param {string} url @param {string} templateName */
     async createDestination(destinationName, url, templateName) {
         await this.navigateToDestinations();
