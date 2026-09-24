@@ -14221,7 +14221,6 @@
         "variablesCopied": "Yeni teste kopyalandı: {names}.",
         "variablesToDefine": "Tek başına çalıştırmadan önce yeni testte tanımlayın: {names}."
       },
-      "startRowLabel": "Açar",
       "subtest": {
         "capChild": "\"{name}\" testinden {count}",
         "capOwn": "{count} kendi adımı",

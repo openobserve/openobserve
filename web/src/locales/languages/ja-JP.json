@@ -14221,7 +14221,6 @@
         "variablesCopied": "新しいテストにコピーされました: {names}。",
         "variablesToDefine": "単独で実行する前に新しいテストで定義してください: {names}。"
       },
-      "startRowLabel": "開く",
       "subtest": {
         "capChild": "「{name}」から {count}",
         "capOwn": "自身の {count}",

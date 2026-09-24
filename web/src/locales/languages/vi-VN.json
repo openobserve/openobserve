@@ -14221,7 +14221,6 @@
         "variablesCopied": "Đã sao chép sang bài test mới: {names}.",
         "variablesToDefine": "Cần định nghĩa trên bài test mới trước khi chạy riêng: {names}."
       },
-      "startRowLabel": "Mở",
       "subtest": {
         "capChild": "{count} từ \"{name}\"",
         "capOwn": "{count} của riêng nó",

@@ -14221,7 +14221,6 @@
         "variablesCopied": "نُسخت إلى الاختبار الجديد: {names}.",
         "variablesToDefine": "يجب تعريفها في الاختبار الجديد قبل تشغيله بمفرده: {names}."
       },
-      "startRowLabel": "يفتح",
       "subtest": {
         "capChild": "{count} من \"{name}\"",
         "capOwn": "{count} خاصة به",

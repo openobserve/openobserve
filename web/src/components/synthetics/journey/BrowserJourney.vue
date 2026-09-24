@@ -737,6 +737,7 @@ defineExpose({
   // issues cannot use this channel — see the `fieldIssues` prop.
   validateStepSelectors: validateJourneySteps,
   revealCapNotice,
+  focusVariablesToggle,
   replayUpTo,
   requestReplay,
 });
@@ -1332,6 +1333,12 @@ function revealCapNotice() {
     ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
+function focusVariablesToggle() {
+  journeyRootRef.value
+    ?.querySelector<HTMLElement>('[data-test="synthetics-journey-toggle-variables-btn"]')
+    ?.focus();
+}
+
 // ── Step CRUD — find by id and mutate ──────────────────────────────────────
 function findIndex(row: BrowserStep): number {
   return props.modelValue.findIndex((s) => s.id === row.id);
@@ -1569,7 +1576,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           <OButtonGroup radius="sm" class="max-md:hidden">
             <OButton
               variant="outline"
-              size="sm"
+              size="icon-sm-split"
               icon-left="add"
               :disabled="addDisabled"
               :aria-label="t('synthetics.journey.addMenu.addStep')"
@@ -1582,7 +1589,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
               <template #trigger>
                 <OButton
                   variant="outline"
-                  size="sm"
+                  size="icon-sm-split"
                   icon-left="arrow-drop-down"
                   :disabled="addDisabled"
                   :aria-label="t('synthetics.journey.addMenu.menuAria')"
@@ -1741,15 +1748,14 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           <!-- Variables panel toggle — only when the host provides that panel -->
           <OButton
             v-if="variablesPanelOpen !== undefined"
-            variant="panel-collapse"
-            size="icon-toolbar"
-            :active="variablesPanelOpen"
+            :variant="variablesPanelOpen ? 'outline-primary' : 'outline'"
+            size="sm"
+            icon-left="data-object"
             :aria-label="variablesToggleLabel"
             :aria-pressed="variablesPanelOpen"
             data-test="synthetics-journey-toggle-variables-btn"
             @click="emit('toggle-variables-panel')"
           >
-            <OIcon name="data-object" size="sm" />
             <OTooltip :content="variablesToggleLabel" side="bottom" />
           </OButton>
         </div>

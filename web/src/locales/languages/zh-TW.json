@@ -14216,7 +14216,6 @@
         "variablesCopied": "已複製到新測試：{names}。",
         "variablesToDefine": "在單獨執行之前，請在新測試中定義：{names}。"
       },
-      "startRowLabel": "開啟",
       "subtest": {
         "capChild": "來自「{name}」的 {count} 個",
         "capOwn": "自身 {count} 個",

@@ -47,7 +47,11 @@ const props = defineProps<{
   /** Referenced checks' steps by id; absent means none loaded, so a subtest counts no usage yet. */
   childJourneys?: Map<string, { steps: BrowserStep[] }>;
 }>();
-const emit = defineEmits<{ "update:check": [value: BrowserCheck]; promoted: [name: string] }>();
+const emit = defineEmits<{
+  "update:check": [value: BrowserCheck];
+  promoted: [name: string];
+  close: [];
+}>();
 
 const { t } = useI18nTyped();
 
@@ -358,6 +362,17 @@ function onPromoted(name: string) {
             data-test="synthetics-check-variables-panel-hint-icon"
           />
         </OTooltip>
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          icon-left="close"
+          class="ms-auto"
+          :aria-label="t('synthetics.variablesPanel.closePanel')"
+          data-test="synthetics-check-variables-panel-close-btn"
+          @click="emit('close')"
+        >
+          <OTooltip :content="t('synthetics.variablesPanel.closePanel')" side="bottom" />
+        </OButton>
       </div>
     </div>
 

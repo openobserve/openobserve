@@ -20,7 +20,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 import { MAX_CHECK_ENVIRONMENTS } from "@/constants/synthetics";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -54,7 +54,6 @@ const { t } = useI18nTyped();
 
 const urlOpen = ref(false);
 const envsOpen = ref(false);
-const draftIds = ref<string[]>([]);
 
 const named = computed(() => namedEnvironments(props.environments));
 
@@ -83,33 +82,9 @@ const opensIn = computed(() => {
   });
 });
 
-const lockedIds = computed(() => lockedEnvironmentIds(draftIds.value, named.value));
-const atCap = computed(() => atEnvironmentCap(draftIds.value));
-
-function envName(id: string) {
-  return raw(named.value.find((env) => env.id === id)?.name ?? id);
-}
-
-const envSummary = computed(() => {
-  const ids = props.selectedIds;
-  if (ids.length === 0) {
-    return {
-      label: t("synthetics.journey.startPill.inGlobalOnly"),
-      aria: t("synthetics.journey.startPill.summaryGlobalOnly"),
-    };
-  }
-  if (ids.length === 1) {
-    const name = envName(ids[0]);
-    return {
-      label: t("synthetics.journey.startPill.inOne", { name }),
-      aria: t("synthetics.journey.startPill.summaryOne", { name }),
-    };
-  }
-  return {
-    label: t("synthetics.journey.startPill.inCount", { count: ids.length }, ids.length),
-    aria: t("synthetics.journey.startPill.summaryCount", { count: ids.length }, ids.length),
-  };
-});
+const lockedIds = computed(() => lockedEnvironmentIds(props.selectedIds, named.value));
+const atCap = computed(() => atEnvironmentCap(props.selectedIds));
+const selectedCount = computed(() => props.selectedIds.length);
 
 const form = useOForm<StartUrlForm>({
   defaultValues: { url: props.url },
@@ -124,18 +99,13 @@ watch(urlOpen, (open) => {
   if (open) form.reset({ url: props.url });
 });
 
-watch(envsOpen, (open) => {
-  if (open) draftIds.value = [...props.selectedIds];
-});
-
-function applyEnvironments() {
-  emit("update:selected-ids", [...draftIds.value]);
-  envsOpen.value = false;
+function onToggleEnvironment(id: string) {
+  emit("update:selected-ids", toggleEnvironment(props.selectedIds, id));
 }
 </script>
 
 <template>
-  <OButtonGroup radius="sm">
+  <div class="flex items-center gap-2">
     <OPopover
       v-model:open="urlOpen"
       :aria-label="t('synthetics.journey.startPill.urlTitle')"
@@ -150,10 +120,8 @@ function applyEnvironments() {
           data-test="synthetics-journey-start-pill-url"
         >
           <OIcon name="language" size="sm" aria-hidden="true" />
-          <span>{{ t("synthetics.journey.startRowLabel") }}</span>
-          <span v-if="url" class="max-w-72 truncate font-mono">{{ url }}</span>
+          <span v-if="url" class="max-w-72 truncate">{{ url }}</span>
           <span v-else>{{ t("synthetics.journey.startPill.noUrl") }}</span>
-          <OIcon name="edit" size="sm" aria-hidden="true" />
           <OTooltip :content="t('synthetics.journey.startPill.editUrl')" side="bottom" />
         </OButton>
       </template>
@@ -212,10 +180,18 @@ function applyEnvironments() {
           variant="outline"
           size="sm"
           :disabled="disabled"
-          :aria-label="t('synthetics.journey.startPill.envAria', { summary: envSummary.aria })"
+          :aria-label="
+            t('synthetics.journey.startPill.envAria', { count: selectedCount }, selectedCount)
+          "
           data-test="synthetics-journey-start-pill-envs"
         >
-          <span>{{ envSummary.label }}</span>
+          <span>{{ t("synthetics.journey.startPill.envLabel") }}</span>
+          <OBadge
+            variant="default"
+            size="sm"
+            data-test="synthetics-journey-start-pill-envs-count"
+            >{{ selectedCount }}</OBadge
+          >
           <OIcon name="arrow-drop-down" size="sm" aria-hidden="true" />
           <OTooltip :content="t('synthetics.journey.startPill.editEnvironments')" side="bottom" />
         </OButton>
@@ -232,11 +208,11 @@ function applyEnvironments() {
         <div class="flex flex-col gap-2">
           <div v-for="env in named" :key="env.id" class="flex min-w-0 items-center gap-2">
             <OCheckbox
-              :model-value="draftIds.includes(env.id)"
+              :model-value="selectedIds.includes(env.id)"
               :label="raw(env.name)"
-              :disabled="atCap && !draftIds.includes(env.id)"
+              :disabled="atCap && !selectedIds.includes(env.id)"
               :data-test="`synthetics-journey-start-pill-env-${env.name}`"
-              @update:model-value="draftIds = toggleEnvironment(draftIds, env.id)"
+              @update:model-value="onToggleEnvironment(env.id)"
             />
             <span class="text-text-secondary truncate font-mono text-xs">
               {{ namedUrls.get(env.id) }}
@@ -259,32 +235,14 @@ function applyEnvironments() {
           <span>
             {{
               t("synthetics.journey.startPill.capLine", {
-                count: draftIds.length,
+                count: selectedCount,
                 cap: MAX_CHECK_ENVIRONMENTS,
               })
             }}
           </span>
           <span>{{ t("synthetics.journey.startPill.replayNote") }}</span>
         </div>
-        <div class="flex justify-end gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="synthetics-journey-start-pill-envs-cancel"
-            @click="envsOpen = false"
-          >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            data-test="synthetics-journey-start-pill-envs-apply"
-            @click="applyEnvironments"
-          >
-            {{ t("common.apply") }}
-          </OButton>
-        </div>
       </div>
     </OPopover>
-  </OButtonGroup>
+  </div>
 </template>

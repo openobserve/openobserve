@@ -14221,7 +14221,6 @@
         "variablesCopied": "새 테스트로 복사됨: {names}.",
         "variablesToDefine": "단독으로 실행하기 전에 새 테스트에서 정의하세요: {names}."
       },
-      "startRowLabel": "열기",
       "subtest": {
         "capChild": "\"{name}\"에서 {count}개",
         "capOwn": "자체 {count}개",

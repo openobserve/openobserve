@@ -14221,7 +14221,6 @@
         "variablesCopied": "Skopiowane do nowego testu: {names}.",
         "variablesToDefine": "Do zdefiniowania w nowym teście przed samodzielnym uruchomieniem: {names}."
       },
-      "startRowLabel": "Otwiera",
       "subtest": {
         "capChild": "{count} z \"{name}\"",
         "capOwn": "{count} własnych",

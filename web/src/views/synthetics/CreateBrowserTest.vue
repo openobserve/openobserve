@@ -158,6 +158,11 @@ const journeySplitterLimits = computed<[number, number]>(() =>
   variablesPanelOpen.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
 );
 
+function closeVariablesPanel() {
+  variablesPanelOpen.value = false;
+  nextTick(() => journeyRef.value?.focusVariablesToggle());
+}
+
 const variablesHintParams = computed(() => ({
   variables: "{{variables}}",
   baseUrl: "{{BASE_URL}}",
@@ -2098,6 +2103,7 @@ function onClearResults() {
                   class="border-border-default border-t"
                   @update:check="onConfigureUpdate"
                   @promoted="onVariablePromoted"
+                  @close="closeVariablesPanel"
                 />
               </template>
             </OSplitter>
