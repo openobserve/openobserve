@@ -379,6 +379,24 @@ impl<F: RangeFunc + ?Sized> Iterator for SeriesRange<'_, F> {
     }
 }
 
+/// A function's scalar argument; in a range query it can take a different value on each step.
+pub(crate) enum ScalarArg {
+    Value(f64),
+    /// One sample per evaluation step, as a range-query scalar holds them.
+    Steps(Vec<Sample>),
+}
+
+impl ScalarArg {
+    fn at(&self, timestamp: i64) -> f64 {
+        match self {
+            Self::Value(value) => *value,
+            Self::Steps(samples) => samples
+                .binary_search_by_key(&timestamp, |sample| sample.timestamp)
+                .map_or(f64::NAN, |step| samples[step].value),
+        }
+    }
+}
+
 /// The fused evaluators' view of the same table: a name that resolves to a range function.
 pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
     name.parse::<Func>().ok()?.range_func()

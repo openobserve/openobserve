@@ -19,6 +19,8 @@ use datafusion::error::{DataFusionError, Result};
 pub(crate) fn vector(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let value = match data {
         Value::Float(f) => f,
+        // a range-query scalar already is one label-less series with a sample per step
+        Value::Matrix(_) if !eval_ctx.is_instant() => return Ok(data),
         _ => {
             return Err(DataFusionError::Plan(
                 "Unexpected input. Expected: \"vector(s scalar)\"".into(),
@@ -78,6 +80,19 @@ mod tests {
         };
         assert_eq!(ranges[0].samples.len(), 3);
         assert!(ranges[0].samples.iter().all(|s| s.value == 3.0));
+    }
+
+    #[test]
+    fn test_vector_passes_range_scalar_through() {
+        let steps = Value::Matrix(vec![RangeValue::new(
+            Labels::default(),
+            [Sample::new(1_000_000, 1.0), Sample::new(2_000_000, 2.0)],
+        )]);
+        let Value::Matrix(ranges) = vector(steps, &range_ctx()).unwrap() else {
+            panic!("expected Matrix");
+        };
+        let values: Vec<f64> = ranges[0].samples.iter().map(|s| s.value).collect();
+        assert_eq!(values, vec![1.0, 2.0]);
     }
 
     #[test]

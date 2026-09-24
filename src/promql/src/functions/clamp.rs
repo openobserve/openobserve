@@ -16,10 +16,31 @@
 use config::meta::promql::value::Value;
 use datafusion::error::Result;
 
+use super::ScalarArg;
+
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
-pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
-    // Apply clamp to all samples in this range
-    super::map_samples(data, "clamp", |sample| sample.value.clamp(min, max))
+pub(crate) fn clamp(data: Value, min: &ScalarArg, max: &ScalarArg) -> Result<Value> {
+    let clamped = super::map_samples(data, "clamp", |sample| {
+        let (min, max) = (min.at(sample.timestamp), max.at(sample.timestamp));
+        // Prometheus' math.Min/Max propagate NaN, where f64::clamp would panic on a NaN bound
+        if sample.value.is_nan() || min.is_nan() || max.is_nan() {
+            f64::NAN
+        } else {
+            sample.value.min(max).max(min)
+        }
+    })?;
+    let Value::Matrix(mut matrix) = clamped else {
+        return Ok(clamped);
+    };
+    // Prometheus returns nothing at a step whose max is below its min, and a NaN bound is not below
+    for series in &mut matrix {
+        series.samples.retain(|sample| {
+            let (min, max) = (min.at(sample.timestamp), max.at(sample.timestamp));
+            min.is_nan() || max.is_nan() || max >= min
+        });
+    }
+    matrix.retain(|series| !series.samples.is_empty());
+    Ok(Value::Matrix(matrix))
 }
 
 #[cfg(test)]
@@ -49,13 +70,17 @@ mod tests {
 
     #[test]
     fn test_clamp_value_none_input() {
-        let result = clamp(Value::None, 0.0, 10.0).unwrap();
+        let result = clamp(Value::None, &ScalarArg::Value(0.0), &ScalarArg::Value(10.0)).unwrap();
         assert!(matches!(result, Value::None));
     }
 
     #[test]
     fn test_clamp_invalid_input_returns_err() {
-        let result = clamp(Value::Float(5.0), 0.0, 10.0);
+        let result = clamp(
+            Value::Float(5.0),
+            &ScalarArg::Value(0.0),
+            &ScalarArg::Value(10.0),
+        );
         assert!(result.is_err());
     }
 
@@ -63,7 +88,7 @@ mod tests {
     fn test_clamp_function() {
         let eval_ts = 1000;
         let matrix = create_matrix(eval_ts, vec![5.0, 15.0, 25.0]);
-        let result = clamp(matrix, 10.0, 20.0).unwrap();
+        let result = clamp(matrix, &ScalarArg::Value(10.0), &ScalarArg::Value(20.0)).unwrap();
 
         match result {
             Value::Matrix(m) => {

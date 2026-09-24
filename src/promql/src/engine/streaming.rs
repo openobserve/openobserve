@@ -1068,8 +1068,8 @@ mod tests {
             ("topk(2, m @ 1100) * 2", 30.0),
             ("max_over_time((m @ 1100)[1m:20s])", 15.0),
             // a step-dependent parameter keeps the aggregation on the steps, not its pinned child
-            ("topk(time(), sum_over_time(m[1m] @ 1100))", 36.0),
-            ("topk(time(), m @ 1100)", 15.0),
+            ("topk(scalar(count(m)), sum_over_time(m[1m] @ 1100))", 36.0),
+            ("topk(scalar(count(m)), m @ 1100)", 15.0),
             // pins to different instants are still step invariant together
             ("m @ 1160 - m @ 1100", 9.0),
             // two pins hoisted apart: the second is still checked after the first was evaluated

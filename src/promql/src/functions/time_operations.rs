@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
-use config::{meta::promql::value::Value, utils::time::parse_i64_to_timestamp_micros};
+use config::{
+    meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value},
+    utils::time::parse_i64_to_timestamp_micros,
+};
 use datafusion::error::Result;
 
 pub(crate) fn minute(data: Value) -> Result<Value> {
@@ -68,6 +71,21 @@ pub(crate) fn timestamp(data: Value) -> Result<Value> {
     })
 }
 
+/// https://prometheus.io/docs/prometheus/latest/querying/functions/#time
+pub(crate) fn time(eval_ctx: &EvalContext) -> Value {
+    // Prometheus evaluates on millisecond timestamps
+    let seconds = |micros: i64| (micros / 1_000) as f64 / 1_000.0;
+    // exec and the binary operators only treat a Float as a scalar
+    if eval_ctx.is_instant() {
+        return Value::Float(seconds(eval_ctx.start));
+    }
+    let samples = eval_ctx
+        .timestamps()
+        .into_iter()
+        .map(|ts| Sample::new(ts, seconds(ts)));
+    Value::Matrix(vec![RangeValue::new(Labels::default(), samples)])
+}
+
 /// Given a timestamp, get the component from it
 /// for e.g. month(), year(), day() etc.
 fn exec(data: Value, op: impl Fn(&DateTime<Utc>) -> u32 + Sync) -> Result<Value> {
@@ -95,6 +113,44 @@ mod tests {
         assert!(matches!(day_of_year(Value::None).unwrap(), Value::None));
         assert!(matches!(days_in_month(Value::None).unwrap(), Value::None));
         assert!(matches!(timestamp(Value::None).unwrap(), Value::None));
+    }
+
+    #[test]
+    fn test_time_instant_is_a_millisecond_scalar() {
+        let eval_ctx = EvalContext::new(
+            1_640_995_200_123_456,
+            1_640_995_200_123_456,
+            60_000_000,
+            "t".into(),
+        );
+        let Value::Float(value) = time(&eval_ctx) else {
+            panic!("expected scalar");
+        };
+        assert_eq!(value, 1_640_995_200.123);
+    }
+
+    #[test]
+    fn test_time_range_follows_each_step() {
+        let start = 1_640_995_200_500_000;
+        let eval_ctx = EvalContext::new(start, start + 120_000_000, 60_000_000, "t".into());
+        let Value::Matrix(series) = time(&eval_ctx) else {
+            panic!("expected matrix");
+        };
+        assert_eq!(series.len(), 1);
+        assert!(series[0].labels.is_empty());
+        let samples: Vec<(i64, f64)> = series[0]
+            .samples
+            .iter()
+            .map(|sample| (sample.timestamp, sample.value))
+            .collect();
+        assert_eq!(
+            samples,
+            vec![
+                (start, 1_640_995_200.5),
+                (start + 60_000_000, 1_640_995_260.5),
+                (start + 120_000_000, 1_640_995_320.5),
+            ]
+        );
     }
 
     #[test]

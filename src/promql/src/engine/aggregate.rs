@@ -24,7 +24,7 @@ use promql_parser::parser::{
     Call, Expr as PromExpr, LabelModifier, MatrixSelector, VectorSelector, token,
 };
 
-use super::Engine;
+use super::{Engine, uniform_scalar};
 use crate::{
     aggregations::{self, AggOp},
     ast::at_modifier::{Pin, pin},
@@ -52,7 +52,7 @@ impl Engine {
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
         let param = match param {
-            Some(param) => Some(self.exec_expr(param).await?),
+            Some(param) => Some(uniform_scalar(self.exec_expr(param).await?)),
             None => None,
         };
         let eval_ctx = self.eval_ctx.clone();

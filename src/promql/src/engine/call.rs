@@ -24,10 +24,10 @@ use promql_parser::parser::{
     Expr as PromExpr, Function, FunctionArgs, MatrixSelector, value::ValueType,
 };
 
-use super::Engine;
+use super::{Engine, uniform_scalar};
 use crate::{
     ast::at_modifier::{Pin, pin},
-    functions::{self, Func, RangeFunc, SingleArgFunc},
+    functions::{self, Func, RangeFunc, ScalarArg, SingleArgFunc},
 };
 
 impl Engine {
@@ -40,10 +40,9 @@ impl Engine {
             DataFusionError::NotImplemented(format!("Unsupported function: {}", func.name))
         })?;
 
-        // TODO: check this implementation
         if func_name == Func::Time {
             self.ensure_args_len(args, 0, "Invalid args passed to the function")?;
-            return Ok(Value::Float((self.eval_ctx.start / 1_000_000) as f64));
+            return Ok(functions::time(&self.eval_ctx));
         }
 
         let start = std::time::Instant::now();
@@ -85,13 +84,10 @@ impl Engine {
                 let err = "Invalid args, expected clamp(v instant-vector, min scalar, max scalar)";
                 self.ensure_args_len(args, 3, err)?;
                 let input = self.call_expr_arg(args, 0).await?;
-                let min_f = self.call_scalar_arg(args, 1, err).await?;
-                let max_f = self.call_scalar_arg(args, 2, err).await?;
+                let min = self.call_step_scalar_arg(args, 1, err).await?;
+                let max = self.call_step_scalar_arg(args, 2, err).await?;
 
-                if min_f > max_f {
-                    return Ok(Value::Matrix(vec![]));
-                }
-                functions::clamp(input, min_f, max_f)
+                functions::clamp(input, &min, &max)
             }
             Func::ClampMax | Func::ClampMin => {
                 let is_max = func_name == Func::ClampMax;
@@ -102,14 +98,14 @@ impl Engine {
                 };
                 self.ensure_args_len(args, 2, err)?;
                 let input = self.call_expr_arg(args, 0).await?;
-                let bound = self.call_scalar_arg(args, 1, err).await?;
+                let bound = self.call_step_scalar_arg(args, 1, err).await?;
                 let (min, max) = if is_max {
-                    (f64::MIN, bound)
+                    (ScalarArg::Value(f64::NEG_INFINITY), bound)
                 } else {
-                    (bound, f64::MAX)
+                    (bound, ScalarArg::Value(f64::INFINITY))
                 };
 
-                functions::clamp(input, min, max)
+                functions::clamp(input, &min, &max)
             }
             Func::HistogramQuantile => {
                 let err = "Invalid args, expected histogram_quantile(phi scalar, b instant-vector)";
@@ -193,12 +189,12 @@ impl Engine {
                 let err = "Invalid args, expected round(v instant-vector, to_nearest=1 scalar)";
                 let input = self.call_expr_arg(args, 0).await?;
                 let to_nearest = match args.len() {
-                    1 => 1.0,
-                    2 => self.call_scalar_arg(args, 1, err).await?,
+                    1 => ScalarArg::Value(1.0),
+                    2 => self.call_step_scalar_arg(args, 1, err).await?,
                     _ => return Err(DataFusionError::NotImplemented(err.into())),
                 };
 
-                functions::round(input, to_nearest)
+                functions::round(input, &to_nearest)
             }
             Func::Sort | Func::SortDesc => {
                 let err = "Invalid args, expected sort(v instant-vector)";
@@ -289,8 +285,27 @@ impl Engine {
         index: usize,
         err: &str,
     ) -> Result<f64> {
-        match self.call_expr_arg(args, index).await? {
+        match uniform_scalar(self.call_expr_arg(args, index).await?) {
             Value::Float(value) => Ok(value),
+            Value::Matrix(_) => Err(DataFusionError::NotImplemented(format!(
+                "{err}: a scalar that changes between steps is not supported here"
+            ))),
+            _ => Err(DataFusionError::NotImplemented(err.into())),
+        }
+    }
+
+    async fn call_step_scalar_arg(
+        &mut self,
+        args: &FunctionArgs,
+        index: usize,
+        err: &str,
+    ) -> Result<ScalarArg> {
+        match self.call_expr_arg(args, index).await? {
+            Value::Float(value) => Ok(ScalarArg::Value(value)),
+            // a range-query scalar is one label-less series with a sample per step
+            Value::Matrix(mut series) if series.len() == 1 => {
+                Ok(ScalarArg::Steps(series.swap_remove(0).samples))
+            }
             _ => Err(DataFusionError::NotImplemented(err.into())),
         }
     }

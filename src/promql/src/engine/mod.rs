@@ -257,6 +257,24 @@ fn scalar_operand(value: Value, expr: &PromExpr, eval_ctx: &EvalContext) -> Valu
     }
 }
 
+/// A range-query scalar with one value on every step, folded for a parameter that takes one value.
+fn uniform_scalar(value: Value) -> Value {
+    match value {
+        Value::Matrix(series)
+            if series.len() == 1
+                && series[0].samples.first().is_some_and(|first| {
+                    series[0]
+                        .samples
+                        .iter()
+                        .all(|sample| sample.value.to_bits() == first.value.to_bits())
+                }) =>
+        {
+            Value::Float(series[0].samples[0].value)
+        }
+        other => other,
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use std::{sync::Arc, time::Duration};
@@ -812,6 +830,104 @@ pub(crate) mod tests {
             let values: Vec<f64> = series[0].samples.iter().map(|s| s.value).collect();
             assert_eq!(values, vec![expected; 3], "{query}");
         }
+    }
+
+    #[tokio::test]
+    async fn test_time_follows_each_range_step() {
+        let labelled = r#"label_replace(vector(1), "job", "x", "", "")"#;
+        for query in [
+            "time()".to_string(),
+            "vector(time())".to_string(),
+            "-(-time())".to_string(),
+            "time() + vector(0)".to_string(),
+            "scalar(vector(0)) + time()".to_string(),
+            format!("{labelled} * time()"),
+            "clamp_max(vector(1e10), time())".to_string(),
+            "clamp_min(vector(0), time())".to_string(),
+            "round(time() + vector(0.4))".to_string(),
+        ] {
+            let series = matrix(eval_on_empty(&query, 3).await.unwrap());
+            assert_eq!(series.len(), 1, "{query}");
+            let samples: Vec<(i64, f64)> = series[0]
+                .samples
+                .iter()
+                .map(|s| (s.timestamp, s.value))
+                .collect();
+            assert_eq!(
+                samples,
+                vec![
+                    (1640995200000000, 1640995200.0),
+                    (1640995260000000, 1640995260.0),
+                    (1640995320000000, 1640995320.0),
+                ],
+                "{query}"
+            );
+        }
+        let series = matrix(
+            eval_on_empty("time() - timestamp(vector(1))", 3)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(series[0].samples.len(), 3);
+        assert!(series[0].samples.iter().all(|s| s.value == 0.0));
+    }
+
+    #[tokio::test]
+    async fn test_step_scalar_function_arguments() {
+        // max is -60, 0 and 60 on the three steps; Prometheus drops the step where it is below min
+        let series = matrix(
+            eval_on_empty("clamp(vector(5), 0, time() - 1640995260)", 3)
+                .await
+                .unwrap(),
+        );
+        let samples: Vec<(i64, f64)> = series[0]
+            .samples
+            .iter()
+            .map(|s| (s.timestamp, s.value))
+            .collect();
+        assert_eq!(
+            samples,
+            vec![(1640995260000000, 0.0), (1640995320000000, 5.0)]
+        );
+
+        let series = matrix(
+            eval_on_empty("round(vector(7), time() - 1640995195)", 3)
+                .await
+                .unwrap(),
+        );
+        let values: Vec<f64> = series[0].samples.iter().map(|s| s.value).collect();
+        assert_eq!(values, vec![5.0, 0.0, 0.0]);
+    }
+
+    #[tokio::test]
+    async fn test_single_valued_parameters_take_a_step_invariant_scalar() {
+        let series = matrix(
+            eval_on_empty("topk(scalar(vector(1)), vector(1))", 3)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(series[0].samples.len(), 3);
+        for query in [
+            "topk(time(), vector(1))",
+            "quantile(time(), vector(1))",
+            "quantile_over_time(time(), vector(1)[1m:1m])",
+        ] {
+            assert!(eval_on_empty(query, 3).await.is_err(), "{query}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_time_folds_to_scalar_in_instant_query() {
+        for (query, expected) in [("time()", 1640995200.0), ("time() - 60", 1640995140.0)] {
+            match eval_on_empty(query, 1).await.unwrap() {
+                Value::Float(value) => assert_eq!(value, expected, "{query}"),
+                other => panic!("expected a scalar for {query}, got {:?}", other.get_type()),
+            }
+        }
+        let value = eval_on_empty("vector(time()) - timestamp(vector(1))", 1)
+            .await
+            .unwrap();
+        assert_eq!(single_value(value), 0.0);
     }
 
     #[test]
