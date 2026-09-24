@@ -1,0 +1,411 @@
+name: API Bug-Fix Regression Tests
+
+# The per-PR suite (api-testing.yml) only runs on a labelled, non-draft PR whose
+# diff touches backend or tests/api-testing. Nothing re-runs the API suite against
+# main afterwards, so a regression that lands via an unrelated path — a dependency
+# bump, a merge-queue interleaving, a change classified as UI-only — is invisible
+# until the next backend PR happens to run it. This is the API sibling of
+# playwright_bugfix_regression.yml: same tests, same flag matrix, run against main
+# on a schedule, with a tracking issue as the notification.
+
+on:
+  schedule:
+    # Offset 1h from the Playwright regression crons so the two do not contend for runners.
+    - cron: '30 18 * * *'  # 12:00 AM IST
+    - cron: '30 0 * * *'   # 6:00 AM IST
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+# Mirrors api-testing.yml's env block; the suite asserts against several of these
+# (ZO_INGEST_ALLOWED_UPTO gates the backfill tests, ZO_SSRF_ALLOW_LOOPBACK the
+# destination tests), so they are not optional decoration.
+env:
+  COLUMNS: 150
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_ROOT_USER_PASSWORD: Complexpass#123
+  ZO_BASE_URL: http://localhost:5080/
+  ZO_BASE_URL_SC: http://localhost:5080/
+  WS_ZO_BASE_URL: ws://localhost:5080/
+  ZO_USAGE_PUBLISH_INTERVAL: 5
+  ZO_ALERT_SCHEDULE_INTERVAL: 3
+  ZO_SMTP_ENABLED: true
+  ZO_CREATE_ORG_THROUGH_INGESTION: true
+  ZO_INGEST_ALLOWED_UPTO: 48  # Allow backdated data ingestion for backfill tests
+  ZO_SSRF_ALLOW_LOOPBACK: true  # Allow localhost destinations in API tests
+
+jobs:
+  # Skip the whole suite when main has not moved since the last regression run:
+  # rebuilding and re-running on identical code is pure waste. Manual dispatch
+  # always runs. Same contract as playwright_bugfix_regression.yml.
+  check_main_changed:
+    timeout-minutes: 5
+    name: check_main_changed
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read  # for `gh run list` (last run's head_sha)
+    outputs:
+      should_run: ${{ steps.decide.outputs.should_run }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Manual dispatch — running regardless of main changes."
+            exit 0
+          fi
+          # On a scheduled run github.sha is main's tip, so no checkout is needed.
+          CURRENT_SHA="${{ github.sha }}"
+          # head_sha of the most recent completed previous run of THIS workflow on main,
+          # excluding the current run. On any failure LAST_SHA stays empty and we fall
+          # through to should_run=true (fail-safe: run rather than skip).
+          LAST_SHA=$(gh run list \
+            --workflow "${{ github.workflow }}" \
+            --branch main \
+            --limit 50 \
+            --json databaseId,headSha,status \
+            --jq "[.[] | select(.databaseId != ${{ github.run_id }} and .status == \"completed\")] | .[0].headSha" \
+            2>/dev/null || echo "")
+          if [ -z "$LAST_SHA" ]; then
+            echo "::warning::Could not determine last run SHA (no prior completed run, or gh query failed) — defaulting to run."
+          fi
+          echo "Current main SHA: ${CURRENT_SHA:-<none>}"
+          echo "Last run SHA:     ${LAST_SHA:-<none>}"
+          if [ -n "$LAST_SHA" ] && [ "$CURRENT_SHA" = "$LAST_SHA" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main unchanged since last regression run ($CURRENT_SHA) — skipping."
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build_api_binary:
+    timeout-minutes: 60
+    name: build_api_binary
+    needs: [check_main_changed]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
+    runs-on: ubicloud-standard-4
+    env:
+      # CI executes a stripped binary; omitting dependency debuginfo keeps the
+      # shared compile cache small while preserving dev-profile debug assertions.
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    permissions:
+      contents: read
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+
+      - uses: ./.github/actions/github-auth
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: nightly-2026-05-20
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          # Read the same dependency cache api-testing.yml reads; the DB workflow's
+          # push:main build is the only writer, so this job never saves.
+          shared-key: backend-debug0-mimalloc-deps-v1
+          add-job-id-key: false
+          save-if: false
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - name: Package OpenObserve debug binary
+        run: |
+          strip target/debug/openobserve
+          tar -C target/debug -czf openobserve-api-debug.tar.gz openobserve
+
+      - name: Upload OpenObserve debug binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-api-debug-${{ github.sha }}
+          path: openobserve-api-debug.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+          # The payload is already gzip-compressed; avoid a second compression pass.
+          compression-level: 0
+
+  # One matrix instead of api-testing.yml's three near-identical jobs: the legs differ
+  # only in the server env, the pytest target and the pytest env, so they are matrix
+  # fields. `category` feeds the junit artifact name that parse-api-junit.py reads.
+  api_regression_tests:
+    timeout-minutes: 60
+    name: "api_regression / ${{ matrix.config.label }}"
+    needs: [check_main_changed, build_api_binary]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
+    runs-on: ubicloud-standard-4
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          # The default set — everything under tests/ except the three dirs that
+          # need their own server configuration. tests/ingest/ lives here, so the
+          # OTLP UTF-8 repair cases run on every scheduled pass.
+          - label: default_set
+            category: api_integration_tests
+            server_env: ""
+            test_env: ""
+            target: "--ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex"
+          # Flag-sensitive query-engine cases: each file is meaningless unless the
+          # server is restarted under the paired flag, which is why they sit outside
+          # the default set.
+          - label: utf8_view_false
+            category: api_integration_tests
+            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false"
+            test_env: ""
+            target: "tests/regression/test_subquery_join_match.py"
+          - label: utf8_view_true
+            category: api_integration_tests
+            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true"
+            test_env: ""
+            target: "tests/regression/test_subquery_join_match.py"
+          - label: join_match_one_true
+            category: api_integration_tests
+            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true"
+            test_env: ""
+            target: "tests/regression/test_logs_to_logs_join.py"
+          - label: join_match_one_false
+            category: api_integration_tests
+            server_env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false"
+            test_env: ""
+            target: "tests/regression/test_logs_to_logs_join.py"
+          # SINGLE_NODE_OPT_MODE decides which queries load_all_queries() includes:
+          # the non-optimized RemoteScanRewriter path trips known upstream DataFusion
+          # bugs, and those queries carry skip_without_single_node_opt.
+          - label: single_node_opt_false
+            category: query_agent_tests
+            server_env: "ZO_MAX_FILE_RETENTION_TIME=1 ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=false"
+            test_env: "SINGLE_NODE_OPT_MODE=false"
+            target: "tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py"
+          - label: single_node_opt_true
+            category: query_agent_tests
+            server_env: "ZO_MAX_FILE_RETENTION_TIME=1 ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=true"
+            test_env: "SINGLE_NODE_OPT_MODE=true"
+            target: "tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py"
+          - label: remove_filter_with_index_false
+            category: query_agent_tests
+            server_env: "ZO_MAX_FILE_RETENTION_TIME=1 ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX=false"
+            test_env: "SINGLE_NODE_OPT_MODE=true"
+            target: "tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py"
+    steps:
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
+        with:
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
+
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        id: setup-python
+        with:
+          python-version: "3.11.6"
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Regenerate query-agent expected values
+        if: ${{ matrix.config.category == 'query_agent_tests' }}
+        run: |
+          cd ${{ github.workspace }}/tests/test-data/query-agent
+          ${{ github.workspace }}/tests/api-testing/.venv/bin/python compute_counts.py
+
+      - name: "Run ${{ matrix.config.label }}"
+        # --force-sugar omitted on purpose: pytest-sugar auto-loads via its entry
+        # point, and passing the flag registers it twice and inflates the counter.
+        run: |
+          ${{ matrix.config.server_env }} ${{ github.workspace }}/target/debug/openobserve > "o2_${{ matrix.config.label }}.log" 2>&1 &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          ${{ matrix.config.test_env }} rye run pytest ${{ matrix.config.target }} --junitxml=junit-${{ matrix.config.label }}.xml
+          kill $SERVER_PID || true
+        working-directory: tests/api-testing/
+
+      # Artifact name is a contract: parse-api-junit.py reads the CATEGORY from the
+      # part between the `__`s, and collapses legs that re-run the same tests.
+      - name: Upload API junit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit__${{ matrix.config.category }}__${{ matrix.config.label }}
+          path: tests/api-testing/junit-${{ matrix.config.label }}.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload OpenObserve server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-${{ matrix.config.label }}-log
+          path: tests/api-testing/o2_${{ matrix.config.label }}.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  api_regression_summary:
+    name: api_regression_summary
+    needs: [check_main_changed, build_api_binary, api_regression_tests]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.check_main_changed.outputs.should_run }}" != "true" ]; then
+            echo "✅ main unchanged since the last run — nothing to verify."
+            exit 0
+          fi
+          if [ "${{ needs.build_api_binary.result }}" == "success" ] && \
+             [ "${{ needs.api_regression_tests.result }}" == "success" ]; then
+            echo "✅ All API regression legs passed"
+            exit 0
+          fi
+          echo "API regression failed: build=${{ needs.build_api_binary.result }}, tests=${{ needs.api_regression_tests.result }}"
+          exit 1
+
+  # GitHub emails assignees and @-mentioned users, so a tracking issue is the
+  # notification: one open issue per breakage, a comment per further failing run,
+  # closed by the next green run. Its own label so it never closes the Playwright one.
+  report_result:
+    name: Report result
+    needs: [api_regression_tests, api_regression_summary]
+    if: ${{ always() && needs.api_regression_tests.result != 'skipped' }}
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      LABEL: ci-api-regression-failure
+      NOTIFY: hengfeiyang,oasisk,Shrinath-O2,neha00290,vamsikarthikr
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      RESULT: ${{ needs.api_regression_summary.result }}
+    steps:
+      - name: Open or update the failure issue, or close it on green
+        run: |
+          OPEN=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number // ""')
+          if [ "$RESULT" = "success" ]; then
+            if [ -n "$OPEN" ]; then
+              gh issue close "$OPEN" --comment "API regression is green again on main (${{ github.sha }}): $RUN_URL"
+            fi
+            exit 0
+          fi
+          FAILED=$(gh api --paginate "repos/$GH_REPO/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.name | startswith("api_regression /")) | select(.conclusion == "failure" or .conclusion == "timed_out") | .name] | join(", ")')
+          MENTIONS=$(echo "$NOTIFY" | sed 's/[^,]*/@&/g; s/,/ /g')
+          BODY="API regression failed on main at ${{ github.sha }}.
+          Failed legs: ${FAILED:-none listed (build or summary failed)}
+          Run: $RUN_URL
+
+          $MENTIONS"
+          if [ -n "$OPEN" ]; then
+            gh issue comment "$OPEN" --body "$BODY"
+          else
+            gh label create "$LABEL" --color B60205 --description "Scheduled API regression on main is failing" 2>/dev/null || true
+            gh issue create --title "API regression failing on main" --label "$LABEL" --assignee "$NOTIFY" --body "$BODY"
+          fi
+
+  # Non-fatal metrics sidecar: same streams and the same junit parser as
+  # api-testing.yml, tagged workflow=regression so the scheduled pass is
+  # distinguishable from the per-PR one. Never fails the run.
+  report_to_openobserve:
+    name: Report run metrics to OpenObserve
+    needs: [api_regression_tests]
+    if: ${{ always() && needs.api_regression_tests.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      # NO merge-multiple: each artifact must land in its own subdir so the parser
+      # can read the category from the dir name. Missing artifacts are non-fatal.
+      - name: Download API junit reports
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: api-junit__*
+          path: junit-xml
+
+      - name: Report run metrics
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
+          O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
+          O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
+          TESTS: ${{ needs.api_regression_tests.result }}
+        run: |
+          set -uo pipefail
+          if [ "$TESTS" = "failure" ]; then CONCLUSION=failure
+          elif [ "$TESTS" = "cancelled" ]; then CONCLUSION=cancelled
+          else CONCLUSION=success; fi
+          export CONCLUSION STREAM=ci_test_runs SUITE=api
+          if [ -d junit-xml ]; then
+            COUNTS=$(python3 .github/scripts/parse-api-junit.py junit-xml 2>/dev/null || echo "")
+            if [ -n "$COUNTS" ] && printf '%s' "$COUNTS" | jq -e . >/dev/null 2>&1; then
+              echo "API counts: $COUNTS"
+              EXTRA_JSON=$(printf '%s' "$COUNTS" | jq -c .total); export EXTRA_JSON
+              printf '%s' "$COUNTS" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
+                '[.by_category[] | {run_id:$run_id, repo:$repo, suite:"api", workflow:"regression", ingest_source:"live",
+                  module:.module, tests_total, tests_passed, tests_failed, tests_flaky, tests_skipped}]' > api_counts_rows.json
+              if [ "$(jq 'length' api_counts_rows.json 2>/dev/null || echo 0)" -gt 0 ]; then
+                bash .github/scripts/o2-report.sh ci_test_counts api_counts_rows.json
+              fi
+            fi
+          fi
+          bash .github/scripts/o2-run-report.sh
