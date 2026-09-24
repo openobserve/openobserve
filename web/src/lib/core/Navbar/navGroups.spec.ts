@@ -85,6 +85,15 @@ describe("groupNavLinks", () => {
     ]);
   });
 
+  it("renders nothing for an empty input, even though Infra is standalone", () => {
+    // Regression: MainLayout holds `linksList` at `[]` until `menuReady`
+    // (config load settles), specifically so the rail doesn't pop tiles in.
+    // Infra's children carry no `requires`, so without an explicit empty-input
+    // guard it would still qualify as active and render alone on refresh,
+    // ahead of every other tile, until the real list arrived a beat later.
+    expect(groupNavLinks([])).toEqual([]);
+  });
+
   it("routes every Traces flyout item through the canonical query tab", () => {
     expect(NAV_SUBNAV.traces).toEqual([
       expect.objectContaining({ name: "traces", tab: "spans", defaultForRoute: true }),
