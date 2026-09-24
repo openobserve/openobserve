@@ -1982,7 +1982,8 @@ describe("CreateBrowserTest", () => {
       const w = mount(CreateBrowserTest, {
         global: {
           plugins: [i18n, store],
-          stubs: { ...baseStubs, ...pageLayoutStubs, OTooltip: OTooltipStub },
+          // Real Teleport: the count's screen-reader breakdown is teleported out of the caption.
+          stubs: { ...baseStubs, ...pageLayoutStubs, OTooltip: OTooltipStub, Teleport: false },
         },
         props: { editId: "check-123" },
       });

@@ -1533,6 +1533,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           data-test="synthetics-journey-select-all"
           @update:model-value="toggleSelectAll()"
         />
+        <h3 class="sr-only">{{ t("synthetics.journey.steps") }}</h3>
         <JourneyStepCount
           :steps="modelValue"
           :children="childrenCache"
@@ -1540,7 +1541,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           class="md:hidden"
           data-test="synthetics-journey-toolbar-step-count"
         />
-        <h3 class="sr-only">{{ t("synthetics.journey.steps") }}</h3>
 
         <JourneySuggestions
           v-if="!readonly"

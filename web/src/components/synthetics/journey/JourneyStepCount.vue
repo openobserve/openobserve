@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useId } from "vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { isCompositionAction } from "@/constants/synthetics";
 import { useI18nTyped } from "@/types/i18n";
@@ -29,6 +29,7 @@ const props = defineProps<{
 }>();
 
 const { t, locale } = useI18nTyped();
+const descriptionId = useId();
 
 const references = computed(() => props.steps.filter((s) => isCompositionAction(s.action)));
 
@@ -87,8 +88,13 @@ const tooltip = computed(() => {
     class="text-xs"
     :class="overLimit ? 'text-status-error-text font-semibold' : 'text-text-secondary'"
     :tabindex="tooltip ? 0 : undefined"
+    :aria-describedby="tooltip ? descriptionId : undefined"
   >
     {{ caption }}
     <OTooltip v-if="tooltip" :content="tooltip" />
+    <!-- Teleported so the caption's own text stays the count; OTooltip child mode opens on hover only. -->
+    <Teleport v-if="tooltip" to="body">
+      <span :id="descriptionId" class="sr-only">{{ tooltip }}</span>
+    </Teleport>
   </span>
 </template>

@@ -177,4 +177,27 @@ describe("JourneyStepCount", () => {
 
     expect(mountCount(own(4)).find('[tabindex="0"]').exists()).toBe(false);
   });
+
+  it("describes the count with the breakdown for keyboard and screen-reader users", () => {
+    // Earlier mounts are separate apps whose teleported ids can repeat.
+    document.body.innerHTML = "";
+    const w = mountCount(
+      [...own(4), reference("r1", "login", "Login")],
+      [child("login", "login-shared", 14)],
+      50,
+    );
+    const describedBy = w.find("[aria-describedby]");
+    expect(describedBy.exists()).toBe(true);
+    const id = describedBy.attributes("aria-describedby");
+    const description = document.getElementById(id!);
+    expect(description).not.toBeNull();
+    expect(description!.textContent?.trim()).toBe(
+      '4 steps in this test and 14 from "login-shared". This test executes 18 of the 50 allowed.',
+    );
+
+    w.unmount();
+    expect(document.getElementById(id!)).toBeNull();
+
+    expect(mountCount(own(4)).find("[aria-describedby]").exists()).toBe(false);
+  });
 });

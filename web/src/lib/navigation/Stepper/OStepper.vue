@@ -184,6 +184,7 @@ function triggerClasses(step: StepRegistration): string {
             </span>
           </button>
           <!-- Outside the button: a disabled trigger can be neither hovered nor focused. -->
+          <!-- ps-12 = the trigger's padding + indicator + gap, so the caption lines up with the title. -->
           <div v-if="step.slots.description" class="ps-12">
             <StepDescription :render="step.slots.description" />
           </div>
