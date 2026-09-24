@@ -72,6 +72,10 @@ const props = defineProps<{
   replayEnvironmentLabel?: I18nText;
   /** Names that resolve only to a stored secret the browser cannot read. */
   secretNames?: ReadonlySet<string>;
+  /** A secret the journey needs has a typed value for the replay environment. */
+  usesTypedSecrets?: boolean;
+  /** Set only when the run that just ended used typed secrets; step numbers are authored. */
+  typedSecretReport?: { names: string[]; stepByName: Record<string, number[]> } | null;
   /** Names the check resolves; a step value naming anything else is warned about. */
   knownVariables?: ReadonlySet<string>;
   /**
@@ -180,6 +184,8 @@ const emit = defineEmits<{
   "toggle-variables-panel": [];
   /** Open the referenced check's editor; the host owns the router. */
   "open-child": [child: ChildJourney];
+  /** Change the typed secrets of the run that failed at `failedAtStep`. */
+  "edit-secrets": [failedAtStep: number];
 }>();
 
 // ── Restore-then-record ─────────────────────────────────────────────────────
@@ -984,6 +990,41 @@ const replayLabel = computed(() =>
     : t("synthetics.journey.replay"),
 );
 
+const replayTooltip = computed(() =>
+  props.usesTypedSecrets
+    ? t("synthetics.journey.replaySecrets.usesTyped", {
+        environment: props.replayEnvironmentLabel ?? "",
+      })
+    : replayLabel.value,
+);
+
+/** The last typed secret used at or before the failed row: that row may fail without typing it. */
+const failedSecretNote = computed(() => {
+  const report = props.typedSecretReport;
+  const failed = firstFailedIndex.value + 1;
+  if (!report || failed < 1) return null;
+  let best: { step: number; name: string } | null = null;
+  for (const name of report.names) {
+    for (const step of report.stepByName[name] ?? []) {
+      if (step <= failed && (!best || step > best.step)) best = { step, name };
+    }
+  }
+  return best;
+});
+
+const failedTitle = computed(() =>
+  props.replayEnvironmentLabel
+    ? t("synthetics.journey.replaySecrets.failedTitle", {
+        environment: props.replayEnvironmentLabel,
+        failed: firstFailedIndex.value + 1,
+        total: props.modelValue.length,
+      })
+    : t("synthetics.journey.replayFailed", {
+        failed: firstFailedIndex.value + 1,
+        total: props.modelValue.length,
+      }),
+);
+
 function onReplayButtonClick() {
   if (props.extensionReady) {
     requestReplay();
@@ -1525,7 +1566,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
               icon-left="replay"
             >
               <span class="max-w-40 truncate">{{ replayLabel }}</span>
-              <OTooltip :content="replayLabel" side="bottom" />
+              <OIcon v-if="usesTypedSecrets" name="key" size="sm" aria-hidden="true" />
+              <OTooltip :content="replayTooltip" side="bottom" />
             </OButton>
             <slot name="replay-menu" :disabled="replayDisabled" />
           </OButtonGroup>
@@ -1847,9 +1889,14 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       data-test="synthetics-journey-passed-banner"
     >
       <OIcon name="check-circle" size="sm" class="text-timeline-dot-success" aria-hidden="true" />
-      <span class="text-badge-success-ol-text font-semi-bold text-sm">{{
-        t("synthetics.journey.replayPassed", { count: executedTotal })
-      }}</span>
+      <span class="flex min-w-0 flex-col gap-0.5">
+        <span class="text-badge-success-ol-text font-semi-bold text-sm">{{
+          t("synthetics.journey.replayPassed", { count: executedTotal })
+        }}</span>
+        <span v-if="typedSecretReport" class="text-badge-success-ol-text text-xs">{{
+          t("synthetics.journey.replaySecrets.passedNote")
+        }}</span>
+      </span>
       <span class="flex-1" />
       <OButton
         variant="ghost"
@@ -1870,17 +1917,35 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
     >
       <OIcon name="error" size="sm" class="text-badge-error-ol-text mt-0.5" aria-hidden="true" />
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span class="text-badge-error-ol-text text-sm font-semibold">{{
-          t("synthetics.journey.replayFailed", {
-            failed: firstFailedIndex + 1,
-            total: modelValue.length,
-          })
-        }}</span>
+        <span class="text-badge-error-ol-text text-sm font-semibold">{{ failedTitle }}</span>
         <span
           v-if="failedStepResult?.stepName"
           class="text-badge-error-ol-text truncate pt-1 text-xs"
           >{{ failedStepResult.stepName }}</span
         >
+        <template v-if="typedSecretReport">
+          <span v-if="failedSecretNote" class="text-badge-error-ol-text pt-1 text-xs">{{
+            t("synthetics.journey.replaySecrets.failedNote", failedSecretNote)
+          }}</span>
+          <div class="flex items-center gap-2 pt-1">
+            <OButton
+              variant="outline"
+              size="xs"
+              data-test="synthetics-journey-failed-change-secret-btn"
+              @click="emit('edit-secrets', firstFailedIndex + 1)"
+            >
+              {{ t("synthetics.journey.replaySecrets.changeValue") }}
+            </OButton>
+            <OButton
+              variant="outline"
+              size="xs"
+              data-test="synthetics-journey-failed-rerun-btn"
+              @click="requestReplay()"
+            >
+              {{ t("synthetics.journey.reRun") }}
+            </OButton>
+          </div>
+        </template>
       </div>
       <OButton
         variant="ghost"

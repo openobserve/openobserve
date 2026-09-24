@@ -29,20 +29,38 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 
-const props = defineProps<{
-  options: ReplayEnvironmentOption[];
-  selectedId: string;
-  disabled: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    options: ReplayEnvironmentOption[];
+    selectedId: string;
+    disabled: boolean;
+    /** Stored secrets the journey needs in the selected environment. */
+    secretsNeeded?: number;
+    secretsEntered?: number;
+    /** The last replay failed while it used a typed secret. */
+    secretFailed?: boolean;
+  }>(),
+  { secretsNeeded: 0, secretsEntered: 0, secretFailed: false },
+);
 
 const emit = defineEmits<{
   "update:selected-id": [id: string];
+  "edit-secrets": [];
 }>();
 
 const { t } = useI18nTyped();
 
-// One choice is no choice, so the arrow would only add noise.
-const visible = computed(() => props.options.length > 1);
+// One choice is no choice, so the arrow would only add noise unless secrets need entering.
+const visible = computed(() => props.options.length > 1 || props.secretsNeeded > 0);
+
+const secretCounts = computed(() => ({
+  entered: props.secretsEntered,
+  needed: props.secretsNeeded,
+}));
+
+const selectedName = computed(
+  () => props.options.find((o) => o.id === props.selectedId)?.name ?? "",
+);
 
 const inTest = computed(() => props.options.filter((o) => o.inTest));
 const notInTest = computed(() => props.options.filter((o) => !o.inTest));
@@ -105,6 +123,25 @@ function itemKey(option: ReplayEnvironmentOption) {
           </ODropdownItem>
         </ODropdownGroup>
       </template>
+    </template>
+    <template v-if="secretsNeeded > 0">
+      <ODropdownSeparator />
+      <ODropdownItem
+        icon-left="key"
+        :aria-label="
+          t('synthetics.journey.replaySecrets.menuAria', {
+            environment: selectedName,
+            ...secretCounts,
+          })
+        "
+        data-test="synthetics-journey-replay-menu-secrets"
+        @select="emit('edit-secrets')"
+      >
+        <span>{{ t("synthetics.journey.replaySecrets.menuItem", secretCounts) }}</span>
+        <template v-if="secretFailed" #icon-right>
+          <span class="bg-status-error-text ms-auto size-2 rounded-full" aria-hidden="true" />
+        </template>
+      </ODropdownItem>
     </template>
   </ODropdown>
 </template>

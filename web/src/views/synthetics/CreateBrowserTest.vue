@@ -111,6 +111,8 @@ import ExtractSubtestDialog from "@/components/synthetics/journey/ExtractSubtest
 import MissingValueDialog from "@/components/synthetics/journey/MissingValueDialog.vue";
 import JourneyStartPill from "@/components/synthetics/journey/JourneyStartPill.vue";
 import ReplayEnvironmentMenu from "@/components/synthetics/journey/ReplayEnvironmentMenu.vue";
+import ReplaySecretsDialog from "@/components/synthetics/journey/ReplaySecretsDialog.vue";
+import { useReplaySecrets } from "@/components/synthetics/journey/useReplaySecrets";
 import type { ExtractForm } from "@/components/synthetics/journey/ExtractSubtestDialog.schema";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import CheckVariablesPanel from "@/components/synthetics/configure/CheckVariablesPanel.vue";
@@ -1364,8 +1366,13 @@ function replayInputsFor(environmentId: string, supplied: Record<string, string>
   });
 }
 
-/** The url and variables replay and recording run with, resolved against that environment. */
-const replayInputsForCheck = computed(() => replayInputsFor(replayEnvironmentId.value, {}));
+const secrets = useReplaySecrets();
+onBeforeUnmount(() => secrets.clear());
+
+/** The url and variables replay and recording run with: typed secrets over that environment's values. */
+const replayInputsForCheck = computed(() =>
+  replayInputsFor(replayEnvironmentId.value, secrets.valuesFor(replayEnvironmentId.value)),
+);
 
 /** Every name the check resolves in any of its environments; undefined until the shared tiers load. */
 const knownVariableNames = computed(() => {
@@ -1419,15 +1426,43 @@ function classifyFor(
   );
 }
 
+/** Stored secrets the current journey needs in an environment, typed or not. */
+function neededSecrets(envId: string): ReplayNameStatus[] {
+  return classifyFor(journeyReplayTexts.value, envId, {}).filter((s) => s.state === "secret");
+}
+
+const replayNeededSecrets = computed(() => neededSecrets(replayEnvironmentId.value));
+
+const typedSecretNames = computed(
+  () =>
+    new Set(
+      replayNeededSecrets.value
+        .map((s) => s.name)
+        .filter((name) => secrets.valueFor(replayEnvironmentId.value, name) !== undefined),
+    ),
+);
+
 /** Names recording can only reach through a stored secret, so its refusal can say so. */
 const replaySecretNames = computed(
   () =>
     new Set(
-      classifyFor(journeyReplayTexts.value, replayEnvironmentId.value, {})
-        .filter((s) => s.state === "secret")
-        .map((s) => s.name),
+      replayNeededSecrets.value
+        .map((s) => s.name)
+        .filter((name) => !typedSecretNames.value.has(name)),
     ),
 );
+
+/** The typed secrets the last replay ran with, for the result banners. */
+const lastReplayTypedSecrets = ref<{
+  envId: string;
+  names: string[];
+  stepByName: Record<string, number[]>;
+} | null>(null);
+
+const typedSecretReport = computed(() => {
+  const last = lastReplayTypedSecrets.value;
+  return last ? { names: last.names, stepByName: last.stepByName } : null;
+});
 
 /** One replay request, fixed when it is classified so an open dialog never follows the selector. */
 interface PendingReplay {
@@ -1492,13 +1527,15 @@ async function runReplay(journey: BrowserStep[]) {
   }
   if (wire.length === 0) return;
   await sharedListsSettled();
-  gateReplay({ journey, wire, map, envId: replayEnvironmentId.value, supplied: {} });
+  const envId = replayEnvironmentId.value;
+  gateReplay({ journey, wire, map, envId, supplied: secrets.valuesFor(envId) });
 }
 
 /** Asks for what the replay cannot resolve, one dialog at a time, then replays. */
 function gateReplay(pending: PendingReplay) {
   // Without the environment list a verdict would be a guess, so replay as before and let a failure speak.
   if (!sharedEnvironmentsLoaded.value) {
+    lastReplayTypedSecrets.value = null;
     startReplay(pending);
     return;
   }
@@ -1513,18 +1550,30 @@ function gateReplay(pending: PendingReplay) {
     missingOpen.value = true;
     return;
   }
-  const secret = statuses.find((s) => s.state === "secret");
-  if (secret) {
-    toast({
-      variant: "error",
-      message: t("synthetics.journey.replayValues.secretUnreadable", {
-        name: secret.name,
-        environment: environmentLabel(pending.envId),
-      }),
+  const needed = statuses.filter((s) => s.state === "secret");
+  if (needed.length > 0) {
+    openSecretsDialog({
+      mode: "ask",
+      envId: pending.envId,
+      pending,
+      secrets: needed.map(({ name, steps }) => ({ name, steps })),
     });
     return;
   }
+  lastReplayTypedSecrets.value = typedSecretsUsed(pending, statuses);
   startReplay(pending);
+}
+
+/** The typed secrets a replay resolves through, keyed to the authored steps that use them. */
+function typedSecretsUsed(pending: PendingReplay, statuses: ReplayNameStatus[]) {
+  const typed = secrets.valuesFor(pending.envId);
+  const used = statuses.filter((s) => Object.prototype.hasOwnProperty.call(typed, s.name));
+  if (used.length === 0) return null;
+  return {
+    envId: pending.envId,
+    names: used.map((s) => s.name),
+    stepByName: Object.fromEntries(used.map((s) => [s.name, s.steps])),
+  };
 }
 
 function startReplay(pending: PendingReplay) {
@@ -1558,6 +1607,8 @@ async function onMissingValueSubmit(values: { value: string; secret: boolean }) 
     return;
   }
   await fetchSharedVariables();
+  // The server never returns a secret, so the value is kept for this session or the re-run would ask.
+  if (values.secret) secrets.set(pending.envId, name, values.value);
   pending.supplied = { ...pending.supplied, [name]: values.value };
   missingOpen.value = false;
   await nextTick();
@@ -1590,6 +1641,54 @@ async function saveReplayValue(
   } else {
     await syntheticsService.createGlobalVariable(org, { name, value, kind: "plain" });
   }
+}
+
+const secretsPrompt = ref<{
+  mode: "ask" | "change";
+  envId: string;
+  pending?: PendingReplay;
+  secrets: { name: string; steps: number[]; value?: string }[];
+  failedAtStep?: number;
+} | null>(null);
+const secretsOpen = ref(false);
+
+function openSecretsDialog(prompt: NonNullable<typeof secretsPrompt.value>) {
+  secretsPrompt.value = prompt;
+  secretsOpen.value = true;
+}
+
+/** Change mode lists every secret the journey needs there, typed ones prefilled. */
+function openSecretsChange(envId: string, failedAtStep?: number) {
+  openSecretsDialog({
+    mode: "change",
+    envId,
+    failedAtStep,
+    secrets: neededSecrets(envId).map(({ name, steps }) => ({
+      name,
+      steps,
+      value: secrets.valueFor(envId, name),
+    })),
+  });
+}
+
+async function onSecretsSubmit(values: Record<string, string>) {
+  const prompt = secretsPrompt.value;
+  if (!prompt) return;
+  for (const [name, value] of Object.entries(values)) secrets.set(prompt.envId, name, value);
+  secretsOpen.value = false;
+  await nextTick();
+  if (!prompt.pending) {
+    onReplay();
+    return;
+  }
+  prompt.pending.supplied = { ...prompt.pending.supplied, ...values };
+  gateReplay(prompt.pending);
+}
+
+function onSecretsForget(names: string[]) {
+  const prompt = secretsPrompt.value;
+  if (!prompt) return;
+  for (const name of names) secrets.forget(prompt.envId, name);
 }
 
 async function onReplayAnyway() {
@@ -1835,6 +1934,8 @@ function onClearResults() {
                     :start-url="replayInputsForCheck.url"
                     :replay-environment-label="replayEnvironmentLabel"
                     :secret-names="replaySecretNames"
+                    :uses-typed-secrets="typedSecretNames.size > 0"
+                    :typed-secret-report="typedSecretReport"
                     :known-variables="knownVariableNames"
                     :extension-ready="extensionReady"
                     :can-record-from="canRecordFrom"
@@ -1863,6 +1964,13 @@ function onClearResults() {
                     @verify-extension="reverifyExtension"
                     @replay-up-to="onReplayUpTo"
                     @stop-replay="onStopReplay"
+                    @edit-secrets="
+                      (step: number) =>
+                        openSecretsChange(
+                          lastReplayTypedSecrets?.envId ?? replayEnvironmentId,
+                          step,
+                        )
+                    "
                     @clear-results="onClearResults"
                     @auto-record-consumed="autoRecord = false"
                     @selection-changed="journeySelectionState = $event"
@@ -1884,7 +1992,11 @@ function onClearResults() {
                         :options="replayMenuOptions"
                         :selected-id="replayEnvironmentId"
                         :disabled="disabled"
+                        :secrets-needed="replayNeededSecrets.length"
+                        :secrets-entered="typedSecretNames.size"
+                        :secret-failed="!!typedSecretReport && replayPhase === 'failed'"
                         @update:selected-id="replayEnvironmentOverride = $event"
+                        @edit-secrets="openSecretsChange(replayEnvironmentId)"
                       />
                     </template>
                   </BrowserJourney>
@@ -2185,6 +2297,17 @@ function onClearResults() {
         <p class="m-0">{{ t("synthetics.save.blockedBody") }}</p>
       </div>
     </ODialog>
+
+    <ReplaySecretsDialog
+      v-if="secretsPrompt"
+      v-model:open="secretsOpen"
+      :mode="secretsPrompt.mode"
+      :environment-name="environmentLabel(secretsPrompt.envId)"
+      :secrets="secretsPrompt.secrets"
+      :failed-at-step="secretsPrompt.failedAtStep"
+      :on-submit="onSecretsSubmit"
+      @forget="onSecretsForget"
+    />
 
     <MissingValueDialog
       v-if="missingDialogProps"

@@ -14312,6 +14312,24 @@
         "sessionOnly": "This session only — not saved with the test.",
         "notInTest": "Not in this test's environments",
         "selected": "Selected"
+      },
+      "replaySecrets": {
+        "title": "Secrets for this replay in {environment}",
+        "fieldLabel": "{name} · secret in {environment} · used by step {steps} | {name} · secret in {environment} · used by steps {steps}",
+        "valueRequired": "Enter the secret's value",
+        "why": "Scheduled runs use the stored secret. Replay runs in your browser, which can't read it.",
+        "memoryOnly": "Kept in memory until you close this tab. Never saved.",
+        "lastFailed": "The last replay failed at step {step} with this value.",
+        "forget": "Forget value",
+        "replayIn": "Replay in {environment}",
+        "saveAndRerun": "Save & re-run",
+        "menuItem": "Secrets · {entered} of {needed} entered",
+        "menuAria": "Secrets for {environment} replays: {entered} of {needed} entered. Edit",
+        "usesTyped": "Replay · {environment} — uses secrets you entered",
+        "passedNote": "Used a secret you entered; the stored secret was not tested.",
+        "failedTitle": "Replay in {environment} failed at step {failed} of {total}",
+        "failedNote": "Step {step} used {name}, a secret you entered for this session.",
+        "changeValue": "Change value"
       }
     },
     "labels": {
