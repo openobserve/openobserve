@@ -2855,12 +2855,17 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Toggle the multi-select "Select All" master checkbox (selects all, or clears
-   * when already all-selected).
+   * Toggle the multi-select "Select All" master row (selects all, or clears
+   * when already all-selected). Clicks the row text rather than the OCheckbox
+   * button: the checkbox is a controlled visual indicator whose own click does
+   * not toggle back off (the parent div's @click.stop=toggleSelectAll is the
+   * handler that actually toggles both ways).
    * @param {string} variableName - Variable name
    */
   async toggleVariableSelectAll(variableName) {
-    await this.getVariableSelectAllCheckboxLocator(variableName).first().click();
+    await this.getVariablePopoverLocator(variableName)
+      .getByText("Select All", { exact: true })
+      .click();
   }
 
   /**
