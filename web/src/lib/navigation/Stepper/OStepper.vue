@@ -139,7 +139,7 @@ function triggerClasses(step: StepRegistration): string {
     >
       <template v-for="(step, index) in sortedSteps" :key="step.name">
         <!-- Step trigger (indicator circle + title) -->
-        <div role="listitem" class="flex shrink-0 flex-col items-start">
+        <div role="listitem" class="flex shrink-0 flex-col items-center">
           <button
             type="button"
             :class="triggerClasses(step)"
@@ -175,19 +175,17 @@ function triggerClasses(step: StepRegistration): string {
             <!-- Title + Description (stacked vertically, right of indicator) -->
             <span class="flex min-w-0 flex-col items-start">
               <span :class="titleClasses(step)">{{ step.title }}</span>
+              <span v-if="step.slots.description" class="mt-0.5 leading-tight">
+                <StepDescription :render="step.slots.description" />
+              </span>
               <span
-                v-if="step.description"
+                v-else-if="step.description"
                 class="text-2xs text-text-secondary mt-0.5 leading-tight"
               >
                 {{ step.description }}
               </span>
             </span>
           </button>
-          <!-- Outside the button: a disabled trigger can be neither hovered nor focused. -->
-          <!-- ps-12 = the trigger's padding + indicator + gap, so the caption lines up with the title. -->
-          <div v-if="step.slots.description" class="ps-12">
-            <StepDescription :render="step.slots.description" />
-          </div>
         </div>
 
         <!-- Connector line between consecutive steps -->

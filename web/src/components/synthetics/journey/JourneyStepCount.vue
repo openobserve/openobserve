@@ -87,7 +87,6 @@ const tooltip = computed(() => {
     v-if="steps.length > 0"
     class="text-xs"
     :class="overLimit ? 'text-status-error-text font-semibold' : 'text-text-secondary'"
-    :tabindex="tooltip ? 0 : undefined"
     :aria-describedby="tooltip ? descriptionId : undefined"
   >
     {{ caption }}

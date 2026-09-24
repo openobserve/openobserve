@@ -165,17 +165,15 @@ describe("JourneyStepCount", () => {
     }
   });
 
-  it("the count is focusable as the tooltip trigger when there are subtests", () => {
+  it("the count is not focusable, since it renders inside the stepper's trigger button", () => {
     const w = mountCount(
       [...own(4), reference("r1", "login", "Login")],
       [child("login", "login-shared", 14)],
     );
-    const trigger = w.find('[tabindex="0"]');
-    expect(trigger.exists()).toBe(true);
-    expect(trigger.text()).toContain("18 steps (including 1 subtest)");
-    expect(trigger.find('[data-test="step-count-tooltip"]').exists()).toBe(true);
+    expect(w.find("[tabindex]").exists()).toBe(false);
+    expect(w.find('[data-test="step-count-tooltip"]').exists()).toBe(true);
 
-    expect(mountCount(own(4)).find('[tabindex="0"]').exists()).toBe(false);
+    expect(mountCount(own(4)).find("[tabindex]").exists()).toBe(false);
   });
 
   it("describes the count with the breakdown for keyboard and screen-reader users", () => {

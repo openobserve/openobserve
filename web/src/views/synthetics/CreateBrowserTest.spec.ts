@@ -2023,6 +2023,8 @@ describe("CreateBrowserTest", () => {
       expect(count.exists()).toBe(true);
       expect(count.text().replace(/\s+/g, " ").trim()).toBe("51 steps (including 2 subtests)");
       expect(isRed(count)).toBe(true);
+      const describedBy = count.attributes("aria-describedby");
+      expect(document.getElementById(describedBy!)?.textContent).toContain("This test executes 51");
       expect(wrapper.find('[data-test="step-count-tooltip"]').attributes("data-tooltip")).toBe(
         '3 steps in this test, 31 from "Login (shared)", and 17 from "Add items to cart". This test executes 51 of the 50 allowed.',
       );

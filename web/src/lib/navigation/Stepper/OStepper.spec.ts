@@ -267,15 +267,17 @@ describe("OStepper description slot", () => {
     wrapper.unmount();
   });
 
-  it("renders the description slot outside the step's trigger button", async () => {
+  it("renders the description slot inside the step's trigger button, right after the title", async () => {
     const wrapper = mountWithDescription("4 steps");
     await wrapper.vm.$nextTick();
 
     const caption = wrapper.find('[role="list"] [data-test="caption"]');
     expect(caption.exists()).toBe(true);
-    expect(caption.element.closest("button")).toBeNull();
-    const item = caption.element.closest('[role="listitem"]');
-    expect(item?.querySelector("button")?.textContent).toContain("First");
+    const button = caption.element.closest("button");
+    expect(button).not.toBeNull();
+    const title = [...button!.querySelectorAll("span")].find((s) => s.textContent === "First");
+    expect(title).toBeDefined();
+    expect(title!.nextElementSibling?.contains(caption.element)).toBe(true);
     wrapper.unmount();
   });
 
