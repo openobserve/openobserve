@@ -1182,6 +1182,187 @@ test.describe('Anomaly Detection', () => {
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════════
+  // Look-back window floor — detection window must be at least
+  // Check Every (schedule) + one Detection Resolution (histogram). The floor
+  // error is submission-gated (it paints on save), but the hint and the legacy
+  // warning render live from the form values, so each is asserted where it is.
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Look-back window floor', () => {
+    test.describe.configure({ mode: 'parallel' });
+
+    test.beforeEach(async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('window'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.openConfigTab();
+    });
+
+    // The boundary test saves successfully (wizard closes), so cancel only when
+    // the wizard is still open rather than failing on a missing cancel button.
+    test.afterEach(async () => {
+      if (await pm.anomalyDetectionPage.getSaveBtnLocator().isVisible()) {
+        await pm.anomalyDetectionPage.cancel();
+      }
+    });
+
+    test('a detection window below the floor blocks save and names the minimum', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P0', '@smoke', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h');
+      // 3600s is under the 1h 5m floor (schedule + histogram).
+      await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
+      await pm.anomalyDetectionPage.save();
+
+      const error = pm.anomalyDetectionPage.getDetectionWindowErrorLocator();
+      await expect(error).toBeVisible();
+      await expect(error).toContainText('at least 1h 5m');
+      // Rejected save keeps the wizard open — it did not create a config.
+      await expect(pm.anomalyDetectionPage.getSaveBtnLocator()).toBeVisible();
+    });
+
+    test('a valid window shows the minimum and recommended hint', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P0', '@smoke', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h');
+      await pm.anomalyDetectionPage.setDetectionWindow(3, 'h'); // 3h ≥ 1h 5m floor
+
+      const hint = pm.anomalyDetectionPage.getDetectionWindowHintLocator();
+      await expect(hint).toBeVisible();
+      await expect(hint).toContainText('Minimum 1h 5m');
+      await expect(hint).toContainText('Recommended 2h 10m');
+      await expect(pm.anomalyDetectionPage.getDetectionWindowErrorLocator()).toBeHidden();
+    });
+
+    test('the floor and hint recompute live from schedule and histogram', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(10, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(2, 'h'); // floor 2h 10m
+      await expect(pm.anomalyDetectionPage.getDetectionWindowHintLocator()).toContainText('Minimum 2h 10m');
+
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h'); // floor 1h 10m
+      await expect(pm.anomalyDetectionPage.getDetectionWindowHintLocator()).toContainText('Minimum 1h 10m');
+    });
+
+    test('seconds and days interval units feed the floor', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setScheduleInterval(90, 's');
+      await pm.anomalyDetectionPage.setHistogramInterval(30, 's'); // floor 120s
+      await expect(pm.anomalyDetectionPage.getDetectionWindowHintLocator()).toContainText('Minimum 2m');
+
+      await pm.anomalyDetectionPage.setDetectionWindow(1, 'd'); // 86400s ≥ 120s floor
+      expect(await pm.anomalyDetectionPage.getDetectionWindowUnit()).toBe('d');
+      // The floor reads schedule + histogram, so the d window unit leaves it at 2m.
+      await expect(pm.anomalyDetectionPage.getDetectionWindowHintLocator()).toContainText('Minimum 2m');
+    });
+
+    test('a new config defaults the detection window to 3 hours', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P1', '@functional', '@all'],
+    }, async () => {
+      expect(await pm.anomalyDetectionPage.getDetectionWindowValue()).toBe('3');
+      expect(await pm.anomalyDetectionPage.getDetectionWindowUnit()).toBe('h');
+    });
+
+    test('the hint is suppressed while the window is in error', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setDetectionWindow(1, 'h'); // below the 1h 5m floor
+      await pm.anomalyDetectionPage.save();
+      await expect(pm.anomalyDetectionPage.getDetectionWindowErrorLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getDetectionWindowHintLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.setDetectionWindow(3, 'h'); // valid again
+      await expect(pm.anomalyDetectionPage.getDetectionWindowHintLocator()).toBeVisible();
+    });
+
+    test('a window exactly at the floor is accepted', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P2', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h'); // floor 1h 5m
+      await pm.anomalyDetectionPage.setDetectionWindow(65, 'm'); // 3900s, exactly the floor
+
+      // Save must proceed: the boundary is valid, so a rejection here is the
+      // off-by-one regression the strict `<` comparison exists to prevent.
+      await pm.anomalyDetectionPage.openAlertingTab();
+      await pm.anomalyDetectionPage.toggleNotifications(false);
+      await pm.anomalyDetectionPage.saveAndExpectSuccess();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Look-back window legacy warning — a grandfathered below-floor config is
+  // warned, not erroring, and saves verbatim until a governing field is edited.
+  // Reachable only by editing an API-seeded below-floor row (the wizard cannot
+  // enter the state), so each test owns its record through the API.
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Look-back window legacy warning', () => {
+    test.describe.configure({ mode: 'parallel' });
+
+    // Seed a below-floor config (schedule 10m + histogram 5m → 15m floor;
+    // 600s window is below it), settle, reload (the list mounts once), edit.
+    const ownBelowFloorConfig = async (page, suffix, detectionWindowSeconds) => {
+      const name = anomalyName(suffix);
+      await createAnomalyViaApi(page, name, { detectionWindowSeconds });
+      await waitForAnomalyListed(page, name);
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+      await pm.anomalyDetectionPage.navigateToAnomalyTab();
+      await pm.anomalyDetectionPage.searchAnomaly(name);
+      await expect(
+        pm.anomalyDetectionPage.getRow(name),
+        `${name} was created via the API but never appeared in the list`,
+      ).toBeVisible({ timeout: 20000 });
+      return name;
+    };
+
+    test('an untouched below-floor saved config warns and saves verbatim', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownBelowFloorConfig(page, 'legacy', 600);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      const warning = pm.anomalyDetectionPage.getDetectionWindowLegacyWarningLocator();
+      await expect(warning).toBeVisible();
+      await expect(warning).toContainText('below the 15m minimum');
+      // Grandfathering suppresses the error that the same values would paint fresh.
+      await expect(pm.anomalyDetectionPage.getDetectionWindowErrorLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.saveAndExpectSuccess();
+
+      const configs = await listAnomalyDetections(page);
+      const saved = configs.find((c) => c.name === name);
+      expect(saved, `${name} should still be listed after save`).toBeTruthy();
+      // Verbatim: the untouched below-floor window round-trips unchanged.
+      expect(saved.detection_window_seconds).toBe(600);
+    });
+
+    test('editing any governing field clears the legacy warning and re-applies the floor', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownBelowFloorConfig(page, 'editclear', 600);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await expect(pm.anomalyDetectionPage.getDetectionWindowLegacyWarningLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h'); // breaks the untouched triple
+      await expect(pm.anomalyDetectionPage.getDetectionWindowLegacyWarningLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.setDetectionWindow(1, 'h'); // 3600s < 1h 5m floor
+      await pm.anomalyDetectionPage.save();
+      await expect(pm.anomalyDetectionPage.getDetectionWindowErrorLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+  });
+
   test.afterAll(async ({ browser }) => {
     if (
       !process.env.ZO_BASE_URL ||

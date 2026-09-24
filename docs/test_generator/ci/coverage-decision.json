@@ -1,0 +1,9 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The anomaly-detection wizard already has a dedicated spec (alerts-anomaly-detection.spec.js) with page-object methods setHistogramInterval/setScheduleInterval/setDetectionWindow and heavy form-validation coverage. The new look-back window floor is a NEW validation/hint/warning surface on that same Detection Config step, so the least-duplicative action is to append new test() cases in a new describe block inside the existing spec — no new spec file, no ci_matrix registration. The only test assets to extend are the page object (3 new locator getters) and api-helper.createAnomalyViaApi (accept detection_window_seconds/schedule_interval to seed a below-floor legacy config)."
+}

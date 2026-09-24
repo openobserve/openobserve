@@ -191,6 +191,8 @@ async function waitForStream(page, streamName, timeoutMs = 60000) {
  *
  * Pass `alert_budget_per_day` (a positive number) to seed a budget-mode config;
  * omit it (or pass null) to seed the default percentile config (`threshold`).
+ * Pass `detectionWindowSeconds` (and optionally `scheduleInterval`) to seed a
+ * below-floor legacy window; the server accepts below-floor writes.
  *
  * @returns {Promise<string>} the new anomaly_id
  */
@@ -201,6 +203,8 @@ async function createAnomalyViaApi(page, name, opts = {}) {
     destinations = [],
     threshold = 97,
     histogramInterval = '5m',
+    scheduleInterval = '10m',
+    detectionWindowSeconds = 3600,
     alert_budget_per_day = null,
   } = opts;
   const res = await apiCall(page, 'POST', `/api/v2/${org}/alerts?folder=default`, {
@@ -218,8 +222,8 @@ async function createAnomalyViaApi(page, name, opts = {}) {
       custom_sql: null,
       detection_function: 'count(*)',
       histogram_interval: histogramInterval,
-      schedule_interval: '10m',
-      detection_window_seconds: 3600,
+      schedule_interval: scheduleInterval,
+      detection_window_seconds: detectionWindowSeconds,
       training_window_days: 1,
       retrain_interval_days: 0,
       // Mutually exclusive on the wire: a budget config sends the per-day cap,

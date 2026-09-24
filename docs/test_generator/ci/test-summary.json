@@ -1,0 +1,11 @@
+[
+  { "title": "a detection window below the floor blocks save and names the minimum", "action": "append", "verifies": "a window narrower than schedule + histogram is rejected with the exact floor minimum named" },
+  { "title": "a valid window shows the minimum and recommended hint", "action": "append", "verifies": "a valid window renders the floor hint with minimum and recommended values" },
+  { "title": "the floor and hint recompute live from schedule and histogram", "action": "append", "verifies": "the floor hint recomputes when the governing intervals change" },
+  { "title": "seconds and days interval units feed the floor", "action": "append", "verifies": "the s/d interval units are selectable and seconds feed the floor computation" },
+  { "title": "a new config defaults the detection window to 3 hours", "action": "append", "verifies": "the shipped default detection window is 3h, not 1h" },
+  { "title": "the hint is suppressed while the window is in error", "action": "append", "verifies": "error and hint never render together; error takes precedence" },
+  { "title": "a window exactly at the floor is accepted", "action": "append", "verifies": "the boundary window (schedule + histogram) saves without a floor error" },
+  { "title": "an untouched below-floor saved config warns and saves verbatim", "action": "append", "verifies": "a grandfathered below-floor row warns instead of erroring and round-trips unchanged" },
+  { "title": "editing any governing field clears the legacy warning and re-applies the floor", "action": "append", "verifies": "the first edit to a governing field clears the legacy warning and live validation takes over" }
+]

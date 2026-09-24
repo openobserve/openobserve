@@ -72,6 +72,8 @@ class AnomalyDetectionPage {
             detectionWindowValue: '[data-test="anomaly-detection-window-value"]',
             detectionWindowUnit: '[data-test="anomaly-detection-window-unit"]',
             detectionWindowError: '[data-test="anomaly-detection-window-error"]',
+            detectionWindowHint: '[data-test="anomaly-detection-window-hint"]',
+            detectionWindowLegacyWarning: '[data-test="anomaly-detection-window-legacy-warning"]',
             trainingWindow: '[data-test="anomaly-training-window"]',
             retrainInterval: '[data-test="anomaly-retrain-interval"]',
             sensitivityTier: '[data-test="anomaly-sensitivity-tier"]',
@@ -371,19 +373,19 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.detectionFunctionInfo);
     }
 
-    /** @param {'m'|'h'} unit */
+    /** @param {'s'|'m'|'h'|'d'} unit */
     async setHistogramInterval(value, unit = 'm') {
         await this.fillFormInput(this.selectors.histogramIntervalValue, value);
         await this.selectOptionByValue(this.selectors.histogramIntervalUnit, unit);
     }
 
-    /** @param {'m'|'h'} unit */
+    /** @param {'s'|'m'|'h'|'d'} unit */
     async setScheduleInterval(value, unit = 'm') {
         await this.fillFormInput(this.selectors.scheduleIntervalValue, value);
         await this.selectOptionByValue(this.selectors.scheduleIntervalUnit, unit);
     }
 
-    /** @param {'m'|'h'} unit */
+    /** @param {'s'|'m'|'h'|'d'} unit */
     async setDetectionWindow(value, unit = 'h') {
         await this.fillFormInput(this.selectors.detectionWindowValue, value);
         await this.selectOptionByValue(this.selectors.detectionWindowUnit, unit);
@@ -392,6 +394,33 @@ class AnomalyDetectionPage {
     /** Blank the resolution field, to exercise a mid-edit invalid interval. */
     async clearHistogramInterval() {
         await this.fillFormInput(this.selectors.histogramIntervalValue, '');
+    }
+
+    /** The below-floor validation message painted under the detection window. */
+    getDetectionWindowErrorLocator() {
+        return this.page.locator(this.selectors.detectionWindowError);
+    }
+
+    /** The floor hint (minimum + recommended), shown only while the window is valid. */
+    getDetectionWindowHintLocator() {
+        return this.page.locator(this.selectors.detectionWindowHint);
+    }
+
+    /** The grandfathered below-floor warning, shown only for an untouched stored triple. */
+    getDetectionWindowLegacyWarningLocator() {
+        return this.page.locator(this.selectors.detectionWindowLegacyWarning);
+    }
+
+    async getDetectionWindowValue() {
+        return this.getFormInputValue(this.selectors.detectionWindowValue);
+    }
+
+    /** The selected window unit ('s' | 'm' | 'h' | 'd'), read from the OSelect value. */
+    async getDetectionWindowUnit() {
+        const trigger = this.page
+            .locator(`${this.selectors.detectionWindowUnit} [data-test$="-trigger"]`)
+            .first();
+        return trigger.getAttribute('data-test-selected-value');
     }
 
     async setTrainingWindow(days) {

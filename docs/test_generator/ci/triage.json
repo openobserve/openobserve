@@ -1,0 +1,29 @@
+{
+  "feature_slug": "anomaly-detection-lookback-window",
+  "feature_title": "Anomaly Detection Look-back Window Floor",
+  "area": "Alerts",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-anomaly-detection.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js",
+  "playwright_group": "Alerts-Anomaly",
+  "source_files": [
+    "web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue",
+    "web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.schema.ts",
+    "web/src/composables/useAlertForm.ts",
+    "web/src/components/alerts/AddAlert.vue",
+    "web/src/components/alerts/ImportAlert.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The complete changed-files list spans both ownership domains: OSS paths under src/** (api/management, config, core, infra, search) and web/src/** carry the shared anomaly-alert models and the Vue config UI, while o2_enterprise/src/enterprise/anomaly_detection/** and o2_enterprise/tests/** carry the enterprise detection engine and its Rust integration tests. Because the combined diff touches both the OSS layer and the enterprise layer (not just one), edition is 'both'. The enterprise paths (o2_enterprise/) plus the anomaly_detection module name are the corroborating enterprise signal; the OSS web/src and src/** changes are the OSS side.",
+    "skip": "Not skipping. The change is user-facing: it adds a look-back window floor validation to the anomaly-detection config step (web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue + its schema), a new s/d interval-unit grammar, a changed default detection window (1h -> 3h), and new hint/legacy-warning UI. There is no skip marker, label, or comment in trigger_comment.txt/feature_hint.txt (both empty). No docs-only/CI-only signal in the changed file list.",
+    "e2e": "E2E is warranted because the anomaly-detection alert config form is an existing Playwright-tested surface and this PR changes its validation and defaults: the detection window now enforces a minimum (schedule interval + histogram interval), shows a 'look-back window minimum/recommended' hint, surfaces a legacy-warning for grandfathered below-floor configs, and accepts seconds/days interval units. A human can exercise the wizard end-to-end to confirm the floor error, the hint/warning states, and the new unit options.",
+    "area": "Alerts. The UI changes live under web/src/components/anomaly_detection/steps/ and web/src/components/alerts/ (AddAlert.vue, ImportAlert.vue) plus web/src/composables/useAlertForm.ts, which is the anomaly-alert form used inside the Alerts wizard. The existing sibling spec alerts-anomaly-detection.spec.js lives in the Alerts folder (actual_folder 'Alerts'), so Alerts is the natural home.",
+    "group": "Alerts-Anomaly. The ci-matrix overlay (ci_matrix.ent.json) already owns a dedicated 'Alerts-Anomaly' shard (actual_folder 'Alerts') whose run_files is exactly alerts-anomaly-detection.spec.js, created specifically so the anomaly spec runs on its own instance. This feature extends that same spec/shard, so 'Alerts-Anomaly' is the closest existing group.",
+    "existing_tests": "No Playwright E2E specs changed in the diff. The only web/src test files are Vitest unit specs (web/src/components/alerts/ImportAlert.spec.ts, web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.spec.ts, web/src/composables/useAlertForm.anomalyDefaults.spec.ts), and the o2_enterprise/tests/anomaly_*.rs files are Rust integration tests — none of these are E2E coverage. So there are no E2E specs in the diff; existing_tests_in_diff stays false."
+  }
+}
