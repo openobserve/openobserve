@@ -102,7 +102,8 @@
     "browser": "chrome",
     "run_files": [
       "ui-regression.spec.js",
-      "landing-regression.spec.js"
+      "landing-regression.spec.js",
+      "internal-route-guards.spec.js"
     ],
     "disabled": []
   },
