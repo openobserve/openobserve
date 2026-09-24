@@ -28,6 +28,7 @@ import { safeHttpUrl, type CardSubstitutions } from "./content/renderMarkdown";
 import { getRichCardContent } from "./content/richCard/registry";
 import AIIntegrationCard from "./content/AIIntegrationCard.vue";
 import AIRichSetupCard from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 const props = defineProps<{
   categorySlug: string;
@@ -67,6 +68,17 @@ const subs = computed<CardSubstitutions>(() => {
   };
 });
 
+const passcodeForbidden = computed(
+  () => !!store.state.organizationData?.organizationPasscodeForbidden,
+);
+
+// must test the RAW markdown: richContent has already had {token} substituted away
+const richContentNeedsPasscode = computed(() =>
+  String(getAICardRaw(integration.value?.contentSlug ?? integration.value?.slug) ?? "").includes(
+    "{token}",
+  ),
+);
+
 // Rich, stepped setup card for integrations that have it (registry-driven, keyed
 // by content slug — e.g. "anthropic"). Falls back to the markdown card otherwise.
 const richContent = computed(() =>
@@ -76,8 +88,14 @@ const richContent = computed(() =>
 
 <template>
   <div v-if="integration" class="p-2">
+    <OBanner
+      v-if="passcodeForbidden && richContent && richContentNeedsPasscode"
+      variant="warning"
+      data-test="ai-integration-detail-passcode-forbidden"
+      :content="t('ingestion.passcodeForbiddenMessage')"
+    />
     <AIRichSetupCard
-      v-if="richContent"
+      v-else-if="richContent"
       :key="integrationSlug"
       :content="richContent"
       :subs="subs"

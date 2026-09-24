@@ -411,7 +411,9 @@ describe("Prebuilt Templates Index", () => {
 
           expect(typeof field.key).toBe("string");
           expect(typeof field.labelKey).toBe("string");
-          expect(["text", "password", "email", "select", "toggle"]).toContain(field.type);
+          expect(["text", "password", "email", "email-multi", "select", "toggle"]).toContain(
+            field.type,
+          );
           expect(typeof field.required).toBe("boolean");
         });
       });
