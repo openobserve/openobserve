@@ -25,6 +25,8 @@ use crate::{
 };
 
 pub const USAGE_STREAM: &str = "usage";
+/// Duplicates the enterprise auditor's private stream name; the two are compared by value.
+pub const AUDIT_STREAM: &str = "audit";
 pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";

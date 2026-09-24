@@ -5,6 +5,8 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+pub mod redaction_evidence;
+
 use std::{
     sync::{Arc, LazyLock as Lazy, OnceLock},
     time::Duration,
@@ -521,8 +523,11 @@ fn decrement_queue_depth(batch: &[ReportingData]) {
 }
 
 fn count_data(data: &[ReportingData]) -> (i64, i64) {
+    // Redaction rides the usage queue, so it must be counted against that depth gauge.
     data.iter().fold((0, 0), |(usage, error), item| match item {
-        ReportingData::Usage(_) | ReportingData::Trigger(_) => (usage + 1, error),
+        ReportingData::Usage(_) | ReportingData::Trigger(_) | ReportingData::Redaction(_) => {
+            (usage + 1, error)
+        }
         ReportingData::Error(_) => (usage, error + 1),
     })
 }
