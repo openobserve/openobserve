@@ -19,6 +19,7 @@ mod call;
 mod columns;
 mod selector;
 mod streaming;
+mod subquery;
 use std::sync::Arc;
 
 use async_recursion::async_recursion;
@@ -87,7 +88,10 @@ impl Engine {
         self.has_at_modifier = uses_at(prom_expr);
         let value = match self.exec_root_range_selector(prom_expr).await? {
             Some(value) => value,
-            None => self.exec_expr(prom_expr).await?,
+            None => match self.exec_root_subquery(prom_expr).await? {
+                Some(value) => value,
+                None => self.exec_expr(prom_expr).await?,
+            },
         };
         Ok((value, self.result_type.clone()))
     }
@@ -184,28 +188,7 @@ impl Engine {
                 }
             }
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
-            PromExpr::Subquery(expr) => {
-                let val = self.exec_expr(&expr.expr).await?;
-                let range = expr.range;
-                let matrix = match val {
-                    Value::Matrix(mut vs) => {
-                        // For matrix type, update the time_window range
-                        for rv in &mut vs {
-                            // Update time_window with new range
-                            rv.time_window = Some(TimeWindow::new(range));
-                        }
-                        vs
-                    }
-                    v => {
-                        return Err(DataFusionError::NotImplemented(format!(
-                            "Unsupported subquery, the return value should have been a matrix but got {:?}",
-                            v.get_type()
-                        )));
-                    }
-                };
-
-                Value::Matrix(matrix)
-            }
+            PromExpr::Subquery(sq) => self.exec_subquery(sq).await?,
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
             PromExpr::VectorSelector(vs) => {

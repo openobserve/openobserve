@@ -256,6 +256,7 @@ const columns = computed(() =>
       accessorFn: (row: ScoreConfigRow) => row.statusPriority,
       sortable: true,
       size: 190,
+      minSize: 136,
       meta: { align: "left" },
     },
     {
@@ -274,6 +275,8 @@ const columns = computed(() =>
       accessorKey: "dataType",
       sortable: true,
       size: COL.type,
+      // Fits the widest badge ("Categorical") so resizing can't clip it.
+      minSize: 104,
       meta: { align: "left" },
     },
     {
@@ -282,6 +285,7 @@ const columns = computed(() =>
       accessorKey: "qualityValue",
       sortable: true,
       size: 120,
+      minSize: 88,
       meta: { align: "right" },
     },
     {
@@ -289,7 +293,8 @@ const columns = computed(() =>
       header: t("onlineEvals.quality.overview.columns.totalScores"),
       accessorKey: "totalScores",
       sortable: true,
-      size: COL.count,
+      size: 120,
+      minSize: 112,
       meta: { align: "right" },
     },
     {
@@ -297,6 +302,7 @@ const columns = computed(() =>
       header: t("onlineEvals.quality.overview.columns.scopeMix"),
       sortable: false,
       size: 240,
+      minSize: 96,
       meta: { align: "left" },
     },
     {
@@ -304,6 +310,7 @@ const columns = computed(() =>
       header: t("onlineEvals.quality.overview.columns.volumeTrend"),
       sortable: false,
       size: 120,
+      minSize: 104,
       meta: { align: "left" },
     },
     {
@@ -312,6 +319,7 @@ const columns = computed(() =>
       accessorKey: "lastUpdatedMs",
       sortable: true,
       size: COL.date,
+      minSize: 112,
       meta: { align: "left" },
     },
   ].map((c: any) => ({

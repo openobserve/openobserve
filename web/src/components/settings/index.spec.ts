@@ -27,9 +27,11 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+const mockIsMetaOrg = vi.hoisted(() => ({ value: true }));
+
 vi.mock("@/composables/useIsMetaOrg", () => ({
   default: () => ({
-    isMetaOrg: { value: true },
+    isMetaOrg: mockIsMetaOrg,
   }),
 }));
 
@@ -122,6 +124,7 @@ describe("SettingsIndex", () => {
     mockStore.state.theme = "light";
     mockStore.state.selectedOrganization = { identifier: "test-org" };
     mockStore.state.zoConfig = { service_streams_enabled: true };
+    mockIsMetaOrg.value = true;
     mockRouterPush.mockClear();
 
     // Set up router state
@@ -423,6 +426,55 @@ describe("SettingsIndex", () => {
             path: "/settings/general",
             query: { org_identifier: "test-org" },
           }),
+        );
+      });
+    });
+
+    const onQueryManagementRoute = (run: () => void) => {
+      const originalRoute = router.currentRoute.value;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        name: "query_management",
+        path: "/query_management",
+      } as any;
+      try {
+        run();
+      } finally {
+        router.currentRoute.value = originalRoute;
+      }
+    };
+
+    it("should redirect query_management to general after switching to a non-meta org", async () => {
+      mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
+      mockIsMetaOrg.value = false;
+
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "true";
+
+      onQueryManagementRoute(() => {
+        createWrapper();
+
+        expect(mockRouterPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            path: "/settings/general",
+            query: { org_identifier: "test-org" },
+          }),
+        );
+      });
+    });
+
+    it("should NOT redirect query_management inside the meta org", async () => {
+      mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
+      mockIsMetaOrg.value = true;
+
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "true";
+
+      onQueryManagementRoute(() => {
+        createWrapper();
+
+        expect(mockRouterPush).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: "/settings/general" }),
         );
       });
     });
