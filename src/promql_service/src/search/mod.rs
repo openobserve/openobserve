@@ -290,9 +290,9 @@ async fn search_in_cluster(
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = req.timeout as u64;
-    let window = parser::parse(&req.query.as_ref().unwrap().query)
-        .map(|ast| selector_window(&ast))
+    let ast = parser::parse(&req.query.as_ref().unwrap().query)
         .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
+    let window = selector_window(&ast);
 
     let &cluster_rpc::MetricsQueryStmt {
         ref query,
@@ -303,6 +303,11 @@ async fn search_in_cluster(
         query_data: _,
         label_selector: _,
     } = req.query.as_ref().unwrap();
+    if start != end && is_root_subquery(&ast) {
+        return Err(Error::ErrorCode(ErrorCodes::InvalidParams(
+            "invalid expression type \"range vector\" for range query, must be Scalar or instant Vector".to_string(),
+        )));
+    }
     let nr_queriers = nodes.len() as i64;
 
     // cache enabled if result cache is enabled and use_cache is true and start != end
@@ -576,6 +581,14 @@ async fn search_in_cluster(
     Ok(values)
 }
 
+/// Whether the query answers with a subquery's own samples, which sit off any range query's grid.
+fn is_root_subquery(expr: &parser::Expr) -> bool {
+    match expr {
+        parser::Expr::Paren(paren) => is_root_subquery(&paren.expr),
+        expr => matches!(expr, parser::Expr::Subquery(_)),
+    }
+}
+
 async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
@@ -778,6 +791,23 @@ fn should_truncate_series(series_count: usize, max_limit: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_root_subquery() {
+        for (query, expected) in [
+            ("up[5m:1m]", true),
+            ("((up[5m:1m] offset 1m))", true),
+            ("max_over_time(up[5m:1m])", false),
+            ("up[5m]", false),
+            ("up", false),
+        ] {
+            assert_eq!(
+                is_root_subquery(&parser::parse(query).unwrap()),
+                expected,
+                "{query}"
+            );
+        }
+    }
 
     #[tokio::test]
     async fn test_merge_matrix_preserves_instant_worker_sample_with_cached_prefix() {
