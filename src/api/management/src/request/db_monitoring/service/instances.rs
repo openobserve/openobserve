@@ -27,11 +27,7 @@ pub(crate) async fn read_dbm_instances_body(
     user_id: &str,
     q: &DbmInstancesQuery,
 ) -> Result<Value, HttpResponse> {
-    let stream = q
-        .stream
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or(DEFAULT_SERVER_STREAM);
+    let stream = validate_server_stream(q.stream.as_deref())?.unwrap_or(DBM_SERVER_STREAM);
     // Auth BEFORE range parsing, so stream existence cannot be probed by a
     // caller who may not read it — the same ordering every sibling uses.
     if !can_read_stream(

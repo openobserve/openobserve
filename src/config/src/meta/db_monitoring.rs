@@ -51,6 +51,17 @@ use super::db_normalizer::{self, Dialect};
 /// fingerprint) so a mid-token cut can never leak a literal.
 pub const MAX_NORM_INPUT: usize = 16 * 1024;
 
+/// The server-vantage logs stream every shipped collector recipe exports to.
+pub const DBM_SERVER_STREAM: &str = "_o2_dbm_server";
+
+/// Closed by name because the `db_monitoring` module grant skips the per-stream read check.
+pub const DBM_SERVER_STREAMS: &[&str] = &[DBM_SERVER_STREAM, "dbm_server_logs"];
+
+/// Whether `name` (already formatted) is a stream DBM canonicalizes on ingest and reads from.
+pub fn is_dbm_server_stream(name: &str) -> bool {
+    DBM_SERVER_STREAMS.contains(&name)
+}
+
 /// Normalize `db.system.name`/`db.system` values to the stable enum vocabulary (design §3.1):
 /// new-semconv aliases fold onto the canonical short names; unknown systems pass through
 /// lowercased (they route to the operation+collection fallback).
@@ -1163,6 +1174,27 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn dbm_server_stream_set_is_closed() {
+        assert_eq!(DBM_SERVER_STREAM, "_o2_dbm_server");
+        assert_eq!(DBM_SERVER_STREAMS, ["_o2_dbm_server", "dbm_server_logs"]);
+        for name in DBM_SERVER_STREAMS {
+            assert!(is_dbm_server_stream(name), "{name} must be a DBM stream");
+        }
+        for name in [
+            "app_logs",
+            "",
+            "_o2_dbm_server_x",
+            "_O2_DBM_SERVER",
+            "_o2_db_stats",
+        ] {
+            assert!(
+                !is_dbm_server_stream(name),
+                "{name} must not be a DBM stream"
+            );
+        }
+    }
 
     /// This vocabulary lives in `config` rather than in core for one reason:
     /// `o2_enterprise` cannot depend on `openobserve_core` (that is a Cargo

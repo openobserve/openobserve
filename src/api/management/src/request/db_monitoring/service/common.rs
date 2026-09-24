@@ -23,9 +23,25 @@
 #[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
 use super::{super::models::*, *};
 
-/// Default server-vantage logs stream — the name the shipped collector recipes
-/// export to (`stream-name: _o2_dbm_server`).
-pub(super) const DEFAULT_SERVER_STREAM: &str = "_o2_dbm_server";
+/// Runs before any auth or read: the module grant would cover whatever stream name it is given.
+pub(super) fn validate_server_stream(
+    stream: Option<&str>,
+) -> Result<Option<&'static str>, HttpResponse> {
+    match stream.filter(|s| !s.is_empty()) {
+        None => Ok(None),
+        Some(s) => DBM_SERVER_STREAMS
+            .iter()
+            .copied()
+            .find(|member| *member == s)
+            .map(Some)
+            .ok_or_else(|| {
+                MetaHttpResponse::bad_request(format!(
+                    "stream must be one of: {}",
+                    DBM_SERVER_STREAMS.join(", ")
+                ))
+            }),
+    }
+}
 
 /// The DBM stream-read decision, split from the OFGA round trips that produce
 /// its inputs so the rule itself is unit-testable without a live OpenFGA store.
@@ -93,9 +109,8 @@ pub(super) async fn can_read_stream(
         // predicate, because counting untagged rows is how the liveness probe
         // distinguishes "collector alive, database healthy" from "collector
         // dead". It projects only `_timestamp` and the kind column and reduces
-        // them to counts, so no field value reaches the wire — but on a
-        // caller-supplied `?stream=` it does expose a row count (capped at
-        // PROBE_SCAN_LIMIT) and a newest-row timestamp. Known and accepted.
+        // them to counts, so no field value reaches the wire, and
+        // `validate_server_stream` pins `?stream=` to the DBM streams first.
         if check_permissions(
             org_id,
             org_id,
@@ -2102,7 +2117,7 @@ pub(crate) struct DbmServerPrologue {
     pub(super) present: HashSet<String>,
 }
 
-/// Compute the shared prologue for [`DEFAULT_SERVER_STREAM`], or `None` when
+/// Compute the shared prologue for [`DBM_SERVER_STREAM`], or `None` when
 /// the caller may not read it or the schema read failed — each slice then runs
 /// its own prologue and owns its own denial/error, byte-identically to the
 /// standalone endpoints. `None` is deliberately NOT a verdict (see
@@ -2112,16 +2127,16 @@ pub(super) async fn server_prologue(org_id: &str, user_id: &str) -> Option<DbmSe
     if !can_read_stream(
         org_id,
         user_id,
-        DEFAULT_SERVER_STREAM,
+        DBM_SERVER_STREAM,
         required_stream_for(DbmVantage::Server),
     )
     .await
     {
         return None;
     }
-    match present_dbm_columns(org_id, DEFAULT_SERVER_STREAM).await {
+    match present_dbm_columns(org_id, DBM_SERVER_STREAM).await {
         Ok(present) => Some(DbmServerPrologue {
-            stream: DEFAULT_SERVER_STREAM.to_string(),
+            stream: DBM_SERVER_STREAM.to_string(),
             present,
         }),
         Err(_) => None,
@@ -2152,6 +2167,125 @@ mod tests {
     use serde_json::json;
 
     use super::{super::testutil::*, *};
+
+    fn is_bad_request(r: &Result<Option<&'static str>, HttpResponse>) -> bool {
+        matches!(r, Err(resp) if resp.status() == axum::http::StatusCode::BAD_REQUEST)
+    }
+
+    #[test]
+    fn validate_server_stream_accepts_only_the_dbm_set() {
+        assert_eq!(validate_server_stream(None).ok(), Some(None));
+        assert_eq!(validate_server_stream(Some("")).ok(), Some(None));
+        assert_eq!(
+            validate_server_stream(Some("_o2_dbm_server")).ok(),
+            Some(Some(DBM_SERVER_STREAM))
+        );
+        assert_eq!(
+            validate_server_stream(Some("dbm_server_logs")).ok(),
+            Some(Some("dbm_server_logs"))
+        );
+        for bad in [
+            "app_logs",
+            "_o2_db_stats",
+            "_O2_DBM_SERVER",
+            " _o2_dbm_server",
+        ] {
+            assert!(
+                is_bad_request(&validate_server_stream(Some(bad))),
+                "{bad} must be a 400"
+            );
+        }
+    }
+
+    /// The module grant skips the per-stream check, so an unpinned name reads any logs stream.
+    #[test]
+    fn every_server_vantage_body_validates_the_stream() {
+        let src = dbm_prod_source();
+        for body_fn in [
+            "read_dbm_instances_body",
+            "read_activity_body",
+            "read_table_health_body",
+            "read_deadlocks_body",
+            "read_blocking_body",
+            "read_plans_body",
+            "read_server_queries_body",
+            "read_server_metrics_body",
+            "read_server_samples_body",
+            "read_query_insights_response",
+        ] {
+            let start = src
+                .find(&format!("async fn {body_fn}("))
+                .unwrap_or_else(|| panic!("{body_fn} must exist"));
+            let body = src[start..].split("\n}\n").next().expect("body");
+            let validate = body
+                .find("validate_server_stream(")
+                .unwrap_or_else(|| panic!("{body_fn} must call validate_server_stream"));
+            for later in [
+                "can_read_stream(",
+                "server_prologue(",
+                "present_dbm_columns(",
+            ] {
+                if let Some(at) = body.find(later) {
+                    assert!(
+                        validate < at,
+                        "{body_fn} must validate the stream before {later}"
+                    );
+                }
+            }
+        }
+        let samples = src
+            .find("async fn read_server_samples_body(")
+            .expect("server samples body");
+        assert!(
+            src[samples..]
+                .split("\n}\n")
+                .next()
+                .expect("body")
+                .contains("DBM_SERVER_STREAMS"),
+            "with no stream, /server_samples must still read BOTH DBM streams (the /badges \
+             zero-trace fallback depends on it)"
+        );
+    }
+
+    fn app_logs<T: serde::de::DeserializeOwned>() -> T {
+        serde_json::from_value(json!({"stream": "app_logs", "fingerprint": "fp"})).unwrap()
+    }
+
+    // A 400 from any other check (missing fingerprint, bad range) must not pass for this one.
+    async fn assert_stream_rejected(resp: HttpResponse) {
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(
+            body.contains("stream must be one of"),
+            "400 for another reason: {body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn query_insights_rejects_a_foreign_stream_before_the_prologue() {
+        let resp = read_query_insights_response("default", "a@a.com", &app_logs()).await;
+        assert_stream_rejected(resp).await;
+    }
+
+    #[tokio::test]
+    async fn activity_rejects_a_foreign_stream_before_the_probe() {
+        let resp = read_activity_body("default", "a@a.com", &app_logs(), false, None).await;
+        assert_stream_rejected(resp.expect_err("activity must 400 on a non-DBM stream")).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn deadlocks_and_blocking_reject_a_foreign_stream() {
+        let deadlocks = read_deadlocks_body("default", "a@a.com", &app_logs(), false, None).await;
+        assert_stream_rejected(deadlocks.expect_err("deadlocks must 400 on a non-DBM stream"))
+            .await;
+        let blocking = read_blocking_body("default", "a@a.com", &app_logs(), false, None).await;
+        assert_stream_rejected(blocking.expect_err("blocking must 400 on a non-DBM stream")).await;
+    }
+
     /// A role granting the `db_monitoring` MODULE
     /// (`{"object":"db_monitoring:_all_default","permission":"AllowAll"}`) and
     /// nothing else must reach all ten DBM endpoints.
