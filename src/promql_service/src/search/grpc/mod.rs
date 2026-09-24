@@ -167,11 +167,10 @@ pub async fn search(
         // 2. generate search group with max records stream
         let start_ts = std::time::Instant::now();
         let wal_floor = wal_floor();
-        // no cut without streaming, around a per-group subquery, or with an `@` pin on the WAL
+        // no cut without streaming, or with an `@` pin on the WAL
         let cut = if cfg.search.feature_metrics_streaming_agg_enabled
             && !query.query_exemplars
             && !req.is_super_cluster
-            && !plan.window.subquery
             && plan.window.pinned.is_none()
         {
             wal_cut(start, end, step, micros(plan.window.ahead), wal_floor)

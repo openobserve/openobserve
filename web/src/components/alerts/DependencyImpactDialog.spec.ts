@@ -26,14 +26,29 @@ import {
 
 const { buildGraph } = realUseDependencyGraph();
 
-// slack: used by 3 alerts (one paused), uses tpl-http.
+// slack: used by 3 alerts (one paused) and a pipeline, uses tpl-http.
+// pager: used only by a synthetic check — no alerts at all.
+// idle: used by nothing at all.
 const graph: DepGraph = buildGraph(
   [
     { alert_id: "a1", name: "cpu", destinations: ["slack"], enabled: true },
     { alert_id: "a2", name: "mem", destinations: ["slack"], enabled: false },
     { alert_id: "a3", name: "disk", destinations: ["slack"], enabled: true },
   ],
-  [{ name: "slack", type: "http", template: "tpl-http" }],
+  [
+    {
+      name: "slack",
+      type: "http",
+      template: "tpl-http",
+      uses: [{ consumer: "pipeline", id: "p1", name: "ingest-pipe" }],
+    },
+    {
+      name: "pager",
+      type: "http",
+      uses: [{ consumer: "synthetic_check", id: "c1", name: "checkout-journey" }],
+    },
+    { name: "idle", type: "http" },
+  ],
   [{ name: "tpl-http", type: "http" }],
 );
 
@@ -106,6 +121,40 @@ describe("DependencyImpactDialog", () => {
         "dependency-impact-row-disk",
       ]),
     );
+  });
+
+  it("destination focus: lists the non-alert consumers the delete guard would name", async () => {
+    mountDialog({ kind: "destination", name: "slack" });
+    await flushPromises();
+    const other = document.querySelector('[data-test="dependency-impact-blocker-pipeline"]');
+    expect(other?.textContent).toContain("1");
+  });
+
+  it("destination used only by a synthetic check never says 'No alerts'", async () => {
+    mountDialog({ kind: "destination", name: "pager" });
+    await flushPromises();
+    // The alerts lane does not render at all — there is nothing to say "No alerts" about.
+    expect(document.querySelector('[data-test="dependency-impact-lane-alert"]')).toBeFalsy();
+    expect(document.querySelector('[data-test="dependency-impact-no-consumers"]')).toBeFalsy();
+    const section = document.querySelector(
+      '[data-test="dependency-impact-blocker-synthetic_check"]',
+    );
+    expect(section?.textContent).toContain("checkout-journey");
+    expect(document.body.textContent).not.toContain("No alerts");
+  });
+
+  it("destination used only by a synthetic check counts it in the header, not '0 alerts'", async () => {
+    mountDialog({ kind: "destination", name: "pager" });
+    await flushPromises();
+    const subtitle = document.querySelector('[data-test="dependency-impact-subtitle"]');
+    expect(subtitle?.textContent).not.toContain("0 alert");
+    expect(subtitle?.textContent).toContain("1 synthetic check");
+  });
+
+  it("destination used by nothing at all shows the blanket empty state", async () => {
+    mountDialog({ kind: "destination", name: "idle" });
+    await flushPromises();
+    expect(document.querySelector('[data-test="dependency-impact-no-consumers"]')).toBeTruthy();
   });
 
   it("template focus: destinations → alerts grouped by destination (no template lane)", async () => {
