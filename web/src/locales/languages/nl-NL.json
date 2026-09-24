@@ -7941,7 +7941,7 @@
     "enabled": "Ingeschakeld",
     "paused": "Gepauzeerd",
     "impactTemplate": "Gebruikt door {destinations} · {alerts}",
-    "impactDestination": "Gebruikt door {alerts}"
+    "impactDestination": "Gebruikt door {consumers}"
   },
   "alert_library": {
     "header": "Meldingenbibliotheek",

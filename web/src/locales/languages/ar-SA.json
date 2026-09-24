@@ -7941,7 +7941,7 @@
     "enabled": "مفعل",
     "paused": "توقف",
     "impactTemplate": "مستخدم من قبل {destinations} · {alerts}",
-    "impactDestination": "استخدمها {alerts}"
+    "impactDestination": "استخدمها {consumers}"
   },
   "alert_library": {
     "header": "مكتبة التنبيه",

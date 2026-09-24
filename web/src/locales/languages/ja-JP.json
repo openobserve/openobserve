@@ -7941,7 +7941,7 @@
     "enabled": "有効",
     "paused": "一時停止",
     "impactTemplate": "使用中: {destinations} · {alerts}",
-    "impactDestination": "使用元 {alerts}"
+    "impactDestination": "使用元 {consumers}"
   },
   "alert_library": {
     "header": "アラートライブラリ",

@@ -7941,7 +7941,7 @@
     "enabled": "已启用",
     "paused": "已暂停",
     "impactTemplate": "被 {destinations} · {alerts} 使用",
-    "impactDestination": "被 {alerts} 使用"
+    "impactDestination": "被 {consumers} 使用"
   },
   "alert_library": {
     "header": "告警库",

@@ -7941,7 +7941,7 @@
     "enabled": "Aktiviert",
     "paused": "Pausiert",
     "impactTemplate": "Verwendet von {destinations} · {alerts}",
-    "impactDestination": "Verwendet von {alerts}"
+    "impactDestination": "Verwendet von {consumers}"
   },
   "alert_library": {
     "header": "Alarm-Bibliothek",

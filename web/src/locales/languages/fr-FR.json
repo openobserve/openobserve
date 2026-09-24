@@ -7941,7 +7941,7 @@
     "enabled": "Activé",
     "paused": "En pause",
     "impactTemplate": "Utilisé par {destinations} · {alerts}",
-    "impactDestination": "Utilisé par {alerts}"
+    "impactDestination": "Utilisé par {consumers}"
   },
   "alert_library": {
     "header": "Bibliothèque d'alertes",

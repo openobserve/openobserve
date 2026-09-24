@@ -161,8 +161,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <OTag type="countChip" value="neutral">{{ chain.alerts.length }}</OTag>
             </div>
+            <!-- Destination focus grows to its content so the consumer sections below
+                 stay on screen; template focus keeps a fixed lane height, because its
+                 two lanes sit side by side and must line up. -->
             <div
-              class="border-border-default bg-surface-panel rounded-surface h-72 overflow-y-auto border p-1.5"
+              class="border-border-default bg-surface-panel rounded-surface overflow-y-auto border p-1.5"
+              :class="isTemplateFocus ? 'h-72' : 'max-h-72 min-h-16'"
             >
               <div
                 v-if="alertsEmpty"

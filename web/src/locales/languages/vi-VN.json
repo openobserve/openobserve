@@ -7941,7 +7941,7 @@
     "enabled": "Đã bật",
     "paused": "Đã tạm dừng",
     "impactTemplate": "Được sử dụng bởi {destinations} · {alerts}",
-    "impactDestination": "Được sử dụng bởi {alerts}"
+    "impactDestination": "Được sử dụng bởi {consumers}"
   },
   "alert_library": {
     "header": "Thư viện cảnh báo",

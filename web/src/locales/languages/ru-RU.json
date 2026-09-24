@@ -7941,7 +7941,7 @@
     "enabled": "Включено",
     "paused": "Приостановлено",
     "impactTemplate": "Используется {destinations} · {alerts}",
-    "impactDestination": "Используется {alerts}"
+    "impactDestination": "Используется {consumers}"
   },
   "alert_library": {
     "header": "Библиотека оповещений",

@@ -7941,7 +7941,7 @@
     "enabled": "활성화됨",
     "paused": "일시 중지됨",
     "impactTemplate": "사용 중: {destinations} · {alerts}",
-    "impactDestination": "사용처: {alerts}"
+    "impactDestination": "사용처: {consumers}"
   },
   "alert_library": {
     "header": "알림 라이브러리",

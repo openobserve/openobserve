@@ -7941,7 +7941,7 @@
     "enabled": "Etkin",
     "paused": "Duraklatıldı",
     "impactTemplate": "{destinations} · {alerts} tarafından kullanılıyor",
-    "impactDestination": "Kullanan: {alerts}"
+    "impactDestination": "Kullanan: {consumers}"
   },
   "alert_library": {
     "header": "Uyarı Kitaplığı",
