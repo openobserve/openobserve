@@ -25,12 +25,14 @@ pub mod llm_scores_schema;
 #[cfg(feature = "enterprise")]
 pub mod llm_scores_writer;
 pub(crate) mod persistence;
+pub mod redaction_schema;
 pub mod search;
 mod triggers_schema;
 mod usage_schema;
 
 #[cfg(feature = "cloud")]
 pub use ingestion::ingest_data_retention_usages;
+pub use usage_reporting::redaction_evidence;
 
 #[cfg(feature = "enterprise")]
 pub struct CoreAuditPublisher;

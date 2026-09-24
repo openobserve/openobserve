@@ -4,7 +4,8 @@
     "actual_folder": "RegressionSet/Logs",
     "browser": "chrome",
     "run_files": [
-      "logs-bugs.spec.js"
+      "logs-bugs.spec.js",
+      "logs-query-editor-resize-bounds.spec.js"
     ],
     "disabled": []
   },

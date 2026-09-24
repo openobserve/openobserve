@@ -19,6 +19,7 @@ enterprise = [
 ]
 cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
 vectorscan = [
+    "enrichment-data/vectorscan",
     "openobserve-core/vectorscan",
     "promql-service/vectorscan",
     "search_service/vectorscan",
