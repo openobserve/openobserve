@@ -129,6 +129,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("dbm.metrics.noAccess", { stream: raw("_o2_dbm_server") }) }}
                 </span>
               </div>
+              <div
+                v-else-if="loadNotCollecting"
+                class="bg-surface-base absolute inset-0 flex items-center justify-center"
+                data-test="dbm-metrics-load-not-collecting"
+              >
+                <OEmptyState
+                  size="inline"
+                  icon="database"
+                  :title="t('dbm.metrics.serverStreamMissing.title')"
+                  :description="
+                    t('dbm.metrics.serverStreamMissing.description', {
+                      stream: raw('_o2_dbm_server'),
+                    })
+                  "
+                  :action-label="t('dbm.metrics.serverStreamMissing.action')"
+                  data-test="dbm-metrics-load-setup"
+                  @action="openSetup"
+                />
+              </div>
             </div>
           </DbmSection>
 
@@ -184,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :explore-url="p.exploreUrl"
                 @update:by="catalogBy[p.entry.key] = $event"
                 @zoom="onChartZoom"
+                @setup="openSetup"
               />
             </div>
           </DbmSection>
@@ -242,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :start-time="current.startTime"
                   :end-time="current.endTime"
                   @zoom="onChartZoom"
+                  @setup="openSetup"
                 />
               </div>
             </DbmSection>
@@ -278,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :start-time="current.startTime"
                   :end-time="current.endTime"
                   @zoom="onChartZoom"
+                  @setup="openSetup"
                 />
               </div>
             </DbmSection>
@@ -330,9 +352,11 @@ import {
   filterDbmMetricPanels,
   filterDbmMetricStreams,
   panelErrorIsForbidden,
+  panelErrorIsStreamMissing,
   type DbmLoadBreakdown,
   type DbmMetricsScope,
 } from "@/utils/dbm/metricsPanels";
+import { DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { buildMetricsUrl } from "@/utils/metrics/buildMetricsUrl";
 import type { MetricStream } from "@/utils/metrics/metricFamily";
 
@@ -414,8 +438,14 @@ const catalogSections = computed<DbmSectionDef[]>(() =>
 /** The honesty hint about the hostname join the host section rides on. */
 /** The load chart's stream-permission state — see panelErrorIsForbidden. */
 const loadNoAccess = ref(false);
+const loadNotCollecting = ref(false);
 const onLoadError = (event: { message?: string; code?: unknown }) => {
   loadNoAccess.value = panelErrorIsForbidden(event);
+  loadNotCollecting.value = panelErrorIsStreamMissing(event);
+};
+
+const openSetup = () => {
+  router.push({ name: DBM_SETUP_ROUTE, query: { org_identifier: org.value } }).catch(() => {});
 };
 
 const hostScopeState = computed(() => dbmHostScopeState(scope.value));

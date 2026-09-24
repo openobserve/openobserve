@@ -28,6 +28,7 @@ import {
   humanizeDbmMetricName,
   injectPromqlSelector,
   panelErrorIsForbidden,
+  panelErrorIsStreamMissing,
 } from "./metricsPanels";
 
 /** Key-echoing stub — the assertions read the KEY, not real copy. */
@@ -142,6 +143,23 @@ describe("panelErrorIsForbidden", () => {
     expect(panelErrorIsForbidden({ code: 500 })).toBe(false);
     expect(panelErrorIsForbidden({ code: "" })).toBe(false);
     expect(panelErrorIsForbidden(null)).toBe(false);
+  });
+});
+
+describe("panelErrorIsStreamMissing", () => {
+  it("recognizes the engine's missing-stream error by code or message", () => {
+    expect(panelErrorIsStreamMissing({ code: 20002 })).toBe(true);
+    expect(panelErrorIsStreamMissing({ code: "20002" })).toBe(true);
+    expect(
+      panelErrorIsStreamMissing({ code: 500, message: "Search stream not found: _o2_dbm_server" }),
+    ).toBe(true);
+  });
+
+  it("rejects every other failure", () => {
+    expect(panelErrorIsStreamMissing({ code: 403, message: "Unauthorized Access" })).toBe(false);
+    expect(panelErrorIsStreamMissing({ code: 500, message: "Search SQL not valid" })).toBe(false);
+    expect(panelErrorIsStreamMissing({ message: "" })).toBe(false);
+    expect(panelErrorIsStreamMissing(null)).toBe(false);
   });
 });
 
