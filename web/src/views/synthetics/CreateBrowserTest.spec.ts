@@ -1685,6 +1685,24 @@ describe("CreateBrowserTest", () => {
       expect(leaveAsks()).toBe(false);
     });
 
+    it("no unsaved dot after the folder fallback", async () => {
+      mockGetFoldersListByType.mockResolvedValue([{ folderId: "folder-1", name: "Checkout" }]);
+      mockServiceGet.mockResolvedValue({
+        data: {
+          name: "Checkout",
+          url: "https://shop.test",
+          folder: "gone",
+          environments: [],
+          journey: saved.map((step) => ({ ...step })),
+        },
+      });
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      expect(wrapper.find(DOT).exists()).toBe(false);
+      expect(leaveAsks()).toBe(false);
+    });
+
     it("the unsaved dot shows after renaming a step", async () => {
       wrapper = await mountSaved();
 
@@ -2050,12 +2068,12 @@ describe("CreateBrowserTest", () => {
     }
 
     async function replay(w: VueWrapper, steps: unknown[]) {
-      mockJourneyToWireSteps.mockReturnValueOnce(steps);
+      mockJourneyToWireSteps.mockReturnValue(steps);
       journeyStub(w).vm.$emit("replay");
       await flushPromises();
     }
 
-    /** Replays the loaded journey; the wire mapper keeps each step's id and text. */
+    /** Replays the loaded journey; the wire mapper keeps each step's id, action and value. */
     async function replayJourney(w: VueWrapper) {
       journeyStub(w).vm.$emit("replay");
       await flushPromises();
@@ -2318,7 +2336,7 @@ describe("CreateBrowserTest", () => {
         );
         expect(missingDialogOpen(wrapper)).toBe(true);
         expect(mockRecorderReplay).not.toHaveBeenCalled();
-        expect(consoleError.mock.calls.flat()).not.toContain(failure);
+        expect(consoleError).not.toHaveBeenCalled();
       } finally {
         consoleError.mockRestore();
       }
@@ -2428,6 +2446,62 @@ describe("CreateBrowserTest", () => {
 
       expect(errorToasts()).toHaveLength(1);
       expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("reports a name used inside a subtest under the reference row's number", async () => {
+      const subtestStep: BrowserStep = {
+        id: "s2",
+        action: "subtest",
+        name: "Authorize (shared)",
+        subtest: { id: "auth-test", name: "Authorize" },
+      };
+      mockServiceListEnvironments.mockResolvedValue({ data: orgEnvironments() });
+      mockServiceGet.mockImplementation(async (_org: string, id: string) => {
+        if (id === "check-123") {
+          return {
+            data: {
+              name: "Login",
+              url: "{{BASE_URL}}/login",
+              environments: ["stg"],
+              journey: [typeStep("s1", "a"), subtestStep],
+            },
+          };
+        }
+        return {
+          data: {
+            name: "Authorize",
+            config: { steps: [typeStep("c1", "b"), typeStep("c2", "{{API_KEY}}")] },
+          },
+        };
+      });
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      await replayJourney(wrapper);
+
+      expect(missingDialogOpen(wrapper)).toBe(true);
+      expect(missingDialog(wrapper).props("steps")).toEqual([2]);
+      expect(missingDialog(wrapper).props("canReplayAnyway")).toBe(true);
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("saves a missing value into Global when the check pins no environment", async () => {
+      wrapper = await mountTemplatedCheck([], { journey: [typeStep("s1", "{{API_KEY}}")] });
+      await replayJourney(wrapper);
+
+      expect(missingDialogOpen(wrapper)).toBe(true);
+      expect(missingDialog(wrapper).props("isGlobal")).toBe(true);
+      expect(missingDialog(wrapper).props("environmentName")).toBe("Global");
+
+      await submitMissing(wrapper, { value: "k", secret: false });
+      await flushPromises();
+
+      expect(mockServiceCreateGlobalVariable).toHaveBeenCalledWith("default", {
+        name: "API_KEY",
+        value: "k",
+        kind: "plain",
+      });
+      expect(mockServiceCreateEnvironmentVariable).not.toHaveBeenCalled();
     });
 
     it("asks for a stored secret before the first replay, then replays with the typed value", async () => {

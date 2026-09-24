@@ -139,6 +139,7 @@ describe("MissingValueDialog", () => {
     wrapper = mountDialog({ environmentName: raw("Global"), isGlobal: true });
     expect(wrapper.find(SECRET).exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Store as a secret");
+    expect(wrapper.text()).toContain("Global values apply to every check");
 
     wrapper.unmount();
     wrapper = mountDialog();

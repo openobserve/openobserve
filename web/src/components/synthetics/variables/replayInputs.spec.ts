@@ -257,6 +257,7 @@ describe("replayEnvironmentOptions", () => {
     ]);
   });
 });
+
 describe("classifyReplayNames", () => {
   const stateOf = (statuses: { name: string; state: string }[], name: string) =>
     statuses.find((s) => s.name === name)?.state;

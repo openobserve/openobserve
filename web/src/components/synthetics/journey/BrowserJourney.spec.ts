@@ -1097,7 +1097,9 @@ describe("BrowserJourney Add Subtest button", () => {
     wrapper = mountJourney({ readonly: true });
 
     expect(wrapper.find(ADD_STEP).attributes("disabled")).toBeDefined();
-    expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeDefined();
+    expect(
+      wrapper.find('[data-test="synthetics-journey-add-menu-trigger"]').attributes("disabled"),
+    ).toBeDefined();
   });
 
   it("should append a step whose action is already subtest", async () => {

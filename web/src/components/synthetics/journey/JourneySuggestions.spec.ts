@@ -185,7 +185,6 @@ describe("JourneySuggestions", () => {
     expect(two.findAllComponents(OSeparator)).toHaveLength(2);
   });
 
-  // The warning colour asks whether the author is stuck; one line answers it.
   it("says that suggestions never block saving or running", async () => {
     const wrapper = render([ZERO_ASSERTION]);
 

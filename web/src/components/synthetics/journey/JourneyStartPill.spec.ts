@@ -203,6 +203,13 @@ describe("JourneyStartPill", () => {
     expect((wrapper.get(URL_INPUT_FIELD).element as HTMLInputElement).value).toBe(
       "{{BASE_URL}}/login",
     );
+
+    await wrapper.get(URL_INPUT_FIELD).setValue("  https://shop.test/checkout  ");
+    await click(wrapper, sel("-url-apply"));
+
+    await vi.waitFor(() =>
+      expect(wrapper.emitted("update:url")?.[1]).toEqual(["https://shop.test/checkout"]),
+    );
   });
 
   it("Apply with an invalid URL shows the reason and emits nothing", async () => {

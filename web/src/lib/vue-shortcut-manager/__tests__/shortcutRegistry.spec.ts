@@ -210,15 +210,15 @@ describe("aiChatToggle entry visibility", () => {
 });
 
 describe("synthetics journey search shortcut", () => {
-  it("registers syntheticsJourneyFocusSearch on / for enterprise only", () => {
+  it("registers syntheticsJourneyFocusSearch on /", () => {
     expect(getShortcutDef("syntheticsJourneyFocusSearch")).toMatchObject({
       key: "/",
       scope: "synthetics-journey",
       descriptionKey: "shortcuts.actions.focusSearch",
     });
     expect(visiblePages(ENTERPRISE).has("shortcuts.pages.syntheticsJourney")).toBe(true);
-    expect(visiblePages(OSS).has("shortcuts.pages.syntheticsJourney")).toBe(false);
-    expect(visiblePages(CLOUD).has("shortcuts.pages.syntheticsJourney")).toBe(false);
+    expect(visiblePages(OSS).has("shortcuts.pages.syntheticsJourney")).toBe(true);
+    expect(visiblePages(CLOUD).has("shortcuts.pages.syntheticsJourney")).toBe(true);
   });
 
   it("the cheatsheet modules include the synthetics journey page", () => {
