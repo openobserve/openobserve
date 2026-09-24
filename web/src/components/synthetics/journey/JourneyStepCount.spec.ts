@@ -56,6 +56,14 @@ function mountCount(steps: BrowserStep[], children: ChildJourney[] = [], limit =
 const text = (w: ReturnType<typeof mountCount>) => w.text().replace(/\s+/g, " ").trim();
 const tooltip = (w: ReturnType<typeof mountCount>) => w.find('[data-test="step-count-tooltip"]');
 
+function setLocale(code: string) {
+  const g = i18n.global as unknown as { locale: string | { value: string } };
+  const previous = typeof g.locale === "string" ? g.locale : g.locale.value;
+  if (typeof g.locale === "string") g.locale = code;
+  else g.locale.value = code;
+  return previous;
+}
+
 describe("JourneyStepCount", () => {
   it("shows the rows as the count when the test has no subtests", () => {
     expect(text(mountCount(own(4)))).toBe("4 steps");
@@ -139,5 +147,34 @@ describe("JourneyStepCount", () => {
     expect(text(w)).toBe("5 steps");
     expect(w.find(".text-status-error-text").exists()).toBe(false);
     expect(tooltip(w).exists()).toBe(false);
+  });
+
+  it("joins the tooltip parts with the locale's list rule", () => {
+    // Messages fall back to English; only the list joiner follows the German locale.
+    const previous = setLocale("de");
+    try {
+      const w = mountCount(
+        [...own(6), reference("r1", "login", "Login"), reference("r2", "checkout", "Checkout")],
+        [child("login", "login-shared", 38), child("checkout", "checkout-flow", 14)],
+      );
+      expect(tooltip(w).attributes("data-tooltip")).toBe(
+        '6 steps in this test, 38 from "login-shared" und 14 from "checkout-flow". This test executes 58 of the 50 allowed.',
+      );
+    } finally {
+      setLocale(previous);
+    }
+  });
+
+  it("the count is focusable as the tooltip trigger when there are subtests", () => {
+    const w = mountCount(
+      [...own(4), reference("r1", "login", "Login")],
+      [child("login", "login-shared", 14)],
+    );
+    const trigger = w.find('[tabindex="0"]');
+    expect(trigger.exists()).toBe(true);
+    expect(trigger.text()).toContain("18 steps (including 1 subtest)");
+    expect(trigger.find('[data-test="step-count-tooltip"]').exists()).toBe(true);
+
+    expect(mountCount(own(4)).find('[tabindex="0"]').exists()).toBe(false);
   });
 });

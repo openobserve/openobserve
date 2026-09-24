@@ -23,9 +23,10 @@ import type { ChildJourney, ExpansionMap } from "@/utils/synthetics/expandJourne
 // It is a spy as well so the interpolation params can be asserted, which is the
 // only place the step NUMBERS in a message are observable.
 const mockT = vi.fn((key: string, ..._args: unknown[]) => key);
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: mockT }),
-}));
+vi.mock("vue-i18n", async () => {
+  const { ref } = await import("vue");
+  return { useI18n: () => ({ t: mockT, locale: ref("en-US") }) };
+});
 
 // Validation raises toasts, so the call has to be observable. The real
 // implementation is a no-op in jsdom, which is why nothing needed this before.
@@ -2271,11 +2272,16 @@ describe("BrowserJourney step cap", () => {
     w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 51 });
     await flushPromises();
 
+    expect(executedBadge(w).exists()).toBe(false);
+    expect(mockT).not.toHaveBeenCalledWith(
+      "synthetics.journey.subtest.executedBadge",
+      expect.anything(),
+    );
+    const badges = w.findAllComponents(OBadgeStub).map((b) => b.text());
+    expect(badges).not.toContain(String(journey.length));
     const heading = w.findAll("h3").find((h) => h.text() === "synthetics.journey.steps");
     expect(heading).toBeDefined();
     expect(heading!.classes()).toEqual(["sr-only"]);
-    const badges = w.findAllComponents(OBadgeStub).map((b) => b.text());
-    expect(badges).not.toContain(String(journey.length));
   });
 
   it("renders no notice at or under the limit, and none when the count is unknown", async () => {

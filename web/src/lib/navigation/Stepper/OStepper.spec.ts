@@ -266,4 +266,34 @@ describe("OStepper description slot", () => {
     expect(caption.text()).toBe("5 steps");
     wrapper.unmount();
   });
+
+  it("renders the description slot outside the step's trigger button", async () => {
+    const wrapper = mountWithDescription("4 steps");
+    await wrapper.vm.$nextTick();
+
+    const caption = wrapper.find('[role="list"] [data-test="caption"]');
+    expect(caption.exists()).toBe(true);
+    expect(caption.element.closest("button")).toBeNull();
+    const item = caption.element.closest('[role="listitem"]');
+    expect(item?.querySelector("button")?.textContent).toContain("First");
+    wrapper.unmount();
+  });
+
+  it("still renders the description prop when no slot is given", async () => {
+    const Wrapper = defineComponent({
+      components: { OStepper, OStep },
+      setup: () => ({ active: ref(1) }),
+      template: `
+        <OStepper v-model="active" :animated="false">
+          <OStep :name="1" title="First" description="Pick a target">Step 1 content</OStep>
+          <OStep :name="2" title="Second">Step 2 content</OStep>
+        </OStepper>
+      `,
+    });
+    const wrapper = mount(Wrapper, { attachTo: document.body });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[role="list"]').text()).toContain("Pick a target");
+    wrapper.unmount();
+  });
 });
