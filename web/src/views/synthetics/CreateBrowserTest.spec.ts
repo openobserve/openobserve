@@ -2380,6 +2380,24 @@ describe("CreateBrowserTest", () => {
       expect(missingDialogOpen(wrapper)).toBe(false);
     });
 
+    it("Replay anyway replays in the environment the replay was started in", async () => {
+      wrapper = await mountTemplatedCheck(["stg", "prod"], {
+        journey: [typeStep("s1", "a"), typeStep("s2", "b"), typeStep("s3", "{{API_KEY}}")],
+      });
+      await replayJourney(wrapper);
+      expect(missingDialogOpen(wrapper)).toBe(true);
+
+      await chooseReplayEnvironment(wrapper, "prod");
+      missingDialog(wrapper).vm.$emit("replay-anyway");
+      await flushPromises();
+      expect(mockReplayUpTo).toHaveBeenCalledWith(2);
+      journeyStub(wrapper).vm.$emit("replay-up-to", 2);
+      await flushPromises();
+
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://stg.test/login");
+    });
+
     it("replays a prefix that does not use the missing name without asking for it", async () => {
       wrapper = await mountTemplatedCheck(["stg"], {
         journey: [typeStep("s1", "a"), typeStep("s2", "b"), typeStep("s3", "{{API_KEY}}")],
@@ -2609,6 +2627,28 @@ describe("CreateBrowserTest", () => {
       expect(secretsDialogOpen(wrapper)).toBe(true);
       expect(secretsDialog(wrapper).props("mode")).toBe("ask");
       expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("Save & re-run replays in the environment the secrets were typed for", async () => {
+      wrapper = await mountTemplatedCheck(
+        ["stg"],
+        { journey: [typeStep("s1", "{{PASSWORD}}")] },
+        qaEnvironments(),
+      );
+      await typeSecret(wrapper, { PASSWORD: "p" });
+      mockRecorderReplay.mockClear();
+
+      replayMenu(wrapper).vm.$emit("edit-secrets");
+      await flushPromises();
+      await chooseReplayEnvironment(wrapper, "qa");
+      await (secretsDialog(wrapper).props("onSubmit") as (v: unknown) => Promise<void> | void)({
+        PASSWORD: "p2",
+      });
+      await flushPromises();
+
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://stg.test/login");
+      expect(replayedVariables()).toContainEqual({ name: "PASSWORD", value: "p2" });
     });
 
     it("typed secrets are gone after the editor remounts", async () => {

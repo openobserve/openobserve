@@ -1332,7 +1332,9 @@ function onReplayUpTo(upTo: number) {
 
 /** The whole journey even for a prefix replay, so untouched later steps do not look valid. */
 function validateJourneyBeforeReplay(): boolean {
-  return journeyRef.value?.validateStepSelectors?.() ?? true;
+  const valid = journeyRef.value?.validateStepSelectors?.() ?? true;
+  if (!valid) nextReplayEnvId = undefined;
+  return valid;
 }
 
 const {
@@ -1517,7 +1519,7 @@ const missingDialogProps = computed(() => {
   return {
     name: prompt.status.name,
     environmentName: environmentLabel(prompt.pending.envId),
-    isGlobal: !env,
+    isGlobal: prompt.pending.envId === GLOBAL_ONLY,
     steps,
     sharedByChecks: env?.checks_count ?? 0,
     canReplayAnyway: !steps.includes(0) && steps[0] > 1,
@@ -1542,6 +1544,9 @@ function sharedListsSettled(): Promise<void> {
   });
 }
 
+/** The environment of a replay a dialog re-runs, so it does not follow a selector change made meanwhile. */
+let nextReplayEnvId: string | undefined;
+
 /** Expanded before shipping, so the runner never sees `subtest`; `expansionMap` folds results back. */
 async function runReplay(journey: BrowserStep[]) {
   expansionMap.value = undefined;
@@ -1559,7 +1564,8 @@ async function runReplay(journey: BrowserStep[]) {
   }
   if (wire.length === 0) return;
   await sharedListsSettled();
-  const envId = replayEnvironmentId.value;
+  const envId = nextReplayEnvId ?? replayEnvironmentId.value;
+  nextReplayEnvId = undefined;
   gateReplay({ journey, wire, map, envId, supplied: secrets.valuesFor(envId) });
 }
 
@@ -1628,8 +1634,14 @@ async function onMissingValueSubmit(values: { value: string; secret: boolean }) 
   if (!prompt) return;
   const { pending } = prompt;
   const { name } = prompt.status;
+  const env = namedEnvironment(pending.envId);
+  // A named environment that left the list must not turn the write into a Global one.
+  if (pending.envId !== GLOBAL_ONLY && !env) {
+    toast({ variant: "error", message: t("synthetics.journey.replayValues.saveFailed") });
+    return;
+  }
   try {
-    await saveReplayValue(namedEnvironment(pending.envId), name, values);
+    await saveReplayValue(env, name, values);
   } catch (err) {
     // Never logged: an axios error's `config.data` carries the typed value.
     toast({
@@ -1710,6 +1722,7 @@ async function onSecretsSubmit(values: Record<string, string>) {
   secretsOpen.value = false;
   await nextTick();
   if (!prompt.pending) {
+    nextReplayEnvId = prompt.envId;
     onReplay();
     return;
   }
@@ -1724,10 +1737,14 @@ function onSecretsForget(names: string[]) {
 }
 
 async function onReplayAnyway() {
-  const steps = missingPrompt.value?.status.steps ?? [];
+  const prompt = missingPrompt.value;
+  if (!prompt) return;
+  const { steps } = prompt.status;
   missingOpen.value = false;
   await nextTick();
-  if (steps[0] > 1) journeyRef.value?.replayUpTo(steps[0] - 1);
+  if (steps[0] <= 1) return;
+  nextReplayEnvId = prompt.pending.envId;
+  journeyRef.value?.replayUpTo(steps[0] - 1);
 }
 
 /** The `loadChildren` fetcher: throws on failure, after recording a refusal or a deletion for the rows. */
