@@ -6,6 +6,7 @@ import {
   SIEM_MARKER,
   buildDetectionAlert,
   detectionMetaOf,
+  detectionAlertName,
   detectionName,
   detectionSql,
   isSiemDetection,
@@ -49,7 +50,7 @@ describe("buildDetectionAlert", () => {
   it("produces a scheduled SQL alert on the right stream", () => {
     const alert = build();
 
-    expect(alert.name).toBe("AWS_Root_Account_Activity");
+    expect(alert.name).toBe("AWS_Root_Account_Activity__cloudtrail");
     expect(alert.stream_name).toBe("cloudtrail");
     expect(alert.stream_type).toBe("logs");
     expect(alert.is_real_time).toBe(false);
@@ -217,5 +218,24 @@ describe("whereOfDetectionSql", () => {
   it("returns nothing for a query it cannot read", () => {
     expect(whereOfDetectionSql("SELECT * FROM s")).toBe("");
     expect(whereOfDetectionSql(null)).toBe("");
+  });
+});
+
+describe("detectionAlertName", () => {
+  it("is unique per stream and stays within the name limit", () => {
+    expect(detectionAlertName("AWS Root Account Activity", "cloudtrail_audit")).toBe(
+      "AWS_Root_Account_Activity__cloudtrail_audit",
+    );
+    expect(detectionAlertName("x", "a")).not.toBe(detectionAlertName("x", "b"));
+    expect(detectionAlertName("t".repeat(200), "stream").length).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("whereOfDetectionSql with awkward names", () => {
+  it("ignores 'where' inside quoted stream names and literals", () => {
+    expect(
+      whereOfDetectionSql(`SELECT "_timestamp" FROM "audit-where" WHERE "msg" = 'where are you'`),
+    ).toBe(`"msg" = 'where are you'`);
+    expect(whereOfDetectionSql(`SELECT * FROM "s"`)).toBe("");
   });
 });

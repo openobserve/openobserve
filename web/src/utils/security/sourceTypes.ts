@@ -127,7 +127,8 @@ export const SOURCE_TYPES: SourceType[] = [
       actor: ["userIdentity.userName", "userIdentity.arn", "userIdentity.principalId"],
       actorId: ["userIdentity.arn", "userIdentity.accountId"],
       srcIp: ["sourceIPAddress"],
-      host: ["recipientAccountId"],
+      // No host: recipientAccountId is the AWS account, not a machine, and CloudTrail
+      // carries no hostname of its own.
       operation: ["eventName"],
       resource: ["eventSource", "requestParameters.bucketName"],
       message: ["errorMessage", "eventName"],

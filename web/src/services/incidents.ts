@@ -80,8 +80,23 @@ export interface IncidentAlert {
   detected_source?: string | null;
 }
 
+/**
+ * One alert DEFINITION attached to an incident (the server's full `Alert`,
+ * deduplicated). Only the fields the UI reads are typed; firings are in
+ * `IncidentWithAlerts.triggers`, not here.
+ */
+export interface IncidentAlertDefinition {
+  id?: string | null;
+  name: string;
+  stream_name?: string;
+  enabled?: boolean;
+  [key: string]: unknown;
+}
+
 export interface IncidentWithAlerts extends Incident {
-  alerts: IncidentAlert[];
+  /** Unique alert definitions behind the incident. */
+  alerts: IncidentAlertDefinition[];
+  /** Each firing correlated into the incident. */
   triggers: IncidentAlert[];
 }
 

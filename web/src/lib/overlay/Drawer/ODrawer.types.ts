@@ -85,6 +85,21 @@ export interface DrawerProps {
    */
   seamless?: boolean;
 
+  /**
+   * When false the drawer is non-modal: no focus trap, the page behind stays
+   * clickable, and an outside click does not close it (the page decides what a
+   * click means — e.g. a list opening the clicked row in the same drawer).
+   * Escape and the close button still close it. Pair with `seamless`.
+   * @default true
+   */
+  modal?: boolean;
+
+  /**
+   * Accessible name for a drawer that renders its own header (no `title`).
+   * Screen readers announce this instead of the generic fallback.
+   */
+  ariaLabel?: string;
+
   // ── Header subtitle ────────────────────────────────────────────────────
 
   /**

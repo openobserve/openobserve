@@ -36,6 +36,7 @@ const search = {
       is_ui_histogram,
       validate,
       signal,
+      use_cache: useCacheOverride,
     }: {
       org_identifier: string;
       query: any;
@@ -61,13 +62,16 @@ const search = {
        * unaffected.
        */
       signal?: AbortSignal;
+      /** Force the result cache on/off; omitted keeps the global default. */
+      use_cache?: boolean;
     },
     search_type: string = "ui",
     is_multi_stream_search: boolean = false,
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
-      (window as any).use_cache !== undefined ? (window as any).use_cache : true;
+      useCacheOverride ??
+      ((window as any).use_cache !== undefined ? (window as any).use_cache : true);
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;

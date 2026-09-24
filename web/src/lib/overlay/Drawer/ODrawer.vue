@@ -42,6 +42,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   showClose: true,
   width: undefined,
   seamless: false,
+  modal: true,
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -87,7 +88,8 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 }
 
 function handleInteractOutside(e: Event) {
-  if (props.persistent) {
+  // Non-modal: the page behind is live, so a click there is the page's to handle.
+  if (props.persistent || !props.modal) {
     e.preventDefault();
     return;
   }
@@ -299,7 +301,7 @@ watch(internalOpen, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="internalOpen" @update:open="handleOpenChange">
+  <DialogRoot :open="internalOpen" :modal="modal" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />
@@ -361,10 +363,10 @@ watch(internalOpen, (open) => {
       >
         <!-- Accessibility: hidden title required by Reka UI -->
         <DialogTitle class="sr-only absolute">
-          {{ title ?? "Drawer" }}
+          {{ ariaLabel ?? title ?? "Drawer" }}
         </DialogTitle>
         <DialogDescription class="sr-only absolute">
-          {{ title ?? "Drawer" }}
+          {{ ariaLabel ?? title ?? "Drawer" }}
         </DialogDescription>
 
         <!-- ── Header ───────────────────────────────────────── -->

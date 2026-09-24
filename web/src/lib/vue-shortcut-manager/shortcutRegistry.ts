@@ -155,9 +155,27 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     titleKey: "shortcuts.modules.runningQueries",
     pages: ["shortcuts.pages.runningQueries"],
   },
+  { titleKey: "shortcuts.modules.security", pages: ["shortcuts.pages.securityRecord"] },
 ];
 
 export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+  // ── Security — any open SIEM record drawer ──────────────────────────────
+  {
+    pageKey: "shortcuts.pages.securityRecord",
+    scope: "security-record",
+    shortcuts: [
+      {
+        id: "securityRecordNext",
+        key: "j",
+        descriptionKey: "shortcuts.actions.securityRecordNext",
+      },
+      {
+        id: "securityRecordPrev",
+        key: "k",
+        descriptionKey: "shortcuts.actions.securityRecordPrev",
+      },
+    ],
+  },
   // ── Global ──────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.global",

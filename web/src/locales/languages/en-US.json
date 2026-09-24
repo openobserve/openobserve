@@ -10810,7 +10810,8 @@
       "onlineEvals": "Online Evals",
       "actions": "Actions",
       "rum": "RUM",
-      "runningQueries": "Running Queries"
+      "runningQueries": "Running Queries",
+      "security": "Security"
     },
     "pages": {
       "global": "Global",
@@ -10860,7 +10861,8 @@
       "orgManagement": "Organization Management",
       "rumErrors": "RUM — Error Tracking",
       "rumSessions": "RUM — Sessions",
-      "sourceMaps": "RUM — Source Maps"
+      "sourceMaps": "RUM — Source Maps",
+      "securityRecord": "Security — open record"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -10969,7 +10971,9 @@
       "orgManagementRefresh": "Refresh list",
       "rumErrorsRefresh": "Refresh list",
       "rumSessionsRefresh": "Refresh list",
-      "sourceMapsRefresh": "Refresh list"
+      "sourceMapsRefresh": "Refresh list",
+      "securityRecordNext": "Next record",
+      "securityRecordPrev": "Previous record"
     }
   },
   "slos": {
@@ -11196,6 +11200,1309 @@
       "burnExplain": "How fast the budget is burning in each bucket on its own, as a multiple of the budget-neutral rate.",
       "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis — the same line read as SLI:\nSLI = 100% − burn rate × (100% − target)",
       "burnNote": "×1 spends the budget exactly at the end of the window, ×2 in half of it; under ×1 the budget is being banked. Because it is per bucket and not cumulative, a spike here stays visible instead of being averaged away. The right axis counts downward: up the chart is more burn, which is a lower SLI."
+    }
+  },
+  "siem": {
+    "severity": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "info": "Info",
+      "unknown": "Unknown",
+      "fatal": "Fatal",
+      "other": "Other"
+    },
+    "range": {
+      "1h": "1h",
+      "24h": "24h",
+      "7d": "7d",
+      "30d": "30d"
+    },
+    "common": {
+      "close": "Close",
+      "mitre": "MITRE ATT&CK",
+      "severity": "Severity",
+      "viewAll": "View all"
+    },
+    "caseStatus": {
+      "open": "New",
+      "acknowledged": "Investigating",
+      "resolved": "Closed"
+    },
+    "health": {
+      "live": "Reporting",
+      "quiet": "Silent for over 24 hours",
+      "never": "No data yet"
+    },
+    "outcome": {
+      "success": "Success",
+      "failure": "Failure"
+    },
+    "op": {
+      "eq": "equals",
+      "neq": "not equals",
+      "contains": "contains",
+      "notContains": "not contains"
+    },
+    "pivot": {
+      "include": "Filter for value",
+      "exclude": "Filter out value",
+      "copy": "Copy value"
+    },
+    "entity": {
+      "actor": "Actor",
+      "source": "Source",
+      "destination": "Destination",
+      "host": "Host",
+      "process": "Process",
+      "operation": "Operation",
+      "resource": "Resource"
+    },
+    "fieldGroup": {
+      "event": "Event",
+      "actor": "Actor",
+      "network": "Network",
+      "device": "Device",
+      "metadata": "Metadata",
+      "other": "Other fields"
+    },
+    "column": {
+      "time": "Time",
+      "severityId": "Severity",
+      "className": "Class",
+      "activity": "Activity",
+      "statusId": "Outcome",
+      "actor": "Actor",
+      "srcIp": "Source IP",
+      "dstIp": "Destination IP",
+      "host": "Host",
+      "process": "Process",
+      "operation": "Operation",
+      "resource": "Resource",
+      "product": "Product",
+      "message": "Message"
+    },
+    "mitre": {
+      "tactics": {
+        "reconnaissance": "Reconnaissance",
+        "resource_development": "Resource Development",
+        "initial_access": "Initial Access",
+        "execution": "Execution",
+        "persistence": "Persistence",
+        "privilege_escalation": "Privilege Escalation",
+        "defense_evasion": "Defense Evasion",
+        "credential_access": "Credential Access",
+        "discovery": "Discovery",
+        "lateral_movement": "Lateral Movement",
+        "collection": "Collection",
+        "command_and_control": "Command and Control",
+        "exfiltration": "Exfiltration",
+        "impact": "Impact"
+      }
+    },
+    "overview": {
+      "title": "SOC Overview",
+      "subtitle": "What fired, what is open, and whether your sources are still reporting",
+      "autoRefreshOn": "Auto-refresh every minute is on",
+      "autoRefreshOff": "Auto-refresh is off",
+      "historyError": "Could not load detection history",
+      "noDetections": "No SIEM detections are enabled yet, so nothing here can fire. Enable detections from the Sigma catalog to start monitoring.",
+      "browseDetections": "Browse detections",
+      "stat": {
+        "critical": "Critical firings",
+        "high": "High firings",
+        "openCases": "Open cases",
+        "firingDetections": "Detections firing",
+        "quietSources": "Silent sources",
+        "activeRules": "Active detections"
+      },
+      "activity": "Detection activity",
+      "activityHint": "No firings in this window | {n} firing in this window, stacked by severity | {n} firings in this window, stacked by severity",
+      "quiet": "Nothing fired",
+      "quietHint": "No detection fired in this time window.",
+      "openCases": "Open cases",
+      "casesUnsupported": "Case management is not available on this deployment",
+      "noOpenCases": "No open cases",
+      "untitledCase": "Untitled case",
+      "caseAlerts": "{n} alert | {n} alerts",
+      "triage": "Triage queue",
+      "triageHint": "Latest firings, newest first",
+      "fullQueue": "Full queue",
+      "detection": "Detection",
+      "matches": "Matches",
+      "fired": "Fired",
+      "queueClear": "Triage queue is clear",
+      "topDetections": "Noisiest detections",
+      "topDetectionsHint": "Where tuning pays off first",
+      "mitre": "MITRE ATT&CK coverage",
+      "mitreHint": "{covered} of {total} tactics covered by enabled detections",
+      "rulesCount": "{n} rule | {n} rules",
+      "firingsCount": "{n} fired | {n} fired",
+      "legendFiring": "Fired in window",
+      "legendCovered": "Covered",
+      "legendGap": "No coverage",
+      "sources": "Log source health",
+      "sourcesHint": "{live} of {total} security sources reporting",
+      "explore": "Explore",
+      "noSources": "No security sources yet",
+      "noSourcesHint": "Ingest CloudTrail, Okta, VPC Flow or syslog. Streams with security, audit, auth or firewall in the name appear here automatically.",
+      "historyCapped": "Showing the newest {n} of {total} evaluations in this window, back to {from}. Counts and charts cover that span only; pick a shorter window for complete numbers.",
+      "uncheckedRules": "{n} alert was not checked for SIEM metadata, so its firings are not counted here. | {n} alerts were not checked for SIEM metadata, so their firings are not counted here."
+    },
+    "events": {
+      "title": "Security Events",
+      "subtitle": "Hunt across normalized security telemetry",
+      "run": "Run",
+      "hideSidebar": "Hide fields",
+      "showSidebar": "Show fields",
+      "selectStream": "Select a stream",
+      "securityStreams": "Security streams",
+      "otherStreams": "Other streams",
+      "builder": "Builder",
+      "allSeverities": "All severities",
+      "field": "Field",
+      "value": "Value",
+      "addFilter": "Add filter",
+      "clearFilters": "Clear all",
+      "sources": "Sources",
+      "addSource": "Add a stream as a source",
+      "removeSource": "Remove from sources",
+      "searchFields": "Search fields",
+      "addColumn": "Show as column",
+      "removeColumn": "Hide column",
+      "noValues": "No values in this window",
+      "noFields": "No fields match",
+      "selectStreamFirst": "Select a stream to see its fields",
+      "confidence": "{n}% match",
+      "telemetryOnly": "Telemetry only",
+      "matchedOn": "matched on {fields}",
+      "detections": "{n} detection | {n} detections",
+      "firing": "{n} firing | {n} firing",
+      "rulesFor": "Sigma rules for {source}",
+      "hits": "{n} hit | {n} hits",
+      "viewHits": "View hits",
+      "createDetection": "Create detection",
+      "events": "Events",
+      "sqlTimelineNote": "The timeline and severity breakdown follow the builder filters. Switch back to Builder to see them for this search.",
+      "noStreamTitle": "No streams to search",
+      "noStreamHint": "Ingest security logs to start hunting. Streams appear here as soon as data arrives.",
+      "showingOf": "Showing latest {shown} of {total} events",
+      "count": "{n} event | {n} events",
+      "hideTimeline": "Hide timeline",
+      "showTimeline": "Show timeline",
+      "normalized": "Normalized",
+      "normalizedHint": "Every source mapped onto OCSF columns",
+      "raw": "Raw",
+      "refresh": "Refresh results",
+      "noEvents": "No events found",
+      "noEventsHint": "Widen the time range or loosen the filters.",
+      "searchFailed": "Search failed",
+      "latestCount": "Latest {n} matching event | Latest {n} matching events",
+      "sql": "SQL",
+      "invertFilter": "Switch between include and exclude",
+      "removeFilter": "Remove filter",
+      "pivotSqlUnsupported": "This SQL query is not a simple SELECT … WHERE, so the filter could not be added to it. Edit the query by hand, or switch to Builder.",
+      "topValuesWholeStream": "SQL mode: values are counted over the whole stream, not your query."
+    },
+    "drawer": {
+      "event": "Security event",
+      "overview": "Overview",
+      "detections": "Detections",
+      "fields": "Fields",
+      "json": "JSON",
+      "noEntities": "No entities recognised",
+      "noEntitiesHint": "This source has no mapping for actor, network or host fields. See the Fields tab for everything that arrived.",
+      "classifiedAs": "Classified as",
+      "evaluating": "Evaluating detections against this event",
+      "noRules": "No detections apply to this source",
+      "noRulesHint": "None of the shipped Sigma rules are written for this log source.",
+      "matchError": "Could not evaluate detections",
+      "noMatches": "No detection matched",
+      "noMatchesHint": "Evaluated {n} rule against this event; it did not match. | Evaluated {n} rules against this event; none of them matched.",
+      "attack": "ATT&CK techniques",
+      "classUid": "class_uid {n}",
+      "eyebrow": "Security event",
+      "source": "Source",
+      "matchedRules": "{n} detection matched | {n} detections matched"
+    },
+    "record": {
+      "prev": "Previous record",
+      "next": "Next record",
+      "position": "{n} of {total}",
+      "copyLink": "Copy link to this record",
+      "linkCopied": "Link copied",
+      "searchFields": "Search fields and values",
+      "noFields": "No fields match",
+      "copyFailed": "Could not copy to the clipboard"
+    },
+    "alerts": {
+      "title": "Alerts",
+      "subtitle": "Every time a detection fired, and the evidence behind it",
+      "eyebrow": "Detection firing",
+      "range": {
+        "1h": "1h",
+        "6h": "6h",
+        "24h": "24h",
+        "7d": "7d",
+        "30d": "30d"
+      },
+      "stat": {
+        "firings": "{severity} firings",
+        "error": "Failed evaluations",
+        "silenced": "Silenced",
+        "low": "Low / info firings"
+      },
+      "status": {
+        "firing": "Firing",
+        "notify_failed": "Firing · notify failed",
+        "error": "Evaluation failed",
+        "normal": "Normal",
+        "skipped": "Skipped",
+        "other": "Unknown"
+      },
+      "column": {
+        "detection": "Detection",
+        "status": "Outcome",
+        "value": "Matched",
+        "window": "Window",
+        "fired": "Fired",
+        "evaluated": "Evaluated"
+      },
+      "fact": {
+        "firedAt": "Fired at",
+        "value": "Matched vs threshold",
+        "window": "Window",
+        "evaluation": "Evaluation took",
+        "windowRange": "Evaluated window",
+        "group": "Group",
+        "error": "Error",
+        "evaluatedAt": "Evaluated at"
+      },
+      "tab": {
+        "overview": "Overview",
+        "evidence": "Evidence",
+        "detection": "Detection",
+        "raw": "Raw"
+      },
+      "rule": {
+        "name": "Name",
+        "state": "State",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "stream": "Stream",
+        "frequency": "Runs every",
+        "logsource": "Log source",
+        "sigmaId": "Sigma rule id"
+      },
+      "minutes": "{n} minute | {n} minutes",
+      "seconds": "{n}s",
+      "yes": "Yes",
+      "search": "Search detections or techniques",
+      "siemOnly": "SIEM detections only",
+      "showEvaluations": "Show all evaluations",
+      "count": "{n} row | {n} rows",
+      "refresh": "Refresh",
+      "loadError": "Could not load alert history",
+      "capped": "Showing the newest {n} of {total} evaluations in this window, back to {from}. Counts cover that span only; pick a shorter window for complete numbers.",
+      "notSiem": "Not a SIEM rule",
+      "notSiemTitle": "Not a SIEM detection",
+      "notSiemHint": "This alert has no Sigma metadata, so there is no rule to show. It is listed because SIEM-only is off.",
+      "empty": "Nothing fired",
+      "emptyHint": "No detection fired in this window.",
+      "noDetections": "No SIEM detections yet",
+      "noDetectionsHint": "Enable detections from the Sigma catalog on the Detections page; their firings appear here.",
+      "whatItDetects": "What it detects",
+      "whyItFired": "Why it fired",
+      "falsePositives": "Known false positives",
+      "noEvidence": "No evidence query",
+      "noEvidenceHint": "This detection has no stream or WHERE clause to replay.",
+      "evidenceCount": "{n} matching event in the evaluated window | {n} matching events in the evaluated window",
+      "evidenceError": "Could not load the matching events",
+      "evidenceAgedOut": "No matching events are left in this window; they may have aged out of retention.",
+      "query": "Detection query",
+      "investigate": "Investigate in Events",
+      "openDetection": "Open detection",
+      "evaluation": "Evaluation",
+      "eyebrowEvaluation": "Detection evaluation",
+      "evidenceNone": "Nothing matched this detection in the evaluated window.",
+      "customWindow": "Showing a fixed window: {from} → {to}",
+      "backToRange": "Back to last {range}",
+      "missing": "The alert this link points to is not in the loaded window. It may be older than this range or past the newest-rows limit.",
+      "dismiss": "Dismiss"
+    },
+    "cases": {
+      "title": "Cases",
+      "subtitle": "Correlated firings, triaged to a verdict",
+      "eyebrow": "Case",
+      "unavailableTitle": "Cases are not available on this build",
+      "unavailableHint": "Case management uses incident correlation, which ships with OpenObserve Enterprise and Cloud. Detection firings are still on the Alerts page.",
+      "search": "Filter this page by title, id, assignee or entity",
+      "refresh": "Refresh",
+      "loadError": "Could not load cases",
+      "openError": "Could not open the case",
+      "updateError": "Could not update the case",
+      "commentError": "Could not post the comment",
+      "analysisError": "Root-cause analysis failed",
+      "empty": "No cases",
+      "emptyHint": "Cases open automatically when related detections fire together.",
+      "unassigned": "Unassigned",
+      "column": {
+        "priority": "Priority",
+        "title": "Case",
+        "status": "Status",
+        "alerts": "Alerts",
+        "assignee": "Assignee",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen"
+      },
+      "fact": {
+        "duration": "Duration"
+      },
+      "durationMinutes": "{n} min",
+      "durationHours": "{n} h",
+      "durationDays": "{n} d",
+      "tab": {
+        "overview": "Overview",
+        "alerts": "Alerts",
+        "timeline": "Timeline",
+        "analysis": "Analysis"
+      },
+      "detections": "Detections in this case",
+      "noDetections": "No detections recorded yet",
+      "firedTimes": "fired {n} time | fired {n} times",
+      "entities": "Affected entities",
+      "noEntities": "The correlation engine recorded no grouping dimensions for this case.",
+      "noAlerts": "No alerts recorded",
+      "external": "External",
+      "reason": {
+        "service_discovery": "Correlated by service discovery",
+        "primary_match": "Correlated on primary dimensions",
+        "secondary_match": "Correlated on secondary dimensions",
+        "alert_id": "Same detection"
+      },
+      "commentPlaceholder": "Add a note for the team",
+      "postComment": "Post note",
+      "noEvents": "No activity yet",
+      "event": {
+        "created": "Case opened",
+        "alert": "{name} fired ({n})",
+        "severityUpgrade": "Priority raised {from} → {to}: {reason}",
+        "severityOverride": "Priority set {from} → {to}",
+        "acknowledged": "Marked investigating",
+        "resolved": "Closed",
+        "autoResolved": "Closed automatically",
+        "reopened": "Reopened: {reason}",
+        "titleChanged": "Renamed to {to}",
+        "assigned": "Assigned to {to}",
+        "unassigned": "Unassigned",
+        "comment": "Note",
+        "analysisBegin": "Root-cause analysis started",
+        "analysisComplete": "Root-cause analysis completed",
+        "analysisFailed": "Root-cause analysis failed: {reason}",
+        "analysisCancelled": "Root-cause analysis cancelled",
+        "other": "{type}"
+      },
+      "analysisHint": "An AI summary of what connects the firings in this case.",
+      "runAnalysis": "Analyze",
+      "rerunAnalysis": "Re-analyze",
+      "noAnalysis": "No analysis yet",
+      "priorityOption": "{p} · {level}",
+      "priorityChanged": "Priority set to {p}",
+      "statusChanged": "Case marked {status}",
+      "viewFirings": "View firings",
+      "transition": {
+        "open": "Reopen",
+        "acknowledged": "Start investigating",
+        "resolved": "Close case"
+      },
+      "goToAlerts": "Go to Alerts",
+      "notFound": "Case not found",
+      "timelinePartial": "This timeline was rebuilt from the case record, so notes, acknowledgements and analysis activity from before the rebuild may be missing."
+    },
+    "mitrePage": {
+      "title": "MITRE ATT&CK",
+      "subtitle": "Which techniques your enabled detections cover, and which fired",
+      "historyCapped": "Firings are counted from the newest {n} of {total} evaluations in this window; pick a shorter window for complete numbers.",
+      "stat": {
+        "firing": "Techniques firing",
+        "gaps": "Coverage gaps",
+        "techniques": "Techniques covered of {total}",
+        "tactics": "Tactics covered of {total}"
+      },
+      "view": {
+        "all": "All",
+        "covered": "Covered",
+        "gaps": "Gaps",
+        "firing": "Firing"
+      },
+      "search": "Search technique or rule",
+      "legend": {
+        "firing": "Fired in window (darker = more)",
+        "covered": "Covered by an enabled detection",
+        "available": "Rule available, not enabled"
+      },
+      "columnCount": "{covered} of {total} covered",
+      "cellEnabled": "{n} detection on | {n} detections on",
+      "cellAvailable": "{n} rule available | {n} rules available",
+      "noMatch": "No techniques match",
+      "unmapped": "Techniques without a known tactic",
+      "footnote": "Techniques come from the {n} shipped Sigma rules and your own detections; placement follows the tactics each rule is tagged with.",
+      "drawerEyebrow": "ATT&CK technique",
+      "state": {
+        "firing": "Firing",
+        "covered": "Covered",
+        "available": "Not covered"
+      },
+      "fact": {
+        "state": "Coverage",
+        "enabled": "Detections on",
+        "catalog": "Catalog rules",
+        "firings": "Firings ({range})"
+      },
+      "tab": {
+        "detections": "Detections",
+        "firings": "Firings",
+        "reference": "Reference"
+      },
+      "subOf": "Sub-technique of {id}",
+      "yourDetections": "Your detections",
+      "noDetections": "No detection of yours covers this technique yet",
+      "enabled": "On",
+      "disabled": "Off",
+      "inCatalog": "Available in the catalog",
+      "enable": "Enable",
+      "noFirings": "Nothing fired for this technique in the last {range}",
+      "referenceHint": "Technique names, procedures and mitigations are maintained by MITRE. This page shows the id your rules carry and links to the authoritative entry.",
+      "openTechnique": "Open {id} on attack.mitre.org",
+      "viewOnAttack": "View on ATT&CK",
+      "manageDetections": "Manage detections",
+      "historyNarrowed": "The alert history's maximum query range limits firings to those since {from}; earlier firings in this window are not counted."
+    },
+    "detections": {
+      "title": "Detections",
+      "subtitle": "Sigma rules running as scheduled detections over your security streams",
+      "new": "New detection",
+      "eyebrow": "Detection rule",
+      "refresh": "Refresh detections",
+      "search": "Search by name, stream or technique",
+      "anySeverity": "Any severity",
+      "scopeSiem": "SIEM detections",
+      "scopeAll": "All alerts",
+      "identifying": "Identifying detections…",
+      "notSiem": "Alert",
+      "unchecked": "{n} alert was not checked for SIEM metadata, so it may be missing from this list. | {n} alerts were not checked for SIEM metadata, so they may be missing from this list.",
+      "scheduleValue": "Every {every}m over {over}m",
+      "minutes": "{n} minute | {n} minutes",
+      "stat": {
+        "fired": "Fired in 24h",
+        "erroring": "Erroring",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "all": "All detections"
+      },
+      "column": {
+        "name": "Detection",
+        "stream": "Stream",
+        "schedule": "Schedule",
+        "enabled": "Enabled",
+        "fired24h": "Fired (24h)",
+        "lastRun": "Last run"
+      },
+      "state": {
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "erroring": "Erroring"
+      },
+      "tab": {
+        "overview": "Overview",
+        "history": "History",
+        "sigma": "Sigma rule",
+        "sql": "Query"
+      },
+      "field": {
+        "logsource": "Logsource",
+        "sourceType": "Source type",
+        "sigmaId": "Sigma rule id",
+        "destinations": "Notifies",
+        "silence": "Quiet after firing",
+        "owner": "Owner",
+        "lastError": "Last error"
+      },
+      "erroringHint": "The last evaluation of this rule failed. It is not detecting anything until the next run succeeds.",
+      "historyLoading": "Loading evaluation history…",
+      "historyError": "Could not load this rule's history",
+      "historyEmpty": "No evaluations recorded",
+      "historyEmptyHint": "This rule has not been evaluated in the last {days} days.",
+      "historySummary": "{firings} firing across the latest {runs} evaluations in the last {days} days. | {firings} firings across the latest {runs} evaluations in the last {days} days.",
+      "historyCapped": "{total} evaluations in total; older ones are not shown.",
+      "outcome": {
+        "firing": "Fired",
+        "error": "Error",
+        "normal": "Nothing found",
+        "notify_failed": "Fired · notification failed",
+        "skipped": "Skipped",
+        "other": "Unknown outcome"
+      },
+      "matched": "{n} matching rows",
+      "took": "{s}s",
+      "noSigma": "No Sigma rule on this alert",
+      "noSigmaHint": "Alerts created outside the SIEM run the same way but were not written as detections.",
+      "noSql": "-- This rule has no SQL query",
+      "delete": "Delete",
+      "deleteTitle": "Delete detection",
+      "deleteMessage": "Delete “{name}”? It stops running immediately. Its past firings stay in alert history.",
+      "deleted": "Deleted {name}",
+      "deleteFailed": "Could not delete the detection",
+      "enable": "Enable",
+      "disable": "Disable",
+      "enabledToast": "{name} enabled",
+      "disabledToast": "{name} disabled",
+      "toggleFailed": "Could not change the rule state",
+      "noId": "{name} has no id and cannot be changed",
+      "viewMatches": "View matches in Events",
+      "emptyTitle": "No detections yet",
+      "emptyHint": "A detection is a Sigma rule running as a scheduled alert. Every firing lands in Alerts and rolls up into Cases.",
+      "createFirst": "Create a detection",
+      "newTitle": "New detection",
+      "newSubtitle": "A Sigma rule compiled to SQL against your stream and scheduled as an alert",
+      "create": "Create detection",
+      "cancel": "Cancel",
+      "library": "Rule library ({n})",
+      "writeSigma": "Write Sigma",
+      "librarySearch": "Filter by title, technique or logsource",
+      "libraryEmpty": "No rules match that filter",
+      "stream": "Stream",
+      "streamPlaceholder": "Choose the stream to run on",
+      "notify": "Notify",
+      "notifyPlaceholder": "Choose a destination",
+      "noDestinations": "No alert destinations exist yet. The alerts API requires at least one, so create a destination under Alerts before saving a detection.",
+      "lookBack": "Look back (minutes)",
+      "runEvery": "Run every (minutes)",
+      "silence": "Stay quiet for (minutes)",
+      "compiles": "Compiles against {stream}",
+      "compilesAs": "Compiles against {stream}, identified as {source}",
+      "wontRun": "Will not run on {stream}",
+      "created": "Detection {name} created",
+      "createFailed": "Could not create the detection",
+      "neverRun": "Not run yet",
+      "notFired": "Did not fire",
+      "firedTimes": "Once, {when} | {n} times, last {when}",
+      "firedCount": "Fired once in 24h | Fired {n} times in 24h",
+      "firingsCapped": "Firing counts cover the newest {n} of {total} evaluations in the last 24 hours; older firings in that window are not counted.",
+      "ago": {
+        "now": "just now",
+        "minutes": "{n}m ago",
+        "hours": "{n}h ago",
+        "days": "{n}d ago"
+      },
+      "firingsError": "Could not load firing history",
+      "firingsErrorBanner": "Firing counts are unavailable: {reason}",
+      "validation": {
+        "positive": "Must be at least 1 minute",
+        "nonNegative": "Cannot be negative",
+        "periodGap": "Shorter than the run interval: minutes between runs would never be checked"
+      },
+      "nameTaken": "A detection or alert named “{name}” already exists. Its history would merge with this one, so pick another stream or remove the existing one first.",
+      "loadError": "Failed to load detection rules",
+      "firingsNarrowed": "Firing counts start at {from}: the history store limits how far back one query can look."
+    },
+    "content": {
+      "title": "Content",
+      "subtitle": "The detection rules and log sources that ship with the SIEM, set against your data",
+      "refresh": "Refresh",
+      "streamsError": "Could not load your streams, so matches to your data are unknown",
+      "tab": {
+        "rules": "Detection rules",
+        "sources": "Log sources",
+        "overview": "Overview",
+        "yourData": "Your data",
+        "yaml": "Sigma YAML",
+        "yourStreams": "Your streams",
+        "mapping": "Field mapping"
+      },
+      "logsources": "Logsources",
+      "allLogsources": "All rules",
+      "anyLevel": "Any level",
+      "searchRules": "Search rules by title, technique or logsource",
+      "searchSources": "Search sources by name, vendor or logsource",
+      "stat": {
+        "ready": "Ready to install",
+        "installed": "Installed",
+        "applies": "Apply to your data",
+        "allRules": "All rules",
+        "detected": "Found in your data",
+        "supported": "Supported sources"
+      },
+      "column": {
+        "rule": "Rule",
+        "logsource": "Logsource",
+        "status": "Status",
+        "yourData": "Your data",
+        "installed": "Installed",
+        "source": "Source",
+        "vendor": "Vendor",
+        "ocsf": "OCSF class",
+        "rules": "Rules",
+        "yourStreams": "Your streams"
+      },
+      "status": {
+        "stable": "Stable",
+        "test": "Test",
+        "experimental": "Experimental",
+        "deprecated": "Deprecated",
+        "unsupported": "Unsupported"
+      },
+      "streamCount": "{n} stream | {n} streams",
+      "noMatchingData": "No matching source",
+      "installed": "Installed",
+      "readyToInstall": "Ready to install",
+      "noRules": "No rules match",
+      "noSources": "No sources match",
+      "telemetryOnly": "Telemetry only",
+      "notDetected": "Not in your data",
+      "detectedInData": "Found in your data",
+      "ruleEyebrow": "Sigma rule",
+      "sourceEyebrow": "Log source",
+      "field": {
+        "author": "Author",
+        "modified": "Updated",
+        "required": "Identified by",
+        "signals": "Supporting fields"
+      },
+      "falsePositives": "Known false positives",
+      "references": "References",
+      "noStreamsForRule": "None of your streams match this rule",
+      "noStreamsForRuleHint": "It was written for {logsource}. Ingest that source and it will show up here.",
+      "runnable": "Runs on this stream",
+      "notRunnable": "Cannot run here",
+      "openInEvents": "Open in Events",
+      "installHere": "Install on this stream",
+      "install": "Install as detection",
+      "installAgain": "Install on another stream",
+      "viewDetection": "View detection",
+      "noStreamsForSource": "Not found in your data",
+      "noStreamsForSourceHint": "A stream is identified as this source when it carries {fields}.",
+      "noRulesForSource": "No rules are written for this source yet",
+      "mappingHint": "How this source's fields map onto the normalized columns every SIEM page reads. The first field present on a row wins.",
+      "detectionCount": "Yes, as {n} detection | Yes, as {n} detections",
+      "notInstalled": "Not installed",
+      "mapColumn": {
+        "actorId": "Actor ID",
+        "srcPort": "Source port",
+        "dstPort": "Destination port",
+        "vendor": "Vendor",
+        "classUid": "OCSF class id",
+        "className": "Class",
+        "severityId": "Severity",
+        "statusId": "Outcome"
+      },
+      "cannotRun": "Cannot run on your data",
+      "unchecked": "{n} alert was not checked for SIEM metadata, so a rule shown as not installed may be running there. | {n} alerts were not checked for SIEM metadata, so rules shown as not installed may be running there."
+    },
+    "entities": {
+      "title": "Entities",
+      "subtitle": "Every user, source IP and host your security sources mention",
+      "kinds": {
+        "user": "Users",
+        "ip": "IP addresses",
+        "host": "Hosts"
+      },
+      "kind": {
+        "user": "User",
+        "ip": "IP address",
+        "host": "Host"
+      },
+      "all": {
+        "user": "All users",
+        "ip": "All IP addresses",
+        "host": "All hosts"
+      },
+      "search": {
+        "user": "Search users",
+        "ip": "Search IP addresses",
+        "host": "Search hosts"
+      },
+      "col": {
+        "signals": "Signals",
+        "events": "Events",
+        "failures": "Failures",
+        "peers": {
+          "ips": "Max IPs in one source",
+          "users": "Max users in one source"
+        },
+        "streams": "Sources",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen"
+      },
+      "signal": {
+        "failures": "High failure rate",
+        "spread": {
+          "user": "Many source IPs",
+          "ip": "Many users",
+          "host": "Many users"
+        },
+        "external": "Public address"
+      },
+      "signalHint": {
+        "failures": "At least {rate}% of this entity’s events failed, with at least {n} failures, counting only sources that report an outcome.",
+        "spread": {
+          "user": "Seen from {n} or more source IPs in a single source during the window.",
+          "ip": "Used by {n} or more users in a single source during the window. NAT and VPN egress look like this too; so does password spraying.",
+          "host": "Accessed by {n} or more users in a single source during the window."
+        },
+        "external": "Not in a private, loopback or link-local range."
+      },
+      "peersChip": {
+        "ips": "Up to {n} source IP in one source | Up to {n} source IPs in one source",
+        "users": "Up to {n} user in one source | Up to {n} users in one source"
+      },
+      "noSignals": "No signals",
+      "windowNote": "Counts cover the selected window across every security source.",
+      "capped": "Each source returned its {n} busiest entities; quieter ones are not listed, and counts for entities near that cut-off may be partial. Tab counts marked + are cut off.",
+      "failedStreams": "Could not read: {streams}",
+      "noSources": "No security sources to read",
+      "noSourcesHint": "Entities are found in streams whose name marks them as security data, or that you added as a source on the Events page.",
+      "empty": "No entities in this window",
+      "emptyHint": "Widen the time range, or check that your sources carry user, IP or host fields.",
+      "refresh": "Refresh",
+      "drawerSubtitle": "Activity over the last {window}",
+      "tab": {
+        "activity": "Activity",
+        "related": "Related",
+        "sources": "Sources"
+      },
+      "activity": "Events over time",
+      "chart": {
+        "ok": "Succeeded or unknown",
+        "failed": "Failed"
+      },
+      "topN": "top {n} by events",
+      "noRelated": "Nothing related in this window.",
+      "failedCount": "{n} failed | {n} failed",
+      "openEvents": "Open in Events",
+      "huntInEvents": "Hunt in Events",
+      "partialStreams": "Partial results from: {streams}",
+      "loadError": "Could not load security sources",
+      "detailFailed": "Some of this entity’s data could not be read: {streams}."
+    },
+    "ueba": {
+      "title": "User Behavior Analytics",
+      "subtitle": "Each user compared with their own recent past",
+      "windowHint": "Last {current}, compared with the {baseline} before it",
+      "method": "Risk scores are heuristics: each user's last {current} is compared with their own {baseline} before it. Every flag shows the numbers that raised it.",
+      "noSources": "No source names a user",
+      "noSourcesHint": "UEBA needs a security source with a user field (CloudTrail, Okta, an auth log with a user column).",
+      "search": "Search users",
+      "empty": "No user activity in this window",
+      "emptyHint": "Widen the window, or check that your sources carry a user field.",
+      "eyebrow": "User behavior",
+      "riskChip": "{tone} risk · {score}",
+      "expected": "vs ~{n} usual",
+      "new": "New",
+      "newIp": "New",
+      "noIps": "No source IPs recorded for this user.",
+      "col": {
+        "user": "User",
+        "risk": "Risk",
+        "signals": "Signals",
+        "events": "Events",
+        "failures": "Failures",
+        "ips": "Source IPs"
+      },
+      "stat": {
+        "critical": "Critical risk",
+        "high": "High risk",
+        "medium": "Medium risk",
+        "all": "Users analyzed"
+      },
+      "signal": {
+        "volume": "Volume spike",
+        "new_ip": "New source IP",
+        "failure_jump": "Failures jumped",
+        "new_hours": "Unusual hours",
+        "first_seen": "First seen"
+      },
+      "reason": {
+        "volume": "{n} events, about {ratio}× the ~{expected} expected from the prior {baseline}.",
+        "newIp": "{n} events from {ip}, never seen in the prior {baseline}. | {n} events from {ip}, never seen in the prior {baseline} ({count} new addresses in all).",
+        "newIpExternal": "{n} events from public address {ip}, never seen in the prior {baseline}. | {n} events from public address {ip}, never seen in the prior {baseline} ({count} new addresses in all).",
+        "failureJump": "{n} failures — {rate}% of events, up from {baseline}% in the baseline.",
+        "newHours": "{n} events at {hours} UTC, hours this user was never active in the prior {baseline}.",
+        "firstSeen": "{n} events from a user with no activity at all in the prior {baseline}."
+      },
+      "fact": {
+        "events": "Events",
+        "eventsValue": "{n} vs ~{expected}",
+        "failureRate": "Failure rate",
+        "failureValue": "{now}% vs {base}%",
+        "history": "Baseline history",
+        "historyValue": "{span} of {window}",
+        "noHistory": "None — first seen",
+        "scoreValue": "{n} of 100"
+      },
+      "tab": {
+        "signals": "Signals",
+        "hours": "Active hours",
+        "ips": "Source IPs"
+      },
+      "noSignals": "Nothing unusual",
+      "noSignalsHint": "This user's activity in the window looks like their baseline.",
+      "scoring": "Score = sum of signal weights, capped at 100. Expected volume is scaled to the history the user actually has; a volume spike needs at least {min} events and {ratio}× that. Unusual hours need history covering {share}% of the prior {baseline}.",
+      "hoursTitle": "When this user is active",
+      "hoursUtc": "Hour of day, UTC",
+      "baselineRow": "Prior {w}",
+      "nowRow": "Last {w}",
+      "hourCell": "{h}:00 UTC — {n} events",
+      "legendUsual": "Activity",
+      "legendNew": "Hour never used in the baseline",
+      "openEntity": "Open entity",
+      "withheld": "Some baseline data came back incomplete, so these signals were not evaluated: {signals}.",
+      "currentPartial": "The current window returned partial data; counts may be low.",
+      "excluded": "Left out (their data could not be read in both windows): {streams}.",
+      "loadError": "Could not load security sources",
+      "spanHours": "{n} hour | {n} hours",
+      "spanDays": "{n} day | {n} days",
+      "notEvaluated": "Not evaluated for this user because baseline data was incomplete: {signals}.",
+      "hoursNotJudged": "Unusual hours are only judged with at least {min} baseline events covering {share}% of the prior {baseline}. This user’s history is shorter, so no hour is flagged.",
+      "noHistory": "No data in the prior {baseline} for {streams}, so nobody there is called first seen.",
+      "volumeNotJudged": "Volume is not judged for this user: windows under a day are compared with the same hours of day in the baseline, which needs at least a day of history."
+    },
+    "compliance": {
+      "title": "Compliance",
+      "subtitle": "Logging and detection coverage, read against framework controls",
+      "disclaimer": "This measures what the platform can observe — which security sources report, what they record, how long data is kept, and which detections run. It is evidence for an assessment, not a certification, and it cannot see process controls such as who reviews what.",
+      "coverageScore": "Coverage score",
+      "status": {
+        "met": "Met",
+        "partial": "Partial",
+        "missing": "Missing",
+        "unknown": "Not assessable"
+      },
+      "framework": {
+        "pci": {
+          "short": "PCI DSS v4.0",
+          "name": "PCI DSS v4.0 — Requirement 10",
+          "scope": "Log and monitor all access to system components and cardholder data."
+        },
+        "nist": {
+          "short": "NIST 800-53",
+          "name": "NIST SP 800-53 Rev. 5 — AU and SI-4",
+          "scope": "Audit and accountability controls, plus system monitoring."
+        },
+        "soc2": {
+          "short": "SOC 2",
+          "name": "SOC 2 — Trust Services Criteria CC6 and CC7",
+          "scope": "Logical access security and system operations monitoring."
+        },
+        "cis": {
+          "short": "CIS Controls v8",
+          "name": "CIS Critical Security Controls v8 — Control 8",
+          "scope": "Audit log management: collect, retain and review audit logs."
+        }
+      },
+      "sourcesCount": "{n} source | {n} sources",
+      "detectionsCount": "{n} detection | {n} detections",
+      "col": {
+        "status": "Status",
+        "ref": "Control",
+        "control": "Requirement",
+        "evidence": "Evidence",
+        "requirements": "Checks met"
+      },
+      "metOf": "{met} of {total}",
+      "noControls": "No controls with this status",
+      "sourcesAssessed": "Sources assessed",
+      "sourcesAssessedHint": "Each security stream, what it was identified as, and what it records",
+      "unidentified": "Not identified",
+      "capability": {
+        "authentication": "Sign-ins",
+        "admin": "Admin and config changes",
+        "network": "Network",
+        "endpoint": "Endpoint",
+        "cloud": "Cloud provider"
+      },
+      "retentionUnknown": "Retention unknown",
+      "retentionDays": "Kept {n} day | Kept {n} days",
+      "tab": {
+        "evidence": "Evidence",
+        "gaps": "Gaps",
+        "about": "How it's measured"
+      },
+      "noGaps": "Nothing missing for this control",
+      "howMeasured": "How this is measured",
+      "howMeasuredBody": "Sources count when they reported within the last 24 hours and are identified as a security source; a stream whose name only looks like security does not count. What a source records comes from its identified type. Normalisation checks that each source's mapping for actor, time and outcome resolves to a real column. Detections count only when they are enabled and ran (not skipped) in the last 24 hours without errors, read from each detection's own history. Cases count when the incidents list reports cases opened. Retention is each stream's own setting, else the server-wide ZO_COMPACT_DATA_RETENTION_DAYS; at 0 or below nothing is deleted.",
+      "action": {
+        "retention": "Stream retention",
+        "sources": "Review sources",
+        "detections": "Detections"
+      },
+      "req": {
+        "anySource": "Identified security sources are being collected",
+        "capability": "A reporting source records {capability}",
+        "capabilityBreadth": "Reporting sources cover at least {n} kinds of activity",
+        "normalized": "Every reporting source maps actor, time and outcome to real fields",
+        "retention": "Logs are kept for at least {days} days",
+        "detectionTactics": "A working detection covers {tactics}",
+        "detectionBreadth": "Working detections span at least {n} ATT&CK tactics",
+        "reviewRunning": "Enabled detections run on schedule without errors",
+        "caseManagement": "Cases are being opened",
+        "detectionTechniques": "A working detection watches for logging being disabled ({techniques})"
+      },
+      "reason": {
+        "anySource": {
+          "met": "The identified security sources below reported in the last 24 hours.",
+          "partial": "The streams below exist but are either not identified as a security source or have not reported in the last 24 hours.",
+          "missing": "No security source has been set up.",
+          "unknown": "The streams below exist but are either not identified as a security source or have not reported in the last 24 hours."
+        },
+        "capability": {
+          "met": "Typically recorded by the reporting sources below (from the identified source type, not checked per record).",
+          "partial": "The sources below typically record {capability} but have not reported in the last 24 hours.",
+          "missing": "No identified source typically records {capability}.",
+          "unknown": "The sources below typically record {capability} but have not reported in the last 24 hours."
+        },
+        "capabilityBreadth": {
+          "met": "The sources below cover {n} or more kinds of activity between them.",
+          "partial": "Reporting sources cover fewer than {n} kinds of activity.",
+          "missing": "No identified source is reporting.",
+          "unknown": "Reporting sources cover fewer than {n} kinds of activity."
+        },
+        "normalized": {
+          "met": "Every reporting source's mapping resolves actor, time and outcome to columns that exist in its stream.",
+          "partial": "For the sources below, actor, time or outcome does not resolve to a real column, or the source was not identified.",
+          "missing": "No reporting source maps actor, time and outcome to real columns.",
+          "unknown": "For the sources below, actor, time or outcome does not resolve to a real column, or the source was not identified."
+        },
+        "retention": {
+          "met": "Every identified reporting source keeps its data for {days} days or longer.",
+          "partial": "Some identified reporting sources keep data for less than {days} days.",
+          "missing": "No identified reporting source keeps data for {days} days.",
+          "unknown": "The server-wide retention (ZO_COMPACT_DATA_RETENTION_DAYS) could not be read, so retention is unknown."
+        },
+        "detectionTactics": {
+          "met": "Covered by the detections below, which ran in the last 24 hours without errors.",
+          "partial": "The detections below cover it but are disabled, did not run, or reported errors in the last 24 hours.",
+          "missing": "No detection covers {tactics}.",
+          "unknown": "Only part of the history could be read for the detections below, so whether they ran cleanly is unknown."
+        },
+        "detectionBreadth": {
+          "met": "The detections below span {n} or more tactics and ran in the last 24 hours without errors.",
+          "partial": "Working detections span fewer than {n} tactics; the ones below are listed with any that did not run.",
+          "missing": "No detection ran in the last 24 hours without errors.",
+          "unknown": "Only part of the history could be read for the detections below, so the count of working tactics is unknown."
+        },
+        "reviewRunning": {
+          "met": "Every enabled detection ran (not skipped) in the last 24 hours without errors. Checked here: that they run, not which sources they query.",
+          "partial": "The detections below did not run, were only skipped, or reported errors in the last 24 hours.",
+          "missing": "No enabled detection ran without errors in the last 24 hours.",
+          "unknown": "Only part of the history could be read for the detections below, so errors may have been missed."
+        },
+        "caseManagement": {
+          "met": "Cases have been opened in this organisation (from any alert, not only SIEM detections).",
+          "partial": "Case management is available, but no case has been opened yet.",
+          "missing": "No case has been opened.",
+          "unknown": "Case management needs an enterprise or cloud deployment, so this cannot be assessed here."
+        },
+        "detectionTechniques": {
+          "met": "Covered by the detections below, which ran in the last 24 hours without errors.",
+          "partial": "Detections for {techniques} exist but are disabled, did not run, or reported errors.",
+          "missing": "No detection watches for {techniques}.",
+          "unknown": "Only part of the history could be read for the detections below."
+        }
+      },
+      "fix": {
+        "anySource": "Ingest a security source such as CloudTrail, Okta, or firewall logs, and check that it is still reporting.",
+        "capability": "Ingest a source that records {capability}, or check why the existing one stopped reporting.",
+        "capabilityBreadth": "Add sources covering more kinds of activity: sign-ins, admin changes, network and endpoint.",
+        "normalized": "Check that each source's actor, time and outcome fields are being ingested, or map the stream to a supported source.",
+        "retention": "Raise the retention of these streams to at least {days} days in stream settings, or the server-wide ZO_COMPACT_DATA_RETENTION_DAYS.",
+        "detectionTactics": "Enable a detection for {tactics}, and fix it if it is not running or reports errors.",
+        "detectionBreadth": "Enable detections across at least {n} ATT&CK tactics.",
+        "reviewRunning": "Enable detections, and fix any that are erroring, so every log is reviewed automatically.",
+        "caseManagement": "Open cases from related alerts on the Cases page. Case management needs an enterprise or cloud deployment.",
+        "detectionTechniques": "Enable a detection for {techniques}, such as AWS CloudTrail Logging Disabled, and make sure it runs."
+      },
+      "controls": {
+        "pci_10_2_1": {
+          "title": "Audit logs are enabled and active",
+          "desc": "Audit logs are enabled and active for all system components and cardholder data. Checked here: at least one identified security source reported in the last 24 hours; coverage of every component is not checked."
+        },
+        "pci_10_2_1_2": {
+          "title": "Administrative actions are logged",
+          "desc": "Every action taken by anyone with administrative access is captured in the audit logs."
+        },
+        "pci_10_2_1_4": {
+          "title": "Invalid access attempts are logged",
+          "desc": "Invalid logical access attempts are captured, and detections watch for brute-force patterns."
+        },
+        "pci_10_2_1_5": {
+          "title": "Changes to credentials and accounts are logged",
+          "desc": "Creation, elevation and changes of identification and authentication credentials are captured."
+        },
+        "pci_10_2_2": {
+          "title": "Audit records carry the required details",
+          "desc": "Each record identifies the user, the event type, the date and time, success or failure, the origin and the affected resource. Checked here: actor, time and outcome map to real fields."
+        },
+        "pci_10_4_1_1": {
+          "title": "Automated mechanisms review audit logs",
+          "desc": "Automated mechanisms perform the audit log reviews. Checked here: enabled detections run on schedule without errors."
+        },
+        "pci_10_5_1": {
+          "title": "Audit log history is kept for 12 months",
+          "desc": "Audit log history is retained for at least twelve months, with the most recent three months immediately available."
+        },
+        "pci_10_7_2": {
+          "title": "Failures of security controls are detected",
+          "desc": "Failures of critical security control systems, such as audit logging being switched off, are detected and alerted on promptly. Checked here: a working detection for audit logging being disabled (T1562.008, T1562.002)."
+        },
+        "nist_au_2": {
+          "title": "Event logging",
+          "desc": "The system logs the event types the organisation has selected for auditing."
+        },
+        "nist_au_3": {
+          "title": "Content of audit records",
+          "desc": "Records establish what happened, when and where, its source, its outcome and the identities involved. Checked here: actor, time and outcome map to real fields."
+        },
+        "nist_au_6": {
+          "title": "Audit record review, analysis and reporting",
+          "desc": "Audit records are reviewed and analysed for signs of inappropriate or unusual activity. Checked here: enabled detections run on schedule without errors."
+        },
+        "nist_au_11": {
+          "title": "Audit record retention",
+          "desc": "Audit records are kept for an organisation-defined period. Assessed here against 90 days, the CIS Control 8.10 minimum."
+        },
+        "nist_au_12": {
+          "title": "Audit record generation",
+          "desc": "Audit records are generated across the system's components, not just one of them."
+        },
+        "nist_si_4": {
+          "title": "System monitoring",
+          "desc": "The system is monitored to detect attacks and indicators of potential attacks."
+        },
+        "soc2_cc6_1": {
+          "title": "Logical access security",
+          "desc": "Logical access to information assets is controlled, and sign-in activity is recorded."
+        },
+        "soc2_cc7_1": {
+          "title": "Detection of configuration changes",
+          "desc": "Changes to configurations that introduce vulnerabilities are detected."
+        },
+        "soc2_cc7_2": {
+          "title": "Monitoring for anomalies",
+          "desc": "System components are monitored for anomalies that indicate malicious acts or errors."
+        },
+        "soc2_cc7_3": {
+          "title": "Evaluation of security events",
+          "desc": "Security events are evaluated to decide whether they are incidents that need a response. Checked here: detections run, and cases have been opened in this organisation."
+        },
+        "cis_8_2": {
+          "title": "Collect audit logs",
+          "desc": "Audit logs are collected from enterprise assets. Checked here: at least one identified security source reported in the last 24 hours."
+        },
+        "cis_8_5": {
+          "title": "Collect detailed audit logs",
+          "desc": "Detailed audit logs carry the event source, date, user, timestamp, addresses and other useful fields. Checked here: actor, time and outcome map to real fields."
+        },
+        "cis_8_9": {
+          "title": "Centralise audit logs",
+          "desc": "Audit logs are centralised. Any source reporting to this platform is centralised by definition."
+        },
+        "cis_8_10": {
+          "title": "Retain audit logs",
+          "desc": "Audit logs are kept for at least 90 days."
+        },
+        "cis_8_11": {
+          "title": "Conduct audit log reviews",
+          "desc": "Audit logs are reviewed to detect anomalies or abnormal events. Checked here: enabled detections run on schedule without errors."
+        },
+        "cis_8_12": {
+          "title": "Collect service provider logs",
+          "desc": "Logs from service providers, such as cloud platforms and identity providers, are collected."
+        }
+      },
+      "capabilityPhrase": {
+        "authentication": "sign-ins",
+        "admin": "admin and configuration changes",
+        "network": "network traffic",
+        "endpoint": "endpoint activity",
+        "cloud": "cloud provider activity"
+      },
+      "uncheckedRules": "{n} alert was not checked for SIEM metadata, so it is left out of detection coverage here. | {n} alerts were not checked for SIEM metadata, so they are left out of detection coverage here.",
+      "field": {
+        "actor": "actor",
+        "time": "time",
+        "outcome": "outcome"
+      },
+      "unmapped": "Not mapped: {fields}",
+      "retentionForever": "Kept indefinitely"
+    },
+    "intel": {
+      "title": "Threat Intel",
+      "subtitle": "Known-bad indicators, and every place they showed up in your security data",
+      "loadFailed": "Could not load indicator lists",
+      "add": "Add indicators",
+      "import": "Import",
+      "importFile": "CSV file",
+      "importFeed": "Feed URL",
+      "runSweep": "Run sweep",
+      "refresh": "Reload lists and sweep again",
+      "search": "Search indicators, sources, lists",
+      "allTypes": "All types",
+      "expiringOnly": "Expiring",
+      "expired": "Expired",
+      "never": "Never",
+      "notSighted": "Not seen",
+      "notSightedIn": "Not seen in {range}",
+      "sighted": "Seen once | Seen {n} times",
+      "sweeping": "Sweeping… {done} of {total} queries",
+      "sweptAcross": "Swept {n} security source | Swept {n} security sources",
+      "partial": "This sweep stopped at its limit of {n} queries, so some columns were not searched. Queries grow with lists × columns: remove stale lists or expired indicators, or split lists by type, for a complete sweep.",
+      "failedQueries": "{n} column could not be searched and was skipped. | {n} columns could not be searched and were skipped.",
+      "truncated": "Only the first {n} rows of {lists} were read; the rest were not swept.",
+      "noIndicators": "No indicators",
+      "noCoverage": "Run a sweep to see which columns are searched",
+      "coverageHint": "What a sweep searched across {n} security sources. Matching is exact, on the columns listed; a type with no column cannot be sighted at all.",
+      "indicatorCount": "{n} indicator | {n} indicators",
+      "columnsSearched": "{n} column | {n} columns",
+      "blind": "Not searchable",
+      "blindHint": "No security stream has a column that carries this kind of value, so these indicators cannot match anything yet.",
+      "cidrNote": "{n} CIDR range is kept on the list but not swept: exact matching cannot test range membership. | {n} CIDR ranges are kept on the list but not swept: exact matching cannot test range membership.",
+      "stat": {
+        "matched": "Indicators seen",
+        "hits": "Sightings",
+        "indicators": "Indicators",
+        "expiring": "Expired or expiring",
+        "lists": "Lists"
+      },
+      "tab": {
+        "matches": "Matches",
+        "indicators": "Indicators",
+        "coverage": "Coverage"
+      },
+      "col": {
+        "indicator": "Indicator",
+        "type": "Type",
+        "hits": "Sightings",
+        "seenIn": "Seen in",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "source": "Source",
+        "confidence": "Confidence",
+        "list": "List",
+        "added": "Added",
+        "expires": "Expires",
+        "description": "Description"
+      },
+      "type": {
+        "auto": "Detect automatically",
+        "ip": "IP address",
+        "cidr": "CIDR range",
+        "domain": "Domain",
+        "url": "URL",
+        "hash": "File hash",
+        "email": "Email address"
+      },
+      "empty": {
+        "title": "No threat intel yet",
+        "description": "Add indicators from a report, import a CSV, or subscribe to a feed. Every indicator is then swept against your security sources."
+      },
+      "noMatches": {
+        "title": "No indicator was seen",
+        "description": "None of {n} live indicators appeared in {streams} security sources over {range}."
+      },
+      "drawer": {
+        "eyebrow": "Indicator · {type}",
+        "sightings": "Sightings",
+        "details": "Details",
+        "overTime": "Sightings over time",
+        "hunt": "Hunt",
+        "huntTop": "Hunt in Events",
+        "notSeenTitle": "Not seen in this window",
+        "notSeen": "This indicator did not appear in {streams} security sources over {range}.",
+        "cidrNotSwept": "CIDR ranges are not swept: exact matching cannot test range membership."
+      },
+      "remove": {
+        "action": "Remove",
+        "title": "Remove indicator",
+        "message": "Remove {indicator} from {table}? The list is read and written back without it, keeping every other row as stored. This is not atomic: indicators added to {table} by anyone else while this runs would be lost.",
+        "confirm": "Remove",
+        "done": "Removed {indicator} | Removed {n} rows holding {indicator}",
+        "failed": "Could not remove the indicator",
+        "tooLarge": "{table} has {n} rows, more than this page can read, so it cannot be rewritten safely. Edit it on the Enrichment Tables page.",
+        "feedHint": "This list is refreshed from a feed; remove the indicator at the feed.",
+        "notFound": "{indicator} is no longer in {table}; it may have been removed already."
+      },
+      "form": {
+        "addTitle": "Add indicators",
+        "addSubtitle": "Paste from a report. Defanged values such as evil[.]com and hxxp:// are accepted.",
+        "addSubmit": "Add",
+        "cancel": "Cancel",
+        "indicators": "Indicators",
+        "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
+        "indicatorsHelp": "One per line, or separated by commas or spaces. Duplicates are ignored.",
+        "indicatorsRequired": "Enter at least one indicator",
+        "invalid": "Not recognised as indicators ({n}): {sample}",
+        "line": "line {n}",
+        "list": "List",
+        "listHelp": "Stored as an enrichment table; names get an ioc_ prefix.",
+        "listRequired": "Name the list",
+        "type": "Type",
+        "confidence": "Confidence (0–100)",
+        "confidenceRange": "Confidence must be between 0 and 100",
+        "source": "Source",
+        "sourcePlaceholder": "Report, vendor or feed name",
+        "description": "Description",
+        "expiry": "Expires",
+        "never": "Never",
+        "days": "In {n} day | In {n} days",
+        "added": "Added {n} indicator to {table} | Added {n} indicators to {table}",
+        "importedSkipped": "Added {n} indicators to {table}; skipped {skipped} row that was not an indicator | Added {n} indicators to {table}; skipped {skipped} rows that were not indicators",
+        "saveFailed": "Could not save the indicators",
+        "feedReadOnly": "{table} is refreshed from a feed and cannot take added rows. Pick another list.",
+        "importTitle": "Import indicators from CSV",
+        "importSubtitle": "Needs an indicator column; type, severity, source and expiry are optional.",
+        "importSubmit": "Import",
+        "file": "CSV file",
+        "fileHelp": "Rows that are not indicators are skipped and counted.",
+        "fileRequired": "Choose a CSV file",
+        "defaultSeverity": "Severity for rows without one",
+        "append": "Add to the list instead of replacing it",
+        "noIndicatorColumn": "The file has no indicator column",
+        "noValidRows": "No row in the file is a recognised indicator",
+        "feedTitle": "Subscribe to a feed",
+        "feedSubtitle": "The server fetches the CSV in the background and keeps the list in step with it.",
+        "feedSubmit": "Subscribe",
+        "url": "Feed URL",
+        "urlHelp": "A public CSV with an indicator column.",
+        "urlInvalid": "Enter an http:// or https:// URL",
+        "feedQueued": "Fetching {table}. Indicators appear once the download finishes.",
+        "allPresent": "Every indicator is already in {table}",
+        "addedSkippedDupes": "Added {n} indicator to {table}; {dupes} already there | Added {n} indicators to {table}; {dupes} already there",
+        "urlPlaceholder": "https://feeds.example/indicators.csv",
+        "noIndicatorColumnIn": "{table} has no indicator, ioc or value column, so indicators cannot be added to it. Pick another list.",
+        "replaceTitle": "Replace the list",
+        "replaceMessage": "Importing with append off replaces {table} entirely: every existing row, its columns and settings are removed and only this file's indicators remain.",
+        "replaceConfirm": "Replace"
+      },
+      "importCsv": "Import a CSV",
+      "unreadTables": "Could not read {lists}; its indicators are not shown or swept. | Could not read {lists}; their indicators are not shown or swept.",
+      "noIndicatorColumn": "{lists} has no indicator column, so none of its rows are used. | {lists} have no indicator column, so none of their rows are used.",
+      "skippedRows": "Rows that are not recognisable indicators were skipped: {detail}.",
+      "unreadStreams": "The schema of {streams} could not be read, so it was not searched. | The schemas of {streams} could not be read, so they were not searched.",
+      "columnsSkipped": "{n} column not searched | {n} columns not searched",
+      "skippedHint": "Not fully searched — the sweep hit its query limit or the query failed:",
+      "caveat": {
+        "capped": "The sweep hit its query limit, so some columns were not searched.",
+        "failed": "{n} column could not be searched. | {n} columns could not be searched.",
+        "partial": "{n} query returned only partial results, so those columns were not fully searched. | {n} queries returned only partial results, so those columns were not fully searched.",
+        "unsearched": "No stream has a column for: {types}.",
+        "cidr": "{n} CIDR range was not swept. | {n} CIDR ranges were not swept."
+      }
+    },
+    "sources": {
+      "title": "Data Sources",
+      "comingSoon": "Guided onboarding with OCSF normalization templates is coming. Until then, ingest security logs as any stream; the Events page identifies and normalizes them automatically."
     }
   }
 }

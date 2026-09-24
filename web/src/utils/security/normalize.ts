@@ -16,6 +16,7 @@ import type { NormalizedEvent } from "./ocsf";
 import { ocsfClass, toOcsfSeverity, toOcsfStatus } from "./ocsf";
 import type { SourceType } from "./sourceTypes";
 import { readPath } from "./classify";
+import { FieldIndex } from "./fields";
 
 const isPresent = (value: unknown) =>
   value !== undefined && value !== null && value !== "" && !(Array.isArray(value) && !value.length);
@@ -144,6 +145,26 @@ export function populatedColumns(
       return typeof value === "number" ? value > 0 : isPresent(value);
     });
   });
+}
+
+/**
+ * The stored column a normalized value was read from on this row, so a click on
+ * "Actor" can filter on the real field (`useridentity_arn`), not the label.
+ * Null when the value was a constant or derived, which cannot be filtered on.
+ */
+export function sourceColumnFor(
+  raw: Record<string, unknown>,
+  source: SourceType | null,
+  column: keyof NormalizedEvent,
+): string | null {
+  const paths = column === "time" ? ["_timestamp"] : ((source?.map?.[column] as string[]) ?? []);
+  const index = new FieldIndex(Object.keys(raw));
+  for (const path of paths) {
+    for (const option of path.split("|")) {
+      if (isPresent(readPath(raw, option))) return index.resolve(option);
+    }
+  }
+  return null;
 }
 
 /**

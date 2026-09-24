@@ -25,7 +25,7 @@
 // zero-migration property.
 
 import type { SigmaLevel, SigmaRule } from "./sigma";
-import { sigmaLevelToSeverity } from "./sigma";
+import { parseSigmaRule, sigmaLevelToSeverity } from "./sigma";
 
 /** The key that marks an alert as belonging to the SIEM. */
 export const SIEM_MARKER = "siem";
@@ -33,6 +33,11 @@ export const SIEM_MARKER = "siem";
 /** How a detection is described once read back off an alert. */
 export interface DetectionMeta {
   isSiem: boolean;
+  /**
+   * The rule's own title ("AWS IAM Access Key Created"). The alert name is a
+   * sanitised copy of it, so every page shows this instead to read the same.
+   */
+  title: string;
   sigmaId: string;
   sigmaYaml: string;
   level: SigmaLevel;
@@ -56,6 +61,23 @@ const splitList = (value: unknown): string[] => {
     .filter(Boolean);
 };
 
+const titleCache = new Map<string, string>();
+function sigmaTitle(yaml: string): string {
+  if (!yaml) return "";
+  let title = titleCache.get(yaml);
+  if (title === undefined) {
+    const parsed = parseSigmaRule(yaml);
+    title = parsed.ok ? parsed.rule.title : "";
+    titleCache.set(yaml, title);
+  }
+  return title;
+}
+
+/** Best readable name for an alert: its Sigma title, else the name with underscores as spaces. */
+export function readableAlertName(name: string, sigmaYaml = ""): string {
+  return sigmaTitle(sigmaYaml) || name.replace(/_+/g, " ").trim();
+}
+
 /**
  * Reads the SIEM metadata off an alert.
  *
@@ -70,6 +92,7 @@ export function detectionMetaOf(alert: Record<string, any> | null | undefined): 
 
   return {
     isSiem: marker === true || marker === "true",
+    title: readableAlertName(String(alert?.name ?? ""), String(attributes.sigma_yaml ?? "")),
     sigmaId: String(attributes.sigma_id ?? ""),
     sigmaYaml: String(attributes.sigma_yaml ?? ""),
     level: (LEVELS as string[]).includes(level) ? (level as SigmaLevel) : "medium",
@@ -106,6 +129,15 @@ export function detectionName(title: string): string {
     .replace(/^_+|_+$/g, "")
     .slice(0, 100);
   return cleaned || "Untitled_detection";
+}
+
+/**
+ * The alert name for a rule installed on a stream. Alert history carries only
+ * the name, so the same rule on two streams must not share one.
+ */
+export function detectionAlertName(title: string, stream: string): string {
+  const suffix = `__${detectionName(stream)}`;
+  return `${detectionName(title).slice(0, 100 - suffix.length)}${suffix}`;
 }
 
 export interface BuildDetectionInput {
@@ -167,7 +199,7 @@ export function buildDetectionAlert(input: BuildDetectionInput): Record<string, 
     .join(" ");
 
   return {
-    name: input.name ?? detectionName(rule.title),
+    name: input.name ?? detectionAlertName(rule.title, stream),
     description: rule.description?.trim() ?? "",
     stream_type: streamType,
     stream_name: stream,
@@ -241,6 +273,22 @@ export function detectionSql(stream: string, where: string, fields: string[] = [
  */
 export function whereOfDetectionSql(sql: string | null | undefined): string {
   if (!sql) return "";
-  const match = /\bwhere\b/i.exec(sql);
+  // Blank out quoted names and literals first, so a stream called "audit-where"
+  // or a value containing "where" is never taken for the clause.
+  let masked = "";
+  let quote: string | null = null;
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (quote) {
+      masked += " ";
+      if (ch === quote) quote = null;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+      masked += " ";
+    } else {
+      masked += ch;
+    }
+  }
+  const match = /\swhere\s/i.exec(masked);
   return match ? sql.slice(match.index + match[0].length).trim() : "";
 }

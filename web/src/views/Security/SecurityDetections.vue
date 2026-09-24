@@ -1,718 +1,1154 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Detection rules.
-     A detection here IS an OpenObserve scheduled alert: same scheduler, same
-     firing history, same incident rollup. What makes it a detection is the Sigma
-     rule stored in its context_attributes, which is also what runs. See
-     utils/security/detection.ts for why that mapping was chosen over a parallel
-     rule engine. -->
+<!-- Detections — the rules the SOC runs.
+     A detection IS an OpenObserve scheduled alert: same scheduler, same firing
+     history, same incident rollup. What makes it a detection is the Sigma rule
+     stored in its context_attributes (see utils/security/detection.ts). The
+     list is the org's alerts, hydrated and identified by useSiemDetections;
+     the drawer reads one rule end to end — what it looks for, the SQL it runs,
+     and every recent evaluation from alert history. -->
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import SecurityRecordDrawer, {
+  type RecordFact,
+  type RecordTab,
+} from "@/components/security/SecurityRecordDrawer.vue";
+import SecurityKeyValues, { type KeyValueRow } from "@/components/security/SecurityKeyValues.vue";
+import SecurityNewDetectionDialog, {
+  type NewDetectionPreset,
+} from "@/components/security/SecurityNewDetectionDialog.vue";
 import alertsService from "@/services/alerts";
-import destinationService from "@/services/alert_destination";
-import streamService from "@/services/stream";
+import { useAlertHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
+import { STATUS_VARIANT, firingStatus, type FiringStatus } from "@/utils/security/firings";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { bestMatch } from "@/utils/security/classify";
-import { SOURCE_TYPE_BY_ID, sigmaLogsourceLabel } from "@/utils/security/sourceTypes";
-import type { SigmaRule } from "@/utils/security/sigma";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useSiemDetections, type DetectionRow } from "@/composables/security/useSiemDetections";
+import { whereOfDetectionSql } from "@/utils/security/detection";
+import { isFiring, type HistoryRow } from "@/utils/security/history";
+import { normalizeTactic, techniqueUrl } from "@/utils/security/mitre";
 import {
-  blockedReason,
-  caveat,
-  compileSigmaRule,
-  parseSigmaRule,
-  sigmaCatalog,
-} from "@/utils/security/sigma";
-import { KEYWORD_FIELDS, SIGMA_FIELD_MAPS } from "@/utils/security/sigma/catalog";
-import { buildDetectionAlert, detectionMetaOf } from "@/utils/security/detection";
-import { useSiemDetections } from "@/composables/security/useSiemDetections";
-import "@/views/Security/security.scss";
+  detectionState,
+  firingsByName,
+  toMicros,
+  type DetectionState,
+} from "@/utils/security/content";
+import {
+  SEVERITY_TONES,
+  severityRailColor,
+  severityTagValue,
+  toneLabelKey,
+  toneOfSigmaLevel,
+  type SeverityTone,
+} from "@/utils/security/severity";
+import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
+import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
+const { t } = useI18n();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
+const { confirm } = useConfirmDialog();
 
-// ── Rule list ────────────────────────────────────────────────────────────────
-// The list and its SIEM metadata come from the shared loader; see
-// composables/security/useSiemDetections.ts for why hydration is needed at all.
+// ── Rules ────────────────────────────────────────────────────────────────────
 const {
   rows,
   siemRows,
   loading,
   hydrating,
   error,
-  unchecked: notHydrated,
+  unchecked,
   load: loadRules,
   patch: patchRule,
   remove: removeRule,
 } = useSiemDetections();
+// Firings in the last day, from alert history: the alert's own
+// `last_triggered_at` is its last evaluation, not its last firing. The shared
+// window loader keeps the cap, dedupe and range narrowing identical to Overview.
+const history24h = useAlertHistoryWindow();
+const firings = computed(() => firingsByName(history24h.rows.value));
+const firingsCapped = history24h.capped;
+const firingsLoading = history24h.loading;
+const firingsError = history24h.error;
+const firingsNarrowedFrom = history24h.effectiveStartMs;
 
-const filter = ref("");
-const siemOnly = ref(true);
-const selected = ref<any | null>(null);
-const activeTab = ref<"detail" | "sigma" | "sql">("detail");
+function loadFirings() {
+  const end = Date.now();
+  return history24h.load(orgId.value, end - 86_400_000, end);
+}
 
-/** Severity words map onto the shared badge classes, which use `info`. */
-const badgeLevel = (level: string) => (level === "informational" ? "info" : level);
+async function refresh() {
+  await Promise.all([loadRules(orgId.value), loadFirings()]);
+}
 
-const filtered = computed(() =>
-  (siemOnly.value ? siemRows.value : rows.value).filter(({ alert, meta }) => {
-    if (!filter.value.trim()) return true;
-    const needle = filter.value.toLowerCase();
-    return (
-      alert.name?.toLowerCase().includes(needle) ||
-      meta.techniques.some((t) => t.toLowerCase().includes(needle)) ||
-      alert.stream_name?.toLowerCase().includes(needle)
-    );
+// ── Filters ──────────────────────────────────────────────────────────────────
+const search = ref("");
+const scope = ref<"siem" | "all">("siem");
+const severity = ref<string | null>(null);
+type Facet = "fired" | DetectionState;
+const facet = ref<Facet | null>(null);
+
+interface Row {
+  id: string;
+  name: string;
+  /** The Sigma rule's own title; the alert name is a sanitised copy of it. */
+  title: string;
+  tone: SeverityTone;
+  stream: string;
+  techniques: string[];
+  enabled: boolean;
+  state: DetectionState;
+  fired: boolean;
+  firings: number;
+  lastFiredUs: number | null;
+  lastRunUs: number | null;
+  lastOutcome: string;
+  schedule: string;
+  isSiem: boolean;
+  entry: DetectionRow;
+}
+
+function scheduleOf(alert: Record<string, any>): string {
+  const tc = alert.trigger_condition;
+  if (!tc?.frequency || !tc?.period) return "—";
+  return t("siem.detections.scheduleValue", { every: tc.frequency, over: tc.period });
+}
+
+const scoped = computed<Row[]>(() =>
+  (scope.value === "siem" ? siemRows.value : rows.value).map((entry) => {
+    const alert = entry.alert;
+    const name = String(alert.name ?? "");
+    const fired = firings.value.get(name);
+    return {
+      id: String(alert.id ?? alert.name),
+      name,
+      title: entry.meta.title || name,
+      tone: entry.meta.isSiem ? toneOfSigmaLevel(entry.meta.level) : "unknown",
+      stream: String(alert.stream_name ?? ""),
+      techniques: entry.meta.techniques,
+      enabled: !!alert.enabled,
+      state: detectionState(alert),
+      fired: !!fired,
+      firings: fired?.count ?? 0,
+      lastFiredUs: fired?.lastUs ?? null,
+      lastRunUs: toMicros(alert.last_outcome_at ?? alert.last_triggered_at),
+      lastOutcome: String(alert.last_outcome ?? ""),
+      schedule: scheduleOf(alert),
+      isSiem: entry.meta.isSiem,
+      entry,
+    };
   }),
 );
 
-const siemCount = computed(() => siemRows.value.length);
+const counts = computed(() => ({
+  fired: scoped.value.filter((r) => r.fired).length,
+  erroring: scoped.value.filter((r) => r.state === "erroring").length,
+  enabled: scoped.value.filter((r) => r.state === "enabled").length,
+  disabled: scoped.value.filter((r) => r.state === "disabled").length,
+}));
 
-const fetchRules = () => loadRules(orgId.value);
-
-/**
- * Toggling asks the server first and only then updates the row.
- *
- * An optimistic flip is the wrong trade for a control that decides whether a
- * detection runs: the failure mode is a UI that says "enabled" over a rule that
- * is switched off, which is exactly the state nobody notices.
- */
-async function toggleRule(entry: { alert: any }) {
-  const alert = entry.alert;
-  const next = !alert.enabled;
-  if (!alert.id) {
-    toast({ variant: "error", message: `${alert.name} has no id and cannot be toggled` });
-    return;
-  }
-  try {
-    await alertsService.toggle_state_by_alert_id(orgId.value, alert.id, next);
-    patchRule(alert.id, { enabled: next });
-    if (selected.value?.id === alert.id) selected.value = { ...selected.value, enabled: next };
-    toast({ variant: "success", message: `${alert.name} ${next ? "enabled" : "disabled"}` });
-  } catch (e: any) {
-    toast({
-      variant: "error",
-      message: e?.response?.data?.message ?? "Could not change the rule state",
-    });
-  }
-}
-
-async function deleteRule(alert: any) {
-  if (!alert.id) {
-    toast({ variant: "error", message: `${alert.name} has no id and cannot be deleted` });
-    return;
-  }
-  try {
-    await alertsService.delete_by_alert_id(orgId.value, alert.id);
-    removeRule(alert.id);
-    if (selected.value?.id === alert.id) selected.value = null;
-    toast({ variant: "success", message: `${alert.name} deleted` });
-  } catch (e: any) {
-    toast({ variant: "error", message: e?.response?.data?.message ?? "Could not delete the rule" });
-  }
-}
-
-function relTime(value: string | number | null | undefined): string {
-  if (!value) return "Never";
-  const raw = typeof value === "number" ? value : Date.parse(value);
-  if (!Number.isFinite(raw)) return "Never";
-  // Alert timestamps arrive in microseconds from some endpoints, milliseconds
-  // from others; both are far enough apart to tell without a flag.
-  const ms = raw > 1e14 ? raw / 1000 : raw;
-  const diff = Date.now() - ms;
-  if (diff < 0) return "Scheduled";
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
-// ── Create ───────────────────────────────────────────────────────────────────
-const showNew = ref(false);
-const mode = ref<"catalog" | "custom">("catalog");
-const catalogFilter = ref("");
-const pickedRuleId = ref("");
-const customYaml = ref(`title: My Detection
-status: experimental
-description: Detects something worth waking up for.
-logsource:
-  product: aws
-  service: cloudtrail
-detection:
-  selection:
-    eventName: CreateAccessKey
-  condition: selection
-level: medium
-tags:
-  - attack.persistence
-  - attack.t1098.001`);
-
-const streams = ref<string[]>([]);
-const pickedStream = ref("");
-const streamFields = ref<string[]>([]);
-const destinations = ref<string[]>([]);
-const pickedDestinations = ref<string[]>([]);
-const period = ref(15);
-const frequency = ref(15);
-const silence = ref(30);
-const saving = ref(false);
-
-const catalog = computed(() => sigmaCatalog());
-
-const catalogMatches = computed(() => {
-  const needle = catalogFilter.value.trim().toLowerCase();
-  if (!needle) return catalog.value;
-  return catalog.value.filter(
-    (rule) =>
-      rule.title.toLowerCase().includes(needle) ||
-      rule.techniques.some((t) => t.toLowerCase().includes(needle)) ||
-      sigmaLogsourceLabel(rule.logsource).toLowerCase().includes(needle),
-  );
-});
-
-/** The rule about to be saved, from whichever tab the user is on. */
-const draftRule = computed<SigmaRule | null>(() => {
-  if (mode.value === "catalog") {
-    return catalog.value.find((rule) => rule.id === pickedRuleId.value) ?? null;
-  }
-  const parsed = parseSigmaRule(customYaml.value);
-  return parsed.ok ? parsed.rule : null;
-});
-
-const customError = computed(() => {
-  if (mode.value !== "custom") return "";
-  const parsed = parseSigmaRule(customYaml.value);
-  return parsed.ok ? "" : parsed.error.message;
-});
-
-/**
- * What the stream was identified as, which decides the field mapping.
- *
- * When the Events page sent us here it already classified the stream with a
- * sample row in hand, which is strictly better evidence than a schema alone, so
- * its answer is preferred over re-deciding from the field list.
- */
-const presetSource = ref("");
-const draftSource = computed(() => {
-  if (presetSource.value) return SOURCE_TYPE_BY_ID.get(presetSource.value) ?? null;
-  return streamFields.value.length ? (bestMatch(streamFields.value)?.source ?? null) : null;
-});
-
-/**
- * The draft compiled against the chosen stream.
- *
- * Recomputed on every change so the dialog can refuse to save a rule that would
- * not run, and say why, before anything is written.
- */
-const draftCompiled = computed(() => {
-  const rule = draftRule.value;
-  if (!rule || !streamFields.value.length) return null;
-  const sourceId = draftSource.value?.id ?? "";
-  return compileSigmaRule(rule, {
-    fieldMap: SIGMA_FIELD_MAPS[sourceId],
-    availableFields: streamFields.value,
-    keywordFields:
-      KEYWORD_FIELDS[sourceId] ??
-      ["message", "log"].filter((f) => streamFields.value.some((name) => name.toLowerCase() === f)),
+const filtered = computed(() => {
+  const needle = search.value.trim().toLowerCase();
+  return scoped.value.filter((r) => {
+    if (facet.value === "fired" && !r.fired) return false;
+    if (facet.value && facet.value !== "fired" && r.state !== facet.value) return false;
+    if (severity.value && r.tone !== severity.value) return false;
+    if (!needle) return true;
+    return (
+      r.name.toLowerCase().includes(needle) ||
+      r.title.toLowerCase().includes(needle) ||
+      r.stream.toLowerCase().includes(needle) ||
+      r.techniques.some((tech) => tech.toLowerCase().includes(needle))
+    );
   });
 });
 
-const canSave = computed(
-  () =>
-    !!draftRule.value &&
-    !!pickedStream.value &&
-    !!pickedDestinations.value.length &&
-    !!draftCompiled.value?.runnable &&
-    !saving.value,
+const filtersActive = computed(() => !!search.value || !!severity.value || !!facet.value);
+function clearFilters() {
+  search.value = "";
+  severity.value = null;
+  facet.value = null;
+}
+
+const stats = computed<StatItem[]>(() => [
+  {
+    key: "fired",
+    label: t("siem.detections.stat.fired"),
+    value:
+      firingsError.value || (firingsLoading.value && !firings.value.size)
+        ? "—"
+        : counts.value.fired,
+    icon: "local-fire-department",
+    tone: "orange",
+    max: scoped.value.length || undefined,
+    dataTest: "security-detections-stat-fired",
+  },
+  {
+    key: "erroring",
+    label: t("siem.detections.stat.erroring"),
+    value: counts.value.erroring,
+    icon: "error-outline",
+    tone: "error",
+    max: scoped.value.length || undefined,
+    dataTest: "security-detections-stat-erroring",
+  },
+  {
+    key: "enabled",
+    label: t("siem.detections.stat.enabled"),
+    value: counts.value.enabled,
+    icon: "verified-user",
+    tone: "success",
+    max: scoped.value.length || undefined,
+    dataTest: "security-detections-stat-enabled",
+  },
+  {
+    key: "disabled",
+    label: t("siem.detections.stat.disabled"),
+    value: counts.value.disabled,
+    icon: "pause-circle-filled",
+    tone: "neutral",
+    max: scoped.value.length || undefined,
+    dataTest: "security-detections-stat-disabled",
+  },
+  {
+    key: "all",
+    label: t("siem.detections.stat.all"),
+    value: scoped.value.length,
+    icon: "shield-alert-outline",
+    tone: "primary",
+    dataTest: "security-detections-stat-all",
+  },
+]);
+
+function onStat(key: string) {
+  facet.value = key === "all" || facet.value === key ? null : (key as Facet);
+}
+
+const severityOptions = computed(() =>
+  SEVERITY_TONES.map((tone) => ({ label: t(toneLabelKey(tone)), value: tone })),
 );
 
-async function loadStreams() {
-  try {
-    const res = await streamService.nameList(orgId.value, "logs", false);
-    streams.value = (res.data?.list ?? []).map((s: any) => s.name);
-  } catch {
-    streams.value = [];
-  }
-}
+// ── Table ────────────────────────────────────────────────────────────────────
+const columns = computed<OTableColumnDef<Row>[]>(() => [
+  { id: "severity", header: t("siem.common.severity"), accessorKey: "tone", size: 110 },
+  {
+    id: "title",
+    header: t("siem.detections.column.name"),
+    accessorKey: "title",
+    meta: { isName: true },
+    sortable: true,
+  },
+  {
+    id: "stream",
+    header: t("siem.detections.column.stream"),
+    accessorKey: "stream",
+    size: 170,
+    hideable: true,
+    sortable: true,
+  },
+  {
+    id: "techniques",
+    header: t("siem.common.mitre"),
+    accessorKey: "techniques",
+    size: 180,
+    hideable: true,
+  },
+  {
+    id: "schedule",
+    header: t("siem.detections.column.schedule"),
+    accessorKey: "schedule",
+    size: 150,
+    hideable: true,
+  },
+  {
+    id: "firings",
+    header: t("siem.detections.column.fired24h"),
+    accessorKey: "firings",
+    size: 150,
+    sortable: true,
+  },
+  {
+    id: "lastRun",
+    header: t("siem.detections.column.lastRun"),
+    accessorKey: "lastRunUs",
+    size: 150,
+    hideable: true,
+    sortable: true,
+  },
+  { id: "enabled", header: t("siem.detections.column.enabled"), accessorKey: "enabled", size: 90 },
+]);
+const columnVisibility = { schedule: false };
 
-async function loadDestinations() {
-  try {
-    const res = await destinationService.list({
-      org_identifier: orgId.value,
-      page_num: 1,
-      page_size: 1000,
-      sort_by: "name",
-      desc: false,
-      module: "alert",
-    });
-    const list = res.data?.list ?? res.data ?? [];
-    destinations.value = (Array.isArray(list) ? list : []).map((d: any) => d.name);
-  } catch {
-    destinations.value = [];
-  }
-}
+// The open record wins over state tints, so the row beside the drawer is findable.
+const rowClass = (row: Row) =>
+  row.id === selectedId.value
+    ? "!bg-table-row-selected-bg"
+    : row.state === "erroring"
+      ? "!bg-status-error-bg"
+      : row.state === "disabled"
+        ? "!bg-surface-panel"
+        : "";
 
-async function loadStreamFields(name: string) {
-  if (!name) {
-    streamFields.value = [];
+// ── Toggle / delete ──────────────────────────────────────────────────────────
+const toggling = ref<string | null>(null);
+
+/**
+ * Asks the server first and only then updates the row: an optimistic flip on
+ * the control that decides whether a detection runs could leave a UI that says
+ * "enabled" over a rule that is off.
+ */
+async function toggleRule(row: Row) {
+  const alert = row.entry.alert;
+  if (!alert.id) {
+    toast({ variant: "error", message: t("siem.detections.noId", { name: alert.name }) });
     return;
   }
+  const next = !alert.enabled;
+  toggling.value = row.id;
   try {
-    const res = await streamService.schema(orgId.value, name, "logs");
-    streamFields.value = (res.data?.schema ?? []).map((f: any) => f.name);
-  } catch {
-    streamFields.value = [];
-  }
-}
-
-watch(pickedStream, (name, previous) => {
-  // The preset belongs to the stream Events sent over. Once the user picks a
-  // different one, that evidence no longer describes what is being compiled.
-  if (previous !== undefined) presetSource.value = "";
-  void loadStreamFields(name);
-});
-
-async function saveDetection() {
-  const rule = draftRule.value;
-  const compiled = draftCompiled.value;
-  if (!rule || !compiled?.runnable) return;
-
-  saving.value = true;
-  try {
-    const payload = buildDetectionAlert({
-      rule,
-      where: compiled.where,
-      fields: compiled.fields,
-      stream: pickedStream.value,
-      destinations: pickedDestinations.value,
-      sourceType: draftSource.value?.id ?? "",
-      period: Number(period.value),
-      frequency: Number(frequency.value),
-      silence: Number(silence.value),
+    // `folder` is required by the API when RBAC is on (EnableAlertQuery).
+    await alertsService.toggle_state_by_alert_id(orgId.value, alert.id, next, alert.folder_id);
+    patchRule(alert.id, { enabled: next });
+    toast({
+      variant: "success",
+      message: next
+        ? t("siem.detections.enabledToast", { name: alert.name })
+        : t("siem.detections.disabledToast", { name: alert.name }),
     });
-    await alertsService.create_by_alert_id(orgId.value, payload);
-    toast({ variant: "success", message: `Detection "${payload.name}" created` });
-    showNew.value = false;
-    await fetchRules();
   } catch (e: any) {
     toast({
       variant: "error",
-      message: e?.response?.data?.message ?? "Could not create the detection",
+      message: e?.response?.data?.message ?? t("siem.detections.toggleFailed"),
     });
   } finally {
-    saving.value = false;
+    toggling.value = null;
   }
 }
 
-// ── Arriving from the Events page with a rule already chosen ────────────────
-async function openFromQuery() {
+async function deleteRule(row: Row) {
+  const alert = row.entry.alert;
+  if (!alert.id) return;
+  const ok = await confirm({
+    title: t("siem.detections.deleteTitle"),
+    message: t("siem.detections.deleteMessage", { name: alert.name }),
+    confirmLabel: t("siem.detections.delete"),
+  });
+  if (!ok) return;
+  try {
+    await alertsService.delete_by_alert_id(orgId.value, alert.id, alert.folder_id);
+    removeRule(alert.id);
+    closeDrawer();
+    toast({ variant: "success", message: t("siem.detections.deleted", { name: alert.name }) });
+  } catch (e: any) {
+    toast({
+      variant: "error",
+      message: e?.response?.data?.message ?? t("siem.detections.deleteFailed"),
+    });
+  }
+}
+
+// ── Drawer ───────────────────────────────────────────────────────────────────
+const selectedId = ref<string | null>(null);
+const drawerTab = ref("overview");
+const selected = computed(() => scoped.value.find((r) => r.id === selectedId.value) ?? null);
+// Position in the table's own (sorted) order; refreshed on open, step, sort
+// and data changes, since the table's sort state is not Vue-reactive here.
+const tableRef = ref<{ table: NavTable<Row> } | null>(null);
+const selectedIndex = ref<number | null>(null);
+function syncIndex() {
+  const rows = displayOrder(tableRef.value?.table, filtered.value);
+  selectedIndex.value = positionOf(rows, (r) => r.id === selectedId.value);
+}
+watch([filtered, selectedId], () => void nextTick(syncIndex));
+
+function openDrawer(row: Row) {
+  selectedId.value = row.id;
+  router.replace({ query: { ...route.query, detection: row.id } });
+}
+function closeDrawer() {
+  selectedId.value = null;
+  const { detection: _drop, ...rest } = route.query;
+  router.replace({ query: rest });
+}
+function step(delta: number) {
+  const next = stepRow(
+    tableRef.value?.table,
+    filtered.value,
+    (r) => r.id === selectedId.value,
+    delta,
+  );
+  if (next) openDrawer(next.row);
+}
+
+const shareUrl = computed(() => {
+  if (!selected.value || typeof window === "undefined") return "";
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.searchParams.set("org_identifier", orgId.value);
+  url.searchParams.set("detection", selected.value.id);
+  return url.toString();
+});
+
+// `?detection=<alert id>` (share links, Alerts, Cases) opens that rule's drawer
+// once the list has loaded. A rule only counts as non-SIEM after hydration has
+// finished; before that its metadata may simply not have arrived yet.
+function openFromDetectionParam() {
+  const wanted = route.query.detection ? String(route.query.detection) : null;
+  if (!wanted || selectedId.value === wanted) return;
+  const row = rows.value.find((r) => String(r.alert.id) === wanted);
+  if (!row) return;
+  if (!row.meta.isSiem) {
+    if (loading.value || hydrating.value) return;
+    scope.value = "all";
+  }
+  selectedId.value = wanted;
+}
+watch(
+  () => [rows.value, hydrating.value, loading.value, route.query.detection] as const,
+  openFromDetectionParam,
+);
+
+// Keep drawer and URL in step: the param leaving (back navigation) closes the
+// drawer, and a record that leaves the list (scope switch, deletion) closes it
+// and drops the param.
+watch(
+  () => route.query.detection,
+  (param) => {
+    if (!param && selectedId.value) selectedId.value = null;
+  },
+);
+watch(selected, (row) => {
+  if (!row && selectedId.value && !loading.value) closeDrawer();
+});
+
+// History: every evaluation of this rule over the last 7 days.
+const HISTORY_DAYS = 7;
+const HISTORY_SIZE = 200;
+const history = ref<HistoryRow[]>([]);
+const historyTotal = ref(0);
+const historyLoading = ref(false);
+const historyError = ref("");
+let historySeq = 0;
+
+async function loadHistory(alertId: string) {
+  const seq = ++historySeq;
+  history.value = [];
+  historyError.value = "";
+  historyLoading.value = true;
+  const end = Date.now() * 1000;
+  try {
+    const res = await alertsService.getHistory(orgId.value, {
+      alert_id: alertId,
+      start_time: String(end - HISTORY_DAYS * 86_400_000_000),
+      end_time: String(end),
+      from: "0",
+      size: String(HISTORY_SIZE),
+      sort_by: "timestamp",
+      sort_order: "desc",
+    });
+    if (seq !== historySeq) return;
+    history.value = res.data?.hits ?? [];
+    historyTotal.value = Number(res.data?.total ?? history.value.length);
+  } catch (e: any) {
+    if (seq !== historySeq) return;
+    historyError.value =
+      e?.response?.data?.message ?? e?.message ?? t("siem.detections.historyError");
+  } finally {
+    if (seq === historySeq) historyLoading.value = false;
+  }
+}
+
+watch(
+  () => selected.value?.entry.alert.id,
+  (id) => {
+    if (id) void loadHistory(String(id));
+  },
+);
+
+const historyFirings = computed(() => history.value.filter(isFiring).length);
+
+const drawerTabs = computed<RecordTab[]>(() => [
+  { name: "overview", label: t("siem.detections.tab.overview"), icon: "dashboard" },
+  {
+    name: "history",
+    label: t("siem.detections.tab.history"),
+    icon: "history",
+    count: historyFirings.value || null,
+  },
+  { name: "sigma", label: t("siem.detections.tab.sigma"), icon: "rule" },
+  { name: "sql", label: t("siem.detections.tab.sql"), icon: "code" },
+]);
+
+const drawerFacts = computed<RecordFact[]>(() => {
+  const row = selected.value;
+  if (!row) return [];
+  // Compact ("35m ago") so a fact fits its tile; the History tab has exact times.
+  const when = (us: number | null) => {
+    if (!us) return "";
+    const mins = Math.max(0, Math.round((Date.now() - us / 1000) / 60_000));
+    if (mins < 1) return t("siem.detections.ago.now");
+    if (mins < 60) return t("siem.detections.ago.minutes", { n: mins });
+    if (mins < 1440) return t("siem.detections.ago.hours", { n: Math.round(mins / 60) });
+    return t("siem.detections.ago.days", { n: Math.round(mins / 1440) });
+  };
+  return [
+    { label: t("siem.detections.column.stream"), value: row.stream, mono: true },
+    { label: t("siem.detections.column.schedule"), value: row.schedule },
+    {
+      label: t("siem.detections.column.fired24h"),
+      value: row.firings
+        ? t(
+            "siem.detections.firedTimes",
+            { n: row.firings, when: when(row.lastFiredUs) },
+            row.firings,
+          )
+        : t("siem.detections.notFired"),
+    },
+    {
+      label: t("siem.detections.column.lastRun"),
+      value: row.lastRunUs
+        ? `${t(`siem.detections.outcome.${outcomeKey(row.lastOutcome)}`)} · ${when(row.lastRunUs)}`
+        : t("siem.detections.neverRun"),
+    },
+  ];
+});
+
+const detailRows = computed<KeyValueRow[]>(() => {
+  const row = selected.value;
+  if (!row) return [];
+  const alert = row.entry.alert;
+  const meta = row.entry.meta;
+  const list: KeyValueRow[] = [
+    {
+      key: "logsource",
+      label: t("siem.detections.field.logsource"),
+      value: meta.logsource,
+      mono: true,
+    },
+    {
+      key: "source_type",
+      label: t("siem.detections.field.sourceType"),
+      value: meta.sourceType,
+      mono: true,
+    },
+    { key: "sigma_id", label: t("siem.detections.field.sigmaId"), value: meta.sigmaId, mono: true },
+    {
+      key: "destinations",
+      label: t("siem.detections.field.destinations"),
+      value: (alert.destinations ?? []).join(", "),
+    },
+    {
+      key: "silence",
+      label: t("siem.detections.field.silence"),
+      value:
+        alert.trigger_condition?.silence != null
+          ? t("siem.detections.minutes", alert.trigger_condition.silence)
+          : "",
+    },
+    { key: "owner", label: t("siem.detections.field.owner"), value: String(alert.owner ?? "") },
+    {
+      key: "last_error",
+      label: t("siem.detections.field.lastError"),
+      value: String(alert.last_error ?? ""),
+    },
+  ];
+  return list.filter((r) => r.value);
+});
+
+const tactics = computed(() =>
+  (selected.value?.entry.meta.tactics ?? [])
+    .map((x) => normalizeTactic(x))
+    .filter((x): x is NonNullable<typeof x> => !!x),
+);
+
+/**
+ * The rule's predicate, for SIEM detections only: their SQL is always
+ * `SELECT … FROM … WHERE <predicate>` (detectionSql). An arbitrary alert's
+ * SQL can carry GROUP BY / ORDER BY / LIMIT after WHERE, which would not survive
+ * being spliced into another query.
+ */
+function matchPredicate(row: Row): string {
+  return row.isSiem ? whereOfDetectionSql(row.entry.alert.query_condition?.sql) : "";
+}
+
+/** Opens Events showing everything this rule matches, over its own look-back window. */
+function viewMatches(row: Row) {
+  const alert = row.entry.alert;
+  const where = matchPredicate(row);
+  if (!where || !alert.stream_name) return;
+  const period = Math.max(1, Number(alert.trigger_condition?.period) || 15);
+  const stream = String(alert.stream_name).replace(/"/g, '""');
+  router.push({
+    path: "/security/events",
+    query: {
+      org_identifier: orgId.value,
+      stream: alert.stream_name,
+      sql_mode: "true",
+      query:
+        b64EncodeUnicode(`SELECT * FROM "${stream}" WHERE ${where} ORDER BY _timestamp DESC`) ?? "",
+      period: `${period}m`,
+    },
+  });
+}
+
+/** The server's run outcome, including skipped and unrecognised runs. */
+const outcomeKey = (status: string): FiringStatus => firingStatus(status);
+const outcomeVariant = (status: string): BadgeVariant => STATUS_VARIANT[firingStatus(status)];
+
+/** Every alert name in the org — the create dialog refuses to reuse one. */
+const existingNames = computed(() => rows.value.map((r) => String(r.alert.name ?? "")));
+
+// ── New detection ────────────────────────────────────────────────────────────
+const showNew = ref(false);
+const preset = ref<NewDetectionPreset | null>(null);
+
+function openNew(p: NewDetectionPreset | null = null) {
+  preset.value = p;
+  showNew.value = true;
+}
+
+async function onCreated() {
+  await refresh();
+}
+
+/** Arriving from Events or Content with a rule already chosen. */
+function openFromQuery() {
   const { sigma_id: sigmaId, stream, source } = route.query;
   if (!sigmaId) return;
-  mode.value = "catalog";
-  pickedRuleId.value = String(sigmaId);
-  if (stream) {
-    pickedStream.value = String(stream);
-    await loadStreamFields(String(stream));
-  }
-  // The Events page already classified the stream; keeping its answer avoids a
-  // second, possibly different, classification from a schema alone.
-  if (source && SOURCE_TYPE_BY_ID.has(String(source))) {
-    presetSource.value = String(source);
-  }
-  showNew.value = true;
-  // Consume the query so a reload does not reopen the dialog.
-  void router.replace({ query: { org_identifier: orgId.value } });
+  openNew({
+    sigmaId: String(sigmaId),
+    stream: stream ? String(stream) : undefined,
+    source: source ? String(source) : undefined,
+  });
+  // Consumed so a reload does not reopen the dialog.
+  const { sigma_id: _a, stream: _b, source: _c, ...rest } = route.query;
+  void router.replace({ query: rest });
 }
 
-onMounted(async () => {
-  await Promise.all([fetchRules(), loadStreams(), loadDestinations()]);
-  await openFromQuery();
+onMounted(() => {
+  void refresh();
+  openFromQuery();
 });
+watch(orgId, () => void refresh());
 </script>
 
 <template>
-  <div class="sec-page flex-row">
-    <!-- Rule list -->
-    <div class="border-border-default flex w-96 shrink-0 flex-col overflow-hidden border-r">
-      <div class="sec-toolbar">
-        <OIcon name="shield-alert-outline" size="sm" class="text-accent" />
-        <span class="text-sm font-semibold">Detections</span>
-        <span class="text-text-tertiary text-xs">
-          {{ siemCount }} SIEM
-          <template v-if="hydrating">· identifying…</template>
-        </span>
-        <div class="flex-1" />
-        <OButton size="sm" icon="add-circle" @click="showNew = true">New detection</OButton>
-      </div>
-
-      <div class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2">
-        <input
-          v-model="filter"
-          class="border-border-default text-compact text-text-primary rounded-default flex-1 border bg-transparent px-2 py-1 outline-none"
-          placeholder="Search rules, streams, techniques…"
-        />
-        <button
-          class="text-2xs rounded-default px-2 py-1 font-semibold"
-          :class="
-            siemOnly ? 'bg-accent text-white' : 'text-text-secondary border-border-default border'
-          "
-          title="Show only rules created by the SIEM"
-          @click="siemOnly = !siemOnly"
-        >
-          SIEM
-        </button>
-        <button class="text-text-tertiary hover:text-text-primary p-1" @click="fetchRules">
-          <OIcon name="restart-alt" size="sm" />
-        </button>
-      </div>
-
-      <div v-if="loading" class="text-text-secondary flex items-center gap-2 px-3 py-4 text-xs">
-        <OIcon name="hourglass-empty" size="sm" />
-        Loading detection rules…
-      </div>
-      <div v-else-if="error" class="text-error flex items-center gap-2 px-3 py-4 text-xs">
-        <OIcon name="error-outline" size="sm" />
-        {{ error }}
-      </div>
-      <div
-        v-else-if="!filtered.length"
-        class="flex flex-col items-center gap-2 px-5 py-7 text-center"
+  <OPageLayout
+    :title="t('siem.detections.title')"
+    :subtitle="t('siem.detections.subtitle')"
+    icon="shield-alert-outline"
+    bleed
+    title-data-test="security-detections-title"
+  >
+    <template #actions>
+      <OButton
+        variant="primary"
+        size="sm"
+        icon-left="add"
+        data-test="security-detections-new"
+        @click="openNew()"
       >
-        <OIcon name="shield-alert-outline" size="lg" class="text-text-tertiary opacity-30" />
-        <div class="text-sm font-bold">
-          <template v-if="hydrating">Identifying rules…</template>
-          <template v-else>{{ siemOnly ? "No detections yet" : "No rules match" }}</template>
-        </div>
-        <div class="text-text-secondary max-w-72 text-xs leading-relaxed">
-          A detection is a Sigma rule running as a scheduled alert. Every firing lands in
-          SIEM&nbsp;&rsaquo;&nbsp;Alerts and rolls up into Cases.
-        </div>
-        <OButton v-if="siemOnly" size="sm" icon="add-circle" @click="showNew = true">
-          Create the first detection
-        </OButton>
-      </div>
+        {{ t("siem.detections.new") }}
+      </OButton>
+    </template>
 
-      <div v-else class="flex-1 overflow-y-auto">
-        <div v-if="notHydrated" class="text-text-tertiary text-2xs px-3 py-2 leading-relaxed">
-          {{ notHydrated }} further alert{{ notHydrated === 1 ? "" : "s" }} were not checked for
-          SIEM metadata. Raise the limit or filter in the Alerts page if a detection is missing
-          here.
-        </div>
-        <div
-          v-for="entry in filtered"
-          :key="entry.alert.id ?? entry.alert.name"
-          class="border-border-subtle hover:bg-surface-hover flex cursor-pointer flex-col gap-1.5 border-b px-3 py-2.5"
-          :class="{ 'bg-surface-selected': selected === entry.alert }"
-          @click="
-            selected = entry.alert;
-            activeTab = 'detail';
-          "
-        >
-          <div class="flex flex-wrap items-center gap-2">
-            <span :class="['sev-badge', `sev-${badgeLevel(entry.meta.level)}`]">
-              {{ entry.meta.level }}
-            </span>
-            <span class="text-compact flex-1 truncate font-semibold">{{ entry.alert.name }}</span>
+    <div class="flex min-h-0 flex-1 flex-col">
+      <OBanner
+        v-if="unchecked > 0"
+        variant="warning"
+        icon="warning-amber"
+        dense
+        class="mx-page-edge mt-2"
+        data-test="security-detections-unchecked"
+      >
+        {{ t("siem.detections.unchecked", unchecked) }}
+      </OBanner>
+
+      <OBanner
+        v-if="firingsError"
+        variant="error-soft"
+        icon="error-outline"
+        dense
+        class="mx-page-edge mt-2"
+        data-test="security-detections-firings-error"
+      >
+        {{ t("siem.detections.firingsErrorBanner", { reason: firingsError }) }}
+      </OBanner>
+      <OBanner
+        v-if="firingsCapped"
+        variant="warning"
+        icon="warning-amber"
+        dense
+        class="mx-page-edge mt-2"
+        data-test="security-detections-firings-capped"
+      >
+        {{
+          t("siem.detections.firingsCapped", {
+            n: formatEventCount(history24h.rows.value.length),
+            total: formatEventCount(history24h.total.value),
+          })
+        }}
+      </OBanner>
+      <OBanner
+        v-if="firingsNarrowedFrom"
+        variant="warning"
+        icon="warning-amber"
+        dense
+        class="mx-page-edge mt-2"
+        data-test="security-detections-firings-narrowed"
+      >
+        {{
+          t("siem.detections.firingsNarrowed", {
+            from: new Date(firingsNarrowedFrom).toLocaleString(),
+          })
+        }}
+      </OBanner>
+
+      <OTable
+        ref="tableRef"
+        :data="filtered"
+        :columns="columns"
+        row-key="id"
+        :loading="loading"
+        :error="error || null"
+        :page-size="50"
+        :page-size-options="[50, 100, 250]"
+        :show-global-filter="false"
+        :column-visibility="columnVisibility"
+        :persist-columns="true"
+        table-id="security-detections"
+        :enable-column-resize="true"
+        :row-class="rowClass"
+        :get-row-status-color="(row: Row) => severityRailColor(row.tone)"
+        class="min-h-0 flex-1"
+        data-test="security-detections-table"
+        @row-click="openDrawer"
+        @sort-change="() => nextTick(syncIndex)"
+      >
+        <template #subheader>
+          <div class="px-page-edge border-table-row-divider border-b py-1.5">
+            <OStatStrip
+              :items="stats"
+              :loading="loading && !rows.length"
+              selectable
+              :selected-key="facet"
+              data-test="security-detections-stats"
+              @select="onStat"
+            />
+          </div>
+        </template>
+
+        <template #toolbar>
+          <div class="flex w-full items-center gap-2">
+            <OToggleGroup
+              :model-value="scope"
+              data-test="security-detections-scope"
+              @update:model-value="(v: unknown) => (scope = v === 'all' ? 'all' : 'siem')"
+            >
+              <OToggleGroupItem value="siem" size="sm" data-test="security-detections-scope-siem">{{
+                t("siem.detections.scopeSiem")
+              }}</OToggleGroupItem>
+              <OToggleGroupItem value="all" size="sm" data-test="security-detections-scope-all">{{
+                t("siem.detections.scopeAll")
+              }}</OToggleGroupItem>
+            </OToggleGroup>
+            <div class="w-40 shrink-0">
+              <OSelect
+                :model-value="severity"
+                :options="severityOptions"
+                :placeholder="t('siem.detections.anySeverity')"
+                clearable
+                data-test="security-detections-severity"
+                @update:model-value="(v: unknown) => (severity = v ? String(v) : null)"
+              />
+            </div>
+            <OSearchInput
+              v-model="search"
+              class="flex-1"
+              :placeholder="t('siem.detections.search')"
+              data-test="security-detections-search"
+            />
             <span
-              v-if="entry.meta.isSiem"
-              class="text-3xs bg-accent/12 text-accent rounded-default px-1.5 py-0.5 font-extrabold"
+              v-if="hydrating"
+              class="text-text-secondary flex shrink-0 items-center gap-1.5 text-xs"
             >
-              SIEM
+              <OSpinner size="xs" />{{ t("siem.detections.identifying") }}
             </span>
           </div>
-          <div class="flex flex-wrap items-center gap-1.5">
-            <span class="text-text-tertiary text-2xs font-mono">{{ entry.alert.stream_name }}</span>
-            <span v-for="t in entry.meta.techniques" :key="t" class="mitre-chip">{{ t }}</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              class="text-3xs rounded-default px-1.5 py-0.5 font-bold"
-              :class="
-                entry.alert.enabled
-                  ? 'bg-success-subtle text-success'
-                  : 'bg-surface-muted text-text-tertiary'
-              "
-              @click.stop="toggleRule(entry)"
-            >
-              {{ entry.alert.enabled ? "Enabled" : "Disabled" }}
-            </button>
-            <div class="flex-1" />
-            <span class="text-text-tertiary text-2xs">
-              {{ relTime(entry.alert.last_triggered_at ?? entry.alert.updatedAt) }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Detail -->
-    <div v-if="selected" class="flex flex-1 flex-col overflow-hidden">
-      <div class="border-border-default flex shrink-0 items-center gap-2 border-b px-4 py-3">
-        <span :class="['sev-badge', `sev-${badgeLevel(detectionMetaOf(selected).level)}`]">
-          {{ detectionMetaOf(selected).level }}
-        </span>
-        <span class="text-compact flex-1 font-bold">{{ selected.name }}</span>
-        <OButton size="sm" variant="ghost" icon="delete" @click="deleteRule(selected)">
-          Delete
-        </OButton>
-        <button class="text-text-tertiary hover:text-text-primary" @click="selected = null">
-          <OIcon name="close" size="sm" />
-        </button>
-      </div>
-
-      <div class="border-border-default flex shrink-0 border-b">
-        <button
-          v-for="tab in ['detail', 'sigma', 'sql'] as const"
-          :key="tab"
-          class="border-b-2 px-4 py-2 text-xs font-semibold"
-          :class="
-            activeTab === tab
-              ? 'border-accent text-text-primary'
-              : 'text-text-secondary border-transparent'
-          "
-          @click="activeTab = tab"
-        >
-          {{ tab === "detail" ? "Details" : tab === "sigma" ? "Sigma rule" : "Compiled SQL" }}
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto p-4">
-        <template v-if="activeTab === 'detail'">
-          <dl class="flex flex-col gap-2.5">
-            <div class="flex items-start gap-3">
-              <dt class="text-text-tertiary text-2xs w-28 shrink-0 font-bold">Stream</dt>
-              <dd class="text-compact font-mono">{{ selected.stream_name }}</dd>
-            </div>
-            <div class="flex items-start gap-3">
-              <dt class="text-text-tertiary text-2xs w-28 shrink-0 font-bold">State</dt>
-              <dd class="text-compact">{{ selected.enabled ? "Enabled" : "Disabled" }}</dd>
-            </div>
-            <div class="flex items-start gap-3">
-              <dt class="text-text-tertiary text-2xs w-28 shrink-0 font-bold">Schedule</dt>
-              <dd class="text-compact">
-                every {{ selected.trigger_condition?.frequency ?? "?" }}m over the last
-                {{ selected.trigger_condition?.period ?? "?" }}m
-              </dd>
-            </div>
-            <div class="flex items-start gap-3">
-              <dt class="text-text-tertiary text-2xs w-28 shrink-0 font-bold">Notifies</dt>
-              <dd class="text-compact">{{ (selected.destinations ?? []).join(", ") || "—" }}</dd>
-            </div>
-            <div v-if="detectionMetaOf(selected).logsource" class="flex items-start gap-3">
-              <dt class="text-text-tertiary text-2xs w-28 shrink-0 font-bold">Logsource</dt>
-              <dd class="text-compact font-mono">{{ detectionMetaOf(selected).logsource }}</dd>
-            </div>
-            <div v-if="detectionMetaOf(selected).techniques.length" class="flex items-start gap-3">
-              <dt class="text-text-tertiary text-2xs w-28 shrink-0 font-bold">MITRE</dt>
-              <dd class="flex flex-wrap gap-1">
-                <span
-                  v-for="t in detectionMetaOf(selected).techniques"
-                  :key="t"
-                  class="mitre-chip"
-                  >{{ t }}</span
-                >
-              </dd>
-            </div>
-            <div v-if="selected.description" class="flex items-start gap-3">
-              <dt class="text-text-tertiary text-2xs w-28 shrink-0 font-bold">Description</dt>
-              <dd class="text-compact leading-relaxed">{{ selected.description }}</dd>
-            </div>
-          </dl>
         </template>
 
-        <template v-else-if="activeTab === 'sigma'">
-          <pre
-            v-if="detectionMetaOf(selected).sigmaYaml"
-            class="border-border-default bg-surface-muted text-compact rounded-surface overflow-x-auto border p-4 font-mono leading-relaxed"
-            >{{ detectionMetaOf(selected).sigmaYaml }}</pre>
-          <div v-else class="text-text-secondary flex items-start gap-2 text-xs leading-relaxed">
-            <OIcon name="info-outline" size="sm" />
-            This alert carries no Sigma rule. Alerts created outside the SIEM run the same way but
-            were not written as detections.
-          </div>
-        </template>
-
-        <template v-else>
-          <pre
-            class="border-border-default bg-surface-muted text-compact rounded-surface overflow-x-auto border p-4 font-mono leading-relaxed"
-            >{{ selected.query_condition?.sql || "No SQL on this rule" }}</pre>
-        </template>
-      </div>
-    </div>
-
-    <div
-      v-else-if="!loading"
-      class="text-text-tertiary text-compact flex flex-1 flex-col items-center justify-center gap-2"
-    >
-      <OIcon name="shield-alert-outline" size="xl" class="opacity-30" />
-      <div>Select a rule to see what it runs</div>
-    </div>
-
-    <!-- Create -->
-    <ODialog
-      v-model:open="showNew"
-      size="xl"
-      title="New detection"
-      sub-title="A Sigma rule compiled to SQL and scheduled as an alert"
-      primary-button-label="Create detection"
-      secondary-button-label="Cancel"
-      :primary-button-disabled="!canSave"
-      :primary-button-loading="saving"
-      data-test="siem-new-detection-dialog"
-      @click:primary="saveDetection"
-      @click:secondary="showNew = false"
-    >
-      <div class="flex flex-col gap-4">
-        <!-- Source of the rule -->
-        <div class="border-border-default flex gap-1 border-b">
-          <button
-            v-for="tab in ['catalog', 'custom'] as const"
-            :key="tab"
-            class="border-b-2 px-3 py-2 text-xs font-semibold"
-            :class="
-              mode === tab
-                ? 'border-accent text-text-primary'
-                : 'text-text-secondary border-transparent'
-            "
-            @click="mode = tab"
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="security-detections-refresh"
+            @click="refresh"
           >
-            {{ tab === "catalog" ? `Rule library (${catalog.length})` : "Write Sigma" }}
-          </button>
-        </div>
-
-        <template v-if="mode === 'catalog'">
-          <input
-            v-model="catalogFilter"
-            class="border-border-default text-compact rounded-default border bg-transparent px-2 py-1.5 outline-none"
-            placeholder="Filter by title, technique or logsource…"
-          />
-          <div class="border-border-default rounded-default max-h-64 overflow-y-auto border">
-            <label
-              v-for="rule in catalogMatches"
-              :key="rule.id"
-              class="border-border-subtle hover:bg-surface-hover flex cursor-pointer items-center gap-2 border-b px-3 py-2 last:border-b-0"
-            >
-              <input v-model="pickedRuleId" type="radio" :value="rule.id" />
-              <span :class="['sev-badge', `sev-${badgeLevel(rule.level ?? 'medium')}`]">
-                {{ rule.level }}
-              </span>
-              <span class="text-compact flex-1 truncate">{{ rule.title }}</span>
-              <span class="text-text-tertiary text-2xs font-mono">
-                {{ sigmaLogsourceLabel(rule.logsource) }}
-              </span>
-            </label>
-            <div v-if="!catalogMatches.length" class="text-text-tertiary p-4 text-center text-xs">
-              No rules match that filter
-            </div>
-          </div>
+            <OTooltip side="bottom" :content="t('siem.detections.refresh')" />
+          </OButton>
         </template>
 
-        <template v-else>
-          <textarea
-            v-model="customYaml"
-            rows="14"
-            spellcheck="false"
-            class="border-border-default bg-surface-muted text-compact rounded-default border p-3 font-mono leading-relaxed outline-none"
+        <template #cell-severity="{ row }">
+          <OTag
+            v-if="row.isSiem"
+            type="severity"
+            :value="severityTagValue(row.tone)"
+            :label="t(toneLabelKey(row.tone))"
+            size="xs"
           />
-          <div v-if="customError" class="text-error text-xs">{{ customError }}</div>
+          <OTag v-else variant="default-soft" size="xs">{{ t("siem.detections.notSiem") }}</OTag>
         </template>
-
-        <!-- Where it runs -->
-        <div class="grid grid-cols-2 gap-3">
-          <OSelect
-            :model-value="pickedStream"
-            :options="streams.map((s) => ({ label: s, value: s }))"
-            label="Stream"
-            placeholder="Choose a stream"
-            @update:model-value="pickedStream = $event as string"
-          />
-          <OSelect
-            :model-value="pickedDestinations"
-            :options="destinations.map((d) => ({ label: d, value: d }))"
-            label="Notify"
-            multiple
-            placeholder="Choose a destination"
-            @update:model-value="pickedDestinations = $event as string[]"
-          />
-        </div>
-
-        <div v-if="!destinations.length" class="text-text-secondary text-xs leading-relaxed">
-          No alert destinations exist yet. The alerts API requires at least one, so create a
-          destination before saving a detection. Firings are recorded in
-          SIEM&nbsp;&rsaquo;&nbsp;Alerts either way.
-        </div>
-
-        <div class="grid grid-cols-3 gap-3">
-          <label class="text-2xs flex flex-col gap-1 font-bold">
-            <span class="text-text-tertiary">Look back (minutes)</span>
-            <input
-              v-model.number="period"
-              type="number"
-              min="1"
-              class="border-border-default text-compact rounded-default border bg-transparent px-2 py-1 font-normal outline-none"
-            />
-          </label>
-          <label class="text-2xs flex flex-col gap-1 font-bold">
-            <span class="text-text-tertiary">Run every (minutes)</span>
-            <input
-              v-model.number="frequency"
-              type="number"
-              min="1"
-              class="border-border-default text-compact rounded-default border bg-transparent px-2 py-1 font-normal outline-none"
-            />
-          </label>
-          <label class="text-2xs flex flex-col gap-1 font-bold">
-            <span class="text-text-tertiary">Stay quiet for (minutes)</span>
-            <input
-              v-model.number="silence"
-              type="number"
-              min="0"
-              class="border-border-default text-compact rounded-default border bg-transparent px-2 py-1 font-normal outline-none"
-            />
-          </label>
-        </div>
-
-        <!-- Whether it will actually run, decided before anything is saved -->
-        <div
-          v-if="draftRule && pickedStream"
-          class="rounded-default border p-3 text-xs leading-relaxed"
-          :class="
-            draftCompiled?.runnable
-              ? 'border-success/40 bg-success-subtle'
-              : 'border-warning/40 bg-warning-subtle'
-          "
-        >
-          <div class="flex items-center gap-2 font-semibold">
+        <template #cell-title="{ row }">
+          <div class="flex min-w-0 items-center gap-1.5">
+            <span class="text-text-heading truncate font-medium"
+              >{{ row.title }}<OTooltip :content="row.name"
+            /></span>
             <OIcon
-              :name="draftCompiled?.runnable ? 'check-circle-outline' : 'warning-outline'"
+              v-if="row.state === 'erroring'"
+              name="error-outline"
               size="xs"
-            />
-            <span v-if="draftCompiled?.runnable">
-              Compiles against {{ pickedStream }}
-              <template v-if="draftSource"> — identified as {{ draftSource.label }} </template>
+              class="text-status-error-text shrink-0"
+            >
+              <OTooltip
+                :content="row.entry.alert.last_error || t('siem.detections.stat.erroring')"
+              />
+            </OIcon>
+          </div>
+        </template>
+        <template #cell-stream="{ row }">
+          <span class="truncate font-mono text-xs">{{ row.stream || "—" }}</span>
+        </template>
+        <template #cell-techniques="{ row }">
+          <div class="flex min-w-0 gap-1 overflow-hidden">
+            <OTag
+              v-for="tech in row.techniques.slice(0, 2)"
+              :key="tech"
+              variant="purple-soft"
+              shape="rounded"
+              size="xs"
+              >{{ tech }}</OTag
+            >
+            <span v-if="row.techniques.length > 2" class="text-text-secondary text-xs">
+              +{{ row.techniques.length - 2 }}
             </span>
-            <span v-else>Will not run on {{ pickedStream }}</span>
+            <span v-if="!row.techniques.length" class="text-text-secondary">—</span>
           </div>
-          <div v-if="draftCompiled && !draftCompiled.runnable" class="mt-1">
-            {{ blockedReason(draftCompiled) }}
+        </template>
+        <template #cell-firings="{ row }">
+          <div v-if="row.firings" class="flex min-w-0 items-center gap-2">
+            <OTag
+              variant="orange-soft"
+              icon="local-fire-department"
+              size="xs"
+              class="tabular-nums"
+              >{{ formatEventCount(row.firings) }}</OTag
+            >
+            <OTimeCell :value="row.lastFiredUs" unit="us" class="text-xs" />
           </div>
-          <div v-else-if="draftCompiled && caveat(draftCompiled)" class="mt-1">
-            {{ caveat(draftCompiled) }}
+          <span v-else class="text-text-secondary">{{ firingsLoading ? "…" : "—" }}</span>
+        </template>
+        <template #cell-lastRun="{ row }">
+          <div v-if="row.lastRunUs" class="flex min-w-0 items-center gap-2">
+            <OTag :variant="outcomeVariant(row.lastOutcome)" size="xs">{{
+              t(`siem.detections.outcome.${outcomeKey(row.lastOutcome)}`)
+            }}</OTag>
+            <OTimeCell :value="row.lastRunUs" unit="us" class="text-xs" />
           </div>
-          <pre v-if="draftCompiled?.where" class="text-2xs mt-2 overflow-x-auto font-mono">{{
-            draftCompiled.where
-          }}</pre>
+          <span v-else class="text-text-secondary">{{ t("siem.detections.neverRun") }}</span>
+        </template>
+        <template #cell-enabled="{ row }">
+          <div @click.stop>
+            <OSwitch
+              :model-value="row.enabled"
+              :disabled="toggling === row.id"
+              :data-test="`security-detections-toggle-${row.id}`"
+              @update:model-value="toggleRule(row)"
+            />
+          </div>
+        </template>
+
+        <template #empty>
+          <OEmptyState
+            v-if="!loading"
+            size="block"
+            icon="shield-alert-outline"
+            :title="hydrating ? t('siem.detections.identifying') : t('siem.detections.emptyTitle')"
+            :description="t('siem.detections.emptyHint')"
+            :action-label="filtersActive ? undefined : t('siem.detections.createFirst')"
+            action-icon="add"
+            :filtered="filtersActive"
+            @action="(id?: string) => (id === 'clear-filters' ? clearFilters() : openNew())"
+          />
+        </template>
+      </OTable>
+    </div>
+
+    <SecurityRecordDrawer
+      v-if="selected"
+      :open="!!selected"
+      v-model:tab="drawerTab"
+      :title="selected.title"
+      :eyebrow="t('siem.detections.eyebrow')"
+      :subtitle="selected.title !== selected.name ? selected.name : undefined"
+      icon="shield-alert-outline"
+      :tone="selected.isSiem ? selected.tone : 'neutral'"
+      :facts="drawerFacts"
+      :tabs="drawerTabs"
+      :index="selectedIndex"
+      :total="filtered.length"
+      :share-url="shareUrl"
+      data-test="security-detection-drawer"
+      @close="closeDrawer"
+      @prev="step(-1)"
+      @next="step(1)"
+    >
+      <template #chips>
+        <OTag
+          v-if="selected.isSiem"
+          type="severity"
+          :value="severityTagValue(selected.tone)"
+          :label="t(toneLabelKey(selected.tone))"
+          size="sm"
+        />
+        <OTag
+          :variant="
+            selected.state === 'enabled'
+              ? 'success-soft'
+              : selected.state === 'erroring'
+                ? 'error-soft'
+                : 'default-soft'
+          "
+          :icon="
+            selected.state === 'enabled'
+              ? 'check-circle'
+              : selected.state === 'erroring'
+                ? 'error-outline'
+                : 'pause-circle-filled'
+          "
+          size="sm"
+          >{{ t(`siem.detections.state.${selected.state}`) }}</OTag
+        >
+        <OTag v-if="selected.fired" variant="orange-soft" icon="local-fire-department" size="sm">
+          {{ t("siem.detections.firedCount", selected.firings) }}
+        </OTag>
+        <OTag
+          v-if="selected.entry.meta.logsource"
+          variant="default-soft"
+          size="sm"
+          class="font-mono"
+        >
+          {{ selected.entry.meta.logsource }}
+        </OTag>
+      </template>
+
+      <template #tab-overview>
+        <p
+          v-if="selected.entry.alert.description"
+          class="text-text-heading text-sm leading-relaxed"
+          data-test="security-detection-drawer-description"
+        >
+          {{ selected.entry.alert.description }}
+        </p>
+        <OBanner
+          v-if="selected.state === 'erroring'"
+          variant="error-soft"
+          icon="error-outline"
+          data-test="security-detection-drawer-error"
+        >
+          {{ selected.entry.alert.last_error || t("siem.detections.erroringHint") }}
+        </OBanner>
+
+        <div v-if="selected.techniques.length || tactics.length" class="flex flex-col gap-2">
+          <span class="text-text-secondary text-xs font-semibold tracking-wide uppercase">{{
+            t("siem.common.mitre")
+          }}</span>
+          <div class="flex flex-wrap gap-1.5">
+            <OTag v-for="tac in tactics" :key="tac" variant="primary-soft" size="sm">{{
+              t(`siem.mitre.tactics.${tac}`)
+            }}</OTag>
+          </div>
+          <div class="flex flex-wrap gap-1">
+            <OButton
+              v-for="tech in selected.techniques"
+              :key="tech"
+              as="a"
+              :href="techniqueUrl(tech)"
+              target="_blank"
+              rel="noopener"
+              variant="ghost-primary"
+              size="xs"
+              icon-right="open-in-new"
+              :data-test="`security-detection-drawer-technique-${tech}`"
+              >{{ tech }}</OButton
+            >
+          </div>
         </div>
-      </div>
-    </ODialog>
-  </div>
+
+        <SecurityKeyValues
+          v-if="detailRows.length"
+          :rows="detailRows"
+          data-test="security-detection-drawer-details"
+        />
+      </template>
+
+      <template #tab-history>
+        <div v-if="historyLoading" class="flex items-center justify-center gap-2 py-10">
+          <OSpinner size="sm" />
+          <span class="text-text-secondary text-sm">{{ t("siem.detections.historyLoading") }}</span>
+        </div>
+        <OEmptyState
+          v-else-if="historyError"
+          size="inline"
+          icon="error-outline"
+          :title="t('siem.detections.historyError')"
+          :description="historyError"
+        />
+        <OEmptyState
+          v-else-if="!history.length"
+          size="inline"
+          icon="history"
+          :title="t('siem.detections.historyEmpty')"
+          :description="t('siem.detections.historyEmptyHint', { days: HISTORY_DAYS })"
+        />
+        <template v-else>
+          <p class="text-text-secondary text-xs">
+            {{
+              t(
+                "siem.detections.historySummary",
+                {
+                  firings: historyFirings,
+                  runs: formatEventCount(history.length),
+                  days: HISTORY_DAYS,
+                },
+                historyFirings,
+              )
+            }}
+            <template v-if="historyTotal > history.length">
+              {{ t("siem.detections.historyCapped", { total: formatEventCount(historyTotal) }) }}
+            </template>
+          </p>
+          <ul
+            class="border-border-default rounded-surface overflow-hidden border"
+            data-test="security-detection-drawer-history"
+          >
+            <li
+              v-for="(h, i) in history"
+              :key="`${h.timestamp}-${i}`"
+              class="border-border-subtle flex items-center gap-3 border-b px-3 py-2 text-xs last:border-b-0"
+            >
+              <OTag :variant="outcomeVariant(h.status)" size="xs" class="shrink-0">
+                {{ t(`siem.detections.outcome.${outcomeKey(h.status)}`) }}
+              </OTag>
+              <OTimeCell :value="h.timestamp" unit="us" mode="absolute" class="shrink-0" />
+              <span class="text-text-secondary min-w-0 flex-1 truncate">
+                <template v-if="h.error">{{ h.error }}</template>
+                <template v-else-if="h.actual_value != null">
+                  {{
+                    t("siem.detections.matched", { n: formatEventCount(Number(h.actual_value)) })
+                  }}
+                </template>
+              </span>
+              <span
+                v-if="h.evaluation_took_in_secs != null"
+                class="text-text-secondary shrink-0 tabular-nums"
+              >
+                {{ t("siem.detections.took", { s: Number(h.evaluation_took_in_secs).toFixed(2) }) }}
+              </span>
+            </li>
+          </ul>
+        </template>
+      </template>
+
+      <template #tab-sigma>
+        <OCodeBlock
+          v-if="selected.entry.meta.sigmaYaml"
+          :code="selected.entry.meta.sigmaYaml"
+          lang="yaml"
+          data-test="security-detection-drawer-sigma"
+        />
+        <OEmptyState
+          v-else
+          size="inline"
+          icon="info-outline"
+          :title="t('siem.detections.noSigma')"
+          :description="t('siem.detections.noSigmaHint')"
+        />
+      </template>
+
+      <template #tab-sql>
+        <OCodeBlock
+          :code="selected.entry.alert.query_condition?.sql || t('siem.detections.noSql')"
+          lang="sql"
+          data-test="security-detection-drawer-sql"
+        />
+      </template>
+
+      <template #footer>
+        <OButton
+          variant="outline-destructive"
+          size="sm-action"
+          icon-left="delete"
+          data-test="security-detection-drawer-delete"
+          @click="deleteRule(selected)"
+        >
+          {{ t("siem.detections.delete") }}
+        </OButton>
+        <div class="flex-1" />
+        <OButton
+          variant="outline"
+          size="sm-action"
+          icon-left="manage-search"
+          :disabled="!matchPredicate(selected)"
+          data-test="security-detection-drawer-view-matches"
+          @click="viewMatches(selected)"
+        >
+          {{ t("siem.detections.viewMatches") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :icon-left="selected.enabled ? 'pause' : 'play-arrow'"
+          :loading="toggling === selected.id"
+          data-test="security-detection-drawer-toggle"
+          @click="toggleRule(selected)"
+        >
+          {{ selected.enabled ? t("siem.detections.disable") : t("siem.detections.enable") }}
+        </OButton>
+      </template>
+    </SecurityRecordDrawer>
+
+    <SecurityNewDetectionDialog
+      v-model:open="showNew"
+      :org-id="orgId"
+      :preset="preset"
+      :existing-names="existingNames"
+      @created="onCreated"
+    />
+  </OPageLayout>
 </template>
