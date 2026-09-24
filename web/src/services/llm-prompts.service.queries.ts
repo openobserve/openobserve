@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-import { mutationOptions, queryOptions } from "@tanstack/vue-query";
+import { mutationOptions } from "@tanstack/vue-query";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import prompts, {
   type CreatePromptInput,
@@ -9,19 +9,17 @@ import prompts, {
 } from "./llm-prompts.service";
 import { llmPromptKeys } from "./llm-prompts.service.querykeys";
 
-export const llmPromptsQuery = (org: string) =>
-  queryOptions({
-    queryKey: llmPromptKeys.list(org),
-    queryFn: () => prompts.list(org, { includeArchived: true }),
-    staleTime: MEDIUM_STALE_TIME,
-  });
+export const llmPromptsQuery = (org: string) => ({
+  queryKey: llmPromptKeys.list(org),
+  queryFn: () => prompts.list(org, { includeArchived: true }),
+  staleTime: MEDIUM_STALE_TIME,
+});
 
-export const promptSettingsQuery = (org: string) =>
-  queryOptions({
-    queryKey: llmPromptKeys.settings(org),
-    queryFn: () => prompts.getSettings(org),
-    staleTime: MEDIUM_STALE_TIME,
-  });
+export const promptSettingsQuery = (org: string) => ({
+  queryKey: llmPromptKeys.settings(org),
+  queryFn: () => prompts.getSettings(org),
+  staleTime: MEDIUM_STALE_TIME,
+});
 
 export const createPromptMutation = (org: string) =>
   mutationOptions({
