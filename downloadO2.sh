@@ -10,7 +10,7 @@
 # Debian/Ubuntu, so bash-only syntax (e.g. `==` inside `[ ]`) silently misbehaves.
 
 BASE_URL="https://downloads.openobserve.ai/releases"
-LATEST_API="https://api.github.com/repos/openobserve/openobserve/releases/latest"
+RELEASES_API="https://api.github.com/repos/openobserve/openobserve/releases?per_page=20"
 
 usage() {
     echo "Usage: sh downloadO2.sh [opensource|enterprise] [version]" >&2
@@ -37,56 +37,76 @@ case "$RELEASE_TYPE" in
 esac
 echo "Edition: $RELEASE_TYPE"
 
-# 2. Version (default: latest GitHub release)
-VERSION=$2
-if [ -z "$VERSION" ]; then
-    echo "Resolving latest version..."
-    VERSION=$(curl -fsSL "$LATEST_API" 2>/dev/null \
-        | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
-        | head -n 1)
-    if [ -z "$VERSION" ]; then
-        echo "Error: could not determine the latest version; pass one explicitly." >&2
-        usage
-        exit 1
-    fi
-fi
-# Release tags are v-prefixed; accept "1.0.4" as well as "v1.0.4".
-case "$VERSION" in
-    v*) ;;
-    *) VERSION="v$VERSION" ;;
-esac
-echo "Version: $VERSION"
-
-# 3. Detect platform
+# 2. Detect platform
 echo "Detecting platform..."
 case "$(uname -s)" in
     Linux*)     PLATFORM="linux" ;;
     Darwin*)    PLATFORM="darwin" ;;
     CYGWIN*|MINGW32*|MSYS*|MINGW*) PLATFORM="windows" ;;
-    *)          echo "Unsupported platform"; exit 1 ;;
+    *)          echo "Error: unsupported platform '$(uname -s)'." >&2; exit 1 ;;
 esac
 echo "Platform: $PLATFORM"
 
-# 4. Detect architecture
+# 3. Detect architecture
 echo "Detecting architecture..."
 ARCH=$(uname -m)
 case "$ARCH" in
     x86_64|amd64)  ARCH="amd64" ;;
     arm64|aarch64) ARCH="arm64" ;;
-    *)             echo "Unsupported architecture"; exit 1 ;;
+    *)             echo "Error: unsupported architecture '$ARCH'." >&2; exit 1 ;;
 esac
 echo "Architecture: $ARCH"
 
-# 5. Construct file name and URL (Windows builds ship as .zip)
+# Windows builds ship as .zip, everything else as .tar.gz.
 EXT="tar.gz"
 [ "$PLATFORM" = "windows" ] && EXT="zip"
-FILE_NAME="${BINARY_NAME}-${VERSION}-${PLATFORM}-${ARCH}.${EXT}"
-DOWNLOAD_URL="${URL}/${VERSION}/${FILE_NAME}"
+
+artifact_url() {
+    echo "${URL}/$1/${BINARY_NAME}-$1-${PLATFORM}-${ARCH}.${EXT}"
+}
+
+# 4. Version (default: newest stable release with a build for this
+#    edition/platform/arch). The newest tag is not always installable: GitHub
+#    publishes a release before its enterprise build is uploaded, and release
+#    candidates are not marked as pre-releases.
+VERSION=$2
+[ "$VERSION" = "latest" ] && VERSION=""
+if [ -z "$VERSION" ]; then
+    echo "Resolving latest version..."
+    TAGS=$(curl -fsSL "$RELEASES_API" 2>/dev/null \
+        | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    if [ -z "$TAGS" ]; then
+        echo "Error: could not list releases from GitHub (offline or rate-limited?); pass a version explicitly." >&2
+        usage
+        exit 1
+    fi
+    for TAG in $TAGS; do
+        case "$TAG" in *-*) continue ;; esac
+        if curl -fsI "$(artifact_url "$TAG")" >/dev/null 2>&1; then
+            VERSION=$TAG
+            break
+        fi
+    done
+    if [ -z "$VERSION" ]; then
+        echo "Error: no recent release has a $RELEASE_TYPE build for $PLATFORM-$ARCH; pass a version explicitly." >&2
+        exit 1
+    fi
+fi
+# Release tags are v-prefixed; accept "1.0.4" and "V1.0.4" as well as "v1.0.4".
+case "$VERSION" in
+    v*) ;;
+    V*) VERSION="v${VERSION#V}" ;;
+    *)  VERSION="v$VERSION" ;;
+esac
+echo "Version: $VERSION"
+
+# 5. Download
+DOWNLOAD_URL=$(artifact_url "$VERSION")
 ARCHIVE="latest_release.${EXT}"
 
 echo "Downloading: $DOWNLOAD_URL"
 if ! curl -fLo "$ARCHIVE" "$DOWNLOAD_URL"; then
-    echo "Error: Download failed. Make sure the file exists." >&2
+    echo "Error: Download failed. Check that $VERSION has a $RELEASE_TYPE build for $PLATFORM-$ARCH." >&2
     rm -f "$ARCHIVE"
     exit 1
 fi
@@ -94,10 +114,16 @@ fi
 # 6. Extract and clean up
 echo "Extracting..."
 if [ "$EXT" = "zip" ]; then
+    # GNU tar (first on Git Bash/Cygwin's PATH) cannot read zips; Windows' own tar can.
     if command -v unzip >/dev/null 2>&1; then
         unzip -o -q "$ARCHIVE"
+    elif [ -x /c/Windows/System32/tar.exe ]; then
+        /c/Windows/System32/tar.exe -xf "$ARCHIVE"
+    elif [ -x /cygdrive/c/Windows/System32/tar.exe ]; then
+        /cygdrive/c/Windows/System32/tar.exe -xf "$ARCHIVE"
     else
-        tar -xf "$ARCHIVE"
+        echo "Error: extracting the .zip needs 'unzip'; install it and retry." >&2
+        false
     fi
 else
     tar -xzf "$ARCHIVE"
