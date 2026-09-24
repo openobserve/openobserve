@@ -389,6 +389,11 @@ pub(crate) fn instant_lookback_func() -> std::sync::Arc<dyn RangeFunc> {
     std::sync::Arc::new(last_over_time::LastOverTimeFunc)
 }
 
+/// The range function `timestamp()` of an instant selector streams as.
+pub(crate) fn sample_timestamp_func(offset: i64) -> std::sync::Arc<dyn RangeFunc> {
+    std::sync::Arc::new(time_operations::SampleTimestampFunc { offset })
+}
+
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
 where
     F: RangeFunc,
