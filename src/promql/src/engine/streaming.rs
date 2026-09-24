@@ -1217,6 +1217,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_subquery_selectors_load_the_subquery_window() {
+        // with a 20 s lookback an inner step finds its sample only if the load reaches back to it
+        let step = |second: i64, value: f64| (BASE + second * SECOND, value);
+        let cases = [
+            (180, "min_over_time(m[2m:20s])", vec![step(180, 12.0)]),
+            (180, "count_over_time(m[2m:20s])", vec![step(180, 6.0)]),
+            (
+                180,
+                "min_over_time(m[1m:20s] offset 1m)",
+                vec![step(180, 12.0)],
+            ),
+            (
+                120,
+                "min_over_time(m[1m:20s])",
+                vec![step(120, 12.0), step(180, 21.0)],
+            ),
+            (
+                120,
+                "sum_over_time(max_over_time(m[40s:20s])[1m:20s])",
+                vec![step(120, 45.0), step(180, 72.0)],
+            ),
+        ];
+        for streams in [false, true] {
+            for (start, query, expected) in &cases {
+                let mut engine = engine_at(
+                    provider(streams, false),
+                    30,
+                    BASE + start * SECOND,
+                    60 * SECOND,
+                    Some(20 * SECOND),
+                );
+                let expr = promql_parser::parser::parse(query).unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
+                let series = canonical(value);
+                assert_eq!(series.len(), 2, "{query}");
+                for (_, samples) in series {
+                    assert_eq!(&samples, expected, "{query}, streams {streams}");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn test_at_modifier_fails_loudly_where_it_cannot_pin() {
         let cases = [
             ("m[1m] @ 1100", "@ modifier is not supported"),

@@ -52,6 +52,10 @@ const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5x
 /// but it has legitimate standalone uses and no measured failure behind it.
 const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
 
+/// The web form states the same floor through its own i18n key; the two are kept in step by hand.
+const WINDOW_FLOOR_RULE: &str =
+    "detection_window_seconds must be at least schedule_interval plus histogram_interval";
+
 /// Value column names tried when a config declares none. Kept so configs created before
 /// `value_column` existed keep resolving exactly as they did.
 #[cfg(feature = "enterprise")]
@@ -65,6 +69,11 @@ const VALUE_COLUMN_TTL: Duration = Duration::from_secs(60);
 #[cfg(feature = "enterprise")]
 static VALUE_COLUMN_CACHE: LazyLock<RwLock<ValueColumnCache>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Lowercased aggregations the trainer's `DetectionFunction` can deserialize. A name
+/// accepted here but unknown there persists a config that can never train.
+const SUPPORTED_DETECTION_FUNCTIONS: [&str; 8] =
+    ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
 
 /// Lowercased operators the enterprise query builder can express, mirroring its
 /// `build_single_filter` arms and the UI's `ANOMALY_FILTER_OPERATORS`. All three must move
@@ -125,6 +134,9 @@ pub struct CreateAnomalyConfigRequest {
     /// Delivered-alert budget per day; mutually exclusive with `percentile` in one request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_budget_per_day: Option<f64>,
+    /// Absent keeps the one-day default; the response echoes the stored value, not the clamp.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level_half_width_seconds: Option<i64>,
     pub rcf_num_trees: Option<i32>,
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
@@ -185,6 +197,14 @@ pub struct UpdateAnomalyConfigRequest {
     )]
     #[schema(value_type = Option<f64>)]
     pub alert_budget_per_day: Option<Option<f64>>,
+    /// Double-option: `Some(None)` clears back to the default, which `Option` cannot express.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<i64>)]
+    pub level_half_width_seconds: Option<Option<i64>>,
     pub retrain_interval_days: Option<i32>,
     pub alert_enabled: Option<bool>,
     pub alert_destinations: Option<Vec<String>>,
@@ -277,6 +297,7 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
         );
     }
     add_effective_shingle_size(&mut val);
+    add_notice_class(&mut val);
     val
 }
 
@@ -308,6 +329,23 @@ fn add_effective_shingle_size(val: &mut serde_json::Value) {
             serde_json::Value::from(effective),
         );
     }
+}
+
+/// §4.8: the UI keys on this class, never on the enterprise notice text riding `last_error`.
+fn add_notice_class(val: &mut serde_json::Value) {
+    let Some(obj) = val.as_object_mut() else {
+        return;
+    };
+    let class = obj
+        .get("last_error")
+        .and_then(|v| v.as_str())
+        .and_then(o2_enterprise::enterprise::anomaly_detection::scheduler::notice_class);
+    obj.insert(
+        "notice_class".to_string(),
+        class.map_or(serde_json::Value::Null, |c| {
+            serde_json::Value::String(c.to_string())
+        }),
+    );
 }
 
 /// Merge the run state the scheduler recorded on the trigger into a config row.
@@ -506,6 +544,25 @@ pub async fn create_config(
         .await
         .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))?;
 
+    let resolved_threshold = clamped_threshold(req.percentile.unwrap_or(DEFAULT_PERCENTILE));
+    let resolved_tree_size = req.rcf_tree_size.unwrap_or(
+        o2_enterprise::enterprise::common::config::get_config()
+            .anomaly_detection
+            .rcf_tree_size as i32,
+    );
+    let resolved_training_window_days = resolved_training_window_days(
+        req.training_window_days,
+        &req.histogram_interval,
+        resolved_threshold as f64,
+        resolved_tree_size,
+    );
+    let starvation_warning = training_window_starvation_warning(
+        &req.histogram_interval,
+        resolved_training_window_days,
+        resolved_threshold as f64,
+        resolved_tree_size,
+    );
+
     use infra::table::entity::anomaly_detection_config::Model as ConfigModel;
     let new_config = ConfigModel {
         anomaly_id: anomaly_id.clone(),
@@ -525,10 +582,9 @@ pub async fn create_config(
         histogram_interval: req.histogram_interval.clone(),
         schedule_interval: req.schedule_interval.clone(),
         detection_window_seconds: req.detection_window_seconds,
-        training_window_days: req.training_window_days.unwrap_or(7),
+        training_window_days: resolved_training_window_days,
         retrain_interval_days: req.retrain_interval_days.unwrap_or(7),
-        // Whole-number percentiles suffice; the model clamps to 50–99.9 regardless.
-        threshold: req.percentile.unwrap_or(97.0).clamp(50.0, 99.9) as i32,
+        threshold: resolved_threshold,
         alert_budget_per_day: req.alert_budget_per_day,
         is_trained: false,
         training_started_at: None,
@@ -536,16 +592,14 @@ pub async fn create_config(
         last_error: None,
         last_processed_timestamp: None,
         current_model_version: 0,
+        // Unclamped on purpose: clamping here would freeze today's bounds into the row.
+        level_half_width_seconds: req.level_half_width_seconds,
         rcf_num_trees: req.rcf_num_trees.unwrap_or(
             o2_enterprise::enterprise::common::config::get_config()
                 .anomaly_detection
                 .rcf_num_trees as i32,
         ),
-        rcf_tree_size: req.rcf_tree_size.unwrap_or(
-            o2_enterprise::enterprise::common::config::get_config()
-                .anomaly_detection
-                .rcf_tree_size as i32,
-        ),
+        rcf_tree_size: resolved_tree_size,
         // Buckets of context per score, so the span is this times histogram_interval.
         rcf_shingle_size: req.rcf_shingle_size.unwrap_or(
             o2_enterprise::enterprise::common::config::get_config()
@@ -661,11 +715,20 @@ pub async fn create_config(
     }
 
     let mut val = serde_json::to_value(result)?;
+    // §4.8: this path bypasses model_to_api_json, so the class is added here too.
+    add_notice_class(&mut val);
     if let Some(obj) = val.as_object_mut() {
         obj.insert(
             "folder_id".to_string(),
             serde_json::Value::String(folder_name_owned),
         );
+        // Returned not refused, since starved shapes serve today — but NO surface reads this key.
+        if let Some(warning) = starvation_warning {
+            obj.insert(
+                "training_window_warning".to_string(),
+                serde_json::Value::String(warning),
+            );
+        }
     }
     Ok(val)
 }
@@ -701,6 +764,8 @@ pub async fn update_config(
 
     validated_intervals(&req, &existing).map_err(validation_error)?;
     validated_detection_window(&req, &existing).map_err(validation_error)?;
+    validated_detection_function(&req, &existing).map_err(validation_error)?;
+    validated_custom_sql(&req, &existing).map_err(validation_error)?;
     validated_denominator(&req, &existing).map_err(validation_error)?;
     validated_budget_update(
         req.percentile,
@@ -709,6 +774,13 @@ pub async fn update_config(
         existing.threshold,
     )
     .map_err(validation_error)?;
+    // `Some(None)` clears back to the default and needs no bound; only an explicit value does.
+    if let Some(Some(half_width)) = req.level_half_width_seconds {
+        validate_level_half_width(half_width).map_err(validation_error)?;
+    }
+    if let Some(days) = req.retrain_interval_days {
+        validate_retrain_interval_days(days).map_err(validation_error)?;
+    }
 
     let mut active_model = existing.into_active_model();
 
@@ -784,7 +856,21 @@ pub async fn update_config(
         active_model.detection_function = Set(combined);
     }
     if let Some(histogram_interval) = req.histogram_interval {
-        retryable_change |= previous.histogram_interval != histogram_interval;
+        if previous.histogram_interval != histogram_interval {
+            retryable_change = true;
+            // §4.2: the edit redefines the grid, so judgment restarts — cursor and watermark.
+            active_model.last_processed_timestamp = Set(None);
+            if let Err(e) =
+                o2_enterprise::enterprise::anomaly_detection::storage::delete_graded_until_blob(
+                    org_id, anomaly_id,
+                )
+                .await
+            {
+                log::warn!(
+                    "[anomaly_detection {anomaly_id}] failed to clear the grading watermark on an interval edit: {e}"
+                );
+            }
+        }
         active_model.histogram_interval = Set(histogram_interval);
     }
     if let Some(schedule_interval) = req.schedule_interval {
@@ -810,6 +896,11 @@ pub async fn update_config(
         let clamped = training_window_days.max(1);
         retryable_change |= previous.training_window_days != clamped;
         active_model.training_window_days = Set(clamped);
+    }
+    if let Some(half_width) = req.level_half_width_seconds {
+        // Retryable: it changes the level the baseline is fitted with, so the model is stale.
+        retryable_change |= previous.level_half_width_seconds != half_width;
+        active_model.level_half_width_seconds = Set(half_width);
     }
     if let Some(retrain_interval_days) = req.retrain_interval_days {
         active_model.retrain_interval_days = Set(retrain_interval_days);
@@ -1002,6 +1093,8 @@ pub async fn update_config(
 
     let name = pk_to_name(Some(&updated.folder_id)).await;
     let mut val = serde_json::to_value(updated)?;
+    // §4.8: this path bypasses model_to_api_json, so the class is added here too.
+    add_notice_class(&mut val);
     if let Some(obj) = val.as_object_mut() {
         obj.insert("folder_id".to_string(), serde_json::Value::String(name));
     }
@@ -1124,6 +1217,7 @@ pub async fn clone_config(
         retrain_interval_days: src.retrain_interval_days,
         threshold: src.threshold,
         alert_budget_per_day: src.alert_budget_per_day,
+        level_half_width_seconds: src.level_half_width_seconds,
         seasonality: src.seasonality.clone(),
         is_trained: false,
         training_started_at: None,
@@ -1616,28 +1710,125 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     }
 
     validated_budget_create(req.percentile, req.alert_budget_per_day)?;
+    if let Some(half_width) = req.level_half_width_seconds {
+        validate_level_half_width(half_width)?;
+    }
+    if let Some(days) = req.retrain_interval_days {
+        validate_retrain_interval_days(days)?;
+    }
 
     // Delegated so create and update cannot drift to two differently-worded rules.
     validate_interval_pair(&req.schedule_interval, &req.histogram_interval)?;
-    validate_detection_window(&req.schedule_interval, req.detection_window_seconds)?;
+    validate_detection_window(
+        &req.schedule_interval,
+        &req.histogram_interval,
+        req.detection_window_seconds,
+    )?;
 
-    // G4 reads the COMBINED form, which is what the row stores and what update sees.
+    // §4.1.1: a custom query's own histogram() must sit on the config's grid.
+    if req.query_mode == "custom_sql"
+        && let Some(sql) = req.custom_sql.as_deref()
+    {
+        validate_custom_sql_grid(sql, &req.histogram_interval)?;
+    }
+
+    // The COMBINED form is what the row stores, what update sees, and what the trainer reads,
+    // so both rules below are spelled against it rather than the two raw fields.
+    let combined = combine_detection_fn(
+        &req.detection_function,
+        req.detection_function_field.as_deref(),
+    );
+
     validate_denominator(
-        &combine_detection_fn(
-            &req.detection_function,
-            req.detection_function_field.as_deref(),
-        ),
+        &combined,
         &req.stream_name,
         &req.query_mode,
         req.filters.as_ref(),
         req.custom_sql.as_deref(),
-    )
+    )?;
+
+    // Last, because G4 reads a count case-insensitively: `COUNT(*)` has to reach the
+    // denominator verdict before this stricter spelling rule can short-circuit it.
+    validate_detection_function(&combined)
+}
+
+/// Splits a combined `fn(field)` into its parts; a bare name yields no field.
+fn split_combined_detection_fn(combined: &str) -> Result<(&str, Option<&str>)> {
+    let combined = combined.trim();
+    let Some((name, rest)) = combined.split_once('(') else {
+        return Ok((combined, None));
+    };
+    let Some(field) = rest.strip_suffix(')') else {
+        anyhow::bail!("detection_function is malformed: {combined}");
+    };
+    Ok((name.trim(), Some(field.trim())))
+}
+
+/// Rejects an aggregation the trainer cannot deserialize, and a non-count one with no field:
+/// both persist a config that saves with a 200 and then fails every training run.
+///
+/// Matched case-SENSITIVELY on purpose. The trainer does
+/// `serde_json::from_str("\"{name}\"")` into its `DetectionFunction`, and serde matches
+/// variants exactly, so `AVG` is as untrainable as `p75`. Lowercasing here would widen this
+/// gate past the one it is mirroring and re-open the bug for a different spelling.
+fn validate_detection_function(combined: &str) -> Result<()> {
+    let (name, field) = split_combined_detection_fn(combined)?;
+    if !SUPPORTED_DETECTION_FUNCTIONS.contains(&name) {
+        if SUPPORTED_DETECTION_FUNCTIONS.contains(&name.to_ascii_lowercase().as_str()) {
+            anyhow::bail!(
+                "detection_function is case-sensitive: use '{}', not '{name}'",
+                name.to_ascii_lowercase()
+            );
+        }
+        anyhow::bail!(
+            "unsupported detection_function: {name}. Supported: {}",
+            SUPPORTED_DETECTION_FUNCTIONS.join(", ")
+        );
+    }
+    // `count` is the one aggregation with no operand; every other reads a column.
+    if name == "count" {
+        return Ok(());
+    }
+    match field {
+        Some(f) if !f.is_empty() && f != "*" => Ok(()),
+        _ => anyhow::bail!("detection_function {name} requires detection_function_field"),
+    }
 }
 
 /// A budget the meter arithmetic cannot enforce (0, negative, NaN, inf) must never be stored.
 fn validate_budget_value(budget: f64) -> Result<()> {
     if !budget.is_finite() || budget <= 0.0 {
         anyhow::bail!("alert_budget_per_day must be a finite value greater than 0");
+    }
+    Ok(())
+}
+
+/// Bounded at the API, not only clamped at fit time, so a typo cannot store an ignored value.
+fn validate_level_half_width(half_width_seconds: i64) -> Result<()> {
+    const ONE_YEAR_SECONDS: i64 = 365 * 86_400;
+    if half_width_seconds <= 0 {
+        anyhow::bail!("level_half_width_seconds must be greater than 0");
+    }
+    if half_width_seconds > ONE_YEAR_SECONDS {
+        anyhow::bail!(
+            "level_half_width_seconds must be at most {ONE_YEAR_SECONDS} (one year); the \
+             level window must fit inside the training window"
+        );
+    }
+    Ok(())
+}
+
+/// `0` is "Never"; a negative value would put the due-time in the future and retrain on every tick.
+fn validate_retrain_interval_days(days: i32) -> Result<()> {
+    const MAX_RETRAIN_INTERVAL_DAYS: i32 = 36_500;
+    if days < 0 {
+        anyhow::bail!("retrain_interval_days must be 0 (never) or greater");
+    }
+    if days > MAX_RETRAIN_INTERVAL_DAYS {
+        anyhow::bail!(
+            "retrain_interval_days must be at most {MAX_RETRAIN_INTERVAL_DAYS} (100 years); \
+             use 0 to never auto-retrain"
+        );
     }
     Ok(())
 }
@@ -1653,10 +1844,28 @@ fn validated_budget_create(percentile: Option<f64>, budget: Option<f64>) -> Resu
     Ok(())
 }
 
-/// Shared with the update path so the replay gate compares exactly what an echo re-stores.
+/// The ceiling reads 99 because the column is `i32`: `99.9 as i32` is already 99.
 fn clamped_threshold(percentile: f64) -> i32 {
-    percentile.clamp(50.0, 99.9) as i32
+    if percentile.is_nan() {
+        return DEFAULT_PERCENTILE as i32;
+    }
+    percentile.clamp(50.0, MAX_STORABLE_PERCENTILE) as i32
 }
+
+/// The derivation only ever WIDENS, so fine cadences keep the shipped default.
+const DERIVED_WINDOW_FLOOR_DAYS: i32 = 7;
+
+/// Past this the honest requirement stops being advice an operator can act on.
+const MAX_ADVISABLE_WINDOW_DAYS: usize = 365;
+
+/// Past a month, provisioning the honest requirement unasked would surprise more than it helps.
+const DERIVED_WINDOW_CEILING_DAYS: i32 = 30;
+
+/// The percentile a create request gets when it names none.
+const DEFAULT_PERCENTILE: f64 = 97.0;
+
+/// The highest percentile the `i32` `threshold` column can store without truncating.
+const MAX_STORABLE_PERCENTILE: f64 = 99.0;
 
 /// While a budget is in force the percentile is derived, so only a CHANGE to it is rejected.
 fn validated_budget_update(
@@ -1683,6 +1892,172 @@ fn validated_budget_update(
         );
     }
     Ok(())
+}
+
+/// An explicit value is ALWAYS honoured however starved; only an absent field derives.
+fn resolved_training_window_days(
+    requested: Option<i32>,
+    histogram_interval: &str,
+    percentile: f64,
+    tree_size: i32,
+) -> i32 {
+    match requested {
+        Some(explicit) => explicit.max(1),
+        None => derived_training_window_days(histogram_interval, percentile, tree_size),
+    }
+}
+
+/// Not `days * buckets_per_day`: the trailing partial bucket and `shingle - 1` never score.
+fn expected_training_windows(
+    histogram_interval: &str,
+    training_window_days: i32,
+    tree_size: i32,
+) -> Option<i64> {
+    let histogram_secs = parse_interval(histogram_interval).ok().filter(|s| *s > 0)?;
+    let days = training_window_days.max(1) as i64;
+    let buckets = days.checked_mul(86_400)?.checked_div(histogram_secs)?;
+    let shingle =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            // The row does not exist yet, so an omitted shingle resolves to create's env default.
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_shingle_size as i32,
+            histogram_interval,
+            training_window_days.max(1),
+            tree_size.max(1),
+        )? as i64;
+    Some((buckets - 1 - (shingle - 1)).max(0))
+}
+
+/// The requirement spans 251x across the legal interval range, so one flat default cannot be right.
+fn derived_training_window_days(histogram_interval: &str, percentile: f64, tree_size: i32) -> i32 {
+    let Ok(histogram_secs) = parse_interval(histogram_interval) else {
+        return DERIVED_WINDOW_FLOOR_DAYS;
+    };
+    if histogram_secs <= 0 {
+        return DERIVED_WINDOW_FLOOR_DAYS;
+    }
+    // Rounded UP: truncating a cadence understates wall-clock and lands short of the bar.
+    let interval_minutes = (histogram_secs as usize).div_ceil(60).max(1);
+    let needed =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::windows_to_clear_every_bar(
+            tree_size.max(1) as usize,
+            percentile,
+        );
+    // Widened by one window to cover the trailing partial bucket the trainer drops.
+    let shingle =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_shingle_size as i32,
+            histogram_interval,
+            DERIVED_WINDOW_CEILING_DAYS,
+            tree_size.max(1),
+        )
+        .unwrap_or(1);
+    let Some(days) = o2_enterprise::enterprise::anomaly_detection::rcf_model::days_for_windows(
+        needed.saturating_add(1),
+        interval_minutes,
+        shingle,
+    ) else {
+        return DERIVED_WINDOW_FLOOR_DAYS;
+    };
+    let proposal = (days.min(i32::MAX as usize) as i32)
+        .clamp(DERIVED_WINDOW_FLOOR_DAYS, DERIVED_WINDOW_CEILING_DAYS);
+    // A widening that does not cross the reservoir buys nothing: below `tree_size` nothing evicts.
+    let clears_reservoir = expected_training_windows(histogram_interval, proposal, tree_size)
+        .is_some_and(|w| w >= tree_size.max(1) as i64);
+    if clears_reservoir {
+        proposal
+    } else {
+        DERIVED_WINDOW_FLOOR_DAYS
+    }
+}
+
+/// `None` when the bar is calibrated or the interval will not parse; a warning, never an error.
+fn training_window_starvation_warning(
+    histogram_interval: &str,
+    training_window_days: i32,
+    percentile: f64,
+    tree_size: i32,
+) -> Option<String> {
+    let windows = expected_training_windows(histogram_interval, training_window_days, tree_size)?;
+    o2_enterprise::enterprise::anomaly_detection::rcf_model::bar_starvation(
+        windows.max(0) as usize,
+        tree_size.max(1) as usize,
+        percentile,
+    )?;
+    let histogram_secs = parse_interval(histogram_interval).ok().filter(|s| *s > 0)?;
+    // Rounded up like the derivation: truncating lands the count short of the bar it must clear.
+    let interval_minutes = (histogram_secs as usize).div_ceil(60).max(1);
+    let shingle =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_shingle_size as i32,
+            histogram_interval,
+            training_window_days.max(1),
+            tree_size.max(1),
+        )
+        .unwrap_or(1);
+    // Sized on every bar, not the one that trips first, or the remedy leaves the config starved.
+    let needed =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::windows_to_clear_every_bar(
+            tree_size.max(1) as usize,
+            percentile,
+        );
+    let days = o2_enterprise::enterprise::anomaly_detection::rcf_model::days_for_windows(
+        needed,
+        interval_minutes,
+        shingle,
+    );
+    let finer =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::interval_minutes_for_windows(
+            needed,
+            training_window_days.max(1) as usize,
+            shingle,
+        )
+        .filter(|m| *m < interval_minutes);
+    let days = days.filter(|d| *d <= MAX_ADVISABLE_WINDOW_DAYS);
+    let remedy = match (days, finer) {
+        (Some(d), Some(m)) => format!(
+            " Raise training_window_days to {d} at the current {histogram_interval}, or use a \
+             histogram_interval of {m}m or finer at the current {training_window_days} days, or \
+             lower the percentile."
+        ),
+        (Some(d), None) => format!(
+            " Raise training_window_days to {d} at the current {histogram_interval}, or lower \
+             the percentile."
+        ),
+        (None, Some(m)) => format!(
+            " No training window under {MAX_ADVISABLE_WINDOW_DAYS} days reaches the bar at a \
+             {histogram_interval} interval. Use a histogram_interval of {m}m or finer at the \
+             current {training_window_days} days, or lower the percentile."
+        ),
+        (None, None) => format!(
+            " No training window under {MAX_ADVISABLE_WINDOW_DAYS} days and no histogram_interval \
+             of a minute or coarser reaches the bar: this combination of interval and percentile \
+             cannot calibrate. Lower the percentile, or use a finer histogram_interval."
+        ),
+    };
+    // `0` is a config that can never train, not a thin window, so it is not a degree of that fault.
+    let severity = if windows == 0 {
+        " This config produces no training windows at all and will never train."
+    } else {
+        ""
+    };
+    Some(format!(
+        "p{} at a {} interval over {} days gives {} training windows, but {} are needed, so \
+         the bar will flag more often than the percentile names. The config is saved and will \
+         train.{}{}",
+        percentile as i64,
+        histogram_interval,
+        training_window_days,
+        windows,
+        needed,
+        severity,
+        remedy,
+    ))
 }
 
 /// Marks a rejected request with the prefix the API layer matches to answer 400, not 500.
@@ -1730,6 +2105,23 @@ fn initial_training_allowed(enabled: bool, globally_disabled: bool) -> bool {
     enabled && !globally_disabled
 }
 
+/// The two time grids agree only where the interval divides the origin.
+fn validate_origin_aligned_interval(histogram_interval: &str, histogram_secs: i64) -> Result<()> {
+    use config::meta::histogram_origin::{DATE_BIN_ORIGIN_SECS, histogram_origin_skew};
+    let skew = histogram_origin_skew(histogram_secs);
+    if skew != 0 {
+        anyhow::bail!(
+            "histogram_interval ({}) must divide the date_bin origin of {}s (2001-01-01): it \
+             leaves a remainder of {}s, so indexed and unindexed runs would bucket the same rows \
+             onto grids that do not line up",
+            histogram_interval,
+            DATE_BIN_ORIGIN_SECS,
+            skew,
+        );
+    }
+    Ok(())
+}
+
 /// The pure interval rule create and update share, so the two cannot drift apart.
 fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> Result<()> {
     let schedule_secs = parse_interval(schedule_interval)?;
@@ -1743,6 +2135,8 @@ fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> 
             histogram_interval
         );
     }
+
+    validate_origin_aligned_interval(histogram_interval, histogram_secs)?;
 
     // A short schedule scores a partial bucket against a full-bucket baseline, forever.
     if schedule_secs < histogram_secs {
@@ -1766,20 +2160,57 @@ fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> 
 
 /// The look-back caps the cursor (`detect_start = max(cursor, now - detection_window)`), so a
 /// window shorter than the gap between runs drops every bucket in between, permanently.
-fn validate_detection_window(schedule_interval: &str, detection_window_seconds: i64) -> Result<()> {
-    let schedule_secs = parse_interval(schedule_interval)?;
+fn validate_detection_window(
+    schedule_interval: &str,
+    histogram_interval: &str,
+    detection_window_seconds: i64,
+) -> Result<()> {
+    // §4.5 (D9): W > 0 is unconditional; each later comparison skips only on its own parse.
     if detection_window_seconds <= 0 {
         anyhow::bail!(
             "detection_window_seconds ({}) must be positive",
             detection_window_seconds
         );
     }
-    if detection_window_seconds < schedule_secs {
+    if let Ok(schedule_secs) = parse_interval(schedule_interval)
+        && detection_window_seconds < schedule_secs
+    {
         anyhow::bail!(
             "detection_window_seconds ({}) must not be shorter than schedule_interval ({}): the \
              look-back caps the cursor, so buckets between runs would never be scored",
             detection_window_seconds,
             schedule_interval
+        );
+    }
+    validate_coverage_floor(
+        schedule_interval,
+        histogram_interval,
+        detection_window_seconds,
+    )
+}
+
+/// A validity floor, not health: below it no cadence holds a complete bucket at an off-grid phase.
+fn validate_coverage_floor(
+    schedule_interval: &str,
+    histogram_interval: &str,
+    detection_window_seconds: i64,
+) -> Result<()> {
+    // §4.5 (D9): the floor needs both parses, so an unparsable value skips only this rule.
+    let (Ok(schedule_secs), Ok(histogram_secs)) = (
+        parse_interval(schedule_interval),
+        parse_interval(histogram_interval),
+    ) else {
+        return Ok(());
+    };
+    let minimum = schedule_secs.saturating_add(histogram_secs);
+    if detection_window_seconds < minimum {
+        anyhow::bail!(
+            "{WINDOW_FLOOR_RULE}: detection_window_seconds ({}) is under the floor of {} \
+             (schedule_interval {} + histogram_interval {})",
+            detection_window_seconds,
+            minimum,
+            schedule_interval,
+            histogram_interval
         );
     }
     Ok(())
@@ -1837,24 +2268,151 @@ fn validated_detection_window(
     req: &UpdateAnomalyConfigRequest,
     existing: &infra::table::entity::anomaly_detection_config::Model,
 ) -> Result<()> {
-    let schedule = req
-        .schedule_interval
-        .clone()
-        .unwrap_or_else(|| existing.schedule_interval.clone());
+    let (schedule, histogram) = merged_interval_pair(req, existing);
     let window = req
         .detection_window_seconds
         .unwrap_or(existing.detection_window_seconds);
+    // The coverage floor reads histogram_interval, so an edit to it is held to the rule too.
     if req
         .schedule_interval
         .as_ref()
         .is_none_or(|v| *v == existing.schedule_interval)
+        && req
+            .histogram_interval
+            .as_ref()
+            .is_none_or(|v| *v == existing.histogram_interval)
         && req
             .detection_window_seconds
             .is_none_or(|v| v == existing.detection_window_seconds)
     {
         return Ok(());
     }
-    validate_detection_window(&schedule, window)
+    validate_detection_window(&schedule, &histogram, window)
+}
+
+/// §4.1.1 grandfathering: a stored violating row stays editable; a grid-touching edit is not.
+fn validated_custom_sql(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    if req
+        .custom_sql
+        .as_ref()
+        .is_none_or(|v| existing.custom_sql.as_deref() == Some(v.as_str()))
+        && req
+            .histogram_interval
+            .as_ref()
+            .is_none_or(|v| *v == existing.histogram_interval)
+        && req
+            .query_mode
+            .as_ref()
+            .is_none_or(|v| *v == existing.query_mode)
+    {
+        return Ok(());
+    }
+    let query_mode = req.query_mode.as_deref().unwrap_or(&existing.query_mode);
+    // The other mode's leftover SQL is not the query the detector runs (see G4's verdict).
+    if !query_mode.eq_ignore_ascii_case("custom_sql") {
+        return Ok(());
+    }
+    let Some(sql) = req.custom_sql.as_deref().or(existing.custom_sql.as_deref()) else {
+        return Ok(());
+    };
+    let (_, histogram) = merged_interval_pair(req, existing);
+    validate_custom_sql_grid(sql, &histogram)
+}
+
+/// §4.1.1: an AST walk, because substring checks lose to nesting, comments and IANA names.
+fn validate_custom_sql_grid(sql: &str, histogram_interval: &str) -> Result<()> {
+    use std::ops::ControlFlow;
+    let statements =
+        sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
+            .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?;
+    // §4.5 (D9): only the interval-equality rule needs the stored interval's parse.
+    let config_interval_secs = parse_interval(histogram_interval).ok();
+    let walk =
+        sqlparser::ast::visit_expressions(&statements, |expr| {
+            match validated_histogram_call(expr, config_interval_secs, histogram_interval) {
+                Ok(()) => ControlFlow::Continue(()),
+                Err(e) => ControlFlow::Break(e),
+            }
+        });
+    match walk {
+        ControlFlow::Continue(()) => Ok(()),
+        ControlFlow::Break(e) => Err(e),
+    }
+}
+
+/// One `histogram()` call held to §4.1.1's four rules; every other expression passes through.
+fn validated_histogram_call(
+    expr: &sqlparser::ast::Expr,
+    config_interval_secs: Option<i64>,
+    configured_interval: &str,
+) -> Result<()> {
+    let sqlparser::ast::Expr::Function(func) = expr else {
+        return Ok(());
+    };
+    if !func.name.to_string().eq_ignore_ascii_case("histogram") {
+        return Ok(());
+    }
+    let args: &[sqlparser::ast::FunctionArg] = match &func.args {
+        sqlparser::ast::FunctionArguments::List(list) => &list.args,
+        _ => &[],
+    };
+    if args.len() > 2 {
+        anyhow::bail!(
+            "custom_sql histogram() must not take a timezone or origin argument: the detector's \
+             grid is UTC on the date_bin origin, and a shifted grid never lines up with it"
+        );
+    }
+    let Some(interval_arg) = args.get(1) else {
+        anyhow::bail!(
+            "custom_sql histogram() must state its interval explicitly, e.g. \
+             histogram(_timestamp, '{configured_interval}'): an omitted interval is injected \
+             at query time and desyncs from the config's grid"
+        );
+    };
+    let raw = interval_arg.to_string();
+    let raw = raw.trim().trim_matches(|c| c == '\'' || c == '"');
+    let sql_secs = custom_sql_interval_seconds(raw)?;
+    if let Some(config_secs) = config_interval_secs
+        && sql_secs != config_secs
+    {
+        anyhow::bail!(
+            "custom_sql histogram() interval '{raw}' does not equal the config's \
+             histogram_interval '{configured_interval}': the two grids would never line up"
+        );
+    }
+    Ok(())
+}
+
+/// The engine's own interval grammar, compared as µs-equivalent seconds ("300s" == "5m").
+fn custom_sql_interval_seconds(interval: &str) -> Result<i64> {
+    let interval = interval.trim();
+    let split = interval
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(interval.len());
+    let (number, unit) = interval.split_at(split);
+    let number: i64 = number.parse().map_err(|_| {
+        anyhow::anyhow!("custom_sql histogram() interval '{interval}' is not a number plus unit")
+    })?;
+    let unit_seconds = match unit.trim().to_ascii_lowercase().as_str() {
+        "second" | "seconds" | "sec" | "secs" | "s" => 1,
+        "minute" | "minutes" | "min" | "mins" | "m" => 60,
+        "hour" | "hours" | "hr" | "hrs" | "h" => 3600,
+        "day" | "days" | "d" => 86400,
+        "month" | "months" | "mon" | "year" | "years" | "y" => anyhow::bail!(
+            "custom_sql histogram() interval '{interval}' uses a calendar unit with no fixed \
+             stride; use seconds, minutes, hours or days"
+        ),
+        _ => anyhow::bail!(
+            "custom_sql histogram() interval '{interval}' has an unsupported unit; use seconds, \
+             minutes, hours or days"
+        ),
+    };
+    number.checked_mul(unit_seconds).ok_or_else(|| {
+        anyhow::anyhow!("custom_sql histogram() interval '{interval}' is out of range")
+    })
 }
 
 /// G4. True for the aggregations that grow with population size and carry no normalizer.
@@ -2147,6 +2705,20 @@ fn validated_denominator(
     )
 }
 
+/// Validates the merged function only when it differs from the persisted one, so a row
+/// already carrying an unusable function stays administrable — it can still be renamed,
+/// moved, disabled or repaired, exactly as the denominator rule allows.
+fn validated_detection_function(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let merged = merged_series_definition(req, existing);
+    if merged.detection_function == existing.detection_function {
+        return Ok(());
+    }
+    validate_detection_function(&merged.detection_function)
+}
+
 /// Collapses the `filters` shapes that mean "no filters" to `[]`; rejects any other non-array.
 fn normalize_request_filters(
     filters: Option<serde_json::Value>,
@@ -2212,22 +2784,28 @@ fn combine_detection_fn(function: &str, field: Option<&str>) -> String {
     }
 }
 
-/// Parse interval string like "1h", "30m" into seconds
+/// Parse "90s" / "30m" / "1h" / "1d" into seconds — §4.5's one grammar with the UI form.
 fn parse_interval(interval: &str) -> Result<i64> {
-    if let Some(stripped) = interval.strip_suffix('h') {
-        let hours: i64 = stripped.parse()?;
-        // A positive wrap lands on a plausible schedule that clears every downstream guard.
-        hours
-            .checked_mul(3600)
-            .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
+    let (value, unit_seconds) = if let Some(stripped) = interval.strip_suffix('s') {
+        (stripped, 1)
     } else if let Some(stripped) = interval.strip_suffix('m') {
-        let minutes: i64 = stripped.parse()?;
-        minutes
-            .checked_mul(60)
-            .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
+        (stripped, 60)
+    } else if let Some(stripped) = interval.strip_suffix('h') {
+        (stripped, 3600)
+    } else if let Some(stripped) = interval.strip_suffix('d') {
+        (stripped, 86400)
     } else {
-        anyhow::bail!("Invalid interval format. Use '1h' or '30m'");
-    }
+        anyhow::bail!("Invalid interval format. Use a number plus 's', 'm', 'h' or 'd'");
+    };
+    let value: i64 = value.parse().map_err(|_| {
+        anyhow::anyhow!(
+            "Invalid interval format ('{interval}'). Use a number plus 's', 'm', 'h' or 'd'"
+        )
+    })?;
+    // A positive wrap lands on a plausible schedule that clears every downstream guard.
+    value
+        .checked_mul(unit_seconds)
+        .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -2268,6 +2846,7 @@ pub fn config_to_training_config(
         retrain_interval_days: config.retrain_interval_days,
         threshold: config.threshold,
         alert_budget_per_day: config.alert_budget_per_day,
+        level_half_width_seconds: config.level_half_width_seconds,
         seasonality: serde_json::from_str(&format!("\"{}\"", config.seasonality))
             .unwrap_or_default(),
         is_trained: config.is_trained,
@@ -3018,10 +3597,17 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_interval_seconds_and_days() {
+        assert_eq!(parse_interval("10s").unwrap(), 10);
+        assert_eq!(parse_interval("90s").unwrap(), 90);
+        assert_eq!(parse_interval("1d").unwrap(), 86400);
+    }
+
+    #[test]
     fn test_parse_interval_invalid_suffix() {
-        assert!(parse_interval("10s").is_err());
-        assert!(parse_interval("10d").is_err());
+        assert!(parse_interval("10x").is_err());
         assert!(parse_interval("abc").is_err());
+        assert!(parse_interval("5").is_err());
     }
 
     #[test]
@@ -3036,6 +3622,7 @@ mod tests {
         CreateAnomalyConfigRequest {
             name: "test".to_string(),
             description: None,
+            level_half_width_seconds: None,
             stream_name: "logs".to_string(),
             stream_type: "logs".to_string(),
             query_mode: "filters".to_string(),
@@ -3045,7 +3632,7 @@ mod tests {
             detection_function_field: None,
             histogram_interval: "5m".to_string(),
             schedule_interval: "1h".to_string(),
-            detection_window_seconds: 3600,
+            detection_window_seconds: 7200,
             training_window_days: Some(7),
             retrain_interval_days: Some(7),
             percentile: Some(97.0),
@@ -3188,6 +3775,34 @@ mod tests {
         assert!(validate_config_request(&req).is_ok());
     }
 
+    /// A negative cadence puts the due-time in the future, retraining on every tick forever.
+    #[test]
+    fn a_negative_or_absurd_retrain_cadence_is_rejected_at_validation() {
+        assert!(validate_retrain_interval_days(0).is_ok(), "0 is Never");
+        for days in [1, 7, 14, 30, 365, 36_500] {
+            assert!(validate_retrain_interval_days(days).is_ok(), "{days}d");
+        }
+        for days in [-1, -7, -36_500, i32::MIN] {
+            assert!(
+                validate_retrain_interval_days(days).is_err(),
+                "{days}d must be rejected"
+            );
+        }
+        for days in [36_501, i32::MAX] {
+            assert!(
+                validate_retrain_interval_days(days).is_err(),
+                "{days}d must be rejected"
+            );
+        }
+
+        // And it is actually wired into the create path, not merely defined.
+        let mut req = make_valid_filters_req();
+        req.retrain_interval_days = Some(-5);
+        assert!(validate_config_request(&req).is_err());
+        req.retrain_interval_days = Some(0);
+        assert!(validate_config_request(&req).is_ok());
+    }
+
     #[test]
     fn test_validate_invalid_query_mode() {
         let mut req = make_valid_filters_req();
@@ -3214,7 +3829,7 @@ mod tests {
     #[test]
     fn test_validate_invalid_histogram_interval() {
         let mut req = make_valid_filters_req();
-        req.histogram_interval = "10d".to_string();
+        req.histogram_interval = "10x".to_string();
         assert!(validate_config_request(&req).is_err());
     }
 
@@ -3239,11 +3854,14 @@ mod tests {
         );
     }
 
+    /// §4.3: `W == schedule` clears the cadence rule yet still misses every off-grid phase.
     #[test]
-    fn test_detection_window_equal_to_schedule_is_accepted() {
+    fn test_detection_window_equal_to_schedule_is_under_the_floor() {
         let mut req = make_valid_filters_req();
         req.schedule_interval = "1h".to_string();
         req.detection_window_seconds = 3600;
+        assert!(validate_config_request(&req).is_err());
+        req.detection_window_seconds = 3900;
         assert!(validate_config_request(&req).is_ok());
     }
 
@@ -3252,6 +3870,88 @@ mod tests {
         let mut req = make_valid_filters_req();
         req.detection_window_seconds = 0;
         assert!(validate_config_request(&req).is_err());
+    }
+
+    /// The live defect shape: it passed both older rules yet could never judge a bucket off-grid.
+    #[test]
+    fn the_window_that_can_never_judge_a_bucket_is_rejected() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "5m".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 300;
+        let err = validate_config_request(&req).expect_err("the live broken config's shape");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("600"),
+            "the message must state the locally computed floor: {msg}"
+        );
+        assert!(
+            !msg.contains("O2_ANOMALY_EDGE_SETTLE_SECONDS"),
+            "the deleted margin must not be named anywhere: {msg}"
+        );
+    }
+
+    /// Boundary-exact on both sides, with the schedule rule unable to fake either verdict.
+    #[test]
+    fn the_coverage_floor_is_boundary_exact() {
+        for (histogram, histogram_secs) in [("1m", 60i64), ("5m", 300)] {
+            let minimum = 1800 + histogram_secs;
+            let mut req = make_valid_filters_req();
+            req.schedule_interval = "30m".to_string();
+            req.histogram_interval = histogram.to_string();
+            req.detection_window_seconds = minimum;
+            assert!(
+                validate_config_request(&req).is_ok(),
+                "exactly the floor must be accepted ({histogram})"
+            );
+            req.detection_window_seconds = minimum - 1;
+            assert!(
+                validate_config_request(&req).is_err(),
+                "one second under the floor must be refused ({histogram})"
+            );
+        }
+    }
+
+    /// N7's other half: both dead formulas' minima give the wrong verdict under this floor.
+    #[test]
+    fn the_coverage_floor_rejects_both_dead_formulas_minima() {
+        // The schedule-only formula (`W >= schedule`) accepted 1800 here; the floor refuses.
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "30m".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 1800;
+        assert!(
+            validate_config_request(&req).is_err(),
+            "the schedule-only minimum must be refused"
+        );
+        // Margin-free, this band is valid; refusing it would strand working configs.
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "5m".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 600;
+        assert!(
+            validate_config_request(&req).is_ok(),
+            "the margin-free floor sits at 600, not the settle-inclusive 900"
+        );
+        req.detection_window_seconds = 899;
+        assert!(
+            validate_config_request(&req).is_ok(),
+            "the settle-inclusive formula must not resurrect"
+        );
+        req.detection_window_seconds = 599;
+        assert!(validate_config_request(&req).is_err());
+    }
+
+    /// §4.6: the floor is computed locally and every surface shares one message constant.
+    #[test]
+    fn the_floor_message_is_the_shared_constant_with_the_computed_minimum() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "1h".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 3899;
+        let msg = validate_config_request(&req).unwrap_err().to_string();
+        assert!(msg.contains(WINDOW_FLOOR_RULE), "one rule text: {msg}");
+        assert!(msg.contains("3900"), "the computed minimum: {msg}");
     }
 
     // ── model_to_api_json ───────────────────────────────────────────────────
@@ -3645,8 +4345,69 @@ mod tests {
 
     // ── P0.4: the interval rule as a shared pure seam ───────────────────────
 
+    /// A value the create path rejects can never reach `SeasonalBaseline::fit`.
+    mod level_half_width_rule {
+        use super::*;
+
+        #[test]
+        fn a_non_null_half_width_inside_the_bound_is_accepted() {
+            for seconds in [1_i64, 3_600, 86_400, 365 * 86_400] {
+                assert!(
+                    validate_level_half_width(seconds).is_ok(),
+                    "{seconds}s is within one year and must be accepted"
+                );
+            }
+        }
+
+        #[test]
+        fn a_non_positive_half_width_is_rejected() {
+            for seconds in [0_i64, -1, -86_400] {
+                assert!(
+                    validate_level_half_width(seconds).is_err(),
+                    "{seconds}s cannot describe a level window"
+                );
+            }
+        }
+
+        #[test]
+        fn a_half_width_past_one_year_is_rejected() {
+            let err = validate_level_half_width(365 * 86_400 + 1)
+                .expect_err("one second past a year must not be stored");
+            let msg = err.to_string();
+            assert!(msg.contains("31536000"), "the bound must be stated: {msg}");
+            assert!(
+                !msg.contains("  "),
+                "the message must not carry a broken line continuation: {msg:?}"
+            );
+        }
+    }
+
     mod interval_pair_rule {
         use super::*;
+
+        /// 2d is the trap: every smaller day-multiple divides the origin, but 11,323 is odd.
+        #[test]
+        fn a_two_day_bucket_is_rejected_even_though_one_day_is_not() {
+            assert!(validate_origin_aligned_interval("1d", 86_400).is_ok());
+            let err = validate_origin_aligned_interval("2d", 172_800)
+                .expect_err("11323 is odd, so 2d leaves a full day of skew");
+            assert!(
+                err.to_string().contains("86400s"),
+                "the message must state the remainder: {err}"
+            );
+        }
+
+        /// An off-grid bucket is refused even when the schedule/histogram ratio is legal.
+        #[test]
+        fn an_off_grid_bucket_is_rejected_through_the_shared_pair_rule() {
+            assert_eq!(2940 % 420, 0, "49m is a whole multiple of 7m");
+            let err = validate_interval_pair("49m", "7m")
+                .expect_err("a clean ratio must not launder an off-grid bucket");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be the one that fired: {err}"
+            );
+        }
 
         #[test]
         fn accepts_equal_intervals() {
@@ -3682,11 +4443,11 @@ mod tests {
         /// error and substituted its own text would otherwise satisfy a bare `is_err()`.
         #[test]
         fn rejects_unparseable_intervals_rather_than_ignoring_them() {
-            for bad in ["bad", "10d", "", "5"] {
+            for bad in ["bad", "10x", "", "5"] {
                 let err = validate_interval_pair(bad, "5m").unwrap_err().to_string();
                 assert!(err.contains("Invalid interval format"), "{bad}: {err}");
             }
-            let err = validate_interval_pair("5m", "10d").unwrap_err().to_string();
+            let err = validate_interval_pair("5m", "10x").unwrap_err().to_string();
             assert!(err.contains("Invalid interval format"), "got: {err}");
         }
 
@@ -3742,6 +4503,7 @@ mod tests {
             infra::table::entity::anomaly_detection_config::Model {
                 anomaly_id: "a1".to_string(),
                 org_id: "default".to_string(),
+                level_half_width_seconds: None,
                 stream_name: "logs".to_string(),
                 stream_type: "logs".to_string(),
                 enabled: true,
@@ -3881,11 +4643,11 @@ mod tests {
             assert!(err.contains("must not be shorter"), "got: {err}");
         }
 
-        /// Mutation shape 2: histogram alone, conflicting with the UNCHANGED stored schedule.
+        /// 8m is on the date_bin grid, so the ratio rule fires here, not the origin rule.
         #[test]
         fn rejects_changing_histogram_alone_into_a_conflict() {
             let req = UpdateAnomalyConfigRequest {
-                histogram_interval: Some("7m".to_string()),
+                histogram_interval: Some("8m".to_string()),
                 ..Default::default()
             };
             let err = update_result(req).unwrap_err().to_string();
@@ -4096,6 +4858,19 @@ mod tests {
                 ..Default::default()
             };
             assert!(validated_detection_window(&req, &stored).is_ok());
+            // Pins that grandfathering spared it: touching the histogram re-enters the rules.
+            let err = validated_intervals(
+                &UpdateAnomalyConfigRequest {
+                    histogram_interval: Some("7m".to_string()),
+                    ..Default::default()
+                },
+                &stored,
+            )
+            .expect_err("an edit that moves the interval is held to the origin rule");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be what refused it: {err}"
+            );
         }
 
         #[test]
@@ -4109,6 +4884,302 @@ mod tests {
             };
             assert!(validated_detection_window(&req, &stored).is_err());
         }
+
+        /// Held to the rule, or grandfathering becomes a back door to the broken shape.
+        #[test]
+        fn widening_the_histogram_under_the_coverage_floor_is_rejected() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "5m".to_string();
+            stored.histogram_interval = "1m".to_string();
+            stored.detection_window_seconds = 400;
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("5m".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_window(&req, &stored).is_err(),
+                "400 clears 300+60 but not 300+300"
+            );
+        }
+
+        /// Only an edit that actually moves an interval is held to the rule.
+        #[test]
+        fn a_stored_off_grid_interval_survives_an_edit_that_leaves_it_alone() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "7m".to_string();
+            stored.histogram_interval = "7m".to_string();
+            assert!(
+                validate_interval_pair("7m", "7m").is_err(),
+                "the row must be one create would now refuse"
+            );
+
+            let elsewhere = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&elsewhere, &stored).is_ok());
+
+            assert!(
+                validated_intervals(&full_body_replay(&stored), &stored).is_ok(),
+                "a full-body PUT resends the interval unchanged and must not strand the row"
+            );
+
+            let respelled = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("420s".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_intervals(&respelled, &stored).is_ok(),
+                "420s is the same duration as 7m, so the row is untouched, not repaired"
+            );
+        }
+
+        /// Off-grid to off-grid is a real edit, so grandfathering cannot admit new bad values.
+        #[test]
+        fn moving_a_stored_interval_to_another_off_grid_value_is_rejected() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.histogram_interval = "7m".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("11m".to_string()),
+                ..Default::default()
+            };
+            let err = validated_intervals(&req, &stored)
+                .expect_err("11m is a new off-grid value, not the stored one");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be the one that fired: {err}"
+            );
+        }
+
+        /// Repair onto the grid must be allowed, or the rule traps the rows it exists to fix.
+        #[test]
+        fn repairing_an_off_grid_interval_onto_the_grid_is_accepted() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.histogram_interval = "7m".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("5m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &stored).is_ok());
+            // Pins that the repair was judged, not waved through.
+            let err = validated_intervals(
+                &UpdateAnomalyConfigRequest {
+                    histogram_interval: Some("11m".to_string()),
+                    ..Default::default()
+                },
+                &stored,
+            )
+            .expect_err("11m is off the grid and must not pass as a repair");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be what refused it: {err}"
+            );
+        }
+
+        /// A pre-existing violation stays administrable while the edit touches none of the fields.
+        #[test]
+        fn an_edit_elsewhere_leaves_a_violating_coverage_floor_alone() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "5m".to_string();
+            stored.histogram_interval = "5m".to_string();
+            stored.detection_window_seconds = 300;
+            let req = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_window(&req, &stored).is_ok());
+        }
+    }
+
+    // ── §4.1.1: the custom-SQL grid rules, enforced by AST walk ─────────────
+
+    mod custom_sql_grid_rules {
+        use super::*;
+
+        fn custom_sql_req(sql: &str) -> CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.custom_sql = Some(sql.to_string());
+            req
+        }
+
+        /// A stored custom-SQL row; the SQL passed in may deliberately violate the rules.
+        fn stored_custom_sql_config(
+            sql: &str,
+        ) -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = update_interval_validation::stored_config();
+            stored.query_mode = "custom_sql".to_string();
+            stored.custom_sql = Some(sql.to_string());
+            stored
+        }
+
+        /// Rule (iii) is semantic µs equality: "300s" and "5m" name the same grid.
+        #[test]
+        fn a_respelled_equal_interval_is_accepted() {
+            for interval in ["5m", "300s", "300 seconds", "300sec"] {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '{interval}') AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                );
+                assert!(
+                    validate_config_request(&custom_sql_req(&sql)).is_ok(),
+                    "'{interval}' equals the config's 5m and must be accepted"
+                );
+            }
+        }
+
+        /// Rule (iii): a mismatched interval is a permanent grid desync.
+        #[test]
+        fn a_mismatched_interval_is_rejected() {
+            let err = validate_config_request(&custom_sql_req(
+                "SELECT histogram(_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(err.contains("does not equal"), "got: {err}");
+        }
+
+        /// Rule (iv): the argless form's interval is injected at query time — guaranteed desync.
+        #[test]
+        fn the_argless_histogram_form_is_rejected() {
+            let err = validate_config_request(&custom_sql_req(
+                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM logs GROUP BY ts",
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(err.contains("explicitly"), "got: {err}");
+        }
+
+        /// Rule (i): a third argument shifts the grid off the detector's, IANA names included.
+        #[test]
+        fn a_timezone_argument_is_rejected() {
+            for timezone in ["'+05:30'", "'America/Los_Angeles'", "'UTC'"] {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '5m', {timezone}) AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                );
+                let err = validate_config_request(&custom_sql_req(&sql))
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("timezone"), "{timezone}: {err}");
+            }
+        }
+
+        /// Rule (ii): calendar units have no fixed stride, so no grid exists to match.
+        #[test]
+        fn a_calendar_unit_interval_is_rejected() {
+            for interval in ["1 month", "1 year", "2 months"] {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '{interval}') AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                );
+                let err = validate_config_request(&custom_sql_req(&sql))
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("calendar"), "'{interval}': {err}");
+            }
+        }
+
+        /// The defeats that beat a substring check — nesting, comments, casing — reach the AST.
+        #[test]
+        fn substring_defeats_are_caught_by_the_ast_walk() {
+            for sql in [
+                "SELECT ts, value FROM (SELECT histogram(_timestamp, '10m') AS ts, \
+                 count(*) AS value FROM logs GROUP BY ts) sub",
+                "SELECT histogram /* tz */ (_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+                "SELECT HISTOGRAM(_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            ] {
+                assert!(
+                    validate_config_request(&custom_sql_req(sql)).is_err(),
+                    "a violation a substring check would miss must still be caught: {sql}"
+                );
+            }
+        }
+
+        /// Refused rather than waved through unexamined: what cannot be parsed cannot be walked.
+        #[test]
+        fn unparsable_sql_is_rejected() {
+            assert!(validate_config_request(&custom_sql_req("SELECT FROM WHERE ((")).is_err());
+        }
+
+        /// §4.1.1 grandfathering: an unrelated edit on a stored violating row still passes.
+        #[test]
+        fn an_unrelated_edit_on_a_violating_row_is_grandfathered() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_ok());
+        }
+
+        /// A full-body PUT resends the stored SQL byte-identically; that is not an edit.
+        #[test]
+        fn a_resent_identical_custom_sql_is_not_a_change() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                custom_sql: stored.custom_sql.clone(),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_ok());
+        }
+
+        /// An edit that touches `custom_sql` is held to the rules.
+        #[test]
+        fn an_edit_touching_custom_sql_is_validated() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp, '5m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                custom_sql: Some(
+                    "SELECT histogram(_timestamp, '10m') AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                        .to_string(),
+                ),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_err());
+        }
+
+        /// An interval edit under a custom query desyncs the same grid through the back door.
+        #[test]
+        fn an_interval_edit_under_a_custom_query_is_validated() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp, '5m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("10m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_err());
+        }
+
+        /// Filters mode's leftover `custom_sql` column is not the running query (G4's rule).
+        #[test]
+        fn a_filters_mode_row_is_not_held_to_the_sql_rules() {
+            let mut stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            );
+            stored.query_mode = "filters".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("1m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_ok());
+        }
     }
 
     // ── P0.6: `enabled` gates training on EVERY entry point, not just the SELECT ──
@@ -4121,6 +5192,7 @@ mod tests {
             infra::table::entity::anomaly_detection_config::Model {
                 anomaly_id: "a1".to_string(),
                 org_id: "default".to_string(),
+                level_half_width_seconds: None,
                 stream_name: "logs".to_string(),
                 stream_type: "logs".to_string(),
                 enabled: true,
@@ -4303,6 +5375,215 @@ mod tests {
     /// separate 20 errors in 330,000 requests from 20 errors in 200, so no forest and no
     /// thresholder can rescue it -- only refusing the config can. The rate form of the same
     /// signal, `nginx_5xx_rate_1h`, is servable and did detect the same platform outage.
+    mod detection_function_rule {
+        use super::*;
+
+        fn req_with(function: &str, field: Option<&str>) -> CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.detection_function = function.to_string();
+            req.detection_function_field = field.map(str::to_string);
+            req
+        }
+
+        fn stored_with(function: &str) -> infra::table::entity::anomaly_detection_config::Model {
+            let mut model = update_interval_validation::stored_config();
+            model.detection_function = function.to_string();
+            model
+        }
+
+        #[test]
+        fn every_supported_function_is_accepted() {
+            for function in ["avg", "sum", "min", "max", "p50", "p95", "p99"] {
+                assert!(
+                    validate_config_request(&req_with(function, Some("latency_ms"))).is_ok(),
+                    "{function} is a supported aggregation and must be accepted"
+                );
+            }
+            assert!(validate_config_request(&req_with("count", None)).is_ok());
+        }
+
+        #[test]
+        fn the_retired_percentiles_are_refused_at_create() {
+            for function in ["p75", "p90"] {
+                let err = validate_config_request(&req_with(function, Some("latency_ms")))
+                    .expect_err("the trainer cannot deserialize this name");
+                assert!(
+                    err.to_string().contains("unsupported detection_function"),
+                    "{function} must name itself in the refusal, got: {err}"
+                );
+            }
+        }
+
+        #[test]
+        fn a_function_the_trainer_cannot_read_is_refused_even_with_runnable_sql() {
+            // `median` is real DataFusion, so only the trainer's enum rejects it: the gap that
+            // let it save with a 200 and then fail every run.
+            let err = validate_config_request(&req_with("median", Some("latency_ms")))
+                .expect_err("median is not a DetectionFunction variant");
+            assert!(err.to_string().contains("median"), "got: {err}");
+        }
+
+        #[test]
+        fn an_arbitrary_name_is_refused() {
+            assert!(validate_config_request(&req_with("totally_made_up", Some("x"))).is_err());
+        }
+
+        #[test]
+        fn the_refusal_lists_what_is_supported() {
+            let err = validate_config_request(&req_with("p75", Some("latency_ms")))
+                .expect_err("p75 is refused");
+            let msg = err.to_string();
+            for supported in SUPPORTED_DETECTION_FUNCTIONS {
+                assert!(msg.contains(supported), "{supported} missing from: {msg}");
+            }
+        }
+
+        #[test]
+        fn a_non_count_function_without_a_field_is_refused() {
+            // `combine_detection_fn` leaves this bare as `avg`, which reads as a column name.
+            let err = validate_config_request(&req_with("avg", None))
+                .expect_err("avg has no operand to aggregate");
+            assert!(
+                err.to_string()
+                    .contains("requires detection_function_field"),
+                "got: {err}"
+            );
+        }
+
+        #[test]
+        fn an_empty_field_is_not_a_field() {
+            assert!(validate_config_request(&req_with("avg", Some(""))).is_err());
+            assert!(validate_config_request(&req_with("avg", Some("   "))).is_err());
+        }
+
+        #[test]
+        fn count_needs_no_field_in_either_spelling() {
+            assert!(validate_config_request(&req_with("count", None)).is_ok());
+            assert!(validate_config_request(&req_with("count(*)", None)).is_ok());
+        }
+
+        #[test]
+        fn a_pre_combined_request_reaches_the_same_verdict() {
+            assert!(validate_config_request(&req_with("p95(latency_ms)", None)).is_ok());
+            assert!(validate_config_request(&req_with("p75(latency_ms)", None)).is_err());
+        }
+
+        #[test]
+        fn an_uppercase_spelling_of_a_supported_function_is_refused() {
+            // Measured: `AVG`, `Avg`, `P95` and `COUNT` all save with a 200 today and then fail
+            // training with `unknown variant`. serde matches enum variants exactly, so a
+            // case-insensitive gate here would leave the bug open under a different spelling.
+            for function in ["AVG", "Avg", "P95", "COUNT", "Sum"] {
+                let err = validate_config_request(&req_with(function, Some("latency_ms")))
+                    .expect_err("the trainer deserializes variants case-sensitively");
+                assert!(
+                    err.to_string().contains("case-sensitive"),
+                    "{function} must be told it is a case problem, got: {err}"
+                );
+            }
+        }
+
+        #[test]
+        fn the_case_refusal_names_the_spelling_that_works() {
+            let err = validate_config_request(&req_with("AVG", Some("latency_ms")))
+                .expect_err("AVG is refused");
+            assert!(err.to_string().contains("'avg'"), "got: {err}");
+        }
+
+        #[test]
+        fn an_uppercase_unsupported_function_is_refused_as_unsupported() {
+            let err = validate_config_request(&req_with("P75", Some("latency_ms")))
+                .expect_err("p75 is refused in any spelling");
+            assert!(
+                err.to_string().contains("unsupported detection_function"),
+                "case is not the reason p75 fails, got: {err}"
+            );
+        }
+
+        #[test]
+        fn a_malformed_combined_form_is_named_not_ignored() {
+            let err = validate_config_request(&req_with("avg(latency_ms", None))
+                .expect_err("an unclosed paren is not a function");
+            assert!(err.to_string().contains("malformed"), "got: {err}");
+        }
+
+        #[test]
+        fn the_rule_is_reported_as_a_400_not_a_500() {
+            let err = validate_config_request(&req_with("p75", Some("latency_ms")))
+                .expect_err("p75 is refused");
+            assert!(
+                validation_error(err)
+                    .to_string()
+                    .starts_with("validation error: "),
+                "the HTTP layer answers 400 only on this prefix"
+            );
+        }
+
+        #[test]
+        fn changing_a_stored_function_into_an_unusable_one_is_refused() {
+            let existing = stored_with("avg(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p75".to_string()),
+                detection_function_field: Some("latency_ms".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_function(&req, &existing).is_err());
+        }
+
+        #[test]
+        fn a_row_already_carrying_an_unusable_function_stays_administrable() {
+            // The mirror of the denominator rule's grandfathering: a config stored before this
+            // gate existed must still be renamable, movable and disableable.
+            let existing = stored_with("p75(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_function(&req, &existing).is_ok(),
+                "an untouched function must not be re-litigated by an unrelated edit"
+            );
+        }
+
+        #[test]
+        fn a_replay_of_the_stored_unusable_function_is_not_a_change() {
+            let existing = stored_with("p75(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p75".to_string()),
+                detection_function_field: Some("latency_ms".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_function(&req, &existing).is_ok(),
+                "a full-body replay re-sends the stored value and changes nothing"
+            );
+        }
+
+        #[test]
+        fn repairing_a_broken_row_is_allowed() {
+            let existing = stored_with("p75(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p95".to_string()),
+                detection_function_field: Some("latency_ms".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_function(&req, &existing).is_ok());
+        }
+
+        #[test]
+        fn dropping_the_field_from_a_stored_function_is_refused() {
+            let existing = stored_with("avg(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("avg".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_function(&req, &existing).is_err(),
+                "an edit that strips the operand must not save a bare aggregation"
+            );
+        }
+    }
+
     mod denominator_rule {
         use super::*;
 
@@ -4401,7 +5682,7 @@ mod tests {
             req.filters = None;
             req.detection_function = "count".to_string();
             req.custom_sql = Some(
-                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM nginx_access \
+                "SELECT histogram(_timestamp, '5m') AS ts, count(*) AS value FROM nginx_access \
                  WHERE status >= 500 GROUP BY ts"
                     .to_string(),
             );
@@ -4419,7 +5700,7 @@ mod tests {
             req.filters = None;
             req.detection_function = "count".to_string();
             req.custom_sql = Some(
-                "SELECT histogram(_timestamp) AS ts, \
+                "SELECT histogram(_timestamp, '5m') AS ts, \
                  count(CASE WHEN status >= 500 THEN 1 END) AS value \
                  FROM nginx_access GROUP BY ts"
                     .to_string(),
@@ -4460,7 +5741,7 @@ mod tests {
             req.filters = None;
             req.detection_function = "count".to_string();
             req.custom_sql = Some(
-                "SELECT histogram(_timestamp) AS ts, \
+                "SELECT histogram(_timestamp, '5m') AS ts, \
                  count(CASE WHEN status >= 500 THEN 1 END) / count(*) AS value \
                  FROM nginx_access GROUP BY ts"
                     .to_string(),
@@ -4670,10 +5951,10 @@ mod tests {
             req.filters = None;
             req.detection_function = "count".to_string();
             for sql in [
-                "SELECT histogram(_timestamp) AS ts, \
+                "SELECT histogram(_timestamp, '5m') AS ts, \
                  sum(CASE WHEN status >= 500 THEN 1 ELSE 0 END) * 1.0 / count(*) AS value \
                  FROM nginx_access GROUP BY ts",
-                "SELECT histogram(_timestamp) AS ts, \
+                "SELECT histogram(_timestamp, '5m') AS ts, \
                  count(*) FILTER (WHERE status >= 500) / count(*) AS value \
                  FROM nginx_access GROUP BY ts",
             ] {
@@ -4941,7 +6222,7 @@ mod tests {
             let to_a_ratio = UpdateAnomalyConfigRequest {
                 query_mode: Some("custom_sql".to_string()),
                 custom_sql: Some(
-                    "SELECT histogram(_timestamp) AS ts, \
+                    "SELECT histogram(_timestamp, '5m') AS ts, \
                      count(CASE WHEN status >= 500 THEN 1 END) / count(*) AS value \
                      FROM nginx_access GROUP BY ts"
                         .to_string(),
@@ -5265,5 +6546,140 @@ mod tests {
             .unwrap();
             assert_eq!(req.alert_budget_per_day, None);
         }
+    }
+
+    /// The whole change rests on this: a value the operator typed is never second-guessed.
+    #[test]
+    fn an_explicit_training_window_is_always_honoured_and_only_an_omitted_one_is_derived() {
+        // A derived value exists for 1h, so a routing bug would return 30, not the explicit value.
+        for explicit in [1_i32, 3, 7, 30, 365, i32::MAX] {
+            assert_eq!(
+                resolved_training_window_days(Some(explicit), "1h", 97.0, 256),
+                explicit,
+                "an explicit {explicit} days must be stored as {explicit}"
+            );
+        }
+        // Non-positive takes update's `.max(1)` rule rather than the derivation.
+        for explicit in [0_i32, -1, i32::MIN] {
+            assert_eq!(
+                resolved_training_window_days(Some(explicit), "1h", 97.0, 256),
+                1,
+                "a non-positive window clamps to 1, never to a derivation"
+            );
+        }
+        // At 1h the derivation must actually move, or every assertion above passes vacuously.
+        assert_eq!(resolved_training_window_days(None, "1h", 97.0, 256), 30);
+    }
+
+    #[test]
+    fn the_derived_training_window_never_narrows_and_only_widens_when_it_buys_something() {
+        // The derivation may only ever widen; a narrowing would silently cut history.
+        for interval in [
+            "1s", "30s", "1m", "5m", "15m", "30m", "1h", "90m", "2h", "6h", "12h", "1d", "202s",
+        ] {
+            for percentile in [50.0, 80.0, 90.0, 97.0, 99.0] {
+                let derived = derived_training_window_days(interval, percentile, 256);
+                assert!(
+                    derived >= 7,
+                    "{interval} at p{percentile} derived {derived}, narrower than the shipped 7"
+                );
+            }
+        }
+        // The floor binds here, so the cadences the ledger measured at are untouched.
+        assert_eq!(derived_training_window_days("1m", 97.0, 256), 7);
+        assert_eq!(derived_training_window_days("5m", 97.0, 256), 7);
+        // Where it widens it must cross the reservoir, or it buys query span for no calibration.
+        for (interval, expected) in [("15m", 11), ("30m", 21), ("1h", 30), ("6h", 7), ("1d", 7)] {
+            assert_eq!(
+                derived_training_window_days(interval, 97.0, 256),
+                expected,
+                "{interval} must derive {expected}"
+            );
+            let derived = derived_training_window_days(interval, 97.0, 256);
+            if derived > 7 {
+                let windows = expected_training_windows(interval, derived, 256)
+                    .expect("a parseable interval has a window count");
+                assert!(
+                    windows >= 256,
+                    "{interval} widened to {derived} days for {windows} windows, still below \
+                     the reservoir — a cost with no benefit"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_starvation_warning_advice_clears_the_bar_in_one_move() {
+        // Sizing the remedy on the bar that trips first left it starved on the percentile's own.
+        let warning = training_window_starvation_warning("1h", 7, 97.0, 256)
+            .expect("7d/1h/p97 is starved at the shipped defaults");
+        assert!(
+            warning.contains("training_window_days to 42"),
+            "the advice must clear every bar at once: {warning}"
+        );
+        assert!(
+            !warning.contains("training_window_days to 11"),
+            "11 days clears only the reservoir: {warning}"
+        );
+        // And following it must genuinely work.
+        let after = expected_training_windows("1h", 42, 256).expect("parseable");
+        assert!(
+            after >= 1000,
+            "42 days at 1h gives {after} windows, short of 1000"
+        );
+
+        // A calibrated config says nothing at all.
+        assert!(
+            training_window_starvation_warning("1m", 7, 97.0, 256).is_none(),
+            "1m/7d/p97 clears both bars and must not be warned about"
+        );
+        // An unparseable interval is the interval rules' business, not this one's.
+        assert!(training_window_starvation_warning("junk", 7, 97.0, 256).is_none());
+    }
+
+    #[test]
+    fn an_unusable_requirement_is_named_as_such_rather_than_printed_as_an_instruction() {
+        // `rcf_tree_size` has no range validation, so garbage must not become confident advice.
+        let absurd = training_window_starvation_warning("1h", 7, 97.0, 2_000_000_000)
+            .expect("an absurd tree size is starved");
+        assert!(
+            !absurd.contains("training_window_days to 83333334"),
+            "a day count nobody can act on must not be printed as advice: {absurd}"
+        );
+        assert!(
+            absurd.contains("cannot calibrate") || absurd.contains("No training window"),
+            "past the advisable bound the message must say so: {absurd}"
+        );
+
+        // A config that can never train at all is a different fault from a thin one.
+        let never = training_window_starvation_warning("30d", 7, 97.0, 256)
+            .expect("a 30d bucket over a 7d window yields nothing");
+        assert!(
+            never.contains("will never train"),
+            "zero training windows is not a degree of thinness: {never}"
+        );
+    }
+
+    #[test]
+    fn the_percentile_ceiling_change_moves_no_finite_value() {
+        // The i32 column truncates, so p99.9 was ALREADY 99; pinned so nobody "fixes" it back.
+        assert_eq!(clamped_threshold(99.9), 99);
+        assert_eq!(clamped_threshold(99.0), 99);
+        assert_eq!(clamped_threshold(97.0), 97);
+        assert_eq!(clamped_threshold(50.0), 50);
+        assert_eq!(clamped_threshold(0.0), 50);
+        assert_eq!(clamped_threshold(1000.0), 99);
+        let mut value = -200.0_f64;
+        while value < 300.0 {
+            assert_eq!(
+                value.clamp(50.0, 99.9) as i32,
+                clamped_threshold(value),
+                "the ceiling change must be a no-op at {value}"
+            );
+            value += 0.01;
+        }
+        // `NaN as i32` saturates to 0, which would have stored percentile 0.
+        assert_eq!(f64::NAN.clamp(50.0, 99.9) as i32, 0);
+        assert_eq!(clamped_threshold(f64::NAN), 97);
     }
 }

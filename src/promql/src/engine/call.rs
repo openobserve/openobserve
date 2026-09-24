@@ -138,16 +138,12 @@ impl Engine {
                 let separator = self
                     .call_string_arg(args, 2, "Invalid separator label found")
                     .await?;
-                let mut source_labels = vec![];
-                for each_src in args.args[3..].iter() {
-                    if let Value::String(label) = self.exec_expr(each_src).await.unwrap() {
-                        source_labels.push(label);
-                    };
-                }
-                if source_labels.is_empty() {
-                    return Err(DataFusionError::NotImplemented(
-                        "source labels can not be empty or invalid".into(),
-                    ));
+                let mut source_labels = Vec::with_capacity(args.len().saturating_sub(3));
+                for index in 3..args.len() {
+                    source_labels.push(
+                        self.call_string_arg(args, index, "Invalid source label found")
+                            .await?,
+                    );
                 }
                 functions::label_join(input, &dst_label, &separator, source_labels)
             }
@@ -395,10 +391,8 @@ mod tests {
             ("3 < vector(5)", 5.0),
             ("3 < bool vector(5)", 1.0),
             ("7 < bool vector(5)", 0.0),
-            // predict_linear is absent deliberately: vector(5) yields one sample per evaluation
-            // timestamp, and one reading is not a trend, so it has no value to preserve here.
-            // Its dispatch is covered in functions::predict_linear.
             ("quantile_over_time(0.5, vector(5)[1m:1s])", 5.0),
+            ("predict_linear(vector(5)[1m:1s], 10)", 5.0),
             (r#"label_join(vector(5), "dst", ",", "src")"#, 5.0),
             (
                 r#"label_replace(vector(5), "dst", "$1", "src", "(.*)")"#,
@@ -519,8 +513,8 @@ mod tests {
                 "Invalid args, expected label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)",
             ),
             (
-                vec!["vector(5)", r#""dst""#, r#"",""#],
-                "source labels can not be empty or invalid",
+                vec!["vector(5)", r#""dst""#, r#"",""#, "5"],
+                "Invalid source label found",
             ),
         ] {
             let args = FunctionArgs {
@@ -534,6 +528,54 @@ mod tests {
                 matches!(result, Err(DataFusionError::NotImplemented(message)) if message == expected)
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_label_join_without_source_labels() {
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        let query = r#"label_join(label_replace(vector(1), "dst", "old", "", ""), "dst", ",")"#;
+        let expr = promql_parser::parser::parse(query).unwrap();
+        let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+            panic!("expected matrix");
+        };
+        assert_eq!(series.len(), 1);
+        assert!(series[0].labels.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_label_replace_copies_value_like_prometheus() {
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        let query = r#"label_replace(label_replace(label_replace(vector(1), "instance", "a", "", ""), "__name__", "mem_usage", "", ""), "host", "$1", "instance", "(.*)")"#;
+        let expr = promql_parser::parser::parse(query).unwrap();
+        let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+            panic!("expected matrix");
+        };
+        assert_eq!(series.len(), 1);
+        let labels: Vec<_> = series[0]
+            .labels
+            .iter()
+            .map(|label| (label.name.as_str(), label.value.as_str()))
+            .collect();
+        assert_eq!(
+            labels,
+            vec![("__name__", "mem_usage"), ("host", "a"), ("instance", "a")]
+        );
     }
 
     #[tokio::test]
@@ -833,17 +875,24 @@ mod tests {
                 (timestamp, timestamp as f64 / 1e6)
             })
             .collect();
-        for query in [
-            "time()",
-            "vector(time())",
-            "max_over_time(vector(time())[10m:1m])",
-        ] {
+        for query in ["time()", "vector(time())"] {
             assert_eq!(
                 step_values(eval_at(query, eval_ctx.clone()).await),
                 expected,
                 "{query}"
             );
         }
+
+        // subquery steps are aligned to multiples of their own step, so the last one is on the
+        // minute
+        let on_the_minute: Vec<_> = expected
+            .iter()
+            .map(|&(timestamp, seconds)| (timestamp, seconds.floor()))
+            .collect();
+        assert_eq!(
+            step_values(eval_at("max_over_time(vector(time())[10m:1m])", eval_ctx).await),
+            on_the_minute
+        );
     }
 
     #[tokio::test]

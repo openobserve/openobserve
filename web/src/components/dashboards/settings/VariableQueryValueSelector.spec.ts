@@ -494,6 +494,44 @@ describe("VariableQueryValueSelector", () => {
       }
     });
 
+    it("should show Select All as checked when every option is ticked by hand", () => {
+      wrapper.vm.selectedValue = ["us-east-1", "us-west-1", "eu-west-1"];
+
+      expect(wrapper.vm.isAllSelected).toBe(true);
+      expect(wrapper.vm.selectedValue).toEqual(["us-east-1", "us-west-1", "eu-west-1"]);
+    });
+
+    it("should uncheck Select All again when one hand-picked option is unticked", () => {
+      wrapper.vm.selectedValue = ["us-east-1", "us-west-1", "eu-west-1"];
+      wrapper.vm.selectedValue = ["us-east-1", "eu-west-1"];
+
+      expect(wrapper.vm.isAllSelected).toBe(false);
+    });
+
+    it("should clear the selection when the hand-checked Select All is toggled", async () => {
+      wrapper.vm.selectedValue = ["us-east-1", "us-west-1", "eu-west-1"];
+
+      await wrapper.vm.toggleSelectAll();
+
+      expect(wrapper.vm.selectedValue).toEqual([]);
+    });
+
+    it("should not treat a hand-picked set as all while options are still loading", () => {
+      wrapper = createWrapper({ variableItem: { ...multiSelectVariableItem, isLoading: true } });
+      wrapper.vm.selectedValue = ["us-east-1", "us-west-1", "eu-west-1"];
+
+      expect(wrapper.vm.isAllSelected).toBe(false);
+    });
+
+    it("should ignore custom-value options when deciding every option is ticked", () => {
+      wrapper = createWrapper({
+        variableItem: { ...multiSelectVariableItem, options: customValueOptions },
+      });
+      wrapper.vm.selectedValue = ["standard"];
+
+      expect(wrapper.vm.isAllSelected).toBe(true);
+    });
+
     it("should handle select all with existing selections", async () => {
       if (wrapper.vm.selectedValue !== undefined) {
         wrapper.vm.selectedValue = ["us-east-1"];
