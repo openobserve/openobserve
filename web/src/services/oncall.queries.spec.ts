@@ -23,6 +23,7 @@ import {
   responsesQuery,
   routingConfigQuery,
   updateOwnershipRuleMutation,
+  updateTeamMutation,
 } from "./oncall.queries";
 import { oncallKeys } from "./oncall.querykeys";
 import oncallService from "./oncall";
@@ -96,6 +97,22 @@ describe("routingConfigQuery", () => {
   it("reads null for an org that never nominated a catch-all", async () => {
     vi.mocked(oncallService.getRoutingConfig).mockResolvedValueOnce({ data: undefined } as any);
     await expect(queryClient.fetchQuery(routingConfigQuery(ORG))).resolves.toBeNull();
+  });
+});
+
+describe("editing a team", () => {
+  /// The name and timezone are echoed by three org-wide answers, so a rename
+  /// or a timezone change has to expire them along with the teams.
+  it("expires the coverage, my-on-call and routing-config answers too", () => {
+    const scopes = updateTeamMutation(ORG, "t1").meta?.invalidates ?? [];
+    for (const key of [
+      oncallKeys.teamsAll(ORG),
+      oncallKeys.coverageGaps(ORG),
+      oncallKeys.myAll(ORG),
+      oncallKeys.routingConfig(ORG),
+    ]) {
+      expect(scopes).toContainEqual(key);
+    }
   });
 });
 

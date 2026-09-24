@@ -429,12 +429,20 @@ export const createTeamMutation = (org: string) =>
     },
   });
 
-/** The timezone moves every resolved shift, not just the header, so the whole team drops. */
+/** The timezone moves every resolved shift, and the name is echoed by the coverage, my-on-call and routing-config answers. */
 export const updateTeamMutation = (org: string, teamId: string) =>
   mutationOptions({
     mutationFn: (data: { name?: string; timezone?: string; description?: string | null }) =>
       oncallService.updateTeam({ org_identifier: org, team_id: teamId, data }),
-    meta: { invalidates: [oncallKeys.teamsAll(org)], silentError: true },
+    meta: {
+      invalidates: [
+        oncallKeys.teamsAll(org),
+        oncallKeys.coverageGaps(org),
+        oncallKeys.myAll(org),
+        oncallKeys.routingConfig(org),
+      ],
+      silentError: true,
+    },
   });
 
 /** The team leaves every scope it appeared in, including another team's routing fallback. */

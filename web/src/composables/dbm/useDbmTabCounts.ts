@@ -706,7 +706,7 @@ export function useDbmTabCounts(): DbmTabCountsSource {
   const publishOwnCount = (key: DbmTabCountKey, value: BadgeCount | undefined): void => {
     if (value === undefined) return;
     // A page's own count describes the scope and window it MEASURED under. The
-    // fetched counts are keyed (`dbmTabCountsKey`); this override was not, so
+    // fetched counts are keyed (`dbMonitoringKeys.badges`); this override was not, so
     // it outlived the question it answered: applying a scope re-fetched the
     // strip correctly, then this stale number was painted back over it. The
     // reported symptom was an Activity badge reading 466 beside a table
