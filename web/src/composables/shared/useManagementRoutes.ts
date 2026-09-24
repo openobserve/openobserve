@@ -240,6 +240,18 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "password_policy",
+          name: "passwordPolicy",
+          component: () => import("@/components/settings/PasswordPolicy.vue"),
+          meta: {
+            keepAlive: true,
+            titleKey: "routeTitles.passwordPolicy",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "correlation/:tab?",
           name: "correlationSettings",
           component: () => import("@/components/settings/CorrelationSettings.vue"),

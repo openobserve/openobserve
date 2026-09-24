@@ -42,6 +42,7 @@ use crate::{
         http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
         otlp::otlp_error_response,
     },
+    request::logs::otlp_utf8::sanitize_invalid_utf8,
     service::{
         ingestion::get_thread_id,
         logs::{self, otlp::handle_request},
@@ -505,18 +506,38 @@ pub async fn otlp_logs_write(
     }
 
     let (request, request_type) = match otlp_request_type_from_content_type(content_type) {
-        Some(OtlpRequestType::HttpProtobuf) => match ExportLogsServiceRequest::decode(body) {
-            Ok(req) => (req, OtlpRequestType::HttpProtobuf),
-            Err(e) => {
-                log::error!("[LOGS:OTLP] Invalid proto: org_id: {org_id} {e}");
-                return otlp_error_response(
-                    OtlpRequestType::HttpProtobuf,
-                    StatusCode::BAD_REQUEST,
-                    3, // INVALID_ARGUMENT
-                    format!("Invalid proto: {e}"),
-                );
+        Some(OtlpRequestType::HttpProtobuf) => {
+            match ExportLogsServiceRequest::decode(body.clone()) {
+                Ok(req) => (req, OtlpRequestType::HttpProtobuf),
+                Err(e) => {
+                    // invalid utf8 in one record must not 400 the whole collector batch
+                    let mut sanitized = body.to_vec();
+                    let replaced = sanitize_invalid_utf8(&mut sanitized);
+                    let retried = if replaced > 0 {
+                        ExportLogsServiceRequest::decode(sanitized.as_slice()).ok()
+                    } else {
+                        None
+                    };
+                    match retried {
+                        Some(req) => {
+                            log::warn!(
+                                "[LOGS:OTLP] replaced {replaced} invalid utf8 bytes: org_id: {org_id} stream: {in_stream_name:?}"
+                            );
+                            (req, OtlpRequestType::HttpProtobuf)
+                        }
+                        None => {
+                            log::error!("[LOGS:OTLP] Invalid proto: org_id: {org_id} {e}");
+                            return otlp_error_response(
+                                OtlpRequestType::HttpProtobuf,
+                                StatusCode::BAD_REQUEST,
+                                3, // INVALID_ARGUMENT
+                                format!("Invalid proto: {e}"),
+                            );
+                        }
+                    }
+                }
             }
-        },
+        }
         Some(OtlpRequestType::HttpJson) => {
             match config::utils::json::from_slice_lenient_floats::<ExportLogsServiceRequest>(
                 body.as_ref(),
