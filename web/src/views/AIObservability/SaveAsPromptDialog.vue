@@ -5,54 +5,70 @@
     size="lg"
     :title="t('aiObservability.promptManagement.saveAsPrompt')"
     :primary-button-label="
-      mode === 'create'
-        ? t('aiObservability.promptManagement.createPrompt')
-        : t('aiObservability.promptManagement.appendVersion')
+      matches.length
+        ? t('aiObservability.promptManagement.saveDuplicate')
+        : values.mode === 'create'
+          ? t('aiObservability.promptManagement.createPrompt')
+          : t('aiObservability.promptManagement.appendVersion')
     "
     :secondary-button-label="t('aiObservability.promptManagement.cancel')"
-    :primary-button-disabled="!canSave"
-    :primary-button-loading="saving"
+    form-id="save-as-prompt-form"
     data-test="save-as-prompt-dialog"
-    @update:open="emit('update:open', $event)"
-    @click:secondary="emit('update:open', false)"
-    @click:primary="save"
+    @update:open="requestClose"
+    @click:secondary="requestClose(false)"
   >
-    <div class="flex flex-col gap-4">
-      <OSelect
-        v-model="mode"
+    <OForm id="save-as-prompt-form" :form="form" class="flex flex-col gap-4">
+      <OFormSelect
+        name="mode"
         :label="t('aiObservability.promptManagement.destination')"
         :options="modeOptions"
-        label-key="label"
-        value-key="value"
         data-test="save-as-prompt-mode"
       />
-      <OInput
-        v-if="mode === 'create'"
-        v-model="name"
+      <OFormInput
+        v-if="values.mode === 'create'"
+        name="name"
         :label="t('aiObservability.promptManagement.immutableName')"
         :placeholder="raw('support-answer')"
+        required
         data-test="save-as-prompt-name"
       />
-      <OSelect
-        v-else
-        v-model="targetId"
-        :label="t('aiObservability.promptManagement.prompt')"
-        :options="promptOptions"
-        label-key="label"
-        value-key="value"
-        searchable
-        :loading="loadingPrompts"
-        data-test="save-as-prompt-target"
-      />
-      <OTextarea
-        v-model="commitMessage"
+      <template v-else>
+        <OEmptyState
+          v-if="promptQuery.isError.value"
+          preset="load-error"
+          size="block"
+          :description="t('aiObservability.promptManagement.loadError')"
+          @action="promptQuery.refetch()"
+        />
+        <OFormSelect
+          name="targetId"
+          :label="t('aiObservability.promptManagement.prompt')"
+          :options="promptOptions"
+          searchable
+          :loading="promptQuery.isFetching.value"
+          required
+          data-test="save-as-prompt-target"
+        />
+        <p
+          v-if="!promptQuery.isPending.value && !promptQuery.isError.value && !promptOptions.length"
+          class="text-text-secondary text-xs"
+        >
+          {{ t("aiObservability.promptManagement.noCompatiblePrompts") }}
+        </p>
+      </template>
+      <OFormTextarea
+        name="commitMessage"
         :label="t('aiObservability.promptManagement.commitMessage')"
         :placeholder="t('aiObservability.promptManagement.explainChanges')"
         :rows="2"
         required
         data-test="save-as-prompt-commit"
       />
-      <div v-if="matches.length" class="rounded-default border-border-default border p-3 text-xs">
+      <div
+        v-if="matches.length"
+        role="status"
+        class="rounded-default border-border-default border p-3 text-xs"
+      >
         <div class="text-text-heading font-semibold">
           {{ t("aiObservability.promptManagement.matchingContentExists") }}
         </div>
@@ -68,18 +84,35 @@
           {{ t("aiObservability.promptManagement.saveAgainToContinue") }}
         </div>
       </div>
-    </div>
+      <p v-if="saveError" role="alert" class="text-status-error-text text-sm">{{ saveError }}</p>
+    </OForm>
   </ODialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { promptErrorText } from "./promptUx";
+import {
+  makeSaveAsPromptSchema,
+  saveAsPromptDefaults,
+  type SaveAsPromptForm,
+} from "./SaveAsPrompt.schema";
+import {
+  llmPromptsQuery,
+  createPromptMutation,
+  createPromptVersionMutation,
+} from "@/services/llm-prompts.service.queries";
 import llmPromptsService, {
   type Prompt,
   type PromptConfig,
@@ -89,6 +122,7 @@ import llmPromptsService, {
 } from "@/services/llm-prompts.service";
 
 const { t } = useI18nTyped();
+const { confirm } = useConfirmDialog();
 const props = withDefaults(
   defineProps<{
     open: boolean;
@@ -101,28 +135,30 @@ const props = withDefaults(
   }>(),
   { type: "chat", source: "ui", folderId: "default" },
 );
-
-const emit = defineEmits<{
-  "update:open": [open: boolean];
-  saved: [prompt: Prompt];
-}>();
-
-const mode = ref<"create" | "append">("create");
-const name = ref("");
-const targetId = ref("");
-const commitMessage = ref("");
-const prompts = ref<Prompt[]>([]);
+const emit = defineEmits<{ "update:open": [open: boolean]; saved: [prompt: Prompt] }>();
+const form = useOForm<SaveAsPromptForm>({
+  defaultValues: saveAsPromptDefaults(),
+  schema: makeSaveAsPromptSchema(t),
+  onSubmit: save,
+});
+const values = form.useStore((state) => state.values);
+const saving = form.useStore((state) => state.isSubmitting);
+const dirty = form.useStore((state) => state.isDirty);
 const matches = ref<PromptMatch[]>([]);
 const confirmedFingerprint = ref("");
-const loadingPrompts = ref(false);
-const saving = ref(false);
-
+const saveError = ref<I18nText>();
+const promptQuery = useQuery(() => ({
+  ...llmPromptsQuery(props.orgId),
+  enabled: props.open && Boolean(props.orgId) && values.value.mode === "append",
+}));
+const createPrompt = useMutation(() => createPromptMutation(props.orgId));
+const createVersion = useMutation(() => createPromptVersionMutation(props.orgId));
 const modeOptions = [
   { label: t("aiObservability.promptManagement.createNewPrompt"), value: "create" },
   { label: t("aiObservability.promptManagement.appendExistingPrompt"), value: "append" },
 ];
 const promptOptions = computed(() =>
-  prompts.value
+  (promptQuery.data.value ?? [])
     .filter((prompt) => prompt.status === "active" && prompt.type === props.type)
     .map((prompt) => ({
       label: raw(`${prompt.name} · v${prompt.latestVersion}`),
@@ -130,115 +166,113 @@ const promptOptions = computed(() =>
     })),
 );
 const fingerprint = computed(() =>
-  JSON.stringify({ type: props.type, payload: props.payload, config: props.config }),
+  JSON.stringify({
+    orgId: props.orgId,
+    type: props.type,
+    payload: props.payload,
+    config: props.config,
+    mode: values.value.mode,
+    name: values.value.name,
+    targetId: values.value.targetId,
+  }),
 );
-const canSave = computed(
-  () =>
-    Boolean(props.orgId) &&
-    Boolean(props.folderId) &&
-    commitMessage.value.trim().length > 0 &&
-    (mode.value === "create" ? /^[a-z0-9_-]+$/.test(name.value) : Boolean(targetId.value)),
-);
+let generation = 0;
 
-async function loadPrompts() {
-  if (!props.open || !props.orgId) return;
-  loadingPrompts.value = true;
-  try {
-    prompts.value = await llmPromptsService.list(props.orgId);
-  } catch (error: unknown) {
-    toast({
-      variant: "error",
-      message: raw(error instanceof Error ? error.message : "Failed to load prompts."),
-    });
-  } finally {
-    loadingPrompts.value = false;
-  }
+async function requestClose(open: boolean) {
+  if (open || saving.value) return;
+  if (
+    dirty.value &&
+    !(await confirm({
+      title: t("aiObservability.promptManagement.discardChangesTitle"),
+      message: t("aiObservability.promptManagement.discardChangesMessage"),
+      confirmLabel: t("aiObservability.promptManagement.discardChanges"),
+    }))
+  )
+    return;
+  emit("update:open", false);
 }
 
-function reset() {
-  mode.value = "create";
-  name.value = "";
-  targetId.value = "";
-  commitMessage.value = "";
-  matches.value = [];
-  confirmedFingerprint.value = "";
-  void loadPrompts();
-}
-
-async function save() {
-  if (!canSave.value) return;
-  saving.value = true;
+async function save(value: SaveAsPromptForm) {
+  const currentGeneration = generation;
+  const orgId = props.orgId;
+  const content = { type: props.type, payload: props.payload, config: props.config };
+  const source = props.source;
+  const folderId = props.folderId;
+  const contentFingerprint = fingerprint.value;
+  saveError.value = undefined;
   try {
-    const discovered = await llmPromptsService.match(props.orgId, {
-      type: props.type,
-      payload: props.payload,
-      config: props.config,
-    });
+    const discovered = await llmPromptsService.match(orgId, content);
+    if (currentGeneration !== generation || contentFingerprint !== fingerprint.value) return;
     matches.value = discovered;
-    if (discovered.length && confirmedFingerprint.value !== fingerprint.value) {
-      confirmedFingerprint.value = fingerprint.value;
-      toast({
-        variant: "warning",
-        message: raw("Matching content exists. Review it, then save again to continue."),
-      });
+    if (discovered.length && confirmedFingerprint.value !== contentFingerprint) {
+      confirmedFingerprint.value = contentFingerprint;
       return;
     }
-
     let saved: Prompt;
-    if (mode.value === "create") {
-      const result = await llmPromptsService.create(
-        props.orgId,
-        {
-          name: name.value.trim(),
-          folderId: props.folderId,
-          type: props.type,
-          payload: props.payload,
-          config: props.config,
-          commitMessage: commitMessage.value.trim(),
-          source: props.source,
+    if (value.mode === "create") {
+      const result = await createPrompt.mutateAsync({
+        input: {
+          ...content,
+          name: value.name.trim(),
+          folderId,
+          commitMessage: value.commitMessage.trim(),
+          source,
         },
-        crypto.randomUUID(),
-      );
+        idempotencyKey: crypto.randomUUID(),
+      });
       saved = result.prompt;
     } else {
-      const target = prompts.value.find((prompt) => prompt.entityId === targetId.value);
-      if (!target) throw new Error("Select an active Prompt.");
-      const base = await llmPromptsService.getVersion(
-        props.orgId,
-        target.entityId,
-        target.latestVersion,
-      );
-      const result = await llmPromptsService.createVersion(
-        props.orgId,
-        target.entityId,
-        {
-          payload: props.payload,
-          config: props.config,
-          commitMessage: commitMessage.value.trim(),
-          source: props.source,
+      // Read the current head before appending so concurrent edits are detected.
+      const target = await llmPromptsService.get(orgId, value.targetId);
+      if (currentGeneration !== generation) return;
+      if (target.status !== "active" || target.type !== content.type)
+        throw new Error(t("aiObservability.promptManagement.selectActivePrompt"));
+      const base = await llmPromptsService.getVersion(orgId, target.entityId, target.latestVersion);
+      if (currentGeneration !== generation) return;
+      const result = await createVersion.mutateAsync({
+        entityId: target.entityId,
+        input: {
+          payload: content.payload,
+          config: content.config,
+          commitMessage: value.commitMessage.trim(),
+          source,
           baseVersion: base.version,
           baseHash: base.contentHash,
         },
-        { ifHead: target.latestVersion, idempotencyKey: crypto.randomUUID() },
-      );
+        ifHead: target.latestVersion,
+        idempotencyKey: crypto.randomUUID(),
+      });
       saved = result.prompt;
     }
+    if (currentGeneration !== generation) return;
     emit("saved", saved);
+    form.reset(saveAsPromptDefaults());
     emit("update:open", false);
-    toast({ variant: "success", message: raw(`${saved.name}@v${saved.latestVersion} saved.`) });
-  } catch (error: unknown) {
     toast({
-      variant: "error",
-      message: raw(error instanceof Error ? error.message : "Failed to save Prompt."),
+      variant: "success",
+      message: t("aiObservability.promptManagement.savedPromptVersion", {
+        name: saved.name,
+        version: saved.latestVersion,
+      }),
     });
-  } finally {
-    saving.value = false;
+  } catch (error: unknown) {
+    if (currentGeneration === generation)
+      saveError.value = promptErrorText(error, t("aiObservability.promptManagement.saveError"));
   }
 }
-
+watch(fingerprint, () => {
+  matches.value = [];
+  confirmedFingerprint.value = "";
+});
 watch(
-  () => props.open,
-  (open) => open && reset(),
+  () => [props.open, props.orgId, props.type],
+  () => {
+    generation++;
+    form.reset(saveAsPromptDefaults());
+    matches.value = [];
+    confirmedFingerprint.value = "";
+    saveError.value = undefined;
+  },
   { immediate: true },
 );
 </script>

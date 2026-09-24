@@ -4,48 +4,63 @@
     :open="open"
     size="lg"
     :title="t('aiObservability.promptManagement.promptSettings')"
-    :primary-button-label="t('aiObservability.promptManagement.saveSettings')"
+    :primary-button-label="ready ? t('aiObservability.promptManagement.saveSettings') : undefined"
     :secondary-button-label="t('aiObservability.promptManagement.cancel')"
-    :primary-button-loading="saving"
-    :primary-button-disabled="!canSave"
+    form-id="prompt-settings-form"
     data-test="prompt-settings-dialog"
-    @update:open="emit('update:open', $event)"
-    @click:secondary="emit('update:open', false)"
-    @click:primary="save"
+    @update:open="requestClose"
+    @click:secondary="requestClose(false)"
   >
-    <div class="flex flex-col gap-4">
-      <OInput
-        v-model="protectedLabelsText"
+    <div v-if="loading" role="status" class="flex flex-col gap-4">
+      <span class="text-text-secondary text-sm">{{
+        t("aiObservability.promptManagement.settingsLoading")
+      }}</span>
+      <OSkeleton class="h-12" /><OSkeleton class="h-24" />
+    </div>
+    <OEmptyState
+      v-else-if="loadError"
+      preset="load-error"
+      size="block"
+      :description="loadError"
+      @action="load"
+    />
+    <OForm v-else-if="ready" id="prompt-settings-form" :form="form" class="flex flex-col gap-5">
+      <OFormSelect
+        name="protectedLabels"
         :label="t('aiObservability.promptManagement.protectedLabels')"
         :help-text="t('aiObservability.promptManagement.protectedLabelsHelp')"
-        :placeholder="raw('production')"
+        :options="protectedLabelOptions"
+        multiple
+        searchable
+        creatable
+        data-test="prompt-settings-protected-labels"
+        @create="addProtectedLabel"
       />
-
       <section class="rounded-default border-border-default flex flex-col gap-3 border p-3">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-3">
           <h4 class="text-text-heading m-0 text-sm font-semibold">
             {{ t("aiObservability.promptManagement.webhook") }}
           </h4>
-          <OSwitch
-            v-model="webhookEnabled"
+          <OFormSwitch
+            name="webhookEnabled"
             :label="t('aiObservability.promptManagement.enabled')"
+            data-test="prompt-settings-webhook-enabled"
           />
         </div>
-        <template v-if="webhookEnabled">
-          <OInput
-            v-model="endpoint"
+        <template v-if="values.webhookEnabled">
+          <OFormInput
+            name="endpoint"
             :label="t('aiObservability.promptManagement.endpoint')"
-            type="url"
             :placeholder="raw('https://example.com/openobserve/prompts')"
+            required
             data-test="prompt-settings-webhook-endpoint"
           />
-          <OSelect
-            v-model="events"
+          <OFormSelect
+            name="events"
             :label="t('aiObservability.promptManagement.subscriptions')"
             :options="eventOptions"
-            label-key="label"
-            value-key="value"
             multiple
+            required
             data-test="prompt-settings-webhook-events"
           />
           <div
@@ -56,7 +71,7 @@
               <div class="text-text-heading text-xs font-semibold">
                 {{ t("aiObservability.promptManagement.signingSecret") }}
               </div>
-              <div class="text-text-secondary text-2xs">
+              <div class="text-text-secondary text-xs">
                 {{
                   secretConfigured
                     ? t("aiObservability.promptManagement.secretConfigured")
@@ -65,8 +80,8 @@
               </div>
             </div>
           </div>
-          <OInput
-            v-model="secret"
+          <OFormInput
+            name="secret"
             type="password"
             :label="t('aiObservability.promptManagement.rotateSigningSecret')"
             :help-text="t('aiObservability.promptManagement.rotateSigningSecretHelp')"
@@ -75,118 +90,179 @@
           />
         </template>
       </section>
-    </div>
+      <p
+        v-if="saveError"
+        role="alert"
+        class="text-status-error-text text-sm"
+        data-test="prompt-settings-save-error"
+      >
+        {{ saveError }}
+      </p>
+    </OForm>
   </ODialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useMutation } from "@tanstack/vue-query";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { promptErrorText } from "./promptUx";
+import { isPromptLabelName } from "./PromptLabel.schema";
+import {
+  makePromptSettingsSchema,
+  promptSettingsDefaults,
+  type PromptSettingsForm,
+} from "./PromptSettings.schema";
+import {
+  updatePromptSettingsMutation,
+  rotatePromptSecretMutation,
+} from "@/services/llm-prompts.service.queries";
 import llmPromptsService, {
   type PromptSettings,
   type PromptWebhookEvent,
 } from "@/services/llm-prompts.service";
 
 const { t } = useI18nTyped();
+const { confirm } = useConfirmDialog();
 const props = defineProps<{ open: boolean; orgId: string }>();
-const emit = defineEmits<{
-  "update:open": [open: boolean];
-  updated: [settings: PromptSettings];
-}>();
-
-const protectedLabelsText = ref("production");
-const webhookEnabled = ref(false);
-const endpoint = ref("");
-const events = ref<PromptWebhookEvent[]>([]);
-const secret = ref("");
+const emit = defineEmits<{ "update:open": [open: boolean]; updated: [settings: PromptSettings] }>();
+const form = useOForm<PromptSettingsForm>({
+  defaultValues: promptSettingsDefaults(),
+  schema: makePromptSettingsSchema(t),
+  onSubmit: save,
+});
+const values = form.useStore((state) => state.values);
+const saving = form.useStore((state) => state.isSubmitting);
+const dirty = form.useStore((state) => state.isDirty);
+const loading = ref(false);
+const ready = ref(false);
+const loadError = ref<I18nText>();
+const saveError = ref<I18nText>();
 const secretConfigured = ref(false);
-const saving = ref(false);
-const eventOptions: Array<{ label: ReturnType<typeof t>; value: PromptWebhookEvent }> = [
+const updateSettings = useMutation(() => updatePromptSettingsMutation(props.orgId));
+const rotateSecret = useMutation(() => rotatePromptSecretMutation(props.orgId));
+let loadGeneration = 0;
+const protectedLabelOptions = computed(() =>
+  [...new Set(["production", "staging", ...values.value.protectedLabels])].map((value) => ({
+    label: raw(value),
+    value,
+  })),
+);
+const eventOptions: Array<{ label: I18nText; value: PromptWebhookEvent }> = [
   {
     label: t("aiObservability.promptManagement.webhookEvent.versionCreated"),
     value: "version_created",
   },
-  {
-    label: t("aiObservability.promptManagement.webhookEvent.labelMoved"),
-    value: "label_moved",
-  },
+  { label: t("aiObservability.promptManagement.webhookEvent.labelMoved"), value: "label_moved" },
   {
     label: t("aiObservability.promptManagement.webhookEvent.labelDeleted"),
     value: "label_deleted",
   },
-  {
-    label: t("aiObservability.promptManagement.webhookEvent.promptArchived"),
-    value: "archived",
-  },
+  { label: t("aiObservability.promptManagement.webhookEvent.promptArchived"), value: "archived" },
 ];
-const canSave = computed(() => {
-  if (!webhookEnabled.value) return true;
-  if (!events.value.length) return false;
-  try {
-    const url = new URL(endpoint.value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
+
+function addProtectedLabel(value: string) {
+  const name = value.trim();
+  if (name === "latest" || !isPromptLabelName(name)) {
+    toast({
+      variant: "error",
+      message: t("aiObservability.promptManagement.protectedLabelsInvalid"),
+    });
+    return;
   }
-});
+  form.setFieldValue("protectedLabels", [...new Set([...values.value.protectedLabels, name])]);
+}
 
 async function load() {
-  if (!props.open) return;
+  const generation = ++loadGeneration;
+  ready.value = false;
+  saveError.value = undefined;
+  loadError.value = undefined;
+  form.reset(promptSettingsDefaults());
+  if (!props.open || !props.orgId) {
+    loading.value = false;
+    return;
+  }
+  loading.value = true;
   try {
+    // This read-modify-write form must start from the current server settings.
     const settings = await llmPromptsService.getSettings(props.orgId);
-    protectedLabelsText.value = settings.protectedLabels.join(", ");
-    webhookEnabled.value = Boolean(settings.webhook);
-    endpoint.value = settings.webhook?.endpoint ?? "";
-    events.value = settings.webhook?.events ?? [];
-    secretConfigured.value = settings.webhook?.secretConfigured ?? false;
-    secret.value = "";
+    if (generation !== loadGeneration) return;
+    form.reset(promptSettingsDefaults(settings));
+    secretConfigured.value = Boolean(settings.webhook?.secretConfigured);
+    ready.value = true;
   } catch (error: unknown) {
-    toast({
-      variant: "error",
-      message: raw(error instanceof Error ? error.message : "Failed to load settings."),
-    });
-  }
-}
-
-async function save() {
-  saving.value = true;
-  try {
-    const settings = await llmPromptsService.updateSettings(props.orgId, {
-      protectedLabels: protectedLabelsText.value
-        .split(",")
-        .map((label) => label.trim())
-        .filter(Boolean),
-      webhook: webhookEnabled.value
-        ? { endpoint: endpoint.value.trim(), events: events.value }
-        : null,
-    });
-    if (webhookEnabled.value && secret.value) {
-      const rotated = await llmPromptsService.rotateSecret(props.orgId, secret.value);
-      secretConfigured.value = rotated.secretConfigured;
-    }
-    emit("updated", {
-      ...settings,
-      webhook: settings.webhook
-        ? { ...settings.webhook, secretConfigured: secretConfigured.value }
-        : null,
-    });
-    emit("update:open", false);
-    toast({ variant: "success", message: raw("Prompt settings saved.") });
-  } catch (error: unknown) {
-    toast({
-      variant: "error",
-      message: raw(error instanceof Error ? error.message : "Failed to save settings."),
-    });
+    if (generation === loadGeneration)
+      loadError.value = promptErrorText(
+        error,
+        t("aiObservability.promptManagement.settingsLoadError"),
+      );
   } finally {
-    saving.value = false;
+    if (generation === loadGeneration) loading.value = false;
   }
 }
 
-watch(() => props.open, load, { immediate: true });
+async function requestClose(open: boolean) {
+  if (open || saving.value) return;
+  if (
+    ready.value &&
+    dirty.value &&
+    !(await confirm({
+      title: t("aiObservability.promptManagement.discardChangesTitle"),
+      message: t("aiObservability.promptManagement.discardChangesMessage"),
+      confirmLabel: t("aiObservability.promptManagement.discardChanges"),
+    }))
+  )
+    return;
+  emit("update:open", false);
+}
+
+async function save(value: PromptSettingsForm) {
+  if (!ready.value) return;
+  const orgId = props.orgId;
+  saveError.value = undefined;
+  let saved: PromptSettings | undefined;
+  try {
+    saved = await updateSettings.mutateAsync({
+      protectedLabels: value.protectedLabels.map((label) => label.trim()),
+      webhook: value.webhookEnabled
+        ? { endpoint: value.endpoint.trim(), events: value.events }
+        : null,
+    });
+    if (props.orgId !== orgId) return;
+    emit("updated", saved);
+    if (value.webhookEnabled && value.secret) {
+      const rotated = await rotateSecret.mutateAsync(value.secret);
+      if (props.orgId !== orgId) return;
+      secretConfigured.value = rotated.secretConfigured;
+      if (saved.webhook)
+        saved = {
+          ...saved,
+          webhook: { ...saved.webhook, secretConfigured: rotated.secretConfigured },
+        };
+      emit("updated", saved);
+    }
+    form.reset(promptSettingsDefaults(saved));
+    emit("update:open", false);
+    toast({ variant: "success", message: t("aiObservability.promptManagement.settingsSaved") });
+  } catch (error: unknown) {
+    if (props.orgId !== orgId) return;
+    saveError.value = saved
+      ? t("aiObservability.promptManagement.secretSavePartial")
+      : promptErrorText(error, t("aiObservability.promptManagement.settingsSaveError"));
+  }
+}
+
+watch(() => [props.open, props.orgId], load, { immediate: true });
 </script>

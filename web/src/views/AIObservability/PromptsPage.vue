@@ -9,7 +9,7 @@
     :main-panel="false"
     data-test="prompts-page"
   >
-    <template #actions>
+    <template #actions-overflow>
       <OButton
         v-if="canManageSettings"
         variant="outline"
@@ -19,6 +19,8 @@
         @click="settingsOpen = true"
         >{{ t("aiObservability.promptManagement.settings") }}</OButton
       >
+    </template>
+    <template #actions>
       <OButton variant="primary" size="sm" data-test="prompt-new" @click="openCreate">
         {{ t("aiObservability.promptManagement.newPrompt") }}
       </OButton>
@@ -36,7 +38,9 @@
           :data="filteredPrompts"
           :columns="columns"
           row-key="entityId"
-          :loading="loading"
+          :loading="promptQuery.isPending.value"
+          :error="listError"
+          :forbidden="errorStatus(promptQuery.error.value) === 403"
           :frame="false"
           :default-columns="false"
           :show-global-filter="false"
@@ -47,7 +51,7 @@
           table-id="ai-prompt-list"
           :footer-title="t('aiObservability.nav.prompts')"
           data-test="prompt-table"
-          @row-click="openDetail"
+          @row-click="(row) => openDetail(row)"
         >
           <template #toolbar>
             <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -65,16 +69,30 @@
                 :options="statusOptions"
                 label-key="label"
                 value-key="value"
-                class="w-36"
+                width="xs"
                 data-test="prompt-status-filter"
               />
-              <OInput
+              <OSelect
                 v-model="tagFilter"
-                class="w-40"
-                :placeholder="t('aiObservability.promptManagement.filterTag')"
+                :options="tagOptions"
+                :placeholder="t('aiObservability.promptManagement.allTags')"
+                :aria-label="t('aiObservability.promptManagement.tags')"
+                width="sm"
+                searchable
                 clearable
+                data-test="prompt-tag-filter"
               />
-              <OToggleGroup v-model="folderScope" type="single">
+              <OSelect
+                v-model="labelFilter"
+                :options="labelOptions"
+                :placeholder="t('aiObservability.promptManagement.allLabels')"
+                :aria-label="t('aiObservability.promptManagement.labels')"
+                width="sm"
+                searchable
+                clearable
+                data-test="prompt-label-filter"
+              />
+              <OToggleGroup v-model="folderScope" type="single" mobile-dropdown>
                 <OToggleGroupItem value="current" size="xs">{{
                   t("aiObservability.promptManagement.thisFolder")
                 }}</OToggleGroupItem>
@@ -85,19 +103,42 @@
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
-              :title="t('aiObservability.promptManagement.refreshPrompts')"
-              @click="loadPrompts"
+            <ORefreshButton
+              :loading="refreshing || promptQuery.isFetching.value"
+              :last-run-at="promptQuery.dataUpdatedAt.value"
+              data-test="prompt-refresh"
+              @click="refresh"
             />
           </template>
 
+          <template #error="{ message }">
+            <OEmptyState preset="load-error" :description="raw(message)" @action="refresh" />
+          </template>
+          <template #empty>
+            <OEmptyState
+              :title="
+                hasFilters
+                  ? t('aiObservability.promptManagement.noMatchingPrompts')
+                  : t('aiObservability.promptManagement.noPrompts')
+              "
+              :description="
+                hasFilters
+                  ? t('aiObservability.promptManagement.noMatchingPromptsHelp')
+                  : t('aiObservability.promptManagement.noPromptsHelp')
+              "
+              :action-label="
+                hasFilters
+                  ? t('aiObservability.promptManagement.clearFilters')
+                  : t('aiObservability.promptManagement.newPrompt')
+              "
+              @action="hasFilters ? clearFilters() : openCreate()"
+            />
+          </template>
           <template #cell-name="{ row }">
             <div class="flex min-w-0 flex-col">
-              <span class="text-text-heading truncate font-medium">{{ row.name }}</span>
+              <OButton variant="ghost" size="xs" @click.stop="openDetail(row)">{{
+                row.name
+              }}</OButton>
               <span v-if="row.description" class="text-text-secondary text-2xs truncate">{{
                 row.description
               }}</span>
@@ -112,7 +153,7 @@
             </div>
           </template>
           <template #cell-labels="{ row }">
-            <div class="flex flex-wrap gap-1">
+            <div class="flex flex-wrap items-center gap-1">
               <OTag
                 v-for="label in activeLabels(row)"
                 :key="label.name"
@@ -127,6 +168,14 @@
                   })
                 }}
               </OTag>
+              <OButton
+                variant="ghost"
+                size="icon-xs"
+                icon-left="edit"
+                :title="t('aiObservability.promptManagement.manageLabels')"
+                data-test="prompt-row-manage-labels"
+                @click.stop="openDetail(row, 'labels')"
+              />
             </div>
           </template>
           <template #cell-latestVersion="{ row }">
@@ -136,7 +185,7 @@
           </template>
           <template #cell-status="{ row }">
             <OTag :variant="row.status === 'active' ? 'success-soft' : 'default-soft'">{{
-              row.status
+              statusLabel(row.status)
             }}</OTag>
           </template>
           <template #cell-updatedAt="{ row }">
@@ -149,10 +198,10 @@
                   variant="ghost"
                   size="icon-xs"
                   icon-left="more-vert"
-                  :title="raw('Prompt actions')"
+                  :title="t('aiObservability.promptManagement.promptActions')"
                 />
               </template>
-              <ODropdownItem @select="openEdit(row)">{{
+              <ODropdownItem v-if="row.status === 'active'" @select="openEdit(row)">{{
                 t("aiObservability.promptManagement.createNewVersion")
               }}</ODropdownItem>
               <ODropdownItem @select="openMove(row)">{{
@@ -172,6 +221,7 @@
       :org-id="orgId"
       :prompt="selectedPrompt"
       :initial-version="routeVersion"
+      :initial-tab="detailTab"
       :protected-labels="protectedLabels"
       @update:open="closeDetail"
       @updated="replacePrompt"
@@ -205,7 +255,7 @@
       :open="settingsOpen"
       :org-id="orgId"
       @update:open="settingsOpen = $event"
-      @updated="protectedLabels = $event.protectedLabels"
+      @updated="updateCachedSettings"
     />
 
     <ODialog
@@ -214,6 +264,7 @@
       :primary-button-label="t('aiObservability.promptManagement.move')"
       :secondary-button-label="t('aiObservability.promptManagement.cancel')"
       :primary-button-disabled="!moveDestination || moveDestination === movingPrompt?.folderId"
+      :primary-button-loading="updateMutation.isPending.value"
       @update:open="moveOpen = $event"
       @click:secondary="moveOpen = false"
       @click:primary="movePrompt"
@@ -236,12 +287,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import {
+  llmPromptsQuery,
+  promptSettingsQuery,
+  updatePromptMutation,
+  archivePromptMutation,
+} from "@/services/llm-prompts.service.queries";
+import { llmPromptKeys } from "@/services/llm-prompts.service.querykeys";
+import { folderKeys } from "@/services/common.querykeys";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -262,6 +324,7 @@ import { getFoldersListByType } from "@/utils/commons";
 import llmPromptsService, {
   type Prompt,
   type PromptLabel,
+  type PromptSettings,
   type PromptVersion,
 } from "@/services/llm-prompts.service";
 import { aiPromptsRoute } from "./promptRoutes";
@@ -277,12 +340,14 @@ const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
 const route = useRoute();
 const router = useRouter();
-const prompts = ref<Prompt[]>([]);
-const loading = ref(false);
+const queryClient = useQueryClient();
+const refreshing = ref(false);
 const activeFolderId = ref(String(route.query.folder ?? "default"));
 const folderScope = ref<"current" | "all">("current");
 const search = ref("");
-const tagFilter = ref("");
+const tagFilter = ref<string | null>(null);
+const labelFilter = ref<string | null>(null);
+const detailTab = ref("configuration");
 const statusFilter = ref<"active" | "archived" | "all">("active");
 const selectedPrompt = ref<Prompt | null>(null);
 const drawerOpen = ref(false);
@@ -290,7 +355,6 @@ const editorOpen = ref(false);
 const editingPrompt = ref<Prompt | null>(null);
 const editingVersion = ref<PromptVersion | null>(null);
 const settingsOpen = ref(false);
-const protectedLabels = ref<string[]>(["production"]);
 const moveOpen = ref(false);
 const movingPrompt = ref<Prompt | null>(null);
 const moveDestination = ref("");
@@ -298,6 +362,23 @@ const moveDestination = ref("");
 const orgId = computed(() =>
   String(store.state.selectedOrganization?.identifier ?? route.query.org_identifier ?? ""),
 );
+const promptQuery = useQuery(() => ({
+  ...llmPromptsQuery(orgId.value),
+  enabled: Boolean(orgId.value),
+}));
+const settingsQuery = useQuery(() => ({
+  ...promptSettingsQuery(orgId.value),
+  enabled: Boolean(orgId.value),
+}));
+const prompts = computed(() => promptQuery.data.value ?? []);
+const protectedLabels = computed(() => settingsQuery.data.value?.protectedLabels ?? ["production"]);
+const listError = computed(() =>
+  promptQuery.isError.value
+    ? errorText(promptQuery.error.value, t("aiObservability.promptManagement.loadError"))
+    : null,
+);
+const updateMutation = useMutation(() => updatePromptMutation(orgId.value));
+const archiveMutation = useMutation(() => archivePromptMutation(orgId.value));
 const routeVersion = computed(() => {
   const parsed = Number(route.query.version);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -309,25 +390,55 @@ const canManageSettings = computed(() => {
 });
 const filteredPrompts = computed(() => {
   const needle = search.value.trim().toLowerCase();
-  const tag = tagFilter.value.trim().toLowerCase();
+  const tag = tagFilter.value?.toLowerCase();
   return prompts.value.filter((prompt) => {
     if (folderScope.value === "current" && prompt.folderId !== activeFolderId.value) return false;
     if (statusFilter.value !== "all" && prompt.status !== statusFilter.value) return false;
     if (
       needle &&
       !prompt.name.toLowerCase().includes(needle) &&
+      !prompt.description?.toLowerCase().includes(needle) &&
+      !activeLabels(prompt).some((label) => label.name.toLowerCase().includes(needle)) &&
       !prompt.tags.some((value) => value.toLowerCase().includes(needle))
+    )
+      return false;
+    if (
+      labelFilter.value &&
+      !activeLabels(prompt).some((label) => label.name === labelFilter.value)
     )
       return false;
     return !tag || prompt.tags.some((value) => value.toLowerCase() === tag);
   });
 });
 
+const tagOptions = computed(() =>
+  [...new Set(prompts.value.flatMap((prompt) => prompt.tags))]
+    .sort()
+    .map((value) => ({ label: raw(value), value })),
+);
+const labelOptions = computed(() =>
+  [...new Set(prompts.value.flatMap((prompt) => activeLabels(prompt).map((label) => label.name)))]
+    .sort()
+    .map((value) => ({ label: raw(value), value })),
+);
+const hasFilters = computed(() =>
+  Boolean(search.value || tagFilter.value || labelFilter.value || statusFilter.value !== "active"),
+);
+function clearFilters() {
+  search.value = "";
+  tagFilter.value = null;
+  labelFilter.value = null;
+  statusFilter.value = "active";
+}
 const statusOptions = computed(() => [
   { label: t("aiObservability.promptManagement.active"), value: "active" },
   { label: t("aiObservability.promptManagement.archived"), value: "archived" },
   { label: t("aiObservability.promptManagement.allStatuses"), value: "all" },
 ]);
+const statusLabel = (status: Prompt["status"]) =>
+  status === "active"
+    ? t("aiObservability.promptManagement.active")
+    : t("aiObservability.promptManagement.archived");
 const columns: OTableColumnDef[] = [
   {
     id: "name",
@@ -335,27 +446,40 @@ const columns: OTableColumnDef[] = [
     accessorKey: "name",
     sortable: true,
   },
-  { id: "tags", header: t("aiObservability.promptManagement.tags"), accessorKey: "tags" },
-  { id: "labels", header: t("aiObservability.promptManagement.labels"), accessorKey: "labels" },
+  {
+    id: "tags",
+    hideable: true,
+    header: t("aiObservability.promptManagement.tags"),
+    accessorKey: "tags",
+  },
+  {
+    id: "labels",
+    hideable: true,
+    header: t("aiObservability.promptManagement.labels"),
+    accessorKey: "labels",
+  },
   {
     id: "latestVersion",
+    hideable: true,
     header: t("aiObservability.promptManagement.latest"),
     accessorKey: "latestVersion",
     sortable: true,
   },
   {
     id: "status",
+    hideable: true,
     header: t("aiObservability.promptManagement.status"),
     accessorKey: "status",
     sortable: true,
   },
   {
     id: "updatedAt",
+    hideable: true,
     header: t("aiObservability.promptManagement.updated"),
     accessorKey: "updatedAt",
     sortable: true,
   },
-  { id: "actions", header: raw(""), accessorKey: "entityId", size: 48 },
+  { id: "actions", isAction: true, header: raw(""), accessorKey: "entityId", size: 48 },
 ];
 
 function activeLabels(prompt: Prompt): PromptLabel[] {
@@ -386,42 +510,64 @@ function errorText(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-async function loadPrompts() {
-  if (!orgId.value) return;
-  loading.value = true;
+async function refresh() {
+  refreshing.value = true;
   try {
-    prompts.value = await llmPromptsService.list(orgId.value, { includeArchived: true });
-    const selected = String(route.query.selected ?? "");
-    if (selected) {
-      selectedPrompt.value = prompts.value.find((prompt) => prompt.entityId === selected) ?? null;
-      if (!selectedPrompt.value)
-        selectedPrompt.value = await llmPromptsService.get(orgId.value, selected);
-      drawerOpen.value = true;
-    }
+    await queryClient.invalidateQueries({ queryKey: folderKeys.list(orgId.value, "prompts") });
+    await Promise.all([
+      promptQuery.refetch(),
+      settingsQuery.refetch(),
+      getFoldersListByType(store, "prompts"),
+    ]);
   } catch (error: unknown) {
     toast({
       variant: "error",
       message: raw(errorText(error, t("aiObservability.promptManagement.loadError"))),
     });
   } finally {
-    loading.value = false;
+    refreshing.value = false;
   }
 }
 
-async function loadSettings() {
+function updateCachedSettings(settings: PromptSettings) {
+  queryClient.setQueryData(llmPromptKeys.settings(orgId.value), settings);
+}
+
+let selectionGeneration = 0;
+async function syncSelection() {
+  const generation = ++selectionGeneration;
+  const selected = String(route.query.selected ?? "");
+  if (!selected) {
+    selectedPrompt.value = null;
+    drawerOpen.value = false;
+    return;
+  }
+  const cached = prompts.value.find((prompt) => prompt.entityId === selected);
+  if (cached) {
+    selectedPrompt.value = cached;
+    drawerOpen.value = true;
+    return;
+  }
+  if (promptQuery.isPending.value) return;
   try {
-    protectedLabels.value = (await llmPromptsService.getSettings(orgId.value)).protectedLabels;
+    // A deep link can point to a prompt missing from the cached list.
+    const prompt = await llmPromptsService.get(orgId.value, selected);
+    if (generation !== selectionGeneration) return;
+    selectedPrompt.value = prompt;
+    drawerOpen.value = true;
   } catch (error: unknown) {
-    if (errorStatus(error) !== 403) {
-      toast({
-        variant: "error",
-        message: raw(errorText(error, t("aiObservability.promptManagement.settingsLoadError"))),
-      });
-    }
+    if (generation !== selectionGeneration) return;
+    selectedPrompt.value = null;
+    drawerOpen.value = false;
+    toast({
+      variant: "error",
+      message: raw(errorText(error, t("aiObservability.promptManagement.loadError"))),
+    });
   }
 }
 
 function selectFolder(folderId: string) {
+  if (activeFolderId.value === (folderId || "default")) return;
   activeFolderId.value = folderId || "default";
   router.replace(
     aiPromptsRoute(orgId.value, {
@@ -435,7 +581,8 @@ function selectFolder(folderId: string) {
   );
 }
 
-function openDetail(prompt: Prompt) {
+function openDetail(prompt: Prompt, tab = "configuration") {
+  detailTab.value = tab;
   selectedPrompt.value = prompt;
   drawerOpen.value = true;
   router.replace(
@@ -465,13 +612,16 @@ function openCreate() {
 }
 
 async function openEdit(prompt: Prompt) {
+  const requestedOrg = orgId.value;
   try {
     editingPrompt.value = prompt;
-    editingVersion.value = await llmPromptsService.getVersion(
-      orgId.value,
+    const version = await llmPromptsService.getVersion(
+      requestedOrg,
       prompt.entityId,
       prompt.latestVersion,
     );
+    if (requestedOrg !== orgId.value || editingPrompt.value?.entityId !== prompt.entityId) return;
+    editingVersion.value = version;
     editorOpen.value = true;
   } catch (error: unknown) {
     toast({
@@ -495,9 +645,11 @@ function afterSave(prompt: Prompt) {
 }
 
 function replacePrompt(prompt: Prompt) {
-  const index = prompts.value.findIndex((entry) => entry.entityId === prompt.entityId);
-  if (index < 0) prompts.value.unshift(prompt);
-  else prompts.value.splice(index, 1, prompt);
+  queryClient.setQueryData<Prompt[]>(llmPromptKeys.list(orgId.value), (entries = []) =>
+    entries.some((entry) => entry.entityId === prompt.entityId)
+      ? entries.map((entry) => (entry.entityId === prompt.entityId ? prompt : entry))
+      : [prompt, ...entries],
+  );
   if (selectedPrompt.value?.entityId === prompt.entityId) selectedPrompt.value = prompt;
 }
 
@@ -508,12 +660,15 @@ function openMove(prompt: Prompt) {
 }
 
 async function movePrompt() {
-  if (!movingPrompt.value || !moveDestination.value) return;
+  if (!movingPrompt.value || !moveDestination.value || updateMutation.isPending.value) return;
   const versionCount = movingPrompt.value.latestVersion;
+  const requestedOrg = orgId.value;
   try {
-    const updated = await llmPromptsService.update(orgId.value, movingPrompt.value.entityId, {
-      folderId: moveDestination.value,
+    const updated = await updateMutation.mutateAsync({
+      entityId: movingPrompt.value.entityId,
+      input: { folderId: moveDestination.value },
     });
+    if (requestedOrg !== orgId.value) return;
     replacePrompt(updated);
     moveOpen.value = false;
     toast({
@@ -529,6 +684,7 @@ async function movePrompt() {
 }
 
 async function archive(prompt: Prompt) {
+  const requestedOrg = orgId.value;
   if (
     !(await confirm({
       title: t("aiObservability.promptManagement.archivePrompt"),
@@ -539,8 +695,10 @@ async function archive(prompt: Prompt) {
     }))
   )
     return;
+  if (requestedOrg !== orgId.value) return;
   try {
-    const updated = await llmPromptsService.archive(orgId.value, prompt.entityId);
+    const updated = await archiveMutation.mutateAsync(prompt.entityId);
+    if (requestedOrg !== orgId.value) return;
     replacePrompt(updated);
     toast({ variant: "success", message: t("aiObservability.promptManagement.archiveSuccess") });
   } catch (error: unknown) {
@@ -577,10 +735,29 @@ function openPlayground(version: PromptVersion, draftName = "") {
   router.push({ name: "aiPlayground", query: { org_identifier: orgId.value, from: "prompt" } });
 }
 
-onMounted(async () => {
-  await getFoldersListByType(store, "prompts").catch(() => null);
-  await Promise.all([loadPrompts(), loadSettings()]);
-});
-watch(orgId, loadPrompts);
-watch(() => route.query.selected, loadPrompts);
+watch(
+  orgId,
+  () => {
+    selectionGeneration++;
+    selectedPrompt.value = null;
+    drawerOpen.value = false;
+    editorOpen.value = false;
+    moveOpen.value = false;
+    settingsOpen.value = false;
+    clearFilters();
+    void getFoldersListByType(store, "prompts").catch(() => null);
+  },
+  { immediate: true },
+);
+watch([() => route.query.selected, prompts], syncSelection, { immediate: true });
+watch(
+  () => settingsQuery.error.value,
+  (error) => {
+    if (error && errorStatus(error) !== 403)
+      toast({
+        variant: "error",
+        message: raw(errorText(error, t("aiObservability.promptManagement.settingsLoadError"))),
+      });
+  },
+);
 </script>

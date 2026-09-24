@@ -25,6 +25,9 @@ class PromptDefaultFolderTests(unittest.TestCase):
         self.org_id = body["identifier"]
         self.prompts = f"/api/{self.org_id}/prompts"
         self.folders = f"/api/v2/{self.org_id}/folders/prompts"
+        status, _ = self.request("GET", self.prompts)
+        if status == 404:
+            self.skipTest("Prompt API requires an enterprise build")
 
     def tearDown(self):
         for entity_id in self.prompt_ids:
