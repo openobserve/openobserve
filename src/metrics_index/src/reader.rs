@@ -25,7 +25,12 @@ use datafusion::{
     physical_plan::PhysicalExpr,
 };
 
-use crate::layout::METRICS_INDEX_ROW_COUNT;
+use crate::{
+    layout::METRICS_INDEX_ROW_COUNT,
+    parsed_cache::{
+        CacheKey, CachedIndex, INDEX_CACHE, ParentIdentity, SidecarBinding, cache_limit,
+    },
+};
 
 /// Label and directory regions up to this total are fetched in one read instead of per column.
 /// 1 MiB is object_store's coalescing gap: below it, one more request costs more than the bytes.
@@ -67,20 +72,52 @@ impl Tail {
 
 pub(super) async fn load_metrics_index_file(
     account: &str,
+    data_path: &str,
     path: &str,
     format: config::FileFormat,
-    parent_rows: usize,
-    parent_size: i64,
+    parent: crate::block::ParentMetadata,
     index_size: i64,
     labels: IndexLabels,
 ) -> Result<MetricsIndexData> {
-    let parent = crate::block::ParentMetadata {
-        rows: u64::try_from(parent_rows)
-            .map_err(|error| DataFusionError::External(error.into()))?,
-        compressed_size: u64::try_from(parent_size)
-            .map_err(|error| DataFusionError::External(error.into()))?,
+    let key = CacheKey {
+        account: account.to_owned(),
+        parent: ParentIdentity {
+            object_key: data_path.to_owned(),
+            rows: parent.rows,
+            compressed_size: parent.compressed_size,
+        },
     };
-    load_block_metadata(account, path, parent, index_size, format, labels).await
+    let limit = cache_limit();
+    let cached = {
+        let mut cache = INDEX_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        cache.trim(limit);
+        cache.get(&key)
+    };
+    let entry = if cached
+        .as_ref()
+        .map(|entry| entry.index.missing_labels(&labels.requested))
+        .transpose()
+        .map_err(|error| DataFusionError::External(error.into()))?
+        .is_some_and(|missing| missing.is_empty())
+    {
+        cached.unwrap()
+    } else {
+        let loaded =
+            fetch_parsed_index(account, path, parent, index_size, &labels.requested, cached)
+                .await?;
+        INDEX_CACHE
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(key, loaded, limit)
+            .map_err(|error| DataFusionError::External(error.into()))?
+    };
+    let index = entry
+        .index
+        .project(&labels.requested)
+        .map_err(|error| DataFusionError::External(error.into()))?;
+    tokio::task::spawn_blocking(move || metrics_block_index_data(&index, format, &labels.flat))
+        .await
+        .map_err(|error| DataFusionError::External(Box::new(error)))?
 }
 
 /// Evaluate `filter` over the run rows and collect the selected physical row
@@ -162,39 +199,86 @@ pub(super) fn evaluate_metrics_index(
     Ok(ranges)
 }
 
-async fn load_block_metadata(
+pub async fn fetch_parsed_index(
     account: &str,
     path: &str,
     parent: crate::block::ParentMetadata,
     index_size: i64,
-    format: config::FileFormat,
-    labels: IndexLabels,
-) -> Result<MetricsIndexData> {
+    labels: &[String],
+    cached: Option<Arc<CachedIndex>>,
+) -> Result<Arc<CachedIndex>> {
+    if cached
+        .as_ref()
+        .map(|entry| entry.index.missing_labels(labels))
+        .transpose()
+        .map_err(|error| DataFusionError::External(error.into()))?
+        .is_some_and(|missing| missing.is_empty())
+    {
+        return Ok(cached.unwrap());
+    }
     let known_size = u64::try_from(index_size).ok().filter(|size| *size > 0);
     let size = if let Some(size) = known_size {
         size
     } else {
         head_size(account, path).await?
     };
-    let (header, tail) = match read_header(account, path, size, &parent).await {
-        Ok(read) => read,
+    let (header, tail, size) = match read_header(account, path, size, &parent).await {
+        Ok((header, tail)) => (header, tail, size),
         Err(error) if known_size.is_some() => {
             let actual_size = head_size(account, path).await?;
             if actual_size == size {
                 return Err(error);
             }
-            read_header(account, path, actual_size, &parent).await?
+            let (header, tail) = read_header(account, path, actual_size, &parent).await?;
+            (header, tail, actual_size)
         }
         Err(error) => return Err(error),
     };
-    let ranges = header
-        .column_ranges(&labels.requested)
+    let trailer = tail
+        .bytes
+        .get(tail.bytes.len() - crate::block::MIDX_TRAILER_LEN..)
+        .ok_or_else(|| DataFusionError::Execution("short MIDX trailer".into()))?;
+    let (binding, _) = SidecarBinding::parse(size, trailer)
         .map_err(|error| DataFusionError::External(error.into()))?;
+    if let Some(existing) = &cached
+        && existing.binding != binding
+    {
+        return Err(DataFusionError::Execution(
+            "MIDX sidecar differs from cached trailer/size".into(),
+        ));
+    }
+    let requested = if let Some(existing) = &cached {
+        existing
+            .index
+            .missing_labels(labels)
+            .map_err(|error| DataFusionError::External(error.into()))?
+    } else {
+        labels.to_vec()
+    };
+    let mut ranges = header
+        .column_ranges(&requested)
+        .map_err(|error| DataFusionError::External(error.into()))?;
+    if cached.is_some() {
+        ranges.remove(0);
+    }
     let columns = read_columns(account, path, &ranges, &tail).await?;
-    tokio::task::spawn_blocking(move || {
-        let index = crate::block::decode_index(&header, &columns, &labels.requested)
-            .map_err(|error| DataFusionError::External(error.into()))?;
-        metrics_block_index_data(&index, format, &labels.flat)
+    tokio::task::spawn_blocking(move || -> Result<_> {
+        let index = if let Some(existing) = cached {
+            let additional =
+                crate::block::decode_additional_labels(&existing.index, &columns, &requested)
+                    .map_err(|error| DataFusionError::External(error.into()))?;
+            existing
+                .index
+                .merge_columns(&additional)
+                .map_err(|error| DataFusionError::External(error.into()))?
+        } else {
+            crate::block::decode_index(&header, &columns, &requested)
+                .map_err(|error| DataFusionError::External(error.into()))?
+        };
+        Ok(Arc::new(CachedIndex {
+            index: Arc::new(index.for_cache()),
+            binding,
+        }))
     })
     .await
     .map_err(|error| DataFusionError::External(Box::new(error)))?
@@ -491,10 +575,13 @@ mod tests {
         let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
         let data = load_metrics_index_file(
             &file.account,
+            &file.key,
             &path,
             config::FileFormat::Parquet,
-            file.meta.records as usize,
-            file.meta.compressed_size,
+            crate::block::ParentMetadata {
+                rows: file.meta.records as u64,
+                compressed_size: file.meta.compressed_size as u64,
+            },
             file.meta.mindex_size + 1,
             IndexLabels {
                 requested: Arc::new(vec!["path".to_string()]),
@@ -514,10 +601,13 @@ mod tests {
         for flat in [false, true] {
             let data = load_metrics_index_file(
                 &file.account,
+                &file.key,
                 &path,
                 config::FileFormat::Vortex,
-                file.meta.records as usize,
-                file.meta.compressed_size,
+                crate::block::ParentMetadata {
+                    rows: file.meta.records as u64,
+                    compressed_size: file.meta.compressed_size as u64,
+                },
                 file.meta.mindex_size,
                 IndexLabels {
                     requested: Arc::new(vec!["path".to_string()]),

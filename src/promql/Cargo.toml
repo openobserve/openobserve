@@ -10,6 +10,9 @@ default = []
 enterprise = ["dep:o2_enterprise"]
 
 [dependencies]
+anyhow.workspace = true
+bytes.workspace = true
+metrics_index.workspace = true
 ahash.workspace = true
 async-recursion.workspace = true
 async-trait.workspace = true
@@ -31,5 +34,11 @@ strum.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
+[target.'cfg(all(unix, target_pointer_width = "64"))'.dependencies]
+memmap2 = "0.9.11"
+
 [dev-dependencies]
+prometheus.workspace = true
+tempfile.workspace = true
+object_store.workspace = true
 expect-test.workspace = true

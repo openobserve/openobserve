@@ -18,13 +18,17 @@
 pub mod block;
 mod cache;
 pub mod layout;
+mod matcher;
+pub mod parsed_cache;
 mod pruner;
 mod reader;
 
 pub use layout::{
     METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_enabled, metrics_index_stream,
 };
+pub use matcher::{matcher_predicates, matcher_residual_field};
 pub use pruner::search;
+pub use reader::fetch_parsed_index;
 
 #[cfg(test)]
 mod tests {
@@ -234,6 +238,7 @@ mod tests {
         let id = config::ider::uuid();
         let account = format!("{id}:default");
         let path = format!("files/test/midx/m/2026/09/22/00/indexed-v1-{id}.midx");
+        let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v1-{id}.vortex");
         let store = object_store::memory::InMemory::new();
         store
             .put_opts(
@@ -246,10 +251,13 @@ mod tests {
         infra::storage::add_account(&id, Box::new(store)).await;
         load_metrics_index_file(
             &account,
+            &data_path,
             &path,
             config::FileFormat::Vortex,
-            rows,
-            123,
+            crate::block::ParentMetadata {
+                rows: rows as u64,
+                compressed_size: 123,
+            },
             0,
             crate::reader::IndexLabels {
                 requested: Arc::new(requested.to_vec()),

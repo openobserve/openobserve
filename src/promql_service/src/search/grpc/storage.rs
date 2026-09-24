@@ -18,8 +18,11 @@ use std::sync::Arc;
 use config::{
     get_config,
     meta::{
+        promql::MetricsBlockScan,
         search::{ScanStats, Session as SearchSession, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
+        stream::{
+            FileKey, FileSelection, PartitionTimeLevel, StreamParams, StreamPartition, StreamType,
+        },
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
 };
@@ -33,8 +36,8 @@ use itertools::Itertools;
 use metrics_index::MetricsFileLayout;
 use promql_parser::label::Matchers;
 use search::{
-    datafusion::{exec::register_metrics_table, sort_order::FileSortOrder},
-    file_cache::{cache_files, calc_target_partitions},
+    datafusion::{exec::register_metrics_table_with_blocks, sort_order::FileSortOrder},
+    file_cache::{cache_files, calc_target_partitions, inspect_file_cache},
 };
 use search_service::match_source;
 use tracing::Instrument;
@@ -127,25 +130,31 @@ pub(crate) async fn create_context(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let (cache_type, cache_hits, cache_misses) = cache_files(
-        trace_id,
-        &files
-            .iter()
-            .map(|f| {
-                (
-                    f.id,
-                    &f.account,
-                    &f.key,
-                    f.meta.compressed_size,
-                    f.meta.max_ts,
-                )
-            })
-            .collect_vec(),
-        &mut scan_stats,
-        "parquet",
-    )
-    .instrument(enter_span.clone())
-    .await;
+    let block_eligible = get_config().compact.metrics_index_enabled
+        && get_config().search.feature_metrics_streaming_agg_enabled
+        && files.iter().all(block_parent_eligible);
+    let cache_inputs = files
+        .iter()
+        .map(|f| {
+            (
+                f.id,
+                &f.account,
+                &f.key,
+                f.meta.compressed_size,
+                f.meta.max_ts,
+            )
+        })
+        .collect_vec();
+    let (cache_type, cache_hits, cache_misses) = if block_eligible {
+        let (_, hits, misses) = inspect_file_cache(trace_id, &cache_inputs, &mut scan_stats)
+            .instrument(enter_span.clone())
+            .await;
+        (file_data::CacheType::None, hits, misses)
+    } else {
+        cache_files(trace_id, &cache_inputs, &mut scan_stats, "parquet")
+            .instrument(enter_span.clone())
+            .await
+    };
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
@@ -190,7 +199,9 @@ pub(crate) async fn create_context(
 
     let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
 
-    cache_metrics_index_files(trace_id, org_id, &files).await;
+    if !block_eligible {
+        cache_metrics_index_files(trace_id, org_id, &files).await;
+    }
 
     // Prune indexed metrics files through their `.midx` metrics indexes: matching
     // physical rows are attached to each FileKey before the metrics table is
@@ -251,11 +262,85 @@ pub(crate) async fn create_context(
         FileSortOrder::None
     };
 
-    let ctx =
-        register_metrics_table(&session, schema.clone(), stream_name, files, sort_order).await?;
+    let unfiltered = matchers.matchers.is_empty() && matchers.or_matchers.is_empty();
+    let block_scan = block_scan_candidate(
+        stream_name,
+        &files,
+        sort_order,
+        keep_filters,
+        block_eligible,
+        unfiltered,
+    );
+    let ctx = register_metrics_table_with_blocks(
+        &session,
+        schema.clone(),
+        stream_name,
+        files,
+        sort_order,
+        block_scan,
+    )
+    .await?;
 
     // keep_filters=false only when the pruner proved its selections exact
     Ok(Some((ctx, schema, scan_stats, keep_filters)))
+}
+
+fn block_parent_eligible(file: &FileKey) -> bool {
+    !file.deleted
+        && config::FileFormat::from_extension(&file.key).is_some()
+        && MetricsFileLayout::of(&file.key) == Some(MetricsFileLayout::Indexed)
+        && file.meta.records > 0
+        && file.meta.compressed_size > 0
+        && file.meta.mindex_size > 0
+}
+
+fn block_scan_candidate(
+    table_name: &str,
+    files: &[FileKey],
+    sort_order: FileSortOrder,
+    keep_filters: bool,
+    enabled: bool,
+    unfiltered: bool,
+) -> Option<Arc<MetricsBlockScan>> {
+    (enabled
+        && (unfiltered || !keep_filters)
+        && sort_order == FileSortOrder::HashTimestampAsc
+        && block_selection_fraction(files, unfiltered).is_some())
+    .then(|| {
+        Arc::new(MetricsBlockScan {
+            table_name: table_name.to_owned(),
+            files: files.to_vec(),
+            unfiltered,
+        })
+    })
+}
+
+fn block_selection_fraction(files: &[FileKey], unfiltered: bool) -> Option<f64> {
+    let mut selected = 0u128;
+    let mut total = 0u128;
+    for file in files {
+        if !block_parent_eligible(file) {
+            return None;
+        }
+        let records = usize::try_from(file.meta.records).ok()?;
+        match &file.selection {
+            Some(FileSelection::RowRanges(ranges)) => {
+                let mut previous_end = 0;
+                for range in ranges.iter() {
+                    if range.start < previous_end || range.start >= range.end || range.end > records
+                    {
+                        return None;
+                    }
+                    selected = selected.checked_add((range.end - range.start) as u128)?;
+                    previous_end = range.end;
+                }
+            }
+            None if unfiltered => selected = selected.checked_add(records as u128)?,
+            _ => return None,
+        }
+        total = total.checked_add(records as u128)?;
+    }
+    (total > 0 && selected > 0).then(|| selected as f64 / total as f64)
 }
 
 /// Prefetch the `.midx` sidecars like the Tantivy path prefetches `.ttv` files:
@@ -342,4 +427,86 @@ async fn get_file_list(
         }
     }
     Ok(files)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ops::Range;
+
+    use config::meta::stream::FileMeta;
+
+    use super::*;
+
+    fn file(records: i64, ranges: Option<Vec<Range<usize>>>) -> FileKey {
+        let mut file = FileKey::new(
+            1,
+            String::new(),
+            "files/org/metrics/m/2026/09/23/00/indexed-v1-id.parquet".into(),
+            FileMeta {
+                records,
+                compressed_size: 100,
+                mindex_size: 50,
+                ..Default::default()
+            },
+            false,
+        );
+        file.selection = ranges.map(|ranges| FileSelection::RowRanges(Arc::new(ranges)));
+        file
+    }
+
+    #[test]
+    fn unfiltered_scan_uses_all_rows_without_source_selection() {
+        let files = vec![file(100, None)];
+        let scan = block_scan_candidate(
+            "m",
+            &files,
+            FileSortOrder::HashTimestampAsc,
+            true,
+            true,
+            true,
+        )
+        .unwrap();
+        assert!(scan.unfiltered);
+        assert_eq!(block_selection_fraction(&files, true), Some(1.0));
+    }
+
+    #[test]
+    fn filtered_scan_requires_exact_selection_and_real_midx() {
+        let files = vec![file(100, Some(std::iter::once(10..20).collect()))];
+        assert!(
+            block_scan_candidate(
+                "m",
+                &files,
+                FileSortOrder::HashTimestampAsc,
+                false,
+                true,
+                false,
+            )
+            .is_some()
+        );
+        assert!(
+            block_scan_candidate(
+                "m",
+                &files,
+                FileSortOrder::HashTimestampAsc,
+                true,
+                true,
+                false,
+            )
+            .is_none()
+        );
+        let mut missing = files;
+        missing[0].meta.mindex_size = 0;
+        assert!(
+            block_scan_candidate(
+                "m",
+                &missing,
+                FileSortOrder::HashTimestampAsc,
+                false,
+                true,
+                false,
+            )
+            .is_none()
+        );
+    }
 }

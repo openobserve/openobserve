@@ -1726,6 +1726,12 @@ pub struct Search {
     )]
     pub metrics_index_selection_cache_max_size: usize,
     #[env_config(
+        name = "ZO_METRICS_INDEX_BLOCKS_CACHE_MAX_SIZE",
+        default = 0,
+        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 2% of node memory clamped to 128-1024 MB, 1-9 disables the cache, and 10 or more sets an explicit limit."
+    )]
+    pub metrics_index_blocks_cache_max_size: usize,
+    #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
         help = "Enable dynamic pushdown filter"
@@ -4317,7 +4323,19 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.metrics_result_cache_max_size =
             cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
     }
+    cfg.search.metrics_index_blocks_cache_max_size = metrics_index_blocks_cache_size_mb(
+        cfg.search.metrics_index_blocks_cache_max_size,
+        cfg.limit.mem_total,
+    );
     Ok(())
+}
+
+fn metrics_index_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
+    match configured {
+        0 => (mem_total / SIZE_IN_MB as usize / 50).clamp(128, 1024),
+        1..=9 => 0,
+        size => size,
+    }
 }
 
 /// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path
@@ -4819,6 +4837,18 @@ mod tests {
     #[test]
     fn every_env_config_default_parses() {
         let _ = super::Config::init().expect("a default failed to parse");
+    }
+
+    #[test]
+    fn metrics_index_blocks_cache_auto_budget_preserves_explicit_limits() {
+        let gib = 1024 * 1024 * 1024;
+        assert_eq!(metrics_index_blocks_cache_size_mb(0, 4 * gib), 128);
+        assert_eq!(metrics_index_blocks_cache_size_mb(0, 48 * gib), 983);
+        assert_eq!(metrics_index_blocks_cache_size_mb(0, 64 * gib), 1024);
+        assert_eq!(metrics_index_blocks_cache_size_mb(1, 48 * gib), 0);
+        assert_eq!(metrics_index_blocks_cache_size_mb(9, 48 * gib), 0);
+        assert_eq!(metrics_index_blocks_cache_size_mb(10, 48 * gib), 10);
+        assert_eq!(metrics_index_blocks_cache_size_mb(2048, 48 * gib), 2048);
     }
 
     use super::*;

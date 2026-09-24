@@ -203,12 +203,17 @@ pub async fn search(
                 let result = async {
                     let data = load_metrics_index_file(
                         &account,
+                        &data_path,
                         &sidecar_path,
                         config::FileFormat::from_extension(&data_path).ok_or_else(|| {
                             DataFusionError::Execution("Unsupported metrics source format".into())
                         })?,
-                        expected_rows,
-                        compressed_size,
+                        crate::block::ParentMetadata {
+                            rows: u64::try_from(expected_rows)
+                                .map_err(|error| DataFusionError::External(error.into()))?,
+                            compressed_size: u64::try_from(compressed_size)
+                                .map_err(|error| DataFusionError::External(error.into()))?,
+                        },
                         mindex_size,
                         IndexLabels {
                             requested: Arc::clone(&labels),
@@ -329,7 +334,7 @@ pub(super) fn residual_matchers_covered(
     matcher_labels: &[String],
 ) -> bool {
     matchers.matchers.iter().all(|matcher| {
-        promql::utils::matcher_residual_field(table_schema, matcher).is_none()
+        crate::matcher_residual_field(table_schema, matcher).is_none()
             || matcher_labels.contains(&matcher.name)
     })
 }
@@ -361,7 +366,7 @@ pub(super) fn create_physical_filter(
     sidecar_schema: &Schema,
     matchers: &Matchers,
 ) -> Result<Option<Arc<dyn PhysicalExpr>>> {
-    let Some(filter) = promql::utils::matcher_predicates(sidecar_schema, matchers)
+    let Some(filter) = crate::matcher_predicates(sidecar_schema, matchers)
         .into_iter()
         .reduce(Expr::and)
     else {

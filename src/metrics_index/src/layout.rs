@@ -67,8 +67,6 @@ impl MetricsFileLayout {
     const HASH_SORTED_PREFIX: &'static str = "hash-sorted-v1-";
     const HASH_MERGED_PREFIX: &'static str = "hash-merged-v1-";
     const INDEXED_PREFIX: &'static str = "indexed-v1-";
-    const METRICS_INDEX_DIR: &'static str = "midx";
-    const METRICS_INDEX_EXT: &'static str = ".midx";
 
     /// Layout of the file at `path` (a full object key or a bare file name).
     pub fn of(path: &str) -> Option<Self> {
@@ -131,18 +129,7 @@ impl MetricsFileLayout {
         if Self::of(path) != Some(Self::Indexed) {
             return None;
         }
-        let mut parts: Vec<&str> = path.split('/').collect();
-        // files/{org}/metrics/{stream}/.../{file}
-        if parts.len() < 5 || parts[2] != StreamType::Metrics.as_str() {
-            return None;
-        }
-        parts[2] = Self::METRICS_INDEX_DIR;
-        let file_name_pos = parts.len() - 1;
-        let file_format = FileFormat::from_extension(parts[file_name_pos])?;
-        let file_name = parts[file_name_pos].strip_suffix(file_format.extension())?;
-        let file_name = format!("{file_name}{}", Self::METRICS_INDEX_EXT);
-        parts[file_name_pos] = &file_name;
-        Some(parts.join("/"))
+        config::meta::promql::blocks::metrics_index_path(path)
     }
 }
 

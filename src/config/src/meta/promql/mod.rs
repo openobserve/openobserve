@@ -68,9 +68,12 @@ where
     deserializer.deserialize_any(StringOrVec)
 }
 
+pub mod blocks;
 pub mod grpc;
 pub mod midx;
 pub mod value;
+
+pub use blocks::MetricsBlockScan;
 
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";

@@ -44,6 +44,8 @@ mod series_stream;
 mod streaming_eval;
 pub mod utils;
 
+pub use series_stream::blocks::load_metrics_block_index;
+
 pub const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
 pub const MAX_DATA_POINTS: i64 = 256; // Width of panel: window.innerWidth / 4
