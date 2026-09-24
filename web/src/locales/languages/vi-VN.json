@@ -7647,7 +7647,7 @@
       "usernameRequired": "Tên người dùng là bắt buộc",
       "passwordRequired": "Mật khẩu là bắt buộc",
       "emailRecipients": "Địa chỉ email người nhận",
-      "emailRecipientsHelp": "Chọn người dùng hoặc tài khoản dịch vụ của tổ chức sẽ nhận email cảnh báo",
+      "emailRecipientsHelp": "Chọn người dùng trong tổ chức hoặc tài khoản dịch vụ sẽ nhận email cảnh báo",
       "emailRecipientsGroupUsers": "Người dùng",
       "emailRecipientsGroupServiceAccounts": "Tài khoản dịch vụ",
       "invalidEmailAddresses": "Địa chỉ email không hợp lệ: {emails}",

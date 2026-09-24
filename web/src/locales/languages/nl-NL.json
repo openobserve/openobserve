@@ -7647,7 +7647,7 @@
       "usernameRequired": "Gebruikersnaam is vereist",
       "passwordRequired": "Wachtwoord is vereist",
       "emailRecipients": "E-mailadressen van ontvangers",
-      "emailRecipientsHelp": "Selecteer de gebruikers of serviceaccounts van de organisatie die alarme-mails moeten ontvangen",
+      "emailRecipientsHelp": "Selecteer de organisatiegebruikers of serviceaccounts die waarschuwingsmails moeten ontvangen",
       "emailRecipientsGroupUsers": "Gebruikers",
       "emailRecipientsGroupServiceAccounts": "Serviceaccounts",
       "invalidEmailAddresses": "Ongeldige e-mailadressen: {emails}",

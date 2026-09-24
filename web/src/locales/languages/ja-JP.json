@@ -7647,7 +7647,7 @@
       "usernameRequired": "ユーザー名は必須です",
       "passwordRequired": "パスワードは必須です",
       "emailRecipients": "受信者メールアドレス",
-      "emailRecipientsHelp": "アラートメールを受信する組織のユーザーまたはサービスアカウントを選択してください",
+      "emailRecipientsHelp": "アラートメールを受信する組織ユーザーまたはサービスアカウントを選択してください",
       "emailRecipientsGroupUsers": "ユーザー",
       "emailRecipientsGroupServiceAccounts": "サービスアカウント",
       "invalidEmailAddresses": "無効なメールアドレス: {emails}",

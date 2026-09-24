@@ -7647,7 +7647,7 @@
       "usernameRequired": "用户名是必填项",
       "passwordRequired": "密码是必填项",
       "emailRecipients": "收件人电子邮件地址",
-      "emailRecipientsHelp": "选择接收告警邮件的组织用户或服务账号",
+      "emailRecipientsHelp": "选择应接收告警邮件的组织用户或服务账号",
       "emailRecipientsGroupUsers": "用户",
       "emailRecipientsGroupServiceAccounts": "服务账号",
       "invalidEmailAddresses": "无效的电子邮件地址：{emails}",

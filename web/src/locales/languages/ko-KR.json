@@ -7647,7 +7647,7 @@
       "usernameRequired": "사용자 이름이 필요합니다.",
       "passwordRequired": "비밀번호가 필요합니다.",
       "emailRecipients": "수신자 이메일 주소",
-      "emailRecipientsHelp": "경고 이메일을 수신할 조직의 사용자 또는 서비스 계정을 선택하세요",
+      "emailRecipientsHelp": "알림 이메일을 수신할 조직 사용자 또는 서비스 계정을 선택하세요",
       "emailRecipientsGroupUsers": "사용자",
       "emailRecipientsGroupServiceAccounts": "서비스 계정",
       "invalidEmailAddresses": "잘못된 이메일 주소: {emails}",

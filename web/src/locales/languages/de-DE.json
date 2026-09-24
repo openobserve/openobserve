@@ -7647,7 +7647,7 @@
       "usernameRequired": "Benutzername ist erforderlich",
       "passwordRequired": "Passwort ist erforderlich",
       "emailRecipients": "E-Mail-Adressen der Empfänger",
-      "emailRecipientsHelp": "Wählen Sie die Benutzer oder Dienstkonten der Organisation aus, die Alarm-E-Mails erhalten sollen",
+      "emailRecipientsHelp": "Wählen Sie die Benutzer der Organisation oder Dienstkonten aus, die Warnmeldungs-E-Mails erhalten sollen",
       "emailRecipientsGroupUsers": "Benutzer",
       "emailRecipientsGroupServiceAccounts": "Dienstkonten",
       "invalidEmailAddresses": "Ungültige E-Mail-Adressen: {emails}",

@@ -7647,7 +7647,7 @@
       "usernameRequired": "Il nome utente è obbligatorio",
       "passwordRequired": "La password è obbligatoria",
       "emailRecipients": "Indirizzi email dei destinatari",
-      "emailRecipientsHelp": "Seleziona gli utenti o gli account di servizio dell'organizzazione che devono ricevere le e-mail di avviso",
+      "emailRecipientsHelp": "Seleziona gli utenti dell'organizzazione o gli account di servizio che devono ricevere le email di avviso",
       "emailRecipientsGroupUsers": "Utenti",
       "emailRecipientsGroupServiceAccounts": "Account di servizio",
       "invalidEmailAddresses": "Indirizzi email non validi: {emails}",
