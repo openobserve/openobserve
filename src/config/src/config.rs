@@ -4279,18 +4279,18 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.search.inverted_index_footer_cache_max_size == 0 {
         cfg.search.inverted_index_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.search.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     if cfg.search.bloom_footer_cache_max_size == 0 {
-        // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
+        // 1% of total mem, clamped to [4, 256] MB. Bloom footers are an
         // order of magnitude smaller than tantivy footers (footer payload
         // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
         // `.bf`), so the cache holds 4-32 K entries at this size.
         cfg.search.bloom_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(4, 256)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.search.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
@@ -4298,7 +4298,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
         cfg.limit.datafusion_file_stat_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
