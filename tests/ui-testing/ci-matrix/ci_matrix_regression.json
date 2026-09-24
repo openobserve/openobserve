@@ -5,7 +5,8 @@
     "browser": "chrome",
     "run_files": [
       "logs-bugs.spec.js",
-      "logs-query-editor-resize-bounds.spec.js"
+      "logs-query-editor-resize-bounds.spec.js",
+      "logs-result-display.spec.js"
     ],
     "disabled": []
   },
@@ -134,7 +135,8 @@
       "logs-vrl-column-cell-actions.spec.js",
       "logs-reset-filters.spec.js",
       "logs-stream-name-case.spec.js",
-      "logs-no-stream-prompt.spec.js"
+      "logs-no-stream-prompt.spec.js",
+      "logs-field-actions.spec.js"
     ],
     "disabled": []
   },
