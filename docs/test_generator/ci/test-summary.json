@@ -1,0 +1,5 @@
+[
+  { "title": "should hide the Query Management tab from the Settings rail on an OSS build", "action": "new", "verifies": "the Settings rail renders with no Query Management tab on an OSS build" },
+  { "title": "should render the 404 page when navigating directly to /settings/query_management on OSS", "action": "new", "verifies": "a direct URL to the enterprise-only route falls through to the 404 page on OSS" },
+  { "title": "Query Management → General Settings redirect is not wired on OSS — route never registered (useManagementRoutes.ts:145-159)", "action": "new", "verifies": "enterprise-only redirect guard is recorded as a fixme gap because the route is never registered on OSS" }
+]

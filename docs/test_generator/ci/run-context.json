@@ -1,0 +1,18 @@
+{
+  "feature_slug": "query-management-redirect",
+  "feature_title": "Settings Query Management Redirect",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "settings-query-management-redirect.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/settings-query-management-redirect.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/index.vue",
+    "web/src/components/settings/index.spec.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

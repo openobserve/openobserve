@@ -95,6 +95,7 @@ import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
+import { QueryManagementPage } from "./generalPages/queryManagementPage.js";
 import { ConnectDataSourcePopupPage } from "./generalPages/connectDataSourcePopupPage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
@@ -241,6 +242,7 @@ class PageManager {
     this.modelPricingPage = new ModelPricingPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);
     this.statusPagesPage = new StatusPagesPage(page);
+    this.queryManagementPage = new QueryManagementPage(page);
     this.connectDataSourcePopupPage = new ConnectDataSourcePopupPage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);

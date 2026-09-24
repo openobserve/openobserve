@@ -1,0 +1,26 @@
+{
+  "feature_slug": "query-management-redirect",
+  "feature_title": "Settings Query Management Redirect",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "settings-query-management-redirect.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/settings-query-management-redirect.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/index.vue",
+    "web/src/components/settings/index.spec.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Checked the complete changed-file list in changed_files.txt: both paths are under web/src/ (web/src/components/settings/index.vue and web/src/components/settings/index.spec.ts). No paths under enterprise/, o2_enterprise/, or src/enterprise/. The diff prose mentions enterprise-only meta-org pages and config.isEnterprise, but those are just string/code references inside OSS-owned files; path evidence is authoritative, so edition = oss.",
+    "skip": "Not skipped. trigger_comment.txt is empty and no tests-added/opt-out label was supplied, so there is no explicit opt-out. The change touches a real Vue component (settings/index.vue) and alters navigation redirect behavior, so it is a user-facing behavior change, not a docs-only/CI-only/comment-only change.",
+    "e2e": "E2E is warranted. The change adds query_management to the set of enterprise-only settings pages (nodes, license, passwordPolicy) that redirect to /settings/general when the current org is not the meta org (or on a non-enterprise build). This is a user-facing navigation/routing interaction that can be verified in a real browser by navigating to the query_management settings route and asserting the redirect (and asserting no redirect inside the meta org).",
+    "area": "The change lives in web/src/components/settings/. Settings-related E2E specs are housed under the GeneralTests folder (e.g. settings-form-validation.spec.js), so GeneralTests is the closest area for this settings navigation behavior.",
+    "group": "GeneralTests is the general/misc shard (actual_folder GeneralTests) that already carries settings-related and enterprise-overlay specs (settings-form-validation, cipherKeys, logoManagement). The new settings navigation spec belongs in this shard rather than GeneralTests-Forms, which is reserved for form-validation specs.",
+    "existing_tests": "No E2E specs in the diff. The only test file changed is web/src/components/settings/index.spec.ts, which is a Vitest unit test under web/src/, not a Playwright E2E spec under tests/ui-testing/playwright-tests/. Therefore existing_tests_in_diff = false (unit-test changes are dev test-maintenance, not E2E coverage)."
+  }
+}

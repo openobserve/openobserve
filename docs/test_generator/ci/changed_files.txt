@@ -1,0 +1,2 @@
+web/src/components/settings/index.spec.ts
+web/src/components/settings/index.vue

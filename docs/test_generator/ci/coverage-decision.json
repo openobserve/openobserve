@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/settings-query-management-redirect.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/settings-form-validation.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/status-pages-enterprise-gating.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/edition-features.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing GeneralTests spec covers the Settings Query Management navigation/gating. settings-form-validation.spec.js is field-validation only (no navigation/gating of the Query Management tab or the 404 fallback); status-pages-enterprise-gating.spec.js is a pattern reference but targets the Synthetics Status Pages dropdown, not Settings; edition-features.spec.js targets the enterprise-upsell dialog. The feature is a distinct area (Settings shell routing + 404 catch-all), so a dedicated spec at the run-context spec_path is correct. Because it is a brand-new file it must be added to GeneralTests.run_files in ci_matrix.json."
+}
