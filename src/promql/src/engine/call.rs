@@ -24,9 +24,12 @@ use promql_parser::parser::{
     Expr as PromExpr, Function, FunctionArgs, MatrixSelector, value::ValueType,
 };
 
-use super::{Engine, selector::Selected};
+use super::{Engine, selector::SelectorOutput};
 use crate::{
-    ast::at_modifier::{Pin, pin, timestamp_selector},
+    ast::{
+        at_modifier::{Pin, pin},
+        timestamp_selector::timestamp_selector,
+    },
     functions::{self, Func, RangeFunc, SingleArgFunc},
     scalar_param::ScalarParam,
 };
@@ -46,7 +49,9 @@ impl Engine {
             return Ok(functions::time(&self.eval_ctx));
         }
         if let Some(vs) = timestamp_selector(func, args) {
-            return self.exec_vector_selector(vs, Selected::SampleTime).await;
+            return self
+                .exec_vector_selector(vs, SelectorOutput::SampleTimestamp)
+                .await;
         }
 
         let start = std::time::Instant::now();

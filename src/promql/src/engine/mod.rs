@@ -192,7 +192,7 @@ impl Engine {
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
             PromExpr::VectorSelector(vs) => {
-                self.exec_vector_selector(vs, selector::Selected::Value)
+                self.exec_vector_selector(vs, selector::SelectorOutput::Value)
                     .await?
             }
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
