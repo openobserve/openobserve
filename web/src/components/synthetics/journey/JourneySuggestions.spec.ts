@@ -25,6 +25,7 @@ vi.mock("reka-ui", async (importOriginal) => {
 });
 
 import en from "@/locales/languages/en-US.json";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { JourneySuggestion } from "@/utils/synthetics/journeySuggestions";
 
@@ -108,6 +109,26 @@ describe("JourneySuggestions", () => {
   it("shows the count and no prose", () => {
     expect(render([ZERO_ASSERTION]).find(CHIP).text()).toBe("1");
     expect(render([ZERO_ASSERTION, NO_TEST_ATTRIBUTE]).find(CHIP).text()).toBe("2");
+  });
+
+  it("the chip is neutral and shows a light bulb with the count", () => {
+    const wrapper = mount(JourneySuggestions, {
+      props: { suggestions: [ZERO_ASSERTION] },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          ...STUBS,
+          OIcon: { props: ["name"], template: '<i :data-icon="name" />' },
+        },
+      },
+    });
+    const chip = wrapper.find(CHIP);
+
+    expect(wrapper.findComponent(OBadge).props("variant")).toBe("default");
+    expect(chip.find('[data-icon="lightbulb"]').exists()).toBe(true);
+    expect(chip.find('[data-icon="warning"]').exists()).toBe(false);
+    expect(chip.text()).toBe("1");
+    expect(wrapper.find(".o-tooltip-stub").attributes("data-content")).toContain("1 suggestion");
   });
 
   it("names itself on hover and to assistive tech, from the same string", () => {

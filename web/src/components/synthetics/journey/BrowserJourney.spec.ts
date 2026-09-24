@@ -56,6 +56,7 @@ vi.mock("@/services/synthetics", () => ({
   },
 }));
 
+import { resetManager } from "@/lib/vue-shortcut-manager";
 import BrowserJourney from "./BrowserJourney.vue";
 
 // Stubs emit native-component click so parent @click handlers fire.
@@ -129,6 +130,24 @@ const ExtensionSetupDialogStub = {
   template: '<div v-if="open" class="extension-setup-dialog-stub" :data-action="action" />',
 };
 
+// Renders menu content inline, so toolbar menu items are reachable without opening a portal.
+const ODropdownStub = {
+  template:
+    '<div class="o-dropdown-stub"><slot name="trigger" /><div class="o-dropdown-stub-content"><slot /></div></div>',
+};
+const ODropdownItemStub = {
+  props: ["disabled", "iconLeft"],
+  emits: ["select"],
+  template:
+    '<button type="button" v-bind="$attrs" :disabled="disabled" @click="$emit(\'select\')"><slot /><slot name="icon-right" /></button>',
+};
+const ODropdownGroupStub = {
+  props: ["label"],
+  template: '<div><span v-if="label">{{ label }}</span><slot /></div>',
+};
+const ODropdownSeparatorStub = { template: "<hr />" };
+const OButtonGroupStub = { template: "<div><slot /></div>" };
+
 const STUBS = {
   OButton: OButtonStub,
   OIcon: OIconStub,
@@ -140,6 +159,11 @@ const STUBS = {
   JourneySteps: JourneyStepsStub,
   ConfirmDialog: ConfirmDialogStub,
   ExtensionSetupDialog: ExtensionSetupDialogStub,
+  ODropdown: ODropdownStub,
+  ODropdownItem: ODropdownItemStub,
+  ODropdownGroup: ODropdownGroupStub,
+  ODropdownSeparator: ODropdownSeparatorStub,
+  OButtonGroup: OButtonGroupStub,
 };
 
 // ── Bridge transport helpers ──────────────────────────────────────────────
@@ -1054,52 +1078,6 @@ describe("BrowserJourney Add Subtest button", () => {
     return (w.props() as Record<string, unknown>).modelValue as BrowserStep[];
   }
 
-  it("should render an outline button with an icon immediately after Add Step", () => {
-    wrapper = mountJourney();
-
-    const btn = wrapper.find(ADD_SUBTEST);
-    expect(btn.exists()).toBe(true);
-    expect(btn.attributes("variant")).toBe("outline");
-    expect(btn.attributes("size")).toBe("sm");
-    expect(btn.attributes("icon-left")).toBe("account-tree");
-    expect(btn.text()).toBe("synthetics.journey.addSubtest");
-
-    const buttons = wrapper.findAll("button").map((b) => b.attributes("data-test"));
-    expect(buttons.indexOf("synthetics-journey-add-subtest-btn")).toBe(
-      buttons.indexOf("synthetics-journey-add-step-btn") + 1,
-    );
-  });
-
-  const disabledReason = (w: VueWrapper) =>
-    w
-      .findAllComponents(OTooltipStub)
-      .filter((c) => c.props("content") === "synthetics.journey.subtest.disabledTooltip");
-
-  it("renders disabled and states why when composition is disabled", () => {
-    mockStoreState.zoConfig = { synthetics_subtests_enabled: false };
-    wrapper = mountJourney();
-
-    expect(wrapper.find(ADD_STEP).attributes("disabled")).toBeUndefined();
-    expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeDefined();
-    expect(disabledReason(wrapper)).toHaveLength(1);
-  });
-
-  // An unknown flag reads as off — the step editor's `=== true` stance.
-  it("renders disabled and states why when the composition flag is absent", () => {
-    mockStoreState.zoConfig = {};
-    wrapper = mountJourney();
-
-    expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeDefined();
-    expect(disabledReason(wrapper)).toHaveLength(1);
-  });
-
-  it("carries no disabled reason when composition is enabled", () => {
-    wrapper = mountJourney();
-
-    expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeUndefined();
-    expect(disabledReason(wrapper)).toHaveLength(0);
-  });
-
   it("should be disabled while readonly, like Add Step", () => {
     wrapper = mountJourney({ readonly: true });
 
@@ -1154,6 +1132,156 @@ describe("BrowserJourney Add Subtest button", () => {
       block: "nearest",
       behavior: "smooth",
     });
+  });
+});
+
+describe("BrowserJourney add menu and step filter", () => {
+  let wrapper: VueWrapper;
+  let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
+
+  const ADD_STEP = '[data-test="synthetics-journey-add-step-btn"]';
+  const ADD_MENU = '[data-test="synthetics-journey-add-menu-trigger"]';
+  const MENU_STEP = '[data-test="synthetics-journey-add-menu-step"]';
+  const MENU_SUBTEST = '[data-test="synthetics-journey-add-subtest-btn"]';
+  const FILTER = '[data-test="synthetics-journey-filter-input"]';
+
+  const OTooltipWithContentStub = {
+    props: ["content"],
+    template: '<div :data-tooltip="content" />',
+  };
+  // Renders the icon-right slot, which carries the shortcut keycap.
+  const OInputWithIconStub = {
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    inheritAttrs: false,
+    template:
+      '<div :data-test="$attrs[\'data-test\']"><input :value="modelValue" /><slot name="icon-right" /></div>',
+  };
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test/" },
+    { id: "s2", action: "click", name: "Sign in", selector: "#login" },
+    { id: "s3", action: "click", name: "Open cart", selector: "#cart" },
+  ] as any[];
+
+  beforeEach(() => {
+    mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+    originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    resetManager();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    resetManager();
+    Element.prototype.scrollIntoView = originalScrollIntoView;
+    mockStoreState.zoConfig = {};
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  function mountToolbar(props: Record<string, unknown> = {}, attach = false) {
+    const w = mount(BrowserJourney, {
+      props: {
+        modelValue: journey,
+        replayPhase: "idle",
+        "onUpdate:modelValue": (steps: BrowserStep[]) => w.setProps({ modelValue: steps }),
+        ...props,
+      },
+      attachTo: attach ? document.body : undefined,
+      global: {
+        stubs: { ...STUBS, OTooltip: OTooltipWithContentStub, OInput: OInputWithIconStub },
+      },
+    }) as VueWrapper;
+    return w;
+  }
+
+  const tooltips = (w: VueWrapper) =>
+    w.findAll("[data-tooltip]").map((t) => t.attributes("data-tooltip"));
+  const currentSteps = (w: VueWrapper) =>
+    (w.props() as Record<string, unknown>).modelValue as BrowserStep[];
+
+  it("the + button adds a step and is named Add step, with a tooltip", async () => {
+    wrapper = mountToolbar();
+
+    const add = wrapper.find(ADD_STEP);
+    expect(add.attributes("icon-left")).toBe("add");
+    expect(add.text()).toBe("");
+    expect(add.attributes("aria-label")).toBe("synthetics.journey.addMenu.addStep");
+    expect(tooltips(wrapper)).toContain("synthetics.journey.addMenu.addStep");
+
+    await add.trigger("click");
+    await flushPromises();
+    expect(currentSteps(wrapper)).toHaveLength(4);
+  });
+
+  it("the add menu arrow has a name and a tooltip; the menu offers Step and Subtest; Subtest adds a subtest row", async () => {
+    wrapper = mountToolbar();
+
+    const trigger = wrapper.find(ADD_MENU);
+    expect(trigger.exists()).toBe(true);
+    expect(trigger.attributes("aria-label")).toBe("synthetics.journey.addMenu.menuAria");
+    expect(tooltips(wrapper)).toContain("synthetics.journey.addMenu.menuAria");
+
+    const step = wrapper.find(MENU_STEP);
+    expect(step.text()).toContain("synthetics.journey.addMenu.step");
+    expect(step.text()).toContain("synthetics.journey.addMenu.stepHint");
+    const subtest = wrapper.find(MENU_SUBTEST);
+    expect(subtest.text()).toContain("synthetics.journey.addMenu.subtest");
+    expect(subtest.text()).toContain("synthetics.journey.addMenu.subtestHint");
+
+    await subtest.trigger("click");
+    await flushPromises();
+    const steps = currentSteps(wrapper);
+    expect(steps).toHaveLength(4);
+    expect(steps[3].action).toBe("subtest");
+  });
+
+  it("Subtest is unavailable, with the reason, when composition is off", () => {
+    for (const zoConfig of [{ synthetics_subtests_enabled: false }, {}]) {
+      mockStoreState.zoConfig = zoConfig;
+      wrapper = mountToolbar();
+
+      const subtest = wrapper.find(MENU_SUBTEST);
+      expect(wrapper.find(MENU_STEP).exists()).toBe(true);
+      expect(subtest.attributes("disabled")).toBeDefined();
+      expect(subtest.text()).toContain("synthetics.journey.subtest.disabledTooltip");
+      expect(subtest.text()).not.toContain("synthetics.journey.addMenu.subtestHint");
+      wrapper.unmount();
+    }
+  });
+
+  it("the add controls are disabled while restoring", async () => {
+    wrapper = mountToolbar({ extensionReady: true, canRecordFrom: true });
+    await wrapper.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[2]);
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(wrapper.find(ADD_STEP).attributes("disabled")).toBeDefined();
+    expect(wrapper.find(ADD_MENU).exists()).toBe(true);
+    expect(wrapper.find(ADD_MENU).attributes("disabled")).toBeDefined();
+  });
+
+  it("pressing / focuses the step filter", async () => {
+    wrapper = mountToolbar({}, true);
+    await flushPromises();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "/", bubbles: true }));
+    await flushPromises();
+
+    expect(document.activeElement).toBe(wrapper.find(`${FILTER} input`).element);
+  });
+
+  it("the filter shows the / keycap", () => {
+    wrapper = mountToolbar();
+
+    const keycap = wrapper.find(`${FILTER} kbd`);
+    expect(keycap.exists()).toBe(true);
+    expect(keycap.text()).toBe("/");
   });
 });
 
@@ -1246,7 +1374,13 @@ describe("BrowserJourney per-step failure evidence", () => {
 
 // Real JourneySteps, since the hooks under test render there; the step editor stub avoids a fetch.
 const BrowserJourneyStepEditorStub = { template: '<div class="step-editor-stub" />' };
-const { JourneySteps: _droppedJourneyStepsStub, ...STUBS_WITH_REAL_JOURNEY_STEPS } = STUBS;
+// The real JourneySteps keeps its real row-action dropdown.
+const {
+  JourneySteps: _droppedJourneyStepsStub,
+  ODropdown: _droppedDropdownStub,
+  ODropdownItem: _droppedDropdownItemStub,
+  ...STUBS_WITH_REAL_JOURNEY_STEPS
+} = STUBS;
 
 function mountWithRealSteps(props: Record<string, unknown> = {}) {
   return mount(BrowserJourney, {
@@ -2573,8 +2707,7 @@ describe("BrowserJourney variables panel toggle", () => {
 
   const TOGGLE = '[data-test="synthetics-journey-toggle-variables-btn"]';
 
-  // The shared OIconStub swallows `name`; this one surfaces it so the chevron
-  // direction can be asserted from the DOM (same shape as JourneySteps.spec.ts).
+  // The shared OIconStub swallows `name`; this one surfaces the toggle icon in the DOM.
   const OIconWithNameStub = {
     props: ["name"],
     template: '<i :data-icon-name="name" />',
@@ -2593,7 +2726,8 @@ describe("BrowserJourney variables panel toggle", () => {
     }) as VueWrapper;
   }
 
-  const chevronOf = (w: VueWrapper) =>
+  const toggleIconOf = (w: VueWrapper) =>
+    w.find(TOGGLE).attributes("icon-left") ??
     w.find(`${TOGGLE} [data-icon-name]`).attributes("data-icon-name");
 
   afterEach(() => {
@@ -2668,16 +2802,15 @@ describe("BrowserJourney variables panel toggle", () => {
     for (const call of emitted) expect(call).toEqual([]);
   });
 
-  it("should point the chevron right — collapse — while the panel is open", () => {
+  it("the variables toggle shows the variables icon and stays pressed while the panel is open", () => {
     wrapper = mountToolbar({ variablesPanelOpen: true });
+    expect(toggleIconOf(wrapper)).toBe("data-object");
+    expect(wrapper.find(TOGGLE).attributes("aria-pressed")).toBe("true");
+    wrapper.unmount();
 
-    expect(chevronOf(wrapper)).toBe("keyboard-double-arrow-right");
-  });
-
-  it("should point the chevron left — open — while the panel is closed", () => {
     wrapper = mountToolbar({ variablesPanelOpen: false });
-
-    expect(chevronOf(wrapper)).toBe("keyboard-double-arrow-left");
+    expect(toggleIconOf(wrapper)).toBe("data-object");
+    expect(wrapper.find(TOGGLE).attributes("aria-pressed")).toBe("false");
   });
 });
 

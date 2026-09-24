@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  getShortcutDef,
   SHORTCUT_MODULES,
   SHORTCUT_REGISTRY,
   type ShortcutCapabilities,
@@ -205,5 +206,25 @@ describe("aiChatToggle entry visibility", () => {
 
   it("is shown only on enterprise with ai_enabled on", () => {
     expect(entryVisible("aiChatToggle", ENTERPRISE)).toBe(true);
+  });
+});
+
+describe("synthetics journey search shortcut", () => {
+  it("registers syntheticsJourneyFocusSearch on / for enterprise only", () => {
+    expect(getShortcutDef("syntheticsJourneyFocusSearch")).toMatchObject({
+      key: "/",
+      scope: "synthetics-journey",
+      descriptionKey: "shortcuts.actions.focusSearch",
+    });
+    expect(visiblePages(ENTERPRISE).has("shortcuts.pages.syntheticsJourney")).toBe(true);
+    expect(visiblePages(OSS).has("shortcuts.pages.syntheticsJourney")).toBe(false);
+    expect(visiblePages(CLOUD).has("shortcuts.pages.syntheticsJourney")).toBe(false);
+  });
+
+  it("the cheatsheet modules include the synthetics journey page", () => {
+    const synthetics = SHORTCUT_MODULES.find((m) => m.titleKey === "shortcuts.modules.synthetics");
+
+    expect(synthetics).toBeDefined();
+    expect(synthetics?.pages).toContain("shortcuts.pages.syntheticsJourney");
   });
 });
