@@ -45,12 +45,12 @@ use hashbrown::{HashMap, HashSet};
 #[cfg(test)]
 use metrics_index::block::ParentMetadata;
 #[cfg(test)]
-use metrics_index::parsed_cache::CacheWeight;
+use metrics_index::block_cache::CacheWeight;
 #[cfg(test)]
-use metrics_index::parsed_cache::SidecarBinding;
+use metrics_index::block_cache::SidecarBinding;
 use metrics_index::{
     block::{BlockDecoder, DecodedBlockRef, Index},
-    parsed_cache::{CacheKey, CachedIndex, INDEX_CACHE, IndexCache, ParentIdentity, cache_limit},
+    block_cache::{CacheKey, CachedIndex, INDEX_CACHE, IndexCache, ParentIdentity, cache_limit},
 };
 use tokio::{
     sync::{OwnedSemaphorePermit, Semaphore},
@@ -989,8 +989,6 @@ async fn validate_partition(
 
 #[cfg(test)]
 mod tests {
-    mod shared_cache;
-
     use std::sync::atomic::{AtomicBool, AtomicUsize};
 
     use async_trait::async_trait;
@@ -1123,10 +1121,7 @@ mod tests {
 
     struct Fixture {
         account: String,
-        inner: Arc<object_store::memory::InMemory>,
         metadata_calls: Arc<AtomicUsize>,
-        metadata_blocked: Arc<AtomicBool>,
-        metadata_gate: Option<Arc<Notify>>,
         calls: Arc<AtomicUsize>,
         active: Arc<AtomicUsize>,
         entered: Arc<Notify>,
@@ -1168,10 +1163,7 @@ mod tests {
             }
             let fixture = Self {
                 account,
-                inner: Arc::clone(&store.inner),
                 metadata_calls: Arc::clone(&store.metadata_calls),
-                metadata_blocked: Arc::clone(&store.metadata_blocked),
-                metadata_gate: store.metadata_gate.clone(),
                 calls: Arc::clone(&store.calls),
                 active: Arc::clone(&store.active),
                 entered: Arc::clone(&store.entered),

@@ -16,10 +16,10 @@
 //! Metrics index layout, label pruning, and row-selection caching.
 
 pub mod block;
+pub mod block_cache;
 mod cache;
 pub mod layout;
 mod matcher;
-pub mod parsed_cache;
 mod pruner;
 mod reader;
 

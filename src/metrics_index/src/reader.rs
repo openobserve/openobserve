@@ -26,10 +26,10 @@ use datafusion::{
 };
 
 use crate::{
-    layout::METRICS_INDEX_ROW_COUNT,
-    parsed_cache::{
+    block_cache::{
         CacheKey, CachedIndex, INDEX_CACHE, ParentIdentity, SidecarBinding, cache_limit,
     },
+    layout::METRICS_INDEX_ROW_COUNT,
 };
 
 /// Label and directory regions up to this total are fetched in one read instead of per column.

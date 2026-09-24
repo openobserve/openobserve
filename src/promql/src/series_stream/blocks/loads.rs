@@ -47,11 +47,6 @@ impl LoadRegistry {
             completed: false,
         })
     }
-
-    #[cfg(test)]
-    pub(super) fn len(&self) -> usize {
-        self.entries.lock().unwrap().len()
-    }
 }
 
 pub(super) enum Claim {
