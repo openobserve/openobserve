@@ -71,7 +71,7 @@ impl SharedCacheFixture {
         self.storage
             .inner
             .put_opts(
-                &config::meta::promql::blocks::metrics_index_path(&self.file.key)
+                &config::meta::promql::index::metrics_index_path(&self.file.key)
                     .unwrap()
                     .into(),
                 Bytes::from(bytes).into(),

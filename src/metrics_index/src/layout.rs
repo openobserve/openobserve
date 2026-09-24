@@ -129,7 +129,7 @@ impl MetricsFileLayout {
         if Self::of(path) != Some(Self::Indexed) {
             return None;
         }
-        config::meta::promql::blocks::metrics_index_path(path)
+        config::meta::promql::index::metrics_index_path(path)
     }
 }
 

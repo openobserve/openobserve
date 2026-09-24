@@ -1024,7 +1024,7 @@ async fn load_index_cached(
         file.meta.mindex_size > 0,
         "block sidecar size is not recorded"
     );
-    let sidecar = config::meta::promql::blocks::metrics_index_path(&file.key)
+    let sidecar = config::meta::promql::index::metrics_index_path(&file.key)
         .context("unsupported block parent layout")?;
     let key = CacheKey {
         account: file.account.clone(),
@@ -1477,7 +1477,7 @@ mod tests {
                 store
                     .inner
                     .put_opts(
-                        &config::meta::promql::blocks::metrics_index_path(&file.key)
+                        &config::meta::promql::index::metrics_index_path(&file.key)
                             .unwrap()
                             .into(),
                         Bytes::from(bytes.clone()).into(),
@@ -2524,7 +2524,7 @@ mod tests {
                 infra::storage::LocalFile {
                     file,
                     meta: ObjectMeta {
-                        location: config::meta::promql::blocks::metrics_index_path(&self.key.key)
+                        location: config::meta::promql::index::metrics_index_path(&self.key.key)
                             .unwrap()
                             .into(),
                         last_modified: chrono::Utc::now(),
@@ -2634,7 +2634,7 @@ mod tests {
                         let disk = disks
                             .iter()
                             .find(|disk| {
-                                config::meta::promql::blocks::metrics_index_path(&disk.key.key)
+                                config::meta::promql::index::metrics_index_path(&disk.key.key)
                                     .as_ref()
                                     == Some(&sidecar)
                             })

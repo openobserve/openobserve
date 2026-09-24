@@ -19,7 +19,7 @@ use std::{collections::HashSet, ops::Range, sync::Arc};
 
 use anyhow::{Context, Result, ensure};
 use arrow::datatypes::{DataType, Schema, SchemaRef};
-use config::meta::promql::midx::MidxTrailer;
+use config::meta::promql::index::MidxTrailer;
 use serde::{Deserialize, Serialize};
 
 use super::*;

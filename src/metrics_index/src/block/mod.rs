@@ -30,7 +30,7 @@ use arrow::{
     array::{Array, DictionaryArray, LargeStringArray, RecordBatch, StringArray, StringViewArray},
     datatypes::{DataType, Schema, SchemaRef, UInt8Type, UInt16Type, UInt32Type},
 };
-pub use config::meta::promql::midx::{MIDX_MAGIC, MIDX_TRAILER_LEN, MIDX_VERSION, MidxTrailer};
+pub use config::meta::promql::index::{MIDX_MAGIC, MIDX_TRAILER_LEN, MIDX_VERSION, MidxTrailer};
 pub use directory::{BlockDirectory, BlockIter};
 pub use header::Header;
 pub use reader::{BlockDecoder, decode_additional_labels, decode_block, decode_file, decode_index};
