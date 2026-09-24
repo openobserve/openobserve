@@ -4,8 +4,6 @@ const PageManager = require('../../../pages/page-manager.js');
 const { ingestTestData } = require('../../utils/data-ingestion.js');
 
 const STREAM = 'e2e_automate';
-const FIRST_FIELD = 'level';
-const SECOND_FIELD = 'message';
 
 test.describe("Logs Field Actions Regression", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -26,18 +24,22 @@ test.describe("Logs Field Actions Regression", () => {
   });
 
   test("a second field filter is ANDed onto the query, not substituted @bug-11988 @P1 @regression @logsRegression", async () => {
-    await pm.logsPage.addEqualsFilterForField(FIRST_FIELD);
+    // Which fields the sidebar offers varies by dataset, so take them as rendered.
+    const [firstField, secondField] = await pm.logsPage.getFilterableSidebarFields(2);
+    testLogger.info(`Using sidebar fields: ${firstField}, ${secondField}`);
+
+    await pm.logsPage.addEqualsFilterForField(firstField);
     const afterFirst = await pm.logsPage.getQueryEditorText();
     testLogger.info(`After first filter: ${afterFirst}`);
-    expect(afterFirst, 'first field filter must reach the editor').toContain(FIRST_FIELD);
+    expect(afterFirst, 'first field filter must reach the editor').toContain(firstField);
 
-    await pm.logsPage.addEqualsFilterForField(SECOND_FIELD);
+    await pm.logsPage.addEqualsFilterForField(secondField);
     const afterSecond = await pm.logsPage.getQueryEditorText();
     testLogger.info(`After second filter: ${afterSecond}`);
 
     // The defect replaced the first field, so the first surviving is the contract.
-    expect(afterSecond, 'the first field must survive the second').toContain(FIRST_FIELD);
-    expect(afterSecond, 'the second field must be added').toContain(SECOND_FIELD);
+    expect(afterSecond, 'the first field must survive the second').toContain(firstField);
+    expect(afterSecond, 'the second field must be added').toContain(secondField);
     expect(afterSecond.toLowerCase(), 'the two filters must be combined').toContain(' and ');
   });
 

@@ -2058,6 +2058,20 @@ export class LogsPage {
         return await this.page.locator(this.highlightedMatch).count();
     }
 
+    /** Sidebar fields that offer an "=" filter, in render order; the set varies by dataset. */
+    async getFilterableSidebarFields(count = 2) {
+        const fields = await this.page
+            .locator('[data-test^="logs-field-list-item-"]')
+            .evaluateAll((items) =>
+                items.map((i) => (i.getAttribute('data-test') || '').replace('logs-field-list-item-', '')),
+            );
+        const usable = fields.filter((f) => f && f !== '_timestamp');
+        if (usable.length < count) {
+            throw new Error(`need ${count} filterable sidebar fields, saw: ${fields.join(', ')}`);
+        }
+        return usable.slice(0, count);
+    }
+
     /** Click a sidebar field's "=" icon; it only renders while its row is hovered. */
     async addEqualsFilterForField(field) {
         await this.page.locator(this.fieldListItem(field)).first().hover();
