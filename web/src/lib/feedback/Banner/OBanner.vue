@@ -3,7 +3,7 @@ import type { I18nText } from "@/types/i18n";
 import { computed, useSlots } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-interface Props {
+export interface Props {
   variant?: "default" | "info" | "success" | "warning" | "error" | "error-soft" | "promo";
   content?: I18nText;
   icon?: string;

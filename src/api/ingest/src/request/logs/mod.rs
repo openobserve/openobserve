@@ -16,3 +16,4 @@
 pub mod hec_collector;
 pub mod ingest;
 pub mod loki;
+pub(crate) mod otlp_utf8;
