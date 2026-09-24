@@ -1271,7 +1271,9 @@ const isCompositionEnabled = computed(
   () => store.state.zoConfig?.synthetics_subtests_enabled === true,
 );
 
-const addDisabled = computed(() => !!props.readonly || isRecording.value || isRestoring.value);
+const addDisabled = computed(
+  () => !!props.readonly || isRecording.value || isRestoring.value || isReplayLocked.value,
+);
 
 useShortcuts([
   {
@@ -1541,7 +1543,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </template>
       </OInput>
       <div class="flex shrink-0 items-center justify-end gap-2">
-        <OButtonGroup v-if="!isRecording && !isReplayLocked" radius="sm">
+        <OButtonGroup radius="sm">
           <OButton
             variant="outline"
             size="sm"
@@ -1598,47 +1600,45 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </OButtonGroup>
 
         <!-- Run replay / Stop / Re-run — positionally stable, same slot -->
-        <template v-if="!isRecording">
-          <!-- Re-run after a finished replay is the same button in the same slot. -->
-          <OButtonGroup v-if="replayPhase === 'idle' || isReplayTerminal" radius="sm">
-            <OButton
-              variant="outline"
-              size="sm"
-              :disabled="replayDisabled"
-              data-test="synthetics-journey-replay-btn"
-              @click="onReplayButtonClick"
-              icon-left="replay"
-            >
-              <span class="max-w-40 truncate">{{ replayLabel }}</span>
-              <OIcon v-if="usesTypedSecrets" name="key" size="sm" aria-hidden="true" />
-              <OTooltip :content="replayTooltip" side="bottom" />
-            </OButton>
-            <slot name="replay-menu" :disabled="replayDisabled" />
-          </OButtonGroup>
+        <!-- Re-run after a finished replay is the same button in the same slot. -->
+        <OButtonGroup v-if="replayPhase === 'idle' || isReplayTerminal" radius="sm">
           <OButton
-            v-else-if="replayPhase === 'running'"
-            variant="destructive"
+            variant="outline"
             size="sm"
-            data-test="synthetics-journey-stop-replay-btn"
-            @click="emit('stop-replay')"
-            icon-left="stop"
+            :disabled="replayDisabled"
+            data-test="synthetics-journey-replay-btn"
+            @click="onReplayButtonClick"
+            icon-left="replay"
           >
-            {{ t("synthetics.journey.stop") }}
+            <span class="max-w-40 truncate">{{ replayLabel }}</span>
+            <OIcon v-if="usesTypedSecrets" name="key" size="sm" aria-hidden="true" />
+            <OTooltip :content="replayTooltip" side="bottom" />
           </OButton>
-          <!-- Stop acknowledged, extension not yet confirmed. Same slot, so no layout
-               shift; disabled so a second click cannot queue another stopReplay. -->
-          <OButton
-            v-else-if="isReplayStopping"
-            variant="destructive"
-            size="sm"
-            loading
-            disabled
-            data-test="synthetics-journey-stopping-replay-btn"
-            icon-left="stop"
-          >
-            {{ t("synthetics.journey.stopping") }}
-          </OButton>
-        </template>
+          <slot name="replay-menu" :disabled="replayDisabled" />
+        </OButtonGroup>
+        <OButton
+          v-else-if="replayPhase === 'running'"
+          variant="destructive"
+          size="sm"
+          data-test="synthetics-journey-stop-replay-btn"
+          @click="emit('stop-replay')"
+          icon-left="stop"
+        >
+          {{ t("synthetics.journey.stop") }}
+        </OButton>
+        <!-- Stop acknowledged, extension not yet confirmed. Same slot, so no layout
+             shift; disabled so a second click cannot queue another stopReplay. -->
+        <OButton
+          v-else-if="isReplayStopping"
+          variant="destructive"
+          size="sm"
+          loading
+          disabled
+          data-test="synthetics-journey-stopping-replay-btn"
+          icon-left="stop"
+        >
+          {{ t("synthetics.journey.stopping") }}
+        </OButton>
 
         <OButton
           v-if="isRecording"
@@ -2084,7 +2084,9 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
             />
           </span>
           <span class="text-status-error-text ps-1.5 text-sm font-semibold">{{
-            t("synthetics.journey.recording")
+            replayEnvironmentLabel
+              ? t("synthetics.journey.recordingIn", { environment: replayEnvironmentLabel })
+              : t("synthetics.journey.recording")
           }}</span>
         </span>
         <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
