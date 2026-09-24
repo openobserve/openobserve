@@ -2555,6 +2555,138 @@ pub static EVAL_SCHEDULER_WATERMARK_LAG_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|
     .expect("Metric created")
 });
 
+// AI chat persistence (server-side chat history; see core::ai_chat)
+pub static AI_CHAT_TURNS_ACTIVE: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "ai_chat_turns_active",
+            "Persisted AI chat turns currently running as background tasks",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_TURN_RESULT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_turn_result_total",
+            "Persisted AI chat turns by outcome (result=persisted|persistence_failed|cancelled|error|busy|timeout)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_BATCHES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_persist_batches_total",
+            "Durable-event batches written for AI chats (status=ok|retry|failed|fenced)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_persist_events_total",
+            "Durable events committed to the protected chat-events stream",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_BATCH_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_persist_batch_latency_seconds",
+            "Time to durably write one batch of AI chat events, including the watermark update",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_UI_DISCONNECTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_ui_disconnects_total",
+            "Browsers that went away while a persisted turn kept running (reason=closed|lagged)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_SEQUENCE_GAPS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_sequence_gaps_total",
+            "Turns whose durable events did not continue the committed prefix (persistence refused, not patched)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_RESTORES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_restores_total",
+            "o2-ai replicas rebuilt from the chat-events stream before a turn (result=ok|failed)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_RESTORE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_restore_seconds",
+            "Time to read a chat's committed history and replay it into an o2-ai replica",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_read_integrity_errors_total",
+            "Committed chat history that could not be read back intact (reason=gap|divergence|hash|decode)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_TURN_LEASE_CONFLICTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_turn_lease_conflicts_total",
+            "Chat turns refused with 409 session_busy because another turn held the session",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -3230,6 +3362,22 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(EVAL_SCHEDULER_WATERMARK_LAG_SECONDS.clone()))
         .expect("Metric registered");
 
+    // AI chat persistence
+    for metric in [
+        Box::new(AI_CHAT_TURN_RESULT_TOTAL.clone()) as Box<dyn prometheus::core::Collector>,
+        Box::new(AI_CHAT_PERSIST_BATCHES_TOTAL.clone()),
+        Box::new(AI_CHAT_PERSIST_EVENTS_TOTAL.clone()),
+        Box::new(AI_CHAT_UI_DISCONNECTS_TOTAL.clone()),
+        Box::new(AI_CHAT_SEQUENCE_GAPS_TOTAL.clone()),
+        Box::new(AI_CHAT_TURN_LEASE_CONFLICTS_TOTAL.clone()),
+        Box::new(AI_CHAT_TURNS_ACTIVE.clone()),
+        Box::new(AI_CHAT_PERSIST_BATCH_LATENCY_SECONDS.clone()),
+        Box::new(AI_CHAT_RESTORES_TOTAL.clone()),
+        Box::new(AI_CHAT_RESTORE_SECONDS.clone()),
+        Box::new(AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL.clone()),
+    ] {
+        registry.register(metric).expect("Metric registered");
+    }
     // on-call paging and escalation
     oncall::register(registry);
 }

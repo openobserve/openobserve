@@ -121,6 +121,19 @@ impl Sql {
         // 1. get table name
         let stream_names = resolve_stream_names_with_type(&sql)
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?;
+        // Every data query is resolved here, whoever issues it (UI, dashboards,
+        // alerts, reports, scheduled pipelines). The AI chat-events stream holds
+        // every user's conversations; only the Chat API reader may query it, and
+        // to anyone else it does not exist.
+        if !config::meta::self_reporting::ai_chat::is_chat_history_reader()
+            && let Some(protected) = stream_names.iter().find(|s| {
+                config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&s.stream_name())
+            })
+        {
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                protected.stream_name(),
+            )));
+        }
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream in stream_names.iter() {
             let stream_name = stream.stream_name();

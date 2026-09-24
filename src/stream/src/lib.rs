@@ -28,6 +28,7 @@ use config::{
     meta::{
         promql,
         promql::get_metadata_from_schema as get_prom_metadata_from_schema,
+        self_reporting::ai_chat::is_protected_ai_chat_stream,
         stream::{
             DistinctField, PartitionTimeLevel, StreamField, StreamSettings, StreamStats,
             StreamType, TimeRange, UpdateStreamSettings,
@@ -234,6 +235,15 @@ pub async fn create_stream(
     stream_type: StreamType,
     mut stream: StreamCreate,
 ) -> Result<HttpResponse, Error> {
+    // The AI chat-events stream is created and written only by server-side
+    // chat persistence, in every edition.
+    if is_protected_ai_chat_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            format!("stream name '{stream_name}' is reserved and cannot be created"),
+        ));
+    }
+
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
@@ -425,6 +435,12 @@ pub async fn update_stream_settings(
     stream_type: StreamType,
     mut new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
+    if is_protected_ai_chat_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            format!("stream '{stream_name}' is reserved and cannot be modified"),
+        ));
+    }
     let Some(settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await else {
         return Ok(MetaHttpResponse::not_found("stream not found"));
     };
@@ -740,6 +756,16 @@ where
     E: FnOnce(String, String, StreamType) -> EFut,
     EFut: Future<Output = ()>,
 {
+    // Chat history is deleted through the Chat API (which tombstones the
+    // session index and lets retention remove the rows), never by dropping
+    // the whole org's stream from the streams UI.
+    if is_protected_ai_chat_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            format!("stream '{stream_name}' is reserved and cannot be deleted"),
+        ));
+    }
+
     let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
         .await
         .unwrap();
@@ -1019,6 +1045,9 @@ pub async fn delete_fields(
     stream_type: Option<StreamType>,
     fields: &[String],
 ) -> Result<(), anyhow::Error> {
+    if is_protected_ai_chat_stream(stream_name) {
+        anyhow::bail!("stream '{stream_name}' is reserved and cannot be modified");
+    }
     if fields.is_empty() {
         return Ok(());
     }
@@ -1058,6 +1087,9 @@ pub async fn update_fields_type(
     stream_type: Option<StreamType>,
     field_updates: &[FieldUpdate],
 ) -> Result<(), anyhow::Error> {
+    if is_protected_ai_chat_stream(stream_name) {
+        anyhow::bail!("stream '{stream_name}' is reserved and cannot be modified");
+    }
     if field_updates.is_empty() {
         return Ok(());
     }

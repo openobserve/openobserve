@@ -17,6 +17,8 @@
 
 #![recursion_limit = "256"]
 
+#[cfg(feature = "enterprise")]
+pub mod ai_chat;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;

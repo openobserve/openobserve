@@ -386,7 +386,7 @@ import {
   truncateQuery,
 } from "@/components/O2AIChat.toolcall";
 
-const { submitFeedback } = useAiChat();
+const { submitFeedback, chatHistoryServer } = useAiChat();
 
 export default defineComponent({
   name: "O2AIChat",
@@ -485,6 +485,7 @@ export default defineComponent({
       () => store.state.userInfo.email ?? "",
       () => store.state.selectedOrganization.identifier ?? "",
       t,
+      chatHistoryServer(),
     );
 
     const userEmail = () => store.state.userInfo.email ?? "";

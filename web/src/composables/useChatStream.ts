@@ -48,7 +48,7 @@ import type {
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { getUUIDv7 } from "@/utils/zincutils";
 
-const { fetchAiChat } = useAiChat();
+const { fetchAiChat, cancelAiChat } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
 
 // Module scope, not setup(): O2AIChat mounts in both HomeView and MainLayout, and a stream handed off between them must share this state.
@@ -169,6 +169,12 @@ export function useChatStream(options: UseChatStreamOptions) {
 
   const cancelCurrentRequest = async () => {
     if (currentAbortController.value) {
+      // With server-side chat persistence the turn outlives this request, so aborting alone would leave it running; fire-and-forget.
+      if (currentSessionId.value) {
+        cancelAiChat(store.state.selectedOrganization.identifier, currentSessionId.value).catch(
+          (e: unknown) => console.debug("AI chat cancel request failed", e),
+        );
+      }
       currentAbortController.value.abort();
       currentAbortController.value = null;
 
