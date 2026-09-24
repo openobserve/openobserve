@@ -1474,6 +1474,8 @@
     "sessionReplay": "Odtwarzanie sesji",
     "viewSessionReplay": "Wyświetl odtwarzanie sesji",
     "playSessionReplay": "Odtwórz sesję",
+    "noReplayRecordedTitle": "Nie nagrano powtórki dla tej sesji",
+    "noReplayRecordedMessage": "Sesja {id} nie ma segmentów powtórki do odtworzenia.",
     "discoverSessionTitle": "Odkryj odtwarzanie sesji, aby szczegółowo zrozumieć interakcje użytkowników",
     "discoverSessionMessage": "Odtwarzanie sesji rejestruje i odtwarza interakcje użytkowników na Twojej stronie internetowej lub w aplikacji. Pozwala to wizualnie przejrzeć, jak użytkownicy nawigują, gdzie klikają, co wpisują i w jaki sposób angażują się w treści.",
     "loadingErrorDetails": "Trzymaj się, pobieramy szczegóły błędu.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "Rozpocznij bezpłatny okres próbny"
   },
   "login": {
+    "lockedOut": "Zbyt wiele nieudanych prób logowania. Spróbuj ponownie za {duration} lub skontaktuj się z administratorem.",
     "redirectingToSsoMessage": "Przekierowywanie do strony logowania SSO. Jeśli nie nastąpi przekierowanie, proszę",
     "clickHere": "kliknij tutaj",
     "loginWithSso": "Zaloguj się przez SSO",
@@ -1963,6 +1966,15 @@
     "fieldRequired": "Pole jest wymagane",
     "passwordRequired": "Hasło jest wymagane.",
     "passwordPolicyHint": "Hasło musi mieć 8-128 znaków i zawierać co najmniej jedną małą literę, jedną wielką literę, jedną cyfrę i jeden znak specjalny.",
+    "lockout": {
+      "locked": "Konto zablokowane",
+      "autoUnlock": "Odblokuje się automatycznie za {duration}.",
+      "staged": "Zostanie odblokowane po zapisaniu.",
+      "unlock": "Odblokuj",
+      "undo": "Pozostaw zablokowane",
+      "confirmTitle": "Odblokować {email}?",
+      "confirmMessage": "Powoduje to wyczyszczenie licznika nieudanych prób i umożliwia natychmiastowe ponowne zalogowanie. Hasło nie zostanie zmienione."
+    },
     "currentPasswordRequired": "Aktualne hasło jest wymagane.",
     "newPasswordRequired": "Nowe hasło jest wymagane.",
     "otherOrgInvalid": "Nazwa organizacji musi zaczynać się od litery i zawierać tylko litery, cyfry, _ lub -.",
@@ -2029,11 +2041,11 @@
       "addToGroup": "Dodaj do grupy użytkowników",
       "addToRole": "Przypisz rolę",
       "step1Title": "Skopiuj swój token",
-      "copyHint": "Skopiuj ten token teraz — nie będziesz mógł go ponownie zobaczyć.",
+      "copyHint": "To jedyny moment, w którym zobaczysz ten token. Skopiuj go lub pobierz teraz — nie będzie można go pobrać ponownie.",
       "done": "Gotowe",
       "applying": "Stosowanie przyznanych dostępu…",
-      "grantedRoles": "Przypisane role: {roles}",
-      "grantedGroups": "Dodano do grup użytkowników: {groups}",
+      "rolesAssignedLabel": "Przypisane role",
+      "groupsAssignedLabel": "Dodano do grup użytkowników",
       "failedRoles": "Nie można przypisać ról: {roles}",
       "failedGroups": "Nie można dodać do grup użytkowników: {groups}",
       "failedHint": "Możesz je przyznać później ze stron Role i Grupy użytkowników."
@@ -2043,6 +2055,9 @@
         "label": "Nazwa konta serwisowego",
         "placeholder": "np. ingest-bot",
         "help": "Małe litery, cyfry i myślniki. Zapisane jako name{suffix}"
+      },
+      "identifier": {
+        "label": "Identyfikator"
       },
       "roles": {
         "label": "Przypisz role",
@@ -2057,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Identyfikator",
+        "roles": "Role",
         "token": "Token",
         "created": "Utworzono"
       }
@@ -2184,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Wszyscy użytkownicy i konta serwisowe powiązane z tymi rolami stracą dostęp."
-      }
+      },
+      "assignColumn": "Przypisz",
+      "assignBtn": "Dodaj",
+      "assignedBadge": "Przypisano",
+      "assignBannerText": "Dodaj {member} do roli — kliknij Dodaj obok roli poniżej.",
+      "assignBannerDone": "Gotowe",
+      "assignSuccess": "Dodano {member} do roli \"{role}\".",
+      "assignError": "Nie udało się dodać konta do tej roli. Spróbuj ponownie."
     },
     "group": {
       "name": {
@@ -2215,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Członkowie tych grup stracą role przyznane przez nie."
-      }
+      },
+      "assignColumn": "Przypisz",
+      "assignBtn": "Dodaj",
+      "assignedBadge": "Przypisano",
+      "assignBannerText": "Dodaj {member} do grupy użytkowników — kliknij Dodaj obok grupy poniżej.",
+      "assignBannerDone": "Gotowe",
+      "assignSuccess": "Dodano {member} do grupy \"{group}\".",
+      "assignError": "Nie udało się dodać konta do tej grupy. Spróbuj ponownie."
     },
     "appGroups": {
       "deleteGroupTitle": "Usuń grupę",
@@ -3585,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Błąd podczas kopiowania zawartości.",
+    "passcodeForbiddenMessage": "Do wyświetlenia tokenu pozyskiwania danych wymagana jest rola administratora lub Root. Poproś administratora o polecenie konfiguracji albo o rolę potrzebną, aby go tu zobaczyć.",
     "updateRUMTokenMessage": "Czy na pewno chcesz zaktualizować token RUM dla tej organizacji?",
     "completeAwsIntegration": "Zakończ integrację AWS",
     "deployAwsServicesOneClick": "Wdróż wszystkie wybrane usługi AWS jednym kliknięciem przy użyciu pojedynczego stosu CloudFormation.",
@@ -4966,7 +4997,7 @@
     "colorLightToDarkBlue": "Jasny do ciemnoniebieskiego (według wartości)",
     "colorPaletteClassicBySeries": "Paleta-klasyczna (według serii)",
     "drilldown": "Drilldown",
-    "drilldownTooltip": "Przejdź do innego pulpitu lub określonego adresu URL, przenosząc wszystkie bieżące zmienne w celu płynnej eksploracji danych.",
+    "drilldownTooltip": "Przejdź do innego pulpitu lub podanego adresu URL, przenosząc wszystkie bieżące zmienne w celu płynnej eksploracji danych.",
     "colorBySeriesTitle": "Kolorowanie według serii",
     "colorBySeriesTooltip": "Zastosuj kolory do serii, aby lepiej odróżnić je na wykresach. Dostosuj kolory dla każdej serii, aby poprawić wizualizację danych.",
     "editColorBySeries": " Edytuj kolorowanie według serii",
@@ -7604,7 +7635,9 @@
       "usernameRequired": "Nazwa użytkownika jest wymagana",
       "passwordRequired": "Hasło jest wymagane",
       "emailRecipients": "Adresy e-mail odbiorców",
-      "emailRecipientsHelp": "Rozdzielone przecinkami adresy e-mail",
+      "emailRecipientsHelp": "Wybierz użytkowników organizacji lub konta usługowe, które powinny otrzymywać e-maile z alertami",
+      "emailRecipientsGroupUsers": "Użytkownicy",
+      "emailRecipientsGroupServiceAccounts": "Konta serwisowe",
       "invalidEmailAddresses": "Nieprawidłowe adresy e-mail: {emails}",
       "opsgenieApiKey": "Klucz API Opsgenie",
       "opsgenieApiKeyHelp": "Pobierz klucz API z ustawień integracji Opsgenie",
@@ -8789,6 +8822,8 @@
     "cipherKeysDesc": "Klucze szyfrowania dla poufnych pól",
     "regexPatternsDesc": "Wielokrotnego użytku wzorce regex do maskowania",
     "domainManagementDesc": "Ogranicz logowanie do dozwolonych domen SSO",
+    "passwordPolicy": "Zasady haseł",
+    "passwordPolicyDesc": "Zasady uwierzytelniania dla natywnych kont e-mail/hasło, stosowane w całej instancji.",
     "pipelineDestinationsDesc": "Zewnętrzne cele dla wyjścia potoku",
     "templatesDesc": "Wielokrotnego użytku szablony wiadomości alertów",
     "storageSettingsDesc": "Konfiguracja przechowywania na organizację",
@@ -13041,10 +13076,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Dane wejściowe z głównego spanu trace."
+              "trace": "Dane wejściowe z głównego spanu czatu w trace.",
+              "session": "Pytanie otwierające: dane wejściowe z głównego spanu czatu pierwszego trace."
             },
             "output": {
-              "trace": "Dane wyjściowe z głównego spanu trace."
+              "trace": "Dane wyjściowe z głównego spanu czatu w trace.",
+              "session": "Odpowiedź końcowa: dane wyjściowe z głównego spanu czatu ostatniego trace."
             },
             "statistics": {
               "trace": "Metryki trace: liczba spanów, czas trwania, wywołania LLM i narzędzi, błędy, tokeny i koszt.",
@@ -13056,6 +13093,10 @@
             "steps": {
               "trace": "Spany w kolejności chronologicznej; środkowa część jest zwijana, gdy trace jest bardzo długi.",
               "session": "Trace'y w kolejności chronologicznej, reprezentowane jako tury rozmowy."
+            },
+            "tool_calls": {
+              "trace": "Każde wywołanie narzędzia w trace, w kolejności chronologicznej, wraz z nazwą, danymi wejściowymi, danymi wyjściowymi i statusem.",
+              "session": "Każde wywołanie narzędzia we wszystkich trace'ach sesji, w kolejności chronologicznej, wraz z nazwą, danymi wejściowymi, danymi wyjściowymi i statusem."
             }
           }
         }
@@ -13375,6 +13416,7 @@
       "searchHistoryNotEnabled": "Historia wyszukiwania nie jest włączona.",
       "enableUsageReporting": "Ustaw ZO_USAGE_REPORTING_ENABLED na true, aby włączyć raportowanie użycia.",
       "selectStreamToExtractPatterns": "Wybierz strumień, aby wyodrębnić wzorce",
+      "patternsUnavailableForMultiStream": "Wzorce nie są dostępne, gdy wybrano wiele strumieni. Wybierz pojedynczy strumień.",
       "errorExtractingPatterns": "Błąd wyodrębniania wzorców. Spróbuj ponownie.",
       "nameOfPanelRequired": "Nazwa panelu jest wymagana",
       "errorsFixAndTryAgain": "Wystąpiły błędy, popraw je i spróbuj ponownie",
@@ -15164,7 +15206,6 @@
       "syntheticsTokensRefresh": "Odśwież listę tokenów",
       "aiChatToggle": "Przełącz czat AI",
       "aiChatClose": "Zamknij czat AI",
-      "aiChatExpand": "Rozwiń/zwiń czat AI",
       "logsSaveView": "Zapisz jako zapisany widok",
       "logsExport": "Eksportuj wyniki jako CSV",
       "tracesCopyUrl": "Kopiuj URL do udostępnienia śladu",
@@ -15777,7 +15818,8 @@
         "destinations": "Cele",
         "templates": "Szablony",
         "reports": "Raporty",
-        "llmModelPricing": "Cennik modeli LLM"
+        "llmModelPricing": "Cennik modeli LLM",
+        "passcode": "Token pozyskiwania danych"
       },
       "noPermissionToChangeFavorites": "Nie masz uprawnień do zmiany ulubionych",
       "couldNotUpdateFavoriteDashboards": "Nie udało się zaktualizować ulubionych pulpitów"
@@ -16015,6 +16057,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "Nie zainicjowano jeszcze procesu pozyskiwania danych. Aby przeglądać inne strony, rozpocznij pozyskiwanie danych."
+    },
+    "iam": {
+      "userSaveFailed": "Nie udało się zapisać użytkownika"
     }
   },
   "cipherKeys": {
@@ -16432,7 +16477,106 @@
       "exponentName": "Wykładnik"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Złożoność",
+    "minLength": "Minimalna długość",
+    "minLengthDesc": "Najkrótsze akceptowane hasło",
+    "maxLength": "Maksymalna długość",
+    "maxLengthDesc": "0 = bez limitu",
+    "requireUppercase": "Wymagaj wielkiej litery",
+    "requireUppercaseDesc": "Co najmniej jedna litera A–Z",
+    "requireLowercase": "Wymagaj małej litery",
+    "requireLowercaseDesc": "Co najmniej jedna litera a–z",
+    "requireDigit": "Wymagaj cyfry",
+    "requireDigitDesc": "Co najmniej jedna cyfra 0–9",
+    "requireSpecial": "Wymagaj znaku specjalnego",
+    "requireSpecialDesc": "Co najmniej jeden z dozwolonego zestawu",
+    "specialCharSet": "Dozwolone znaki specjalne",
+    "specialCharSetDesc": "Pozostaw puste, aby akceptować dowolny znak niealfanumeryczny",
+    "maxLengthTooSmall": "Maksymalna długość musi wynosić co najmniej tyle, ile minimalna, albo 0 dla braku limitu.",
+    "confirmTitle": "Zapisać zasady haseł?",
+    "confirmMessage": "Zapisanie może wymusić na każdym natywnym użytkowniku ustawienie nowego hasła przed dalszym korzystaniem. Konto root, użytkownicy zewnętrzni i konta usług są zwolnione — dotyczy to również Ciebie, chyba że jesteś kontem root. Tej operacji nie można cofnąć.",
+    "saved": "Zasady haseł zostały zapisane. | Zasady haseł zostały zapisane. {count} użytkowników musi zresetować swoje hasła. | Zasady haseł zostały zapisane. {count} użytkowników musi zresetować swoje hasła.",
+    "saveFailed": "Nie udało się zapisać zasad haseł.",
+    "notAdminTitle": "Wymagany dostęp administratora",
+    "notAdmin": "Konfigurowanie zasad haseł wymaga administratora organizacji meta.",
+    "loadFailedTitle": "Nie udało się wczytać zasad haseł",
+    "loadFailed": "Wystąpił problem podczas odczytywania bieżących zasad.",
+    "rotation": "Rotacja",
+    "rotationDays": "Okres rotacji",
+    "rotationDaysDesc": "Liczba dni do wygaśnięcia hasła. 0 = nigdy nie wygasa",
+    "rotationWarningDays": "Ostrzegaj przed wygaśnięciem",
+    "rotationWarningDaysDesc": "Liczba dni powiadomienia przy logowaniu. 0 = brak ostrzeżenia",
+    "warningDaysTooLong": "Okno ostrzeżenia nie może być dłuższe niż okres rotacji.",
+    "rotationPreview": "Hasło ustawione dzisiaj wygasa {expires}. Ostrzeżenie przy logowaniu rozpoczyna się {warns}.",
+    "rotationPreviewNoWarning": "Hasło ustawione dzisiaj wygasa {expires}. Do tego czasu nie jest wyświetlane żadne ostrzeżenie.",
+    "reuse": "Zapobieganie ponownemu użyciu",
+    "historyCount": "Zapamiętane hasła",
+    "historyCountDesc": "Nowe hasło nie może być takie samo jak ta liczba poprzednich. 0 = brak sprawdzania",
+    "historyMaxRetained": "Zachowana historia",
+    "historyMaxRetainedDesc": "Ile poprzednich haseł jest zachowywanych na użytkownika",
+    "historyRetainedTooSmall": "Zachowana historia musi wynosić co najmniej tyle, ile liczba zapamiętanych haseł.",
+    "reuseExplainer": "Bieżące hasło liczy się jako jedno z zapamiętanego zestawu — jego ponowne użycie jest odrzucane przez tę regułę, a nie przez osobne sprawdzenie.",
+    "lockout": "Blokada konta",
+    "lockoutThreshold": "Nieudane próby przed blokadą",
+    "lockoutThresholdDesc": "0 = blokada wyłączona",
+    "lockoutBucketSize": "Próby przed każdą kolejną blokadą",
+    "lockoutBucketSizeDesc": "0 = użyj wartości powyżej",
+    "lockoutStartSecs": "Czas trwania pierwszej blokady",
+    "lockoutStartSecsDesc": "Sekundy",
+    "lockoutMaxSecs": "Maksymalny czas trwania blokady",
+    "lockoutMaxSecsDesc": "Sekundy — pułap, do którego ograniczana jest eskalacja",
+    "lockoutStartTooLong": "Pierwsza blokada nie może trwać dłużej niż maksymalna blokada.",
+    "lockoutBackoff": "Eskalacja",
+    "lockoutBackoffDesc": "Jak każda blokada rośnie względem poprzedniej",
+    "backoffExponential": "Wykładnicza",
+    "backoffLinear": "Liniowa",
+    "lockoutPreview": "{threshold} nieudanych prób → {first} · co {bucket} kolejnych prób → {rest} · ograniczone do {max}. Udane logowanie resetuje wszystko.",
+    "sessionEnforcement": "Sesja i egzekwowanie",
+    "cookieMaxAge": "Czas życia sesji",
+    "cookieMaxAgeDesc": "Liczba sekund, przez jaką zalogowana sesja pozostaje ważna. 0 = użyj domyślnej wartości instancji z {envVar}",
+    "applyToRoot": "Zastosuj do konta root",
+    "applyToRootDesc": "Konto root jest zwolnione ze wszystkich powyższych reguł, chyba że ta opcja jest włączona.",
+    "rootWarning": "Zablokowanie konta root może wprowadzić system w stan nie do odzyskania.",
+    "rootDialogTitle": "Zastosować politykę do konta root?",
+    "rootDialogMessage": "Konto root będzie podlegać blokadzie, rotacji i wymuszonym resetom tak jak każde inne konto natywne. Jeśli root jest Twoim jedynym kontem administracyjnym, blokada lub wygaśnięcie, którego nie da się spełnić, sprawi, że nie będzie już drogi powrotnej do tej instancji.",
+    "rootDialogAck": "Rozumiem, że konto root może zostać trwale zablokowane w tej instancji.",
+    "rootDialogConfirm": "Zastosuj do konta root"
+  },
+  "passwordReset": {
+    "title": "Zaktualizuj hasło",
+    "signedInAs": "Zalogowano jako {email}",
+    "reasonPolicyTightened": "Polityka haseł uległa zmianie. Zaktualizuj hasło, aby dalej korzystać z OpenObserve.",
+    "reasonRotationExpired": "Twoje hasło wygasło. Ustaw nowe, aby dalej korzystać z OpenObserve.",
+    "reasonRotationWarning": "Twoje hasło wkrótce wygaśnie. Ustaw nowe teraz, aby uniknąć zablokowania dostępu do pracy.",
+    "reused": "To hasło było niedawno używane. Wybierz hasło, którego nie było wśród Twoich ostatnich {count} haseł.",
+    "expiryBanner": "Twoje hasło wygasa za {count} dzień. Zaktualizuj je teraz, aby uniknąć zablokowania dostępu do pracy. | Twoje hasło wygasa za {count} dni. Zaktualizuj je teraz, aby uniknąć zablokowania dostępu do pracy.",
+    "expiryBannerAction": "Zaktualizuj teraz",
+    "expiryBannerDismiss": "Odrzuć",
+    "currentPassword": "Obecne hasło",
+    "newPassword": "Nowe hasło",
+    "confirmPassword": "Potwierdź nowe hasło",
+    "currentPasswordRequired": "Obecne hasło jest wymagane.",
+    "newPasswordRequired": "Nowe hasło jest wymagane.",
+    "confirmPasswordRequired": "Wprowadź ponownie nowe hasło.",
+    "mismatch": "Hasła nie są zgodne.",
+    "signOut": "Wyloguj się",
+    "submit": "Zaktualizuj hasło",
+    "updated": "Twoje hasło zostało zaktualizowane. Zaloguj się ponownie.",
+    "updateFailed": "Nie udało się zaktualizować hasła.",
+    "req": {
+      "minLength": "Co najmniej {count} znaków",
+      "maxLength": "Nie więcej niż {count} znaków",
+      "uppercase": "Jedna wielka litera",
+      "lowercase": "Jedna mała litera",
+      "digit": "Jedna cyfra",
+      "special": "Jeden znak specjalny",
+      "specialFromSet": "Jeden znak specjalny z {set}",
+      "unmet": "Hasło musi zawierać: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Polityka haseł",
     "loginCallback": "Callback logowania",
     "slackOAuthCallback": "Łączenie ze Slackiem",
     "emptyStateDemo": "Demo pustego stanu",

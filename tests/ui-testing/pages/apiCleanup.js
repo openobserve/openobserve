@@ -222,6 +222,262 @@ class APICleanup {
     }
 
     /**
+     * Create an alerts folder via the v2 folders API.
+     * @param {string} name - Unique folder name
+     * @returns {Promise<{folderId: string, name: string}>}
+     */
+    async createAlertFolder(name) {
+        const response = await this._fetch(
+            `${this.baseUrl}/api/v2/${this.org}/folders/alerts`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description: '' })
+            }
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createAlertFolder: HTTP ${response.status} — ${body}`);
+        }
+        const folder = await response.json();
+        testLogger.info('Created alert folder', { name, folderId: folder.folderId });
+        return { folderId: folder.folderId, name: folder.name };
+    }
+
+    /**
+     * Seed `count` minimal scheduled alerts into a folder.
+     * Alert creation validates the source stream exists, so a single row is ingested
+     * into a dedicated stream first.
+     * @param {string} folderId
+     * @param {number} count
+     * @param {string} prefix - Alert name prefix (deterministic ordering by name); also used
+     *   to derive the source stream name
+     * @returns {Promise<Array<{alertId: string, name: string}>>}
+     */
+    async seedAlertsInFolder(folderId, count, prefix) {
+        const streamName = `${prefix}_stream`;
+        await this._fetch(`${this.baseUrl}/api/${this.org}/${streamName}/_json`, {
+            method: 'POST',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify([{ message: 'e2e pagination seed row' }])
+        });
+        await this.waitForStreamSchema(streamName);
+
+        // Alert creation requires at least one destination (or workflow) attached.
+        const templateName = `${prefix}_tmpl`;
+        const destinationName = `${prefix}_dest`;
+        await this.createAlertTemplate(templateName);
+        await this.createAlertDestination(destinationName, templateName);
+
+        const created = [];
+        for (let i = 0; i < count; i++) {
+            const name = `${prefix}_${i}`;
+            const payload = {
+                name,
+                stream_type: 'logs',
+                stream_name: streamName,
+                is_real_time: false,
+                query_condition: {
+                    type: 'custom',
+                    conditions: { version: 2, conditions: { filterType: 'group', logicalOperator: 'AND', conditions: [] } },
+                    sql: null, promql: null, promql_condition: null, aggregation: null,
+                    vrl_function: null, search_event_type: null, multi_time_range: [],
+                },
+                trigger_condition: {
+                    period: 10, operator: '>=', threshold: 3, frequency: 10, cron: '',
+                    frequency_type: 'minutes', silence: 10, timezone: 'UTC', align_time: true,
+                },
+                destinations: [destinationName], context_attributes: {}, row_template: '', enabled: false,
+            };
+            const response = await this._fetch(
+                `${this.baseUrl}/api/v2/${this.org}/alerts?folder=${folderId}`,
+                {
+                    method: 'POST',
+                    headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }
+            );
+            if (!response.ok) {
+                const body = await response.text();
+                throw new Error(`seedAlertsInFolder: HTTP ${response.status} — ${body}`);
+            }
+            created.push({ name });
+        }
+        return { alerts: created, templateName, destinationName, streamName };
+    }
+
+    /**
+     * Poll a freshly-ingested stream's settings endpoint until its schema is
+     * registered. Alert creation validates the source stream exists, and schema
+     * registration can lag a moment behind the ingest write on a busy shared env.
+     * @param {string} streamName
+     * @param {number} maxWaitMs
+     */
+    async waitForStreamSchema(streamName, maxWaitMs = 15000) {
+        const deadline = Date.now() + maxWaitMs;
+        while (Date.now() < deadline) {
+            const response = await this._fetch(
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+                { method: 'GET', headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' } }
+            );
+            if (response.ok) return;
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        testLogger.warn('Stream schema did not register in time', { streamName, maxWaitMs });
+    }
+
+    /**
+     * Fetch all alert templates (prebuilt + custom).
+     * @returns {Promise<Array>} Array of template objects
+     */
+    async fetchAlertTemplates() {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/templates`, {
+                method: 'GET',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) {
+                testLogger.error('Failed to fetch alert templates', { status: response.status });
+                return [];
+            }
+            return await response.json();
+        } catch (error) {
+            testLogger.error('Failed to fetch alert templates', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Create an alert notification template via API.
+     * @param {string} name
+     * @param {string} [body] - Defaults to a minimal valid template body
+     */
+    async createAlertTemplate(name, body = null) {
+        const templateBody = body || '{"text": "{alert_name} is active"}';
+        const response = await this._fetch(
+            `${this.baseUrl}/api/${this.org}/alerts/templates`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, body: templateBody })
+            }
+        );
+        if (!response.ok) {
+            const errBody = await response.text();
+            throw new Error(`createAlertTemplate: HTTP ${response.status} — ${errBody}`);
+        }
+        testLogger.info('Created alert template via API', { name });
+    }
+
+    /**
+     * Seed `count` minimal alert templates.
+     * @param {number} count
+     * @param {string} prefix
+     * @returns {Promise<Array<{name: string}>>}
+     */
+    async seedAlertTemplates(count, prefix) {
+        const created = [];
+        for (let i = 0; i < count; i++) {
+            const name = `${prefix}_${i}`;
+            await this.createAlertTemplate(name);
+            created.push({ name });
+        }
+        return created;
+    }
+
+    /**
+     * Delete a single alert template by name.
+     * @param {string} name
+     * @returns {Promise<Object>} { code, message }
+     */
+    async deleteAlertTemplate(name) {
+        try {
+            const response = await this._fetch(
+                `${this.baseUrl}/api/${this.org}/alerts/templates/${encodeURIComponent(name)}`,
+                {
+                    method: 'DELETE',
+                    headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+                }
+            );
+            const text = await response.text();
+            return { code: response.ok ? 200 : response.status, message: text };
+        } catch (error) {
+            testLogger.error('Failed to delete alert template', { name, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Create an HTTP alert destination via API. example.com is IANA-reserved and never
+     * contacted — no spec fires these alerts, so the destination just needs a URL the
+     * server's SSRF guard accepts (it blocks localhost/private targets).
+     * @param {string} name
+     * @param {string} templateName - Must reference an existing template
+     */
+    async createAlertDestination(name, templateName) {
+        const payload = {
+            name,
+            url: 'http://example.com/e2e_pag_sink',
+            method: 'post',
+            template: templateName,
+            type: 'http',
+            headers: {}
+        };
+        const response = await this._fetch(
+            `${this.baseUrl}/api/${this.org}/alerts/destinations`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }
+        );
+        if (!response.ok) {
+            const errBody = await response.text();
+            throw new Error(`createAlertDestination: HTTP ${response.status} — ${errBody}`);
+        }
+        testLogger.info('Created alert destination via API', { name });
+    }
+
+    /**
+     * Seed `count` minimal HTTP alert destinations, all sharing one template.
+     * @param {number} count
+     * @param {string} prefix
+     * @param {string} templateName
+     * @returns {Promise<Array<{name: string}>>}
+     */
+    async seedAlertDestinations(count, prefix, templateName) {
+        const created = [];
+        for (let i = 0; i < count; i++) {
+            const name = `${prefix}_${i}`;
+            await this.createAlertDestination(name, templateName);
+            created.push({ name });
+        }
+        return created;
+    }
+
+    /**
+     * Delete a single alert destination by name.
+     * @param {string} name
+     * @returns {Promise<Object>} { code, message }
+     */
+    async deleteAlertDestination(name) {
+        try {
+            const response = await this._fetch(
+                `${this.baseUrl}/api/${this.org}/alerts/destinations/${encodeURIComponent(name)}`,
+                {
+                    method: 'DELETE',
+                    headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+                }
+            );
+            const text = await response.text();
+            return { code: response.ok ? 200 : response.status, message: text };
+        } catch (error) {
+            testLogger.error('Failed to delete alert destination', { name, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
      * Fetch all dashboard folders
      * @returns {Promise<Array>} Array of folder objects
      */
@@ -245,6 +501,73 @@ class APICleanup {
         } catch (error) {
             testLogger.error('Failed to fetch dashboard folders', { error: error.message });
             return [];
+        }
+    }
+
+    /**
+     * Create a dashboards folder via the v2 folders API.
+     * @param {string} name - Unique folder name
+     * @returns {Promise<{folderId: string, name: string}>}
+     */
+    async createDashboardFolder(name) {
+        const response = await this._fetch(
+            `${this.baseUrl}/api/v2/${this.org}/folders/dashboards`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description: '', icon: null })
+            }
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createDashboardFolder: HTTP ${response.status} — ${body}`);
+        }
+        const folder = await response.json();
+        testLogger.info('Created dashboard folder', { name, folderId: folder.folderId });
+        return { folderId: folder.folderId, name: folder.name };
+    }
+
+    /**
+     * Seed `count` minimal dashboards into a folder via createMinimalDashboard.
+     * @param {string} folderId
+     * @param {number} count
+     * @param {string} prefix - Dashboard title prefix (deterministic ordering by name)
+     * @returns {Promise<Array<{dashboardId: string, title: string}>>}
+     */
+    async seedDashboardsInFolder(folderId, count, prefix) {
+        const created = [];
+        for (let i = 0; i < count; i++) {
+            const title = `${prefix}_${i}`;
+            const { dashboardId } = await this.createMinimalDashboard(title, folderId);
+            created.push({ dashboardId, title });
+        }
+        return created;
+    }
+
+    /**
+     * Delete a dashboards folder by id. Dashboards inside must be removed first,
+     * otherwise the backend returns 400 ("Folder contains dashboards").
+     * @param {string} folderId
+     * @returns {Promise<Object>} { code, message }
+     */
+    async deleteDashboardFolder(folderId) {
+        try {
+            const response = await this._fetch(
+                `${this.baseUrl}/api/v2/${this.org}/folders/dashboards/${folderId}`,
+                {
+                    method: 'DELETE',
+                    headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+                }
+            );
+            const text = await response.text();
+            if (response.ok) {
+                return { code: 200, message: text };
+            }
+            testLogger.warn('Failed to delete dashboard folder', { folderId, status: response.status, body: text });
+            return { code: response.status, message: text };
+        } catch (error) {
+            testLogger.error('Failed to delete dashboard folder', { folderId, error: error.message });
+            return { code: 500, error: error.message };
         }
     }
 
@@ -302,7 +625,9 @@ class APICleanup {
             throw new Error(`createMinimalDashboard: HTTP ${response.status} — ${body}`);
         }
         const result = await response.json();
-        const dashboardId = result.dashboard_id || result.dashboardId || result.id;
+        // MetaDashboard nests the actual data under the version key (e.g. "v8").
+        const inner = result[`v${result.version}`] || result;
+        const dashboardId = inner.dashboardId || inner.dashboard_id || result.dashboard_id || result.id;
         testLogger.info('Created minimal dashboard', { dashboardId, folderId });
         return { dashboardId, folderId };
     }
@@ -375,6 +700,74 @@ class APICleanup {
         const dashboardId = inner.dashboardId || inner.dashboard_id || result.dashboard_id || result.id;
         testLogger.info('Created dashboard with panel', { dashboardId, panelTitle, folderId });
         return { dashboardId, folderId };
+    }
+
+    /**
+     * Create a dashboard with `panelCount` stacked bar panels, each laid out at
+     * full width (w:24, h:8) and offset vertically (y: 0, 9, 18, ...) so the grid
+     * is tall enough to exceed one print page. Used by the dashboard print-layout
+     * specs, which need a deterministic multi-panel grid geometry.
+     * @param {string} title - Dashboard title
+     * @param {number} [panelCount=4] - Number of stacked panels
+     * @param {string} [streamName='e2e_automate'] - Logs stream each panel queries
+     * @returns {Promise<{dashboardId: string, folderId: string}>}
+     */
+    async createDashboardWithStackedPanels(title, panelCount = 4, streamName = 'e2e_automate') {
+        const panels = [];
+        for (let i = 0; i < panelCount; i++) {
+            panels.push({
+                id: `Panel_ID${Date.now()}_${i}`,
+                type: 'bar',
+                title: `${title} Panel ${i + 1}`,
+                description: '',
+                config: { show_legends: false, decimals: 2, drilldown: [] },
+                queryType: 'sql',
+                queries: [
+                    {
+                        query: `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "${streamName}" GROUP BY x_axis_1`,
+                        vrlFunctionQuery: '',
+                        customQuery: false,
+                        fields: {
+                            stream: streamName,
+                            stream_type: 'logs',
+                            x: [{ label: 'Timestamp', alias: 'x_axis_1', column: '_timestamp', color: null, aggregationFunction: 'histogram' }],
+                            y: [{ label: 'Count', alias: 'y_axis_1', column: '_timestamp', color: '#5960b2', aggregationFunction: 'count' }],
+                            z: [],
+                            breakdown: [],
+                            filter: { filterType: 'group', logicalOperator: 'AND', conditions: [] },
+                        },
+                        config: { promql_legend: '', layer_type: 'scatter', weight_fixed: 1, limit: 0, min: 0, max: 100 },
+                    },
+                ],
+                layout: { x: 0, y: i * 9, w: 24, h: 8, i: i + 1 },
+            });
+        }
+        const payload = {
+            version: 5,
+            title,
+            description: '',
+            role: '',
+            owner: this.email,
+            tabs: [{ tabId: 'default', name: 'Default', panels }],
+            variables: {},
+        };
+        const response = await this._fetch(
+            `${this.baseUrl}/api/${this.org}/dashboards?folder=${encodeURIComponent('default')}`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createDashboardWithStackedPanels: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json();
+        const inner = result[`v${result.version}`] || result;
+        const dashboardId = inner.dashboardId || inner.dashboard_id || result.dashboard_id || result.id;
+        testLogger.info('Created dashboard with stacked panels', { dashboardId, panelCount, folderId: 'default' });
+        return { dashboardId, folderId: 'default' };
     }
 
     /**

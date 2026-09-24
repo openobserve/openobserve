@@ -96,6 +96,17 @@ describe("ONavbar", () => {
       expect(nav.attributes("role")).toBe("navigation");
       expect(nav.attributes("aria-label")).toBe("Main navigation");
     });
+
+    it("renders no tiles — not even the standalone Infra group — while linksList is empty", () => {
+      // Regression: MainLayout keeps `visible` at its default `true` and drives
+      // content purely through `linksList`, holding it at `[]` until config
+      // settles (menuReady). Infra's default children carry no `requires`, so
+      // before the navGroups.ts empty-input guard it would still render alone
+      // on refresh — every other group needs an absorbed item to be present.
+      wrapper = mountNavbar({ linksList: [] });
+      expect(wrapper.findAll('[data-test^="menu-link-"]')).toHaveLength(0);
+      expect(wrapper.findAll('[data-test^="nav-group-"]')).toHaveLength(0);
+    });
   });
 
   describe("grouping", () => {

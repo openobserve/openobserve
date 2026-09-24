@@ -15,15 +15,15 @@
 
   // Reflect when the SDK bundles have actually loaded and initialized.
   function reportReady() {
-    if (window.OO_RUM && typeof window.OO_RUM.getInternalContext === 'function') {
+    if (window.O2_RUM && typeof window.O2_RUM.getInternalContext === 'function') {
       setStatus('RUM ready — session active. Interact to generate events.');
     } else {
       // Still queued; the stub exists but the bundle has not parsed yet.
       setStatus('RUM stub queued — waiting for CDN bundle…');
     }
   }
-  if (window.OO_RUM) window.OO_RUM.onReady(reportReady);
-  if (window.OO_LOGS) window.OO_LOGS.onReady(function () { setStatus('Logs SDK ready.'); });
+  if (window.O2_RUM) window.O2_RUM.onReady(reportReady);
+  if (window.O2_LOGS) window.O2_LOGS.onReady(function () { setStatus('Logs SDK ready.'); });
 
   window.ooSample = {
     // Clear the OpenObserve session cookie so a brand-new session is created
@@ -37,8 +37,8 @@
 
     // RUM custom action — shows up as a named action in RUM.
     trackAction: function () {
-      window.OO_RUM.onReady(function () {
-        window.OO_RUM.addAction('sample_custom_action', { source: 'cdn-sample', clickedAt: Date.now() });
+      window.O2_RUM.onReady(function () {
+        window.O2_RUM.addAction('sample_custom_action', { source: 'cdn-sample', clickedAt: Date.now() });
       });
       setStatus('Sent RUM custom action: sample_custom_action');
     },
@@ -54,8 +54,8 @@
 
     // Generate a resource-timing entry (trackResources captures this).
     doFetch: function () {
-      setStatus('Fetching https://browsersdk.openobserve.ai/0.3.4/openobserve-rum-slim.js …');
-      fetch('https://browsersdk.openobserve.ai/0.3.4/openobserve-rum-slim.js', { cache: 'no-store' })
+      setStatus('Fetching https://browsersdk.openobserve.ai/0.4.3/openobserve-rum-slim.js …');
+      fetch('https://browsersdk.openobserve.ai/0.4.3/openobserve-rum-slim.js', { cache: 'no-store' })
         .then(function (r) { setStatus('Fetch done: HTTP ' + r.status); })
         .catch(function (e) { setStatus('Fetch failed: ' + e.message); });
     },
@@ -74,15 +74,15 @@
 
     // Explicit structured logs via the Logs SDK.
     logInfo: function () {
-      window.OO_LOGS.onReady(function () {
-        window.OO_LOGS.logger.info('Sample info log', { feature: 'cdn-sample', level: 'info' });
+      window.O2_LOGS.onReady(function () {
+        window.O2_LOGS.logger.info('Sample info log', { feature: 'cdn-sample', level: 'info' });
       });
       setStatus('Sent info log to OpenObserve Logs.');
     },
 
     logError: function () {
-      window.OO_LOGS.onReady(function () {
-        window.OO_LOGS.logger.error('Sample error log', { feature: 'cdn-sample', level: 'error' });
+      window.O2_LOGS.onReady(function () {
+        window.O2_LOGS.logger.error('Sample error log', { feature: 'cdn-sample', level: 'error' });
       });
       setStatus('Sent error log to OpenObserve Logs.');
     },
@@ -90,8 +90,8 @@
     // Attach user identity to the session.
     setUser: function () {
       var name = document.querySelector('[data-test="rum-sample-user-name-input"]').value || 'Anonymous';
-      window.OO_RUM.onReady(function () {
-        window.OO_RUM.setUser({ id: '1', name: name, email: 'sample@example.com' });
+      window.O2_RUM.onReady(function () {
+        window.O2_RUM.setUser({ id: '1', name: name, email: 'sample@example.com' });
       });
       setStatus('Set RUM user: ' + name);
     },

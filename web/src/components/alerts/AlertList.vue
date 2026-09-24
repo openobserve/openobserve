@@ -1129,7 +1129,7 @@ export default defineComponent({
       (isLoading) => {
         if (isLoading) return;
         setTimeout(() => {
-          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+          oTableRef.value?.restorePage?.(currentPage.value);
         }, 0);
       },
       { once: true },
@@ -2292,6 +2292,8 @@ export default defineComponent({
           loading.value = false;
           return;
         }
+        // A folder switch starts a new list; the page persisted for the previous folder must not be restored onto it.
+        currentPage.value = 1;
         if (searchAcrossFolders.value) {
           searchAcrossFolders.value = false;
           searchQuery.value = "";

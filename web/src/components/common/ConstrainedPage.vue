@@ -43,7 +43,7 @@ import { computed } from "vue";
 const props = withDefaults(
   defineProps<{
     /** Reading-column width. `lg` (default) matches the section hubs. */
-    size?: "sm" | "md" | "lg" | "xl";
+    size?: "sm" | "md" | "lg" | "xl" | "full";
     /** Apply the default page gutter (px-6 py-6). Off → child owns padding. */
     padded?: boolean;
     /** Column placement. `center` (default) for hubs; `left` for form pages. */
@@ -62,6 +62,7 @@ const SIZE_CLASS = {
   md: "max-w-3xl", // settings sections, org params
   lg: "max-w-5xl", // section hubs (Settings/IAM landing)
   xl: "max-w-7xl", // wide reading content
+  full: "max-w-none", // dense settings forms that use the row width
 } as const;
 
 const maxWidthClass = computed(() => SIZE_CLASS[props.size]);

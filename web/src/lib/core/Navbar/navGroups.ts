@@ -438,6 +438,14 @@ export function groupNavLinks(
    */
   gateOpen: (gate: string) => boolean = () => true,
 ): RailEntry[] {
+  // An empty input means the caller isn't ready yet (e.g. MainLayout holds
+  // `linksList` back to `[]` until `menuReady`, specifically to avoid tiles
+  // popping in). A `standalone` group's children never carry `requires`, so
+  // without this guard it would still qualify and render alone — the one rail
+  // entry that doesn't depend on any item being present — until the real list
+  // arrives a beat later.
+  if (links.length === 0) return [];
+
   const presentNames = new Set(links.map((l) => l.name));
 
   // Activate a COLLAPSING group only when it has ≥1 present absorbed item AND

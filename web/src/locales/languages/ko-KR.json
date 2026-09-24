@@ -1474,6 +1474,8 @@
     "sessionReplay": "세션 리플레이",
     "viewSessionReplay": "세션 리플레이 보기",
     "playSessionReplay": "플레이 세션 리플레이",
+    "noReplayRecordedTitle": "이 세션에 대한 리플레이가 기록되지 않았습니다",
+    "noReplayRecordedMessage": "세션 {id}에 재생할 리플레이 세그먼트가 없습니다.",
     "discoverSessionTitle": "세션 리플레이를 통해 사용자 상호작용에 대해 자세히 알아보세요",
     "discoverSessionMessage": "Session Replay는 웹 사이트 또는 애플리케이션에서의 사용자 상호 작용을 캡처하고 재생합니다.이를 통해 사용자가 탐색하는 방식, 클릭한 위치, 입력하는 내용, 콘텐츠에 참여하는 방식을 시각적으로 검토할 수 있습니다.",
     "loadingErrorDetails": "잠시만요. 오류 세부 정보를 가져오는 중입니다.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "무료 체험 시작"
   },
   "login": {
+    "lockedOut": "로그인 시도 실패 횟수가 너무 많습니다. {duration} 후에 다시 시도하거나 관리자에게 문의하세요.",
     "redirectingToSsoMessage": "SSO 로그인 페이지로 리디렉션합니다. 리디렉션되지 않으면",
     "clickHere": "여기를 클릭하세요",
     "loginWithSso": "SSO로 로그인",
@@ -1963,6 +1966,15 @@
     "fieldRequired": "필드는 필수입니다",
     "passwordRequired": "비밀번호가 필요합니다.",
     "passwordPolicyHint": "암호는 8~128자여야 하며 소문자 1개, 대문자 1개, 숫자 1개, 특수 문자 1개를 포함해야 합니다.",
+    "lockout": {
+      "locked": "계정 잠김",
+      "autoUnlock": "{duration} 후에 자동으로 잠금 해제됩니다.",
+      "staged": "저장하면 잠금이 해제됩니다.",
+      "unlock": "잠금 해제",
+      "undo": "잠금 유지",
+      "confirmTitle": "{email}의 잠금을 해제하시겠습니까?",
+      "confirmMessage": "이 작업은 해당 사용자의 실패 시도 횟수를 초기화하고 즉시 다시 로그인할 수 있게 합니다. 비밀번호는 변경되지 않습니다."
+    },
     "currentPasswordRequired": "현재 암호가 필요합니다.",
     "newPasswordRequired": "새 암호가 필요합니다.",
     "otherOrgInvalid": "조직 이름은 문자로 시작하고 영숫자, _ 또는 -여야 합니다.",
@@ -2029,11 +2041,11 @@
       "addToGroup": "사용자 그룹에 추가",
       "addToRole": "역할 할당",
       "step1Title": "토큰 복사",
-      "copyHint": "지금 이 토큰을 복사하세요. 다시는 볼 수 없을 것입니다.",
+      "copyHint": "이 토큰은 지금 한 번만 표시됩니다. 지금 복사하거나 다운로드하세요. 다시는 확인할 수 없습니다.",
       "done": "완료",
       "applying": "액세스 권한 부여 적용 중…",
-      "grantedRoles": "할당된 역할: {roles}",
-      "grantedGroups": "사용자 그룹에 추가됨: {groups}",
+      "rolesAssignedLabel": "할당된 역할",
+      "groupsAssignedLabel": "사용자 그룹에 추가됨",
       "failedRoles": "역할을 할당할 수 없음: {roles}",
       "failedGroups": "사용자 그룹에 추가할 수 없음: {groups}",
       "failedHint": "나중에 역할 및 사용자 그룹 페이지에서 부여할 수 있습니다."
@@ -2043,6 +2055,9 @@
         "label": "서비스 계정 이름",
         "placeholder": "예: ingest-bot",
         "help": "소문자, 숫자, 하이픈. name{suffix}으로 저장됨"
+      },
+      "identifier": {
+        "label": "식별자"
       },
       "roles": {
         "label": "역할 할당",
@@ -2057,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "식별자",
+        "roles": "역할",
         "token": "토큰",
         "created": "생성됨"
       }
@@ -2184,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "이러한 역할에 바인딩된 모든 사용자 및 서비스 계정은 액세스 권한을 잃게 됩니다."
-      }
+      },
+      "assignColumn": "할당",
+      "assignBtn": "추가",
+      "assignedBadge": "할당됨",
+      "assignBannerText": "{member}을(를) 역할에 추가하세요 — 아래 역할 옆의 추가를 클릭하세요.",
+      "assignBannerDone": "완료",
+      "assignSuccess": "{member}을(를) \"{role}\" 역할에 추가했습니다.",
+      "assignError": "해당 계정을 이 역할에 추가할 수 없습니다. 다시 시도하세요."
     },
     "group": {
       "name": {
@@ -2215,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "이러한 그룹의 구성원은 부여받은 역할을 잃게 됩니다."
-      }
+      },
+      "assignColumn": "할당",
+      "assignBtn": "추가",
+      "assignedBadge": "할당됨",
+      "assignBannerText": "{member}을(를) 사용자 그룹에 추가하세요 — 아래 그룹 옆의 추가를 클릭하세요.",
+      "assignBannerDone": "완료",
+      "assignSuccess": "{member}을(를) \"{group}\" 그룹에 추가했습니다.",
+      "assignError": "해당 계정을 이 그룹에 추가할 수 없습니다. 다시 시도하세요."
     },
     "appGroups": {
       "deleteGroupTitle": "그룹 삭제",
@@ -3585,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "콘텐츠를 복사하는 중 오류가 발생했습니다.",
+    "passcodeForbiddenMessage": "수집 토큰을 보려면 관리자 또는 루트 역할이 필요합니다. 관리자에게 설정 명령을 요청하거나, 여기에서 확인하는 데 필요한 역할을 요청하세요.",
     "updateRUMTokenMessage": "이 조직의 RUM 토큰을 업데이트하시겠습니까?",
     "completeAwsIntegration": "AWS 통합 완료",
     "deployAwsServicesOneClick": "단일 CloudFormation 스택을 사용하여 선택한 모든 AWS 서비스를 한 번의 클릭으로 배포합니다.",
@@ -4966,7 +4997,7 @@
     "colorLightToDarkBlue": "밝은 파란색에서 진한 파란색으로 (값별)",
     "colorPaletteClassicBySeries": "팔레트-클래식 (시리즈별)",
     "drilldown": "드릴다운",
-    "drilldownTooltip": "원활한 데이터 탐색을 위해 현재 변수를 모두 가져와 다른 대시보드 또는 지정된 URL로 이동합니다.",
+    "drilldownTooltip": "다른 대시보드 또는 지정된 URL로 이동하며, 모든 현재 변수를 그대로 유지하여 원활하게 데이터를 탐색합니다.",
     "colorBySeriesTitle": "시리즈별 색상",
     "colorBySeriesTooltip": "차트에서 시각적으로 더 잘 구분할 수 있도록 시리즈에 색상을 적용하세요.각 시리즈의 색상을 사용자 지정하여 데이터 시각화를 향상시키세요.",
     "editColorBySeries": " 시리즈별 색상 편집",
@@ -7604,7 +7635,9 @@
       "usernameRequired": "사용자 이름이 필요합니다.",
       "passwordRequired": "비밀번호가 필요합니다.",
       "emailRecipients": "수신자 이메일 주소",
-      "emailRecipientsHelp": "쉼표로 구분된 이메일 주소",
+      "emailRecipientsHelp": "알림 이메일을 받아야 하는 조직 사용자 또는 서비스 계정을 선택하세요",
+      "emailRecipientsGroupUsers": "사용자",
+      "emailRecipientsGroupServiceAccounts": "서비스 계정",
       "invalidEmailAddresses": "잘못된 이메일 주소: {emails}",
       "opsgenieApiKey": "Opsgenie API 키",
       "opsgenieApiKeyHelp": "Opsgenie 통합 설정에서 API 키를 가져오세요.",
@@ -8789,6 +8822,8 @@
     "cipherKeysDesc": "민감한 필드를 위한 암호화 키",
     "regexPatternsDesc": "수정에 재사용 가능한 regex 패턴",
     "domainManagementDesc": "허용된 SSO 도메인으로 로그인 제한",
+    "passwordPolicy": "비밀번호 정책",
+    "passwordPolicyDesc": "네이티브 이메일/비밀번호 계정에 대한 인증 정책으로, 인스턴스 전체에 적용됩니다.",
     "pipelineDestinationsDesc": "파이프라인 출력을 위한 외부 대상",
     "templatesDesc": "재사용 가능한 알림 메시지 템플릿",
     "storageSettingsDesc": "조직별 스토리지 구성",
@@ -13041,10 +13076,12 @@
           },
           "variables": {
             "input": {
-              "trace": "트레이스의 루트 스팬에서 입력."
+              "trace": "트레이스의 루트 채팅 스팬에서 가져온 입력입니다.",
+              "session": "시작 질문: 첫 번째 트레이스의 루트 채팅 스팬에서 가져온 입력입니다."
             },
             "output": {
-              "trace": "트레이스의 루트 스팬에서 출력."
+              "trace": "트레이스의 루트 채팅 스팬에서 가져온 출력입니다.",
+              "session": "최종 답변: 마지막 트레이스의 루트 채팅 스팬에서 가져온 출력입니다."
             },
             "statistics": {
               "trace": "트레이스 메트릭: 스팬 수, 기간, LLM 및 도구 호출, 오류, 토큰 및 비용.",
@@ -13056,6 +13093,10 @@
             "steps": {
               "trace": "시간 순서의 스팬, 트레이스가 매우 길면 중간이 접힙니다.",
               "session": "대화 턴으로 표현된 시간 순서의 트레이스."
+            },
+            "tool_calls": {
+              "trace": "트레이스의 모든 도구 호출을 시간 순서대로 나열하며, 이름, 입력, 출력, 상태를 포함합니다.",
+              "session": "세션의 트레이스 전반에 걸친 모든 도구 호출을 시간 순서대로 나열하며, 이름, 입력, 출력, 상태를 포함합니다."
             }
           }
         }
@@ -13375,6 +13416,7 @@
       "searchHistoryNotEnabled": "검색 기록이 활성화되지 않았습니다.",
       "enableUsageReporting": "사용량 보고를 활성화하려면 ZO_USAGE_REPORTING_ENABLED를 true로 설정하세요.",
       "selectStreamToExtractPatterns": "패턴을 추출할 스트림을 선택하세요.",
+      "patternsUnavailableForMultiStream": "여러 스트림을 선택한 경우 패턴을 사용할 수 없습니다. 단일 스트림을 선택하세요.",
       "errorExtractingPatterns": "패턴 추출 중 오류가 발생했습니다. 다시 시도하세요.",
       "nameOfPanelRequired": "패널 이름은 필수입니다.",
       "errorsFixAndTryAgain": "일부 오류가 있습니다. 수정한 후 다시 시도하세요.",
@@ -15164,7 +15206,6 @@
       "syntheticsTokensRefresh": "토큰 목록 새로고침",
       "aiChatToggle": "AI 채팅 켜기/끄기",
       "aiChatClose": "AI 채팅 닫기",
-      "aiChatExpand": "AI 채팅 펼치기/접기",
       "logsSaveView": "저장된 뷰로 저장",
       "logsExport": "결과를 CSV로 내보내기",
       "tracesCopyUrl": "트레이스 공유 URL 복사",
@@ -15777,7 +15818,8 @@
         "destinations": "대상",
         "templates": "템플릿",
         "reports": "보고서",
-        "llmModelPricing": "LLM 모델 가격"
+        "llmModelPricing": "LLM 모델 가격",
+        "passcode": "수집 토큰"
       },
       "noPermissionToChangeFavorites": "즐겨찾기를 변경할 권한이 없습니다.",
       "couldNotUpdateFavoriteDashboards": "즐겨찾기 대시보드를 업데이트하지 못했습니다."
@@ -16015,6 +16057,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "아직 데이터 수집 프로세스를 시작하지 않았습니다. 다른 페이지를 탐색하려면 데이터 수집을 시작하세요."
+    },
+    "iam": {
+      "userSaveFailed": "사용자를 저장할 수 없습니다"
     }
   },
   "cipherKeys": {
@@ -16432,7 +16477,106 @@
       "exponentName": "지수"
     }
   },
+  "passwordPolicy": {
+    "complexity": "복잡도",
+    "minLength": "최소 길이",
+    "minLengthDesc": "허용되는 가장 짧은 비밀번호",
+    "maxLength": "최대 길이",
+    "maxLengthDesc": "0 = 제한 없음",
+    "requireUppercase": "대문자 필수",
+    "requireUppercaseDesc": "A–Z 중 최소 하나",
+    "requireLowercase": "소문자 필수",
+    "requireLowercaseDesc": "a–z 중 최소 하나",
+    "requireDigit": "숫자 필수",
+    "requireDigitDesc": "0–9 중 최소 하나",
+    "requireSpecial": "특수 문자 필수",
+    "requireSpecialDesc": "허용된 집합 중 최소 하나",
+    "specialCharSet": "허용되는 특수 문자",
+    "specialCharSetDesc": "비워 두면 영숫자가 아닌 모든 문자를 허용합니다",
+    "maxLengthTooSmall": "최대 길이는 최소 길이 이상이어야 하며, 제한 없음은 0입니다.",
+    "confirmTitle": "비밀번호 정책을 저장하시겠습니까?",
+    "confirmMessage": "저장하면 모든 네이티브 사용자가 계속하려면 새 비밀번호를 설정해야 할 수 있습니다. Root, 외부 사용자 및 서비스 계정은 예외입니다. 여기에는 root 계정이 아닌 한 본인도 포함됩니다. 이 작업은 되돌릴 수 없습니다.",
+    "saved": "비밀번호 정책이 저장되었습니다. | 비밀번호 정책이 저장되었습니다. {count}명의 사용자가 비밀번호를 재설정해야 합니다. | 비밀번호 정책이 저장되었습니다. {count}명의 사용자가 비밀번호를 재설정해야 합니다.",
+    "saveFailed": "비밀번호 정책을 저장할 수 없습니다.",
+    "notAdminTitle": "관리자 권한이 필요합니다",
+    "notAdmin": "비밀번호 정책을 구성하려면 메타 조직의 관리자 권한이 필요합니다.",
+    "loadFailedTitle": "비밀번호 정책을 불러올 수 없습니다",
+    "loadFailed": "현재 정책을 읽는 중 문제가 발생했습니다.",
+    "rotation": "교체",
+    "rotationDays": "교체 주기",
+    "rotationDaysDesc": "비밀번호가 만료되기까지의 일수입니다. 0 = 만료되지 않음",
+    "rotationWarningDays": "만료 전 경고",
+    "rotationWarningDaysDesc": "로그인 시 사전 알림 일수입니다. 0 = 경고 없음",
+    "warningDaysTooLong": "경고 기간은 교체 주기보다 길 수 없습니다.",
+    "rotationPreview": "오늘 설정한 비밀번호는 {expires}에 만료됩니다. 로그인 경고는 {warns}부터 시작됩니다.",
+    "rotationPreviewNoWarning": "오늘 설정한 비밀번호는 {expires}에 만료됩니다. 그 전까지는 경고가 표시되지 않습니다.",
+    "reuse": "재사용 방지",
+    "historyCount": "기억되는 비밀번호 수",
+    "historyCountDesc": "새 비밀번호는 이 개수만큼의 이전 비밀번호와 일치할 수 없습니다. 0 = 검사 안 함",
+    "historyMaxRetained": "보관되는 이력",
+    "historyMaxRetainedDesc": "사용자당 보관되는 이전 비밀번호 수",
+    "historyRetainedTooSmall": "보관되는 이력은 기억되는 비밀번호 수 이상이어야 합니다.",
+    "reuseExplainer": "현재 비밀번호는 기억되는 집합 중 하나로 간주됩니다. 이를 재사용하는 것은 별도의 검사가 아니라 이 규칙에 의해 거부됩니다.",
+    "lockout": "계정 잠금",
+    "lockoutThreshold": "잠금 전 실패 시도 횟수",
+    "lockoutThresholdDesc": "0 = 잠금 비활성화",
+    "lockoutBucketSize": "추가 잠금마다 필요한 시도 횟수",
+    "lockoutBucketSizeDesc": "0 = 위 값 재사용",
+    "lockoutStartSecs": "첫 잠금 지속 시간",
+    "lockoutStartSecsDesc": "초",
+    "lockoutMaxSecs": "최대 잠금 지속 시간",
+    "lockoutMaxSecsDesc": "초 — 에스컬레이션이 제한되는 상한",
+    "lockoutStartTooLong": "첫 잠금은 최대 잠금보다 길 수 없습니다.",
+    "lockoutBackoff": "에스컬레이션",
+    "lockoutBackoffDesc": "각 잠금이 이전 잠금에서 얼마나 증가하는지",
+    "backoffExponential": "지수",
+    "backoffLinear": "선형",
+    "lockoutPreview": "{threshold}회 실패 → {first} · {bucket}회 추가마다 → {rest} · 최대 {max}. 로그인에 성공하면 모두 초기화됩니다.",
+    "sessionEnforcement": "세션 및 적용",
+    "cookieMaxAge": "세션 수명",
+    "cookieMaxAgeDesc": "로그인된 세션이 유효하게 유지되는 시간(초). 0 = {envVar}의 인스턴스 기본값 사용",
+    "applyToRoot": "루트 계정에 적용",
+    "applyToRootDesc": "이 옵션을 켜지 않으면 루트는 위의 모든 규칙에서 제외됩니다",
+    "rootWarning": "루트를 잠그면 시스템이 복구할 수 없는 상태가 될 수 있습니다.",
+    "rootDialogTitle": "루트에 정책을 적용할까요?",
+    "rootDialogMessage": "루트는 다른 네이티브 계정과 마찬가지로 잠금, 순환 및 강제 재설정의 대상이 됩니다. 루트가 유일한 관리 계정인 경우, 잠금이나 충족할 수 없는 만료가 발생하면 이 인스턴스에 다시 접근할 방법이 없어집니다.",
+    "rootDialogAck": "루트가 이 인스턴스에서 영구적으로 잠길 수 있음을 이해합니다.",
+    "rootDialogConfirm": "루트에 적용"
+  },
+  "passwordReset": {
+    "title": "비밀번호 업데이트",
+    "signedInAs": "{email}(으)로 로그인됨",
+    "reasonPolicyTightened": "비밀번호 정책이 변경되었습니다. OpenObserve를 계속 사용하려면 비밀번호를 업데이트하세요.",
+    "reasonRotationExpired": "비밀번호가 만료되었습니다. OpenObserve를 계속 사용하려면 새 비밀번호를 설정하세요.",
+    "reasonRotationWarning": "비밀번호가 곧 만료됩니다. 작업에서 잠기지 않도록 지금 새 비밀번호를 설정하세요.",
+    "reused": "최근에 사용한 비밀번호입니다. 최근 {count}개의 비밀번호에 사용하지 않은 비밀번호를 선택하세요.",
+    "expiryBanner": "{count}일 후에 비밀번호가 만료됩니다. 작업에서 잠기지 않도록 지금 업데이트하세요. | {count}일 후에 비밀번호가 만료됩니다. 작업에서 잠기지 않도록 지금 업데이트하세요.",
+    "expiryBannerAction": "지금 업데이트",
+    "expiryBannerDismiss": "닫기",
+    "currentPassword": "현재 비밀번호",
+    "newPassword": "새 비밀번호",
+    "confirmPassword": "새 비밀번호 확인",
+    "currentPasswordRequired": "현재 비밀번호를 입력하세요.",
+    "newPasswordRequired": "새 비밀번호를 입력하세요.",
+    "confirmPasswordRequired": "새 비밀번호를 다시 입력하세요.",
+    "mismatch": "비밀번호가 일치하지 않습니다.",
+    "signOut": "로그아웃",
+    "submit": "비밀번호 업데이트",
+    "updated": "비밀번호가 업데이트되었습니다. 다시 로그인하세요.",
+    "updateFailed": "비밀번호를 업데이트할 수 없습니다.",
+    "req": {
+      "minLength": "최소 {count}자",
+      "maxLength": "최대 {count}자",
+      "uppercase": "대문자 1개",
+      "lowercase": "소문자 1개",
+      "digit": "숫자 1개",
+      "special": "특수 문자 1개",
+      "specialFromSet": "{set}에서 특수 문자 1개",
+      "unmet": "비밀번호 요구 사항: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "비밀번호 정책",
     "loginCallback": "로그인 콜백",
     "slackOAuthCallback": "Slack 연결 중",
     "emptyStateDemo": "빈 상태 데모",

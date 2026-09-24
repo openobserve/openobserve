@@ -1474,6 +1474,8 @@
     "sessionReplay": "Oturum Tekrar Oynatma",
     "viewSessionReplay": "Oturum Tekrarını Görüntüle",
     "playSessionReplay": "Oturum Oynatma Oynatma",
+    "noReplayRecordedTitle": "Bu oturum için kayıt oynatımı yapılmadı",
+    "noReplayRecordedMessage": "{id} oturumunun oynatılacak kayıt oynatım bölümü yok.",
     "discoverSessionTitle": "Kullanıcı Etkileşimlerini Ayrıntılı Anlamak için Oturum Tekrarını Keşfedin",
     "discoverSessionMessage": "Session Replay, web sitenizdeki veya uygulamanızdaki kullanıcı etkileşimlerini yakalar ve tekrarlar. Bu, kullanıcıların nasıl gezindiklerini, nereye tıkladıklarını, ne yazdıklarını ve içeriğinizle nasıl etkileşim kurduklarını görsel olarak incelemenizi sağlar.",
     "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "Ücretsiz denemeye başla"
   },
   "login": {
+    "lockedOut": "Çok fazla başarısız oturum açma denemesi. {duration} sonra tekrar deneyin veya yöneticinizle iletişime geçin.",
     "redirectingToSsoMessage": "SSO giriş sayfasına yönlendiriliyorsunuz. Yönlendirilmezseniz, lütfen",
     "clickHere": "buraya tıklayın",
     "loginWithSso": "SSO ile giriş yap",
@@ -1963,6 +1966,15 @@
     "fieldRequired": "Alan zorunludur",
     "passwordRequired": "Şifre gereklidir.",
     "passwordPolicyHint": "Şifre 8-128 karakter olmalı ve en az bir küçük harf, bir büyük harf, bir basamak ve bir özel karakter içermelidir.",
+    "lockout": {
+      "locked": "Hesap kilitlendi",
+      "autoUnlock": "{duration} sonra otomatik olarak kilidi açılır.",
+      "staged": "Kaydettiğinizde kilidi açılacak.",
+      "unlock": "Kilidi aç",
+      "undo": "Kilitli tut",
+      "confirmTitle": "{email} kullanıcısının kilidi açılsın mı?",
+      "confirmMessage": "Bu işlem, başarısız deneme sayısını sıfırlar ve hemen tekrar oturum açmalarını sağlar. Parolalarını değiştirmez."
+    },
     "currentPasswordRequired": "Geçerli şifre gereklidir.",
     "newPasswordRequired": "Yeni şifre gereklidir.",
     "otherOrgInvalid": "Kuruluş adı bir harfle başlamalı ve alfasayısal, _ veya - olmalıdır.",
@@ -2029,11 +2041,11 @@
       "addToGroup": "Kullanıcı grubuna ekleme",
       "addToRole": "Bir rol atama",
       "step1Title": "Jetonunuzu kopyalayın",
-      "copyHint": "Bu belirteci şimdi kopyalayın - bir daha göremezsiniz.",
+      "copyHint": "Bu token'ı yalnızca bu kez göreceksiniz. Şimdi kopyalayın veya indirin, tekrar erişilemez.",
       "done": "Bitti",
       "applying": "Erişim izinleri uygulanıyor…",
-      "grantedRoles": "Atanan roller: {roles}",
-      "grantedGroups": "Kullanıcı gruplarına eklendi: {groups}",
+      "rolesAssignedLabel": "Atanan roller",
+      "groupsAssignedLabel": "Kullanıcı gruplarına eklendi",
       "failedRoles": "Roller atanamadı: {roles}",
       "failedGroups": "Kullanıcı gruplarına eklenemedi: {groups}",
       "failedHint": "Bunları daha sonra Roller ve Kullanıcı Grupları sayfalarından verebilirsiniz."
@@ -2043,6 +2055,9 @@
         "label": "Hizmet hesabı adı",
         "placeholder": "ör. ingest-bot",
         "help": "Küçük harfler, rakamlar ve tireler. name{suffix} olarak kaydedilir"
+      },
+      "identifier": {
+        "label": "Tanımlayıcı"
       },
       "roles": {
         "label": "Rolleri ata",
@@ -2057,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Tanımlayıcı",
+        "roles": "Roller",
         "token": "Simge",
         "created": "Oluşturuldu"
       }
@@ -2184,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Bu rollere bağlı tüm kullanıcılar ve hizmet hesapları erişimini kaybedecektir."
-      }
+      },
+      "assignColumn": "Ata",
+      "assignBtn": "Ekle",
+      "assignedBadge": "Atandı",
+      "assignBannerText": "{member} kullanıcısını bir role ekleyin — aşağıdaki rolün yanındaki Ekle'ye tıklayın.",
+      "assignBannerDone": "Tamam",
+      "assignSuccess": "{member}, \"{role}\" rolüne eklendi.",
+      "assignError": "Hesap bu role eklenemedi. Lütfen tekrar deneyin."
     },
     "group": {
       "name": {
@@ -2215,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Bu grupların üyeleri kendileri tarafından verilen rolleri kaybedeceklerdir."
-      }
+      },
+      "assignColumn": "Ata",
+      "assignBtn": "Ekle",
+      "assignedBadge": "Atandı",
+      "assignBannerText": "{member} kullanıcısını bir kullanıcı grubuna ekleyin — aşağıdaki grubun yanındaki Ekle'ye tıklayın.",
+      "assignBannerDone": "Tamam",
+      "assignSuccess": "{member}, \"{group}\" grubuna eklendi.",
+      "assignError": "Hesap bu gruba eklenemedi. Lütfen tekrar deneyin."
     },
     "appGroups": {
       "deleteGroupTitle": "Grubu Sil",
@@ -3585,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "İçerik kopyalanırken hata oluştu.",
+    "passcodeForbiddenMessage": "Veri alımı tokenını görüntülemek için Yönetici veya Root rolü gerekir. Kurulum komutunu ya da burada görmek için gereken rolü bir yöneticiden isteyin.",
     "updateRUMTokenMessage": "Bu kuruluş için RUM token'ını güncellemek istediğinize emin misiniz?",
     "completeAwsIntegration": "AWS Entegrasyonunu Tamamla",
     "deployAwsServicesOneClick": "Seçilen tüm AWS hizmetlerini tek bir CloudFormation yığını kullanarak tek tıkla dağıtın.",
@@ -4966,7 +4997,7 @@
     "colorLightToDarkBlue": "Açık - Koyu Mavi (Değere Göre)",
     "colorPaletteClassicBySeries": "Palette-Classic (Serilere Göre)",
     "drilldown": "Detaya inme",
-    "drilldownTooltip": "Sorunsuz veri araştırması için geçerli tüm değişkenleri taşıyan başka bir panoya veya belirtilen URL'ye gidin.",
+    "drilldownTooltip": "Tüm geçerli değişkenleri taşıyarak başka bir gösterge panosuna veya belirtilen URL'ye gidin, kesintisiz veri keşfi için.",
     "colorBySeriesTitle": "Serilere göre renk",
     "colorBySeriesTooltip": "Grafiklerde daha iyi görsel ayrım için serilere renk uygulayın. Veri görselleştirmesini geliştirmek için her seri için renkleri özelleştirin.",
     "editColorBySeries": " Rengi seriye göre düzenle",
@@ -7604,7 +7635,9 @@
       "usernameRequired": "Kullanıcı adı gereklidir",
       "passwordRequired": "Şifre gereklidir",
       "emailRecipients": "Alıcı E-posta Adresleri",
-      "emailRecipientsHelp": "Virgülle ayrılmış e-posta adresleri",
+      "emailRecipientsHelp": "Uyarı e-postalarını alması gereken organizasyon kullanıcılarını veya hizmet hesaplarını seçin",
+      "emailRecipientsGroupUsers": "Kullanıcılar",
+      "emailRecipientsGroupServiceAccounts": "Hizmet Hesapları",
       "invalidEmailAddresses": "Geçersiz e-posta adresleri: {emails}",
       "opsgenieApiKey": "Opsgenie API Anahtarı",
       "opsgenieApiKeyHelp": "API anahtarınızı Opsgenie entegrasyon ayarlarından alın",
@@ -8789,6 +8822,8 @@
     "cipherKeysDesc": "Hassas alanlar için şifreleme anahtarları",
     "regexPatternsDesc": "Maskeleme için yeniden kullanılabilir regex desenleri",
     "domainManagementDesc": "Oturum açmayı izin verilen SSO alan adlarıyla kısıtlayın",
+    "passwordPolicy": "Parola İlkesi",
+    "passwordPolicyDesc": "Yerel e-posta/parola hesapları için kimlik doğrulama ilkeleri, örnek genelinde uygulanır.",
     "pipelineDestinationsDesc": "Pipeline çıktısı için harici hedefler",
     "templatesDesc": "Yeniden kullanılabilir uyarı mesajı şablonları",
     "storageSettingsDesc": "Organizasyon bazında depolama yapılandırması",
@@ -13041,10 +13076,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Trace'in kök span'inden girdi."
+              "trace": "İz'in kök sohbet span'inden gelen girdi.",
+              "session": "Açılış sorusu: ilk iz'in kök sohbet span'inden gelen girdi."
             },
             "output": {
-              "trace": "Trace'in kök span'inden çıktı."
+              "trace": "İz'in kök sohbet span'inden gelen çıktı.",
+              "session": "Nihai yanıt: son iz'in kök sohbet span'inden gelen çıktı."
             },
             "statistics": {
               "trace": "Trace metrikleri: span sayısı, süre, LLM ve araç çağrıları, hatalar, token'lar ve maliyet.",
@@ -13056,6 +13093,10 @@
             "steps": {
               "trace": "Zaman sırasına göre span'ler; trace çok uzun olduğunda orta kısım katlanır.",
               "session": "Zaman sırasına göre trace'ler, konuşma turları olarak temsil edilir."
+            },
+            "tool_calls": {
+              "trace": "İz'deki her araç çağrısı, zaman sırasına göre adı, girdisi, çıktısı ve durumuyla birlikte.",
+              "session": "Oturumun izleri genelindeki her araç çağrısı, zaman sırasına göre adı, girdisi, çıktısı ve durumuyla birlikte."
             }
           }
         }
@@ -13375,6 +13416,7 @@
       "searchHistoryNotEnabled": "Arama geçmişi etkin değil.",
       "enableUsageReporting": "Kullanım raporlamasını etkinleştirmek için ZO_USAGE_REPORTING_ENABLED'ı true olarak ayarlayın.",
       "selectStreamToExtractPatterns": "Desenleri çıkarmak için lütfen bir akış seçin",
+      "patternsUnavailableForMultiStream": "Birden fazla akış seçildiğinde desenler kullanılamaz. Lütfen tek bir akış seçin.",
       "errorExtractingPatterns": "Desenler çıkarılırken hata. Lütfen tekrar deneyin.",
       "nameOfPanelRequired": "Panel adı gerekli",
       "errorsFixAndTryAgain": "Bazı hatalar var, lütfen düzeltin ve tekrar deneyin",
@@ -15164,7 +15206,6 @@
       "syntheticsTokensRefresh": "Belirteç listesini yenile",
       "aiChatToggle": "AI sohbetini aç/kapat",
       "aiChatClose": "AI sohbetini kapat",
-      "aiChatExpand": "AI sohbetini genişlet/daralt",
       "logsSaveView": "Kayıtlı görünüm olarak kaydet",
       "logsExport": "Sonuçları CSV olarak dışa aktarın",
       "tracesCopyUrl": "İz paylaşım URL'sini kopyala",
@@ -15777,7 +15818,8 @@
         "destinations": "Hedefler",
         "templates": "Şablonlar",
         "reports": "Raporlar",
-        "llmModelPricing": "LLM Model Fiyatlandırması"
+        "llmModelPricing": "LLM Model Fiyatlandırması",
+        "passcode": "Veri Alımı Tokenı"
       },
       "noPermissionToChangeFavorites": "Favorileri değiştirme izniniz yok",
       "couldNotUpdateFavoriteDashboards": "Favori panolar güncellenemedi"
@@ -16015,6 +16057,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "Veri alım sürecini henüz başlatmadınız. Diğer sayfaları keşfetmek için lütfen veri alımını başlatın."
+    },
+    "iam": {
+      "userSaveFailed": "Kullanıcı kaydedilemedi"
     }
   },
   "cipherKeys": {
@@ -16432,7 +16477,106 @@
       "exponentName": "Üs"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Karmaşıklık",
+    "minLength": "Minimum uzunluk",
+    "minLengthDesc": "Kabul edilen en kısa parola",
+    "maxLength": "Maksimum uzunluk",
+    "maxLengthDesc": "0 = sınırsız",
+    "requireUppercase": "Büyük harf zorunlu",
+    "requireUppercaseDesc": "En az bir A–Z",
+    "requireLowercase": "Küçük harf zorunlu",
+    "requireLowercaseDesc": "En az bir a–z",
+    "requireDigit": "Rakam zorunlu",
+    "requireDigitDesc": "En az bir 0–9",
+    "requireSpecial": "Özel karakter zorunlu",
+    "requireSpecialDesc": "İzin verilen kümeden en az bir karakter",
+    "specialCharSet": "İzin verilen özel karakterler",
+    "specialCharSetDesc": "Herhangi bir alfanümerik olmayan karakteri kabul etmek için boş bırakın",
+    "maxLengthTooSmall": "Maksimum uzunluk en az minimum uzunluk kadar olmalı veya sınırsız için 0 olmalıdır.",
+    "confirmTitle": "Parola ilkesi kaydedilsin mi?",
+    "confirmMessage": "Kaydetmek, her yerel kullanıcıyı devam edebilmesi için yeni bir parola belirlemeye zorlayabilir. Root, harici kullanıcılar ve hizmet hesapları muaftır — root hesabı değilseniz bu sizi de kapsar. Bu işlem geri alınamaz.",
+    "saved": "Parola ilkesi kaydedildi. | Parola ilkesi kaydedildi. {count} kullanıcının parolasını sıfırlaması gerekiyor. | Parola ilkesi kaydedildi. {count} kullanıcının parolasını sıfırlaması gerekiyor.",
+    "saveFailed": "Parola ilkesi kaydedilemedi.",
+    "notAdminTitle": "Yönetici erişimi gerekli",
+    "notAdmin": "Parola ilkesini yapılandırmak için meta organizasyonun bir yöneticisi gerekir.",
+    "loadFailedTitle": "Parola ilkesi yüklenemedi",
+    "loadFailed": "Geçerli ilke okunurken bir şeyler ters gitti.",
+    "rotation": "Rotasyon",
+    "rotationDays": "Rotasyon süresi",
+    "rotationDaysDesc": "Parolanın süresi dolmadan önceki gün sayısı. 0 = hiç süresi dolmaz",
+    "rotationWarningDays": "Süresi dolmadan önce uyar",
+    "rotationWarningDaysDesc": "Oturum açma sırasında bildirim gün sayısı. 0 = uyarı yok",
+    "warningDaysTooLong": "Uyarı penceresi rotasyon süresinden uzun olamaz.",
+    "rotationPreview": "Bugün belirlenen bir parolanın süresi {expires} tarihinde dolar. Oturum açma uyarısı {warns} tarihinde başlar.",
+    "rotationPreviewNoWarning": "Bugün belirlenen bir parolanın süresi {expires} tarihinde dolar. O zamana kadar uyarı gösterilmez.",
+    "reuse": "Yeniden kullanımı önleme",
+    "historyCount": "Hatırlanan parolalar",
+    "historyCountDesc": "Yeni bir parola bu sayıdaki önceki parolayla eşleşemez. 0 = kontrol yok",
+    "historyMaxRetained": "Saklanan geçmiş",
+    "historyMaxRetainedDesc": "Kullanıcı başına kaç geçmiş parolanın saklandığı",
+    "historyRetainedTooSmall": "Saklanan geçmiş, hatırlanan parola sayısından az olamaz.",
+    "reuseExplainer": "Geçerli parola, hatırlanan kümenin bir parçası sayılır — onu yeniden kullanmak ayrı bir kontrolle değil, bu kuralla reddedilir.",
+    "lockout": "Hesap kilitleme",
+    "lockoutThreshold": "Kilitleme öncesi başarısız deneme sayısı",
+    "lockoutThresholdDesc": "0 = kilitleme devre dışı",
+    "lockoutBucketSize": "Her ek kilitleme öncesi deneme sayısı",
+    "lockoutBucketSizeDesc": "0 = yukarıdaki değeri kullan",
+    "lockoutStartSecs": "İlk kilitleme süresi",
+    "lockoutStartSecsDesc": "Saniye",
+    "lockoutMaxSecs": "Maksimum kilitleme süresi",
+    "lockoutMaxSecsDesc": "Saniye — artışın sınırlandığı üst değer",
+    "lockoutStartTooLong": "İlk kilitleme süresi maksimum kilitleme süresinden uzun olamaz.",
+    "lockoutBackoff": "Artış",
+    "lockoutBackoffDesc": "Her kilitlemenin bir öncekine göre nasıl arttığı",
+    "backoffExponential": "Üstel",
+    "backoffLinear": "Doğrusal",
+    "lockoutPreview": "{threshold} başarısız deneme → {first} · her {bucket} denemede bir → {rest} · üst sınır {max}. Başarılı bir oturum açma her şeyi sıfırlar.",
+    "sessionEnforcement": "Oturum ve zorlama",
+    "cookieMaxAge": "Oturum ömrü",
+    "cookieMaxAgeDesc": "Oturum açmış bir oturumun geçerli kaldığı saniye sayısı. 0 = {envVar} içindeki örnek varsayılanını kullan",
+    "applyToRoot": "Root hesabına uygula",
+    "applyToRootDesc": "Bu açık olmadıkça Root, yukarıdaki tüm kurallardan muaftır",
+    "rootWarning": "Root'un kilitlenmesi sistemin kurtarılamaz bir duruma girmesine neden olabilir.",
+    "rootDialogTitle": "Politika Root'a uygulansın mı?",
+    "rootDialogMessage": "Root, diğer tüm yerel hesaplar gibi kilitleme, rotasyon ve zorunlu sıfırlamalara tabi olacaktır. Root tek yönetici hesabınızsa, karşılayamayacağı bir kilitleme veya süre sonu bu örneğe geri dönüş yolunu tamamen kapatabilir.",
+    "rootDialogAck": "Root'un bu örnekten kalıcı olarak kilitlenebileceğini anlıyorum.",
+    "rootDialogConfirm": "Root'a uygula"
+  },
+  "passwordReset": {
+    "title": "Parolanızı güncelleyin",
+    "signedInAs": "{email} olarak oturum açıldı",
+    "reasonPolicyTightened": "Parola politikası değişti. OpenObserve'u kullanmaya devam etmek için parolanızı güncelleyin.",
+    "reasonRotationExpired": "Parolanızın süresi doldu. OpenObserve'u kullanmaya devam etmek için yeni bir parola belirleyin.",
+    "reasonRotationWarning": "Parolanızın süresi yakında doluyor. Çalışmalarınıza erişimi kaybetmemek için şimdi yeni bir parola belirleyin.",
+    "reused": "Bu parola yakın zamanda kullanıldı. Son {count} parolanızda kullanmadığınız birini seçin.",
+    "expiryBanner": "Parolanızın süresi {count} gün içinde doluyor. Çalışmalarınıza erişimi kaybetmemek için şimdi güncelleyin. | Parolanızın süresi {count} gün içinde doluyor. Çalışmalarınıza erişimi kaybetmemek için şimdi güncelleyin.",
+    "expiryBannerAction": "Şimdi güncelle",
+    "expiryBannerDismiss": "Yoksay",
+    "currentPassword": "Mevcut parola",
+    "newPassword": "Yeni parola",
+    "confirmPassword": "Yeni parolayı doğrula",
+    "currentPasswordRequired": "Mevcut parola gereklidir.",
+    "newPasswordRequired": "Yeni parola gereklidir.",
+    "confirmPasswordRequired": "Lütfen yeni parolayı yeniden girin.",
+    "mismatch": "Parolalar eşleşmiyor.",
+    "signOut": "Oturumu kapat",
+    "submit": "Parolayı güncelle",
+    "updated": "Parolanız güncellendi. Lütfen tekrar oturum açın.",
+    "updateFailed": "Parolanız güncellenemedi.",
+    "req": {
+      "minLength": "En az {count} karakter",
+      "maxLength": "En fazla {count} karakter",
+      "uppercase": "Bir büyük harf",
+      "lowercase": "Bir küçük harf",
+      "digit": "Bir rakam",
+      "special": "Bir özel karakter",
+      "specialFromSet": "{set} kümesinden bir özel karakter",
+      "unmet": "Parola şunu içermelidir: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Parola Politikası",
     "loginCallback": "Giriş Geri Çağrısı",
     "slackOAuthCallback": "Slack'e bağlanılıyor",
     "emptyStateDemo": "Boş Durum Demosu",

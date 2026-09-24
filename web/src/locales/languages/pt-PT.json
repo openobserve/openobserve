@@ -1474,6 +1474,8 @@
     "sessionReplay": "Repetição da sessão",
     "viewSessionReplay": "Exibir repetição da sessão",
     "playSessionReplay": "Reproduzir repetição da sessão",
+    "noReplayRecordedTitle": "Nenhuma reprodução foi gravada para esta sessão",
+    "noReplayRecordedMessage": "A sessão {id} não tem segmentos de reprodução para exibir.",
     "discoverSessionTitle": "Descubra o Session Replay para entender detalhadamente as interações do usuário",
     "discoverSessionMessage": "O Session Replay captura e reproduz as interações do usuário em seu site ou aplicativo. Isso permite que você analise visualmente como os usuários navegam, onde clicam, o que digitam e como interagem com seu conteúdo.",
     "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "Iniciar avaliação gratuita"
   },
   "login": {
+    "lockedOut": "Muitas tentativas de login falharam. Tente novamente em {duration} ou contate seu administrador.",
     "redirectingToSsoMessage": "Redirecionando para a página de login SSO. Se você não for redirecionado, por favor",
     "clickHere": "clique aqui",
     "loginWithSso": "Entrar com SSO",
@@ -1963,6 +1966,15 @@
     "fieldRequired": "O campo é obrigatório",
     "passwordRequired": "A senha é obrigatória.",
     "passwordPolicyHint": "A senha deve ter de 8 a 128 caracteres e conter pelo menos uma letra minúscula, uma letra maiúscula, um dígito e um caractere especial.",
+    "lockout": {
+      "locked": "Conta bloqueada",
+      "autoUnlock": "Desbloqueia automaticamente em {duration}.",
+      "staged": "Será desbloqueada quando você salvar.",
+      "unlock": "Desbloquear",
+      "undo": "Manter bloqueada",
+      "confirmTitle": "Desbloquear {email}?",
+      "confirmMessage": "Isso zera a contagem de tentativas falhas e permite que ele faça login novamente imediatamente. Não altera a senha."
+    },
     "currentPasswordRequired": "A senha atual é obrigatória.",
     "newPasswordRequired": "É necessária uma nova senha.",
     "otherOrgInvalid": "O nome da organização deve começar com uma letra e ser alfanumérico, _ ou -.",
@@ -2029,11 +2041,11 @@
       "addToGroup": "Adicionar a um grupo de usuários",
       "addToRole": "Atribuir uma função",
       "step1Title": "Copie seu token",
-      "copyHint": "Copie esse token agora — você não poderá vê-lo novamente.",
+      "copyHint": "Esta é a única vez que você verá este token. Copie-o ou baixe-o agora, ele não poderá ser recuperado novamente.",
       "done": "Feito",
       "applying": "Aplicando concessões de acesso…",
-      "grantedRoles": "Funções atribuídas: {roles}",
-      "grantedGroups": "Adicionado a grupos de usuários: {groups}",
+      "rolesAssignedLabel": "Funções atribuídas",
+      "groupsAssignedLabel": "Adicionado a grupos de usuários",
       "failedRoles": "Não foi possível atribuir funções: {roles}",
       "failedGroups": "Não foi possível adicionar a grupos de usuários: {groups}",
       "failedHint": "Você pode conceder isso posteriormente nas páginas de Funções e Grupos de Usuários."
@@ -2043,6 +2055,9 @@
         "label": "Nome da conta de serviço",
         "placeholder": "ex.: ingest-bot",
         "help": "Letras minúsculas, números e hífens. Salvo como nome{suffix}"
+      },
+      "identifier": {
+        "label": "Identificador"
       },
       "roles": {
         "label": "Atribuir funções",
@@ -2057,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Identificador",
+        "roles": "Funções",
         "token": "Ficha",
         "created": "Criado"
       }
@@ -2184,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Todos os usuários e contas de serviço vinculados a essas funções perderão o acesso."
-      }
+      },
+      "assignColumn": "Atribuir",
+      "assignBtn": "Adicionar",
+      "assignedBadge": "Atribuído",
+      "assignBannerText": "Adicione {member} a uma função — clique em Adicionar ao lado de uma função abaixo.",
+      "assignBannerDone": "Concluído",
+      "assignSuccess": "Adicionado {member} à função \"{role}\".",
+      "assignError": "Não foi possível adicionar a conta a essa função. Tente novamente."
     },
     "group": {
       "name": {
@@ -2215,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Os membros desses grupos perderão as funções concedidas por eles."
-      }
+      },
+      "assignColumn": "Atribuir",
+      "assignBtn": "Adicionar",
+      "assignedBadge": "Atribuído",
+      "assignBannerText": "Adicione {member} a um grupo de usuários — clique em Adicionar ao lado de um grupo abaixo.",
+      "assignBannerDone": "Concluído",
+      "assignSuccess": "Adicionado {member} ao grupo \"{group}\".",
+      "assignError": "Não foi possível adicionar a conta a esse grupo. Tente novamente."
     },
     "appGroups": {
       "deleteGroupTitle": "Excluir Grupo",
@@ -3585,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Erro ao copiar conteúdo.",
+    "passcodeForbiddenMessage": "É necessário ter a função de Administrador ou Root para visualizar o token de ingestão. Peça a um administrador o comando de configuração ou a função necessária para vê-lo aqui.",
     "updateRUMTokenMessage": "Tem certeza de que deseja atualizar o token RUM para esta organização?",
     "completeAwsIntegration": "Concluir Integração com AWS",
     "deployAwsServicesOneClick": "Implante todos os serviços AWS selecionados em um clique usando uma única pilha CloudFormation.",
@@ -4966,7 +4997,7 @@
     "colorLightToDarkBlue": "Azul claro a escuro (por valor)",
     "colorPaletteClassicBySeries": "Palette-Classic (por série)",
     "drilldown": "Detalhamento",
-    "drilldownTooltip": "Navegue até outro painel ou URL especificado, transferindo todas as variáveis atuais para uma exploração perfeita dos dados.",
+    "drilldownTooltip": "Navegue para outro painel ou URL especificado, transportando todas as variáveis atuais para uma exploração de dados contínua.",
     "colorBySeriesTitle": "Colorir por série",
     "colorBySeriesTooltip": "Aplique cores às séries para obter uma melhor distinção visual nos gráficos. Personalize as cores de cada série para aprimorar a visualização dos dados.",
     "editColorBySeries": " Editar cor por série",
@@ -7604,7 +7635,9 @@
       "usernameRequired": "Nome de usuário é obrigatório",
       "passwordRequired": "Senha é obrigatória",
       "emailRecipients": "Endereços de e-mail do destinatário",
-      "emailRecipientsHelp": "Endereços de e-mail separados por vírgula",
+      "emailRecipientsHelp": "Selecione os usuários da organização ou contas de serviço que devem receber e-mails de alerta",
+      "emailRecipientsGroupUsers": "Usuários",
+      "emailRecipientsGroupServiceAccounts": "Contas de serviço",
       "invalidEmailAddresses": "Endereços de e-mail inválidos: {emails}",
       "opsgenieApiKey": "Chave de API do Opsgenie",
       "opsgenieApiKeyHelp": "Obtenha sua chave de API nas configurações de integração do Opsgenie",
@@ -8789,6 +8822,8 @@
     "cipherKeysDesc": "Chaves de criptografia para campos sensíveis",
     "regexPatternsDesc": "Padrões regex reutilizáveis para redação",
     "domainManagementDesc": "Restringir o login a domínios SSO permitidos",
+    "passwordPolicy": "Política de senhas",
+    "passwordPolicyDesc": "Políticas de autenticação para contas nativas de e-mail/senha, aplicadas a toda a instância.",
     "pipelineDestinationsDesc": "Destinos externos para a saída do pipeline",
     "templatesDesc": "Modelos reutilizáveis de mensagens de alerta",
     "storageSettingsDesc": "Configuração de armazenamento por organização",
@@ -13041,10 +13076,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Entrada do span raiz do trace."
+              "trace": "Entrada do span de chat raiz do rastro.",
+              "session": "A pergunta inicial: entrada do span de chat raiz do primeiro rastro."
             },
             "output": {
-              "trace": "Saída do span raiz do trace."
+              "trace": "Saída do span de chat raiz do rastro.",
+              "session": "A resposta final: saída do span de chat raiz do último rastro."
             },
             "statistics": {
               "trace": "Métricas do trace: contagem de spans, duração, chamadas de LLM e ferramentas, erros, tokens e custo.",
@@ -13056,6 +13093,10 @@
             "steps": {
               "trace": "Spans em ordem de tempo; o meio é recolhido quando o trace é muito longo.",
               "session": "Traces em ordem de tempo, representados como turnos de conversa."
+            },
+            "tool_calls": {
+              "trace": "Todas as chamadas de ferramenta no rastro, em ordem cronológica, com seu nome, entrada, saída e status.",
+              "session": "Todas as chamadas de ferramenta nos rastros da sessão, em ordem cronológica, com seu nome, entrada, saída e status."
             }
           }
         }
@@ -13375,6 +13416,7 @@
       "searchHistoryNotEnabled": "O histórico de pesquisa não está ativado.",
       "enableUsageReporting": "Defina ZO_USAGE_REPORTING_ENABLED como true para ativar o relatório de uso.",
       "selectStreamToExtractPatterns": "Selecione um stream para extrair padrões",
+      "patternsUnavailableForMultiStream": "Padrões não estão disponíveis quando vários streams são selecionados. Selecione um único stream.",
       "errorExtractingPatterns": "Erro ao extrair padrões. Tente novamente.",
       "nameOfPanelRequired": "O nome do painel é obrigatório",
       "errorsFixAndTryAgain": "Há alguns erros, corrija-os e tente novamente",
@@ -15164,7 +15206,6 @@
       "syntheticsTokensRefresh": "Atualizar lista de tokens",
       "aiChatToggle": "Alternar bate-papo com IA",
       "aiChatClose": "Fechar chat de IA",
-      "aiChatExpand": "Expandir/recolher chat de IA",
       "logsSaveView": "Salvar como visualização salva",
       "logsExport": "Exportar resultados como CSV",
       "tracesCopyUrl": "Copiar URL de compartilhamento do rastreamento",
@@ -15777,7 +15818,8 @@
         "destinations": "Destinos",
         "templates": "Modelos",
         "reports": "Relatórios",
-        "llmModelPricing": "Preços de Modelos LLM"
+        "llmModelPricing": "Preços de Modelos LLM",
+        "passcode": "Token de ingestão"
       },
       "noPermissionToChangeFavorites": "Você não tem permissão para alterar favoritos",
       "couldNotUpdateFavoriteDashboards": "Não foi possível atualizar os dashboards favoritos"
@@ -16015,6 +16057,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "Você ainda não iniciou o processo de ingestão de dados. Para explorar outras páginas, inicie a ingestão de dados."
+    },
+    "iam": {
+      "userSaveFailed": "Não foi possível salvar o usuário"
     }
   },
   "cipherKeys": {
@@ -16432,7 +16477,106 @@
       "exponentName": "Expoente"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Complexidade",
+    "minLength": "Comprimento mínimo",
+    "minLengthDesc": "Menor senha aceita",
+    "maxLength": "Comprimento máximo",
+    "maxLengthDesc": "0 = sem limite",
+    "requireUppercase": "Exigir letra maiúscula",
+    "requireUppercaseDesc": "Pelo menos um A–Z",
+    "requireLowercase": "Exigir letra minúscula",
+    "requireLowercaseDesc": "Pelo menos um a–z",
+    "requireDigit": "Exigir dígito",
+    "requireDigitDesc": "Pelo menos um 0–9",
+    "requireSpecial": "Exigir caractere especial",
+    "requireSpecialDesc": "Pelo menos um do conjunto permitido",
+    "specialCharSet": "Caracteres especiais permitidos",
+    "specialCharSetDesc": "Deixe vazio para aceitar qualquer caractere não alfanumérico",
+    "maxLengthTooSmall": "O comprimento máximo deve ser pelo menos o comprimento mínimo, ou 0 para sem limite.",
+    "confirmTitle": "Salvar política de senhas?",
+    "confirmMessage": "Salvar pode forçar todos os usuários nativos a definir uma nova senha antes de continuar. Usuários root, externos e contas de serviço estão isentos — isso inclui você, a menos que você seja a conta root. Não pode ser desfeito.",
+    "saved": "Política de senhas salva. | Política de senhas salva. {count} usuário deve redefinir a senha. | Política de senhas salva. {count} usuários devem redefinir a senha.",
+    "saveFailed": "Não foi possível salvar a política de senhas.",
+    "notAdminTitle": "Acesso de administrador necessário",
+    "notAdmin": "Configurar a política de senhas exige um administrador da meta organização.",
+    "loadFailedTitle": "Não foi possível carregar a política de senhas",
+    "loadFailed": "Algo deu errado ao ler a política atual.",
+    "rotation": "Rotação",
+    "rotationDays": "Período de rotação",
+    "rotationDaysDesc": "Dias antes de a senha expirar. 0 = nunca expira",
+    "rotationWarningDays": "Avisar antes da expiração",
+    "rotationWarningDaysDesc": "Dias de antecedência no login. 0 = sem aviso",
+    "warningDaysTooLong": "O período de aviso não pode ser maior que o período de rotação.",
+    "rotationPreview": "Uma senha definida hoje expira {expires}. O aviso no login começa {warns}.",
+    "rotationPreviewNoWarning": "Uma senha definida hoje expira {expires}. Nenhum aviso é exibido antes disso.",
+    "reuse": "Prevenção de reutilização",
+    "historyCount": "Senhas memorizadas",
+    "historyCountDesc": "Uma nova senha não pode ser igual a esta quantidade de senhas anteriores. 0 = sem verificação",
+    "historyMaxRetained": "Histórico retido",
+    "historyMaxRetainedDesc": "Quantas senhas anteriores são mantidas por usuário",
+    "historyRetainedTooSmall": "O histórico retido deve ser pelo menos igual ao número de senhas memorizadas.",
+    "reuseExplainer": "A senha atual conta como uma das senhas do conjunto memorizado — reutilizá-la é recusado por esta regra, não por uma verificação separada.",
+    "lockout": "Bloqueio de conta",
+    "lockoutThreshold": "Tentativas falhas antes do bloqueio",
+    "lockoutThresholdDesc": "0 = bloqueio desativado",
+    "lockoutBucketSize": "Tentativas antes de cada bloqueio adicional",
+    "lockoutBucketSizeDesc": "0 = reutiliza o valor acima",
+    "lockoutStartSecs": "Duração do primeiro bloqueio",
+    "lockoutStartSecsDesc": "Segundos",
+    "lockoutMaxSecs": "Duração máxima do bloqueio",
+    "lockoutMaxSecsDesc": "Segundos — o teto ao qual a escalada é limitada",
+    "lockoutStartTooLong": "O primeiro bloqueio não pode ser maior que o bloqueio máximo.",
+    "lockoutBackoff": "Escalada",
+    "lockoutBackoffDesc": "Como cada bloqueio cresce em relação ao anterior",
+    "backoffExponential": "Exponencial",
+    "backoffLinear": "Linear",
+    "lockoutPreview": "{threshold} falhas → {first} · a cada {bucket} adicionais → {rest} · limitado a {max}. Um login bem-sucedido redefine tudo.",
+    "sessionEnforcement": "Sessão e aplicação",
+    "cookieMaxAge": "Duração da sessão",
+    "cookieMaxAgeDesc": "Segundos durante os quais uma sessão autenticada permanece válida. 0 = usar o padrão da instância de {envVar}",
+    "applyToRoot": "Aplicar à conta root",
+    "applyToRootDesc": "O root está isento de todas as regras acima, a menos que isto esteja ativado",
+    "rootWarning": "Bloquear o root pode levar o sistema a um estado irrecuperável.",
+    "rootDialogTitle": "Aplicar a política ao root?",
+    "rootDialogMessage": "O root ficará sujeito a bloqueio, rotação e redefinições forçadas como qualquer outra conta nativa. Se o root for sua única conta administrativa, um bloqueio ou uma expiração que ele não consiga atender deixará você sem forma de voltar a esta instância.",
+    "rootDialogAck": "Entendo que o root pode ser bloqueado permanentemente desta instância.",
+    "rootDialogConfirm": "Aplicar ao root"
+  },
+  "passwordReset": {
+    "title": "Atualize sua senha",
+    "signedInAs": "Conectado como {email}",
+    "reasonPolicyTightened": "A política de senhas mudou. Atualize sua senha para continuar usando o OpenObserve.",
+    "reasonRotationExpired": "Sua senha expirou. Defina uma nova para continuar usando o OpenObserve.",
+    "reasonRotationWarning": "Sua senha expira em breve. Defina uma nova agora para não perder o acesso ao seu trabalho.",
+    "reused": "Esta senha foi usada recentemente. Escolha uma que você não tenha usado nas suas últimas {count} senhas.",
+    "expiryBanner": "Sua senha expira em {count} dia. Atualize-a agora para não perder o acesso ao seu trabalho. | Sua senha expira em {count} dias. Atualize-a agora para não perder o acesso ao seu trabalho.",
+    "expiryBannerAction": "Atualizar agora",
+    "expiryBannerDismiss": "Dispensar",
+    "currentPassword": "Senha atual",
+    "newPassword": "Nova senha",
+    "confirmPassword": "Confirme a nova senha",
+    "currentPasswordRequired": "A senha atual é obrigatória.",
+    "newPasswordRequired": "A nova senha é obrigatória.",
+    "confirmPasswordRequired": "Digite novamente a nova senha.",
+    "mismatch": "As senhas não coincidem.",
+    "signOut": "Sair",
+    "submit": "Atualizar senha",
+    "updated": "Sua senha foi atualizada. Faça login novamente.",
+    "updateFailed": "Não foi possível atualizar sua senha.",
+    "req": {
+      "minLength": "Pelo menos {count} caracteres",
+      "maxLength": "No máximo {count} caracteres",
+      "uppercase": "Uma letra maiúscula",
+      "lowercase": "Uma letra minúscula",
+      "digit": "Um dígito",
+      "special": "Um caractere especial",
+      "specialFromSet": "Um caractere especial de {set}",
+      "unmet": "A senha deve ter: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Política de senha",
     "loginCallback": "Callback de login",
     "slackOAuthCallback": "Conectando ao Slack",
     "emptyStateDemo": "Demonstração de estado vazio",

@@ -27,6 +27,10 @@ const users = {
   update: (data: any, org_identifier: string, user_email: string) => {
     return http().put(`/api/${org_identifier}/users/${user_email}`, data);
   },
+  /** One member with their failed-login lockout state. Enterprise only; Root/Admin on the org. */
+  get: (org_identifier: string, user_email: string) => {
+    return http().get(`/api/${org_identifier}/users/${user_email}`);
+  },
   updateexistinguser: (data: any, org_identifier: string, user_email: string) => {
     return http().post(`/api/${org_identifier}/users/${user_email}`, data);
   },

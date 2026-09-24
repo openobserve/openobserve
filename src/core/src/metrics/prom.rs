@@ -53,7 +53,7 @@ use search_service;
 
 use super::{
     columnar, ingest,
-    native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram},
+    native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, ExpansionLimits, expand_native_histogram},
     prom_decode,
 };
 use crate::{
@@ -459,7 +459,7 @@ pub async fn remote_write(
                 &event.histograms,
                 &labels,
                 &metric_name,
-                cfg.prom.native_histogram_max_buckets,
+                ExpansionLimits::from_config(&cfg),
                 &mut gate,
                 &mut sink,
             )
@@ -929,14 +929,7 @@ pub async fn get_label_values(
         return Ok(label_values);
     }
 
-    let metric_name = match opt_metric_name {
-        Some(name) => name,
-        None => {
-            // HACK: in the ideal world we would have queried all the metric streams
-            // and collected label names from them.
-            return Ok(vec![]);
-        }
-    };
+    let metric_name = label_values_metric_name(selector.as_ref())?;
 
     let schema = infra::schema::get(org_id, &metric_name, stream_type)
         .await
@@ -1021,24 +1014,26 @@ pub async fn get_label_values(
     Ok(label_values)
 }
 
+pub fn label_values_metric_name(selector: Option<&parser::VectorSelector>) -> Result<String> {
+    let metric_name = selector.and_then(try_into_metric_name);
+    metric_name.ok_or_else(|| {
+        Error::Message(
+            "match[] must specify a metric for label values, e.g. match[]=up; querying all metrics streams is not supported"
+                .to_owned(),
+        )
+    })
+}
+
 pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
-    match &selector.name {
-        Some(name) => {
-            // `match[]` argument contains a metric name, e.g.
-            // `match[]=zo_response_code{method="GET"}`
-            Some(name.clone())
-        }
-        None => {
-            // `match[]` argument does not contain a metric name.
-            // Check if there is `__name__` among the matchers,
-            // e.g. `match[]={__name__="zo_response_code",method="GET"}`
-            selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .map(|m| m.value.clone())
-        }
+    if let Some(name) = &selector.name {
+        return (!name.is_empty()).then(|| name.clone());
     }
+    selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .into_iter()
+        .find(|matcher| matches!(matcher.op, MatchOp::Equal) && !matcher.value.is_empty())
+        .map(|matcher| matcher.value)
 }
 
 /// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
@@ -1112,7 +1107,7 @@ async fn buffer_native_histograms(
     histograms: &[prometheus_rpc::Histogram],
     labels: &json::Map<String, json::Value>,
     metric_name: &str,
-    max_buckets: usize,
+    limits: ExpansionLimits,
     gate: &mut HaGate<'_>,
     sink: &mut RecordSink<'_>,
 ) -> Option<usize> {
@@ -1127,7 +1122,7 @@ async fn buffer_native_histograms(
     let mut counted = 0;
     for hp in histograms {
         counted += 1;
-        let records = expand_native_histogram(hp, max_buckets);
+        let records = expand_native_histogram(hp, limits);
         if records.is_empty() {
             // unsupported schema or stale marker: nothing will be written
             continue;
@@ -1464,6 +1459,26 @@ mod tests {
     }
 
     #[test]
+    fn test_try_into_metric_name_rejects_non_exact_names() {
+        for query in [
+            r#"{__name__!="up",job="x"}"#,
+            r#"{__name__=~"up.*",job="x"}"#,
+            r#"{__name__=~"up",job="x"}"#,
+            r#"{__name__!~"up.*",job="x"}"#,
+            r#"{__name__="",job="x"}"#,
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected vector selector: {query}");
+            };
+            assert_eq!(try_into_metric_name(&selector), None, "{query}");
+            assert!(
+                label_values_metric_name(Some(&selector)).is_err(),
+                "{query}"
+            );
+        }
+    }
+
+    #[test]
     fn test_try_into_metric_name_none_when_no_name_or_name_label() {
         let sel = VectorSelector {
             name: None,
@@ -1569,5 +1584,38 @@ mod tests {
             Some(&json::json!(recomputed))
         );
         assert_eq!(json_data[1].0.get(HASH_LABEL), Some(&json::json!(7_u64)));
+    }
+
+    #[test]
+    fn test_label_values_metric_name() {
+        assert!(label_values_metric_name(None).is_err());
+        let parser::Expr::VectorSelector(selector) =
+            parser::parse(r#"{job="prometheus"}"#).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        assert!(label_values_metric_name(Some(&selector)).is_err());
+        for (matcher, expected) in [
+            ("up", "up"),
+            (r#"up{job="prometheus"}"#, "up"),
+            (r#"{__name__="up"}"#, "up"),
+            (r#"{__name__=~"up.*",__name__="up"}"#, "up"),
+            (r#"up{job="prometheus" or job="other"}"#, "up"),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(matcher).unwrap() else {
+                panic!("expected vector selector");
+            };
+            assert_eq!(
+                label_values_metric_name(Some(&selector)).unwrap(),
+                expected,
+                "{matcher}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_label_values_requires_metric() {
+        let result = get_label_values("default", "job".to_owned(), None, 0, 1).await;
+        assert!(result.unwrap_err().to_string().contains("match[]"));
     }
 }

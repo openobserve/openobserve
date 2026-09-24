@@ -41,6 +41,7 @@ vi.mock("@/services/users", async (importOriginal) => {
       create: vi.fn(),
       update: vi.fn(),
       updateexistinguser: vi.fn(),
+      get: vi.fn(() => Promise.resolve({ data: {} })),
       getUserRoles: vi.fn(() => Promise.resolve({ data: [] })),
     },
   });
@@ -48,6 +49,11 @@ vi.mock("@/services/users", async (importOriginal) => {
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
+}));
+
+const confirmMock = vi.fn();
+vi.mock("@/composables/useConfirmDialog", () => ({
+  useConfirmDialog: () => ({ confirm: confirmMock }),
 }));
 
 const { mockToast } = vi.hoisted(() => ({
@@ -735,6 +741,36 @@ describe("AddUser", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="user-custom-role-field"]').exists()).toBe(true);
+    });
+
+    it("stages an unlock and sends it on save, after confirming", async () => {
+      vi.mocked(userServiece.get).mockResolvedValue({
+        data: { lockout: { locked: true, retry_after_secs: 240 } },
+      } as any);
+      vi.mocked(userServiece.update).mockResolvedValue({ data: {} } as any);
+      confirmMock.mockResolvedValue(true);
+      wrapper = mountComp({
+        modelValue: { email: "other@example.com", first_name: "Other", org_member_id: "2" },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="user-lockout-banner"]').exists()).toBe(true);
+      await wrapper.find('[data-test="user-lockout-unlock-btn"]').trigger("click");
+      setField(wrapper, "role", "admin");
+      await submitForm(wrapper);
+
+      expect(confirmMock).toHaveBeenCalled();
+      const [body] = vi.mocked(userServiece.update).mock.calls[0];
+      expect(body.remove_lockout).toBe(true);
+    });
+
+    it("never fetches lockout state for your own row", async () => {
+      wrapper = mountComp({
+        modelValue: { email: ADMIN_EMAIL, first_name: "Me", org_member_id: "1" },
+      });
+      await flushPromises();
+
+      expect(userServiece.get).not.toHaveBeenCalled();
     });
   });
 

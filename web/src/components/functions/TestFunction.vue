@@ -68,14 +68,13 @@
             @update:model-value="updateQuery"
           />
         </div>
-        <div class="functions-duration-input w-82.5">
+        <div>
           <div class="text-text-label text-xs">
             {{ t("common.duration") + " *" }}
           </div>
 
           <DateTime
             :label="t('alerts.startTime')"
-            class="w-full py-1"
             auto-apply
             :default-type="dateTime.type"
             :default-absolute-time="{
@@ -829,14 +828,10 @@ defineExpose({
 </script>
 
 <style scoped>
-/* keep(lib-override): compact run-query button + full-width date-time button (child DOM) */
+/* keep(lib-override): compact run-query button (child DOM) */
 .test-function-query-container :deep(.test-function-run-query-btn) {
   padding: 0.125rem 0.5rem !important;
   font-size: var(--text-2xs) !important;
   margin: 0.0625rem 0.125rem !important;
-}
-
-.functions-duration-input :deep(.date-time-button) {
-  width: 100%;
 }
 </style>

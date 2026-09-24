@@ -82,7 +82,7 @@
                `items-start`, not `items-end`: OTagInput is taller than an
                OInput, and bottom-aligning the cells lifted its label clear of
                the other two so the row read as three unrelated fields. -->
-          <div class="grid grid-cols-1 items-start gap-3 md:grid-cols-[14rem_1fr_1fr]">
+          <div class="grid grid-cols-1 items-start gap-3 2xl:grid-cols-[14rem_1fr_1fr]">
             <div>
               <!-- No label here: SelectFolderDropDown renders its own, and a
                    second one above it left this column a row taller than the

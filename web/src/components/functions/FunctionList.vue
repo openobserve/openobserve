@@ -386,7 +386,7 @@ export default defineComponent({
     // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
     const restorePageIndex = () => {
       setTimeout(() => {
-        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        oTableRef.value?.restorePage?.(currentPage.value);
       }, 0);
     };
 

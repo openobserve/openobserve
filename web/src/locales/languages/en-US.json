@@ -1474,6 +1474,8 @@
     "sessionReplay": "Session Replay",
     "viewSessionReplay": "View Session Replay",
     "playSessionReplay": "Play Session Replay",
+    "noReplayRecordedTitle": "No replay was recorded for this session",
+    "noReplayRecordedMessage": "Session {id} has no replay segments to play.",
     "discoverSessionTitle": "Discover Session Replay to Understand User Interactions in Detail",
     "discoverSessionMessage": "Session Replay captures and replays user interactions on your website or application. This allows you to visually review how users navigate, where they click, what they type, and how they engage with your content",
     "loadingErrorDetails": "Hold on tight, we're fetching error details.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "Start free trial"
   },
   "login": {
+    "lockedOut": "Too many failed sign-in attempts. Try again in {duration}, or contact your administrator.",
     "redirectingToSsoMessage": "Redirecting to SSO login page. If you are not redirected, please",
     "clickHere": "click here",
     "loginWithSso": "Login with SSO",
@@ -1963,6 +1966,15 @@
     "fieldRequired": "Field is required",
     "passwordRequired": "Password is required.",
     "passwordPolicyHint": "Password must be 8-128 characters and contain at least one lowercase letter, one uppercase letter, one digit, and one special character.",
+    "lockout": {
+      "locked": "Account locked",
+      "autoUnlock": "Unlocks automatically in {duration}.",
+      "staged": "Will be unlocked when you save.",
+      "unlock": "Unlock",
+      "undo": "Keep locked",
+      "confirmTitle": "Unlock {email}?",
+      "confirmMessage": "This clears their failed attempt count and lets them sign in again immediately. It does not change their password."
+    },
     "currentPasswordRequired": "Current password is required.",
     "newPasswordRequired": "New password is required.",
     "otherOrgInvalid": "Organization name must start with a letter and be alphanumeric, _ or -.",
@@ -2029,11 +2041,11 @@
       "addToGroup": "Add to a user group",
       "addToRole": "Assign a role",
       "step1Title": "Copy your token",
-      "copyHint": "Copy this token now — you won't be able to see it again.",
+      "copyHint": "This is the only time you'll see this token. Copy or download it now, it can't be retrieved again.",
       "done": "Done",
       "applying": "Applying access grants…",
-      "grantedRoles": "Roles assigned: {roles}",
-      "grantedGroups": "Added to user groups: {groups}",
+      "rolesAssignedLabel": "Roles assigned",
+      "groupsAssignedLabel": "Added to user groups",
       "failedRoles": "Could not assign roles: {roles}",
       "failedGroups": "Could not add to user groups: {groups}",
       "failedHint": "You can grant these later from the Roles and User Groups pages."
@@ -2043,6 +2055,9 @@
         "label": "Service account name",
         "placeholder": "e.g. ingest-bot",
         "help": "Lowercase letters, numbers and hyphens. Saved as name{suffix}"
+      },
+      "identifier": {
+        "label": "Identifier"
       },
       "roles": {
         "label": "Assign roles",
@@ -2057,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Identifier",
+        "roles": "Roles",
         "token": "Token",
         "created": "Created"
       }
@@ -2184,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Any users and service accounts bound to these roles will lose access."
-      }
+      },
+      "assignColumn": "Assign",
+      "assignBtn": "Add",
+      "assignedBadge": "Assigned",
+      "assignBannerText": "Add {member} to a role — click Add next to a role below.",
+      "assignBannerDone": "Done",
+      "assignSuccess": "Added {member} to role \"{role}\".",
+      "assignError": "Could not add the account to that role. Please try again."
     },
     "group": {
       "name": {
@@ -2215,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Members of these groups will lose the roles granted by them."
-      }
+      },
+      "assignColumn": "Assign",
+      "assignBtn": "Add",
+      "assignedBadge": "Assigned",
+      "assignBannerText": "Add {member} to a user group — click Add next to a group below.",
+      "assignBannerDone": "Done",
+      "assignSuccess": "Added {member} to group \"{group}\".",
+      "assignError": "Could not add the account to that group. Please try again."
     },
     "appGroups": {
       "deleteGroupTitle": "Delete Group",
@@ -3585,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Error while copy content.",
+    "passcodeForbiddenMessage": "Admin or Root role required to view the ingestion token. Ask an administrator for the setup command, or for the role needed to see it here.",
     "updateRUMTokenMessage": "Are you sure you want to update rum token for this organization?",
     "completeAwsIntegration": "Complete AWS Integration",
     "deployAwsServicesOneClick": "Deploy all selected AWS services in one click using a single CloudFormation stack.",
@@ -4966,7 +4997,7 @@
     "colorLightToDarkBlue": "Light To Dark Blue (By Value)",
     "colorPaletteClassicBySeries": "Palette-Classic (By Series)",
     "drilldown": "Drilldown",
-    "drilldownTooltip": "Navigate to a another dashboard or specified URL, carrying over all current variables for seamless data exploration.",
+    "drilldownTooltip": "Navigate to another dashboard or specified URL, carrying over all current variables for seamless data exploration.",
     "colorBySeriesTitle": "Color by series",
     "colorBySeriesTooltip": "Apply colors to series for better visual distinction in charts. Customize colors for each series to enhance data visualization.",
     "editColorBySeries": " Edit color by series",
@@ -7604,7 +7635,9 @@
       "usernameRequired": "Username is required",
       "passwordRequired": "Password is required",
       "emailRecipients": "Recipient Email Addresses",
-      "emailRecipientsHelp": "Comma-separated email addresses",
+      "emailRecipientsHelp": "Select the organization users or service accounts that should receive alert emails",
+      "emailRecipientsGroupUsers": "Users",
+      "emailRecipientsGroupServiceAccounts": "Service Accounts",
       "invalidEmailAddresses": "Invalid email addresses: {emails}",
       "opsgenieApiKey": "Opsgenie API Key",
       "opsgenieApiKeyHelp": "Get your API key from Opsgenie integration settings",
@@ -8789,6 +8822,8 @@
     "cipherKeysDesc": "Encryption keys for sensitive fields",
     "regexPatternsDesc": "Reusable regex patterns for redaction",
     "domainManagementDesc": "Restrict sign-in to allowed SSO domains",
+    "passwordPolicy": "Password Policy",
+    "passwordPolicyDesc": "Authentication policies for native email/password accounts, applied instance-wide.",
     "pipelineDestinationsDesc": "External targets for pipeline output",
     "templatesDesc": "Reusable alert message templates",
     "storageSettingsDesc": "Per-organization storage configuration",
@@ -13041,10 +13076,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Input from the trace's root span."
+              "trace": "Input from the trace's root chat span.",
+              "session": "The opening question: input from the first trace's root chat span."
             },
             "output": {
-              "trace": "Output from the trace's root span."
+              "trace": "Output from the trace's root chat span.",
+              "session": "The final answer: output from the last trace's root chat span."
             },
             "statistics": {
               "trace": "Trace metrics: span count, duration, LLM and tool calls, errors, tokens, and cost.",
@@ -13056,6 +13093,10 @@
             "steps": {
               "trace": "Spans in time order; the middle is folded when the trace is very long.",
               "session": "Traces in time order, represented as conversation turns."
+            },
+            "tool_calls": {
+              "trace": "Every tool call in the trace, in time order, with its name, input, output, and status.",
+              "session": "Every tool call across the session's traces, in time order, with its name, input, output, and status."
             }
           }
         }
@@ -13375,6 +13416,7 @@
       "searchHistoryNotEnabled": "Search history is not enabled.",
       "enableUsageReporting": "Set ZO_USAGE_REPORTING_ENABLED to true to enable usage reporting.",
       "selectStreamToExtractPatterns": "Please select a stream to extract patterns",
+      "patternsUnavailableForMultiStream": "Patterns are not available when multiple streams are selected. Please select a single stream.",
       "errorExtractingPatterns": "Error extracting patterns. Please try again.",
       "nameOfPanelRequired": "Name of Panel is required",
       "errorsFixAndTryAgain": "There are some errors, please fix them and try again",
@@ -15164,7 +15206,6 @@
       "syntheticsTokensRefresh": "Refresh token list",
       "aiChatToggle": "Toggle AI chat",
       "aiChatClose": "Close AI chat",
-      "aiChatExpand": "Expand/collapse AI chat",
       "logsSaveView": "Save as saved view",
       "logsExport": "Export results as CSV",
       "tracesCopyUrl": "Copy trace share URL",
@@ -15777,7 +15818,8 @@
         "destinations": "Destinations",
         "templates": "Templates",
         "reports": "Reports",
-        "llmModelPricing": "LLM Model Pricing"
+        "llmModelPricing": "LLM Model Pricing",
+        "passcode": "Ingestion Token"
       },
       "noPermissionToChangeFavorites": "You don't have permission to change favorites",
       "couldNotUpdateFavoriteDashboards": "Couldn't update favorite dashboards"
@@ -16015,6 +16057,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion."
+    },
+    "iam": {
+      "userSaveFailed": "Could not save the user"
     }
   },
   "cipherKeys": {
@@ -16432,7 +16477,106 @@
       "exponentName": "Exponent"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Complexity",
+    "minLength": "Minimum length",
+    "minLengthDesc": "Shortest password accepted",
+    "maxLength": "Maximum length",
+    "maxLengthDesc": "0 = unbounded",
+    "requireUppercase": "Require uppercase letter",
+    "requireUppercaseDesc": "At least one A–Z",
+    "requireLowercase": "Require lowercase letter",
+    "requireLowercaseDesc": "At least one a–z",
+    "requireDigit": "Require digit",
+    "requireDigitDesc": "At least one 0–9",
+    "requireSpecial": "Require special character",
+    "requireSpecialDesc": "At least one from the allowed set",
+    "specialCharSet": "Allowed special characters",
+    "specialCharSetDesc": "Leave empty to accept any non-alphanumeric character",
+    "maxLengthTooSmall": "Maximum length must be at least the minimum length, or 0 for unbounded.",
+    "confirmTitle": "Save password policy?",
+    "confirmMessage": "Saving may force every native user to set a new password before they can continue. Root, external users and service accounts are exempt — this includes you unless you are the root account. It cannot be undone.",
+    "saved": "Password policy saved. | Password policy saved. {count} user must reset their password. | Password policy saved. {count} users must reset their password.",
+    "saveFailed": "Could not save the password policy.",
+    "notAdminTitle": "Administrator access required",
+    "notAdmin": "Configuring the password policy requires an administrator of the meta organization.",
+    "loadFailedTitle": "Could not load the password policy",
+    "loadFailed": "Something went wrong while reading the current policy.",
+    "rotation": "Rotation",
+    "rotationDays": "Rotation period",
+    "rotationDaysDesc": "Days before a password expires. 0 = never expires",
+    "rotationWarningDays": "Warn before expiry",
+    "rotationWarningDaysDesc": "Days of notice at sign-in. 0 = no warning",
+    "warningDaysTooLong": "The warning window cannot be longer than the rotation period.",
+    "rotationPreview": "A password set today expires {expires}. The sign-in warning starts {warns}.",
+    "rotationPreviewNoWarning": "A password set today expires {expires}. No warning is shown before then.",
+    "reuse": "Reuse prevention",
+    "historyCount": "Passwords remembered",
+    "historyCountDesc": "A new password may not match this many previous ones. 0 = no check",
+    "historyMaxRetained": "History retained",
+    "historyMaxRetainedDesc": "How many past passwords are kept per user",
+    "historyRetainedTooSmall": "History retained must be at least the number of passwords remembered.",
+    "reuseExplainer": "The current password counts as one of the remembered set — reusing it is refused by this rule, not by a separate check.",
+    "lockout": "Account lockout",
+    "lockoutThreshold": "Failed attempts before lockout",
+    "lockoutThresholdDesc": "0 = lockout disabled",
+    "lockoutBucketSize": "Attempts before each further lockout",
+    "lockoutBucketSizeDesc": "0 = reuse the value above",
+    "lockoutStartSecs": "First lockout duration",
+    "lockoutStartSecsDesc": "Seconds",
+    "lockoutMaxSecs": "Maximum lockout duration",
+    "lockoutMaxSecsDesc": "Seconds — the ceiling escalation clamps to",
+    "lockoutStartTooLong": "The first lockout cannot be longer than the maximum lockout.",
+    "lockoutBackoff": "Escalation",
+    "lockoutBackoffDesc": "How each lockout grows from the one before",
+    "backoffExponential": "Exponential",
+    "backoffLinear": "Linear",
+    "lockoutPreview": "{threshold} failures → {first} · every {bucket} more → {rest} · capped at {max}. A successful sign-in resets everything.",
+    "sessionEnforcement": "Session & enforcement",
+    "cookieMaxAge": "Session lifetime",
+    "cookieMaxAgeDesc": "Seconds a signed-in session stays valid. 0 = use the instance default from {envVar}",
+    "applyToRoot": "Apply to the root account",
+    "applyToRootDesc": "Root is exempt from every rule above unless this is on",
+    "rootWarning": "Locking root might cause the system to go into an unrecoverable state.",
+    "rootDialogTitle": "Apply the policy to root?",
+    "rootDialogMessage": "Root will be subject to lockout, rotation and forced resets like any other native account. If root is your only administrative account, a lockout or an expiry it cannot satisfy will leave no way back into this instance.",
+    "rootDialogAck": "I understand root can be locked out of this instance permanently.",
+    "rootDialogConfirm": "Apply to root"
+  },
+  "passwordReset": {
+    "title": "Update your password",
+    "signedInAs": "Signed in as {email}",
+    "reasonPolicyTightened": "The password policy has changed. Update your password to continue using OpenObserve.",
+    "reasonRotationExpired": "Your password has expired. Set a new one to continue using OpenObserve.",
+    "reasonRotationWarning": "Your password expires soon. Set a new one now to avoid being locked out of your work.",
+    "reused": "This password was used recently. Choose one you have not used in your last {count} passwords.",
+    "expiryBanner": "Your password expires in {count} day. Update it now to avoid being locked out of your work. | Your password expires in {count} days. Update it now to avoid being locked out of your work.",
+    "expiryBannerAction": "Update now",
+    "expiryBannerDismiss": "Dismiss",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "currentPasswordRequired": "Current password is required.",
+    "newPasswordRequired": "New password is required.",
+    "confirmPasswordRequired": "Please re-enter the new password.",
+    "mismatch": "Passwords do not match.",
+    "signOut": "Sign out",
+    "submit": "Update password",
+    "updated": "Your password has been updated. Please sign in again.",
+    "updateFailed": "Could not update your password.",
+    "req": {
+      "minLength": "At least {count} characters",
+      "maxLength": "No more than {count} characters",
+      "uppercase": "One uppercase letter",
+      "lowercase": "One lowercase letter",
+      "digit": "One digit",
+      "special": "One special character",
+      "specialFromSet": "One special character from {set}",
+      "unmet": "Password must have: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Password Policy",
     "loginCallback": "Login Callback",
     "slackOAuthCallback": "Connecting Slack",
     "emptyStateDemo": "Empty State Demo",

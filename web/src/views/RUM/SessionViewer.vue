@@ -25,8 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <template #subtitle>
-      <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+    <template v-if="!sessionNotFound" #subtitle>
+      <div
+        class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+        data-test="session-viewer-subtitle"
+      >
         <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="language" size="sm" />
           {{ sessionDetails.ip }}
@@ -69,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-    <template #actions>
+    <template v-if="!sessionNotFound" #actions>
       <ShareButton
         data-test="session-viewer-share-link-btn"
         :url="shareUrl"
@@ -77,7 +80,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
       />
     </template>
-    <div class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden">
+    <OEmptyState
+      v-if="sessionNotFound"
+      size="hero"
+      illustration="no-results"
+      :title="t('rum.noReplayRecordedTitle')"
+      :description="t('rum.noReplayRecordedMessage', { id: sessionId })"
+      data-test="session-viewer-no-replay"
+    />
+    <div
+      v-else
+      class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden"
+    >
       <OSplitter
         v-model="splitterSize"
         :limits="[200, 1400]"
@@ -110,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :sessionDetails="sessionDetails"
             :session-id="sessionId"
             :current-time="currentTime"
-            :start-time="sessionState.data.selectedSession?.start_time || 0"
+            :start-time="replayOrigin"
             :end-time="sessionState.data.selectedSession?.end_time || 0"
             @event-emitted="handleSidebarEvent"
             class="h-full"
@@ -148,6 +162,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
 
@@ -186,6 +201,7 @@ const segmentEvents = ref<any[]>([]);
 // starting, which is exactly the moment the mobile player mounts — that dip is what let
 // the "No session replay available" empty state flash before the segments arrived.
 const segmentsLoading = ref(true);
+const sessionNotFound = ref(false);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -196,6 +212,27 @@ const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const splitterSize = ref(600);
 const { performanceState } = usePerformance();
+
+// Where playback actually begins, which is not always where the session begins.
+//
+// The converter resets its node-id counter and string table on every FullSnapshot
+// (utils/rum/sessionReplayChangeFormat.ts), so a stream MUST open with one. When the
+// first view loses its `index_in_view: 0` segment, the earliest rows by `start` are
+// orphan mutations that decode against an empty id space: rrweb builds no DOM and the
+// player paints nothing, even though the rest of the session is intact and playable.
+//
+// So play from the first full snapshot, and measure every timeline offset from that same
+// instant — event markers, breadcrumbs and trace rows all treat this as t=0, so they
+// desynchronise from the video if they keep counting from the session start.
+// `replay_start` is null when no segment carries a snapshot; then nothing is playable
+// anyway and the session start is the honest origin.
+const replayOrigin = computed(() =>
+  Number(
+    sessionState.data.selectedSession?.replay_start ??
+      sessionState.data.selectedSession?.start_time ??
+      0,
+  ),
+);
 
 const getSessionId = computed(() => router.currentRoute.value.params.id);
 
@@ -210,12 +247,11 @@ const forwardToEventTime = computed(() => {
     return null;
   }
 
-  // event_time is in milliseconds, session start_time is also in milliseconds
+  // event_time is in milliseconds, replayOrigin is also in milliseconds
   const eventTimestamp = Number(eventTime.value);
-  const sessionStartTime = Number(sessionState.data.selectedSession.start_time);
 
-  // Relative time in milliseconds from session start
-  const relativeTime = formatTimeDifference(eventTimestamp, sessionStartTime);
+  // Relative time in milliseconds from the start of playback
+  const relativeTime = formatTimeDifference(eventTimestamp, replayOrigin.value);
 
   // Only return valid positive relative times
   return relativeTime;
@@ -247,6 +283,7 @@ const rawEventsMap = ref<Map<string, any>>(new Map());
 onBeforeMount(async () => {
   sessionId.value = router.currentRoute.value.params.id as string;
   await getSession();
+  if (sessionNotFound.value) return;
   getSessionSegments();
   getSessionEvents();
 });
@@ -323,9 +360,17 @@ const getSession = () => {
       geoFields += "min(geo_info_country) as country,";
     }
 
+    // Older streams (and mobile schemas) have no has_full_snapshot column. Ask for the
+    // playback origin only when it exists; replayOrigin falls back to the session start.
+    const replayStartField = performanceState.data.streams["_sessionreplay"]["schema"][
+      "has_full_snapshot"
+    ]
+      ? "min(case when has_full_snapshot then start end) as replay_start,"
+      : "";
+
     const req = {
       query: {
-        sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where ${sqlEquals("session_id", getSessionId.value)} order by zo_sql_timestamp`,
+        sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, ${replayStartField} min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where ${sqlEquals("session_id", getSessionId.value)} order by zo_sql_timestamp`,
         start_time: Number(router.currentRoute.value.query.start_time) - 86400000000,
         end_time: Number(router.currentRoute.value.query.end_time) + 86400000000,
         from: 0,
@@ -345,6 +390,8 @@ const getSession = () => {
       )
       .then((res) => {
         if (res.data.hits.length === 0) {
+          sessionNotFound.value = true;
+          segmentsLoading.value = false;
           return;
         }
 
@@ -403,9 +450,14 @@ const getSessionSegments = () => {
       "RUM",
     )
     .then((res) => {
+      // Skip anything before the first full snapshot — see replayOrigin. Only leading
+      // segments can be dropped here: replayOrigin IS the first snapshot's start, so
+      // every later segment passes.
+      const origin = replayOrigin.value;
       // const segmentsCopy = [];
       // const viewIds = [];
       res.data.hits.forEach((hit: any) => {
+        if (Number(hit.start) < origin) return;
         segments.value.push(JSON.parse(hit.segment));
       });
 
@@ -553,9 +605,11 @@ const getDefaultEvent = (event: any) => {
   _event.event_id = event[`${event.type}_id`];
   _event.type = event.type;
   _event.timestamp = event.date;
+  // formatTimeDifference is absolute, so an event from before playback begins would come
+  // back as a positive offset pointing the wrong way. Pin those to the first frame.
   const relativeTime = formatTimeDifference(
-    _event.timestamp,
-    Number(sessionState.data.selectedSession.start_time),
+    Math.max(_event.timestamp, replayOrigin.value),
+    replayOrigin.value,
   );
   _event.relativeTime = relativeTime[0] as number;
   _event.displayTime = relativeTime[1] as string;

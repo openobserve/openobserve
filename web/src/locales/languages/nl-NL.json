@@ -1474,6 +1474,8 @@
     "sessionReplay": "Sessie opnieuw afspelen",
     "viewSessionReplay": "Bekijk de herhaling van de sessie",
     "playSessionReplay": "Sessie opnieuw afspelen",
+    "noReplayRecordedTitle": "Geen replay opgenomen voor deze sessie",
+    "noReplayRecordedMessage": "Sessie {id} heeft geen replay-segmenten om af te spelen.",
     "discoverSessionTitle": "Ontdek Session Replay om gebruikersinteracties in detail te begrijpen",
     "discoverSessionMessage": "Session Replay legt gebruikersinteracties op uw website of applicatie vast en herhaalt deze. Zo kun je visueel bekijken hoe gebruikers navigeren, waar ze klikken, wat ze typen en hoe ze met je inhoud omgaan.",
     "loadingErrorDetails": "Wacht even, we halen foutgegevens op.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "Start gratis proef"
   },
   "login": {
+    "lockedOut": "Te veel mislukte aanmeldpogingen. Probeer het over {duration} opnieuw, of neem contact op met uw beheerder.",
     "redirectingToSsoMessage": "Doorverwijzen naar SSO-inlogpagina. Als je niet wordt doorgestuurd, ",
     "clickHere": "klik hier",
     "loginWithSso": "Inloggen met SSO",
@@ -1963,6 +1966,15 @@
     "fieldRequired": "Veld is verplicht",
     "passwordRequired": "Wachtwoord is vereist.",
     "passwordPolicyHint": "Het wachtwoord moet 8-128 tekens lang zijn en minstens één kleine letter, één hoofdletter, één cijfer en één speciaal teken bevatten.",
+    "lockout": {
+      "locked": "Account vergrendeld",
+      "autoUnlock": "Wordt automatisch ontgrendeld over {duration}.",
+      "staged": "Wordt ontgrendeld wanneer u opslaat.",
+      "unlock": "Ontgrendelen",
+      "undo": "Vergrendeld houden",
+      "confirmTitle": "{email} ontgrendelen?",
+      "confirmMessage": "Hiermee wordt het aantal mislukte pogingen gewist en kan de gebruiker zich direct weer aanmelden. Het wachtwoord wordt niet gewijzigd."
+    },
     "currentPasswordRequired": "Het huidige wachtwoord is vereist.",
     "newPasswordRequired": "Een nieuw wachtwoord is vereist.",
     "otherOrgInvalid": "De naam van de organisatie moet beginnen met een letter en alfanumeriek zijn, _ of -.",
@@ -2029,11 +2041,11 @@
       "addToGroup": "Aan een gebruikersgroep toevoegen",
       "addToRole": "Een rol toewijzen",
       "step1Title": "Kopieer je token",
-      "copyHint": "Kopieer dit token nu — je zult het niet meer kunnen zien.",
+      "copyHint": "Dit is de enige keer dat u dit token te zien krijgt. Kopieer of download het nu, het kan niet opnieuw worden opgehaald.",
       "done": "Klaar",
       "applying": "Toegangsrechten toepassen...",
-      "grantedRoles": "Rollen toegewezen: {roles}",
-      "grantedGroups": "Toegevoegd aan gebruikersgroepen: {groups}",
+      "rolesAssignedLabel": "Toegewezen rollen",
+      "groupsAssignedLabel": "Toegevoegd aan gebruikersgroepen",
       "failedRoles": "Kon rollen niet toewijzen: {roles}",
       "failedGroups": "Kon niet toevoegen aan gebruikersgroepen: {groups}",
       "failedHint": "Je kunt deze later toewijzen via de pagina's Rollen en Gebruikersgroepen."
@@ -2043,6 +2055,9 @@
         "label": "Serviceaccountnaam",
         "placeholder": "bijv. ingest-bot",
         "help": "Kleine letters, cijfers en koppeltekens. Opgeslagen als naam{suffix}"
+      },
+      "identifier": {
+        "label": "Identifier"
       },
       "roles": {
         "label": "Rollen toewijzen",
@@ -2057,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Identificatie",
+        "roles": "Rollen",
         "token": "Blijk",
         "created": "Gemaakt"
       }
@@ -2184,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Alle gebruikers en serviceaccounts die aan deze rollen zijn gekoppeld, verliezen de toegang."
-      }
+      },
+      "assignColumn": "Toewijzen",
+      "assignBtn": "Toevoegen",
+      "assignedBadge": "Toegewezen",
+      "assignBannerText": "Voeg {member} toe aan een rol — klik hieronder op Toevoegen naast een rol.",
+      "assignBannerDone": "Gereed",
+      "assignSuccess": "{member} toegevoegd aan rol \"{role}\".",
+      "assignError": "Het account kon niet aan die rol worden toegevoegd. Probeer het opnieuw."
     },
     "group": {
       "name": {
@@ -2215,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Leden van deze groepen verliezen de door hen toegekende rollen."
-      }
+      },
+      "assignColumn": "Toewijzen",
+      "assignBtn": "Toevoegen",
+      "assignedBadge": "Toegewezen",
+      "assignBannerText": "Voeg {member} toe aan een gebruikersgroep — klik hieronder op Toevoegen naast een groep.",
+      "assignBannerDone": "Gereed",
+      "assignSuccess": "{member} toegevoegd aan groep \"{group}\".",
+      "assignError": "Het account kon niet aan die groep worden toegevoegd. Probeer het opnieuw."
     },
     "appGroups": {
       "deleteGroupTitle": "Groep verwijderen",
@@ -3585,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Fout bij het kopiëren van inhoud.",
+    "passcodeForbiddenMessage": "Admin- of Root-rol vereist om het ingestietoken te bekijken. Vraag een beheerder om het installatiecommando, of om de rol die nodig is om het hier te zien.",
     "updateRUMTokenMessage": "Weet je zeker dat je het RUM-token voor deze organisatie wilt bijwerken?",
     "completeAwsIntegration": "AWS-integratie voltooien",
     "deployAwsServicesOneClick": "Implementeer alle geselecteerde AWS-services in één klik met behulp van een enkele CloudFormation-stack.",
@@ -4966,7 +4997,7 @@
     "colorLightToDarkBlue": "Licht tot donkerblauw (per waarde)",
     "colorPaletteClassicBySeries": "Palette-Classic (per serie)",
     "drilldown": "Inzoomen",
-    "drilldownTooltip": "Navigeer naar een ander dashboard of een andere opgegeven URL, waarbij alle huidige variabelen worden meegenomen voor een naadloze gegevensverkenning.",
+    "drilldownTooltip": "Navigeer naar een ander dashboard of opgegeven URL, waarbij alle huidige variabelen worden meegenomen voor naadloze gegevensverkenning.",
     "colorBySeriesTitle": "Kleur per serie",
     "colorBySeriesTooltip": "Pas kleuren toe op series voor een beter visueel onderscheid in diagrammen. Pas kleuren aan voor elke serie om de datavisualisatie te verbeteren.",
     "editColorBySeries": " Kleur per serie bewerken",
@@ -7604,7 +7635,9 @@
       "usernameRequired": "Gebruikersnaam is vereist",
       "passwordRequired": "Wachtwoord is vereist",
       "emailRecipients": "E-mailadressen van ontvangers",
-      "emailRecipientsHelp": "Door komma's gescheiden e-mailadressen",
+      "emailRecipientsHelp": "Selecteer de gebruikers van de organisatie of serviceaccounts die alarm-e-mails moeten ontvangen",
+      "emailRecipientsGroupUsers": "Gebruikers",
+      "emailRecipientsGroupServiceAccounts": "Serviceaccounts",
       "invalidEmailAddresses": "Ongeldige e-mailadressen: {emails}",
       "opsgenieApiKey": "Opsgenie API-sleutel",
       "opsgenieApiKeyHelp": "Haal uw API-sleutel op uit de integratie-instellingen van Opsgenie",
@@ -8789,6 +8822,8 @@
     "cipherKeysDesc": "Versleutelingssleutels voor gevoelige velden",
     "regexPatternsDesc": "Herbruikbare regex-patronen voor redactie",
     "domainManagementDesc": "Aanmelden beperken tot toegestane SSO-domeinen",
+    "passwordPolicy": "Wachtwoordbeleid",
+    "passwordPolicyDesc": "Authenticatiebeleid voor native e-mail-/wachtwoordaccounts, toegepast op de hele instantie.",
     "pipelineDestinationsDesc": "Externe doelen voor pipeline-uitvoer",
     "templatesDesc": "Herbruikbare sjablonen voor waarschuwingsberichten",
     "storageSettingsDesc": "Opslagconfiguratie per organisatie",
@@ -13041,10 +13076,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Invoer van de root-span van de trace."
+              "trace": "Invoer van de root chat-span van de trace.",
+              "session": "De openingsvraag: invoer van de root chat-span van de eerste trace."
             },
             "output": {
-              "trace": "Uitvoer van de root-span van de trace."
+              "trace": "Uitvoer van de root chat-span van de trace.",
+              "session": "Het uiteindelijke antwoord: uitvoer van de root chat-span van de laatste trace."
             },
             "statistics": {
               "trace": "Trace-metrieken: span-aantal, duur, LLM- en toolcalls, fouten, tokens en kosten.",
@@ -13056,6 +13093,10 @@
             "steps": {
               "trace": "Spans in tijdsvolgorde; het midden wordt samengevouwen wanneer de trace erg lang is.",
               "session": "Traces in tijdsvolgorde, weergegeven als gespreksbeurten."
+            },
+            "tool_calls": {
+              "trace": "Elke toolaanroep in de trace, in tijdvolgorde, met de naam, invoer, uitvoer en status.",
+              "session": "Elke toolaanroep in alle traces van de sessie, in tijdvolgorde, met de naam, invoer, uitvoer en status."
             }
           }
         }
@@ -13375,6 +13416,7 @@
       "searchHistoryNotEnabled": "Zoekgeschiedenis is niet ingeschakeld.",
       "enableUsageReporting": "Stel ZO_USAGE_REPORTING_ENABLED in op true om gebruiksrapportage in te schakelen.",
       "selectStreamToExtractPatterns": "Selecteer een stream om patronen te extraheren",
+      "patternsUnavailableForMultiStream": "Patronen zijn niet beschikbaar wanneer meerdere streams zijn geselecteerd. Selecteer één stream.",
       "errorExtractingPatterns": "Fout bij extraheren van patronen. Probeer het opnieuw.",
       "nameOfPanelRequired": "Naam van paneel is vereist",
       "errorsFixAndTryAgain": "Er zijn fouten, corrigeer deze en probeer het opnieuw",
@@ -15164,7 +15206,6 @@
       "syntheticsTokensRefresh": "Tokenlijst vernieuwen",
       "aiChatToggle": "AI-chat inschakelen",
       "aiChatClose": "AI-chat sluiten",
-      "aiChatExpand": "AI-chat uitvouwen/invouwen",
       "logsSaveView": "Opslaan als opgeslagen weergave",
       "logsExport": "Exporteer resultaten als CSV",
       "tracesCopyUrl": "Kopieer trace-deel-URL",
@@ -15777,7 +15818,8 @@
         "destinations": "Bestemmingen",
         "templates": "Sjablonen",
         "reports": "Rapporten",
-        "llmModelPricing": "LLM-modelprijzen"
+        "llmModelPricing": "LLM-modelprijzen",
+        "passcode": "Ingestietoken"
       },
       "noPermissionToChangeFavorites": "Je hebt geen toestemming om favorieten te wijzigen",
       "couldNotUpdateFavoriteDashboards": "Kan favoriete dashboards niet bijwerken"
@@ -16015,6 +16057,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "U bent nog niet begonnen met het data-ingestieproces. Om andere pagina's te verkennen, start u de data-ingestie."
+    },
+    "iam": {
+      "userSaveFailed": "Kon de gebruiker niet opslaan"
     }
   },
   "cipherKeys": {
@@ -16432,7 +16477,106 @@
       "exponentName": "Exponent"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Complexiteit",
+    "minLength": "Minimumlengte",
+    "minLengthDesc": "Kortste geaccepteerde wachtwoord",
+    "maxLength": "Maximumlengte",
+    "maxLengthDesc": "0 = onbeperkt",
+    "requireUppercase": "Hoofdletter vereisen",
+    "requireUppercaseDesc": "Ten minste één A–Z",
+    "requireLowercase": "Kleine letter vereisen",
+    "requireLowercaseDesc": "Ten minste één a–z",
+    "requireDigit": "Cijfer vereisen",
+    "requireDigitDesc": "Ten minste één 0–9",
+    "requireSpecial": "Speciaal teken vereisen",
+    "requireSpecialDesc": "Ten minste één uit de toegestane set",
+    "specialCharSet": "Toegestane speciale tekens",
+    "specialCharSetDesc": "Laat leeg om elk niet-alfanumeriek teken te accepteren",
+    "maxLengthTooSmall": "Maximumlengte moet ten minste de minimumlengte zijn, of 0 voor onbeperkt.",
+    "confirmTitle": "Wachtwoordbeleid opslaan?",
+    "confirmMessage": "Opslaan kan ertoe leiden dat elke native gebruiker een nieuw wachtwoord moet instellen voordat deze verder kan. Root, externe gebruikers en serviceaccounts zijn uitgezonderd — dit geldt ook voor u, tenzij u het rootaccount bent. Dit kan niet ongedaan worden gemaakt.",
+    "saved": "Wachtwoordbeleid opgeslagen. | Wachtwoordbeleid opgeslagen. {count} gebruiker moet zijn wachtwoord opnieuw instellen. | Wachtwoordbeleid opgeslagen. {count} gebruikers moeten hun wachtwoord opnieuw instellen.",
+    "saveFailed": "Kon het wachtwoordbeleid niet opslaan.",
+    "notAdminTitle": "Beheerdersrechten vereist",
+    "notAdmin": "Voor het configureren van het wachtwoordbeleid is een beheerder van de meta-organisatie vereist.",
+    "loadFailedTitle": "Kon het wachtwoordbeleid niet laden",
+    "loadFailed": "Er is iets misgegaan bij het lezen van het huidige beleid.",
+    "rotation": "Rotatie",
+    "rotationDays": "Rotatieperiode",
+    "rotationDaysDesc": "Dagen voordat een wachtwoord verloopt. 0 = verloopt nooit",
+    "rotationWarningDays": "Waarschuwen voor afloop",
+    "rotationWarningDaysDesc": "Dagen van kennisgeving bij aanmelding. 0 = geen waarschuwing",
+    "warningDaysTooLong": "Het waarschuwingsvenster kan niet langer zijn dan de rotatieperiode.",
+    "rotationPreview": "Een vandaag ingesteld wachtwoord verloopt op {expires}. De aanmeldwaarschuwing begint op {warns}.",
+    "rotationPreviewNoWarning": "Een vandaag ingesteld wachtwoord verloopt op {expires}. Er wordt voor die tijd geen waarschuwing getoond.",
+    "reuse": "Hergebruikpreventie",
+    "historyCount": "Onthouden wachtwoorden",
+    "historyCountDesc": "Een nieuw wachtwoord mag niet overeenkomen met dit aantal eerdere wachtwoorden. 0 = geen controle",
+    "historyMaxRetained": "Bewaarde geschiedenis",
+    "historyMaxRetainedDesc": "Hoeveel eerdere wachtwoorden per gebruiker worden bewaard",
+    "historyRetainedTooSmall": "Bewaarde geschiedenis moet ten minste gelijk zijn aan het aantal onthouden wachtwoorden.",
+    "reuseExplainer": "Het huidige wachtwoord telt als een van de onthouden wachtwoorden — hergebruik ervan wordt door deze regel geweigerd, niet door een aparte controle.",
+    "lockout": "Accountvergrendeling",
+    "lockoutThreshold": "Mislukte pogingen voor vergrendeling",
+    "lockoutThresholdDesc": "0 = vergrendeling uitgeschakeld",
+    "lockoutBucketSize": "Pogingen voor elke volgende vergrendeling",
+    "lockoutBucketSizeDesc": "0 = hergebruik de waarde hierboven",
+    "lockoutStartSecs": "Duur van eerste vergrendeling",
+    "lockoutStartSecsDesc": "Seconden",
+    "lockoutMaxSecs": "Maximale vergrendelingsduur",
+    "lockoutMaxSecsDesc": "Seconden — het plafond waarnaar escalatie wordt afgekapt",
+    "lockoutStartTooLong": "De eerste vergrendeling kan niet langer zijn dan de maximale vergrendeling.",
+    "lockoutBackoff": "Escalatie",
+    "lockoutBackoffDesc": "Hoe elke vergrendeling groeit ten opzichte van de vorige",
+    "backoffExponential": "Exponentieel",
+    "backoffLinear": "Lineair",
+    "lockoutPreview": "{threshold} fouten → {first} · elke {bucket} meer → {rest} · gemaximeerd op {max}. Een succesvolle aanmelding reset alles.",
+    "sessionEnforcement": "Sessie en handhaving",
+    "cookieMaxAge": "Sessielevensduur",
+    "cookieMaxAgeDesc": "Seconden dat een aangemelde sessie geldig blijft. 0 = gebruik de standaardwaarde van de instantie uit {envVar}",
+    "applyToRoot": "Toepassen op het rootaccount",
+    "applyToRootDesc": "Root is vrijgesteld van alle bovenstaande regels tenzij dit is ingeschakeld",
+    "rootWarning": "Het vergrendelen van root kan ertoe leiden dat het systeem in een onherstelbare staat terechtkomt.",
+    "rootDialogTitle": "Het beleid toepassen op root?",
+    "rootDialogMessage": "Root zal net als elk ander systeemeigen account onderhevig zijn aan vergrendeling, rotatie en gedwongen resets. Als root uw enige beheerdersaccount is, kan een vergrendeling of een vervaldatum waaraan niet kan worden voldaan, ervoor zorgen dat er geen weg terug is naar deze instantie.",
+    "rootDialogAck": "Ik begrijp dat root permanent buitengesloten kan worden van deze instantie.",
+    "rootDialogConfirm": "Toepassen op root"
+  },
+  "passwordReset": {
+    "title": "Uw wachtwoord bijwerken",
+    "signedInAs": "Aangemeld als {email}",
+    "reasonPolicyTightened": "Het wachtwoordbeleid is gewijzigd. Werk uw wachtwoord bij om OpenObserve te blijven gebruiken.",
+    "reasonRotationExpired": "Uw wachtwoord is verlopen. Stel een nieuw wachtwoord in om OpenObserve te blijven gebruiken.",
+    "reasonRotationWarning": "Uw wachtwoord verloopt binnenkort. Stel nu een nieuw wachtwoord in om te voorkomen dat u buitengesloten raakt van uw werk.",
+    "reused": "Dit wachtwoord is onlangs gebruikt. Kies een wachtwoord dat u niet hebt gebruikt in uw laatste {count} wachtwoorden.",
+    "expiryBanner": "Uw wachtwoord verloopt over {count} dag. Werk het nu bij om te voorkomen dat u buitengesloten raakt van uw werk. | Uw wachtwoord verloopt over {count} dagen. Werk het nu bij om te voorkomen dat u buitengesloten raakt van uw werk.",
+    "expiryBannerAction": "Nu bijwerken",
+    "expiryBannerDismiss": "Sluiten",
+    "currentPassword": "Huidig wachtwoord",
+    "newPassword": "Nieuw wachtwoord",
+    "confirmPassword": "Bevestig nieuw wachtwoord",
+    "currentPasswordRequired": "Huidig wachtwoord is vereist.",
+    "newPasswordRequired": "Nieuw wachtwoord is vereist.",
+    "confirmPasswordRequired": "Voer het nieuwe wachtwoord opnieuw in.",
+    "mismatch": "Wachtwoorden komen niet overeen.",
+    "signOut": "Uitloggen",
+    "submit": "Wachtwoord bijwerken",
+    "updated": "Uw wachtwoord is bijgewerkt. Meld u opnieuw aan.",
+    "updateFailed": "Uw wachtwoord kon niet worden bijgewerkt.",
+    "req": {
+      "minLength": "Minimaal {count} tekens",
+      "maxLength": "Maximaal {count} tekens",
+      "uppercase": "Eén hoofdletter",
+      "lowercase": "Eén kleine letter",
+      "digit": "Eén cijfer",
+      "special": "Eén speciaal teken",
+      "specialFromSet": "Eén speciaal teken uit {set}",
+      "unmet": "Wachtwoord moet bevatten: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Wachtwoordbeleid",
     "loginCallback": "Login-callback",
     "slackOAuthCallback": "Slack verbinden",
     "emptyStateDemo": "Lege-statusdemo",

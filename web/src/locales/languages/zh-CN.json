@@ -1474,6 +1474,8 @@
     "sessionReplay": "会话重放",
     "viewSessionReplay": "查看会话重放",
     "playSessionReplay": "播放会话重放",
+    "noReplayRecordedTitle": "此会话未录制回放",
+    "noReplayRecordedMessage": "会话 {id} 没有可播放的回放片段。",
     "discoverSessionTitle": "探索会话回放以详细了解用户互动",
     "discoverSessionMessage": "Session Replay 捕获并重放您的网站或应用程序上的用户互动。这使您可以直观地查看用户的导航方式、点击的位置、键入的内容以及他们如何与您的内容互动",
     "loadingErrorDetails": "等一下，我们正在获取错误细节。",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "开始免费试用"
   },
   "login": {
+    "lockedOut": "登录失败次数过多。请在 {duration} 后重试，或联系管理员。",
     "redirectingToSsoMessage": "正在重定向到 SSO 登录页面。如果未自动重定向，请",
     "clickHere": "点击此处",
     "loginWithSso": "使用 SSO 登录",
@@ -1963,6 +1966,15 @@
     "fieldRequired": "字段为必填字段",
     "passwordRequired": "密码为必填项。",
     "passwordPolicyHint": "密码必须为 8-128 个字符，并且至少包含一个小写字母、一个大写字母、一个数字和一个特殊字符。",
+    "lockout": {
+      "locked": "账户已锁定",
+      "autoUnlock": "将在 {duration} 后自动解锁。",
+      "staged": "保存后将自动解锁。",
+      "unlock": "解锁",
+      "undo": "保持锁定",
+      "confirmTitle": "解锁 {email}？",
+      "confirmMessage": "这会清除其失败尝试次数，使其可立即重新登录。不会更改其密码。"
+    },
     "currentPasswordRequired": "当前密码为必填项。",
     "newPasswordRequired": "需要新密码。",
     "otherOrgInvalid": "组织名称必须以字母开头，并且必须是字母数字、_ 或-。",
@@ -2029,11 +2041,11 @@
       "addToGroup": "添加到用户组",
       "addToRole": "分配角色",
       "step1Title": "复制令牌",
-      "copyHint": "立即复制此令牌——您将无法再次看到它。",
+      "copyHint": "这是您唯一一次能看到此令牌的机会。请立即复制或下载，之后将无法再次获取。",
       "done": "完成了",
       "applying": "正在应用访问授权…",
-      "grantedRoles": "已分配角色：{roles}",
-      "grantedGroups": "已添加到用户组：{groups}",
+      "rolesAssignedLabel": "已分配角色",
+      "groupsAssignedLabel": "已添加到用户组",
       "failedRoles": "无法分配角色：{roles}",
       "failedGroups": "无法添加到用户组：{groups}",
       "failedHint": "您可以稍后从角色和用户组页面授予这些权限。"
@@ -2043,6 +2055,9 @@
         "label": "服务账户名称",
         "placeholder": "例如 ingest-bot",
         "help": "小写字母、数字和连字符。保存为 name{suffix}"
+      },
+      "identifier": {
+        "label": "标识符"
       },
       "roles": {
         "label": "分配角色",
@@ -2057,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "标识符",
+        "roles": "角色",
         "token": "令牌",
         "created": "已创建"
       }
@@ -2184,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "绑定到这些角色的任何用户和服务帐户都将失去访问权限。"
-      }
+      },
+      "assignColumn": "分配",
+      "assignBtn": "添加",
+      "assignedBadge": "已分配",
+      "assignBannerText": "将 {member} 添加到角色 — 点击下方角色旁的“添加”。",
+      "assignBannerDone": "完成",
+      "assignSuccess": "已将 {member} 添加到角色“{role}”。",
+      "assignError": "无法将该账户添加到该角色。请重试。"
     },
     "group": {
       "name": {
@@ -2215,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "这些群组的成员将失去他们授予的角色。"
-      }
+      },
+      "assignColumn": "分配",
+      "assignBtn": "添加",
+      "assignedBadge": "已分配",
+      "assignBannerText": "将 {member} 添加到用户组 — 点击下方用户组旁的“添加”。",
+      "assignBannerDone": "完成",
+      "assignSuccess": "已将 {member} 添加到用户组“{group}”。",
+      "assignError": "无法将该账户添加到该用户组。请重试。"
     },
     "appGroups": {
       "deleteGroupTitle": "删除群组",
@@ -3585,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "复制内容时出错",
+    "passcodeForbiddenMessage": "查看数据摄取令牌需要管理员或 Root 角色。请向管理员索取设置命令，或获取在此处查看它所需的角色。",
     "updateRUMTokenMessage": "确定要更新此组织的 RUM 令牌吗？",
     "completeAwsIntegration": "完成 AWS 集成",
     "deployAwsServicesOneClick": "使用单个 CloudFormation 堆栈一键部署所有选定的 AWS 服务。",
@@ -4966,7 +4997,7 @@
     "colorLightToDarkBlue": "浅蓝到深蓝（按值）",
     "colorPaletteClassicBySeries": "Palette-Classic（按系列分类）",
     "drilldown": "下钻",
-    "drilldownTooltip": "导航到另一个仪表板或指定的 URL，保留所有当前变量，实现无缝数据探索。",
+    "drilldownTooltip": "跳转到另一个仪表盘或指定 URL，并携带所有当前变量，实现无缝的数据探索。",
     "colorBySeriesTitle": "按系列着色",
     "colorBySeriesTooltip": "对系列应用颜色以更好地区分图表中的视觉效果。为每个系列自定义颜色以增强数据可视化。",
     "editColorBySeries": " 按系列编辑颜色",
@@ -7604,7 +7635,9 @@
       "usernameRequired": "用户名是必填项",
       "passwordRequired": "密码是必填项",
       "emailRecipients": "收件人电子邮件地址",
-      "emailRecipientsHelp": "逗号分隔的电子邮件地址",
+      "emailRecipientsHelp": "选择应接收告警邮件的组织用户或服务账号",
+      "emailRecipientsGroupUsers": "用户",
+      "emailRecipientsGroupServiceAccounts": "服务账号",
       "invalidEmailAddresses": "无效的电子邮件地址：{emails}",
       "opsgenieApiKey": "Opsgenie API 密钥",
       "opsgenieApiKeyHelp": "从 Opsgenie 集成设置获取您的 API 密钥",
@@ -8789,6 +8822,8 @@
     "cipherKeysDesc": "用于敏感字段的加密密钥",
     "regexPatternsDesc": "用于脱敏的可重用 regex 模式",
     "domainManagementDesc": "限制仅允许的 SSO 域登录",
+    "passwordPolicy": "密码策略",
+    "passwordPolicyDesc": "适用于原生邮箱/密码账户的认证策略，在整个实例范围内生效。",
     "pipelineDestinationsDesc": "流水线输出的外部目标",
     "templatesDesc": "可重用的告警消息模板",
     "storageSettingsDesc": "按组织划分的存储配置",
@@ -13041,10 +13076,12 @@
           },
           "variables": {
             "input": {
-              "trace": "来自追踪根 Span 的输入。"
+              "trace": "来自追踪根聊天 Span 的输入。",
+              "session": "开场问题：来自第一个追踪根聊天 Span 的输入。"
             },
             "output": {
-              "trace": "来自追踪根 Span 的输出。"
+              "trace": "来自追踪根聊天 Span 的输出。",
+              "session": "最终答案：来自最后一个追踪根聊天 Span 的输出。"
             },
             "statistics": {
               "trace": "追踪指标：Span 数量、时长、LLM 与工具调用、错误、Token 数和成本。",
@@ -13056,6 +13093,10 @@
             "steps": {
               "trace": "按时间顺序排列的 Span；当追踪很长时，中间部分会被折叠。",
               "session": "按时间顺序排列的追踪，以对话轮次表示。"
+            },
+            "tool_calls": {
+              "trace": "追踪中的每个工具调用，按时间顺序排列，包含其名称、输入、输出和状态。",
+              "session": "会话的所有追踪中的每个工具调用，按时间顺序排列，包含其名称、输入、输出和状态。"
             }
           }
         }
@@ -13375,6 +13416,7 @@
       "searchHistoryNotEnabled": "搜索历史未启用。",
       "enableUsageReporting": "将 ZO_USAGE_REPORTING_ENABLED 设置为 true 以启用使用报告。",
       "selectStreamToExtractPatterns": "请选择要提取模式的流",
+      "patternsUnavailableForMultiStream": "选择多个数据流时无法使用模式。请选择单个数据流。",
       "errorExtractingPatterns": "提取模式时出错。请重试。",
       "nameOfPanelRequired": "面板名称是必需的",
       "errorsFixAndTryAgain": "存在一些错误，请修复后重试",
@@ -15164,7 +15206,6 @@
       "syntheticsTokensRefresh": "刷新令牌列表",
       "aiChatToggle": "切换 AI 聊天",
       "aiChatClose": "关闭 AI 聊天",
-      "aiChatExpand": "展开/折叠 AI 聊天",
       "logsSaveView": "另存为已保存视图",
       "logsExport": "将结果导出为 CSV",
       "tracesCopyUrl": "复制追踪分享链接",
@@ -15777,7 +15818,8 @@
         "destinations": "目标",
         "templates": "模板",
         "reports": "报表",
-        "llmModelPricing": "LLM 模型定价"
+        "llmModelPricing": "LLM 模型定价",
+        "passcode": "数据摄取令牌"
       },
       "noPermissionToChangeFavorites": "您没有权限更改收藏",
       "couldNotUpdateFavoriteDashboards": "无法更新收藏的仪表盘"
@@ -16015,6 +16057,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "您尚未开始数据接入流程。要浏览其他页面，请先开始数据接入。"
+    },
+    "iam": {
+      "userSaveFailed": "无法保存用户"
     }
   },
   "cipherKeys": {
@@ -16432,7 +16477,106 @@
       "exponentName": "指数"
     }
   },
+  "passwordPolicy": {
+    "complexity": "复杂度",
+    "minLength": "最小长度",
+    "minLengthDesc": "可接受的最短密码长度",
+    "maxLength": "最大长度",
+    "maxLengthDesc": "0 = 不限制",
+    "requireUppercase": "要求包含大写字母",
+    "requireUppercaseDesc": "至少包含一个大写字母 A–Z",
+    "requireLowercase": "要求包含小写字母",
+    "requireLowercaseDesc": "至少包含一个小写字母 a–z",
+    "requireDigit": "要求包含数字",
+    "requireDigitDesc": "至少包含一个数字 0–9",
+    "requireSpecial": "要求包含特殊字符",
+    "requireSpecialDesc": "至少包含一个允许的特殊字符",
+    "specialCharSet": "允许的特殊字符",
+    "specialCharSetDesc": "留空则接受任意非字母数字字符",
+    "maxLengthTooSmall": "最大长度必须不小于最小长度，或设为 0 表示不限制。",
+    "confirmTitle": "保存密码策略？",
+    "confirmMessage": "保存后可能强制所有原生用户在继续使用前设置新密码。Root、外部用户和服务账户除外——这包括你本人，除非你是 root 账户。此操作无法撤销。",
+    "saved": "密码策略已保存。 | 密码策略已保存。{count} 个用户必须重置密码。 | 密码策略已保存。{count} 个用户必须重置密码。",
+    "saveFailed": "无法保存密码策略。",
+    "notAdminTitle": "需要管理员权限",
+    "notAdmin": "配置密码策略需要 meta 组织的管理员权限。",
+    "loadFailedTitle": "无法加载密码策略",
+    "loadFailed": "读取当前策略时出错。",
+    "rotation": "轮换",
+    "rotationDays": "轮换周期",
+    "rotationDaysDesc": "密码过期前的天数。0 = 永不过期",
+    "rotationWarningDays": "过期前提醒",
+    "rotationWarningDaysDesc": "登录时提前提醒的天数。0 = 不提醒",
+    "warningDaysTooLong": "提醒窗口不能长于轮换周期。",
+    "rotationPreview": "今天设置的密码将于 {expires} 过期。登录提醒将于 {warns} 开始。",
+    "rotationPreviewNoWarning": "今天设置的密码将于 {expires} 过期。在此之前不会显示任何提醒。",
+    "reuse": "防止重复使用",
+    "historyCount": "记住的密码数",
+    "historyCountDesc": "新密码不得与此数量的历史密码相同。0 = 不检查",
+    "historyMaxRetained": "保留的历史密码数",
+    "historyMaxRetainedDesc": "每个用户保留的历史密码数量",
+    "historyRetainedTooSmall": "保留的历史密码数必须不小于记住的密码数量。",
+    "reuseExplainer": "当前密码属于已记住的密码之一——重复使用它会被此规则拒绝，而不是通过单独的检查。",
+    "lockout": "账户锁定",
+    "lockoutThreshold": "锁定前的失败尝试次数",
+    "lockoutThresholdDesc": "0 = 禁用锁定",
+    "lockoutBucketSize": "每次后续锁定前的尝试次数",
+    "lockoutBucketSizeDesc": "0 = 重用上面的值",
+    "lockoutStartSecs": "首次锁定时长",
+    "lockoutStartSecsDesc": "秒",
+    "lockoutMaxSecs": "最大锁定时长",
+    "lockoutMaxSecsDesc": "秒 — 递增锁定时长封顶于此值",
+    "lockoutStartTooLong": "首次锁定时长不能超过最大锁定时长。",
+    "lockoutBackoff": "递增",
+    "lockoutBackoffDesc": "每次锁定时长相对于上一次的增长方式",
+    "backoffExponential": "指数",
+    "backoffLinear": "线性",
+    "lockoutPreview": "{threshold} 次失败 → {first} · 每再失败 {bucket} 次 → {rest} · 上限为 {max}。成功登录会重置一切。",
+    "sessionEnforcement": "会话与强制执行",
+    "cookieMaxAge": "会话有效期",
+    "cookieMaxAgeDesc": "已登录会话保持有效的秒数。0 = 使用来自 {envVar} 的实例默认值",
+    "applyToRoot": "应用到 root 账户",
+    "applyToRootDesc": "除非启用此项，否则 root 不受上述所有规则的约束",
+    "rootWarning": "锁定 root 可能导致系统进入不可恢复状态。",
+    "rootDialogTitle": "将策略应用到 root？",
+    "rootDialogMessage": "root 将像任何其他原生账户一样受到锁定、轮换和强制重置的约束。如果 root 是您唯一的管理账户，一次锁定或无法满足的到期要求将使您无法再回到此实例。",
+    "rootDialogAck": "我明白 root 可能会被永久锁定在此实例之外。",
+    "rootDialogConfirm": "应用到 root"
+  },
+  "passwordReset": {
+    "title": "更新您的密码",
+    "signedInAs": "已登录为 {email}",
+    "reasonPolicyTightened": "密码策略已更改。请更新您的密码以继续使用 OpenObserve。",
+    "reasonRotationExpired": "您的密码已过期。请设置新密码以继续使用 OpenObserve。",
+    "reasonRotationWarning": "您的密码即将过期。请立即设置新密码，以免无法继续您的工作。",
+    "reused": "此密码最近使用过。请选择一个未在您最近 {count} 个密码中使用过的密码。",
+    "expiryBanner": "您的密码将在 {count} 天后过期。请立即更新，以免无法继续您的工作。 | 您的密码将在 {count} 天后过期。请立即更新，以免无法继续您的工作。",
+    "expiryBannerAction": "立即更新",
+    "expiryBannerDismiss": "忽略",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认新密码",
+    "currentPasswordRequired": "当前密码为必填项。",
+    "newPasswordRequired": "新密码为必填项。",
+    "confirmPasswordRequired": "请重新输入新密码。",
+    "mismatch": "密码不匹配。",
+    "signOut": "退出",
+    "submit": "更新密码",
+    "updated": "您的密码已更新。请重新登录。",
+    "updateFailed": "无法更新您的密码。",
+    "req": {
+      "minLength": "至少 {count} 个字符",
+      "maxLength": "不超过 {count} 个字符",
+      "uppercase": "一个大写字母",
+      "lowercase": "一个小写字母",
+      "digit": "一个数字",
+      "special": "一个特殊字符",
+      "specialFromSet": "来自 {set} 的一个特殊字符",
+      "unmet": "密码必须包含：{requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "密码策略",
     "loginCallback": "登录回调",
     "slackOAuthCallback": "正在连接 Slack",
     "emptyStateDemo": "空状态演示",
