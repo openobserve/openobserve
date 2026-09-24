@@ -1,0 +1,2 @@
+web/src/components/dashboards/settings/VariableQueryValueSelector.spec.ts
+web/src/components/dashboards/settings/VariableQueryValueSelector.vue

@@ -1,0 +1,25 @@
+{
+  "feature_slug": "dashboard-variable-select-all",
+  "feature_title": "Dashboard Variable Select All",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-variable-select-all.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-variable-select-all.spec.js",
+  "playwright_group": "Dashboards-Settings",
+  "source_files": [
+    "web/src/components/dashboards/settings/VariableQueryValueSelector.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The complete changed-files list contains only two paths, both under web/src/components/dashboards/settings/. No path is under any enterprise-owned directory (enterprise/, o2_enterprise/, src/enterprise/), and no enterprise keywords (cipher, SSO, SAML, RBAC, SDR, sensitive-data, logo-management) appear in the paths or symbols. Classified as OSS.",
+    "skip": "No skip marker is present: trigger_comment.txt and feature_hint.txt are empty and no tests-added label was passed. The change is user-facing (it alters the Select All behavior of a dashboard variable value selector rendered in the UI), so the docs/CI-only skip does not apply and it is not skipped.",
+    "e2e": "E2E is warranted because the change modifies user-exercisable UI behavior in web/src: the dashboard variable query value selector now treats a hand-ticked full set of options as 'Select All' and toggles it correctly. This is a visible interaction/state change in the dashboards settings flow that a browser test should verify.",
+    "area": "The bulk of the change lives in web/src/components/dashboards/settings/, and the sibling Playwright specs for dashboard variable settings are under tests/ui-testing/playwright-tests/Dashboards/, so the Dashboards area is the correct fit.",
+    "group": "The Dashboards-Settings group (actual_folder Dashboards) already carries dashboard-variables-setting.spec.js, which is the closest existing shard to this dashboard variable settings change, so the new spec should join it.",
+    "existing_tests": "No E2E specs in the diff. The only test file changed is web/src/components/dashboards/settings/VariableQueryValueSelector.spec.ts, which is a Vitest unit test, not a Playwright E2E spec under tests/ui-testing/playwright-tests/, so existing_tests_in_diff is false."
+  }
+}

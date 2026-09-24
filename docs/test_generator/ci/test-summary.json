@@ -1,0 +1,7 @@
+[
+  { "title": "should render the multi-select 'Select All' master row and select all values", "action": "new", "verifies": "the multi-select master row renders and clicking it checks the box and sets the trigger to <ALL>" },
+  { "title": "should clear the selection when 'Select All' is toggled off", "action": "new", "verifies": "toggling 'Select All' off unchecks the master box and clears the <ALL> value" },
+  { "title": "should select all and close the popover via the single-select 'All' row", "action": "new", "verifies": "the single-select 'All' row sets <ALL> and closes the popover immediately" },
+  { "title": "should auto-check 'Select All' when every option is hand-ticked", "action": "new", "verifies": "hand-ticking every option auto-checks the master row while keeping an explicit value list" },
+  { "title": "should uncheck 'Select All' when one option is unticked", "action": "new", "verifies": "unticking one option unchecks the master row" }
+]
