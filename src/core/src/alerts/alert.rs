@@ -2738,10 +2738,17 @@ pub async fn send_recovery_notification(
             explicit,
         )
         .await;
-        if let Err(e) =
-            send_to_destination(alert, &destination_type, effective.template(), &mut ctx).await
-        {
-            failures = format!("{failures} destination {dest_name}: {e};");
+        // Logged, not discarded: the firing half records its per-destination
+        // status on the trigger row, and a resolve nobody can see landing is
+        // the hard one to debug — PagerDuty answers 202 even when it drops one.
+        match send_to_destination(alert, &destination_type, effective.template(), &mut ctx).await {
+            Ok(resp) => log::info!(
+                "[RECOVERY] {}/{} episode {} destination {dest_name} {resp}",
+                alert.org_id,
+                alert.name,
+                event.episode_id
+            ),
+            Err(e) => failures = format!("{failures} destination {dest_name}: {e};"),
         }
     }
 
