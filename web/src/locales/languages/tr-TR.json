@@ -7635,7 +7635,7 @@
       "usernameRequired": "Kullanıcı adı gereklidir",
       "passwordRequired": "Şifre gereklidir",
       "emailRecipients": "Alıcı E-posta Adresleri",
-      "emailRecipientsHelp": "Uyarı e-postaları alması gereken kuruluş kullanıcılarını veya hizmet hesaplarını seçin",
+      "emailRecipientsHelp": "Uyarı e-postalarını alması gereken organizasyon kullanıcılarını veya hizmet hesaplarını seçin",
       "emailRecipientsGroupUsers": "Kullanıcılar",
       "emailRecipientsGroupServiceAccounts": "Hizmet Hesapları",
       "invalidEmailAddresses": "Geçersiz e-posta adresleri: {emails}",

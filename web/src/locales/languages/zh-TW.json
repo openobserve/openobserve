@@ -7630,7 +7630,7 @@
       "usernameRequired": "使用者名稱為必填",
       "passwordRequired": "密碼為必填",
       "emailRecipients": "收件人電子郵件地址",
-      "emailRecipientsHelp": "選擇接收告警郵件的組織使用者或服務帳戶",
+      "emailRecipientsHelp": "選擇應接收警示電子郵件的組織使用者或服務帳戶",
       "emailRecipientsGroupUsers": "使用者",
       "emailRecipientsGroupServiceAccounts": "服務帳戶",
       "invalidEmailAddresses": "無效的電子郵件地址：{emails}",

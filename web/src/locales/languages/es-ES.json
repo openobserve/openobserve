@@ -7635,7 +7635,7 @@
       "usernameRequired": "El nombre de usuario es obligatorio",
       "passwordRequired": "La contraseña es obligatoria",
       "emailRecipients": "Direcciones de correo electrónico del destinatario",
-      "emailRecipientsHelp": "Seleccione los usuarios o las cuentas de servicio de la organización que deben recibir correos de alertas",
+      "emailRecipientsHelp": "Selecciona los usuarios de la organización o las cuentas de servicio que deben recibir los correos electrónicos de alerta",
       "emailRecipientsGroupUsers": "Usuarios",
       "emailRecipientsGroupServiceAccounts": "Cuentas de servicio",
       "invalidEmailAddresses": "Direcciones de correo electrónico no válidas: {emails}",
