@@ -14158,8 +14158,6 @@
       "advancedSettleHeading": "After it acts — let the page settle",
       "advancedTimeoutHeading": "While it acts — give up after",
       "advancedFailureHeading": "If it fails",
-      "addStep": "Add Step",
-      "addSubtest": "Add Subtest",
       "addStepManually": "Add a step manually",
       "bulkDeleteStepsBody": "Delete {count} step? This cannot be undone. | Delete {count} steps? This cannot be undone.",
       "bulkDeleteStepsTitle": "Delete steps",
@@ -14330,6 +14328,14 @@
         "failedTitle": "Replay in {environment} failed at step {failed} of {total}",
         "failedNote": "Step {step} used {name}, a secret you entered for this session.",
         "changeValue": "Change value"
+      },
+      "addMenu": {
+        "addStep": "Add step",
+        "menuAria": "Add step or subtest",
+        "step": "Step",
+        "stepHint": "A single action",
+        "subtest": "Subtest",
+        "subtestHint": "Reuse a shared flow"
       }
     },
     "labels": {
@@ -15299,7 +15305,8 @@
       "actions": "Actions",
       "rum": "RUM",
       "runningQueries": "Running Queries",
-      "oncall": "On-Call"
+      "oncall": "On-Call",
+      "synthetics": "Synthetics"
     },
     "pages": {
       "global": "Global",
@@ -15350,7 +15357,8 @@
       "rumSessions": "{product} — Sessions",
       "sourceMaps": "RUM — Source Maps",
       "oncall": "On-Call",
-      "oncallDetail": "On-Call Page"
+      "oncallDetail": "On-Call Page",
+      "syntheticsJourney": "Synthetics journey"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",

@@ -26,6 +26,11 @@ import useSyntheticsRecorder, {
 import { getUUIDv7 } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput } from "@/utils/keyboardShortcuts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -1266,6 +1271,15 @@ const isCompositionEnabled = computed(
   () => store.state.zoConfig?.synthetics_subtests_enabled === true,
 );
 
+const addDisabled = computed(() => !!props.readonly || isRecording.value || isRestoring.value);
+
+useShortcuts([
+  {
+    id: "syntheticsJourneyFocusSearch",
+    handler: () => focusSearchInput("synthetics-journey-filter-input"),
+  },
+]);
+
 // An unknown `ownStepCount` shows no notice; the server backstop applies.
 const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
 const overCap = computed(
@@ -1521,37 +1535,67 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         :placeholder="t('synthetics.journey.filterSteps')"
         class="flex-1"
         data-test="synthetics-journey-filter-input"
-      />
+      >
+        <template #icon-right>
+          <OShortcut id="syntheticsJourneyFocusSearch" />
+        </template>
+      </OInput>
       <div class="flex shrink-0 items-center justify-end gap-2">
-        <OButton
-          v-if="!isRecording && !isReplayLocked"
-          variant="outline"
-          size="sm"
-          :disabled="readonly || isRecording || isRestoring"
-          data-test="synthetics-journey-add-step-btn"
-          @click="addStep"
-          icon-left="add"
-        >
-          {{ t("synthetics.journey.addStep") }}
-        </OButton>
-        <!-- The wrapper carries the tooltip: a disabled button receives no pointer events. -->
-        <span v-if="!isRecording && !isReplayLocked" class="inline-flex">
+        <OButtonGroup v-if="!isRecording && !isReplayLocked" radius="sm">
           <OButton
             variant="outline"
             size="sm"
-            :disabled="!isCompositionEnabled || readonly || isRecording || isRestoring"
-            data-test="synthetics-journey-add-subtest-btn"
-            @click="addSubtestStep"
-            icon-left="account-tree"
+            icon-left="add"
+            :disabled="addDisabled"
+            :aria-label="t('synthetics.journey.addMenu.addStep')"
+            data-test="synthetics-journey-add-step-btn"
+            @click="addStep"
           >
-            {{ t("synthetics.journey.addSubtest") }}
+            <OTooltip :content="t('synthetics.journey.addMenu.addStep')" side="bottom" />
           </OButton>
-          <OTooltip
-            v-if="!isCompositionEnabled"
-            :content="t('synthetics.journey.subtest.disabledTooltip')"
-            side="bottom"
-          />
-        </span>
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm"
+                icon-left="arrow-drop-down"
+                :disabled="addDisabled"
+                :aria-label="t('synthetics.journey.addMenu.menuAria')"
+                data-test="synthetics-journey-add-menu-trigger"
+              >
+                <OTooltip :content="t('synthetics.journey.addMenu.menuAria')" side="bottom" />
+              </OButton>
+            </template>
+            <ODropdownItem
+              icon-left="ads-click"
+              :disabled="addDisabled"
+              data-test="synthetics-journey-add-menu-step"
+              @select="addStep"
+            >
+              <span class="flex flex-col">
+                <span>{{ t("synthetics.journey.addMenu.step") }}</span>
+                <span class="text-text-secondary text-xs">{{
+                  t("synthetics.journey.addMenu.stepHint")
+                }}</span>
+              </span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="account-tree"
+              :disabled="!isCompositionEnabled || addDisabled"
+              data-test="synthetics-journey-add-subtest-btn"
+              @select="addSubtestStep"
+            >
+              <span class="flex flex-col">
+                <span>{{ t("synthetics.journey.addMenu.subtest") }}</span>
+                <span class="text-text-secondary text-xs">{{
+                  isCompositionEnabled
+                    ? t("synthetics.journey.addMenu.subtestHint")
+                    : t("synthetics.journey.subtest.disabledTooltip")
+                }}</span>
+              </span>
+            </ODropdownItem>
+          </ODropdown>
+        </OButtonGroup>
 
         <!-- Run replay / Stop / Re-run — positionally stable, same slot -->
         <template v-if="!isRecording">
@@ -1634,16 +1678,13 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           v-if="variablesPanelOpen !== undefined"
           variant="panel-collapse"
           size="icon-toolbar"
+          :active="variablesPanelOpen"
           :aria-label="variablesToggleLabel"
+          :aria-pressed="variablesPanelOpen"
           data-test="synthetics-journey-toggle-variables-btn"
           @click="emit('toggle-variables-panel')"
         >
-          <OIcon
-            :name="
-              variablesPanelOpen ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
-            "
-            size="sm"
-          />
+          <OIcon name="data-object" size="sm" />
           <OTooltip :content="variablesToggleLabel" side="bottom" />
         </OButton>
       </div>

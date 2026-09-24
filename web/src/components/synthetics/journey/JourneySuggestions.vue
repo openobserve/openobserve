@@ -93,7 +93,7 @@ function run(kind: JourneySuggestionActionKind) {
   >
     <template #trigger>
       <OBadge
-        variant="warning"
+        variant="default"
         size="sm"
         clickable
         :aria-label="label"
@@ -105,7 +105,7 @@ function run(kind: JourneySuggestionActionKind) {
              while the panel is open, or hovering the chip you just clicked
              floats a bubble over the panel it opened. -->
         <OTooltip :content="label" :disabled="open" />
-        <OIcon name="warning" size="xs" aria-hidden="true" />
+        <OIcon name="lightbulb" size="xs" aria-hidden="true" />
         {{ count }}
       </OBadge>
     </template>
