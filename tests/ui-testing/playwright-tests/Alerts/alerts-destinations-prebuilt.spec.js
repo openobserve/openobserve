@@ -417,7 +417,8 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
    *   edit to ADD recipients ............... D-07
    *   edit to REMOVE recipients ............ ML-08
    *   delete the destination ............... UI-12
-   *   validate email address format ........ UI-02
+   *   every offered recipient is a real account ... UI-02 (recipients are picked
+   *     from an org-account list, so there is no typed address to validate)
    *
    * That spec also tiers its cases, so only true delivery assertions need a mail
    * sink; everything above runs anywhere SMTP is enabled.

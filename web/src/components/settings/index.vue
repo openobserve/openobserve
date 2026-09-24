@@ -36,7 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="activeSectionItem?.icon as any"
         class="border-border-default shrink-0 border-b"
       />
-      <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
+      <ConstrainedPage
+        :size="activeSection === 'password_policy' ? 'full' : 'lg'"
+        align="left"
+        :padded="false"
+        class="min-h-0 flex-1 px-4 py-3"
+      >
         <router-view title="" />
       </ConstrainedPage>
     </div>
@@ -89,6 +94,7 @@ export default defineComponent({
       queryManagement: "queryManagement",
       query_management: "queryManagement",
       domainManagement: "domain_management",
+      passwordPolicy: "password_policy",
       pipelineDestinations: "pipeline_destinations",
       alertTemplates: "templates",
       modelPricing: "model_pricing",
@@ -118,6 +124,7 @@ export default defineComponent({
       "organization",
       "license",
       "domain_management",
+      "password_policy",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
 
@@ -130,10 +137,16 @@ export default defineComponent({
           query: { org_identifier: store.state.selectedOrganization?.identifier },
         });
       };
-      // Nodes, License and Query Management are enterprise-only meta-org pages.
+      // Nodes, License, Password policy and Query Management are enterprise-only meta-org pages.
       const notMeta =
         store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
-      if ((name === "nodes" || name === "license" || name === "query_management") && notMeta) {
+      if (
+        (name === "nodes" ||
+          name === "license" ||
+          name === "passwordPolicy" ||
+          name === "query_management") &&
+        notMeta
+      ) {
         toGeneral();
         return;
       }
@@ -227,6 +240,16 @@ export default defineComponent({
           to: { name: "domainManagement", query: { org_identifier: org } },
           visible: isEnt && meta,
           dataTest: "domain-management-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "password_policy",
+          label: t("settings.passwordPolicy"),
+          description: t("settings.passwordPolicyDesc"),
+          icon: "lock",
+          to: { name: "passwordPolicy", query: { org_identifier: org } },
+          visible: isEnt && meta,
+          dataTest: "password-policy-tab",
           group: "Access & Security",
         },
         // Notification Destinations and Templates are alerting configuration and

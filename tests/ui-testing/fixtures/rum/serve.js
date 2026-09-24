@@ -2,7 +2,7 @@
 // --------------------------------------------------------------------------
 // Serves the committed `fixtures/rum/cdn-sample` app AS-IS so a real browser can
 // load the LIVE CDN RUM/Logs bundles and emit genuine SDK beacons. The ONLY
-// thing this server rewrites is the OpenObserve config block inside `oo-rum.js`
+// thing this server rewrites is the OpenObserve config block inside `o2-rum.js`
 // (clientToken / site / organizationIdentifier / insecureHTTP / service /
 // applicationId) so the SDK ships beacons to the local instance under test.
 //
@@ -54,7 +54,7 @@ function templateSdkVersion(source, version) {
 }
 
 /**
- * Rewrite the OO_CONFIG values inside the sample's oo-rum.js. We replace values
+ * Rewrite the O2_CONFIG values inside the sample's o2-rum.js. We replace values
  * by key with a targeted regex so the rest of the sample code is untouched.
  */
 function templateOoRum(source, cfg) {
@@ -143,7 +143,7 @@ function startFixtureServer(opts) {
       // document opts in — without this the SDK never loads the profiler chunk.
       if (ext === '.html') headers['Document-Policy'] = 'js-profiling';
 
-      if (path.basename(filePath) === 'oo-rum.js') {
+      if (path.basename(filePath) === 'o2-rum.js') {
         const templated = templateOoRum(fs.readFileSync(filePath, 'utf8'), cfg);
         res.writeHead(200, headers).end(templated);
         return;
@@ -201,18 +201,18 @@ function publicConfig(cfg) {
 
 /**
  * Rewrite the sample HTML for the NPM path: strip the CDN async-loader <script>
- * and the `oo-rum.js` include, and inject the config + bundled entry instead.
+ * and the `o2-rum.js` include, and inject the config + bundled entry instead.
  * Everything else (nav, buttons, app.js, styles) is reused unchanged.
  */
 function rewriteHtmlForNpm(html, cfg) {
   const inject =
-    `  <script>window.__OO_CONFIG__=${JSON.stringify(publicConfig(cfg))};</script>\n` +
+    `  <script>window.__O2_CONFIG__=${JSON.stringify(publicConfig(cfg))};</script>\n` +
     `  <script src="/npm-bundle.js"></script>\n`;
   return html
-    // Remove the CDN async loader block (the <script> that installs OO_RUM/OO_LOGS queues).
+    // Remove the CDN async loader block (the <script> that installs O2_RUM/O2_LOGS queues).
     .replace(/<script>\s*\(function \(h, o, u, n, g\)[\s\S]*?<\/script>/, '')
     // Replace the CDN init include with the bundled entry + config.
-    .replace(/<script src="\.\/oo-rum\.js"><\/script>/, inject);
+    .replace(/<script src="\.\/o2-rum\.js"><\/script>/, inject);
 }
 
 /**
@@ -254,8 +254,8 @@ function startNpmFixtureServer(opts) {
         res.writeHead(403).end('Forbidden');
         return;
       }
-      // oo-rum.js is not used in the NPM path.
-      if (path.basename(filePath) === 'oo-rum.js') {
+      // o2-rum.js is not used in the NPM path.
+      if (path.basename(filePath) === 'o2-rum.js') {
         res.writeHead(404).end('not used in npm fixture');
         return;
       }

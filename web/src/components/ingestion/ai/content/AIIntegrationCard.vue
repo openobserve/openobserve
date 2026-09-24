@@ -52,6 +52,13 @@ const subs = computed<CardSubstitutions>(() => {
   };
 });
 
+const passcodeForbidden = computed(
+  () => !!store.state.organizationData?.organizationPasscodeForbidden,
+);
+
+// cards come from a separate content repo, so a card may carry no {token} at all
+const contentNeedsPasscode = computed(() => String(props.content ?? "").includes("{token}"));
+
 const parsed = computed(() => parseCard(props.content));
 const metadata = computed(() => parsed.value.metadata);
 const warnings = computed(() => parsed.value.warnings);
@@ -68,7 +75,13 @@ const renderedSections = computed(() =>
 </script>
 
 <template>
-  <div class="o2-card min-w-0" data-test="ai-integration-card">
+  <OBanner
+    v-if="passcodeForbidden && contentNeedsPasscode"
+    variant="warning"
+    data-test="ai-integration-card-passcode-forbidden"
+    :content="t('ingestion.passcodeForbiddenMessage')"
+  />
+  <div v-else class="o2-card min-w-0" data-test="ai-integration-card">
     <div class="o2-card-inner min-w-0">
       <!-- Header chrome -->
       <header class="mb-5">
