@@ -19,6 +19,9 @@ export default class DashboardPrintPage {
     this.emptyStateAddPanelBtn = page.locator(
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
     );
+    // ONavbar root — removed (v-if) while print mode is on, so its absence/visibility
+    // is the primary signal for the globally-hidden app shell.
+    this.navbarMainNav = page.locator('[data-test="navbar-main-nav"]');
   }
 
   async navigateToDashboardView(dashboardId, folderId, print = false) {
@@ -149,6 +152,16 @@ export default class DashboardPrintPage {
     await expect(this.printModeContainer).toHaveCount(0);
     await expect(this.backBtn).toBeVisible();
     await expect(this.refreshBtn).toBeVisible();
+  }
+
+  // The app shell navbar is removed via v-if while print mode is on, so hidden
+  // here means detached from the DOM (not just display:none).
+  async expectAppShellHidden() {
+    await expect(this.navbarMainNav).toBeHidden();
+  }
+
+  async expectAppShellRestored() {
+    await expect(this.navbarMainNav).toBeVisible();
   }
 
   async expectPrintModeContainerVisible() {

@@ -1,0 +1,2 @@
+web/src/views/Dashboards/ViewDashboard.vue
+web/src/views/Dashboards/viewDashboard.spec.ts

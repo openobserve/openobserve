@@ -176,4 +176,34 @@ test.describe("Dashboard Print Layout testcases", () => {
       testLogger.info("Empty dashboard in print mode verified");
     }
   );
+
+  test(
+    "should clear print mode and restore the app shell when leaving the dashboard via browser Back",
+    { tag: ["@dashboard-print-mode-leave", "@all", "@P0"] },
+    async ({ page }) => {
+      const title = `PrintModeLeave_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`;
+      const { dashboardId, folderId } = await pm.apiCleanup.createDashboardWithStackedPanels(title, 4);
+      apiDashboard = { dashboardId, folderId };
+
+      // Reach the dashboard view in-app (menu -> list -> click) so page.goBack()
+      // is an SPA popstate that fires the onBeforeRouteLeave guard — a page.goto
+      // + goBack() would be a cross-document traversal and never run the guard.
+      await pm.dashboardList.menuItem("dashboards-item");
+      await pm.dashboardList.clickOnDashboard(title);
+
+      await pm.dashboardPrint.waitForPanelMounted();
+      await pm.dashboardPrint.enterPrintMode();
+
+      // Guard the mode switch: print mode is active AND the app shell is hidden.
+      await pm.dashboardPrint.expectPrintChromeApplied();
+      await pm.dashboardPrint.expectAppShellHidden();
+
+      // Leave via browser Back -> popstate to the list -> guard resets printMode.
+      await page.goBack();
+
+      await pm.dashboardPrint.expectAppShellRestored();
+
+      testLogger.info("App shell restored after leaving print mode via browser Back");
+    }
+  );
 });
