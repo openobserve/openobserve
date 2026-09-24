@@ -125,6 +125,15 @@ pub struct SanitizedDashboard {
     pub timestamp_column: String,
     /// Viewer re-read interval — the author's "Refresh every" rebuild cadence.
     pub refresh_secs: i64,
+    /// Frozen variable values, shown read-only; no variable is ever viewer-editable.
+    pub variables: Vec<PublicVariable>,
+}
+
+/// A dashboard variable as the public viewer sees it: display label and frozen value only.
+#[derive(Clone, Debug, Serialize)]
+pub struct PublicVariable {
+    pub label: String,
+    pub value: serde_json::Value,
 }
 
 #[cfg(test)]

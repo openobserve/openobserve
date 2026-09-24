@@ -3471,16 +3471,16 @@ async fn handle_public_dashboard_triggers(
         }
     };
 
-    if let Some(exp) = pd.expires_at {
-        if exp <= now {
-            db::scheduler::delete(
-                &trigger.org,
-                db::scheduler::TriggerModule::PublicDashboard,
-                pd_id,
-            )
-            .await?;
-            return Ok(());
-        }
+    if let Some(exp) = pd.expires_at
+        && exp <= now
+    {
+        db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::PublicDashboard,
+            pd_id,
+        )
+        .await?;
+        return Ok(());
     }
 
     if let Err(e) = crate::public_dashboards::rebuild_one(&pd).await {
@@ -3489,13 +3489,25 @@ async fn handle_public_dashboard_triggers(
         );
     }
 
-    let rebuild_secs = pd.rebuild_secs.max(1) as i64;
-    // Schedule from rebuild COMPLETION, not the pre-rebuild `now`: a rebuild
-    // slower than the interval must not schedule the next run in the past
-    // (which would refire back-to-back with no spacing).
-    new_trigger.next_run_at = now_micros() + rebuild_secs * 1_000_000;
+    new_trigger.next_run_at = next_public_dashboard_run(
+        trigger.next_run_at,
+        i64::from(pd.rebuild_secs),
+        now_micros(),
+    );
     db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
     Ok(())
+}
+
+/// Fixed-rate: completion + interval lands just past a poll and waits a whole extra poll cycle.
+fn next_public_dashboard_run(scheduled_at: i64, rebuild_secs: i64, now: i64) -> i64 {
+    let interval = rebuild_secs.max(1) * 1_000_000;
+    let planned = scheduled_at + interval;
+    // An overrun skips the missed slot instead of refiring back-to-back.
+    if planned > now {
+        planned
+    } else {
+        now + interval
+    }
 }
 
 async fn handle_report_triggers(
@@ -7202,5 +7214,16 @@ mod tests {
             assert!(trigger.data.contains("\"normal\""));
             assert!(!trigger.data.contains("\"error\""));
         }
+    }
+
+    #[test]
+    fn public_dashboard_runs_at_a_fixed_rate() {
+        let s = 1_000_000;
+        // On time: exactly one interval after the previous slot, not after completion.
+        assert_eq!(next_public_dashboard_run(100 * s, 10, 103 * s), 110 * s);
+        // Overran its slot: skip it rather than refire immediately.
+        assert_eq!(next_public_dashboard_run(100 * s, 10, 115 * s), 125 * s);
+        // A zero cadence still spaces runs by a second.
+        assert_eq!(next_public_dashboard_run(100 * s, 0, 100 * s), 101 * s);
     }
 }

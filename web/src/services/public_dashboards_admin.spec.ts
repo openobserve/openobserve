@@ -43,10 +43,7 @@ describe("public_dashboards_admin service", () => {
   it("publish() posts the config to the dashboard's public route", async () => {
     const cfg = { visibility: "public", rebuild_secs: 60 };
     await service.publish("org1", "dash1", cfg);
-    expect(mockHttp.post).toHaveBeenCalledWith(
-      "/api/org1/dashboards/dash1/public",
-      cfg,
-    );
+    expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public", cfg);
   });
 
   it("revoke() deletes the share", async () => {

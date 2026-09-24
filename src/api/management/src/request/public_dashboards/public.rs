@@ -27,7 +27,7 @@ use axum::{
 use config::{
     meta::{
         dashboards::Dashboard,
-        public_dashboards::{SanitizedDashboard, TimeRangePolicy},
+        public_dashboards::{PublicVariable, SanitizedDashboard, TimeRangePolicy},
     },
     utils::time::now_micros,
 };
@@ -98,6 +98,7 @@ pub async fn config(Path(slug): Path<String>) -> Response {
         built_at: pd.last_rebuilt_at,
         timestamp_column: config::TIMESTAMP_COL_NAME.to_string(),
         refresh_secs: i64::from(pd.rebuild_secs),
+        variables: public_variables(&dash, pd.frozen_variables.as_deref()),
     })
     .into_response()
 }
@@ -118,6 +119,31 @@ pub async fn data(Path(slug): Path<String>, Query(params): Query<DataParams>) ->
         Ok(None) => (StatusCode::ACCEPTED, "preparing").into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
+}
+
+/// Visible variables with their frozen values; one missing from the capture shows as null.
+fn public_variables(dash: &Dashboard, frozen: Option<&str>) -> Vec<PublicVariable> {
+    let frozen: std::collections::BTreeMap<String, serde_json::Value> = frozen
+        .and_then(|s| serde_json::from_str(s).ok())
+        .unwrap_or_default();
+    let Some(list) = dash.v8.as_ref().and_then(|v8| v8.variables.as_ref()) else {
+        return vec![];
+    };
+    list.list
+        .iter()
+        .filter(|v| v.hide_on_dashboard != Some(true))
+        .map(|v| PublicVariable {
+            label: if v.label.is_empty() {
+                v.name.clone()
+            } else {
+                v.label.clone()
+            },
+            value: frozen
+                .get(&v.name)
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+        })
+        .collect()
 }
 
 fn unavailable() -> Response {

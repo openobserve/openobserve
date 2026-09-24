@@ -19,7 +19,7 @@
  view-only) fed with pre-built snapshots, so no query ever runs from here.
 -->
 <template>
-  <div class="bg-surface-base flex min-h-screen flex-col">
+  <div class="bg-surface-base flex h-screen flex-col">
     <div
       v-if="state === 'loading' || state === 'preparing'"
       class="flex min-h-[60vh] flex-col items-center justify-center gap-3"
@@ -46,28 +46,62 @@
     </div>
 
     <template v-else>
-      <header class="px-page-edge flex items-center justify-between gap-3 pt-3">
-        <div class="text-text-heading text-lg font-semibold">
-          {{ config.title }}
-        </div>
-        <div class="flex items-center gap-3">
-          <OSelect
-            v-if="timeEditable && presetOptions.length"
-            v-model="selectedPreset"
-            :options="presetOptions"
-            :label="t('dashboard.publicDashboard.timeRange')"
-            label-position="left"
-            data-test="dashboards-public-dashboard-preset-select"
-            @update:model-value="loadData"
-          />
-          <div class="text-text-secondary flex shrink-0 flex-col text-xs whitespace-nowrap">
-            <span v-if="builtAtLabel">{{ builtAtLabel }}</span>
-            <span v-if="refreshInLabel" data-test="dashboards-public-dashboard-refresh-countdown">
-              {{ refreshInLabel }}
-            </span>
+      <OPageHeader
+        :title="raw(config.title)"
+        icon="dashboard"
+        title-data-test="dashboards-public-dashboard-title"
+      >
+        <template #title-trail>
+          <div class="flex h-8 self-center max-md:hidden">
+            <OSeparator vertical />
           </div>
-        </div>
-      </header>
+          <PoweredByOpenObserve size="md" class="max-md:hidden" />
+        </template>
+        <template #actions>
+          <ODropdown v-if="presetOptions.length" side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm-toolbar"
+                class="h-8!"
+                icon-left="schedule"
+                :icon-right="timeEditable ? 'keyboard-arrow-down' : undefined"
+                :disabled="!timeEditable"
+                data-test="dashboards-public-dashboard-preset-btn"
+              >
+                {{ selectedPresetLabel }}
+              </OButton>
+            </template>
+            <ODropdownItem
+              v-for="option in presetOptions"
+              :key="option.value"
+              :data-test="`dashboards-public-dashboard-preset-${option.value}`"
+              @select="selectPreset(option.value)"
+            >
+              {{ option.label }}
+            </ODropdownItem>
+          </ODropdown>
+          <span
+            v-if="windowLabel"
+            class="text-text-secondary text-sm whitespace-nowrap tabular-nums max-lg:hidden"
+            data-test="dashboards-public-dashboard-window"
+          >
+            {{ windowLabel }}
+          </span>
+          <div class="flex h-8 self-center max-md:hidden">
+            <OSeparator vertical />
+          </div>
+          <ORefreshButton
+            :last-run-at="builtAt ? builtAt / 1000 : null"
+            :loading="refreshing"
+            variant="outline"
+            layout="inline"
+            data-test="dashboards-public-dashboard-refresh-btn"
+            @click="refreshNow"
+          />
+          <ThemeSwitcher bordered />
+        </template>
+      </OPageHeader>
 
       <RenderDashboardCharts
         class="min-h-0 flex-1"
@@ -82,7 +116,39 @@
         :allow-alert-creation="false"
         :show-legends-button="true"
         data-test="dashboards-public-dashboard-charts"
-      />
+      >
+        <template #before_panels>
+          <!-- Same markup the live dashboard uses for a read-only constant variable. -->
+          <div
+            v-if="publicVariables.length"
+            class="mt-1 flex flex-wrap gap-y-1"
+            data-test="dashboards-public-dashboard-variables"
+          >
+            <div
+              v-for="variable in publicVariables"
+              :key="variable.label"
+              class="max-w-[40rem] min-w-37.5"
+            >
+              <OInput
+                class="me-4 mt-1"
+                :model-value="variableValue(variable.value)"
+                :label="raw(variable.label)"
+                label-position="inside"
+                readonly
+                data-test="dashboards-public-dashboard-variable"
+              />
+            </div>
+          </div>
+        </template>
+      </RenderDashboardCharts>
+
+      <footer
+        class="border-border-default px-page-edge text-2xs text-text-secondary flex items-center justify-between gap-3 border-t py-3"
+        data-test="dashboards-public-dashboard-footer"
+      >
+        <PoweredByOpenObserve />
+        <span>{{ footerNote }}</span>
+      </footer>
     </template>
   </div>
 </template>
@@ -93,9 +159,18 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
+import PoweredByOpenObserve from "@/components/common/PoweredByOpenObserve.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ThemeSwitcher from "@/components/ThemeSwitcher.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import publicDashboardsService from "@/services/public_dashboards";
+import { formatExactDuration } from "@/utils/formatters";
 
 interface PresetOption {
   label: I18nText;
@@ -125,13 +200,6 @@ const presetOptions = computed<PresetOption[]>(() =>
 );
 const builtAt = computed<number | null>(
   () => snapshot.value?.built_at ?? config.value?.built_at ?? null,
-);
-const builtAtLabel = computed<I18nText | "">(() =>
-  builtAt.value
-    ? t("dashboard.publicDashboard.updatedAt", {
-        time: raw(new Date(builtAt.value / 1000).toLocaleString()),
-      })
-    : "",
 );
 
 // Variables are frozen server-side, so the grid gets none and renders no selectors.
@@ -175,16 +243,51 @@ const injectedPanelData = computed(() => {
 });
 
 function presetLabel(secs: number): I18nText {
-  const range =
-    secs % 86400 === 0
-      ? `${secs / 86400}d`
-      : secs % 3600 === 0
-        ? `${secs / 3600}h`
-        : secs % 60 === 0
-          ? `${secs / 60}m`
-          : `${secs}s`;
-  return t("dashboard.publicDashboard.past", { range: raw(range) });
+  if (secs % 86400 === 0) {
+    const n = secs / 86400;
+    return t("dashboard.publicDashboard.pastDays", { n }, n);
+  }
+  if (secs % 3600 === 0) {
+    const n = secs / 3600;
+    return t("dashboard.publicDashboard.pastHours", { n }, n);
+  }
+  const n = Math.max(1, Math.round(secs / 60));
+  return t("dashboard.publicDashboard.pastMinutes", { n }, n);
 }
+
+const selectedPresetLabel = computed<I18nText>(() =>
+  selectedPreset.value ? presetLabel(selectedPreset.value) : raw(""),
+);
+
+// Start → end of the window the shown snapshot covers; spans of a day or more show the date too.
+const windowLabel = computed<I18nText | "">(() => {
+  if (!builtAt.value || !selectedPreset.value) return "";
+  const endMs = builtAt.value / 1000;
+  const startMs = endMs - selectedPreset.value * 1000;
+  const opts: Intl.DateTimeFormatOptions =
+    selectedPreset.value >= 86400
+      ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
+      : { hour: "2-digit", minute: "2-digit" };
+  const fmt = (ms: number) => raw(new Date(ms).toLocaleString(undefined, opts));
+  return t("dashboard.publicDashboard.window", { start: fmt(startMs), end: fmt(endMs) });
+});
+
+const publicVariables = computed<Array<{ label: string; value: unknown }>>(() =>
+  Array.isArray(config.value?.variables) ? config.value.variables : [],
+);
+
+// A variable missing from the capture falls back to its live default server-side, so empty means unset.
+const variableValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") {
+    return t("dashboard.publicDashboard.variableUnset");
+  }
+  return Array.isArray(value) ? value.join(", ") : String(value);
+};
+
+const selectPreset = (secs: number) => {
+  selectedPreset.value = secs;
+  loadData();
+};
 
 const pickDefaultPreset = (): number | null => {
   const def = config.value?.time_range?.default_range_secs;
@@ -246,14 +349,15 @@ const load = async () => {
   }
 };
 
-let refreshTimer: ReturnType<typeof setInterval> | null = null;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 const refreshSecs = computed(() => Number(config.value?.refresh_secs) || 0);
-// Seconds until the next re-read; counts down on the author's "Refresh every" cadence.
-const secondsLeft = ref(0);
-const refreshInLabel = computed<I18nText | "">(() =>
-  refreshSecs.value > 0 && state.value === "ready"
-    ? t("dashboard.publicDashboard.refreshIn", { secs: raw(String(secondsLeft.value)) })
-    : "",
+const refreshing = ref(false);
+const footerNote = computed<I18nText>(() =>
+  refreshSecs.value > 0
+    ? t("dashboard.publicDashboard.footerNoteRefresh", {
+        interval: formatExactDuration(refreshSecs.value),
+      })
+    : t("dashboard.publicDashboard.footerNote"),
 );
 
 // Re-read on the author's "Refresh every" cadence — the same interval the snapshot rebuilds on.
@@ -268,22 +372,40 @@ const refresh = async () => {
   }
 };
 
-// Paused while the tab is hidden, so a background tab never polls.
-const tick = async () => {
-  if (document.hidden || refreshSecs.value <= 0) return;
-  secondsLeft.value -= 1;
-  if (secondsLeft.value > 0) return;
-  secondsLeft.value = refreshSecs.value;
+// Grace past the rebuild's due time so the read lands after the new snapshot is written.
+const REBUILD_GRACE_MS = 2000;
+
+// Aim the next read just after the next rebuild is due; a stale or missing snapshot falls back to the plain cadence.
+const nextRefreshDelay = (): number => {
+  const cadenceMs = refreshSecs.value * 1000;
+  if (!builtAt.value) return cadenceMs;
+  const due = builtAt.value / 1000 + cadenceMs + REBUILD_GRACE_MS - Date.now();
+  return due > 0 && due <= cadenceMs + REBUILD_GRACE_MS ? due : cadenceMs;
+};
+
+const scheduleRefresh = () => {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  if (refreshSecs.value <= 0) return;
+  refreshTimer = setTimeout(async () => {
+    // Paused while the tab is hidden, so a background tab never polls.
+    if (!document.hidden) await refresh();
+    scheduleRefresh();
+  }, nextRefreshDelay());
+};
+
+const refreshNow = async () => {
+  refreshing.value = true;
   await refresh();
+  refreshing.value = false;
+  scheduleRefresh();
 };
 
 onMounted(async () => {
   await load();
-  secondsLeft.value = refreshSecs.value;
-  refreshTimer = setInterval(tick, 1000);
+  scheduleRefresh();
 });
 
 onBeforeUnmount(() => {
-  if (refreshTimer) clearInterval(refreshTimer);
+  if (refreshTimer) clearTimeout(refreshTimer);
 });
 </script>

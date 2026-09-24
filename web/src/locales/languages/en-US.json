@@ -537,6 +537,13 @@
     }
   },
   "common": {
+    "durationSeconds": "{n} second | {n} seconds",
+    "durationMinutes": "{n} minute | {n} minutes",
+    "durationHours": "{n} hour | {n} hours",
+    "durationDays": "{n} day | {n} days",
+    "durationWeeks": "{n} week | {n} weeks",
+    "durationYears": "{n} year | {n} years",
+    "poweredBy": "Powered by",
     "copiedToClipboard": "Copied to clipboard",
     "inlineEdit": {
       "autoHint": "Click to rename. Until you do, this name is generated from your configuration and keeps up as you change it."
@@ -4512,7 +4519,13 @@
       "unavailable": "This dashboard is currently unavailable.",
       "preparing": "Preparing this dashboard…",
       "updatedAt": "Updated {time}",
-      "refreshIn": "Auto refresh in {secs}s",
+      "pastMinutes": "Past {n} minute | Past {n} minutes",
+      "pastHours": "Past {n} hour | Past {n} hours",
+      "pastDays": "Past {n} day | Past {n} days",
+      "window": "{start} → {end}",
+      "variableUnset": "Not set",
+      "footerNote": "Read-only view. Anyone with the link can see this dashboard.",
+      "footerNoteRefresh": "Read-only view, refreshed every {interval}. Anyone with the link can see this dashboard.",
       "panelNotAvailable": "Not available",
       "timeRange": "Time range",
       "renderError": "Unable to render panel",
