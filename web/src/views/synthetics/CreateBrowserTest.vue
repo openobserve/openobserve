@@ -22,7 +22,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
-import { cloneDeep, isEqual } from "lodash-es";
+import { cloneDeep } from "lodash-es";
 import {
   useRouter,
   useRoute,
@@ -79,6 +79,7 @@ import {
   buildCreateBrowserTestPayload,
   mapResponseToBrowserCheck,
 } from "@/utils/synthetics/buildPayload";
+import { browserCheckChanged } from "@/utils/synthetics/payloadChanged";
 import {
   extractEligibility,
   type ExtractEligibility,
@@ -744,21 +745,11 @@ watch(
   },
 );
 
-// `start` and `tz_offset` are read off the clock when a payload is built, so two builds always differ there.
-function payloadChanged(current: Record<string, unknown>, saved: Record<string, unknown>) {
-  const { start: _start, tz_offset: _tz, ...rest } = current;
-  const { start: _savedStart, tz_offset: _savedTz, ...savedRest } = saved;
-  return !isEqual(rest, savedRest);
-}
-
 /** Edit mode compares against the saved check, so a load is clean and an undone edit clears. */
 const hasUnsavedChanges = computed(() => {
   if (!props.editId) return isDirty.value;
   if (!savedCheck.value) return false;
-  return payloadChanged(
-    apiPayload.value,
-    buildCreateBrowserTestPayload(cloneDeep(savedCheck.value)),
-  );
+  return browserCheckChanged(check.value, savedCheck.value);
 });
 
 function onConfigureUpdate(val: BrowserCheck) {

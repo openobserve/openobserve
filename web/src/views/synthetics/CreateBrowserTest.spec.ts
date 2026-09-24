@@ -1736,6 +1736,16 @@ describe("CreateBrowserTest", () => {
       expect(wrapper.find(DOT).exists()).toBe(true);
     });
 
+    it("the unsaved dot shows after changing the scheduled start", async () => {
+      wrapper = await mountSaved();
+      const vm = wrapper.vm as any;
+
+      vm.check = { ...vm.check, schedule: { ...vm.check.schedule, startTime: "10:30" } };
+      await flushPromises();
+
+      expect(wrapper.find(DOT).exists()).toBe(true);
+    });
+
     it("the unsaved dot clears after Save & Continue", async () => {
       wrapper = await mountSaved();
       await setJourney(wrapper, renamed());
