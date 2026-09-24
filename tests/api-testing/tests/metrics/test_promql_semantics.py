@@ -11,6 +11,13 @@ Three regressions found by A/B testing against Thanos (openobserve#14607,
 * An instant query on a range selector or subquery returned a vector (one value
   per series) instead of a matrix (every raw sample).
 
+A fourth group came from the same sweep: ``sort``, ``sort_desc``,
+``present_over_time`` and the ``@`` modifier were reported as unimplemented and
+now evaluate. They are pinned here because nothing else covers them — an
+"unsupported function" error is a silent regression for a dashboard that uses
+one. ``mad_over_time`` and ``double_exponential_smoothing`` are still
+unimplemented and are deliberately NOT asserted.
+
 Each assertion is on ``resultType``/series count, not on the numbers, so the
 tests stay stable whatever else the instance holds.
 """
@@ -86,4 +93,27 @@ def test_instant_query_on_a_range_selector_returns_a_matrix(client, seeded_metri
     assert data.get("resultType") == "matrix", (
         f"a range selector must return every raw sample as a matrix; got "
         f"resultType={data.get('resultType')!r}"
+    )
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "sort({metric})",
+        "sort_desc({metric})",
+        "present_over_time({metric}[5m])",
+        "{metric} @ end()",
+    ],
+)
+def test_previously_unsupported_functions_now_evaluate(client, seeded_metric, query):
+    """Each of these used to come back as an unsupported-function error."""
+    resp = client.get(
+        "prometheus/api/v1/query",
+        params={"query": query.format(metric=seeded_metric)},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body.get("status") != "error", (
+        f"{query.format(metric=seeded_metric)} returned an error: "
+        f"{body.get('error') or body.get('message')}"
     )
