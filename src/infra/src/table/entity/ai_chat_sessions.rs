@@ -16,6 +16,8 @@ pub struct Model {
     pub opencode_session_id: Option<String>,
     pub agent_type: String,
     pub title: String,
+    /// `prompt` | `generated` | `user` ('' while untitled): who set `title`.
+    pub title_source: String,
     pub status: String,
     pub created_at: i64,
     pub updated_at: i64,
