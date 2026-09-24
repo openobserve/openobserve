@@ -197,6 +197,9 @@ struct ConfigResponse<'a> {
     /// Hours ahead the ingester accepts a record's timestamp.
     ingest_allowed_in_future: i64,
     ai_enabled: bool,
+    /// AI conversations are stored server-side (`/ai/chats`); the browser's
+    /// IndexedDB copy is then only a cache.
+    ai_chat_persistence_enabled: bool,
     /// Days a soft-deleted org stays recoverable before it is purged. `0` means no
     /// recovery window at all — deletion is immediate and permanent, which is what
     /// every OSS build reports.
@@ -483,6 +486,10 @@ pub async fn zo_config(
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
     // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
     let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
+    let ai_chat_persistence_enabled = enterprise_value!(
+        false,
+        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && o2cfg.ai.chat_persistence_enabled
+    );
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
@@ -600,6 +607,7 @@ pub async fn zo_config(
         ingest_allowed_upto: cfg.limit.ingest_allowed_upto,
         ingest_allowed_in_future: cfg.limit.ingest_allowed_in_future,
         ai_enabled,
+        ai_chat_persistence_enabled,
         org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,

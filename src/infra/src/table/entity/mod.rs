@@ -2,6 +2,7 @@
 
 pub mod prelude;
 
+pub mod ai_chat_sessions;
 pub mod alert_calibration_configs;
 pub mod alert_composite_children;
 pub mod alert_composites;

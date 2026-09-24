@@ -85,4 +85,9 @@ export interface ChatHistoryEntry {
   messages: ChatMessage[];
   sessionId?: string; // UUID v7 for tracking all API calls in this chat session
   userOrgKey?: string; // SHA-256 hash of "email:orgIdentifier" for per-user/org isolation
+  // Server-side chat persistence: the entry is a cache of a server-stored chat
+  // (not a browser-only one), and the committed sequence it reflects — unset
+  // while a live turn may have changed it, so the next open revalidates.
+  serverBacked?: boolean;
+  cachedLastSeq?: number;
 }
