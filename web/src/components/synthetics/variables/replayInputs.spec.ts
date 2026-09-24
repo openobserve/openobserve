@@ -20,7 +20,9 @@ import {
   classifyReplayNames,
   defaultReplayEnvironmentId,
   environmentStartUrls,
+  GLOBAL_ONLY,
   mergeReplayVariables,
+  replayEnvironmentOptions,
   replayInputs,
   sharedPlainValues,
 } from "./replayInputs";
@@ -88,6 +90,15 @@ describe("sharedPlainValues", () => {
     expect(sharedPlainValues(envs, globals, undefined)).toEqual({
       BASE_URL: "https://global.test",
       ORG: "acme",
+    });
+  });
+
+  it("applies only global values for Global only", () => {
+    const globals = [plain("BASE_URL", "https://global.test")];
+    const envs = [env("prod", [plain("BASE_URL", "https://prod.test"), plain("ORG", "acme")])];
+
+    expect(sharedPlainValues(envs, globals, GLOBAL_ONLY)).toEqual({
+      BASE_URL: "https://global.test",
     });
   });
 
@@ -163,19 +174,89 @@ describe("defaultReplayEnvironmentId", () => {
     );
   });
 
-  it("falls back to the first named environment in server order when the check pins none", () => {
-    expect(defaultReplayEnvironmentId([], [global, env("prod", []), env("stg", [])])).toBe("prod");
+  it("returns Global only when the check pins no environment", () => {
+    expect(GLOBAL_ONLY).toBe("");
+    expect(defaultReplayEnvironmentId([], [global, env("prod", []), env("stg", [])])).toBe(
+      GLOBAL_ONLY,
+    );
   });
 
-  it("is undefined when the org has only the global environment", () => {
-    expect(defaultReplayEnvironmentId([], [global])).toBeUndefined();
+  it("skips a pinned environment the user cannot read", () => {
+    expect(defaultReplayEnvironmentId(["hidden", "stg"], [env("stg", [])])).toBe("stg");
   });
 
-  it("is undefined before the shared list loads", () => {
-    expect(defaultReplayEnvironmentId([], [])).toBeUndefined();
+  it("returns Global only when no pinned environment is readable", () => {
+    expect(defaultReplayEnvironmentId(["hidden"], [env("prod", [])])).toBe(GLOBAL_ONLY);
+  });
+
+  it("returns Global only when the org has only the global environment", () => {
+    expect(defaultReplayEnvironmentId([], [global])).toBe(GLOBAL_ONLY);
+  });
+
+  it("returns Global only before the shared list loads", () => {
+    expect(defaultReplayEnvironmentId([], [])).toBe(GLOBAL_ONLY);
   });
 });
 
+describe("replayEnvironmentOptions", () => {
+  const global = { ...env("global", []), is_global: true };
+  const envs = [
+    global,
+    env("prod", [plain("BASE_URL", "https://prod.test")]),
+    env("stg", [plain("BASE_URL", "https://stg.test")]),
+    env("qa", [plain("BASE_URL", "https://qa.test")]),
+  ];
+  const globals = [plain("BASE_URL", "https://global.test")];
+
+  it("lists the test's environments first, then the others as not in this test", () => {
+    const options = replayEnvironmentOptions("{{BASE_URL}}/login", [], envs, globals, [
+      "stg",
+      "hidden",
+      "prod",
+    ]);
+
+    expect(options.map(({ id, inTest }) => ({ id, inTest }))).toEqual([
+      { id: "stg", inTest: true },
+      { id: "prod", inTest: true },
+      { id: "qa", inTest: false },
+    ]);
+    expect(options.map((o) => o.name)).toEqual(["stg", "prod", "qa"]);
+  });
+
+  it("offers Global first when the test pins no readable environment", () => {
+    const options = replayEnvironmentOptions("{{BASE_URL}}/login", [], envs, globals, ["hidden"]);
+
+    expect(options.map(({ id, inTest }) => ({ id, inTest }))).toEqual([
+      { id: GLOBAL_ONLY, inTest: true },
+      { id: "prod", inTest: false },
+      { id: "stg", inTest: false },
+      { id: "qa", inTest: false },
+    ]);
+    expect(options[0].host).toBe("global.test");
+  });
+
+  it("reads the host from each environment's resolved Starting URL", () => {
+    const withPort = [
+      env("prod", [plain("BASE_URL", "https://prod.test:8443")]),
+      env("bare", [plain("BASE_URL", "stg.test")]),
+      env("broken", [plain("BASE_URL", "bad host")]),
+    ];
+
+    const options = replayEnvironmentOptions(
+      "{{BASE_URL}}/login",
+      [],
+      withPort,
+      [],
+      ["prod", "bare", "broken"],
+    );
+
+    expect(options.map((o) => o.host)).toEqual([
+      "prod.test:8443",
+      "stg.test",
+      "https://bad host/login",
+    ]);
+  });
+});
 describe("classifyReplayNames", () => {
   const stateOf = (statuses: { name: string; state: string }[], name: string) =>
     statuses.find((s) => s.name === name)?.state;

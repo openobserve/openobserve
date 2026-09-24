@@ -1,0 +1,181 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { afterEach, describe, expect, it } from "vitest";
+import { mount, type VueWrapper } from "@vue/test-utils";
+import { createI18n } from "vue-i18n";
+import en from "@/locales/languages/en-US.json";
+import type { ReplayEnvironmentOption } from "@/components/synthetics/variables/replayInputs";
+import ReplayEnvironmentMenu from "./ReplayEnvironmentMenu.vue";
+
+const i18n = createI18n({
+  legacy: false,
+  locale: "en-US",
+  fallbackLocale: "en-US",
+  messages: { "en-US": en as Record<string, unknown> },
+});
+
+// The menu content renders inline and always, so items can be read without driving reka's pointer events.
+const ODropdownStub = {
+  name: "ODropdown",
+  props: ["open", "side", "align", "contentClass"],
+  template:
+    '<div class="o-dropdown-stub"><slot name="trigger" /><div class="o-dropdown-content"><slot /></div></div>',
+};
+const ODropdownItemStub = {
+  name: "ODropdownItem",
+  props: ["disabled", "iconLeft", "variant"],
+  emits: ["select"],
+  template:
+    '<div role="menuitem" @click="$emit(\'select\', $event)"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
+};
+const ODropdownGroupStub = {
+  name: "ODropdownGroup",
+  props: ["label"],
+  template:
+    '<div class="o-dropdown-group" :data-label="label"><span>{{ label }}</span><slot /></div>',
+};
+const ODropdownSeparatorStub = { name: "ODropdownSeparator", template: "<hr />" };
+const OTooltipStub = {
+  name: "OTooltip",
+  props: ["content", "disabled", "side"],
+  template: '<span class="o-tooltip-stub" :data-content="content" />',
+};
+const OIconStub = { props: ["name", "size"], template: '<i :data-icon="name" />' };
+
+const STUBS = {
+  ODropdown: ODropdownStub,
+  ODropdownItem: ODropdownItemStub,
+  ODropdownGroup: ODropdownGroupStub,
+  ODropdownSeparator: ODropdownSeparatorStub,
+  OTooltip: OTooltipStub,
+  OIcon: OIconStub,
+};
+
+const PROD: ReplayEnvironmentOption = {
+  id: "env-prod",
+  name: "Production",
+  host: "prod.test",
+  inTest: true,
+};
+const STG: ReplayEnvironmentOption = {
+  id: "env-stg",
+  name: "Staging",
+  host: "stg.test",
+  inTest: true,
+};
+const QA: ReplayEnvironmentOption = { id: "env-qa", name: "QA", host: "qa.test", inTest: false };
+const GLOBAL: ReplayEnvironmentOption = {
+  id: "",
+  name: "Global",
+  host: "global.test",
+  inTest: true,
+};
+
+const TRIGGER = '[data-test="synthetics-journey-replay-menu-trigger"]';
+const item = (key: string) => `[data-test="synthetics-journey-replay-menu-env-${key}"]`;
+
+function mountMenu(props: Record<string, unknown> = {}) {
+  return mount(ReplayEnvironmentMenu, {
+    props: { options: [PROD, STG, QA], selectedId: "env-stg", disabled: false, ...props },
+    global: { plugins: [i18n], stubs: STUBS },
+  }) as VueWrapper;
+}
+
+describe("ReplayEnvironmentMenu", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("marks the selected environment with a check and announces it as selected", () => {
+    wrapper = mountMenu();
+
+    const selected = wrapper.get(item("env-stg"));
+    expect(selected.find('[data-icon="check"]').exists()).toBe(true);
+    expect(selected.find(".sr-only").text()).toBe("Selected");
+    expect(selected.find(".text-accent").text()).toBe("Staging");
+    expect(selected.text()).toContain("stg.test");
+
+    const other = wrapper.get(item("env-prod"));
+    expect(other.find('[data-icon="check"]').exists()).toBe(false);
+    expect(other.text()).not.toContain("Selected");
+    expect(other.find(".text-accent").exists()).toBe(false);
+    expect(other.text()).toContain("Production");
+    expect(other.text()).toContain("prod.test");
+  });
+
+  it("groups environments outside the test under Not in this test's environments", () => {
+    wrapper = mountMenu();
+
+    const outside = wrapper
+      .findAll(".o-dropdown-group")
+      .find((g) => g.attributes("data-label") === "Not in this test's environments");
+    expect(outside).toBeDefined();
+    expect(outside!.find(item("env-qa")).exists()).toBe(true);
+    expect(outside!.find(item("env-prod")).exists()).toBe(false);
+    expect(outside!.find(item("env-stg")).exists()).toBe(false);
+
+    wrapper.unmount();
+    wrapper = mountMenu({ options: [PROD, STG] });
+    expect(wrapper.text()).not.toContain("Not in this test's environments");
+  });
+
+  it("emits the chosen environment", async () => {
+    wrapper = mountMenu();
+    await wrapper.get(item("env-qa")).trigger("click");
+    expect(wrapper.emitted("update:selected-id")).toEqual([["env-qa"]]);
+
+    wrapper.unmount();
+    wrapper = mountMenu({ options: [GLOBAL, PROD], selectedId: "env-prod" });
+    await wrapper.get(item("global")).trigger("click");
+    expect(wrapper.emitted("update:selected-id")).toEqual([[""]]);
+  });
+
+  it("renders no arrow when the org offers no other environment", () => {
+    wrapper = mountMenu({ options: [PROD], selectedId: "env-prod" });
+    expect(wrapper.find(TRIGGER).exists()).toBe(false);
+    expect(wrapper.find(item("env-prod")).exists()).toBe(false);
+
+    wrapper.unmount();
+    wrapper = mountMenu({ options: [], selectedId: "" });
+    expect(wrapper.find(TRIGGER).exists()).toBe(false);
+  });
+
+  it("shows the arrow for a one-environment test when the org has other environments", () => {
+    wrapper = mountMenu({ options: [PROD, QA], selectedId: "env-prod" });
+    expect(wrapper.find(TRIGGER).exists()).toBe(true);
+    expect(wrapper.find(item("env-qa")).exists()).toBe(true);
+  });
+
+  it("the arrow has a name and a tooltip, and follows disabled", async () => {
+    wrapper = mountMenu();
+    const trigger = wrapper.get(TRIGGER);
+    expect(trigger.attributes("aria-label")).toBe("Replay environment");
+    expect(trigger.attributes("disabled")).toBeUndefined();
+    const tips = wrapper.findAllComponents(OTooltipStub).map((c) => c.props("content"));
+    expect(tips).toContain("Replay environment");
+
+    await wrapper.setProps({ disabled: true });
+    expect(wrapper.get(TRIGGER).attributes("disabled")).toBeDefined();
+  });
+
+  it("says the choice is for this session only", () => {
+    wrapper = mountMenu();
+    expect(wrapper.text()).toContain("Replay and record in");
+    expect(wrapper.text()).toContain("This session only — not saved with the test.");
+  });
+});

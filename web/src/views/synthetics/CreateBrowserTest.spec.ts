@@ -325,6 +325,12 @@ const baseStubs = {
     props: ["url", "environments", "selectedIds", "checkVariables", "globals", "disabled"],
     emits: ["update:url", "update:selected-ids"],
   },
+  ReplayEnvironmentMenu: {
+    name: "ReplayEnvironmentMenu",
+    template: '<div data-test="synthetics-journey-replay-menu-stub" />',
+    props: ["options", "selectedId", "disabled"],
+    emits: ["update:selected-id"],
+  },
   MissingValueDialog: {
     name: "MissingValueDialog",
     template: '<div data-test="synthetics-missing-value-dialog-stub" :data-open="open" />',
@@ -1824,6 +1830,12 @@ describe("CreateBrowserTest", () => {
       missingDialog(w).exists() && missingDialog(w).props("open") === true;
     const submitMissing = (w: VueWrapper, values: { value: string; secret: boolean }) =>
       (missingDialog(w).props("onSubmit") as (v: unknown) => Promise<void>)(values);
+    const replayMenu = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-journey-replay-menu-stub"]') as VueWrapper<any>;
+    async function chooseReplayEnvironment(w: VueWrapper, id: string) {
+      replayMenu(w).vm.$emit("update:selected-id", id);
+      await flushPromises();
+    }
     const replayedVariables = (call = 0) =>
       mockRecorderReplay.mock.calls[call]?.[2] as { name: string; value: string }[];
     const errorToasts = () =>
@@ -1883,11 +1895,88 @@ describe("CreateBrowserTest", () => {
       expect(variables).toContainEqual({ name: "BASE_URL", value: "https://stg.test" });
     });
 
-    it("should fall back to the org's first named environment when the check pins none", async () => {
+    it("replays with Global values only when the check pins no environment", async () => {
+      mockServiceListGlobalVariables.mockResolvedValue({
+        data: [variable("BASE_URL", "https://global.test")],
+      });
       wrapper = await mountTemplatedCheck([]);
 
       await replay(wrapper, [{ action: "navigate", url: "{{BASE_URL}}/login" }]);
 
+      expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://global.test/login");
+    });
+
+    it("replays in the environment chosen on the Replay menu", async () => {
+      wrapper = await mountTemplatedCheck(["prod"]);
+      expect(replayMenu(wrapper).props("selectedId")).toBe("prod");
+
+      await chooseReplayEnvironment(wrapper, "stg");
+      await replay(wrapper, [{ action: "navigate", url: "{{BASE_URL}}/login" }]);
+
+      expect(replayMenu(wrapper).props("selectedId")).toBe("stg");
+      expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://stg.test/login");
+    });
+
+    it("choosing a replay environment does not change the saved test", async () => {
+      wrapper = await mountTemplatedCheck(["prod"]);
+
+      await chooseReplayEnvironment(wrapper, "stg");
+
+      expect(leaveAsks()).toBe(false);
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+      expect(mockServiceUpdate.mock.calls[0][2]).toMatchObject({ environments: ["prod"] });
+    });
+
+    it("records with the replay environment's values", async () => {
+      wrapper = await mountTemplatedCheck(["prod"]);
+
+      await chooseReplayEnvironment(wrapper, "stg");
+
+      expect(journeyStub(wrapper).props("variables")).toContainEqual({
+        name: "BASE_URL",
+        value: "https://stg.test",
+      });
+      expect(journeyStub(wrapper).props("startUrl")).toBe("https://stg.test/login");
+      expect(journeyStub(wrapper).props("replayEnvironmentLabel")).toBe("stg");
+    });
+
+    it("can replay in an environment that is not in the test", async () => {
+      wrapper = await mountTemplatedCheck(["prod"]);
+      const options = replayMenu(wrapper).props("options") as { id: string; inTest: boolean }[];
+      expect(options.find((o) => o.id === "stg")).toMatchObject({ inTest: false });
+
+      await chooseReplayEnvironment(wrapper, "stg");
+      await replay(wrapper, [{ action: "navigate", url: "{{BASE_URL}}/login" }]);
+
+      expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://stg.test/login");
+    });
+
+    it("an unpinned test can replay in a named environment", async () => {
+      wrapper = await mountTemplatedCheck([]);
+
+      await chooseReplayEnvironment(wrapper, "prod");
+      await replay(wrapper, [{ action: "navigate", url: "{{BASE_URL}}/login" }]);
+
+      expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://prod.test/login");
+    });
+
+    it("falls back to the default when the chosen environment disappears", async () => {
+      wrapper = await mountTemplatedCheck(["prod"]);
+      await chooseReplayEnvironment(wrapper, "stg");
+      mockServiceListEnvironments.mockResolvedValue({
+        data: orgEnvironments().filter((env) => env.id !== "stg"),
+      });
+
+      // A promotion from the variables panel is one of the host's shared-list refreshes.
+      journeyStub(wrapper).vm.$emit("toggle-variables-panel");
+      await flushPromises();
+      wrapper.findComponent({ name: "CheckVariablesPanel" }).vm.$emit("promoted", "OTHER");
+      await flushPromises();
+      await replay(wrapper, [{ action: "navigate", url: "{{BASE_URL}}/login" }]);
+
+      expect(replayMenu(wrapper).props("selectedId")).toBe("prod");
       expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://prod.test/login");
     });
 
@@ -2006,9 +2095,7 @@ describe("CreateBrowserTest", () => {
       await replayJourney(wrapper);
       expect(missingDialogOpen(wrapper)).toBe(true);
 
-      // No selector before Phase 3: the default rule follows the pinned list.
-      (wrapper.vm as any).check.environments = ["prod"];
-      await flushPromises();
+      await chooseReplayEnvironment(wrapper, "prod");
       await submitMissing(wrapper, { value: "k", secret: false });
       await flushPromises();
 

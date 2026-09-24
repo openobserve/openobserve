@@ -15,7 +15,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { h, nextTick } from "vue";
 import type { BrowserStep } from "@/types/synthetics";
 import type { ChildJourney, ExpansionMap } from "@/utils/synthetics/expandJourney";
 
@@ -3367,6 +3367,89 @@ describe("BrowserJourney Starting URL pill slot", () => {
     const table = wrapper.findComponent(JourneyStepsStubWithStartRow);
     expect(table.exists()).toBe(true);
     expect(table.props("startRow")).toBeFalsy();
+  });
+});
+
+describe("BrowserJourney replay environment", () => {
+  let wrapper: VueWrapper;
+
+  const REPLAY = '[data-test="synthetics-journey-replay-btn"]';
+  const LONG_NAME = "Staging for the EU payments migration";
+
+  const OTooltipWithContentStub = {
+    props: ["content"],
+    template: '<div :data-tooltip="content" />',
+  };
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test/" },
+    { id: "s2", action: "click", name: "Sign in", selector: "#login" },
+    { id: "s3", action: "click", name: "Open cart", selector: "#cart" },
+  ] as any[];
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+    mockT.mockImplementation((key: string, ...args: unknown[]) =>
+      key === "synthetics.journey.replayEnv.buttonLabel"
+        ? `Replay · ${(args[0] as { environment: string }).environment}`
+        : key,
+    );
+  });
+
+  afterEach(() => {
+    mockT.mockImplementation((key: string) => key);
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  function mountReplay(props: Record<string, unknown> = {}, menuSlot?: (p: any) => unknown) {
+    return mount(BrowserJourney, {
+      props: { modelValue: journey, replayPhase: "idle", ...props },
+      slots: menuSlot ? { "replay-menu": menuSlot as any } : {},
+      global: { stubs: { ...STUBS, OTooltip: OTooltipWithContentStub } },
+    }) as VueWrapper;
+  }
+
+  it("labels Replay with the replay environment", () => {
+    wrapper = mountReplay({ replayEnvironmentLabel: "Staging" });
+
+    expect(wrapper.find(REPLAY).text()).toBe("Replay · Staging");
+  });
+
+  it("shows the full environment name in the Replay tooltip", () => {
+    wrapper = mountReplay({ replayEnvironmentLabel: LONG_NAME });
+
+    const tooltips = wrapper.findAll("[data-tooltip]").map((t) => t.attributes("data-tooltip"));
+    expect(tooltips).toContain(`Replay · ${LONG_NAME}`);
+  });
+
+  it("passes the Replay disabled state to the replay-menu slot", async () => {
+    const slot = (p: { disabled: boolean }) =>
+      h("span", { "data-test": "replay-menu-slot", "data-disabled": String(p.disabled) });
+    const disabledOf = (w: VueWrapper) =>
+      w.find('[data-test="replay-menu-slot"]').attributes("data-disabled");
+
+    wrapper = mountReplay({ modelValue: [], replayPhase: "idle" }, slot);
+    expect(wrapper.find('[data-test="replay-menu-slot"]').exists()).toBe(true);
+    expect(disabledOf(wrapper)).toBe("true");
+    wrapper.unmount();
+
+    wrapper = mountReplay({ replayPhase: "passed" }, slot);
+    expect(disabledOf(wrapper)).toBe("false");
+    wrapper.unmount();
+
+    wrapper = mountReplay(
+      { replayPhase: "passed", extensionReady: true, canRecordFrom: true },
+      slot,
+    );
+    await wrapper.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[2]);
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    expect(disabledOf(wrapper)).toBe("true");
   });
 });
 
