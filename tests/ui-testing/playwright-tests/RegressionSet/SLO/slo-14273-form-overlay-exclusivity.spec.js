@@ -1,5 +1,7 @@
-// slo-form-overlay-exclusivity.spec.js
-// Regression cover for openobserve#14273 — on the New SLO form, the Source alert
+// slo-14273-form-overlay-exclusivity.spec.js
+// SLO Regression — New SLO form overlay exclusivity (#14273)
+//
+// On the New SLO form, the Source alert
 // dropdown and the Reliability nav flyout were open at the same time and drew on
 // top of each other, so the alert options and the menu items were unreadable.
 //
@@ -7,8 +9,8 @@
 // either overlay dismisses the other. A z-index tweak alone would leave the two
 // still open, so "they do not overlap" is not enough — one of them must be gone.
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
 
 // The flyout's own items, used as the proof it is open. Matching on the exact
 // item text keeps this independent of the flyout's wrapper markup.

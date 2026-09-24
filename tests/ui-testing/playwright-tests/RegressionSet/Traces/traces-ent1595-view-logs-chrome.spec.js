@@ -1,5 +1,7 @@
-// traceDetailsViewLogsChrome.spec.js
-// Regression cover for o2-enterprise#1595 — on a build that has correlation, the
+// traces-ent1595-view-logs-chrome.spec.js
+// Traces Regression — trace-details View Logs chrome (o2-enterprise#1595)
+//
+// On a build that has correlation, the
 // manual log-stream picker and its View Logs button in the trace-details header
 // are redundant: correlated navigation replaces them. They were removed, and this
 // pins that removal so they cannot drift back.
@@ -8,9 +10,9 @@
 // they are how a user reaches logs for one span — so they are asserted present,
 // otherwise "hide the chrome" could quietly become "hide the feature".
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const { generateMultiHopTrace, ingestTrace } = require('../utils/service-graph-ingestion.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const { generateMultiHopTrace, ingestTrace } = require('../../utils/service-graph-ingestion.js');
 
 test.describe('Trace details View Logs chrome', { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });

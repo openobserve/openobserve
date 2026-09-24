@@ -1,5 +1,7 @@
-// traceFlameGraphSelection.spec.js
-// Regression cover for openobserve#11615 — selecting a span from the Flame Graph
+// traces-11615-flame-graph-span-selection.spec.js
+// Traces Regression — Flame Graph span selection (#11615)
+//
+// Selecting a span from the Flame Graph
 // used to redirect the user to the Waterfall tab, breaking the analysis flow of
 // anyone working in the flame graph. Span details must open WITHOUT leaving the
 // Flame Graph tab.
@@ -10,9 +12,9 @@
 // that point. Everything asserted afterwards — the active tab, the flame-graph
 // sidebar, the absence of the waterfall tree — is ordinary DOM.
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const { generateMultiHopTrace, ingestTrace } = require('../utils/service-graph-ingestion.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const { generateMultiHopTrace, ingestTrace } = require('../../utils/service-graph-ingestion.js');
 
 // A span the pointer is over renders the ECharts tooltip. Scanning rows top-down
 // finds the widest bar (the root) first, which is present in every trace.

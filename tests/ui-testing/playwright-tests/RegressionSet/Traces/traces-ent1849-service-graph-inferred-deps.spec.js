@@ -1,5 +1,7 @@
-// service-graph-inferred-dependencies.spec.js
-// Regression cover for o2-enterprise#1849 — databases, queues and external APIs
+// traces-ent1849-service-graph-inferred-deps.spec.js
+// Traces Regression — Service Graph inferred dependencies (o2-enterprise#1849)
+//
+// Databases, queues and external APIs
 // were invisible in the Service Graph. The topology was built by joining a SERVER
 // span to its CLIENT parent, and an uninstrumented dependency never emits a SERVER
 // span: only the caller's CLIENT/PRODUCER span exists. Every such dependency was
@@ -14,13 +16,13 @@
 // too, so that node arrives through the ordinary join and would survive the
 // inference path being removed entirely.
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
 const {
   generateUninstrumentedDependencyTrace,
   ingestTraces,
-} = require('../utils/service-graph-ingestion.js');
+} = require('../../utils/service-graph-ingestion.js');
 
 // The v4 resolver stages a peer that carries no explicit `peer.service` until it
 // can finalise its identity, and the daemon only processes windows older than

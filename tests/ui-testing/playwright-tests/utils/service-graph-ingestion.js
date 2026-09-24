@@ -505,6 +505,53 @@ function generateUninstrumentedDependencyTrace({
 }
 
 /**
+ * openobserve#6591 item 8: span names whose numeric suffixes overlap, so a
+ * substring search can be told apart from a broken one. Searching "querier-1"
+ * must match querier-1 and querier-13 and NOT querier-3 or querier-31 — a trace
+ * of ordinary operation names cannot distinguish those two behaviours.
+ */
+function generateQuerierFanoutTrace({
+  coordinatorService = 'search-coordinator',
+  spanNames = ['querier-1', 'querier-3', 'querier-13', 'querier-31', 'ingester-1'],
+  latencyMs = 60,
+} = {}) {
+  const traceId = generateTraceId();
+  const rootSpanId = generateSpanId();
+  const startNs = Date.now() * 1_000_000;
+
+  const rootSpan = buildSpan({
+    traceId,
+    spanId: rootSpanId,
+    name: 'search dispatch',
+    kind: SpanKind.SERVER,
+    startTimeNs: startNs,
+    endTimeNs: startNs + msToNs(latencyMs * spanNames.length + 40),
+    attributes: k8sAttrs(coordinatorService),
+    status: { code: StatusCode.OK },
+  });
+
+  const childSpans = spanNames.map((name, index) => {
+    const childStartNs = startNs + msToNs(10 + index * latencyMs);
+    return buildSpan({
+      traceId,
+      spanId: generateSpanId(),
+      parentSpanId: rootSpanId,
+      name,
+      kind: SpanKind.SERVER,
+      startTimeNs: childStartNs,
+      endTimeNs: childStartNs + msToNs(latencyMs),
+      attributes: k8sAttrs(coordinatorService),
+      status: { code: StatusCode.OK },
+    });
+  });
+
+  return {
+    payload: buildTracePayload([buildResourceSpans(coordinatorService, [rootSpan, ...childSpans])]),
+    metadata: { traceId, coordinatorService, spanNames, type: 'querier_fanout' },
+  };
+}
+
+/**
  * TC-006, TC-015: Messaging trace with PRODUCER/CONSUMER spans
  * PRODUCER span (kind=4) + CONSUMER span (kind=5) with messaging.system
  */
@@ -2249,6 +2296,7 @@ module.exports = {
   generateErrorTrace,
   generateDatabaseTrace,
   generateUninstrumentedDependencyTrace,
+  generateQuerierFanoutTrace,
   generateMessagingTrace,
   generateGrpcTrace,
   generateOrphanClientTrace,
