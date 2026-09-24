@@ -35,7 +35,8 @@
       "alerts-14308-composite-trigger-timestamps.spec.js",
       "alerts-measure-column-default.spec.js",
       "alerts-from-dashboard-panel.spec.js",
-      "alerts-query-editor-search-endpoint.spec.js"
+      "alerts-query-editor-search-endpoint.spec.js",
+      "alerts-13243-prebuilt-form-reuse.spec.js"
     ],
     "disabled": []
   },
@@ -80,7 +81,10 @@
       "traces-bugs.spec.js",
       "traces-filter-reset.spec.js",
       "traces-share-url.spec.js",
-      "traces-span-kind-badges.spec.js"
+      "traces-span-kind-badges.spec.js",
+      "traces-11615-flame-graph-span-selection.spec.js",
+      "traces-6591-explorer-state.spec.js",
+      "traces-6591-details-interactions.spec.js"
     ],
     "disabled": []
   },
@@ -152,7 +156,8 @@
     "actual_folder": "RegressionSet/SLO",
     "browser": "chrome",
     "run_files": [
-      "slo-error-messages.spec.js"
+      "slo-error-messages.spec.js",
+      "slo-14273-form-overlay-exclusivity.spec.js"
     ],
     "disabled": []
   },
@@ -162,6 +167,15 @@
     "browser": "chrome",
     "run_files": [
       "llmProviderTypes.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "RUM-Regression",
+    "actual_folder": "RegressionSet/RUM",
+    "browser": "chrome",
+    "run_files": [
+      "rum-11749-session-trace-correlation.spec.js"
     ],
     "disabled": []
   }

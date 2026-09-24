@@ -27,7 +27,9 @@ function logsUrl() {
   return `${baseUrl}/web/logs?org_identifier=${org}&stream_type=logs&period=15m`;
 }
 
-test.describe('Search scheduler after a logs search (#13243)', () => {
+// Enterprise-gated: the scheduler route guard and the toolbar button are both
+// behind config.isEnterprise, so this cannot run on an OSS build.
+test.describe('Search scheduler after a logs search (#13243)', { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(async ({ page }, testInfo) => {
