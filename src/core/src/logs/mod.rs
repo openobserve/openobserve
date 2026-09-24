@@ -66,6 +66,62 @@ static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
 pub type IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
+/// No association names `_all_values`, so the scan leaves its stale pre-redaction text.
+#[cfg(feature = "vectorscan")]
+pub fn snapshot_derived_sources(records: &[(i64, Map<String, Value>)]) -> Vec<String> {
+    let max_len = get_config().limit.index_all_max_value_length;
+    records
+        .iter()
+        .map(|(_, record)| {
+            if record.contains_key(config::ALL_VALUES_COL_NAME) {
+                all_values_of(record, max_len)
+            } else {
+                String::new()
+            }
+        })
+        .collect()
+}
+
+/// `_original` is redacted in place by the engine; only `_all_values` needs rebuilding here.
+#[cfg(feature = "vectorscan")]
+pub fn refresh_derived_columns(before: &[String], records: &mut [(i64, Map<String, Value>)]) {
+    let max_len = get_config().limit.index_all_max_value_length;
+    for (stale, (_, record)) in before.iter().zip(records.iter_mut()) {
+        if !record.contains_key(config::ALL_VALUES_COL_NAME) {
+            continue;
+        }
+        let values = all_values_of(record, max_len);
+        if &values == stale {
+            continue;
+        }
+        record.insert(
+            config::ALL_VALUES_COL_NAME.to_string(),
+            Value::String(values),
+        );
+    }
+}
+
+/// The `_all_values` concatenation: every field but the derived ones, space-joined.
+#[cfg(feature = "vectorscan")]
+fn all_values_of(record: &Map<String, Value>, max_len: usize) -> String {
+    let mut values = Vec::with_capacity(record.len());
+    for (k, value) in record.iter() {
+        if [
+            TIMESTAMP_COL_NAME,
+            config::ID_COL_NAME,
+            config::ORIGINAL_DATA_COL_NAME,
+            config::ALL_VALUES_COL_NAME,
+        ]
+        .contains(&k.as_str())
+            || (max_len != 0 && value.as_str().is_some_and(|s| s.len() > max_len))
+        {
+            continue;
+        }
+        values.push(value.to_string());
+    }
+    values.join(" ")
+}
+
 fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
     let local_val = v.as_object()?;
     for action in BULK_OPERATORS {
@@ -776,5 +832,63 @@ mod tests {
         assert!(ts >= before && ts <= after);
         // field should be inserted
         assert!(val.get(TIMESTAMP_COL_NAME).is_some());
+    }
+
+    #[cfg(feature = "vectorscan")]
+    fn record_with(pairs: &[(&str, &str)]) -> (i64, Map<String, Value>) {
+        let mut record = Map::new();
+        for (k, v) in pairs {
+            record.insert(k.to_string(), Value::from(*v));
+        }
+        (1, record)
+    }
+
+    #[test]
+    #[cfg(feature = "vectorscan")]
+    fn refresh_rebuilds_all_values_from_the_redacted_fields() {
+        let mut records = vec![record_with(&[
+            ("email", "bob@x.com"),
+            (config::ALL_VALUES_COL_NAME, "\"bob@x.com\""),
+        ])];
+        let before = snapshot_derived_sources(&records);
+        records[0]
+            .1
+            .insert("email".to_string(), Value::from("[REDACTED]"));
+        refresh_derived_columns(&before, &mut records);
+
+        let rebuilt = records[0].1[config::ALL_VALUES_COL_NAME].as_str().unwrap();
+        assert!(rebuilt.contains("[REDACTED]"));
+        assert!(!rebuilt.contains("bob@x.com"));
+    }
+
+    #[test]
+    #[cfg(feature = "vectorscan")]
+    fn refresh_keeps_original_the_engine_already_redacted() {
+        let mut records = vec![record_with(&[
+            ("email", "[REDACTED]"),
+            (config::ORIGINAL_DATA_COL_NAME, "{\"email\":\"[REDACTED]\"}"),
+            (config::ALL_VALUES_COL_NAME, "\"bob@x.com\""),
+        ])];
+        let before = vec!["stale".to_string()];
+        refresh_derived_columns(&before, &mut records);
+
+        assert_eq!(
+            records[0].1[config::ORIGINAL_DATA_COL_NAME].as_str(),
+            Some("{\"email\":\"[REDACTED]\"}")
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "vectorscan")]
+    fn a_record_without_all_values_is_left_alone() {
+        let mut records = vec![record_with(&[
+            ("email", "[REDACTED]"),
+            (config::ORIGINAL_DATA_COL_NAME, "{\"email\":\"[REDACTED]\"}"),
+        ])];
+        let before = snapshot_derived_sources(&records);
+        assert_eq!(before, vec![String::new()]);
+
+        refresh_derived_columns(&before, &mut records);
+        assert_eq!(records[0].1.len(), 2);
     }
 }
