@@ -18,7 +18,6 @@ mod loads;
 use std::{
     collections::VecDeque,
     hash::Hasher,
-    ops::Range,
     sync::{
         Arc, LazyLock, Mutex,
         atomic::{AtomicU64, Ordering},
@@ -47,15 +46,15 @@ use hashbrown::{HashMap, HashSet};
 use metrics_index::block::ParentMetadata;
 #[cfg(test)]
 use metrics_index::parsed_cache::CacheWeight;
+#[cfg(test)]
+use metrics_index::parsed_cache::SidecarBinding;
 use metrics_index::{
     block::{BlockDecoder, DecodedBlockRef, Index},
-    parsed_cache::{
-        CacheKey, CachedIndex, INDEX_CACHE, IndexCache, ParentIdentity, SidecarBinding, cache_limit,
-    },
+    parsed_cache::{CacheKey, CachedIndex, INDEX_CACHE, IndexCache, ParentIdentity, cache_limit},
 };
 use tokio::{
     sync::{OwnedSemaphorePermit, Semaphore},
-    task::{JoinHandle, JoinSet},
+    task::JoinSet,
 };
 
 use super::{SeriesStream, block_ranges::plan_coalesced_ranges, plan::LabelColumns};
@@ -73,46 +72,9 @@ static METADATA_WORKERS: LazyLock<Arc<Semaphore>> = LazyLock::new(|| {
 });
 static FILE_LOADS: LazyLock<Arc<loads::LoadRegistry>> =
     LazyLock::new(|| Arc::new(loads::LoadRegistry::default()));
-struct BlockingMetadata<T> {
-    handle: JoinHandle<Result<T>>,
-}
-
-impl<T: Send + 'static> BlockingMetadata<T> {
-    #[cfg(test)]
-    async fn run(
-        permit: OwnedSemaphorePermit,
-        work: impl FnOnce() -> Result<T> + Send + 'static,
-    ) -> Result<T> {
-        Self::run_shared(Arc::new(permit), work).await
-    }
-
-    async fn run_shared(
-        permit: Arc<OwnedSemaphorePermit>,
-        work: impl FnOnce() -> Result<T> + Send + 'static,
-    ) -> Result<T> {
-        let mut task = Self {
-            handle: tokio::task::spawn_blocking(move || {
-                let _permit = permit;
-                work()
-            }),
-        };
-        (&mut task.handle)
-            .await
-            .context("metrics metadata worker failed")?
-    }
-}
-
-impl<T> Drop for BlockingMetadata<T> {
-    fn drop(&mut self) {
-        // Running blocking work retains its permit; queued work can still be aborted.
-        self.handle.abort();
-    }
-}
-
 struct MetadataLoad<'a> {
     file: &'a FileKey,
     labels: &'a [String],
-    map_samples: bool,
     key: CacheKey,
     sidecar: String,
     limit: usize,
@@ -126,7 +88,6 @@ impl MetadataLoad<'_> {
         let Self {
             file,
             labels,
-            map_samples,
             key,
             sidecar,
             limit,
@@ -145,14 +106,13 @@ impl MetadataLoad<'_> {
                 let loaded = load_entry(
                     file,
                     labels,
-                    map_samples,
                     &key.parent,
                     &sidecar,
                     seed,
                     Arc::clone(&permit),
                 )
                 .await;
-                let (entry, mapping) = match loaded {
+                let entry = match loaded {
                     Ok(value) => value,
                     Err(error) => {
                         cache
@@ -166,7 +126,6 @@ impl MetadataLoad<'_> {
                     account: file.account.clone(),
                     sidecar,
                     index: Arc::new(entry.index.project(labels)?),
-                    mapping,
                 }));
             }
             match flights.claim(key.clone()) {
@@ -187,7 +146,6 @@ impl MetadataLoad<'_> {
                     let loaded = load_entry(
                         file,
                         labels,
-                        map_samples,
                         &key.parent,
                         &sidecar,
                         seed,
@@ -195,7 +153,7 @@ impl MetadataLoad<'_> {
                     )
                     .await;
                     match loaded {
-                        Ok((entry, mapping)) => {
+                        Ok(entry) => {
                             let admitted = if prior
                                 .as_ref()
                                 .is_some_and(|prior| Arc::ptr_eq(prior, &entry))
@@ -214,7 +172,6 @@ impl MetadataLoad<'_> {
                                 account: file.account.clone(),
                                 sidecar,
                                 index: Arc::new(entry.index.project(labels)?),
-                                mapping,
                             }));
                         }
                         Err(error) => {
@@ -238,10 +195,6 @@ struct ReadStats {
     partitions: usize,
     selected_blocks: usize,
     selected_bytes: u64,
-    mapped_files: usize,
-    mapped_virtual_bytes: u64,
-    mapped_blocks: AtomicU64,
-    mapped_payload_bytes: AtomicU64,
     read_batches: AtomicU64,
     read_ranges: AtomicU64,
     read_bytes: AtomicU64,
@@ -252,7 +205,7 @@ struct ReadStats {
 impl Drop for ReadStats {
     fn drop(&mut self) {
         log::info!(
-            "[trace_id: {}] [PromQL] metrics blocks read: selected_blocks {}, selected_bytes {}, read_batches {}, read_bytes {}, decoded_blocks {}, completed_partitions {}/{}, read_ranges {}, mapped_files {}, mapped_virtual_bytes {}, mapped_blocks {}, mapped_payload_bytes {}",
+            "[trace_id: {}] [PromQL] metrics blocks read: selected_blocks {}, selected_bytes {}, read_batches {}, read_bytes {}, decoded_blocks {}, completed_partitions {}/{}, read_ranges {}",
             self.trace_id,
             self.selected_blocks,
             self.selected_bytes,
@@ -262,18 +215,12 @@ impl Drop for ReadStats {
             self.completed_partitions.load(Ordering::Relaxed),
             self.partitions,
             self.read_ranges.load(Ordering::Relaxed),
-            self.mapped_files,
-            self.mapped_virtual_bytes,
-            self.mapped_blocks.load(Ordering::Relaxed),
-            self.mapped_payload_bytes.load(Ordering::Relaxed),
         );
     }
 }
 
 #[derive(Default)]
 struct PartitionReadStats {
-    mapped_blocks: u64,
-    mapped_payload_bytes: u64,
     read_batches: u64,
     read_ranges: u64,
     read_bytes: u64,
@@ -284,47 +231,6 @@ struct LoadedFile {
     account: String,
     sidecar: String,
     index: Arc<Index>,
-    mapping: Option<Arc<MappedIndex>>,
-}
-
-/// Query-owned raw compressed bytes, never stored in the global index cache.
-struct MappedIndex {
-    #[cfg(all(unix, target_pointer_width = "64"))]
-    data: memmap2::Mmap,
-    payload_end: u64,
-}
-
-impl MappedIndex {
-    fn len(&self) -> u64 {
-        #[cfg(all(unix, target_pointer_width = "64"))]
-        {
-            self.data.len() as u64
-        }
-        #[cfg(not(all(unix, target_pointer_width = "64")))]
-        {
-            0
-        }
-    }
-
-    fn payload(&self, range: Range<u64>) -> Result<&[u8]> {
-        ensure!(
-            range.start < range.end && range.end <= self.payload_end,
-            "mapped block payload outside validated payload area"
-        );
-        let start = usize::try_from(range.start)?;
-        let end = usize::try_from(range.end)?;
-        #[cfg(all(unix, target_pointer_width = "64"))]
-        {
-            self.data
-                .get(start..end)
-                .context("mapped block payload outside file")
-        }
-        #[cfg(not(all(unix, target_pointer_width = "64")))]
-        {
-            let _ = (start, end);
-            anyhow::bail!("mapped blocks unsupported on this platform")
-        }
-    }
 }
 
 pub(super) struct PreparedPartition {
@@ -356,19 +262,6 @@ impl FileCursor {
         stats: &mut PartitionReadStats,
     ) -> Result<DecodedBlockRef<'a>> {
         let block_id = self.head().context("missing block cursor")?;
-        if let Some(mapping) = &self.file.mapping {
-            if stats.mapped_blocks.is_multiple_of(PREFETCH_BLOCKS as u64) {
-                tokio::task::yield_now().await;
-            }
-            let block = &self.file.index.blocks.block(block_id);
-            let payload = mapping.payload(block.block_range())?;
-            stats.mapped_blocks += 1;
-            stats.mapped_payload_bytes += payload.len() as u64;
-            let decoded = decoder.decode(payload, block)?;
-            self.next += 1;
-            stats.decoded_blocks += 1;
-            return Ok(decoded);
-        }
         if self.pending.is_empty() {
             let mut end = self.next;
             let mut bytes = 0usize;
@@ -463,12 +356,6 @@ impl BlockSeriesStream {
 
 impl Drop for BlockSeriesStream {
     fn drop(&mut self) {
-        self.stats
-            .mapped_blocks
-            .fetch_add(self.local_stats.mapped_blocks, Ordering::Relaxed);
-        self.stats
-            .mapped_payload_bytes
-            .fetch_add(self.local_stats.mapped_payload_bytes, Ordering::Relaxed);
         self.stats
             .read_batches
             .fetch_add(self.local_stats.read_batches, Ordering::Relaxed);
@@ -626,7 +513,7 @@ struct ValidatedPartition {
 
 pub async fn load_metrics_block_index(file: &FileKey, labels: &[String]) -> Result<Arc<Index>> {
     Ok(Arc::clone(
-        &load_index_inner(file, labels, false, Arc::clone(&METADATA_WORKERS))
+        &load_index_inner(file, labels, Arc::clone(&METADATA_WORKERS))
             .await?
             .index,
     ))
@@ -692,12 +579,6 @@ pub(super) async fn prepare(
         .into_iter()
         .map(|file| file.expect("all metadata jobs completed"))
         .collect::<Vec<_>>();
-    let mapped_files = loaded.iter().filter(|file| file.mapping.is_some()).count();
-    let mapped_virtual_bytes = loaded
-        .iter()
-        .filter_map(|file| file.mapping.as_ref())
-        .map(|mapping| mapping.len())
-        .sum();
     let metadata_ms = metadata_started.elapsed().as_secs_f64() * 1000.0;
     let selection_started = Instant::now();
     let jobs = scan
@@ -766,10 +647,6 @@ pub(super) async fn prepare(
             .iter()
             .map(|partition| partition.selected_bytes)
             .sum(),
-        mapped_files,
-        mapped_virtual_bytes,
-        mapped_blocks: AtomicU64::new(0),
-        mapped_payload_bytes: AtomicU64::new(0),
         read_batches: AtomicU64::new(0),
         read_ranges: AtomicU64::new(0),
         read_bytes: AtomicU64::new(0),
@@ -832,180 +709,22 @@ fn label_value<'a>(index: &'a Index, row: usize, name: &str) -> Result<Option<&'
     index.label_value(row, name)
 }
 
-fn validate_projected_labels(index: &Index, labels: &[String]) -> Result<()> {
-    ensure!(
-        index.labels.num_rows() == index.blocks.len(),
-        "block label metadata length mismatch"
-    );
-    ensure!(
-        index.missing_labels(labels)?.is_empty(),
-        "block label projection incomplete"
-    );
-    Ok(())
-}
-
-#[cfg(all(unix, target_pointer_width = "64"))]
-fn checked_mapping_len(size: u64) -> Result<usize> {
-    ensure!(
-        size >= metrics_index::block::MIDX_TRAILER_LEN as u64,
-        "short block sidecar"
-    );
-    let size = usize::try_from(size)?;
-    ensure!(
-        size <= isize::MAX as usize,
-        "block mapping exceeds addressable slice size"
-    );
-    Ok(size)
-}
-
-#[cfg(all(unix, target_pointer_width = "64"))]
-#[cfg(test)]
-fn load_opened_local_index(
-    local: infra::storage::LocalFile,
-    cached: Option<Arc<CachedIndex>>,
-    parent: &ParentIdentity,
-    labels: &[String],
-) -> Result<(Arc<CachedIndex>, Option<Arc<MappedIndex>>)> {
-    load_opened_local_index_with(local, cached, parent, labels, map_local_index)
-}
-
-#[cfg(all(unix, target_pointer_width = "64"))]
-fn map_local_index(
-    file: &std::fs::File,
-    len: usize,
-    payload_end: u64,
-) -> std::io::Result<Arc<MappedIndex>> {
-    // SAFETY: native storage publishes immutable inodes atomically and only unlinks on retirement.
-    let data = unsafe { memmap2::MmapOptions::new().len(len).map(file)? };
-    Ok(Arc::new(MappedIndex { data, payload_end }))
-}
-
-#[cfg(all(unix, target_pointer_width = "64"))]
-fn load_opened_local_index_with(
-    local: infra::storage::LocalFile,
-    cached: Option<Arc<CachedIndex>>,
-    parent: &ParentIdentity,
-    labels: &[String],
-    map: impl FnOnce(&std::fs::File, usize, u64) -> std::io::Result<Arc<MappedIndex>>,
-) -> Result<(Arc<CachedIndex>, Option<Arc<MappedIndex>>)> {
-    use std::os::unix::fs::FileExt;
-
-    let metadata = local.file.metadata()?;
-    ensure!(metadata.is_file(), "block sidecar is not a regular file");
-    let size = metadata.len();
-    ensure!(size == local.meta.size, "opened block sidecar size changed");
-    let len = checked_mapping_len(size)?;
-    let mut footer_bytes = [0; metrics_index::block::MIDX_TRAILER_LEN];
-    local.file.read_exact_at(
-        &mut footer_bytes,
-        size - metrics_index::block::MIDX_TRAILER_LEN as u64,
-    )?;
-    let (binding, trailer) = SidecarBinding::parse(size, &footer_bytes)?;
-    if let Some(cached) = &cached {
-        ensure!(
-            cached.binding == binding,
-            "opened block sidecar differs from cached trailer/size"
-        );
-    }
-    let mapping = match map(&local.file, len, binding.payload_end) {
-        Ok(mapping) => {
-            ensure!(
-                mapping
-                    .data
-                    .get(len - metrics_index::block::MIDX_TRAILER_LEN..)
-                    == Some(binding.trailer.as_slice()),
-                "mapped block sidecar trailer changed"
-            );
-            Some(mapping)
-        }
-        Err(error) => {
-            log::debug!("MIDX read-only mapping unavailable, retaining range reader: {error}");
-            None
-        }
-    };
-    let complete = cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(labels))
-        .transpose()?
-        .is_some_and(|missing| missing.is_empty());
-    let cached = if complete {
-        cached.unwrap()
-    } else {
-        let header_bytes = read_local_range(
-            &local.file,
-            mapping.as_deref(),
-            trailer.header_start(size)..size,
-        )?;
-        let header = metrics_index::block::Header::parse(&header_bytes, size, &parent.metadata())?;
-        let requested = if let Some(existing) = &cached {
-            existing.index.missing_labels(labels)?
-        } else {
-            labels.to_vec()
-        };
-        let mut ranges = header.column_ranges(&requested)?;
-        if cached.is_some() {
-            ranges.remove(0);
-        }
-        let columns = ranges
-            .into_iter()
-            .map(|range| read_local_range(&local.file, mapping.as_deref(), range))
-            .collect::<Result<Vec<_>>>()?;
-        decode_cached_metadata(&header, &columns, &requested, cached, binding)?
-    };
-    Ok((cached, mapping))
-}
-
-#[cfg(all(unix, target_pointer_width = "64"))]
-fn read_local_range(
-    file: &std::fs::File,
-    mapping: Option<&MappedIndex>,
-    range: Range<u64>,
-) -> Result<Bytes> {
-    use std::os::unix::fs::FileExt;
-
-    if let Some(mapping) = mapping {
-        return Ok(Bytes::copy_from_slice(
-            mapping
-                .data
-                .get(usize::try_from(range.start)?..usize::try_from(range.end)?)
-                .context("MIDX column outside mapped file")?,
-        ));
-    }
-    let length = usize::try_from(range.end - range.start)?;
-    let mut bytes = Vec::new();
-    bytes.try_reserve_exact(length)?;
-    bytes.resize(length, 0);
-    file.read_exact_at(&mut bytes, range.start)?;
-    Ok(Bytes::from(bytes))
-}
-
 async fn load_index(file: &FileKey, labels: &[String]) -> Result<Arc<LoadedFile>> {
-    load_index_inner(file, labels, true, Arc::clone(&METADATA_WORKERS)).await
+    load_index_inner(file, labels, Arc::clone(&METADATA_WORKERS)).await
 }
 
 async fn load_index_inner(
     file: &FileKey,
     labels: &[String],
-    map_samples: bool,
     workers: Arc<Semaphore>,
 ) -> Result<Arc<LoadedFile>> {
     let limit = cache_limit();
-    load_index_cached(
-        file,
-        labels,
-        map_samples,
-        workers,
-        &INDEX_CACHE,
-        &FILE_LOADS,
-        limit,
-    )
-    .await
+    load_index_cached(file, labels, workers, &INDEX_CACHE, &FILE_LOADS, limit).await
 }
 
 async fn load_index_cached(
     file: &FileKey,
     labels: &[String],
-    map_samples: bool,
     workers: Arc<Semaphore>,
     cache: &Mutex<IndexCache>,
     flights: &Arc<loads::LoadRegistry>,
@@ -1044,7 +763,6 @@ async fn load_index_cached(
     MetadataLoad {
         file,
         labels,
-        map_samples,
         key,
         sidecar,
         limit,
@@ -1059,37 +777,21 @@ async fn load_index_cached(
 async fn load_entry(
     file: &FileKey,
     labels: &[String],
-    map_samples: bool,
     parent: &ParentIdentity,
     sidecar: &str,
     cached: Option<Arc<CachedIndex>>,
     permit: Arc<OwnedSemaphorePermit>,
-) -> Result<(Arc<CachedIndex>, Option<Arc<MappedIndex>>)> {
-    #[cfg(all(unix, target_pointer_width = "64"))]
-    if let Some(local) = infra::storage::try_open_local_file(&file.account, sidecar).await? {
-        let parent = parent.clone();
-        let labels = labels.to_vec();
-        return BlockingMetadata::run_shared(permit, move || {
-            load_opened_local_index_with(local, cached, &parent, &labels, |file, len, end| {
-                if map_samples {
-                    map_local_index(file, len, end)
-                } else {
-                    Err(std::io::Error::other("metadata-only read"))
-                }
-            })
-        })
-        .await;
-    }
+) -> Result<Arc<CachedIndex>> {
     if cached
         .as_ref()
         .map(|entry| entry.index.missing_labels(labels))
         .transpose()?
         .is_some_and(|missing| missing.is_empty())
     {
-        return Ok((cached.unwrap(), None));
+        return Ok(cached.unwrap());
     }
     let _permit = permit;
-    let entry = metrics_index::fetch_parsed_index(
+    Ok(metrics_index::fetch_parsed_index(
         &file.account,
         sidecar,
         parent.metadata(),
@@ -1097,29 +799,7 @@ async fn load_entry(
         labels,
         cached,
     )
-    .await?;
-    Ok((entry, None))
-}
-
-fn decode_cached_metadata(
-    header: &metrics_index::block::Header,
-    columns: &[Bytes],
-    labels: &[String],
-    cached: Option<Arc<CachedIndex>>,
-    binding: SidecarBinding,
-) -> Result<Arc<CachedIndex>> {
-    let index = if let Some(cached) = cached {
-        let additional =
-            metrics_index::block::decode_additional_labels(&cached.index, columns, labels)?;
-        cached.index.merge_columns(&additional)?
-    } else {
-        metrics_index::block::decode_index(header, columns, labels)?
-    };
-    validate_projected_labels(&index, labels)?;
-    Ok(Arc::new(CachedIndex {
-        index: Arc::new(index.for_cache()),
-        binding,
-    }))
+    .await?)
 }
 
 fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
@@ -1523,15 +1203,12 @@ mod tests {
         let first_file = key.clone();
         let first_workers = Arc::clone(&workers);
         let first =
-            tokio::spawn(
-                async move { load_index_inner(&first_file, &[], false, first_workers).await },
-            );
+            tokio::spawn(async move { load_index_inner(&first_file, &[], first_workers).await });
         fixture.entered.notified().await;
         let second_file = key.clone();
         let second_workers = Arc::clone(&workers);
-        let second = tokio::spawn(async move {
-            load_index_inner(&second_file, &[], false, second_workers).await
-        });
+        let second =
+            tokio::spawn(async move { load_index_inner(&second_file, &[], second_workers).await });
         tokio::task::yield_now().await;
         assert_eq!(fixture.active.load(Ordering::SeqCst), 1);
         assert_eq!(workers.available_permits(), 0);
@@ -1559,33 +1236,8 @@ mod tests {
                 .is_none()
         );
         workers.close();
-        assert!(load_index_inner(&key, &[], false, workers).await.is_err());
+        assert!(load_index_inner(&key, &[], workers).await.is_err());
         assert_eq!(fixture.active.load(Ordering::SeqCst), 0);
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn blocking_metadata_failure_releases_admission_and_keeps_runtime_responsive() {
-        let workers = Arc::new(Semaphore::new(1));
-        let runtime_thread = std::thread::current().id();
-        let result = BlockingMetadata::<()>::run(
-            Arc::clone(&workers).acquire_owned().await.unwrap(),
-            move || {
-                assert_ne!(std::thread::current().id(), runtime_thread);
-                panic!("injected metadata worker panic");
-            },
-        )
-        .await;
-        assert!(result.is_err());
-        assert_eq!(workers.available_permits(), 1);
-        assert_eq!(
-            BlockingMetadata::run(Arc::clone(&workers).acquire_owned().await.unwrap(), || Ok(
-                7
-            ))
-            .await
-            .unwrap(),
-            7
-        );
-        assert_eq!(workers.available_permits(), 1);
     }
 
     fn schema() -> Arc<Schema> {
@@ -1898,6 +1550,62 @@ mod tests {
             stats.decoded_blocks.load(Ordering::Relaxed),
             stats.selected_blocks as u64
         );
+    }
+
+    #[tokio::test]
+    async fn local_disk_sidecar_reads_selected_samples_without_mmap() {
+        let (mut file, bytes) = file(&[
+            (0, 10, 1.0, Some("x")),
+            (0, 20, 2.0, Some("x")),
+            (1, 10, 3.0, Some("y")),
+        ]);
+        let directory = tempfile::tempdir().unwrap();
+        let sidecar = config::meta::promql::index::metrics_index_path(&file.key).unwrap();
+        let path = directory.path().join(&sidecar);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, bytes).unwrap();
+        let id = config::ider::uuid();
+        infra::storage::add_account(
+            &id,
+            Box::new(
+                object_store::local::LocalFileSystem::new_with_prefix(directory.path()).unwrap(),
+            ),
+        )
+        .await;
+        file.account = format!("{id}:default");
+        let scan = MetricsBlockScan {
+            table_name: "m".into(),
+            files: vec![file],
+            unfiltered: false,
+        };
+        let prepared = prepare(&scan, columns(), &intervals(), 100, 20, &eval())
+            .await
+            .unwrap();
+        let mut result = Vec::new();
+        for partition in prepared {
+            let mut stream = BlockSeriesStream::new(partition);
+            while stream.advance().await.unwrap().is_some() {
+                let labels = stream.labels();
+                let mut samples = Vec::new();
+                stream.consume(&mut samples).await.unwrap();
+                result.push((
+                    labels,
+                    samples
+                        .iter()
+                        .map(|sample| (sample.timestamp, sample.value.to_bits()))
+                        .collect::<Vec<_>>(),
+                ));
+            }
+        }
+        result.sort_by(|left, right| left.1.cmp(&right.1));
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].0, vec![Arc::new(Label::new("group", "x"))]);
+        assert_eq!(
+            result[0].1,
+            vec![(110, 1.0f64.to_bits()), (120, 2.0f64.to_bits())]
+        );
+        assert_eq!(result[1].0, vec![Arc::new(Label::new("group", "y"))]);
+        assert_eq!(result[1].1, vec![(110, 3.0f64.to_bits())]);
     }
 
     #[tokio::test]
@@ -2477,619 +2185,6 @@ mod tests {
         assert_eq!(fixture.active.load(Ordering::SeqCst), 0);
     }
 
-    #[cfg(all(unix, target_pointer_width = "64"))]
-    mod mapped {
-        use std::{path::PathBuf, sync::Weak};
-
-        use super::*;
-
-        struct DropSignal(Option<tokio::sync::oneshot::Sender<()>>);
-
-        impl Drop for DropSignal {
-            fn drop(&mut self) {
-                if let Some(sender) = self.0.take() {
-                    let _ = sender.send(());
-                }
-            }
-        }
-
-        struct DiskFixture {
-            _directory: tempfile::TempDir,
-            path: PathBuf,
-            key: FileKey,
-            original: Vec<u8>,
-        }
-        impl DiskFixture {
-            fn new(data: &(FileKey, Vec<u8>)) -> Self {
-                let directory = tempfile::tempdir().unwrap();
-                let path = directory.path().join("immutable.midx");
-                std::fs::write(&path, &data.1).unwrap();
-                Self {
-                    _directory: directory,
-                    path,
-                    key: data.0.clone(),
-                    original: data.1.clone(),
-                }
-            }
-            fn parent(&self) -> ParentIdentity {
-                ParentIdentity {
-                    object_key: self.key.key.clone(),
-                    rows: self.key.meta.records as u64,
-                    compressed_size: self.key.meta.compressed_size as u64,
-                }
-            }
-            fn open(&self) -> infra::storage::LocalFile {
-                let file = std::fs::File::open(&self.path).unwrap();
-                let size = file.metadata().unwrap().len();
-                infra::storage::LocalFile {
-                    file,
-                    meta: ObjectMeta {
-                        location: config::meta::promql::index::metrics_index_path(&self.key.key)
-                            .unwrap()
-                            .into(),
-                        last_modified: chrono::Utc::now(),
-                        size,
-                        e_tag: None,
-                        version: None,
-                    },
-                }
-            }
-            fn binding(&self) -> SidecarBinding {
-                SidecarBinding::parse(
-                    self.original.len() as u64,
-                    &self.original[self.original.len() - metrics_index::block::MIDX_TRAILER_LEN..],
-                )
-                .unwrap()
-                .0
-            }
-            fn replace(&self, bytes: &[u8]) {
-                let staging = self.path.with_extension("new");
-                std::fs::write(&staging, bytes).unwrap();
-                std::fs::rename(staging, &self.path).unwrap();
-            }
-        }
-
-        #[tokio::test(flavor = "current_thread")]
-        async fn cancelled_blocking_native_metadata_keeps_its_permit_and_drops_results() {
-            let disk = DiskFixture::new(&file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]));
-            let local = disk.open();
-            let parent = disk.parent();
-            let cache_key = CacheKey {
-                account: config::ider::uuid(),
-                parent: parent.clone(),
-            };
-            let publish_key = cache_key.clone();
-            let workers = Arc::new(Semaphore::new(1));
-            let permit = Arc::clone(&workers).acquire_owned().await.unwrap();
-            let runtime_thread = std::thread::current().id();
-            let (started_tx, started_rx) = tokio::sync::oneshot::channel();
-            let (release_tx, release_rx) = std::sync::mpsc::channel();
-            let (mapping_tx, mapping_rx) = tokio::sync::oneshot::channel();
-            let (dropped_tx, dropped_rx) = tokio::sync::oneshot::channel();
-            let published = Arc::new(AtomicUsize::new(0));
-            let published_task = Arc::clone(&published);
-            let caller = tokio::spawn(async move {
-                let (entry, mapping, _dropped) = BlockingMetadata::run(permit, move || {
-                    assert_ne!(std::thread::current().id(), runtime_thread);
-                    let dropped = DropSignal(Some(dropped_tx));
-                    let _ = started_tx.send(());
-                    let _ = release_rx.recv();
-                    let (entry, mapping) =
-                        load_opened_local_index(local, None, &parent, &["group".into()])?;
-                    let _ = mapping_tx.send(Arc::downgrade(mapping.as_ref().unwrap()));
-                    Ok((entry, mapping, dropped))
-                })
-                .await?;
-                published_task.fetch_add(1, Ordering::SeqCst);
-                INDEX_CACHE
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .insert(publish_key, entry, 1024 * 1024)
-                    .unwrap();
-                drop(mapping);
-                Ok::<(), anyhow::Error>(())
-            });
-            started_rx.await.unwrap();
-            tokio::task::yield_now().await;
-            caller.abort();
-            assert!(caller.await.unwrap_err().is_cancelled());
-            assert_eq!(workers.available_permits(), 0);
-            assert!(Arc::clone(&workers).try_acquire_owned().is_err());
-            assert!(
-                INDEX_CACHE
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .get(&cache_key)
-                    .is_none()
-            );
-            release_tx.send(()).unwrap();
-            let mapping = mapping_rx.await.unwrap();
-            tokio::time::timeout(std::time::Duration::from_secs(5), dropped_rx)
-                .await
-                .unwrap()
-                .unwrap();
-            let released_permit = Arc::clone(&workers).acquire_owned().await.unwrap();
-            assert!(mapping.upgrade().is_none());
-            assert_eq!(published.load(Ordering::SeqCst), 0);
-            assert!(
-                INDEX_CACHE
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .get(&cache_key)
-                    .is_none()
-            );
-            drop(released_permit);
-            assert_eq!(workers.available_permits(), 1);
-        }
-
-        fn map_prepared(
-            prepared: &mut [PreparedPartition],
-            disks: &[DiskFixture],
-        ) -> Vec<Weak<MappedIndex>> {
-            let mut replacements: HashMap<String, Arc<LoadedFile>> = HashMap::new();
-            for partition in prepared.iter_mut() {
-                for cursor in &mut partition.files {
-                    let sidecar = cursor.file.sidecar.clone();
-                    if !replacements.contains_key(&sidecar) {
-                        let disk = disks
-                            .iter()
-                            .find(|disk| {
-                                config::meta::promql::index::metrics_index_path(&disk.key.key)
-                                    .as_ref()
-                                    == Some(&sidecar)
-                            })
-                            .unwrap();
-                        let cached = Arc::new(CachedIndex {
-                            index: Arc::clone(&cursor.file.index),
-                            binding: disk.binding(),
-                        });
-                        let labels = cursor
-                            .file
-                            .index
-                            .labels
-                            .schema()
-                            .fields()
-                            .iter()
-                            .map(|field| field.name().clone())
-                            .collect::<Vec<_>>();
-                        let (entry, mapping) = load_opened_local_index(
-                            disk.open(),
-                            Some(cached),
-                            &disk.parent(),
-                            &labels,
-                        )
-                        .unwrap();
-                        assert!(mapping.is_some());
-                        replacements.insert(
-                            sidecar.clone(),
-                            Arc::new(LoadedFile {
-                                account: cursor.file.account.clone(),
-                                sidecar: sidecar.clone(),
-                                index: Arc::clone(&entry.index),
-                                mapping,
-                            }),
-                        );
-                    }
-                    cursor.file = Arc::clone(&replacements[&sidecar]);
-                }
-            }
-            let old = &prepared[0].stats;
-            let stats = Arc::new(ReadStats {
-                trace_id: old.trace_id.clone(),
-                partitions: old.partitions,
-                selected_blocks: old.selected_blocks,
-                selected_bytes: old.selected_bytes,
-                mapped_files: replacements.len(),
-                mapped_virtual_bytes: replacements
-                    .values()
-                    .map(|file| file.mapping.as_ref().unwrap().len())
-                    .sum(),
-                mapped_blocks: AtomicU64::new(0),
-                mapped_payload_bytes: AtomicU64::new(0),
-                read_batches: AtomicU64::new(0),
-                read_ranges: AtomicU64::new(0),
-                read_bytes: AtomicU64::new(0),
-                decoded_blocks: AtomicU64::new(0),
-                completed_partitions: AtomicU64::new(0),
-            });
-            for partition in prepared {
-                partition.stats = Arc::clone(&stats);
-            }
-            replacements
-                .values()
-                .map(|file| Arc::downgrade(file.mapping.as_ref().unwrap()))
-                .collect()
-        }
-
-        #[tokio::test]
-        async fn mapped_streams_preserve_offset_labels_bits_and_drop_shared_maps() {
-            let nan = f64::from_bits(0x7ff8_0000_0000_0042);
-            let first = file(&[
-                (0, 0, 1.0, None),
-                (0, 10, nan, None),
-                (0, 20, -0.0, None),
-                (u64::MAX, 10, 3.0, Some("")),
-            ]);
-            let second = file(&[
-                (0, 30, 0.0, None),
-                (0, 40, 7.0, None),
-                (0, 50, 8.0, None),
-                (u64::MAX, 40, 9.0, Some("")),
-            ]);
-            let disks = [DiskFixture::new(&first), DiskFixture::new(&second)];
-            let fixture = Fixture::new(&[first.clone(), second.clone()], false).await;
-            let scan = fixture.scan([first.0, second.0]);
-            let mut outputs = Vec::new();
-            for mapped in [false, true] {
-                let mut prepared = prepare(&scan, columns(), &intervals(), 100, 20, &eval())
-                    .await
-                    .unwrap();
-                let maps = if mapped {
-                    map_prepared(&mut prepared, &disks)
-                } else {
-                    vec![]
-                };
-                let stats = Arc::clone(&prepared[0].stats);
-                let metadata_owner = Arc::clone(&prepared[0].files[0].file.index);
-                let prior_reads = fixture.calls.load(Ordering::SeqCst);
-                let mut output = Vec::new();
-                for (shard, partition) in prepared.into_iter().enumerate() {
-                    let mut stream = BlockSeriesStream::new(partition);
-                    let mut samples = Vec::new();
-                    while stream.advance().await.unwrap().is_some() {
-                        let labels = stream
-                            .labels()
-                            .iter()
-                            .map(|label| (label.name.clone(), label.value.clone()))
-                            .collect::<Vec<_>>();
-                        stream.consume(&mut samples).await.unwrap();
-                        output.push((
-                            shard,
-                            labels,
-                            samples
-                                .iter()
-                                .map(|sample| (sample.timestamp, sample.value.to_bits()))
-                                .collect::<Vec<_>>(),
-                        ));
-                    }
-                }
-                if mapped {
-                    assert_eq!(fixture.calls.load(Ordering::SeqCst), prior_reads);
-                    assert_eq!(stats.read_bytes.load(Ordering::Relaxed), 0);
-                    assert_eq!(
-                        stats.mapped_blocks.load(Ordering::Relaxed),
-                        stats.selected_blocks as u64
-                    );
-                    assert_eq!(
-                        stats.mapped_payload_bytes.load(Ordering::Relaxed),
-                        stats.selected_bytes
-                    );
-                    assert_eq!(stats.mapped_files, 2);
-                    assert!(maps.iter().all(|map| map.upgrade().is_none()));
-                    assert!(
-                        !metadata_owner.blocks.is_empty(),
-                        "metadata survives independently of query maps"
-                    );
-                }
-                outputs.push(output);
-            }
-            assert_eq!(outputs[0], outputs[1]);
-        }
-
-        #[test]
-        fn opened_mapping_survives_atomic_replacement_and_unlink() {
-            let data = file(&[(1, 10, -0.0, Some("alpha")), (1, 20, 5.0, Some("alpha"))]);
-            let disk = DiskFixture::new(&data);
-            let (entry, mapping) =
-                load_opened_local_index(disk.open(), None, &disk.parent(), &["group".into()])
-                    .unwrap();
-            let mapping = mapping.unwrap();
-            let weak = Arc::downgrade(&mapping);
-            let other = file(&[(1, 10, 99.0, Some("bravo"))]);
-            disk.replace(&other.1);
-            std::fs::remove_file(&disk.path).unwrap();
-            let block = &entry.index.blocks.block(0);
-            let decoded = metrics_index::block::decode_block(
-                mapping.payload(block.block_range()).unwrap(),
-                block,
-            )
-            .unwrap();
-            assert_eq!(
-                decoded.value_bits,
-                vec![(-0.0f64).to_bits(), 5.0f64.to_bits()]
-            );
-            drop(mapping);
-            assert!(weak.upgrade().is_none());
-            assert!(!entry.index.blocks.is_empty());
-        }
-
-        #[test]
-        fn changed_footer_and_invalid_files_reject_before_mapping() {
-            let data = file(&[(1, 10, 1.0, Some("alpha")), (1, 20, 2.0, Some("alpha"))]);
-            let disk = DiskFixture::new(&data);
-            let (entry, map) =
-                load_opened_local_index(disk.open(), None, &disk.parent(), &["group".into()])
-                    .unwrap();
-            drop(map);
-            let mut writer = BlockWriter::new(
-                Vec::new(),
-                schema(),
-                vec!["group".into()],
-                disk.parent().metadata(),
-                2,
-            )
-            .unwrap();
-            writer
-                .write(&batch(&[
-                    (1, 10, 1.0, Some("bravo-longer")),
-                    (1, 20, 2.0, Some("bravo-longer")),
-                ]))
-                .unwrap();
-            let replacement = writer.finish().unwrap();
-            assert_ne!(replacement.len(), disk.original.len());
-            disk.replace(&replacement);
-            let result = load_opened_local_index_with(
-                disk.open(),
-                Some(entry),
-                &disk.parent(),
-                &["group".into()],
-                |_, _, _| panic!("changed trailer must precede mmap"),
-            );
-            assert!(
-                result
-                    .err()
-                    .unwrap()
-                    .to_string()
-                    .contains("cached trailer/size")
-            );
-            disk.replace(b"short");
-            assert!(
-                load_opened_local_index(disk.open(), None, &disk.parent(), &["group".into()])
-                    .is_err()
-            );
-            let mut directory = disk.open();
-            directory.file = std::fs::File::open(disk.path.parent().unwrap()).unwrap();
-            assert!(
-                load_opened_local_index(directory, None, &disk.parent(), &[])
-                    .err()
-                    .unwrap()
-                    .to_string()
-                    .contains("regular file")
-            );
-            assert!(checked_mapping_len(0).is_err());
-            assert!(checked_mapping_len(isize::MAX as u64 + 1).is_err());
-            assert!(checked_mapping_len(u64::MAX).is_err());
-        }
-
-        #[tokio::test]
-        async fn map_admission_falls_back_but_metadata_corruption_drops_created_map() {
-            let data = file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]);
-            let disk = DiskFixture::new(&data);
-            let (entry, mapping) = load_opened_local_index_with(
-                disk.open(),
-                None,
-                &disk.parent(),
-                &["group".into()],
-                |_, _, _| Err(std::io::Error::other("injected mmap admission failure")),
-            )
-            .unwrap();
-            assert!(mapping.is_none());
-            assert_eq!(entry.index.blocks.len(), 1);
-            let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
-            let mut prepared = prepare(
-                &fixture.scan([data.0.clone()]),
-                columns(),
-                &intervals(),
-                100,
-                20,
-                &eval(),
-            )
-            .await
-            .unwrap();
-            for partition in &mut prepared {
-                for cursor in &mut partition.files {
-                    cursor.file = Arc::new(LoadedFile {
-                        account: cursor.file.account.clone(),
-                        sidecar: cursor.file.sidecar.clone(),
-                        index: Arc::clone(&entry.index),
-                        mapping: None,
-                    });
-                }
-            }
-            let mut stream = BlockSeriesStream::new(prepared.into_iter().next().unwrap());
-            assert!(stream.advance().await.unwrap().is_some());
-            let mut samples = Vec::new();
-            stream.consume(&mut samples).await.unwrap();
-            assert_eq!(
-                samples
-                    .iter()
-                    .map(|sample| (sample.timestamp, sample.value.to_bits()))
-                    .collect::<Vec<_>>(),
-                vec![(110, 1.0f64.to_bits()), (120, 2.0f64.to_bits())]
-            );
-            assert!(
-                fixture.calls.load(Ordering::SeqCst) > 0,
-                "mmap admission failure uses the actual range reader"
-            );
-            drop(stream);
-            let mut invalid = disk.original.clone();
-            invalid[disk.binding().payload_end as usize] ^= 1;
-            disk.replace(&invalid);
-            let weak: Mutex<Option<Weak<MappedIndex>>> = Mutex::new(None);
-            let result = load_opened_local_index_with(
-                disk.open(),
-                None,
-                &disk.parent(),
-                &["group".into()],
-                |file, len, end| {
-                    let mapping = map_local_index(file, len, end)?;
-                    *weak.lock().unwrap() = Some(Arc::downgrade(&mapping));
-                    Ok(mapping)
-                },
-            );
-            assert!(result.is_err());
-            assert!(weak.lock().unwrap().as_ref().unwrap().upgrade().is_none());
-        }
-
-        #[test]
-        fn mapped_bounds_and_corrupt_payload_keep_checked_decoder_errors() {
-            let data = file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]);
-            let disk = DiskFixture::new(&data);
-            let (entry, map) =
-                load_opened_local_index(disk.open(), None, &disk.parent(), &["group".into()])
-                    .unwrap();
-            let map = map.unwrap();
-            for range in [
-                0..0,
-                Range { start: 2, end: 1 },
-                0..u64::MAX,
-                map.payload_end..map.payload_end + 1,
-            ] {
-                assert!(map.payload(range).is_err());
-            }
-            assert!(map.payload(0..map.payload_end).is_ok());
-            drop(map);
-            let mut invalid = disk.original.clone();
-            invalid[entry.index.blocks.block(0).block_offset as usize] ^= 1;
-            disk.replace(&invalid);
-            let (cached, map) = load_opened_local_index(
-                disk.open(),
-                Some(entry),
-                &disk.parent(),
-                &["group".into()],
-            )
-            .unwrap();
-            let map = map.unwrap();
-            let block = &cached.index.blocks.block(0);
-            assert!(
-                metrics_index::block::decode_block(
-                    map.payload(block.block_range()).unwrap(),
-                    block
-                )
-                .is_err()
-            );
-        }
-
-        #[tokio::test]
-        async fn cancelling_active_current_thread_mapped_decode_drops_query_map() {
-            let rows = (0..4096)
-                .map(|timestamp| (1, timestamp, timestamp as f64, Some("x")))
-                .collect::<Vec<Row>>();
-            let data = file(&rows);
-            let disk = DiskFixture::new(&data);
-            let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
-            let eval = EvalContext::new(4095, 4095, 1, "mapped-cancel".into());
-            let mut prepared = prepare(
-                &fixture.scan([data.0]),
-                columns(),
-                &intervals(),
-                0,
-                4095,
-                &eval,
-            )
-            .await
-            .unwrap();
-            let maps = map_prepared(&mut prepared, &[disk]);
-            let stats = Arc::clone(&prepared[0].stats);
-            let mut stream = BlockSeriesStream::new(prepared.into_iter().next().unwrap());
-            let mut pending = Box::pin(stream.advance());
-            let waker = futures::task::noop_waker();
-            let mut context = std::task::Context::from_waker(&waker);
-            assert!(pending.as_mut().poll(&mut context).is_pending());
-            assert!(pending.as_mut().poll(&mut context).is_pending());
-            drop(pending);
-            assert!(stream.local_stats.mapped_blocks > 0);
-            assert!(stream.local_stats.mapped_blocks < stats.selected_blocks as u64);
-            drop(stream);
-            assert!(maps.iter().all(|map| map.upgrade().is_none()));
-            assert_eq!(stats.completed_partitions.load(Ordering::Relaxed), 0);
-            assert!(stats.mapped_blocks.load(Ordering::Relaxed) > 0);
-            assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
-        }
-
-        #[tokio::test]
-        async fn mapped_and_range_readers_preserve_all_range_functions() {
-            use std::time::Duration;
-
-            use crate::{functions, streaming_eval};
-
-            let data = file(&[
-                (0, 10, 0.0, Some("x")),
-                (0, 20, 2.0, Some("x")),
-                (0, 30, 1.0, Some("x")),
-                (0, 40, 4.0, Some("x")),
-                (u64::MAX, 10, 10.0, None),
-                (u64::MAX, 20, 13.0, None),
-                (u64::MAX, 30, 17.0, None),
-                (u64::MAX, 40, 20.0, None),
-            ]);
-            let disk = DiskFixture::new(&data);
-            let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
-            let scan = fixture.scan([data.0]);
-            let eval = EvalContext::new(30, 40, 5, "mapped-range-functions".into());
-            for name in [
-                "avg_over_time",
-                "changes",
-                "count_over_time",
-                "delta",
-                "deriv",
-                "idelta",
-                "increase",
-                "irate",
-                "last_over_time",
-                "max_over_time",
-                "min_over_time",
-                "rate",
-                "resets",
-                "stddev_over_time",
-                "stdvar_over_time",
-                "sum_over_time",
-            ] {
-                let mut outputs = Vec::new();
-                for mapped in [false, true] {
-                    let mut prepared = prepare(&scan, columns(), &intervals(), 0, 20, &eval)
-                        .await
-                        .unwrap();
-                    if mapped {
-                        map_prepared(&mut prepared, std::slice::from_ref(&disk));
-                    }
-                    let sources = prepared
-                        .into_iter()
-                        .map(|partition| async move {
-                            Ok::<_, DataFusionError>(BlockSeriesStream::new(partition))
-                        })
-                        .collect();
-                    let func: Arc<dyn functions::RangeFunc> =
-                        Arc::from(functions::fusable_range_func(name).unwrap());
-                    let range = Arc::new(streaming_eval::RangeExpr::new(
-                        func,
-                        Duration::from_micros(20),
-                        &eval,
-                    ));
-                    let (series, _) = streaming_eval::eval_range(sources, range).await.unwrap();
-                    let mut output = series
-                        .into_iter()
-                        .map(|row| {
-                            (
-                                row.labels
-                                    .iter()
-                                    .map(|label| (label.name.clone(), label.value.clone()))
-                                    .collect::<Vec<_>>(),
-                                row.samples
-                                    .iter()
-                                    .map(|sample| (sample.timestamp, sample.value.to_bits()))
-                                    .collect::<Vec<_>>(),
-                            )
-                        })
-                        .collect::<Vec<_>>();
-                    output.sort_unstable();
-                    outputs.push(output);
-                }
-                assert_eq!(outputs[0], outputs[1], "{name}");
-            }
-        }
-    }
-
     fn observed_cache() -> (IndexCache, prometheus::Registry) {
         let metrics = IndexBlocksCacheMetrics::default();
         let registry = prometheus::Registry::new();
@@ -3104,7 +2199,7 @@ mod tests {
             rows: 1,
             compressed_size: 123,
         };
-        let (binding, _) = SidecarBinding::parse(
+        let binding = SidecarBinding::parse(
             bytes.len() as u64,
             &bytes[bytes.len() - metrics_index::block::MIDX_TRAILER_LEN..],
         )
@@ -3304,8 +2399,7 @@ mod tests {
                 bytes.len() as u64,
                 &bytes[bytes.len() - metrics_index::block::MIDX_TRAILER_LEN..],
             )
-            .unwrap()
-            .0,
+            .unwrap(),
         });
         let mut cache = IndexCache::default();
         cache

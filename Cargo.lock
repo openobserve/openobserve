@@ -9428,7 +9428,6 @@ dependencies = [
  "infra",
  "itertools 0.14.0",
  "log",
- "memmap2 0.9.11",
  "metrics_index",
  "o2_enterprise",
  "object_store",

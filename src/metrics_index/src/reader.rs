@@ -238,7 +238,7 @@ pub async fn fetch_parsed_index(
         .bytes
         .get(tail.bytes.len() - crate::block::MIDX_TRAILER_LEN..)
         .ok_or_else(|| DataFusionError::Execution("short MIDX trailer".into()))?;
-    let (binding, _) = SidecarBinding::parse(size, trailer)
+    let binding = SidecarBinding::parse(size, trailer)
         .map_err(|error| DataFusionError::External(error.into()))?;
     if let Some(existing) = &cached
         && existing.binding != binding

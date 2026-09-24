@@ -50,18 +50,15 @@ pub struct CacheKey {
 pub struct SidecarBinding {
     pub size: u64,
     pub trailer: [u8; block::MIDX_TRAILER_LEN],
-    pub payload_end: u64,
 }
 
 impl SidecarBinding {
-    pub fn parse(size: u64, bytes: &[u8]) -> Result<(Self, block::MidxTrailer)> {
-        let trailer = block::MidxTrailer::read(bytes, size)?;
-        let binding = Self {
+    pub fn parse(size: u64, bytes: &[u8]) -> Result<Self> {
+        block::MidxTrailer::read(bytes, size)?;
+        Ok(Self {
             size,
             trailer: bytes.try_into()?,
-            payload_end: trailer.blocks_end(size),
-        };
-        Ok((binding, trailer))
+        })
     }
 }
 

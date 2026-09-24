@@ -48,7 +48,6 @@ impl SharedCacheFixture {
             load_index_cached(
                 &self.file,
                 &names.iter().map(|name| (*name).into()).collect::<Vec<_>>(),
-                false,
                 Arc::clone(&self.workers),
                 &self.cache,
                 &self.flights,
@@ -361,7 +360,6 @@ async fn aggregate_growth_evicts_an_entire_other_file_and_reconciles_bytes() {
     let other_view = load_index_cached(
         &other.file,
         &["group".into()],
-        false,
         Arc::clone(&fixture.workers),
         &fixture.cache,
         &fixture.flights,

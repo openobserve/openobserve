@@ -59,12 +59,6 @@ pub enum StorageTier {
     InfrequentAccess,
 }
 
-#[derive(Debug)]
-pub struct LocalFile {
-    pub file: std::fs::File,
-    pub meta: ObjectMeta,
-}
-
 // Create a wrapper trait that extends ObjectStore
 #[async_trait]
 pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
@@ -89,15 +83,6 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
         location: &Path,
         opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>>;
-    /// Optional positive capability; unknown/custom backends must not be probed.
-    async fn try_open_local_file(
-        &self,
-        _account: &str,
-        _location: &Path,
-    ) -> Result<Option<LocalFile>> {
-        Ok(None)
-    }
-
     async fn get(&self, account: &str, location: &Path) -> Result<GetResult>;
     async fn get_opts(
         &self,
@@ -173,12 +158,6 @@ pub fn get_account(org_id: &str, file: &str) -> Option<String> {
 pub async fn add_account(org_id: &str, acc: Box<dyn ObjectStore>) {
     let key = get_org_storage_key(org_id);
     MULTI_ACCOUNTS.add_account(key, acc).await;
-}
-
-pub async fn try_open_local_file(account: &str, file: &str) -> Result<Option<LocalFile>> {
-    MULTI_ACCOUNTS
-        .try_open_local_file(account, &file.into())
-        .await
 }
 
 pub async fn get(account: &str, file: &str) -> Result<GetResult> {
