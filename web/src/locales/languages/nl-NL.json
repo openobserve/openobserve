@@ -7954,7 +7954,18 @@
     "enabled": "Ingeschakeld",
     "paused": "Gepauzeerd",
     "impactTemplate": "Gebruikt door {destinations} · {alerts}",
-    "impactDestination": "Gebruikt door {alerts}"
+    "impactDestination": "Gebruikt door {consumers}",
+    "impactUnused": "Niet gebruikt",
+    "noConsumers": "Geen afnemers.",
+    "countCompositeAlert": "{count} samengesteld alarm | {count} samengestelde alarmen",
+    "countPipeline": "{count} pijpleiding | {count} pijpleidingen",
+    "countSyntheticCheck": "{count} synthetische check | {count} synthetische checks",
+    "countOncallPolicy": "{count} escalatiebeleid | {count} escalatiebeleidsregels",
+    "countOncallTeamChannel": "{count} teamkanaal | {count} teamkanalen",
+    "countWorkflow": "{count} workflow | {count} workflows",
+    "countAnomalyDetection": "{count} anomaliedetector | {count} anomaliedetectoren",
+    "countIncidentIntegration": "{count} incidentintegratie | {count} incidentintegraties",
+    "sectionOtherConsumers": "Ook gebruikt door"
   },
   "alert_library": {
     "header": "Meldingenbibliotheek",

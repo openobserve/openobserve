@@ -7954,7 +7954,18 @@
     "enabled": "Ativado",
     "paused": "Pausado",
     "impactTemplate": "Usado por {destinations} · {alerts}",
-    "impactDestination": "Usado por {alerts}"
+    "impactDestination": "Usado por {consumers}",
+    "impactUnused": "Não usado",
+    "noConsumers": "Nenhum consumidor.",
+    "countCompositeAlert": "{count} alerta composto | {count} alertas compostos",
+    "countPipeline": "{count} oleoduto | {count} oleodutos",
+    "countSyntheticCheck": "{count} verificação sintética | {count} verificações sintéticas",
+    "countOncallPolicy": "{count} política de escalonamento | {count} políticas de escalonamento",
+    "countOncallTeamChannel": "{count} canal de equipe | {count} canais de equipe",
+    "countWorkflow": "{count} fluxo de trabalho | {count} fluxos de trabalho",
+    "countAnomalyDetection": "{count} detector de anomalias | {count} detectores de anomalias",
+    "countIncidentIntegration": "{count} integração de incidentes | {count} integrações de incidentes",
+    "sectionOtherConsumers": "Também usado por"
   },
   "alert_library": {
     "header": "Biblioteca de Alertas",
