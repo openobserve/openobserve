@@ -7635,7 +7635,7 @@
       "usernameRequired": "Требуется имя пользователя",
       "passwordRequired": "Требуется пароль",
       "emailRecipients": "Адреса электронной почты получателей",
-      "emailRecipientsHelp": "Выберите пользователей или сервисные учетные записи организации, которые должны получать письма с оповещениями",
+      "emailRecipientsHelp": "Выберите пользователей организации или сервисные аккаунты, которые должны получать письма с оповещениями",
       "emailRecipientsGroupUsers": "Пользователи",
       "emailRecipientsGroupServiceAccounts": "Сервисные учетные записи",
       "invalidEmailAddresses": "Недопустимые адреса электронной почты: {emails}",
@@ -7954,7 +7954,18 @@
     "enabled": "Включено",
     "paused": "Приостановлено",
     "impactTemplate": "Используется {destinations} · {alerts}",
-    "impactDestination": "Используется {consumers}"
+    "impactDestination": "Используется в {consumers}",
+    "impactUnused": "Не используется",
+    "noConsumers": "Нет потребителей.",
+    "countCompositeAlert": "{count} составное оповещение | {count} составных оповещений",
+    "countPipeline": "{count} конвейер | {count} конвейеров",
+    "countSyntheticCheck": "{count} синтетическая проверка | {count} синтетических проверок",
+    "countOncallPolicy": "{count} политика эскалации | {count} политик эскалации",
+    "countOncallTeamChannel": "{count} канал команды | {count} каналов команды",
+    "countWorkflow": "{count} рабочий процесс | {count} рабочих процессов",
+    "countAnomalyDetection": "{count} детектор аномалий | {count} детекторов аномалий",
+    "countIncidentIntegration": "{count} интеграция с инцидентами | {count} интеграций с инцидентами",
+    "sectionOtherConsumers": "Также используется в"
   },
   "alert_library": {
     "header": "Библиотека оповещений",

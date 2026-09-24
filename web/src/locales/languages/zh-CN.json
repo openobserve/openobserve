@@ -7635,7 +7635,7 @@
       "usernameRequired": "用户名是必填项",
       "passwordRequired": "密码是必填项",
       "emailRecipients": "收件人电子邮件地址",
-      "emailRecipientsHelp": "选择接收告警邮件的组织用户或服务账号",
+      "emailRecipientsHelp": "选择应接收告警电子邮件的组织用户或服务账号",
       "emailRecipientsGroupUsers": "用户",
       "emailRecipientsGroupServiceAccounts": "服务账号",
       "invalidEmailAddresses": "无效的电子邮件地址：{emails}",
@@ -7954,7 +7954,18 @@
     "enabled": "已启用",
     "paused": "已暂停",
     "impactTemplate": "被 {destinations} · {alerts} 使用",
-    "impactDestination": "被 {consumers} 使用"
+    "impactDestination": "被 {consumers} 使用",
+    "impactUnused": "未使用",
+    "noConsumers": "无使用方。",
+    "countCompositeAlert": "{count} 个复合告警 | {count} 个复合告警",
+    "countPipeline": "{count} 条流水线 | {count} 条流水线",
+    "countSyntheticCheck": "{count} 个合成检查 | {count} 个合成检查",
+    "countOncallPolicy": "{count} 个升级策略 | {count} 个升级策略",
+    "countOncallTeamChannel": "{count} 个团队频道 | {count} 个团队频道",
+    "countWorkflow": "{count} 个工作流 | {count} 个工作流",
+    "countAnomalyDetection": "{count} 个异常检测器 | {count} 个异常检测器",
+    "countIncidentIntegration": "{count} 个事件集成 | {count} 个事件集成",
+    "sectionOtherConsumers": "还被以下使用"
   },
   "alert_library": {
     "header": "告警库",

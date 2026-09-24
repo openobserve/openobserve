@@ -7635,7 +7635,7 @@
       "usernameRequired": "Il nome utente è obbligatorio",
       "passwordRequired": "La password è obbligatoria",
       "emailRecipients": "Indirizzi email dei destinatari",
-      "emailRecipientsHelp": "Seleziona gli utenti o gli account di servizio dell'organizzazione che devono ricevere le e-mail di avviso",
+      "emailRecipientsHelp": "Seleziona gli utenti dell'organizzazione o gli account di servizio che devono ricevere le email di avviso",
       "emailRecipientsGroupUsers": "Utenti",
       "emailRecipientsGroupServiceAccounts": "Account di servizio",
       "invalidEmailAddresses": "Indirizzi email non validi: {emails}",
@@ -7954,7 +7954,18 @@
     "enabled": "Abilitato",
     "paused": "In pausa",
     "impactTemplate": "Usato da {destinations} · {alerts}",
-    "impactDestination": "Usato da {consumers}"
+    "impactDestination": "Utilizzato da {consumers}",
+    "impactUnused": "Non utilizzato",
+    "noConsumers": "Nessun consumatore.",
+    "countCompositeAlert": "{count} avviso composito | {count} avvisi compositi",
+    "countPipeline": "{count} pipeline | {count} pipeline",
+    "countSyntheticCheck": "{count} controllo sintetico | {count} controlli sintetici",
+    "countOncallPolicy": "{count} policy di escalation | {count} policy di escalation",
+    "countOncallTeamChannel": "{count} canale del team | {count} canali del team",
+    "countWorkflow": "{count} workflow | {count} workflow",
+    "countAnomalyDetection": "{count} rilevatore di anomalie | {count} rilevatori di anomalie",
+    "countIncidentIntegration": "{count} integrazione di incidenti | {count} integrazioni di incidenti",
+    "sectionOtherConsumers": "Utilizzato anche da"
   },
   "alert_library": {
     "header": "Libreria di avvisi",
