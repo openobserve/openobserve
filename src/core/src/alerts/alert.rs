@@ -90,6 +90,11 @@ use crate::{
     short_url,
 };
 
+/// Ceiling for `keep_firing_for`, in seconds. A day is far past any real
+/// flap-damping window, and short enough that a milliseconds-for-seconds typo
+/// is refused rather than stored.
+pub const KEEP_FIRING_FOR_MAX_SECS: i64 = 24 * 60 * 60;
+
 /// Errors that can occur when interacting with alerts.
 #[derive(Debug, thiserror::Error)]
 pub enum AlertError {
@@ -297,6 +302,8 @@ pub enum AlertError {
     PendingPeriodOnRealtimeAlert,
     #[error("Alert pending period must be >= 0")]
     NegativePendingPeriod,
+    #[error("Alert keep_firing_for must be between 0 and {KEEP_FIRING_FOR_MAX_SECS} seconds")]
+    KeepFiringForOutOfRange,
     #[error("Error in multi alert grouping: {0}")]
     MultiAlertGroupingError(String),
 }
@@ -678,6 +685,13 @@ async fn prepare_alert(
 
     if alert.pending_period_sec < 0 {
         return Err(AlertError::NegativePendingPeriod);
+    }
+
+    // Seconds, and the units are the whole reason for the ceiling: 300000 typed
+    // for "5 minutes in milliseconds" is three and a half days of an alert that
+    // cannot recover, cannot close its on-call record, and so cannot page again.
+    if !(0..=KEEP_FIRING_FOR_MAX_SECS).contains(&alert.keep_firing_for) {
+        return Err(AlertError::KeepFiringForOutOfRange);
     }
 
     // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
@@ -4446,6 +4460,28 @@ mod send_path_tests {
 
 #[cfg(test)]
 mod tests {
+
+    /// The ceiling exists for a units mistake, not a policy one.
+    ///
+    /// `keep_firing_for` is seconds. Typing 300000 for "5 minutes in
+    /// milliseconds" is three and a half days during which the alert cannot
+    /// recover, its on-call record cannot close, and so it cannot page again.
+    #[test]
+    fn keep_firing_for_is_capped_at_a_day() {
+        assert_eq!(KEEP_FIRING_FOR_MAX_SECS, 86_400);
+        for ok in [0, 1, 300, KEEP_FIRING_FOR_MAX_SECS] {
+            assert!(
+                (0..=KEEP_FIRING_FOR_MAX_SECS).contains(&ok),
+                "{ok} is a real hold"
+            );
+        }
+        for rejected in [-1, KEEP_FIRING_FOR_MAX_SECS + 1, 300_000] {
+            assert!(
+                !(0..=KEEP_FIRING_FOR_MAX_SECS).contains(&rejected),
+                "{rejected} must be refused at save rather than stored"
+            );
+        }
+    }
     use arrow_schema::DataType;
     use serde_json::json;
 

@@ -109,6 +109,7 @@ export const makeKeepFiringForSchema = (t: Translator) =>
     .number({ message: t("alerts.alertSettings.keepFiringForInvalid") })
     .int({ message: t("alerts.alertSettings.keepFiringForInvalid") })
     .min(0, { message: t("alerts.alertSettings.keepFiringForInvalid") })
+    .max(86400, { message: t("alerts.alertSettings.keepFiringForInvalid") })
     .optional();
 
 /**
