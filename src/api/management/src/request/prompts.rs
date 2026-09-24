@@ -111,6 +111,18 @@ async fn can_manage_prompt_settings(org_id: &str, _user_id: &str) -> bool {
     }
 }
 
+async fn require_prompt_write(org_id: &str, user_id: &str) -> Result<(), Response> {
+    if can_manage_prompt_settings(org_id, user_id).await {
+        Ok(())
+    } else {
+        Err(machine_error(
+            StatusCode::FORBIDDEN,
+            "unauthorized_access",
+            "Unauthorized Access",
+        ))
+    }
+}
+
 fn validate_protected_labels(labels: BTreeSet<String>) -> Result<BTreeSet<String>, PromptError> {
     labels
         .into_iter()
@@ -235,6 +247,9 @@ pub async fn create_prompt(
     headers: HeaderMap,
     Json(body): Json<CreatePromptRequestBody>,
 ) -> Response {
+    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
+        return response;
+    }
     let idempotency_key = match idempotency_key(&headers) {
         Ok(key) => key,
         Err(response) => return response,
@@ -487,6 +502,9 @@ pub async fn update_prompt(
     Headers(user): Headers<UserEmail>,
     Json(body): Json<UpdatePromptRequestBody>,
 ) -> Response {
+    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
+        return response;
+    }
     match prompts::update_head(
         &org_id,
         &entity_id,
@@ -509,6 +527,9 @@ pub async fn archive_prompt(
     Path((org_id, entity_id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
+    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
+        return response;
+    }
     match prompts::archive(&org_id, &entity_id, &context(&user, PromptSource::Ui)).await {
         Ok(prompt) => Json(PromptResponseBody::from(prompt)).into_response(),
         Err(error) => prompt_error_response(error),
@@ -543,6 +564,9 @@ pub async fn create_prompt_version(
     headers: HeaderMap,
     Json(body): Json<CreatePromptVersionRequestBody>,
 ) -> Response {
+    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
+        return response;
+    }
     let idempotency_key = match idempotency_key(&headers) {
         Ok(key) => key,
         Err(response) => return response,
@@ -609,6 +633,9 @@ pub async fn move_prompt_label(
     Headers(user): Headers<UserEmail>,
     Json(body): Json<MovePromptLabelRequestBody>,
 ) -> Response {
+    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
+        return response;
+    }
     let can_move_protected = match can_move_protected_label(&org_id, &user.user_id, &label).await {
         Ok(allowed) => allowed,
         Err(response) => return response,
@@ -638,6 +665,9 @@ pub async fn delete_prompt_label(
     Query(query): Query<DeletePromptLabelQuery>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
+    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
+        return response;
+    }
     let can_move_protected = match can_move_protected_label(&org_id, &user.user_id, &label).await {
         Ok(allowed) => allowed,
         Err(response) => return response,

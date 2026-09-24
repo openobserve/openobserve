@@ -162,6 +162,7 @@ pub(crate) fn enforce_new_reference(
     }
 }
 
+/// Watches coordinator events until the invalidation channel closes.
 pub async fn watch_invalidation() -> Result<(), anyhow::Error> {
     let coordinator = infra::coordinator::get_coordinator().await;
     let mut events = coordinator

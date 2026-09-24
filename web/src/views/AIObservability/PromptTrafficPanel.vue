@@ -20,39 +20,30 @@
         class="w-28"
         data-test="prompt-traffic-window"
       />
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
-        :loading="loading"
-        @click="refresh"
-      />
+      <ORefreshButton :loading="loading" data-test="prompt-traffic-refresh" @click="refresh" />
     </div>
 
-    <div
+    <OEmptyState
       v-if="error"
-      class="rounded-default bg-error-subtle text-status-error-text px-3 py-2 text-xs"
-    >
-      {{ error }}
-    </div>
-    <div
-      v-if="!streamName"
-      class="text-text-secondary rounded-default border-border-default border border-dashed p-6 text-center text-xs"
-    >
-      {{ t("aiObservability.promptManagement.selectTraceStream") }}
-    </div>
+      preset="load-error"
+      size="block"
+      :description="raw(error)"
+      @action="refresh"
+    />
+    <OEmptyState
+      v-else-if="!streamName"
+      size="block"
+      :title="t('aiObservability.promptManagement.selectTraceStream')"
+    />
 
     <template v-else>
-      <section class="grid grid-cols-5 gap-2 max-lg:grid-cols-3 max-md:grid-cols-2">
-        <div
-          v-for="card in cards"
-          :key="card.label"
-          class="rounded-default border-border-default bg-surface-base border p-3"
-        >
-          <div class="text-text-secondary text-2xs font-semibold">{{ card.label }}</div>
-          <div class="text-text-heading mt-1 text-xl font-bold tabular-nums">{{ card.value }}</div>
-        </div>
-      </section>
+      <OSkeleton v-if="loading" class="h-20" />
+      <ODescriptionList v-else-if="!isDesktop" dense data-test="prompt-traffic-stats">
+        <ODescriptionItem v-for="card in cards" :key="card.key" :label="card.label">{{
+          card.value
+        }}</ODescriptionItem>
+      </ODescriptionList>
+      <OStatStrip v-else :items="cards" compact data-test="prompt-traffic-stats" />
 
       <section>
         <h4 class="text-text-heading mb-2 text-sm font-semibold">
@@ -61,9 +52,11 @@
         <OTable
           :data="breakdown"
           :columns="breakdownColumns"
-          row-key="label"
+          :row-key="(row) => JSON.stringify([row.label, row.model])"
           :show-global-filter="false"
-          :show-footer="false"
+          pagination="none"
+          :fill-height="false"
+          :default-columns="false"
           :loading="loading"
           data-test="prompt-traffic-breakdown"
         />
@@ -129,7 +122,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
+import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -152,6 +151,7 @@ const props = defineProps<{
 
 const store = useStore();
 const { t } = useI18nTyped();
+const { isDesktop } = useBreakpoint();
 const { getStreams } = useStreams(t);
 const streamName = ref("");
 const window = ref<PromptAnalyticsWindow>("24h");
@@ -172,20 +172,28 @@ const windowOptions = [
   { label: raw("30d"), value: "30d" },
 ];
 const cards = computed(() => [
-  { label: t("aiObservability.promptManagement.calls"), value: kpis.value.calls.toLocaleString() },
   {
+    key: "calls",
+    label: t("aiObservability.promptManagement.calls"),
+    value: kpis.value.calls.toLocaleString(),
+  },
+  {
+    key: "errorRate",
     label: t("aiObservability.promptManagement.errorRate"),
     value: kpis.value.errorRate == null ? "—" : `${kpis.value.errorRate.toFixed(1)}%`,
   },
   {
+    key: "p50Latency",
     label: t("aiObservability.promptManagement.p50Latency"),
     value: kpis.value.p50LatencyMs == null ? "—" : `${kpis.value.p50LatencyMs.toFixed(0)} ms`,
   },
   {
+    key: "p95Latency",
     label: t("aiObservability.promptManagement.p95Latency"),
     value: kpis.value.p95LatencyMs == null ? "—" : `${kpis.value.p95LatencyMs.toFixed(0)} ms`,
   },
   {
+    key: "cost",
     label: t("aiObservability.promptManagement.cost"),
     value: kpis.value.cost == null ? "—" : `$${kpis.value.cost.toFixed(4)}`,
   },
@@ -257,6 +265,7 @@ const recentColumns: OTableColumnDef[] = [
 ];
 
 async function refresh() {
+  await getStreams("traces", false, false, true).catch(() => null);
   await Promise.all([loadTraffic(), loadExperimentEvidence(props.orgId)]);
 }
 

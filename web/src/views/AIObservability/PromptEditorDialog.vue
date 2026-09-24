@@ -9,22 +9,28 @@
         : t('aiObservability.promptManagement.newPrompt')
     "
     :primary-button-label="
-      prompt
-        ? t('aiObservability.promptManagement.saveVersion')
-        : t('aiObservability.promptManagement.createPrompt')
+      duplicateConfirmed
+        ? prompt
+          ? t('aiObservability.promptManagement.saveDuplicate')
+          : t('aiObservability.promptManagement.createDuplicate')
+        : prompt
+          ? t('aiObservability.promptManagement.saveVersion')
+          : t('aiObservability.promptManagement.createPrompt')
     "
     :secondary-button-label="t('aiObservability.promptManagement.cancel')"
-    :primary-button-loading="saving"
-    :primary-button-disabled="!canSave"
+    form-id="prompt-editor-form"
     data-test="prompt-editor-dialog"
-    @update:open="emit('update:open', $event)"
-    @click:secondary="emit('update:open', false)"
-    @click:primary="save"
+    @update:open="requestClose"
+    @click:secondary="requestClose(false)"
   >
-    <div class="flex max-h-[72vh] flex-col gap-4 overflow-auto p-0.5">
+    <OForm
+      id="prompt-editor-form"
+      :form="form"
+      class="flex max-h-[72vh] flex-col gap-4 overflow-auto p-0.5"
+    >
       <div
         v-if="prompt && baseVersion"
-        class="rounded-default bg-info-subtle text-text-body px-3 py-2 text-xs"
+        class="rounded-default bg-status-info-bg text-text-body px-3 py-2 text-xs"
       >
         {{
           t("aiObservability.promptManagement.editingVersion", {
@@ -35,16 +41,17 @@
       </div>
 
       <div class="grid grid-cols-2 gap-3 max-md:grid-cols-1">
-        <OInput
-          v-model="name"
+        <OFormInput
+          name="name"
           :label="t('aiObservability.promptManagement.name')"
-          :placeholder="raw('support-answer')"
+          :placeholder="t('aiObservability.promptManagement.namePlaceholder')"
+          :help-text="t('aiObservability.promptManagement.nameHelp')"
           :disabled="Boolean(prompt)"
           required
           data-test="prompt-editor-name"
         />
-        <OSelect
-          v-model="type"
+        <OFormSelect
+          name="type"
           :label="t('aiObservability.promptManagement.type')"
           :options="typeOptions"
           label-key="label"
@@ -54,17 +61,18 @@
         />
       </div>
 
-      <OTextarea
+      <OFormTextarea
         v-if="!prompt"
-        v-model="description"
+        name="description"
         :label="t('aiObservability.promptManagement.description')"
         :rows="2"
       />
-      <OInput
+      <OFormInput
         v-if="!prompt"
-        v-model="tagsText"
+        name="tagsText"
         :label="t('aiObservability.promptManagement.tags')"
-        :placeholder="raw('support, production')"
+        :placeholder="t('aiObservability.promptManagement.tagsPlaceholder')"
+        :help-text="t('aiObservability.promptManagement.tagsHelp')"
       />
 
       <section class="flex flex-col gap-2">
@@ -76,11 +84,12 @@
             {{ t("aiObservability.promptManagement.variableHint") }}
           </span>
         </div>
-        <OTextarea
+        <OFormTextarea
           v-if="type === 'text'"
-          v-model="textPayload"
+          name="textPayload"
+          :aria-label="t('aiObservability.promptManagement.promptBody')"
           :rows="10"
-          :placeholder="raw('Write the prompt…')"
+          :placeholder="t('aiObservability.promptManagement.bodyPlaceholder')"
           data-test="prompt-editor-text"
         />
         <PlaygroundMessageList
@@ -105,15 +114,25 @@
             >{{ variable }}</OTag
           >
         </div>
+        <p
+          v-if="type === 'chat' && submitted && !hasBody"
+          role="alert"
+          class="text-status-error-text text-xs"
+        >
+          {{ t("aiObservability.promptManagement.bodyRequired") }}
+        </p>
       </section>
 
       <section class="rounded-default border-border-default flex flex-col gap-3 border p-3">
         <h4 class="text-text-heading m-0 text-sm font-semibold">
           {{ t("aiObservability.promptManagement.configuration") }}
         </h4>
-        <OSelect
+        <p class="text-text-secondary text-xs">
+          {{ t("aiObservability.promptManagement.optionalConfiguration") }}
+        </p>
+        <OFormSelect
           v-if="enterpriseMode"
-          v-model="model"
+          name="model"
           :label="t('aiObservability.promptManagement.model')"
           :options="modelOptions"
           label-key="label"
@@ -122,11 +141,11 @@
           clearable
           data-test="prompt-editor-model"
         />
-        <OInput
+        <OFormInput
           v-else
-          v-model="model"
+          name="model"
           :label="t('aiObservability.promptManagement.model')"
-          :placeholder="raw('gpt-4o-mini')"
+          :placeholder="t('aiObservability.promptManagement.modelPlaceholder')"
           data-test="prompt-editor-model"
         />
         <span v-if="capableProviders.length" class="text-text-secondary text-2xs">
@@ -137,26 +156,26 @@
           }}
         </span>
         <div class="grid grid-cols-3 gap-3 max-md:grid-cols-1">
-          <OTextarea
-            v-model="paramsText"
+          <OFormTextarea
+            name="paramsText"
             :label="t('aiObservability.promptManagement.parametersJson')"
             :rows="4"
           />
-          <OTextarea
-            v-model="toolsText"
+          <OFormTextarea
+            name="toolsText"
             :label="t('aiObservability.promptManagement.toolsJson')"
             :rows="4"
           />
-          <OTextarea
-            v-model="responseFormatText"
+          <OFormTextarea
+            name="responseFormatText"
             :label="t('aiObservability.promptManagement.responseFormatJson')"
             :rows="4"
           />
         </div>
       </section>
 
-      <OTextarea
-        v-model="commitMessage"
+      <OFormTextarea
+        name="commitMessage"
         :label="t('aiObservability.promptManagement.commitMessage')"
         :placeholder="t('aiObservability.promptManagement.explainChanges')"
         :rows="2"
@@ -164,7 +183,11 @@
         data-test="prompt-editor-commit-message"
       />
 
-      <div v-if="matches.length" class="rounded-default border-border-default border p-3 text-xs">
+      <div
+        v-if="duplicateConfirmed"
+        role="status"
+        class="rounded-default border-border-default border p-3 text-xs"
+      >
         <div class="text-text-heading mb-1 font-semibold">
           {{ t("aiObservability.promptManagement.sameContentExists") }}
         </div>
@@ -182,24 +205,40 @@
         <OButton
           variant="outline"
           size="sm"
-          :disabled="!hasBody"
+          :disabled="!hasBody || !validConfiguration"
           @click="emit('test', handoffVersion, name)"
         >
           {{ t("aiObservability.promptManagement.testInPlayground") }}
         </OButton>
       </div>
-    </div>
+    </OForm>
   </ODialog>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { providersQuery } from "@/services/online-evals.service.queries";
+import {
+  createPromptMutation,
+  createPromptVersionMutation,
+} from "@/services/llm-prompts.service.queries";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import {
+  makePromptEditorSchema,
+  promptEditorDefaults,
+  isPromptJson,
+  type PromptEditorForm,
+} from "./PromptEditor.schema";
+import { promptErrorText } from "./promptUx";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -209,16 +248,16 @@ import type {
   PlaygroundRole,
   PlaygroundVariant,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
-import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
+
 import llmPromptsService, {
   type Prompt,
   type PromptConfig,
   type PromptMatch,
-  type PromptType,
   type PromptVersion,
 } from "@/services/llm-prompts.service";
 
 const { t } = useI18nTyped();
+const { confirm } = useConfirmDialog();
 const props = withDefaults(
   defineProps<{
     open: boolean;
@@ -229,6 +268,9 @@ const props = withDefaults(
   }>(),
   { prompt: null, baseVersion: null },
 );
+
+const createPrompt = useMutation(() => createPromptMutation(props.orgId));
+const createVersion = useMutation(() => createPromptVersionMutation(props.orgId));
 
 const emit = defineEmits<{
   "update:open": [open: boolean];
@@ -241,20 +283,29 @@ const typeOptions = [
   { label: t("aiObservability.promptManagement.chat"), value: "chat" },
 ];
 const enterpriseMode = config.isEnterprise === "true" || config.isCloud === "true";
-const name = ref("");
-const type = ref<PromptType>("text");
-const description = ref("");
-const tagsText = ref("");
-const textPayload = ref("");
-const model = ref("");
-const paramsText = ref("{}");
-const toolsText = ref("");
-const responseFormatText = ref("");
-const commitMessage = ref("");
-const saving = ref(false);
+const form = useOForm<PromptEditorForm>({
+  defaultValues: promptEditorDefaults(),
+  schema: makePromptEditorSchema(t),
+  onSubmit: save,
+});
+const name = form.useStore((state) => state.values.name);
+const type = form.useStore((state) => state.values.type);
+const textPayload = form.useStore((state) => state.values.textPayload);
+const model = form.useStore((state) => state.values.model ?? "");
+const paramsText = form.useStore((state) => state.values.paramsText);
+const toolsText = form.useStore((state) => state.values.toolsText);
+const responseFormatText = form.useStore((state) => state.values.responseFormatText);
+const commitMessage = form.useStore((state) => state.values.commitMessage);
+const saving = form.useStore((state) => state.isSubmitting);
+const submitted = form.useStore((state) => state.submissionAttempts > 0);
+const dirty = form.useStore((state) => state.isDirty);
 const matches = ref<PromptMatch[]>([]);
 const confirmedMatchFingerprint = ref("");
-const providers = ref<Provider[]>([]);
+const providerQuery = useQuery(() => ({
+  ...providersQuery(props.orgId),
+  enabled: props.open && enterpriseMode && Boolean(props.orgId),
+}));
+const providers = computed(() => providerQuery.data.value ?? []);
 const variableValues = reactive<Record<string, string>>({});
 const variant = reactive<PlaygroundVariant>({
   id: "prompt-editor",
@@ -283,15 +334,11 @@ const hasBody = computed(() =>
     ? textPayload.value.trim().length > 0
     : variant.messages.some((message) => message.content.trim().length > 0),
 );
-const canSave = computed(
+const validConfiguration = computed(
   () =>
-    Boolean(props.folderId) &&
-    /^[a-z0-9_-]+$/.test(name.value) &&
-    hasBody.value &&
-    commitMessage.value.trim().length > 0 &&
-    parseObjectJson(paramsText.value) !== null &&
-    isJsonOrBlank(toolsText.value) &&
-    isJsonOrBlank(responseFormatText.value),
+    isPromptJson(paramsText.value, true) &&
+    isPromptJson(toolsText.value) &&
+    isPromptJson(responseFormatText.value),
 );
 const modelOptions = computed(() => {
   const models = new Set<string>();
@@ -337,6 +384,9 @@ const handoffVersion = computed<PromptVersion>(() => ({
 const contentFingerprint = computed(() =>
   JSON.stringify({ type: type.value, payload: payload.value, config: configValue.value }),
 );
+const duplicateConfirmed = computed(
+  () => matches.value.length > 0 && confirmedMatchFingerprint.value === contentFingerprint.value,
+);
 
 function parseJson(value: string): unknown | null {
   if (!value.trim()) return null;
@@ -345,9 +395,6 @@ function parseJson(value: string): unknown | null {
   } catch {
     return null;
   }
-}
-function isJsonOrBlank(value: string): boolean {
-  return !value.trim() || parseJson(value) !== null;
 }
 
 function parseObjectJson(value: string): Record<string, unknown> | null {
@@ -379,65 +426,87 @@ function chatMessages(payload: unknown): PlaygroundMessage[] {
 }
 
 function reset() {
-  name.value = props.prompt?.name ?? "";
-  type.value = props.prompt?.type ?? "text";
-  description.value = props.prompt?.description ?? "";
-  tagsText.value = props.prompt?.tags.join(", ") ?? "";
   const version = props.baseVersion;
-  textPayload.value = typeof version?.payload === "string" ? version.payload : "";
   variant.messages = chatMessages(version?.payload);
-  model.value = version?.config.model ?? "";
-  paramsText.value = version?.config.params ? JSON.stringify(version.config.params, null, 2) : "{}";
-  toolsText.value = version?.config.tools ? JSON.stringify(version.config.tools, null, 2) : "";
-  responseFormatText.value = version?.config.responseFormat
-    ? JSON.stringify(version.config.responseFormat, null, 2)
-    : "";
-  commitMessage.value = "";
+  form.reset({
+    name: props.prompt?.name ?? "",
+    type: props.prompt?.type ?? "text",
+    description: props.prompt?.description ?? "",
+    tagsText: props.prompt?.tags.join(", ") ?? "",
+    textPayload: typeof version?.payload === "string" ? version.payload : "",
+    chatContent: variant.messages.map((message) => message.content),
+    model: version?.config.model ?? "",
+    paramsText: version?.config.params ? JSON.stringify(version.config.params, null, 2) : "{}",
+    toolsText: version?.config.tools ? JSON.stringify(version.config.tools, null, 2) : "",
+    responseFormatText: version?.config.responseFormat
+      ? JSON.stringify(version.config.responseFormat, null, 2)
+      : "",
+    commitMessage: "",
+  });
   matches.value = [];
   confirmedMatchFingerprint.value = "";
 }
 
-async function save() {
-  if (!canSave.value) return;
-  saving.value = true;
+async function requestClose(open: boolean) {
+  if (open || saving.value) return;
+  if (
+    dirty.value &&
+    !(await confirm({
+      title: t("aiObservability.promptManagement.discardChangesTitle"),
+      message: t("aiObservability.promptManagement.discardChangesMessage"),
+      confirmLabel: t("aiObservability.promptManagement.discardChanges"),
+    }))
+  )
+    return;
+  emit("update:open", false);
+}
+
+async function save(value: PromptEditorForm) {
+  const orgId = props.orgId;
+  const entityId = props.prompt?.entityId;
+  const fingerprint = contentFingerprint.value;
   try {
     const discoveredMatches = await llmPromptsService.match(props.orgId, {
       type: type.value,
       payload: payload.value,
       config: configValue.value,
     });
+    if (
+      !props.open ||
+      orgId !== props.orgId ||
+      entityId !== props.prompt?.entityId ||
+      fingerprint !== contentFingerprint.value
+    )
+      return;
     matches.value = discoveredMatches;
     if (discoveredMatches.length && confirmedMatchFingerprint.value !== contentFingerprint.value) {
       confirmedMatchFingerprint.value = contentFingerprint.value;
       toast({
         variant: "warning",
-        message: raw(
-          "Matching content already exists. Review the matches, then save again to continue.",
-        ),
+        message: t("aiObservability.promptManagement.matchingContentWarning"),
       });
       return;
     }
     const result = props.prompt
-      ? await llmPromptsService.createVersion(
-          props.orgId,
-          props.prompt.entityId,
-          {
+      ? await createVersion.mutateAsync({
+          entityId: props.prompt.entityId,
+          input: {
             payload: payload.value,
             config: configValue.value,
             commitMessage: commitMessage.value.trim(),
             source: "ui",
             baseVersion: props.baseVersion?.version ?? props.prompt.latestVersion,
           },
-          { ifHead: props.prompt.latestVersion, idempotencyKey: crypto.randomUUID() },
-        )
-      : await llmPromptsService.create(
-          props.orgId,
-          {
+          ifHead: props.prompt.latestVersion,
+          idempotencyKey: crypto.randomUUID(),
+        })
+      : await createPrompt.mutateAsync({
+          input: {
             name: name.value.trim(),
             folderId: props.folderId,
             type: type.value,
-            description: description.value.trim() || null,
-            tags: tagsText.value
+            description: value.description.trim() || null,
+            tags: value.tagsText
               .split(",")
               .map((tag) => tag.trim())
               .filter(Boolean),
@@ -446,21 +515,24 @@ async function save() {
             commitMessage: commitMessage.value.trim(),
             source: "ui",
           },
-          crypto.randomUUID(),
-        );
+          idempotencyKey: crypto.randomUUID(),
+        });
+    if (!props.open || orgId !== props.orgId || entityId !== props.prompt?.entityId) return;
     emit("saved", result.prompt);
     emit("update:open", false);
     toast({
       variant: "success",
-      message: raw(props.prompt ? `Saved v${result.version.version}.` : "Prompt created."),
+      message: props.prompt
+        ? t("aiObservability.promptManagement.versionSaveSuccess", {
+            version: result.version.version,
+          })
+        : t("aiObservability.promptManagement.createSuccess"),
     });
   } catch (error: unknown) {
     toast({
       variant: "error",
-      message: raw(error instanceof Error ? error.message : "Failed to save prompt."),
+      message: promptErrorText(error, t("aiObservability.promptManagement.saveError")),
     });
-  } finally {
-    saving.value = false;
   }
 }
 
@@ -491,20 +563,12 @@ function moveMessage(from: number, to: number) {
   if (message) variant.messages.splice(to, 0, message);
 }
 
-watch(() => [props.open, props.prompt?.entityId, props.baseVersion?.id], reset, {
+watch(
+  () => variant.messages.map((message) => message.content),
+  (content) => form.setFieldValue("chatContent", content),
+  { flush: "sync" },
+);
+watch(() => [props.open, props.orgId, props.prompt?.entityId, props.baseVersion?.id], reset, {
   immediate: true,
 });
-watch(
-  () => props.open,
-  async (open) => {
-    if (open && enterpriseMode && !providers.value.length) {
-      try {
-        providers.value = await onlineEvalsService.providers.list(props.orgId);
-      } catch {
-        providers.value = [];
-      }
-    }
-  },
-  { immediate: true },
-);
 </script>

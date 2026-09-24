@@ -15,6 +15,7 @@ pub use service::{
     resolve_prompt, update_head,
 };
 
+/// System-managed label that advances automatically and cannot be moved or deleted.
 pub const LATEST_LABEL: &str = "latest";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,7 +101,9 @@ impl TryFrom<&str> for PromptSource {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PromptSelector {
+    /// Resolve a validated movable label, including the system-managed `latest` label.
     Label(String),
+    /// Resolve an immutable positive version number.
     Version(i32),
 }
 
@@ -404,6 +407,7 @@ fn validate_chat_payload(payload: &Value) -> Result<(), PromptError> {
     Ok(())
 }
 
+/// Hashes normalized camel-case content after dropping absent optional config fields.
 pub fn content_hash(payload: &Value, config: &PromptConfig) -> String {
     infra::idempotency::canonical_sha256(&json!({
         "payload": payload,
@@ -420,6 +424,7 @@ pub fn normalize_tags(tags: Vec<String>) -> Vec<String> {
         .collect()
 }
 
+/// Decodes request config and reports malformed input as a client-facing config error.
 pub fn config_from_request_value(value: Value) -> Result<PromptConfig, PromptError> {
     if contains_provider(&value) {
         return Err(PromptError::ProviderNotAllowed);
@@ -427,6 +432,7 @@ pub fn config_from_request_value(value: Value) -> Result<PromptConfig, PromptErr
     serde_json::from_value(value).map_err(|error| PromptError::InvalidConfig(error.to_string()))
 }
 
+/// Decodes persisted config and reports malformed content as invalid stored data.
 pub fn config_from_value(value: Value) -> Result<PromptConfig, PromptError> {
     if contains_provider(&value) {
         return Err(PromptError::ProviderNotAllowed);
