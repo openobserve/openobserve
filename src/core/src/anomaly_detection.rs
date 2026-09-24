@@ -2910,7 +2910,8 @@ pub async fn execute_anomaly_query(
         regions: vec![],
         clusters: vec![],
         timeout: 0,
-        search_type: None,
+        // Untagged, this multi-day training scan routes to the interactive nodes serving the UI.
+        search_type: Some(config::meta::search::SearchEventType::DerivedStream),
         search_event_context: None,
         use_cache: false,
         clear_cache: false,
@@ -6681,5 +6682,18 @@ mod tests {
         // `NaN as i32` saturates to 0, which would have stored percentile 0.
         assert_eq!(f64::NAN.clamp(50.0, 99.9) as i32, 0);
         assert_eq!(clamped_threshold(f64::NAN), 97);
+    }
+
+    #[test]
+    fn the_training_search_type_routes_to_background_nodes() {
+        use config::meta::{cluster::RoleGroup, search::SearchEventType};
+
+        assert_eq!(
+            RoleGroup::from(SearchEventType::DerivedStream),
+            RoleGroup::Background,
+            "training scans must not land on the interactive nodes serving the UI"
+        );
+        // An untagged request yields no role group at all, which is the bug this pins.
+        assert_ne!(RoleGroup::from(SearchEventType::UI), RoleGroup::Background);
     }
 }
