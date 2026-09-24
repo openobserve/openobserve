@@ -25,10 +25,11 @@ use config::{get_config, is_local_disk_storage, utils::hash::Sum64};
 use futures::{TryStreamExt, stream::BoxStream};
 use hashbrown::{HashMap, HashSet};
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    GetOptions, GetRange, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
     ObjectStoreExt as ObjStoreExt, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
     path::Path,
 };
+use parking_lot::RwLock;
 use tokio::sync::Mutex;
 
 use crate::storage::{ObjectStoreExt, get_stream_from_file, remote::StorageConfig};
@@ -49,6 +50,8 @@ pub struct StorageClientFactory {
     accounts: ArcSwap<HashMap<String, Arc<Box<dyn ObjectStore>>>>,
     stream_strategy: StreamStrategy,
     only_default: bool,
+    // Accounts whose store rejected a suffix range (Azure); their suffix GETs go HEAD + bounded.
+    suffix_unsupported: RwLock<HashSet<String>>,
 }
 
 impl Default for StorageClientFactory {
@@ -96,6 +99,7 @@ impl StorageClientFactory {
             accounts: ArcSwap::from_pointee(temp),
             only_default,
             stream_strategy,
+            suffix_unsupported: RwLock::default(),
         }
     }
 
@@ -118,6 +122,7 @@ impl StorageClientFactory {
         for (k, v) in r.iter() {
             temp.insert(k.clone(), v.clone());
         }
+        self.suffix_unsupported.write().remove(&key);
         temp.insert(key, Arc::new(acc));
         self.accounts.swap(Arc::new(temp));
         drop(lock);
@@ -166,6 +171,40 @@ impl StorageClientFactory {
             .get(DEFAULT_ACCOUNT)
             .cloned()
             .expect("default object store account not found")
+    }
+
+    /// Suffix GET that falls back to HEAD + bounded range on stores rejecting suffix ranges.
+    async fn get_suffix_opts(
+        &self,
+        account: &str,
+        location: &Path,
+        options: GetOptions,
+        n: u64,
+    ) -> Result<GetResult> {
+        let client = self.get_client_by_name(account);
+        if !self.suffix_unsupported.read().contains(account) {
+            match client.get_opts(location, options.clone()).await {
+                Err(object_store::Error::NotSupported { source }) => {
+                    log::info!(
+                        "[STORAGE] account `{account}` rejects suffix ranges ({source}), \
+                         falling back to HEAD + bounded range"
+                    );
+                    self.suffix_unsupported.write().insert(account.to_string());
+                }
+                res => return res,
+            }
+        }
+        let size = client.head(location).await?.size;
+        let range = GetRange::Bounded(size.saturating_sub(n)..size);
+        client
+            .get_opts(
+                location,
+                GetOptions {
+                    range: Some(range),
+                    ..options
+                },
+            )
+            .await
     }
 }
 
@@ -355,6 +394,9 @@ impl ObjectStoreExt for StorageClientFactory {
         location: &Path,
         options: GetOptions,
     ) -> Result<GetResult> {
+        if let Some(GetRange::Suffix(n)) = options.range {
+            return self.get_suffix_opts(account, location, options, n).await;
+        }
         self.get_client_by_name(account)
             .get_opts(location, options)
             .await
@@ -443,9 +485,98 @@ impl ObjectStoreExt for StorageClientFactory {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use config::S3;
+    use object_store::{CopyOptions, memory::InMemory};
 
     use super::*;
+
+    #[derive(Debug)]
+    struct RejectSuffixStore {
+        inner: InMemory,
+        suffix_calls: Arc<AtomicUsize>,
+    }
+
+    impl std::fmt::Display for RejectSuffixStore {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("reject-suffix")
+        }
+    }
+
+    #[async_trait]
+    impl ObjectStore for RejectSuffixStore {
+        async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+            if matches!(options.range, Some(GetRange::Suffix(_))) {
+                self.suffix_calls.fetch_add(1, Ordering::Relaxed);
+                return Err(object_store::Error::NotSupported {
+                    source: "suffix range requests".into(),
+                });
+            }
+            self.inner.get_opts(location, options).await
+        }
+
+        async fn put_opts(
+            &self,
+            location: &Path,
+            payload: PutPayload,
+            options: PutOptions,
+        ) -> Result<PutResult> {
+            self.inner.put_opts(location, payload, options).await
+        }
+
+        async fn put_multipart_opts(
+            &self,
+            location: &Path,
+            options: PutMultipartOptions,
+        ) -> Result<Box<dyn MultipartUpload>> {
+            self.inner.put_multipart_opts(location, options).await
+        }
+
+        fn delete_stream(
+            &self,
+            locations: BoxStream<'static, Result<Path>>,
+        ) -> BoxStream<'static, Result<Path>> {
+            self.inner.delete_stream(locations)
+        }
+
+        fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
+            self.inner.list(prefix)
+        }
+
+        async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
+            self.inner.list_with_delimiter(prefix).await
+        }
+
+        async fn copy_opts(&self, from: &Path, to: &Path, options: CopyOptions) -> Result<()> {
+            self.inner.copy_opts(from, to, options).await
+        }
+    }
+
+    async fn reject_suffix_store(location: &Path) -> (Box<dyn ObjectStore>, Arc<AtomicUsize>) {
+        let inner = InMemory::new();
+        inner
+            .put_opts(
+                location,
+                Bytes::from_static(b"0123456789abcdef").into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        let suffix_calls = Arc::new(AtomicUsize::new(0));
+        let store = RejectSuffixStore {
+            inner,
+            suffix_calls: Arc::clone(&suffix_calls),
+        };
+        (Box::new(store), suffix_calls)
+    }
+
+    fn suffix(n: u64) -> GetOptions {
+        GetOptions {
+            range: Some(GetRange::Suffix(n)),
+            ..Default::default()
+        }
+    }
 
     fn base_s3_config() -> S3 {
         S3 {
@@ -618,5 +749,34 @@ mod tests {
         let factory = StorageClientFactory::new_with_config(&config, true);
         assert_eq!(format!("{factory}"), "storage for StorageClientFactory");
         assert_eq!(format!("{factory:?}"), "storage for StorageClientFactory");
+    }
+
+    #[tokio::test]
+    async fn test_suffix_falls_back_to_bounded_range_when_unsupported() {
+        let factory = StorageClientFactory::new_with_config(&base_s3_config(), true);
+        let location = Path::from("files/o/logs/s/f.bin");
+        let (store, suffix_calls) = reject_suffix_store(&location).await;
+        factory.add_account("azure".to_string(), store).await;
+
+        for (n, want) in [(4, &b"cdef"[..]), (100, &b"0123456789abcdef"[..])] {
+            let res = factory
+                .get_opts("azure", &location, suffix(n))
+                .await
+                .unwrap();
+            assert_eq!(res.bytes().await.unwrap(), want);
+        }
+        assert_eq!(suffix_calls.load(Ordering::Relaxed), 1);
+
+        let (store, suffix_calls) = reject_suffix_store(&location).await;
+        factory.add_account("azure".to_string(), store).await;
+        factory
+            .get_opts("azure", &location, suffix(4))
+            .await
+            .unwrap();
+        assert_eq!(
+            suffix_calls.load(Ordering::Relaxed),
+            1,
+            "re-adding an account must retry suffix ranges on the new store"
+        );
     }
 }

@@ -537,10 +537,97 @@ fn try_predicate(cond: &Condition, bloom_indexed_fields: &HashSet<String>) -> Op
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    use async_trait::async_trait;
     use config::meta::stream::{FileKey, FileMeta};
+    use futures::stream::BoxStream;
     use infra::bloom::{BloomBuilder, BloomReader, BloomWriter};
+    use object_store::{
+        CopyOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+        PutMultipartOptions, PutOptions, PutPayload, PutResult, memory::InMemory, path::Path,
+    };
 
     use super::*;
+
+    #[derive(Debug)]
+    struct RejectSuffixStore {
+        inner: InMemory,
+        suffix_calls: Arc<AtomicUsize>,
+    }
+
+    impl std::fmt::Display for RejectSuffixStore {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("reject-suffix")
+        }
+    }
+
+    #[async_trait]
+    impl ObjectStore for RejectSuffixStore {
+        async fn get_opts(
+            &self,
+            location: &Path,
+            options: GetOptions,
+        ) -> object_store::Result<GetResult> {
+            if matches!(options.range, Some(GetRange::Suffix(_))) {
+                self.suffix_calls.fetch_add(1, Ordering::Relaxed);
+                return Err(object_store::Error::NotSupported {
+                    source: "suffix range requests".into(),
+                });
+            }
+            self.inner.get_opts(location, options).await
+        }
+
+        async fn put_opts(
+            &self,
+            location: &Path,
+            payload: PutPayload,
+            options: PutOptions,
+        ) -> object_store::Result<PutResult> {
+            self.inner.put_opts(location, payload, options).await
+        }
+
+        async fn put_multipart_opts(
+            &self,
+            location: &Path,
+            options: PutMultipartOptions,
+        ) -> object_store::Result<Box<dyn MultipartUpload>> {
+            self.inner.put_multipart_opts(location, options).await
+        }
+
+        fn delete_stream(
+            &self,
+            locations: BoxStream<'static, object_store::Result<Path>>,
+        ) -> BoxStream<'static, object_store::Result<Path>> {
+            self.inner.delete_stream(locations)
+        }
+
+        fn list(
+            &self,
+            prefix: Option<&Path>,
+        ) -> BoxStream<'static, object_store::Result<ObjectMeta>> {
+            self.inner.list(prefix)
+        }
+
+        async fn list_with_delimiter(
+            &self,
+            prefix: Option<&Path>,
+        ) -> object_store::Result<ListResult> {
+            self.inner.list_with_delimiter(prefix).await
+        }
+
+        async fn copy_opts(
+            &self,
+            from: &Path,
+            to: &Path,
+            options: CopyOptions,
+        ) -> object_store::Result<()> {
+            self.inner.copy_opts(from, to, options).await
+        }
+    }
 
     fn fk(key: &str, bloom_ver: i64) -> FileKey {
         let mut k = FileKey::new(0, "default".into(), key.into(), FileMeta::default(), false);
@@ -558,6 +645,37 @@ mod tests {
             c.add_condition(x);
         }
         c
+    }
+
+    fn bf_blob(file_count: u64) -> Vec<u8> {
+        let mut bb = BloomBuilder::new();
+        for fid in 0..file_count {
+            let i = bb.begin_with_blocks(fid, "trace_id", 1);
+            bb.insert(i, format!("v-{fid}").as_bytes());
+        }
+        BloomWriter::serialize(bb.finish()).unwrap()
+    }
+
+    async fn group_hits(account: &str, path: &str, file_count: u64) -> Vec<(usize, bool)> {
+        let files: Vec<FileKey> = (0..file_count)
+            .map(|fid| {
+                let mut k = fk("files/o/logs/s/2026/05/08/14/a.parquet", 1);
+                k.id = fid as i64;
+                k
+            })
+            .collect();
+        let idxs: Vec<usize> = (0..files.len()).collect();
+        let preds = [Predicate {
+            field: "trace_id".into(),
+            values: vec!["v-0".into()],
+        }];
+        match run_group("tid", account, path, &idxs, &preds, &files).await {
+            GroupResult::Ok(outcomes) => outcomes
+                .into_iter()
+                .map(|(f, _, _, hit)| (f, hit))
+                .collect(),
+            GroupResult::Err(_, e) => panic!("group `{path}` failed: {e}"),
+        }
     }
 
     // ---- collect_decidable dispatch ----
@@ -917,5 +1035,45 @@ mod tests {
         let r = BloomReader::parse_suffix(big, total).expect("parse with precise footer suffix");
         assert!(r.column_index("trace_id", 0).is_some());
         assert!(r.column_index("trace_id", 299).is_some());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_prunes_on_store_without_suffix_support() {
+        let id = config::ider::uuid();
+        let small = bloom_path(&id, StreamType::Logs, "s", "2026/05/08/14", 1);
+        let large = bloom_path(&id, StreamType::Logs, "s", "2026/05/08/15", 2);
+        let large_blob = bf_blob(2000);
+        let probe_start = large_blob.len() - BLOOM_SUFFIX_PROBE_BYTES as usize;
+        assert!(
+            footer_shortfall(&large_blob[probe_start..], large_blob.len() as u64).is_some(),
+            "large `.bf` footer must overflow the probe to cover the top-up read"
+        );
+
+        let inner = InMemory::new();
+        for (path, blob) in [(&small, bf_blob(2)), (&large, large_blob)] {
+            inner
+                .put_opts(&path.as_str().into(), blob.into(), PutOptions::default())
+                .await
+                .unwrap();
+        }
+        let suffix_calls = Arc::new(AtomicUsize::new(0));
+        infra::storage::add_account(
+            &id,
+            Box::new(RejectSuffixStore {
+                inner,
+                suffix_calls: Arc::clone(&suffix_calls),
+            }),
+        )
+        .await;
+        let account = format!("{id}:default");
+
+        assert_eq!(
+            group_hits(&account, &small, 2).await,
+            vec![(0, true), (1, false)]
+        );
+        let large_hits = group_hits(&account, &large, 2000).await;
+        assert_eq!(large_hits.len(), 2000);
+        assert_eq!(large_hits[..2], [(0, true), (1, false)]);
+        assert_eq!(suffix_calls.load(Ordering::Relaxed), 1);
     }
 }
