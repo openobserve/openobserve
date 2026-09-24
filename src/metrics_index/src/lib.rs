@@ -17,8 +17,6 @@
 
 pub mod block;
 mod cache;
-#[cfg(test)]
-mod io_tests;
 pub mod layout;
 mod pruner;
 mod reader;

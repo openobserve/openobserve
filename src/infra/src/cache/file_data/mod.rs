@@ -23,7 +23,10 @@ use std::{
 };
 
 use bytes::Bytes;
-use config::utils::time::{HourFormat, get_ymdh_from_micros};
+use config::{
+    meta::promql::midx::{MIDX_TRAILER_LEN, MidxTrailer},
+    utils::time::{HourFormat, get_ymdh_from_micros},
+};
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 use object_store::{GetOptions, GetResult};
@@ -232,7 +235,6 @@ async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Erro
             }
         }
         FileType::Midx => {
-            use config::meta::promql::midx::{MIDX_TRAILER_LEN, MidxTrailer};
             if bytes.len() < MIDX_TRAILER_LEN {
                 return Err(anyhow::anyhow!("invalid metrics index file"));
             }
@@ -527,7 +529,7 @@ mod tests {
     async fn validate_midx_checks_current_trailer() {
         let mut bytes = b"sample-block{\"header\":1}".to_vec();
         bytes.extend_from_slice(
-            &config::meta::promql::midx::MidxTrailer {
+            &MidxTrailer {
                 label_len: 2,
                 directory_len: 4,
                 header_len: 13,

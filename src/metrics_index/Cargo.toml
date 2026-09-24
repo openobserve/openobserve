@@ -25,7 +25,6 @@ tokio.workspace = true
 zstd.workspace = true
 
 [dev-dependencies]
-async-trait.workspace = true
 object_store.workspace = true
 regex.workspace = true
 tempfile.workspace = true

@@ -28,7 +28,7 @@ use datafusion::{
 use crate::layout::METRICS_INDEX_ROW_COUNT;
 
 /// Label plus directory regions up to this size are read whole, like object_store coalescing.
-pub(super) const SMALL_METADATA_BYTES: u64 = 1024 * 1024;
+const SMALL_METADATA_BYTES: u64 = 1024 * 1024;
 
 pub(super) struct MetricsIndexData {
     pub(super) schema: SchemaRef,
@@ -338,4 +338,229 @@ fn metrics_block_index_data(
             .map_err(|e| DataFusionError::External(e.into()))?,
         row_group_size,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow::{
+        array::{Float64Array, Int64Array, StringArray, UInt64Array},
+        datatypes::{DataType, Field, Schema},
+    };
+    use config::meta::stream::{FileKey, FileMeta, FileSelection};
+    use object_store::{ObjectStore, PutOptions};
+    use promql_parser::label::{MatchOp, Matcher, Matchers};
+
+    use super::*;
+    use crate::MetricsFileLayout;
+
+    async fn fixture(format: config::FileFormat) -> (RecordBatch, FileKey, Vec<u8>) {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("value", DataType::Float64, false),
+            Field::new("path", DataType::Utf8, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from(vec![1, 1, 1, 2, 2, 3])),
+                Arc::new(Int64Array::from(vec![10, 20, 30, 10, 20, 10])),
+                Arc::new(Float64Array::from(vec![1., 2., 3., 4., 5., 6.])),
+                Arc::new(StringArray::from(vec![
+                    Some("a"),
+                    Some("a"),
+                    Some("a"),
+                    None,
+                    None,
+                    Some(""),
+                ])),
+            ],
+        )
+        .unwrap();
+        let id = config::ider::uuid();
+        let mut file = FileKey::new(
+            0,
+            format!("{id}:default"),
+            format!(
+                "files/test/metrics/m/2026/09/20/00/indexed-v1-{id}{}",
+                format.extension()
+            ),
+            FileMeta {
+                records: 6,
+                compressed_size: 123,
+                ..Default::default()
+            },
+            false,
+        );
+        let mut writer =
+            crate::block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
+        writer.write(&batch).unwrap();
+        let bytes = match format {
+            config::FileFormat::Parquet => {
+                let mut parquet = config::utils::parquet::new_parquet_writer(
+                    Vec::new(),
+                    &schema,
+                    &[],
+                    &file.meta,
+                    false,
+                    None,
+                );
+                parquet.write(&batch).await.unwrap();
+                let metadata = parquet.finish().await.unwrap();
+                file.meta.compressed_size = i64::try_from(parquet.bytes_written()).unwrap();
+                writer.finish_for_parquet(
+                    crate::block::ParentMetadata {
+                        rows: 6,
+                        compressed_size: file.meta.compressed_size as u64,
+                    },
+                    metadata,
+                )
+            }
+            config::FileFormat::Vortex => writer.finish_for_vortex(
+                crate::block::ParentMetadata {
+                    rows: 6,
+                    compressed_size: 123,
+                },
+                schema,
+            ),
+        }
+        .unwrap();
+        file.meta.mindex_size = i64::try_from(bytes.len()).unwrap();
+        (batch, file, bytes)
+    }
+
+    async fn store(file: &FileKey, bytes: Option<Vec<u8>>) {
+        let store = object_store::memory::InMemory::new();
+        if let Some(bytes) = bytes {
+            let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
+            store
+                .put_opts(
+                    &path.into(),
+                    bytes::Bytes::from(bytes).into(),
+                    PutOptions::default(),
+                )
+                .await
+                .unwrap();
+        }
+        let id = file.account.strip_suffix(":default").unwrap();
+        infra::storage::add_account(id, Box::new(store)).await;
+    }
+
+    #[tokio::test]
+    async fn current_metadata_prunes_both_parent_formats() {
+        for format in [config::FileFormat::Parquet, config::FileFormat::Vortex] {
+            let (batch, file, bytes) = fixture(format).await;
+            store(&file, Some(bytes)).await;
+            for (op, value, expected) in [
+                (MatchOp::Equal, "a", vec![Range { start: 0, end: 3 }]),
+                (MatchOp::Equal, "", vec![Range { start: 5, end: 6 }]),
+                (MatchOp::NotEqual, "a", vec![Range { start: 5, end: 6 }]),
+                (MatchOp::Re(".*".parse().unwrap()), ".*", vec![0..3, 5..6]),
+                (MatchOp::Equal, "unmatched", vec![]),
+            ] {
+                let mut files = vec![file.clone()];
+                let case = format!("{format:?} {op:?} {value}");
+                let matchers = Matchers::new(vec![Matcher::new(op, "path", value)]);
+                let (_, exact) =
+                    crate::search("prune", &mut files, batch.schema().as_ref(), &matchers, 1)
+                        .await
+                        .unwrap()
+                        .unwrap();
+                assert!(exact, "{case}");
+                if expected.is_empty() {
+                    assert!(files.is_empty());
+                } else {
+                    assert_eq!(files.len(), 1);
+                    assert!(
+                        matches!(&files[0].selection, Some(FileSelection::RowRanges(ranges)) if ranges.as_ref() == &expected)
+                    );
+                    assert_eq!(
+                        files[0].row_group_size.is_some(),
+                        format == config::FileFormat::Parquet
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn stale_mindex_size_retries_with_object_size() {
+        let (_, file, bytes) = fixture(config::FileFormat::Parquet).await;
+        store(&file, Some(bytes)).await;
+        let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
+        let data = load_metrics_index_file(
+            &file.account,
+            &path,
+            config::FileFormat::Parquet,
+            file.meta.records as usize,
+            file.meta.compressed_size,
+            file.meta.mindex_size + 1,
+            IndexLabels {
+                requested: Arc::new(vec!["path".to_string()]),
+                flat: Arc::new(Vec::new()),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(data.parent_records, 6);
+    }
+
+    #[tokio::test]
+    async fn equality_keeps_dictionary_and_regex_flattens_label() {
+        let (_, file, bytes) = fixture(config::FileFormat::Vortex).await;
+        store(&file, Some(bytes)).await;
+        let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
+        for flat in [false, true] {
+            let data = load_metrics_index_file(
+                &file.account,
+                &path,
+                config::FileFormat::Vortex,
+                file.meta.records as usize,
+                file.meta.compressed_size,
+                file.meta.mindex_size,
+                IndexLabels {
+                    requested: Arc::new(vec!["path".to_string()]),
+                    flat: Arc::new(if flat {
+                        vec!["path".to_string()]
+                    } else {
+                        vec![]
+                    }),
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                matches!(
+                    data.schema.field_with_name("path").unwrap().data_type(),
+                    DataType::Dictionary(_, _)
+                ),
+                !flat
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn unusable_index_preserves_source_scan() {
+        for format in [config::FileFormat::Parquet, config::FileFormat::Vortex] {
+            for present in [false, true] {
+                let (batch, file, _) = fixture(format).await;
+                store(&file, present.then(|| vec![0; 128])).await;
+                let mut files = vec![file];
+                let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]);
+                let (_, exact) = crate::search(
+                    "fallback",
+                    &mut files,
+                    batch.schema().as_ref(),
+                    &matchers,
+                    1,
+                )
+                .await
+                .unwrap()
+                .unwrap();
+                assert!(!exact);
+                assert_eq!(files.len(), 1);
+                assert!(files[0].selection.is_none());
+            }
+        }
+    }
 }
