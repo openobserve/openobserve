@@ -5168,7 +5168,7 @@ mod tests {
 
     #[tokio::test]
     async fn workflow_rejects_a_function_that_is_not_javascript() {
-        // A null trans_type is neither VRL nor JS, so validate_workflow's is_vrl() misses it.
+        // execute_workflow and retry_run skip validate_workflow, so this path must refuse both.
         let org = "org-1";
         for (name, trans_type) in [("null_typed_fn", None), ("vrl_typed_fn", Some(0))] {
             QUERY_FUNCTIONS.insert(
