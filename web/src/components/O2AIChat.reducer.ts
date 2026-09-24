@@ -475,6 +475,8 @@ function reduceText(
 }
 
 export function reduce(state: StreamState, data: any, ctx: ReducerCtx): StreamEffect[] {
+  // Server-side chat persistence frames (opencode durable events) are for OpenObserve, never the UI; unknown types would otherwise fall through to extractStreamText.
+  if (data && (data.type === "sync" || data.type === "sync_state")) return [];
   if (data && data.type === "title") return reduceTitle(state, data, ctx);
   // ponytail: phase gate reproduces the tail-flush handler gap on purpose. Delete with the follow-up fix.
   if (data && data.type === "confirmation_required" && ctx.phase === "stream") {

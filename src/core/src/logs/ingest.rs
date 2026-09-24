@@ -170,8 +170,14 @@ pub async fn ingest(
 
     // Start retrieve associated pipeline and construct pipeline components
     let stream_param = StreamParams::new(org_id, &stream_name, stream_type);
+    // Chat history is replayed verbatim and hash-checked; no user pipeline may
+    // read (copy elsewhere) or rewrite it.
     let executable_pipelines =
-        crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
+        if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&stream_name) {
+            Vec::new()
+        } else {
+            crate::ingestion::get_stream_executable_pipelines(&stream_param).await
+        };
     let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
     let mut original_options = Vec::with_capacity(stream_params.len());

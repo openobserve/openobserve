@@ -314,6 +314,16 @@ impl Pipeline {
                     node.id
                 ));
             }
+            if let NodeData::Stream(params) = node.get_node_data()
+                && crate::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+                    &params.stream_name,
+                )
+            {
+                return Err(anyhow!(
+                    "Stream {} is internal and cannot be used in a pipeline",
+                    params.stream_name
+                ));
+            }
         }
 
         // ck 3

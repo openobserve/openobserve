@@ -1421,6 +1421,9 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
             .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
             .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
+            .route("/{org_id}/ai/chats", get(ai::chats::list).delete(ai::chats::delete_all))
+            .route("/{org_id}/ai/chats/{session_id}", get(ai::chats::get).patch(ai::chats::rename).delete(ai::chats::delete))
+            .route("/{org_id}/ai/chats/{session_id}/cancel", post(ai::chat::cancel))
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
 
