@@ -1125,6 +1125,16 @@ export default defineComponent({
     // in the same tick — this ensures only the first one executes the render.
     let streamEndRenderPending = false;
 
+    // custom_chart JS errors are type-specific and would otherwise block every re-convert of the new type
+    watch(
+      () => panelSchema.value?.type,
+      (newType, oldType) => {
+        if (oldType === "custom_chart" && newType !== "custom_chart") {
+          errorDetail.value = { message: "", code: "" };
+        }
+      },
+    );
+
     // Watch for panel schema changes to re-convert panel data
     watch(
       panelSchema,
@@ -1453,7 +1463,7 @@ export default defineComponent({
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
-      if (type === "html" || type === "markdown" || type === "custom_chart") {
+      if (type === "html" || type === "markdown") {
         return "";
       }
 
@@ -1476,6 +1486,11 @@ export default defineComponent({
       // Once loading completes with empty data, show "No Data".
       if (!hasRawData) {
         return loading.value && panelData.value?.chartType ? "" : "No Data";
+      }
+
+      // Custom chart output is user-defined ECharts options, so row presence is the only reliable signal.
+      if (type === "custom_chart") {
+        return "";
       }
 
       // Raw data exists but conversion hasn't produced output yet — wait.

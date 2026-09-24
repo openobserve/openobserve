@@ -240,9 +240,6 @@ export const convertPanelData = async (
           chartType: panelSchema.type,
           ...safeResult,
         };
-      } else {
-        if (panelSchema?.queries?.[0]?.query?.trim() == "")
-          throw new Error(gt("dashboard.utils.noDataFound"));
       }
     }
     // falls through — custom chart without data resolves to the default empty result
