@@ -1168,7 +1168,7 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
 /// request header (mobile RUM). The header path exists because the mobile SDK's native
 /// request factory appends its own query string to the intake URL and therefore cannot
 /// also carry `?oo-api-key=...` without producing a malformed double-`?` URL.
-/// Both the `oo-api-key` header/param and the legacy `o2-api-key` alias are accepted,
+/// Both the `o2-api-key` header/param and the legacy `oo-api-key` alias are accepted,
 /// query first. Returns `None` when neither source carries a token.
 fn extract_rum_token(
     query: &std::collections::HashMap<String, String>,

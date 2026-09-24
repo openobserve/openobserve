@@ -504,6 +504,8 @@ export class LogsPage {
         this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
         this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
+        this.queryPlanDialog = '[data-test="query-plan-dialog"]';
+        this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -10910,6 +10912,87 @@ export class LogsPage {
         await expect(this.page.locator(this.resultsSkeleton)).toHaveCount(0);
         await expect(this.page.locator(this.resultsLoadingBanner)).toHaveCount(0);
         testLogger.info('Results grid settled with rows, no skeleton or loading banner');
+    }
+
+    /** Bounds the query/results splitter advertises; #12452's fix is that a max exists at all. */
+    async getQueryEditorSplitterBounds() {
+        const separator = this.page.locator(this.queryEditorSplitter);
+        const [now, min, max] = await Promise.all([
+            separator.getAttribute('aria-valuenow'),
+            separator.getAttribute('aria-valuemin'),
+            separator.getAttribute('aria-valuemax'),
+        ]);
+        return { now: Number(now), min: Number(min), max: Number(max) };
+    }
+
+    async getViewportHeight() {
+        return await this.page.evaluate(() => window.innerHeight);
+    }
+
+    /** Drive the splitter from the keyboard; End requests the maximum in one step. */
+    async pressQueryEditorSplitterKey(key, times = 1) {
+        const separator = this.page.locator(this.queryEditorSplitter);
+        await separator.focus();
+        for (let i = 0; i < times; i++) {
+            await separator.press(key);
+        }
+    }
+
+    /** Drag the splitter down by deltaY, the gesture #12452 was reported against. */
+    async dragQueryEditorSplitterBy(deltaY) {
+        const separator = this.page.locator(this.queryEditorSplitter);
+        const box = await separator.boundingBox();
+        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await this.page.mouse.down();
+        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + deltaY, { steps: 12 });
+        await this.page.mouse.up();
+    }
+
+    /** Distance from the separator to the bottom of the viewport; negative means off-screen. */
+    async getQueryEditorSplitterViewportGap() {
+        return await this.page.locator(this.queryEditorSplitter).evaluate(
+            (el) => window.innerHeight - el.getBoundingClientRect().bottom,
+        );
+    }
+
+    /** Assert the query execution plan dialog actually opened. */
+    async expectQueryPlanDialogVisible() {
+        await expect(this.page.locator(this.queryPlanDialog)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Query plan dialog is visible');
+    }
+
+    /** Assert the query execution plan dialog closed. */
+    async expectQueryPlanDialogHidden() {
+        await expect(this.page.locator(this.queryPlanDialog)).toBeHidden({ timeout: 10000 });
+        testLogger.info('Query plan dialog is hidden');
+    }
+
+    /** The logs table delegates scrolling to an unnamed ancestor, so resolve it at runtime. */
+    async getResultsScrollTop() {
+        return await this.page.locator(this.logsSearchResultLogsTable).evaluate((el) => {
+            let node = el.parentElement;
+            while (node && node !== document.body) {
+                const overflowY = getComputedStyle(node).overflowY;
+                if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight + 20) {
+                    return node.scrollTop;
+                }
+                node = node.parentElement;
+            }
+            return null;
+        });
+    }
+
+    /** Wheel over the results grid; hovering first is required or the wheel lands elsewhere. */
+    async scrollResultsGrid(deltaY = 400) {
+        await this.page.locator(this.logsSearchResultLogsTable).hover();
+        await this.page.mouse.wheel(0, deltaY);
+    }
+
+    /** The #9996 contract: the grid must keep rendering rows, never blank out mid-scroll. */
+    async expectResultsGridStillRendersRows() {
+        await expect(this.page.locator(this.logsSearchResultTableRows).first()).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator(this.resultsSkeleton)).toHaveCount(0);
+        await expect(this.page.locator(this.noResultsFoundText)).toHaveCount(0);
     }
 
     /** Assert the results progress bar has faded out once the search settled. */

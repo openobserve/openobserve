@@ -41,6 +41,7 @@ vectorscan = [
     "openobserve-jobs/vectorscan",
     "super_cluster_queue/vectorscan",
     "search_service/vectorscan",
+    "enrichment-data/vectorscan",
 ]
 cloud = [
     "openobserve-api-http/cloud",
@@ -280,7 +281,6 @@ members = [
     "src/usage_reporting",
     "src/audit",
     "src/promql",
-    "src/metrics_block",
     "src/metrics_index",
     "src/promql_service",
     "src/jobs",
@@ -338,7 +338,6 @@ search_service = { path = "src/search_service" }
 usage_reporting = { path = "src/usage_reporting" }
 audit = { path = "src/audit" }
 promql = { path = "src/promql" }
-metrics_block = { path = "src/metrics_block" }
 metrics_index = { path = "src/metrics_index" }
 promql-service = { path = "src/promql_service" }
 openobserve-api-common = { path = "src/api/common" }
