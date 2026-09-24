@@ -1728,7 +1728,7 @@ pub struct Search {
     #[env_config(
         name = "ZO_METRICS_INDEX_BLOCKS_CACHE_MAX_SIZE",
         default = 0,
-        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 2% of node memory clamped to 128-1024 MB, 1-9 disables the cache, and 10 or more sets an explicit limit."
+        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 2% of node memory clamped to 128-1024 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
     )]
     pub metrics_index_blocks_cache_max_size: usize,
     #[env_config(
