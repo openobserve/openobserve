@@ -62,8 +62,16 @@ const selectedName = computed(
   () => props.options.find((o) => o.id === props.selectedId)?.name ?? "",
 );
 
-const inTest = computed(() => props.options.filter((o) => o.inTest));
-const notInTest = computed(() => props.options.filter((o) => !o.inTest));
+const groups = computed(() =>
+  [
+    { key: "in-test", label: undefined, options: props.options.filter((o) => o.inTest) },
+    {
+      key: "not-in-test",
+      label: t("synthetics.journey.replayEnv.notInTest"),
+      options: props.options.filter((o) => !o.inTest),
+    },
+  ].filter((group) => group.options.length > 0),
+);
 
 function itemKey(option: ReplayEnvironmentOption) {
   return option.id === GLOBAL_ONLY ? "global" : option.id;
@@ -92,37 +100,29 @@ function itemKey(option: ReplayEnvironmentOption) {
         {{ t("synthetics.journey.replayEnv.sessionOnly") }}
       </span>
     </div>
-    <template
-      v-for="group in [
-        { options: inTest, label: undefined },
-        { options: notInTest, label: t('synthetics.journey.replayEnv.notInTest') },
-      ]"
-      :key="group.label ?? 'in-test'"
-    >
-      <template v-if="group.options.length">
-        <ODropdownSeparator v-if="group.label" />
-        <ODropdownGroup :label="group.label">
-          <ODropdownItem
-            v-for="option in group.options"
-            :key="option.id"
-            :data-test="`synthetics-journey-replay-menu-env-${itemKey(option)}`"
-            @select="emit('update:selected-id', option.id)"
-          >
-            <span class="flex min-w-0 flex-col">
-              <span :class="{ 'text-accent': option.id === selectedId }">{{ option.name }}</span>
-              <span class="text-text-secondary text-xs">{{ option.host }}</span>
+    <template v-for="group in groups" :key="group.key">
+      <ODropdownSeparator v-if="group.label" />
+      <ODropdownGroup :label="group.label">
+        <ODropdownItem
+          v-for="option in group.options"
+          :key="option.id"
+          :data-test="`synthetics-journey-replay-menu-env-${itemKey(option)}`"
+          @select="emit('update:selected-id', option.id)"
+        >
+          <span class="flex min-w-0 flex-col">
+            <span :class="{ 'text-accent': option.id === selectedId }">{{ option.name }}</span>
+            <span class="text-text-secondary text-xs">{{ option.host }}</span>
+          </span>
+          <span v-if="option.id === selectedId" class="sr-only">
+            {{ t("synthetics.journey.replayEnv.selected") }}
+          </span>
+          <template v-if="option.id === selectedId" #icon-right>
+            <span class="ms-auto inline-flex">
+              <OIcon name="check" size="sm" aria-hidden="true" />
             </span>
-            <span v-if="option.id === selectedId" class="sr-only">
-              {{ t("synthetics.journey.replayEnv.selected") }}
-            </span>
-            <template v-if="option.id === selectedId" #icon-right>
-              <span class="ms-auto inline-flex">
-                <OIcon name="check" size="sm" aria-hidden="true" />
-              </span>
-            </template>
-          </ODropdownItem>
-        </ODropdownGroup>
-      </template>
+          </template>
+        </ODropdownItem>
+      </ODropdownGroup>
     </template>
     <template v-if="secretsNeeded > 0">
       <ODropdownSeparator />

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -53,21 +53,6 @@ const form = useOForm<Record<string, string>>({
   onSubmit: (values) => props.onSubmit({ ...values }),
 });
 const isSubmitting = form.useStore((s) => s.isSubmitting);
-
-// The dialog persists across opens, so the fields and their schema follow the names asked for.
-watch(
-  () => [props.open, names.value.join("\u0000")],
-  () => {
-    if (!props.open) return;
-    const schema = makeReplaySecretsSchema(t, names.value);
-    form.update({
-      ...form.options,
-      defaultValues: defaults(),
-      validators: { onDynamic: schema as any, onDynamicAsync: schema as any },
-    });
-    form.reset(defaults());
-  },
-);
 
 function fieldLabel(secret: { name: string; steps: number[] }) {
   return t(
@@ -117,6 +102,7 @@ function onForget() {
         :name="secret.name"
         type="password"
         revealable
+        required
         :label="fieldLabel(secret)"
         :data-test="`synthetics-journey-replay-secrets-input-${secret.name}`"
       />

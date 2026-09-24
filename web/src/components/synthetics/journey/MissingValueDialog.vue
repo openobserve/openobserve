@@ -22,7 +22,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { makeMissingValueSchema, type MissingValueForm } from "./MissingValueDialog.schema";
 
 const FORM_ID = "synthetics-journey-missing-value-form";
@@ -128,29 +128,21 @@ function onUpdateOpen(value: boolean) {
           {{ t("synthetics.journey.missingValue.kindLocked", { kind: kindLabel }) }}
         </span>
       </div>
-      <div
-        class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 flex items-start gap-2 border p-3"
-        role="note"
+      <OBanner
+        variant="warning"
+        dense
+        role="status"
+        :content="
+          isGlobal
+            ? t('synthetics.journey.missingValue.globalWarning')
+            : t(
+                'synthetics.journey.missingValue.sharedWarning',
+                { environment: environmentName, count: sharedByChecks },
+                sharedByChecks,
+              )
+        "
         data-test="synthetics-journey-missing-value-warning"
-      >
-        <OIcon
-          name="warning"
-          size="sm"
-          class="text-badge-warning-ol-text mt-0.5"
-          aria-hidden="true"
-        />
-        <span class="text-text-body text-xs">
-          {{
-            isGlobal
-              ? t("synthetics.journey.missingValue.globalWarning")
-              : t(
-                  "synthetics.journey.missingValue.sharedWarning",
-                  { environment: environmentName, count: sharedByChecks },
-                  sharedByChecks,
-                )
-          }}
-        </span>
-      </div>
+      />
     </OForm>
   </ODialog>
 </template>

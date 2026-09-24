@@ -1275,6 +1275,34 @@ const addDisabled = computed(
   () => !!props.readonly || isRecording.value || isRestoring.value || isReplayLocked.value,
 );
 
+/** The add actions, shared by the toolbar's add menu and the phone menu. */
+const addMenuItems = computed(() => [
+  {
+    key: "step",
+    icon: "ads-click" as const,
+    label: t("synthetics.journey.addMenu.step"),
+    phoneLabel: t("synthetics.journey.addMenu.addStep"),
+    hint: t("synthetics.journey.addMenu.stepHint"),
+    disabled: addDisabled.value,
+    onSelect: addStep,
+    dataTest: "synthetics-journey-add-menu-step",
+    phoneDataTest: "synthetics-journey-toolbar-menu-add-step",
+  },
+  {
+    key: "subtest",
+    icon: "account-tree" as const,
+    label: t("synthetics.journey.addMenu.subtest"),
+    phoneLabel: t("synthetics.journey.addMenu.subtest"),
+    hint: isCompositionEnabled.value
+      ? t("synthetics.journey.addMenu.subtestHint")
+      : t("synthetics.journey.subtest.disabledTooltip"),
+    disabled: !isCompositionEnabled.value || addDisabled.value,
+    onSelect: addSubtestStep,
+    dataTest: "synthetics-journey-add-subtest-btn",
+    phoneDataTest: "synthetics-journey-toolbar-menu-add-subtest",
+  },
+]);
+
 useShortcuts([
   {
     id: "syntheticsJourneyFocusSearch",
@@ -1572,38 +1600,22 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
                 </OButton>
               </template>
               <ODropdownItem
-                icon-left="ads-click"
-                :disabled="addDisabled"
-                data-test="synthetics-journey-add-menu-step"
-                @select="addStep"
+                v-for="item in addMenuItems"
+                :key="item.key"
+                :icon-left="item.icon"
+                :disabled="item.disabled"
+                :data-test="item.dataTest"
+                @select="item.onSelect"
               >
                 <span class="flex flex-col">
-                  <span>{{ t("synthetics.journey.addMenu.step") }}</span>
-                  <span class="text-text-secondary text-xs">{{
-                    t("synthetics.journey.addMenu.stepHint")
-                  }}</span>
-                </span>
-              </ODropdownItem>
-              <ODropdownItem
-                icon-left="account-tree"
-                :disabled="!isCompositionEnabled || addDisabled"
-                data-test="synthetics-journey-add-subtest-btn"
-                @select="addSubtestStep"
-              >
-                <span class="flex flex-col">
-                  <span>{{ t("synthetics.journey.addMenu.subtest") }}</span>
-                  <span class="text-text-secondary text-xs">{{
-                    isCompositionEnabled
-                      ? t("synthetics.journey.addMenu.subtestHint")
-                      : t("synthetics.journey.subtest.disabledTooltip")
-                  }}</span>
+                  <span>{{ item.label }}</span>
+                  <span class="text-text-secondary text-xs">{{ item.hint }}</span>
                 </span>
               </ODropdownItem>
             </ODropdown>
           </OButtonGroup>
 
           <!-- Run replay / Stop / Re-run — positionally stable, same slot -->
-          <!-- Re-run after a finished replay is the same button in the same slot. -->
           <OButtonGroup
             v-if="replayPhase === 'idle' || isReplayTerminal"
             radius="sm"
@@ -1696,31 +1708,16 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
               </OButton>
             </template>
             <ODropdownItem
-              icon-left="ads-click"
-              :disabled="addDisabled"
-              data-test="synthetics-journey-toolbar-menu-add-step"
-              @select="addStep"
+              v-for="item in addMenuItems"
+              :key="item.key"
+              :icon-left="item.icon"
+              :disabled="item.disabled"
+              :data-test="item.phoneDataTest"
+              @select="item.onSelect"
             >
               <span class="flex flex-col">
-                <span>{{ t("synthetics.journey.addMenu.addStep") }}</span>
-                <span class="text-text-secondary text-xs">{{
-                  t("synthetics.journey.addMenu.stepHint")
-                }}</span>
-              </span>
-            </ODropdownItem>
-            <ODropdownItem
-              icon-left="account-tree"
-              :disabled="!isCompositionEnabled || addDisabled"
-              data-test="synthetics-journey-toolbar-menu-add-subtest"
-              @select="addSubtestStep"
-            >
-              <span class="flex flex-col">
-                <span>{{ t("synthetics.journey.addMenu.subtest") }}</span>
-                <span class="text-text-secondary text-xs">{{
-                  isCompositionEnabled
-                    ? t("synthetics.journey.addMenu.subtestHint")
-                    : t("synthetics.journey.subtest.disabledTooltip")
-                }}</span>
+                <span>{{ item.phoneLabel }}</span>
+                <span class="text-text-secondary text-xs">{{ item.hint }}</span>
               </span>
             </ODropdownItem>
             <ODropdownItem

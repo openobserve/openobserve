@@ -74,14 +74,8 @@ const namedUrls = computed(() => urlsFor(named.value.map((env) => env.id)));
 /** What the URL popover lists: each selected readable environment, or Global when none is selected. */
 const opensIn = computed(() => {
   if (props.selectedIds.length === 0) {
-    const [global] = environmentStartUrls(
-      props.url,
-      props.checkVariables,
-      props.environments,
-      props.globals,
-      [GLOBAL_ONLY],
-    );
-    return [{ id: "global", name: t("synthetics.journey.replayValues.global"), url: global.url }];
+    const url = urlsFor([GLOBAL_ONLY]).get(GLOBAL_ONLY) ?? "";
+    return [{ id: "global", name: t("synthetics.journey.replayValues.global"), url }];
   }
   return props.selectedIds.flatMap((id) => {
     const env = named.value.find((e) => e.id === id);

@@ -40,12 +40,16 @@ function apiOrigin(): string {
 export interface SyntheticsVariablePayload {
   name: string;
   value?: string;
-  /** Fixed once created, so an update may leave it out. */
-  kind?: "plain" | "secret";
+  kind: "plain" | "secret";
   description?: string;
   example?: string;
   tags?: string[];
 }
+
+/** A variable's kind is fixed once created, so an update may leave it out. */
+export type SyntheticsVariableUpdatePayload = Omit<SyntheticsVariablePayload, "kind"> & {
+  kind?: SyntheticsVariablePayload["kind"];
+};
 
 export interface SyntheticsEnvironmentPayload {
   name: string;
@@ -238,7 +242,7 @@ const syntheticsService = {
   updateGlobalVariable: (
     orgIdentifier: string,
     id: string,
-    body: SyntheticsVariablePayload,
+    body: SyntheticsVariableUpdatePayload,
     force = false,
   ) => http().put(`/api/${orgIdentifier}/synthetics/variables/${id}?force=${force}`, body),
 
@@ -280,7 +284,7 @@ const syntheticsService = {
     orgIdentifier: string,
     env: string,
     id: string,
-    body: SyntheticsVariablePayload,
+    body: SyntheticsVariableUpdatePayload,
     force = false,
   ) =>
     http().put(

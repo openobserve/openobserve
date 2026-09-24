@@ -1486,7 +1486,6 @@ const replaySecretNames = computed(
     ),
 );
 
-/** The typed secrets the last replay ran with, for the result banners. */
 const lastReplayTypedSecrets = ref<{
   envId: string;
   names: string[];
@@ -1696,7 +1695,11 @@ const secretsPrompt = ref<{
 } | null>(null);
 const secretsOpen = ref(false);
 
+// A fresh dialog per open, so its fields and schema are built for the names asked for.
+const secretsPromptSerial = ref(0);
+
 function openSecretsDialog(prompt: NonNullable<typeof secretsPrompt.value>) {
+  secretsPromptSerial.value += 1;
   secretsPrompt.value = prompt;
   secretsOpen.value = true;
 }
@@ -2367,6 +2370,7 @@ function onClearResults() {
 
     <ReplaySecretsDialog
       v-if="secretsPrompt"
+      :key="secretsPromptSerial"
       v-model:open="secretsOpen"
       :mode="secretsPrompt.mode"
       :environment-name="environmentLabel(secretsPrompt.envId)"
