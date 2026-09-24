@@ -17,6 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   findFirstValidMappedValue,
   validateDashboardJson,
+  validateSQLPanelFields,
 } from "@/utils/dashboard/panelValidation";
 import { gt } from "@/types/i18n";
 
@@ -292,4 +293,88 @@ describe("panelValidation", () => {
       expect(errors.some((e) => e.includes("must have a panels array"))).toBe(true);
     });
   });
+
+  /**
+   * openobserve#2188 — a gauge panel whose fields are wrong shows a validation
+   * message instead of a chart. `panelValidation.ts` has a `case "gauge"` branch
+   * for exactly that, and before this block the whole suite had NO gauge case:
+   * deleting either rule left every test green. The rules are asymmetric and easy
+   * to get backwards — a gauge needs EXACTLY one value field, but zero OR one
+   * label field — so each edge is pinned here rather than just the happy path.
+   */
+  describe("validateSQLPanelFields — gauge field rules", () => {
+    const panel = (fields: any) => ({
+      type: "gauge",
+      queryType: "sql",
+      queries: [{ customQuery: false, fields }],
+    });
+    const errorsFor = (fields: any, pageKey?: string) => {
+      const errors: string[] = [];
+      validateSQLPanelFields(gt, panel(fields), 0, "X", "Y", errors, true, pageKey);
+      return errors;
+    };
+    // `type: "raw"` short-circuits the per-field aggregation-function check, which
+    // this file mocks `functionValidation.json` to an empty list for — without it every
+    // field would fail that check and drown out the gauge rules under test.
+    const field = (alias: string) => ({
+      alias,
+      column: alias,
+      label: alias,
+      type: "raw",
+      rawQuery: `count(${alias})`,
+    });
+
+    it("accepts exactly one value field and one label field", () => {
+      expect(errorsFor({ x: [field("service")], y: [field("count")] })).toEqual([]);
+    });
+
+    it("accepts exactly one value field and no label field", () => {
+      expect(errorsFor({ x: [], y: [field("count")] })).toEqual([]);
+    });
+
+    it("rejects a gauge with no value field", () => {
+      const errors = errorsFor({ x: [field("service")], y: [] });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/value field/i);
+    });
+
+    it("rejects a gauge with more than one value field", () => {
+      const errors = errorsFor({ x: [field("service")], y: [field("count"), field("total")] });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/value field/i);
+    });
+
+    it("rejects a gauge with more than one label field", () => {
+      const errors = errorsFor({ x: [field("service"), field("pod")], y: [field("count")] });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/label field/i);
+    });
+
+    it("reports both rules when the value and label counts are each wrong", () => {
+      const errors = errorsFor({ x: [field("service"), field("pod")], y: [] });
+      expect(errors).toHaveLength(2);
+    });
+
+    it("uses the logs-page wording when validating from the logs page", () => {
+      const errors = errorsFor({ x: [field("service")], y: [] }, "logs");
+      expect(errors).toHaveLength(1);
+      // The logs page has no X/Y axis vocabulary, so it must not borrow the
+      // dashboard wording that names those axes.
+      expect(errors[0]).not.toMatch(/gauge chart/i);
+    });
+
+    it("skips field validation for a custom query, which the user writes by hand", () => {
+      const errors: string[] = [];
+      validateSQLPanelFields(
+        gt,
+        { type: "gauge", queryType: "sql", queries: [{ customQuery: true, fields: { x: [], y: [] } }] },
+        0,
+        "X",
+        "Y",
+        errors,
+      );
+      expect(errors).toEqual([]);
+    });
+  });
+
 });
