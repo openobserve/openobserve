@@ -70,7 +70,7 @@ impl MidxTrailer {
     }
 
     /// End of the sample blocks and start of the label region; valid for the size read with.
-    pub fn payload_end(&self, file_size: u64) -> u64 {
+    pub fn blocks_end(&self, file_size: u64) -> u64 {
         self.directory_start(file_size)
             .saturating_sub(self.label_len)
     }
@@ -107,7 +107,7 @@ mod tests {
         let parsed = MidxTrailer::read(&trailer(10, MIDX_VERSION, MIDX_MAGIC), 100).unwrap();
         assert_eq!(parsed.header_start(100), 58);
         assert_eq!(parsed.directory_start(100), 51);
-        assert_eq!(parsed.payload_end(100), 46);
+        assert_eq!(parsed.blocks_end(100), 46);
         let mut overflow = trailer(10, MIDX_VERSION, MIDX_MAGIC);
         overflow[..8].copy_from_slice(&u64::MAX.to_le_bytes());
         let mut empty_directory = trailer(10, MIDX_VERSION, MIDX_MAGIC);

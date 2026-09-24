@@ -409,7 +409,7 @@ fn projected_labels_do_not_retain_unrequested_large_buffers() {
     let mut writer = test_writer(2);
     writer.write(&input).unwrap();
     let blob = writer.finish().unwrap();
-    let metadata_bytes = blob.len() - trailer_of(&blob).payload_end(blob.len() as u64) as usize;
+    let metadata_bytes = blob.len() - trailer_of(&blob).blocks_end(blob.len() as u64) as usize;
     let index = index(&blob, &["label_b"]).unwrap();
     assert!(metadata_bytes < 100_000);
     assert!(
@@ -758,7 +758,7 @@ fn v3_tail_header_locates_labels_before_directory() {
         header.directory_range().start,
         regions.directory_start(size)
     );
-    assert_eq!(header.payload_end(), regions.payload_end(size));
+    assert_eq!(header.blocks_end(), regions.blocks_end(size));
     assert!(Header::parse(&tail[1..], blob.len() as u64, &parent()).is_err());
     let ranges = header
         .column_ranges(&["label_b".into(), "missing".into(), "label_b".into()])
@@ -773,7 +773,7 @@ fn v3_tail_header_locates_labels_before_directory() {
     let all = header
         .column_ranges(&["label_a".into(), "label_b".into()])
         .unwrap();
-    assert_eq!(all[1].start, regions.payload_end(size));
+    assert_eq!(all[1].start, regions.blocks_end(size));
     assert_eq!(all[1].end, all[2].start);
     assert_eq!(all[2].end, all[0].start);
     let columns = ranges
@@ -825,9 +825,9 @@ fn trailer_and_header_reject_truncation_and_invalid_structure() {
 #[test]
 fn completion_marker_is_last_and_write_or_flush_errors_propagate() {
     let complete = fixture();
-    let payload_end = trailer_of(&complete).payload_end(complete.len() as u64) as usize;
+    let blocks_end = trailer_of(&complete).blocks_end(complete.len() as u64) as usize;
     for (fail_after, fail_flush) in [
-        (payload_end + 1, usize::MAX),
+        (blocks_end + 1, usize::MAX),
         (complete.len() - 9, usize::MAX),
         (complete.len() - 4, usize::MAX),
         (usize::MAX, 1),
@@ -948,7 +948,7 @@ fn vortex_finalizer_rejects_invalid_source_metadata() {
 }
 
 #[test]
-fn sample_payload_requires_one_complete_frame() {
+fn sample_block_requires_one_complete_frame() {
     let blob = fixture();
     let parsed = index(&blob, &[]).unwrap();
     let mut block = parsed.blocks.block(0);

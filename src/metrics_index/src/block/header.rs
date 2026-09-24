@@ -31,7 +31,7 @@ pub struct Header {
     pub row_group_size: Option<u32>,
     pub source_schema: SchemaRef,
     pub(super) blocks: usize,
-    pub(super) payload_end: u64,
+    pub(super) blocks_end: u64,
     pub(super) labels: Vec<LabelColumn>,
     pub(super) directory: Vec<Column>,
 }
@@ -69,8 +69,8 @@ impl Header {
     }
 
     /// End of the sample blocks, where the label frames start.
-    pub fn payload_end(&self) -> u64 {
-        self.payload_end
+    pub fn blocks_end(&self) -> u64 {
+        self.blocks_end
     }
 
     /// Directory range followed by one range per requested label stored in this file.
@@ -142,8 +142,8 @@ impl Header {
             .checked_mul(4)
             .and_then(|n| n.checked_add(4))
             .context("label size overflow")?;
-        let payload_end = trailer.payload_end(file_size);
-        let mut next = payload_end;
+        let blocks_end = trailer.blocks_end(file_size);
+        let mut next = blocks_end;
         let mut labels = Vec::with_capacity(data.labels.len());
         for label in data.labels {
             let column = Column::next(&mut next, label.section)?;
@@ -183,7 +183,7 @@ impl Header {
             row_group_size: data.row_group_size,
             source_schema: Arc::new(data.source_schema),
             blocks,
-            payload_end,
+            blocks_end,
             labels,
             directory,
         })

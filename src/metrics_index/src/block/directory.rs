@@ -22,7 +22,7 @@ pub struct BlockDirectory {
     entries: Box<[PackedBlock]>,
     strict: Box<[u8]>,
     rows: u64,
-    payload_end: u64,
+    blocks_end: u64,
 }
 
 impl BlockDirectory {
@@ -44,7 +44,7 @@ impl BlockDirectory {
         let next_offset = self
             .entries
             .get(index + 1)
-            .map_or(self.payload_end, |next| next.block_offset);
+            .map_or(self.blocks_end, |next| next.block_offset);
         BlockMeta {
             hash: entry.hash,
             row_start: entry.row_start,
@@ -53,7 +53,7 @@ impl BlockDirectory {
             max_timestamp: entry.max_timestamp,
             block_offset: entry.block_offset,
             block_length: u32::try_from(next_offset - entry.block_offset)
-                .expect("validated block payload span"),
+                .expect("validated block byte span"),
             strictly_increasing: self.strict[index / 8] & (1 << (index % 8)) != 0,
         }
     }
@@ -126,16 +126,16 @@ pub(crate) struct DirectoryBuilder {
     entries: Vec<PackedBlock>,
     strict: Vec<u8>,
     rows: u64,
-    payload_end: u64,
+    blocks_end: u64,
 }
 
 impl DirectoryBuilder {
-    pub(crate) fn new(count: usize, rows: u64, payload_end: u64) -> Self {
+    pub(crate) fn new(count: usize, rows: u64, blocks_end: u64) -> Self {
         Self {
             entries: Vec::with_capacity(count),
             strict: vec![0; count.div_ceil(8)],
             rows,
-            payload_end,
+            blocks_end,
         }
     }
 
@@ -158,7 +158,7 @@ impl DirectoryBuilder {
             entries: self.entries.into_boxed_slice(),
             strict: self.strict.into_boxed_slice(),
             rows: self.rows,
-            payload_end: self.payload_end,
+            blocks_end: self.blocks_end,
         }
     }
 }

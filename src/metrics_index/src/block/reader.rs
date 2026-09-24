@@ -41,12 +41,12 @@ impl BlockDecoder {
 
     pub fn decode<'a>(
         &'a mut self,
-        payload: &[u8],
+        block_bytes: &[u8],
         block: &BlockMeta,
     ) -> Result<DecodedBlockRef<'a>> {
         self.timestamps.clear();
         self.value_bits.clear();
-        if let Err(error) = self.decode_inner(payload, block) {
+        if let Err(error) = self.decode_inner(block_bytes, block) {
             self.timestamps.clear();
             self.value_bits.clear();
             return Err(error);
@@ -72,7 +72,7 @@ impl BlockDecoder {
         })
     }
 
-    fn decode_inner(&mut self, payload: &[u8], block: &BlockMeta) -> Result<()> {
+    fn decode_inner(&mut self, block_bytes: &[u8], block: &BlockMeta) -> Result<()> {
         ensure!(
             block.row_count > 0 && block.row_count as usize <= MAX_BLOCK_ROWS,
             "invalid decoded row count"
@@ -82,13 +82,13 @@ impl BlockDecoder {
             "compressed block length exceeds format bound"
         );
         ensure!(
-            payload.len() == block.block_length as usize,
-            "payload length mismatch"
+            block_bytes.len() == block.block_length as usize,
+            "block length mismatch"
         );
         ensure!(
-            zstd::zstd_safe::find_frame_compressed_size(payload)
+            zstd::zstd_safe::find_frame_compressed_size(block_bytes)
                 .map_err(|error| anyhow!("invalid sample frame: {error:?}"))?
-                == payload.len(),
+                == block_bytes.len(),
             "extra sample frame bytes"
         );
         let count = block.row_count as usize;
@@ -99,7 +99,7 @@ impl BlockDecoder {
         );
         let raw = &mut self.raw[..size];
         ensure!(
-            self.decoder.decompress_to_buffer(payload, raw)? == size,
+            self.decoder.decompress_to_buffer(block_bytes, raw)? == size,
             "decoded size mismatch"
         );
         let (timestamp_bytes, value_bytes) = raw.split_at(count * 8);
@@ -167,7 +167,7 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
             rows,
         )?);
     }
-    let blocks = decode_directory(&arrays, &header.parent, header.payload_end)?;
+    let blocks = decode_directory(&arrays, &header.parent, header.blocks_end)?;
     let mut fields = Vec::with_capacity(projection.len());
     let mut label_columns: Vec<ArrayRef> = Vec::with_capacity(projection.len());
     for (bytes, index) in columns[1..].iter().zip(&projection) {
@@ -233,9 +233,9 @@ pub fn decode_file(file: &[u8], expected: &ParentMetadata, labels: &[String]) ->
     decode_index(&header, &columns, labels)
 }
 
-pub fn decode_block(payload: &[u8], block: &BlockMeta) -> Result<DecodedBlock> {
+pub fn decode_block(block_bytes: &[u8], block: &BlockMeta) -> Result<DecodedBlock> {
     let mut decoder = BlockDecoder::with_capacity(block.row_count as usize)?;
-    decoder.decode(payload, block)?;
+    decoder.decode(block_bytes, block)?;
     Ok(DecodedBlock {
         timestamps: decoder.timestamps,
         value_bits: decoder.value_bits,
@@ -245,7 +245,7 @@ pub fn decode_block(payload: &[u8], block: &BlockMeta) -> Result<DecodedBlock> {
 fn decode_directory(
     columns: &[ArrayRef],
     parent: &ParentMetadata,
-    payload_end: u64,
+    blocks_end: u64,
 ) -> Result<BlockDirectory> {
     let count = columns[0].len();
     let hashes = columns[0]
@@ -280,7 +280,7 @@ fn decode_directory(
         .as_any()
         .downcast_ref::<BooleanArray>()
         .context("strict type")?;
-    let mut blocks = super::directory::DirectoryBuilder::new(count, parent.rows, payload_end);
+    let mut blocks = super::directory::DirectoryBuilder::new(count, parent.rows, blocks_end);
     let mut next_row = 0u64;
     let mut next_offset = 0u64;
     let mut previous: Option<(u64, i64)> = None;
@@ -305,7 +305,7 @@ fn decode_directory(
         );
         ensure!(
             block.row_start == next_row && block.block_length > 0,
-            "noncontiguous row or payload directory"
+            "noncontiguous row or block directory"
         );
         ensure!(
             block.min_timestamp <= block.max_timestamp,
@@ -331,21 +331,21 @@ fn decode_directory(
             .context("row end overflow")?;
         ensure!(
             block.block_offset == next_offset,
-            "noncontiguous payload directory"
+            "noncontiguous block directory"
         );
         next_offset = next_offset
             .checked_add(u64::from(block.block_length))
-            .context("payload end overflow")?;
+            .context("blocks end overflow")?;
         ensure!(
-            next_row <= parent.rows && next_offset <= payload_end,
+            next_row <= parent.rows && next_offset <= blocks_end,
             "block outside parent bounds"
         );
         previous = Some((block.hash, block.max_timestamp));
         blocks.push(block);
     }
     ensure!(
-        next_row == parent.rows && next_offset == payload_end,
-        "directory does not tile source rows and payload"
+        next_row == parent.rows && next_offset == blocks_end,
+        "directory does not tile source rows and blocks"
     );
     Ok(blocks.finish())
 }
@@ -365,7 +365,7 @@ mod decoder_tests {
                 raw.push((sample.1 >> (byte * 8)) as u8);
             }
         }
-        let payload = zstd::bulk::compress(&raw, 1).unwrap();
+        let block_bytes = zstd::bulk::compress(&raw, 1).unwrap();
         let block = BlockMeta {
             hash: 7,
             row_start: 0,
@@ -373,10 +373,10 @@ mod decoder_tests {
             min_timestamp: samples[0].0,
             max_timestamp: samples.last().unwrap().0,
             block_offset: 0,
-            block_length: payload.len() as u32,
+            block_length: block_bytes.len() as u32,
             strictly_increasing: samples.windows(2).all(|w| w[0].0 < w[1].0),
         };
-        (payload, block)
+        (block_bytes, block)
     }
 
     #[test]
@@ -400,8 +400,8 @@ mod decoder_tests {
             let samples: Vec<_> = (0..count)
                 .map(|i| (i as i64 * 15_000_000, (i as u64).rotate_left(31)))
                 .collect();
-            let (payload, block) = fixture(&samples);
-            let decoded = decoder.decode(&payload, &block).unwrap();
+            let (block_bytes, block) = fixture(&samples);
+            let decoded = decoder.decode(&block_bytes, &block).unwrap();
             assert_eq!(
                 decoded
                     .timestamps
@@ -433,10 +433,10 @@ mod decoder_tests {
     #[test]
     fn reusable_decoder_recovers_after_integrity_and_native_errors() {
         let samples = [(0, 0), (15_000_000, 1f64.to_bits())];
-        let (payload, block) = fixture(&samples);
+        let (block_bytes, block) = fixture(&samples);
         let mut decoder = BlockDecoder::new().unwrap();
-        decoder.decode(&payload, &block).unwrap();
-        let mut corrupt = payload.clone();
+        decoder.decode(&block_bytes, &block).unwrap();
+        let mut corrupt = block_bytes.clone();
         corrupt[0] ^= 1;
         let bad_zstd = [1, 2, 3, 4];
         let mut bad_frame = block.clone();
@@ -450,14 +450,14 @@ mod decoder_tests {
         for (bytes, metadata) in [
             (&corrupt[..], &block),
             (&bad_zstd[..], &bad_frame),
-            (&payload[..], &bad_endpoint),
-            (&payload[..], &bad_strict),
-            (&payload[..], &too_many),
+            (&block_bytes[..], &bad_endpoint),
+            (&block_bytes[..], &bad_strict),
+            (&block_bytes[..], &too_many),
         ] {
             assert!(decoder.decode(bytes, metadata).is_err());
             assert!(decoder.timestamps.is_empty());
             assert!(decoder.value_bits.is_empty());
-            let actual = decoder.decode(&payload, &block).unwrap();
+            let actual = decoder.decode(&block_bytes, &block).unwrap();
             assert_eq!(actual.timestamps, &[0, 15_000_000]);
             assert_eq!(actual.value_bits, &[0, 1f64.to_bits()]);
         }
@@ -500,13 +500,13 @@ mod decoder_tests {
             (15_000_001, 100f64.to_bits()),
             (i64::MAX, 1f64.to_bits()),
         ];
-        let (payload, metadata) = fixture(&samples);
-        let owned = decode_block(&payload, &metadata).unwrap();
+        let (block_bytes, metadata) = fixture(&samples);
+        let owned = decode_block(&block_bytes, &metadata).unwrap();
         let mut first = BlockDecoder::new().unwrap();
         let mut second = BlockDecoder::new().unwrap();
-        let borrowed = first.decode(&payload, &metadata).unwrap();
-        let (other_payload, other_metadata) = fixture(&[(77, f64::INFINITY.to_bits())]);
-        second.decode(&other_payload, &other_metadata).unwrap();
+        let borrowed = first.decode(&block_bytes, &metadata).unwrap();
+        let (other_block_bytes, other_metadata) = fixture(&[(77, f64::INFINITY.to_bits())]);
+        second.decode(&other_block_bytes, &other_metadata).unwrap();
         assert_eq!(borrowed.timestamps, owned.timestamps);
         assert_eq!(borrowed.value_bits, owned.value_bits);
         assert_eq!(

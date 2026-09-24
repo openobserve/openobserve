@@ -350,10 +350,10 @@ impl<W: Write> BlockWriter<W> {
                 raw.push((value >> (byte * 8)) as u8);
             }
         }
-        let payload = zstd::bulk::compress(&raw, 1)?;
-        let block_length = u32::try_from(payload.len())?;
+        let block_bytes = zstd::bulk::compress(&raw, 1)?;
+        let block_length = u32::try_from(block_bytes.len())?;
         ensure!(
-            payload.len() <= max_compressed_block_len(u32::try_from(count)?)?,
+            block_bytes.len() <= max_compressed_block_len(u32::try_from(count)?)?,
             "compressed block exceeds format bound"
         );
         let meta = BlockMeta {
@@ -372,8 +372,8 @@ impl<W: Write> BlockWriter<W> {
         self.offset = self
             .offset
             .checked_add(u64::from(block_length))
-            .context("payload offset overflow")?;
-        self.output.write_all(&payload)?;
+            .context("block offset overflow")?;
+        self.output.write_all(&block_bytes)?;
         self.blocks.push(meta);
         self.labels.push(self.current_labels.clone());
         self.timestamps.clear();

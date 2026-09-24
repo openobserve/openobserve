@@ -233,7 +233,7 @@ async fn read_header(
     let mut bytes = get_range(account, path, start..size).await?;
     let trailer = crate::block::Header::trailer(&bytes, size).map_err(external)?;
     let needed = if trailer.label_len + trailer.directory_len <= SMALL_METADATA_BYTES {
-        trailer.payload_end(size)
+        trailer.blocks_end(size)
     } else if trailer.header_start(size) < start {
         trailer.directory_start(size)
     } else {

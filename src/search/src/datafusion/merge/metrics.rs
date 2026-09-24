@@ -1206,16 +1206,16 @@ mod tests {
             let mut native = Vec::new();
             for block in &index.blocks {
                 let range = block.block_range();
-                let payload = metrics_index::block::decode_block(
+                let decoded = metrics_index::block::decode_block(
                     &encoded[range.start as usize..range.end as usize],
                     &block,
                 )
                 .unwrap();
                 native.extend(
-                    payload
+                    decoded
                         .timestamps
                         .into_iter()
-                        .zip(payload.value_bits)
+                        .zip(decoded.value_bits)
                         .map(|(t, v)| (block.hash, t, Some(v))),
                 );
             }
