@@ -1749,7 +1749,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           <OButton
             v-if="variablesPanelOpen !== undefined"
             :variant="variablesPanelOpen ? 'outline-primary' : 'outline'"
-            size="sm"
+            size="icon-sm-split"
             icon-left="data-object"
             :aria-label="variablesToggleLabel"
             :aria-pressed="variablesPanelOpen"

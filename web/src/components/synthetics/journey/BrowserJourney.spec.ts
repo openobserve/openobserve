@@ -2766,12 +2766,12 @@ describe("BrowserJourney variables panel toggle", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the toggle as an outline sm button with the variables icon", () => {
+  it("renders the toggle as an outline slim icon button with the variables icon", () => {
     wrapper = mountToolbar({ variablesPanelOpen: false });
 
     const toggle = wrapper.find(TOGGLE);
     expect(toggle.attributes("variant")).toBe("outline");
-    expect(toggle.attributes("size")).toBe("sm");
+    expect(toggle.attributes("size")).toBe("icon-sm-split");
     expect(toggle.attributes("icon-left")).toBe("data-object");
     expect(toggle.text()).toBe("");
   });
