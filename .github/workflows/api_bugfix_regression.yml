@@ -368,7 +368,7 @@ jobs:
   # distinguishable from the per-PR one. Never fails the run.
   report_to_openobserve:
     name: Report run metrics to OpenObserve
-    needs: [check_main_changed, api_regression_tests]
+    needs: [check_main_changed, api_regression_tests, api_regression_summary]
     if: ${{ always() && needs.check_main_changed.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -395,25 +395,32 @@ jobs:
           O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
           O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
-          TESTS: ${{ needs.api_regression_tests.result }}
+          # The SUMMARY, not the test job: this job now also runs when the build failed,
+          # and in that case the test job is `skipped` — which read as success and would
+          # post a broken run to ci_test_runs as green. Anything that is not an explicit
+          # success or cancellation counts as a failure, so the metric errs loud.
+          RESULT: ${{ needs.api_regression_summary.result }}
         run: |
           set -uo pipefail
-          if [ "$TESTS" = "failure" ]; then CONCLUSION=failure
-          elif [ "$TESTS" = "cancelled" ]; then CONCLUSION=cancelled
-          else CONCLUSION=success; fi
+          if [ "$RESULT" = "success" ]; then CONCLUSION=success
+          elif [ "$RESULT" = "cancelled" ]; then CONCLUSION=cancelled
+          else CONCLUSION=failure; fi
           export CONCLUSION STREAM=ci_test_runs SUITE=api
           # o2-run-report.sh derives its workflow tag from the STREAM name alone
           # (regression only for ci_regression), so a scheduled run posting to
           # ci_test_runs would be indistinguishable from a per-PR api-testing run and
           # would pollute the PR-CI duration and pass-rate panels. EXTRA_JSON keys win
-          # the merge, so override it here — and unconditionally, so the tag survives a
-          # junit parse failure. It must agree with the resync entry, which is is_regression=True.
+          # the merge, so override it here. The default stands unless the counts merge
+          # BOTH succeeds and produces output — an empty EXTRA_JSON is skipped by the
+          # reporter, which would silently drop the tag back to "test". It must agree
+          # with the resync entry, which registers this workflow as is_regression=True.
           EXTRA_JSON='{"workflow":"regression"}'
           if [ -d junit-xml ]; then
             COUNTS=$(python3 .github/scripts/parse-api-junit.py junit-xml 2>/dev/null || echo "")
             if [ -n "$COUNTS" ] && printf '%s' "$COUNTS" | jq -e . >/dev/null 2>&1; then
               echo "API counts: $COUNTS"
-              EXTRA_JSON=$(printf '%s' "$COUNTS" | jq -c '.total + {workflow:"regression"}')
+              MERGED=$(printf '%s' "$COUNTS" | jq -c '.total + {workflow:"regression"}' 2>/dev/null || echo "")
+              [ -n "$MERGED" ] && EXTRA_JSON="$MERGED"
               printf '%s' "$COUNTS" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
                 '[.by_category[] | {run_id:$run_id, repo:$repo, suite:"api", workflow:"regression", ingest_source:"live",
                   module:.module, tests_total, tests_passed, tests_failed, tests_flaky, tests_skipped}]' > api_counts_rows.json
