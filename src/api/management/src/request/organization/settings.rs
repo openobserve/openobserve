@@ -19,14 +19,20 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-#[cfg(feature = "cloud")]
-use config::META_ORG_ID;
 use db::organization::{get_org_setting, set_org_setting};
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
     axum::extract::{Multipart, Query},
     o2_enterprise::enterprise::common::settings,
+};
+#[cfg(feature = "cloud")]
+use {
+    config::META_ORG_ID,
+    o2_enterprise::enterprise::cloud::{
+        billing_group::list_billing_group_members_of, billings::MeteringProvider, customer_billings,
+    },
+    std::collections::HashSet,
 };
 
 use crate::common::meta::{
@@ -213,6 +219,51 @@ pub async fn create(
             mapping.domain = mapping.domain.to_lowercase();
         }
         data.domain_org_mappings = mappings;
+    }
+
+    #[cfg(feature = "cloud")]
+    if let Some(configs) = settings.budget_config {
+        let billings = match customer_billings::get_by_org_id(&org_id).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("error getting customer billings for org_id {org_id} : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+
+        if let Some(v) = billings.first()
+            && v.provider == MeteringProvider::Stripe
+        {
+            let child_orgs = match list_billing_group_members_of(&org_id).await {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "error in getting child orgs of {org_id} for budget config update : {e}"
+                    );
+                    return MetaHttpResponse::internal_error(e);
+                }
+            };
+
+            let mut allowed_orgs: HashSet<_> =
+                child_orgs.into_iter().map(|v| v.member_org_id).collect();
+            allowed_orgs.insert(org_id.clone());
+
+            for config in &configs {
+                if !allowed_orgs.contains(&config.org_id) {
+                    return MetaHttpResponse::bad_request(format!(
+                        "cannot set budget notification configuration for org {}",
+                        config.org_id
+                    ));
+                }
+            }
+            data.budget_config = configs;
+            field_found = true;
+        } else {
+            return MetaHttpResponse::bad_request(
+                "this org is not configured with stripe billing, so budget cannot be set"
+                    .to_string(),
+            );
+        }
     }
 
     if !field_found {
