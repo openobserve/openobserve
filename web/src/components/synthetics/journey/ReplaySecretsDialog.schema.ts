@@ -16,7 +16,6 @@
 import { z } from "zod";
 import type { TranslateFn } from "@/types/i18n";
 
-/** One required field per secret name; the names are the form's keys. */
 export const makeReplaySecretsSchema = (t: TranslateFn, names: string[]) =>
   z.object(
     Object.fromEntries(

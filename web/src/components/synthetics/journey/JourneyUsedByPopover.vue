@@ -65,6 +65,7 @@ function editRoute(reference: { id: string; folder_id: string }) {
         size="sm"
         icon-left="account-tree"
         aria-haspopup="dialog"
+        class="max-md:hidden"
         data-test="synthetics-journey-used-by-trigger"
       >
         {{ t("synthetics.save.usedByCount", { count }, count) }}

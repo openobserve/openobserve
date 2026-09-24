@@ -125,6 +125,7 @@ import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTest
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const router = useRouter();
 const route = useRoute();
@@ -177,6 +178,17 @@ const folderName = computed(() => {
   if (!fid || fid === "default") return "";
   return folders.value.find((f) => f.folderId === fid)?.name ?? "";
 });
+const { isMobile } = useBreakpoint();
+/** A phone has no room for the header's Used by button, so the count joins the subtitle. */
+const headerSubtitle = computed(() =>
+  isMobile.value && referencedByCount.value > 0
+    ? t(
+        "synthetics.journey.usedBy.subtitle",
+        { folder: folderName.value, count: referencedByCount.value },
+        referencedByCount.value,
+      )
+    : raw(folderName.value),
+);
 /**
  * Where every exit from this wizard lands.
  *
@@ -1773,7 +1785,7 @@ function onClearResults() {
   <!-- ── Non-loading: shared wrapper with page header ── -->
   <OPageLayout
     class="bg-surface-base"
-    :subtitle="raw(folderName)"
+    :subtitle="headerSubtitle"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: backTo,
@@ -2014,6 +2026,7 @@ function onClearResults() {
                   >
                     <template #start-pill="{ locked }">
                       <JourneyStartPill
+                        class="max-md:order-last max-md:basis-full"
                         :url="check.url"
                         :environments="sharedEnvironments"
                         :selected-ids="check.environments ?? []"
