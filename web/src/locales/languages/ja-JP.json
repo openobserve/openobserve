@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "{engine}が実行に費やした時間",
         "serverWait": "{engine}が待機に費やした時間 — 待機時間であり、実行時間ではありません",
-        "serverCounted": "すべてのクライアントにわたって{engine}によってカウント",
-        "clientObserved": "計測された呼び出し元によって観測 — データベースはこれを報告しませんでした"
+        "serverCounted": "すべてのクライアントにわたって{engine}によってカウント"
       },
       "endpointsConcentrated": "1つのエンドポイントがこのクエリの時間の{percent}を占めています。{endpoint}を修正すれば、このクエリも修正されます。",
       "typicalMarker": "遅い呼び出し {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "実行時間",
         "serverWait": "待機時間",
         "serverCounted": "サーバー数",
-        "clientObserved": "クライアント観測",
         "serverReported": "データベースから報告"
       }
     },

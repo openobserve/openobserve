@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "وقت {engine} يقضى في تنفيذه",
         "serverWait": "الوقت {engine} يقضى في انتظاره — وقت انتظار، وليس وقت تنفيذ",
-        "serverCounted": "حسب {engine}، عبر كل عميل",
-        "clientObserved": "تمت ملاحظة ذلك من قبل المتصلين المسلحين — قاعدة بياناتك لم تبلغ عن هذا الحدث"
+        "serverCounted": "حسب {engine}، عبر كل عميل"
       },
       "endpointsConcentrated": "نقطة نهاية واحدة تمثل {percent} وقت هذا الاستعلام. إذا صححت {endpoint} فستكون قد أصلحت هذا الاستعلام.",
       "typicalMarker": "نداءات بطيئة {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "زمن التنفيذ",
         "serverWait": "زمن الانتظار",
         "serverCounted": "عدد الخوادم",
-        "clientObserved": "تمت ملاحظته من العميل",
         "serverReported": "أبلغت عنه قواعد البيانات الخاصة بك"
       }
     },

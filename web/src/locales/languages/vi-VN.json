@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "Thời gian {engine} dành để thực thi nó",
         "serverWait": "Thời gian {engine} chờ nó — thời gian chờ, không phải thời gian thực thi",
-        "serverCounted": "Được đếm bởi {engine}, trên mọi máy khách",
-        "clientObserved": "Được quan sát bởi các bên gọi được cài đặt đo lường — cơ sở dữ liệu của bạn không báo cáo điều này."
+        "serverCounted": "Được đếm bởi {engine}, trên mọi máy khách"
       },
       "endpointsConcentrated": "Một endpoint chiếm {percent} thời gian của truy vấn này. Sửa {endpoint} là bạn đã sửa xong truy vấn này.",
       "typicalMarker": "lời gọi chậm {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "thời gian thực thi",
         "serverWait": "thời gian chờ",
         "serverCounted": "số lượng máy chủ",
-        "clientObserved": "quan sát từ máy khách",
         "serverReported": "được báo cáo bởi các cơ sở dữ liệu của bạn"
       }
     },

@@ -20,6 +20,7 @@ import type { I18nText } from "@/types/i18n";
 
 import { computed, useSlots } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { StatTone, StatTrend } from "./OStatStrip.types";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -36,6 +37,8 @@ const props = withDefaults(
      * time"). Not a second metric and never a trend.
      */
     sub?: I18nText;
+    /** Render the qualifier as this glyph; `sub` becomes its accessible name and tooltip. */
+    subIcon?: IconName;
     icon?: IconName;
     tone?: StatTone;
     trend?: StatTrend;
@@ -176,7 +179,17 @@ const trendClass = computed(() =>
              number IS (which measurement, whose count), so a tile under a
              generic heading cannot be read as the wrong quantity. Truncates
              before the value does — the value never shrinks. -->
-        <span v-if="sub" class="text-text-label text-2xs min-w-0 truncate max-lg:hidden">{{
+        <OIcon
+          v-if="sub && subIcon"
+          :name="subIcon"
+          size="xs"
+          :label="sub"
+          class="text-text-label self-center max-lg:hidden"
+          data-test="o-stat-card-sub-icon"
+        >
+          <OTooltip :content="sub" />
+        </OIcon>
+        <span v-else-if="sub" class="text-text-label text-2xs min-w-0 truncate max-lg:hidden">{{
           sub
         }}</span>
       </div>

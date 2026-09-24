@@ -122,4 +122,25 @@ describe("OStatStrip", () => {
       expect(selectedKeys({ selectable: false, selectedKey: "b", defaultKey: "a" })).toBe(0);
     });
   });
+
+  // ── a qualifier shown as a glyph ──────────────────────────────────────────
+  describe("subIcon", () => {
+    const mountCard = (item: Record<string, unknown>) =>
+      mount(OStatStrip, {
+        props: { items: [{ key: "c", label: raw("Calls"), value: 5, ...item }] },
+      });
+
+    it("renders the qualifier as a labelled glyph instead of text", () => {
+      const wrapper = mountCard({ sub: raw("From traces"), subIcon: "account-tree" });
+      const icon = wrapper.get("[data-test='o-stat-card-sub-icon']");
+      expect(icon.attributes("aria-label")).toBe("From traces");
+      expect(wrapper.text()).not.toContain("From traces");
+    });
+
+    it("keeps the text qualifier when no glyph is given", () => {
+      const wrapper = mountCard({ sub: raw("wait time") });
+      expect(wrapper.find("[data-test='o-stat-card-sub-icon']").exists()).toBe(false);
+      expect(wrapper.text()).toContain("wait time");
+    });
+  });
 });

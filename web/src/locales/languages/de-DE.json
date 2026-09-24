@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "Zeit, die {engine} für die Ausführung aufgewendet hat",
         "serverWait": "Zeit, die {engine} darauf gewartet hat — Wartezeit, nicht Ausführungszeit",
-        "serverCounted": "Gezählt von {engine}, über alle Clients hinweg",
-        "clientObserved": "Beobachtet von instrumentierten Aufrufern — Ihre Datenbank hat diese nicht gemeldet."
+        "serverCounted": "Gezählt von {engine}, über alle Clients hinweg"
       },
       "endpointsConcentrated": "Ein Endpunkt macht {percent} der Zeit dieser Abfrage aus. Beheben Sie {endpoint}, und Sie haben diese Abfrage behoben.",
       "typicalMarker": "Langsame Aufrufe {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "Ausführungszeit",
         "serverWait": "Wartezeit",
         "serverCounted": "Serveranzahl",
-        "clientObserved": "clientseitig beobachtet",
         "serverReported": "von Ihren Datenbanken gemeldet"
       }
     },

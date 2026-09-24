@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "{engine} 执行它所花费的时间",
         "serverWait": "{engine} 等待它所花费的时间——等待时间，而非执行时间",
-        "serverCounted": "由{engine}统计，涵盖每个客户端",
-        "clientObserved": "由已埋点的调用方观察到——您的数据库未报告此项"
+        "serverCounted": "由{engine}统计，涵盖每个客户端"
       },
       "endpointsConcentrated": "一个端点占用此查询时间的{percent}。修复{endpoint}即可修复此查询。",
       "typicalMarker": "慢调用 {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "执行时间",
         "serverWait": "等待时间",
         "serverCounted": "服务器数量",
-        "clientObserved": "客户端观测",
         "serverReported": "由您的数据库报告"
       }
     },

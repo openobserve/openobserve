@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "{engine}가 실행하는 데 소비한 시간",
         "serverWait": "{engine}가 대기하는 데 소비한 시간 — 대기 시간, 실행 시간이 아님",
-        "serverCounted": "모든 클라이언트에 걸쳐 {engine}가 집계한 수치",
-        "clientObserved": "계측된 호출자에 의해 관측됨 — 데이터베이스에서 이 값을 보고하지 않았습니다."
+        "serverCounted": "모든 클라이언트에 걸쳐 {engine}가 집계한 수치"
       },
       "endpointsConcentrated": "하나의 엔드포인트가 이 쿼리 시간의 {percent}를 차지합니다. {endpoint}를 수정하면 이 쿼리를 해결할 수 있습니다.",
       "typicalMarker": "느린 호출 {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "실행 시간",
         "serverWait": "대기 시간",
         "serverCounted": "서버 수",
-        "clientObserved": "클라이언트 관찰",
         "serverReported": "데이터베이스에서 보고됨"
       }
     },

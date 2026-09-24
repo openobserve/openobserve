@@ -183,9 +183,32 @@ describe("QueriesPage sources its overlap measures from the database", () => {
         source.indexOf("const visibleSummaryStats ="),
       );
       expect(stats).toContain(
-        "...(calls.qualified ? { sub: qualifier(totals.calls.qualifierKey) }",
+        "...(calls.qualified\n        ? { sub: qualifier(totals.calls.qualifierKey), ...qualifierIcon(totals.calls.qualifierKey) }",
       );
-      expect(stats).toContain("...(time.qualified ? { sub: qualifier(totals.time.qualifierKey) }");
+      expect(stats).toContain(
+        "...(time.qualified\n        ? { sub: qualifier(totals.time.qualifierKey), ...qualifierIcon(totals.time.qualifierKey) }",
+      );
+    });
+
+    /** An app-sourced total shows the traces glyph, never the old text label. */
+    it("marks an app-sourced total with the glyph, not a client-observed label", () => {
+      const stats = source.slice(
+        source.indexOf("const summaryStats ="),
+        source.indexOf("const visibleSummaryStats ="),
+      );
+      expect(stats).toContain('key === APP_SOURCE_QUALIFIER ? { subIcon: "account-tree" } : {}');
+      expect(stats).toContain('t("dbm.appSource.marker")');
+      expect(source).not.toContain("dbm.list.overlap.clientObserved");
+    });
+
+    it("explains the glyph with a legend beside the table", () => {
+      expect(source).toContain('data-test="dbm-queries-app-source-legend"');
+      expect(source).toContain('v-if="hasAppSourcedRows" #legend');
+    });
+
+    // Here the glyph separates trace-only rows from server-counted ones, so it must stay on.
+    it("keeps the marker on trace-only rows", () => {
+      expect(source).not.toContain(':with-marker="false"');
     });
 
     /**
@@ -306,10 +329,18 @@ describe("DatabasesPage qualifies its overlap measures", () => {
    * share would have divided it by a traced total; here both halves of the
    * fraction are the same client vantage, so the percentage is honest.
    */
-  it("qualifies the load column and keeps its client-scoped share", () => {
+  it("keeps the load column's client-scoped share", () => {
     const cell = cellSlot(source, "load");
-    expect(cell).toContain("dbm.list.overlap.clientObserved");
+    expect(cell).not.toContain("clientObserved");
     expect(cell).toContain("formatPercent(row.share, 0)");
+  });
+
+  // Every figure in both columns is app-sourced, so a per-row glyph would distinguish nothing.
+  it("renders no trace-source marker on its rows, and no legend for one", () => {
+    expect(cellSlot(source, "load")).not.toContain("DbmAppSourceMarker");
+    expect(cellSlot(source, "calls")).toContain(':with-marker="false"');
+    expect(source).not.toContain("DbmAppSourceMarker");
+    expect(source).not.toContain("DbmAppSourceLegend");
   });
 
   it("states the calls provenance in the header too", () => {
@@ -585,5 +616,14 @@ describe("a MySQL row can never show its time without a wait qualifier", () => {
     const cell = readFileSync(join(here, "../../components/dbm/DbmOverlapValue.vue"), "utf8");
     // Both conditions together — a value AND something true to say about it.
     expect(cell).toContain("props.value !== null && props.qualifierKey !== null");
+  });
+});
+
+describe("the Databases calls header fits its sub-label", () => {
+  it("leaves room for 'from your apps' beside the sort chevron", () => {
+    const source = read("DatabasesPage.vue");
+    const calls = source.slice(source.indexOf('id: "calls",'), source.indexOf('id: "qps",'));
+    const size = Number(/size: (\d+),/.exec(calls)?.[1]);
+    expect(size).toBeGreaterThanOrEqual(124);
   });
 });

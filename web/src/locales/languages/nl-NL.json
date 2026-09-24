@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "Tijd die {engine} besteedde aan het uitvoeren ervan",
         "serverWait": "Tijd die {engine} besteedde aan wachten erop — wachttijd, niet uitvoeringstijd",
-        "serverCounted": "Geteld door {engine}, voor elke client",
-        "clientObserved": "Waargenomen door geïnstrumenteerde aanroepers — je database heeft deze niet gerapporteerd"
+        "serverCounted": "Geteld door {engine}, voor elke client"
       },
       "endpointsConcentrated": "Eén endpoint is verantwoordelijk voor {percent} van de tijd van deze query. Los {endpoint} op en je hebt deze query opgelost.",
       "typicalMarker": "trage aanroepen {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "uitvoeringstijd",
         "serverWait": "wachttijd",
         "serverCounted": "serveraantal",
-        "clientObserved": "client-waargenomen",
         "serverReported": "gerapporteerd door uw databases"
       }
     },

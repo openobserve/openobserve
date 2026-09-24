@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "Temps passé par {engine} à l'exécuter",
         "serverWait": "Temps passé par {engine} à attendre — temps d'attente, pas temps d'exécution",
-        "serverCounted": "Compté par {engine}, sur chaque client",
-        "clientObserved": "Observé par des appelants instrumentés — votre base de données n'a pas signalé celui-ci"
+        "serverCounted": "Compté par {engine}, sur chaque client"
       },
       "endpointsConcentrated": "Un point de terminaison représente {percent} du temps de cette requête. Corrigez {endpoint} et vous avez corrigé cette requête.",
       "typicalMarker": "appels lents {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "temps d'exécution",
         "serverWait": "temps d'attente",
         "serverCounted": "nombre de serveurs",
-        "clientObserved": "observé par le client",
         "serverReported": "signalé par vos bases de données"
       }
     },

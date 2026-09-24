@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "Tempo que {engine} gastou executando",
         "serverWait": "Tempo que {engine} gastou esperando por ela — tempo de espera, não tempo de execução",
-        "serverCounted": "Contado por {engine}, em todos os clientes",
-        "clientObserved": "Observado por chamadores instrumentados — seu banco de dados não reportou isso"
+        "serverCounted": "Contado por {engine}, em todos os clientes"
       },
       "endpointsConcentrated": "Um endpoint é responsável por {percent} do tempo desta consulta. Corrija {endpoint} e você corrigiu esta consulta.",
       "typicalMarker": "chamadas lentas {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "tempo de execução",
         "serverWait": "tempo de espera",
         "serverCounted": "contagem de servidores",
-        "clientObserved": "observado pelo cliente",
         "serverReported": "relatado pelos seus bancos de dados"
       }
     },

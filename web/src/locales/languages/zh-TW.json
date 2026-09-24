@@ -17434,8 +17434,7 @@
       "overlap": {
         "serverExecution": "{engine} 執行它所花費的時間",
         "serverWait": "{engine} 等待它所花費的時間 — 等待時間，而非執行時間",
-        "serverCounted": "由 {engine} 計數，涵蓋每個用戶端",
-        "clientObserved": "由已檢測的呼叫者觀察 — 您的資料庫並未回報此項"
+        "serverCounted": "由 {engine} 計數，涵蓋每個用戶端"
       },
       "endpointsConcentrated": "單一端點佔了此查詢時間的 {percent}。修正 {endpoint} 就能修正此查詢。",
       "typicalMarker": "慢速呼叫 {value}",
@@ -17509,7 +17508,6 @@
         "serverExecution": "執行時間",
         "serverWait": "等待時間",
         "serverCounted": "伺服器數量",
-        "clientObserved": "用戶端觀察",
         "serverReported": "由您的資料庫回報"
       }
     },

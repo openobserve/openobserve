@@ -45,6 +45,8 @@ export interface StatItem {
    * alone is ambiguous (e.g. "wait time" under a generic "Database time").
    */
   sub?: I18nText;
+  /** Show the qualifier as this small glyph instead of text; `sub` becomes its accessible name and tooltip. */
+  subIcon?: IconName;
   /** Optional leading glyph, shown in a tone-coloured chip. */
   icon?: IconName;
   /** Semantic colour. Defaults to `neutral`. */

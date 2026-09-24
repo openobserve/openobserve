@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "{engine} onu çalıştırmak için harcadığı süre",
         "serverWait": "{engine} onu beklemek için harcadığı süre — bekleme süresi, yürütme süresi değil",
-        "serverCounted": "{engine} tarafından, tüm istemcilerde sayıldı",
-        "clientObserved": "İzlenen çağıranlar tarafından gözlemlendi — veritabanınız bunu bildirmedi"
+        "serverCounted": "{engine} tarafından, tüm istemcilerde sayıldı"
       },
       "endpointsConcentrated": "Bu sorgunun süresinin {percent}'i tek bir uç noktadan geliyor. {endpoint}'i düzeltirseniz bu sorguyu düzeltmiş olursunuz.",
       "typicalMarker": "yavaş çağrılar {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "çalıştırma süresi",
         "serverWait": "bekleme süresi",
         "serverCounted": "sunucu sayısı",
-        "clientObserved": "istemci tarafından gözlemlenen",
         "serverReported": "veritabanlarınız tarafından bildirildi"
       }
     },

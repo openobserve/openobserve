@@ -17439,8 +17439,7 @@
       "overlap": {
         "serverExecution": "Czas, jaki {engine} spędził na jego wykonywaniu",
         "serverWait": "Czas, jaki {engine} spędził na czekaniu na nie — czas oczekiwania, nie czas wykonywania",
-        "serverCounted": "Zliczane przez {engine} dla wszystkich klientów",
-        "clientObserved": "Zaobserwowane przez wywołujących z instrumentacją — twoja baza danych tego nie zgłosiła."
+        "serverCounted": "Zliczane przez {engine} dla wszystkich klientów"
       },
       "endpointsConcentrated": "Jeden endpoint odpowiada za {percent} czasu tego zapytania. Napraw {endpoint}, a naprawisz to zapytanie.",
       "typicalMarker": "wolne wywołania {value}",
@@ -17514,7 +17513,6 @@
         "serverExecution": "czas wykonania",
         "serverWait": "czas oczekiwania",
         "serverCounted": "liczba serwerów",
-        "clientObserved": "zaobserwowane przez klienta",
         "serverReported": "raportowane przez Twoje bazy danych"
       }
     },

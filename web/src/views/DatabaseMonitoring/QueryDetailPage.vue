@@ -242,13 +242,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="traceVantage ? '' : 'order-2'"
             data-test="dbm-detail-stats"
           >
-            <div
+            <DbmAppSourceLegend
               v-if="traceVantage"
-              class="text-text-secondary text-xs"
+              :label="t('dbm.detail.serverMetrics.clientSubtitle')"
               data-test="dbm-detail-stats-provenance"
-            >
-              {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
-            </div>
+            />
             <KpiCardRow>
               <KpiCard
                 v-for="tile in summaryCards"
@@ -259,6 +257,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #label>
                   {{ tile.label
                   }}<span v-if="tile.sub" class="ms-1 font-normal opacity-70">{{ tile.sub }}</span>
+                  <DbmAppSourceMarker
+                    v-if="tile.fromApp"
+                    class="ms-1"
+                    :data-test="`dbm-detail-stat-${tile.id}-app-source`"
+                  />
                 </template>
                 <template #value>
                   <OSkeleton v-if="loading" type="text" class="h-6 w-16" />
@@ -1175,6 +1178,8 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import config from "@/aws-exports";
+import DbmAppSourceLegend from "@/components/dbm/DbmAppSourceLegend.vue";
+import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmHistoryPanel from "@/components/dbm/DbmHistoryPanel.vue";
 import DbmQueryText from "@/components/dbm/DbmQueryText.vue";
@@ -2177,6 +2182,7 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
                 : raw(""),
             )
           : overlapDetail(databaseTime.value.qualifierKey),
+      fromApp: databaseTime.value.source === "client",
       tone: "",
     },
     {
@@ -2198,10 +2204,12 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
           : overlapDetail(callCount.value.qualifierKey),
       // Only the client delta is signed; the server overlap caption is not.
       detailTone: callCount.value.source === "client" ? deltaTone(callsChange) : undefined,
+      fromApp: callCount.value.source === "client",
       tone: "",
     },
     {
       id: "p50",
+      fromApp: true,
       icon: "access-time",
       label: t("dbm.detail.stats.p50"),
       sub: raw("p50"),
@@ -2214,6 +2222,7 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
     },
     {
       id: "p95",
+      fromApp: true,
       icon: "hourglass-empty",
       label: t("dbm.detail.stats.p95"),
       sub: raw("p95"),
@@ -2226,6 +2235,7 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
     },
     {
       id: "max",
+      fromApp: true,
       icon: "trending-up",
       label: t("dbm.detail.stats.max"),
       sub: raw("max"),
@@ -2236,6 +2246,7 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
     },
     {
       id: "errors",
+      fromApp: true,
       icon: "error-outline",
       label: t("dbm.detail.stats.errors"),
       sub: undefined,
