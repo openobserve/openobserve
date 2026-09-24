@@ -2563,11 +2563,11 @@ pub struct Limit {
     #[env_config(name = "ZO_GRPC_RUNTIME_WORKER_NUM", default = 0)]
     pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
-    pub grpc_runtime_blocking_worker_num: usize, // equals to 512 if 0
+    pub grpc_runtime_blocking_worker_num: usize, // equals to max(16, cpu_num * 8) if 0
     #[env_config(name = "ZO_JOB_RUNTIME_WORKER_NUM", default = 0)]
     pub job_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_JOB_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
-    pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
+    pub job_runtime_blocking_worker_num: usize, // equals to max(16, cpu_num * 8) if 0
     #[env_config(name = "ZO_WAL_RUNTIME_WORKER_NUM", default = 0)]
     pub wal_runtime_worker_num: usize, // equals to mem_table_bucket_num if 0
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
@@ -3674,6 +3674,16 @@ pub fn init() -> Config {
     cfg
 }
 
+/// Default ceiling for a runtime's blocking thread pool.
+///
+/// Blocking threads are spawned on demand and each one costs a thread stack
+/// plus its own allocator arena, so the ceiling is an out-of-memory guard, not
+/// a sizing knob. Scale it with the CPU budget instead of pinning it at a flat
+/// 512 per runtime.
+pub fn default_blocking_worker_num(cpu_num: usize) -> usize {
+    max(16, cpu_num * 8)
+}
+
 fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // set real cpu num
     cfg.limit.real_cpu_num = max(1, sysinfo::get_cpu_limit());
@@ -3700,13 +3710,13 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.grpc_runtime_worker_num = cpu_num;
     }
     if cfg.limit.grpc_runtime_blocking_worker_num == 0 {
-        cfg.limit.grpc_runtime_blocking_worker_num = 512;
+        cfg.limit.grpc_runtime_blocking_worker_num = default_blocking_worker_num(cpu_num);
     }
     if cfg.limit.job_runtime_worker_num == 0 {
         cfg.limit.job_runtime_worker_num = cpu_num;
     }
     if cfg.limit.job_runtime_blocking_worker_num == 0 {
-        cfg.limit.job_runtime_blocking_worker_num = 512;
+        cfg.limit.job_runtime_blocking_worker_num = default_blocking_worker_num(cpu_num);
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
