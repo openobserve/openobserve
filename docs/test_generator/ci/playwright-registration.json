@@ -1,6 +1,0 @@
-{
-  "group": "GeneralTests",
-  "spec_filename": "settings-query-management-redirect.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
