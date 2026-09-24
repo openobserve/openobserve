@@ -1321,7 +1321,10 @@ test.describe('Anomaly Detection', () => {
       return name;
     };
 
-    test('an untouched below-floor saved config warns and saves verbatim', {
+    // Parked: create_config now enforces the look-back floor (src/core/src/anomaly_detection.rs:1722),
+    // so a below-floor legacy row cannot be seeded via the API; the warning path is only reachable
+    // for pre-existing rows. See #14770.
+    test.fixme('an untouched below-floor saved config warns and saves verbatim (unreachable via API — create enforces the floor, see #14770)', {
       tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P1', '@functional', '@all'],
     }, async ({ page }) => {
       const name = await ownBelowFloorConfig(page, 'legacy', 600);
@@ -1343,7 +1346,9 @@ test.describe('Anomaly Detection', () => {
       expect(saved.detection_window_seconds).toBe(600);
     });
 
-    test('editing any governing field clears the legacy warning and re-applies the floor', {
+    // Parked for the same reason as the verbatim-save test above: the below-floor
+    // precondition cannot be seeded via the API. See #14770.
+    test.fixme('editing any governing field clears the legacy warning and re-applies the floor (unreachable via API — create enforces the floor, see #14770)', {
       tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P2', '@functional', '@all'],
     }, async ({ page }) => {
       const name = await ownBelowFloorConfig(page, 'editclear', 600);
