@@ -1,0 +1,32 @@
+[
+  {
+    "title": "should clamp the custom value to a minimum of 1 and truncate decimals",
+    "action": "new",
+    "verifies": "the custom relative value floors to 1 for sub-1/negative input and truncates (not rounds) decimals"
+  },
+  {
+    "title": "should cap the custom value at the per-unit ten-year maximum",
+    "action": "new",
+    "verifies": "an oversized value is capped at the per-unit ~10-year maximum (120 months / 5,256,000 minutes)"
+  },
+  {
+    "title": "should restore the last valid custom value when the field is emptied on blur",
+    "action": "new",
+    "verifies": "an emptied/non-numeric value is never applied and the last valid value is restored on blur"
+  },
+  {
+    "title": "should re-cap the custom value when the unit changes",
+    "action": "new",
+    "verifies": "switching units re-clamps the value against the new unit's maximum without re-typing"
+  },
+  {
+    "title": "should clamp the custom value and narrow the unit list under a max query range restriction",
+    "action": "new",
+    "verifies": "max_query_range clamps the value, drops days/weeks/months from the unit list, and disables out-of-range presets"
+  },
+  {
+    "title": "should display weeks as weeks in the trigger label",
+    "action": "new",
+    "verifies": "the trigger label reads the week count rather than the internal day arithmetic"
+  }
+]
