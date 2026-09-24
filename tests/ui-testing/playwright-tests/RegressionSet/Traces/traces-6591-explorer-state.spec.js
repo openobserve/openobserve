@@ -5,16 +5,19 @@
 // the Explorer itself; the trace-details ones are in
 // traces-6591-details-interactions.spec.js.
 //
-//   1  the loader was not visible while a search ran
+//   1  the loader was not visible on the Explorer
 //   2  the query was reset when coming back from Trace Details
 //   3  the results were reset the same way
 //   4  the Explorer had no pagination
 //   5  "No results found" was shown on the way back, over results that existed
-//   9  "Cancel query" did not appear after Run query
 //
 // Items 2, 3 and 5 are one round trip, so they are asserted together rather than
 // as three separate navigations — splitting them would triple the setup cost and
 // still exercise the same transition.
+//
+// Item 9 ("Cancel query" after Run query) is NOT here: that button is behind
+// `config.isEnterprise` in SearchBar.vue, so it cannot exist on the OSS build
+// this suite runs against. It lives in traces-ent6591-cancel-query.spec.js.
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
@@ -62,31 +65,22 @@ test.describe('Traces Explorer state (#6591)', () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  test('P1: a running search shows a loader and a Cancel query control', {
+  test('P1: the Explorer shows a loader while it is still loading', {
     tag: ['@traces', '@regression', '@P1', '@all'],
   }, async ({ page }) => {
-    // Hold the search open so the in-flight state is observable at all; without
-    // this a local search returns faster than any assertion can run, and the test
-    // would pass on a build that never renders either control.
-    await page.route('**/_search**', async (route) => {
-      await page.waitForTimeout(6000);
+    // Hold the stream list open so `loadingStream` stays true long enough to
+    // observe. Without this the page settles faster than any assertion can run,
+    // and the test would pass against a build that renders no loader at all.
+    await page.route('**/api/*/streams**', async (route) => {
+      await page.waitForTimeout(5000);
       await route.continue();
     });
 
-    await page.getByRole('button', { name: 'Run query' }).first().click();
+    await page.goto(tracesUrl());
 
-    // Item 9: the query is cancellable while it runs.
-    await expect(page.locator('[data-test="traces-search-bar-cancel-btn"]')).toBeVisible({
+    await expect(page.locator('[data-test="traces-search-loading"]')).toBeVisible({
       timeout: 15000,
     });
-
-    // Item 1: something tells the user work is in progress.
-    const spinnerCount = await page.evaluate(
-      () =>
-        [...document.querySelectorAll('[class*="spinner"], [class*="animate-spin"], [role="progressbar"]')]
-          .filter((el) => el.getBoundingClientRect().width > 0).length,
-    );
-    expect(spinnerCount, 'a running search must show a loader').toBeGreaterThan(0);
 
     await page.unrouteAll({ behavior: 'ignoreErrors' });
   });

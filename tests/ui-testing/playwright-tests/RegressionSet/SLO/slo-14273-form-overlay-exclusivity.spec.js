@@ -16,11 +16,13 @@ const testLogger = require('../../utils/test-logger.js');
 // item text keeps this independent of the flyout's wrapper markup.
 const FLYOUT_ITEM = /^(SLOs|Incidents|External Alert Sources)$/;
 
-// The picker renders its options with no listbox wrapper, so the options
-// themselves are the signal that it is open; the empty state covers an org with
-// no eligible source alert, where the popover still opens.
+// The popover element exists ONLY while the picker is open, in an org with
+// eligible alerts and in one without. The options cannot serve as the signal —
+// an org with none renders no options — and the empty-state hint is worse: it
+// sits on the form permanently, open or closed, so a locator built on it can
+// never reach zero and the "it closed" assertion is unsatisfiable.
 const sourceAlertOverlay = (page) =>
-  page.locator('[role="option"], [data-test="slos-addslo-alert-source-empty"]');
+  page.locator('[data-test="slos-addslo-alert-source-popover"]');
 
 async function flyoutItemCount(page) {
   return page.evaluate(
