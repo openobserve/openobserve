@@ -218,7 +218,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
-import { providersQuery } from "@/services/online-evals.service.queries";
+import onlineEvalsService from "@/services/online-evals.service";
+import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import {
   createPromptMutation,
@@ -302,15 +303,12 @@ const submitted = form.useStore((state) => state.submissionAttempts > 0);
 const dirty = form.useStore((state) => state.isDirty);
 const matches = ref<PromptMatch[]>([]);
 const confirmedMatchFingerprint = ref("");
-const providerQuery = useQuery(() => {
-  const { queryKey, queryFn } = providersQuery(props.orgId);
-  return {
-    queryKey,
-    queryFn,
-    staleTime: MEDIUM_STALE_TIME,
-    enabled: props.open && enterpriseMode && Boolean(props.orgId),
-  };
-});
+const providerQuery = useQuery(() => ({
+  queryKey: onlineEvalKeys.providers(props.orgId),
+  queryFn: () => onlineEvalsService.providers.list(props.orgId),
+  staleTime: MEDIUM_STALE_TIME,
+  enabled: props.open && enterpriseMode && Boolean(props.orgId),
+}));
 const providers = computed(() => providerQuery.data.value ?? []);
 const variableValues = reactive<Record<string, string>>({});
 const variant = reactive<PlaygroundVariant>({
