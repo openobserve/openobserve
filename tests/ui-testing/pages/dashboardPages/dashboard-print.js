@@ -19,8 +19,7 @@ export default class DashboardPrintPage {
     this.emptyStateAddPanelBtn = page.locator(
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
     );
-    // ONavbar root — removed (v-if) while print mode is on, so its absence/visibility
-    // is the primary signal for the globally-hidden app shell.
+    // ONavbar root — removed (v-if) in print mode, so its absence is the primary app-shell signal.
     this.navbarMainNav = page.locator('[data-test="navbar-main-nav"]');
   }
 
@@ -40,8 +39,7 @@ export default class DashboardPrintPage {
     await this.panelContainer.first().waitFor({ state: "visible", timeout });
   }
 
-  // Multi-panel print layout: injected @page style + non-empty grid height +
-  // every panel force-mounted (no placeholders left).
+  // Multi-panel print layout: injected @page style + non-empty grid height + every panel force-mounted.
   async waitForPrintLayout(timeout = 30000) {
     await expect
       .poll(
@@ -90,9 +88,7 @@ export default class DashboardPrintPage {
       .toBe(true);
   }
 
-  // Print layout cleared = px top overrides restored to calc(). GridStack
-  // re-initializes on exit and re-sets a natural (non-empty) inline height, so
-  // the print override is measured via panel tops, not an empty grid height.
+  // Print cleared = px top overrides restored to calc(); panel tops (not grid height) are measured because exit re-sets a natural height.
   async waitForPrintModeCleared(timeout = 30000) {
     await expect
       .poll(
@@ -129,9 +125,7 @@ export default class DashboardPrintPage {
     });
   }
 
-  // preparePrintLayout overrides every panel top with a plain `px` value; before
-  // print mode GridStack positions items with a calc() formula, so px count > 0
-  // proves the reflow ran.
+  // preparePrintLayout overrides panel tops with px (vs calc() before), so px count > 0 proves the reflow ran.
   async getPanelTopOverrideCount() {
     return this.page.evaluate(() => {
       return Array.from(document.querySelectorAll(".grid-stack-item")).filter((el) =>
@@ -154,8 +148,7 @@ export default class DashboardPrintPage {
     await expect(this.refreshBtn).toBeVisible();
   }
 
-  // The app shell navbar is removed via v-if while print mode is on, so hidden
-  // here means detached from the DOM (not just display:none).
+  // App shell navbar is v-if removed in print mode, so hidden means detached from the DOM (not just display:none).
   async expectAppShellHidden() {
     await expect(this.navbarMainNav).toBeHidden();
   }

@@ -185,9 +185,7 @@ test.describe("Dashboard Print Layout testcases", () => {
       const { dashboardId, folderId } = await pm.apiCleanup.createDashboardWithStackedPanels(title, 4);
       apiDashboard = { dashboardId, folderId };
 
-      // Reach the dashboard view in-app (menu -> list -> click) so page.goBack()
-      // is an SPA popstate that fires the onBeforeRouteLeave guard — a page.goto
-      // + goBack() would be a cross-document traversal and never run the guard.
+      // Reach the dashboard in-app (menu -> list -> click) so goBack() fires the onBeforeRouteLeave guard via SPA popstate; goto+goBack would skip it.
       await pm.dashboardList.menuItem("dashboards-item");
       await pm.dashboardList.clickOnDashboard(title);
 
