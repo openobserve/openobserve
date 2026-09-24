@@ -36,7 +36,7 @@ use config::{
         },
         stream::{FileKey, FileSelection},
     },
-    metrics::metrics_index_blocks_cache::{CacheMetrics, METRICS},
+    metrics::metrics::{INDEX_BLOCKS_CACHE_METRICS, IndexBlocksCacheMetrics},
     utils::hash::gxhash,
 };
 use datafusion::error::DataFusionError;
@@ -65,7 +65,7 @@ static METADATA_WORKERS: LazyLock<Arc<Semaphore>> = LazyLock::new(|| {
 static FILE_LOADS: LazyLock<Arc<loads::LoadRegistry>> =
     LazyLock::new(|| Arc::new(loads::LoadRegistry::default()));
 static INDEX_CACHE: LazyLock<Mutex<IndexCache>> =
-    LazyLock::new(|| Mutex::new(IndexCache::new(METRICS.clone())));
+    LazyLock::new(|| Mutex::new(IndexCache::new(INDEX_BLOCKS_CACHE_METRICS.clone())));
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct ParentIdentity {
@@ -153,11 +153,11 @@ struct IndexCache {
     entries: LruCache<CacheKey, (Arc<CachedIndex>, CacheWeight)>,
     bytes: usize,
     limit: usize,
-    metrics: CacheMetrics,
+    metrics: IndexBlocksCacheMetrics,
 }
 
 impl IndexCache {
-    fn new(metrics: CacheMetrics) -> Self {
+    fn new(metrics: IndexBlocksCacheMetrics) -> Self {
         Self {
             entries: LruCache::new_unbounded(),
             bytes: 0,
@@ -250,7 +250,7 @@ impl IndexCache {
 
 impl Default for IndexCache {
     fn default() -> Self {
-        Self::new(CacheMetrics::default())
+        Self::new(IndexBlocksCacheMetrics::default())
     }
 }
 
@@ -3269,7 +3269,7 @@ mod tests {
     }
 
     fn observed_cache() -> (IndexCache, prometheus::Registry) {
-        let metrics = CacheMetrics::default();
+        let metrics = IndexBlocksCacheMetrics::default();
         let registry = prometheus::Registry::new();
         registry.register(Box::new(metrics.clone())).unwrap();
         (IndexCache::new(metrics), registry)

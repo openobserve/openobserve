@@ -136,11 +136,11 @@ pub async fn search(
             (account, sidecar_path, cache_key, expected_rows, compressed_size, mindex_size),
         ) in index_files
         {
-            metrics::METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL
+            metrics::metrics::INDEX_SELECTION_CACHE_REQUESTS_TOTAL
                 .with_label_values::<&str>(&[])
                 .inc();
             if let Some((ranges, row_group_size)) = cache.get(&cache_key) {
-                metrics::METRICS_INDEX_SELECTION_CACHE_HITS_TOTAL
+                metrics::metrics::INDEX_SELECTION_CACHE_HITS_TOTAL
                     .with_label_values::<&str>(&[])
                     .inc();
                 // only complete selections are cached, so a hit implies exactness
