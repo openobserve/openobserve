@@ -523,4 +523,107 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     testLogger.info(`Circular edges found: ${circularEdgesFound}/3`);
     expect(circularEdgesFound).toBeGreaterThanOrEqual(1);
   });
+
+  // ===== REGRESSION: closed Needs-Automation issues =====
+
+  test("P1: Operations table sorts on duration columns @bug-11590", {
+    tag: ['@serviceGraph', '@traces', '@regression', '@P1', '@all']
+  }, async ({ page }) => {
+    testLogger.info('=== Testing operations table duration sorting (#11590) ===');
+
+    await pm.serviceGraphPage.navigateToServiceGraphUrl();
+    await pm.serviceGraphPage.expectServiceGraphPageVisible();
+    await pm.serviceGraphPage.clickNodeByName('api-gateway');
+    await pm.serviceGraphPage.expectSidePanelVisible();
+    await pm.serviceGraphPage.expectOperationsSectionVisible();
+
+    const rowCount = await pm.serviceGraphPage.getOperationsTableRowCount();
+    // One row can be ordered any way at all, so it cannot demonstrate sorting.
+    test.skip(rowCount < 2, `needs at least 2 operations to order, got ${rowCount}`);
+
+    await pm.serviceGraphPage.sortOperationsByColumn('p95');
+    const ascOperations = await pm.serviceGraphPage.getOperationsColumnText('operation');
+    const ascRatios = await pm.serviceGraphPage.getOperationsDurationRatios('p95');
+    testLogger.info(`Ascending p95 ratios: ${ascRatios.join(', ')}`);
+
+    // The defect was duration columns comparing as formatted strings, so the
+    // assertion is on the latencies themselves, not merely that order changed.
+    const ascending = [...ascRatios].sort((a, b) => a - b);
+    expect(ascRatios, 'p95 must order by latency ascending').toEqual(ascending);
+
+    await pm.serviceGraphPage.sortOperationsByColumn('p95');
+    const descOperations = await pm.serviceGraphPage.getOperationsColumnText('operation');
+    const descRatios = await pm.serviceGraphPage.getOperationsDurationRatios('p95');
+    testLogger.info(`Descending p95 ratios: ${descRatios.join(', ')}`);
+
+    expect(descRatios, 'second click must reverse the latency order')
+      .toEqual([...descRatios].sort((a, b) => b - a));
+    expect(descOperations, 'descending rows must be the ascending rows reversed')
+      .toEqual([...ascOperations].reverse());
+
+    await pm.serviceGraphPage.closeSidePanel();
+  });
+
+  test("P2: Operations table exposes request, error and latency columns @bug-11169", {
+    tag: ['@serviceGraph', '@traces', '@regression', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('=== Testing operations table columns (#11169) ===');
+
+    await pm.serviceGraphPage.navigateToServiceGraphUrl();
+    await pm.serviceGraphPage.expectServiceGraphPageVisible();
+    await pm.serviceGraphPage.clickNodeByName('api-gateway');
+    await pm.serviceGraphPage.expectSidePanelVisible();
+    await pm.serviceGraphPage.expectOperationsSectionVisible();
+
+    const columnIds = await pm.serviceGraphPage.getOperationsColumnIds();
+    testLogger.info(`Operations columns: ${columnIds.join(', ')}`);
+
+    for (const expected of ['operation', 'requests', 'errors', 'p75', 'p95', 'p99']) {
+      expect(columnIds, `operations table must expose the ${expected} column`).toContain(expected);
+    }
+
+    await pm.serviceGraphPage.closeSidePanel();
+  });
+
+  test("P2: Resource tabs carry the operations table columns @bug-11360", {
+    tag: ['@serviceGraph', '@traces', '@regression', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('=== Testing node/pod resource tabs (#11360) ===');
+
+    await pm.serviceGraphPage.navigateToServiceGraphUrl();
+    await pm.serviceGraphPage.expectServiceGraphPageVisible();
+    await pm.serviceGraphPage.clickNodeByName('api-gateway');
+    await pm.serviceGraphPage.expectSidePanelVisible();
+
+    // Resource tabs are generated from the OTEL attributes present, so a build
+    // without pod/node attributes legitimately renders neither.
+    const tabIds = await pm.serviceGraphPage.getSidePanelTabIds();
+    testLogger.info(`Side panel tabs: ${tabIds.join(', ')}`);
+    test.skip(!tabIds.includes('nodes') && !tabIds.includes('pods'),
+      `no node/pod resource tab in this dataset, tabs were: ${tabIds.join(', ')}`);
+
+    if (tabIds.includes('nodes')) {
+      await pm.serviceGraphPage.switchToNodesTab();
+      await pm.serviceGraphPage.expectNodesTableVisible();
+      const nodeColumns = await pm.serviceGraphPage.getResourceTableColumnIds(
+        pm.serviceGraphPage.nodesTable);
+      testLogger.info(`Nodes table columns: ${nodeColumns.join(', ')}`);
+      for (const expected of ['requests', 'errors', 'p75', 'p95', 'p99']) {
+        expect(nodeColumns, `nodes table must expose the ${expected} column`).toContain(expected);
+      }
+    }
+
+    if (tabIds.includes('pods')) {
+      await pm.serviceGraphPage.switchToPodsTab();
+      await pm.serviceGraphPage.expectPodsTableVisible();
+      const podColumns = await pm.serviceGraphPage.getResourceTableColumnIds(
+        pm.serviceGraphPage.podsTable);
+      testLogger.info(`Pods table columns: ${podColumns.join(', ')}`);
+      for (const expected of ['requests', 'errors', 'p75', 'p95', 'p99']) {
+        expect(podColumns, `pods table must expose the ${expected} column`).toContain(expected);
+      }
+    }
+
+    await pm.serviceGraphPage.closeSidePanel();
+  });
 });

@@ -506,6 +506,70 @@ export class ServiceGraphPage {
     return tabNames;
   }
 
+  // ===== SIDE PANEL TABLES (Operations / resource tabs) =====
+
+  /** OTable marks headers o2-table-th-<id> and body cells o2-table-cell-<id>. */
+  _tableColumnHeader(tableSelector, columnId) {
+    return this.page.locator(`${tableSelector} thead th[data-test="o2-table-th-${columnId}"]`);
+  }
+
+  async getOperationsColumnIds() {
+    const headers = this.page.locator(`${this.operationsTable} thead th[data-test^="o2-table-th-"]`);
+    const ids = await headers.evaluateAll((nodes) =>
+      nodes.map((n) => (n.getAttribute('data-test') || '').replace('o2-table-th-', '')),
+    );
+    return ids.filter((id) => id && id !== '__spacer__');
+  }
+
+  async sortOperationsByColumn(columnId) {
+    await this._tableColumnHeader(this.operationsTable, columnId).click();
+    await this.page.waitForTimeout(500);
+  }
+
+  /** Text of one operations column, top to bottom, for comparing row order. */
+  async getOperationsColumnText(columnId) {
+    return await this.page
+      .locator(`${this.operationsTable} tbody td[data-test="o2-table-cell-${columnId}"]`)
+      .evaluateAll((cells) => cells.map((c) => c.innerText.trim()));
+  }
+
+  /**
+   * Latency cells render a ServiceCatalogBarCell whose progress bar carries
+   * aria-valuenow = round(value / columnMax * 100), monotonic in the raw duration.
+   * Reading it avoids parsing formatted latencies across us/ms/s units.
+   */
+  async getOperationsDurationRatios(columnId) {
+    return await this.page
+      .locator(`${this.operationsTable} tbody td[data-test="o2-table-cell-${columnId}"] [role="progressbar"]`)
+      .evaluateAll((bars) => bars.map((b) => Number(b.getAttribute('aria-valuenow'))));
+  }
+
+  /** Resource tabs are generated per OTEL workload, so the set varies by data. */
+  async getSidePanelTabIds() {
+    return await this.page
+      .locator('[data-test^="service-graph-node-panel-tab-"]')
+      .evaluateAll((nodes) =>
+        nodes.map((n) => (n.getAttribute('data-test') || '').replace('service-graph-node-panel-tab-', '')),
+      );
+  }
+
+  async expectNodesTableVisible() {
+    await expect(this.page.locator(this.nodesTable)).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectPodsTableVisible() {
+    await expect(this.page.locator(this.podsTable)).toBeVisible({ timeout: 15000 });
+  }
+
+  async getResourceTableColumnIds(tableSelector) {
+    const ids = await this.page
+      .locator(`${tableSelector} thead th[data-test^="o2-table-th-"]`)
+      .evaluateAll((nodes) =>
+        nodes.map((n) => (n.getAttribute('data-test') || '').replace('o2-table-th-', '')),
+      );
+    return ids.filter((id) => id && id !== '__spacer__');
+  }
+
   // ===== SCREENSHOTS (Visual Verification) =====
 
   async takeGraphScreenshot(name = 'service-graph') {
