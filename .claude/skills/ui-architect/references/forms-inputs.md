@@ -259,8 +259,8 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
   @blur="validateUrl"
 >
   <template #prefix><OIcon name="link" size="sm" /></template>
-  <template #suggestion="{ suggestion }">
-    <VariableSuggestionRow :suggestion="suggestion" />
+  <template #suggestion="{ suggestion, active }">
+    <VariableSuggestionRow :suggestion="suggestion" :active="active" />
   </template>
 </OTemplateInput>
 ```
