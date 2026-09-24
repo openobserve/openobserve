@@ -130,6 +130,11 @@ describe("ReplaySecretsDialog", () => {
     expect(field(wrapper, "PASSWORD").type).toBe("password");
   });
 
+  it("keeps the browser from autofilling a saved password into a secret", () => {
+    wrapper = mountDialog();
+    expect(field(wrapper, "PASSWORD").getAttribute("autocomplete")).toBe("new-password");
+  });
+
   it("says the value stays in memory and is never saved", () => {
     wrapper = mountDialog();
     expect(wrapper.text()).toContain(

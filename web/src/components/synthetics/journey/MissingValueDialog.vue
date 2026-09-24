@@ -56,6 +56,7 @@ const form = useOForm<MissingValueForm>({
   onSubmit: (values) => props.onSubmit({ value: values.value, secret: values.secret }),
 });
 const isSubmitting = form.useStore((s) => s.isSubmitting);
+const storedAsSecret = form.useStore((s) => s.values.secret || props.existingKind === "secret");
 
 watch(
   () => [props.open, props.name, props.existingKind],
@@ -67,20 +68,24 @@ watch(
 // Built in script: a `{{` literal in the template is read as an interpolation.
 const placeholder = computed(() => "{{" + props.name + "}}");
 
+// Global gets its own copy, or it would read "Global, Global and this test".
 const body = computed(() => {
   const params = { placeholder: placeholder.value, environment: props.environmentName };
-  if (props.steps.includes(0)) return t("synthetics.journey.missingValue.bodyStartingUrl", params);
-  return t(
-    "synthetics.journey.missingValue.body",
-    { ...params, steps: props.steps.join(", ") },
-    props.steps.length,
-  );
+  if (props.steps.includes(0)) {
+    return props.isGlobal
+      ? t("synthetics.journey.missingValue.bodyStartingUrlGlobal", params)
+      : t("synthetics.journey.missingValue.bodyStartingUrl", params);
+  }
+  const stepParams = { ...params, steps: props.steps.join(", ") };
+  return props.isGlobal
+    ? t("synthetics.journey.missingValue.bodyGlobal", stepParams, props.steps.length)
+    : t("synthetics.journey.missingValue.body", stepParams, props.steps.length);
 });
 
-const kindLabel = computed(() =>
+const kindLocked = computed(() =>
   props.existingKind === "secret"
-    ? t("synthetics.variables.kindSecret")
-    : t("synthetics.variables.kindPlain"),
+    ? t("synthetics.journey.missingValue.kindLockedSecret")
+    : t("synthetics.journey.missingValue.kindLockedPlain"),
 );
 
 function onUpdateOpen(value: boolean) {
@@ -115,6 +120,9 @@ function onUpdateOpen(value: boolean) {
           t('synthetics.journey.missingValue.valueLabel', { name, environment: environmentName })
         "
         required
+        :type="storedAsSecret ? 'password' : 'text'"
+        :revealable="storedAsSecret"
+        :autocomplete="storedAsSecret ? 'new-password' : undefined"
         data-test="synthetics-journey-missing-value-input"
       />
       <div v-if="!isGlobal" class="flex flex-col gap-1">
@@ -125,7 +133,7 @@ function onUpdateOpen(value: boolean) {
           data-test="synthetics-journey-missing-value-secret"
         />
         <span v-if="existingKind !== null" class="text-text-secondary text-xs">
-          {{ t("synthetics.journey.missingValue.kindLocked", { kind: kindLabel }) }}
+          {{ kindLocked }}
         </span>
       </div>
       <OBanner

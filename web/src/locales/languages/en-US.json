@@ -14276,11 +14276,14 @@
         "valueLabel": "Value for {name} in {environment}",
         "valueRequired": "Enter a value",
         "storeAsSecret": "Store as a secret",
-        "kindLocked": "This variable is already stored as {kind}.",
         "sharedWarning": "{environment} is shared by {count} check. The value is saved now and used by all of them; it does not wait for Save & Exit. | {environment} is shared by {count} checks. The value is saved now and used by all of them; it does not wait for Save & Exit.",
         "globalWarning": "Global values apply to every check. The value is saved now and used by all of them; it does not wait for Save & Exit.",
         "replayAnyway": "Replay anyway",
-        "saveAndReplay": "Save & replay"
+        "saveAndReplay": "Save & replay",
+        "bodyGlobal": "Step {steps} uses {placeholder}. Global and this test have no value for it, so scheduled runs will fail too. | Steps {steps} use {placeholder}. Global and this test have no value for it, so scheduled runs will fail too.",
+        "bodyStartingUrlGlobal": "The Starting URL uses {placeholder}. Global and this test have no value for it, so scheduled runs will fail too.",
+        "kindLockedSecret": "This variable is already stored as a secret.",
+        "kindLockedPlain": "This variable is already stored as plain text."
       },
       "startPill": {
         "urlAria": "Starting URL: {url}. Edit",

@@ -103,6 +103,7 @@ function onForget() {
         type="password"
         revealable
         required
+        autocomplete="new-password"
         :label="fieldLabel(secret)"
         :data-test="`synthetics-journey-replay-secrets-input-${secret.name}`"
       />

@@ -184,6 +184,44 @@ describe("MissingValueDialog", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("masks the value and blocks autofill once it is stored as a secret", async () => {
+    wrapper = mountDialog();
+    const valueField = () => wrapper.get(INPUT_FIELD).element as HTMLInputElement;
+    expect(valueField().type).toBe("text");
+
+    await secretBox(wrapper).trigger("click");
+    await flushPromises();
+    expect(valueField().type).toBe("password");
+    expect(valueField().getAttribute("autocomplete")).toBe("new-password");
+
+    wrapper.unmount();
+    wrapper = mountDialog({ existingKind: "secret" });
+    expect(valueField().type).toBe("password");
+    expect(valueField().getAttribute("autocomplete")).toBe("new-password");
+  });
+
+  it("says Global once when the value would be saved there", () => {
+    wrapper = mountDialog({ environmentName: raw("Global"), isGlobal: true });
+    expect(wrapper.text()).toContain(
+      "Step 3 uses {{API_KEY}}. Global and this test have no value for it, so scheduled runs will fail too.",
+    );
+    expect(wrapper.text()).not.toContain("Global, Global");
+
+    wrapper.unmount();
+    wrapper = mountDialog({ environmentName: raw("Global"), isGlobal: true, steps: [0] });
+    expect(wrapper.text()).toContain(
+      "The Starting URL uses {{API_KEY}}. Global and this test have no value for it, so scheduled runs will fail too.",
+    );
+  });
+
+  it("says the lock in words, in sentence case", () => {
+    wrapper = mountDialog({ existingKind: "secret" });
+    expect(wrapper.text()).toContain("This variable is already stored as a secret.");
+    wrapper.unmount();
+    wrapper = mountDialog({ existingKind: "plain" });
+    expect(wrapper.text()).toContain("This variable is already stored as plain text.");
+  });
+
   it("submits the value and the secret choice", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     wrapper = mountDialog({ onSubmit });
