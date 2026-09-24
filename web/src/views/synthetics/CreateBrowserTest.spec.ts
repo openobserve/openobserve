@@ -1756,6 +1756,7 @@ describe("CreateBrowserTest", () => {
       await setJourney(wrapper, renamed());
 
       expect(leaveAsks()).toBe(true);
+      await nextTick();
       expect(wrapper.find('[data-test="synthetics-create-unsaved-dialog"]').exists()).toBe(true);
     });
   });
@@ -2509,6 +2510,9 @@ describe("CreateBrowserTest", () => {
     });
 
     it("saves a missing value into Global when the check pins no environment", async () => {
+      mockServiceListGlobalVariables.mockResolvedValue({
+        data: [variable("BASE_URL", "https://global.test")],
+      });
       wrapper = await mountTemplatedCheck([], { journey: [typeStep("s1", "{{API_KEY}}")] });
       await replayJourney(wrapper);
 
