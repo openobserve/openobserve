@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-destinations-usage.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-destinations-prebuilt.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/dl-email-destinations.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alertDestinationsPagination.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alert-library.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the new 'Used by' dependency surface. alerts-destinations-prebuilt.spec.js and dl-email-destinations.spec.js exercise destination CRUD/email, and grep for 'used-by'/'dependency-impact' returns no E2E coverage (only unit *.spec.ts under web/src). The run-context specifies spec_path tests/ui-testing/playwright-tests/Alerts/alerts-destinations-usage.spec.js, which matches the Alerts area + @alerts shard. A brand-new spec is required, so it must be registered in ci-matrix/ci_matrix.json under the 'Alerts' run_files array."
+}

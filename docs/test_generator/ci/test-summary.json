@@ -1,0 +1,27 @@
+[
+  {
+    "title": "should render the alert count badge in the Used by cell for a used destination",
+    "action": "new",
+    "verifies": "a destination referenced by 3 alerts shows an alert count badge of 3 and no Unused chip"
+  },
+  {
+    "title": "should open the impact dialog and list the destination's downstream alerts without disagreement",
+    "action": "new",
+    "verifies": "the impact dialog subtitle and alerts lane agree with the Used by cell count (3 alerts)"
+  },
+  {
+    "title": "should show the Unused chip and a No consumers dialog for an orphan destination",
+    "action": "new",
+    "verifies": "an orphan destination shows the Unused chip and a No consumers dialog"
+  },
+  {
+    "title": "should surface the 409 in-use error when deleting a destination referenced by alerts",
+    "action": "new",
+    "verifies": "deleting an in-use destination shows the 'is used by' error toast and the row remains"
+  },
+  {
+    "title": "should decrement the Used by count when an alert is deleted from the impact dialog",
+    "action": "new",
+    "verifies": "deleting one alert from the impact dialog decrements the Used by count from 2 to 1 without a page reload"
+  }
+]

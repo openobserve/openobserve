@@ -2826,4 +2826,138 @@ export class AlertDestinationsPage {
         await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.debug('Selected template', { templateName: templateName || 'first available' });
     }
+
+    // ============================================================================
+    // USED-BY CELL + IMPACT DIALOG (dependency-impact)
+    // ============================================================================
+
+    /** The whole "Used by" cell button for a destination row (opens the impact dialog). */
+    getUsedByCell(name) {
+        return this.page.locator(`[data-test="used-by-${name}"]`);
+    }
+
+    /** Per-kind count chip in the "Used by" cell (e.g. used-by-mydest-alert). */
+    getUsedByBadge(name, kind) {
+        return this.page.locator(`[data-test="used-by-${name}-${kind}"]`);
+    }
+
+    /** The "Unused" (orphan) chip for a destination row. */
+    getUnusedChip(name) {
+        return this.page.locator(`[data-test="used-by-${name}-unused"]`);
+    }
+
+    getImpactBody() {
+        return this.page.locator('[data-test="dependency-impact-body"]');
+    }
+
+    getImpactSubtitle() {
+        return this.page.locator('[data-test="dependency-impact-subtitle"]');
+    }
+
+    getAlertLane() {
+        return this.page.locator('[data-test="dependency-impact-lane-alert"]');
+    }
+
+    getAlertRow(name) {
+        return this.page.locator(`[data-test="dependency-impact-row-${name}"]`);
+    }
+
+    getDeleteEntityBtn(name) {
+        return this.page.locator(`[data-test="dependency-impact-delete-${name}"]`);
+    }
+
+    getNoConsumers() {
+        return this.page.locator('[data-test="dependency-impact-no-consumers"]');
+    }
+
+    /**
+     * Wait for a per-kind "Used by" badge to paint (cold read first shows the neutral
+     * graph icon), then assert its count text.
+     */
+    async expectUsedByBadgeCount(name, kind, count) {
+        const badge = this.getUsedByBadge(name, kind);
+        await expect(badge).toBeVisible({ timeout: 30000 });
+        await expect(badge).toContainText(String(count), { timeout: 15000 });
+    }
+
+    async expectUnusedChipVisible(name) {
+        await expect(this.getUnusedChip(name)).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectUnusedChipAbsent(name) {
+        await expect(this.getUnusedChip(name)).toHaveCount(0, { timeout: 10000 });
+    }
+
+    /** Click the "Used by" cell and await the impact dialog body. */
+    async openImpactDialog(name) {
+        await this.getUsedByCell(name).click();
+        await expect(this.getImpactBody()).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectImpactSubtitleToContain(text) {
+        await expect(this.getImpactSubtitle()).toContainText(text, { timeout: 15000 });
+    }
+
+    async expectAlertRowVisible(name) {
+        await expect(this.getAlertRow(name)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectAlertRowAbsent(name) {
+        await expect(this.getAlertRow(name)).toHaveCount(0, { timeout: 15000 });
+    }
+
+    async expectAlertLaneRowCount(count) {
+        await expect(
+            this.getAlertLane().locator('[data-test^="dependency-impact-row-"]'),
+        ).toHaveCount(count, { timeout: 15000 });
+    }
+
+    async expectNoConsumersVisible() {
+        await expect(this.getNoConsumers()).toBeVisible({ timeout: 15000 });
+    }
+
+    /** Delete one alert row from inside the impact dialog (hover-reveal + confirm). */
+    async deleteEntityFromDialog(name) {
+        const row = this.getAlertRow(name);
+        await row.hover();
+        const deleteBtn = this.getDeleteEntityBtn(name);
+        await expect(deleteBtn).toBeVisible({ timeout: 5000 });
+        await deleteBtn.click();
+        await this.page.locator(this.confirmButton).click();
+    }
+
+    async closeImpactDialog() {
+        await this.page.locator('[data-test="dependency-impact-close"]').click();
+        await expect(this.getImpactBody()).toHaveCount(0, { timeout: 15000 }).catch(() => {});
+    }
+
+    /** Click a destination's delete button and confirm — for the delete-guard (409) path. */
+    async attemptDeleteDestination(name) {
+        const deleteBtn = this.getDeleteDestinationBtn(name);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
+        const confirmBtn = this.page.locator(this.confirmButton);
+        await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await confirmBtn.click();
+    }
+
+    /** The backend's "is used by ..." error toast surfaced when delete is blocked (409). */
+    async expectInUseErrorToast() {
+        const toast = this.page
+            .locator(this.errorToastMessage)
+            .filter({ hasText: this.destinationInUseMessage });
+        await expect(toast.first()).toBeVisible({ timeout: 15000 });
+    }
+
+    /** The in-use destination row must still be present after a blocked delete. */
+    async expectDestinationRowStillVisible(name) {
+        await expect(this.getDeleteDestinationBtn(name)).toBeVisible({ timeout: 10000 });
+    }
+
+    /** A success toast whose message contains `text` (e.g. "deleted" for in-dialog delete). */
+    async expectSuccessToastMessageContaining(text) {
+        await expect(
+            this.page.locator(this.successToastMessage).first(),
+        ).toContainText(text, { timeout: 15000 });
+    }
 }
