@@ -16,10 +16,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
 import {
+  createOwnershipRuleMutation,
+  deleteOwnershipRuleMutation,
   oncallTeamsQuery,
   pagedResponsesQuery,
   responsesQuery,
   routingConfigQuery,
+  updateOwnershipRuleMutation,
 } from "./oncall.queries";
 import { oncallKeys } from "./oncall.querykeys";
 import oncallService from "./oncall";
@@ -93,6 +96,18 @@ describe("routingConfigQuery", () => {
   it("reads null for an org that never nominated a catch-all", async () => {
     vi.mocked(oncallService.getRoutingConfig).mockResolvedValueOnce({ data: undefined } as any);
     await expect(queryClient.fetchQuery(routingConfigQuery(ORG))).resolves.toBeNull();
+  });
+});
+
+describe("ownership rule writes", () => {
+  /// A rule's "never matched" finding lives in its team's risk list, so a
+  /// deleted rule kept warning from the team page for the risk tier.
+  it.each([
+    ["create", createOwnershipRuleMutation(ORG)],
+    ["update", updateOwnershipRuleMutation(ORG)],
+    ["delete", deleteOwnershipRuleMutation(ORG)],
+  ])("expires every team's reads on %s", (_name, mutation) => {
+    expect(mutation.meta?.invalidates).toContainEqual(oncallKeys.teamsAll(ORG));
   });
 });
 

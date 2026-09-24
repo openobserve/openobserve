@@ -561,20 +561,26 @@ function setSignalIncludeDismissed(value: unknown) {
   fetchSignals();
 }
 
+// The newest read: a slower answer for a filter the reader has already left must not overwrite the queue.
+let latestSignalsRead = 0;
+
 async function fetchSignals(force = false) {
   loadingSignals.value = true;
   signalsError.value = false;
+  const readId = ++latestSignalsRead;
   try {
     const queue = await read<UnroutedSignal[] | null>(
       unroutedSignalsQuery(orgId.value, signalFilters.value),
       force,
     );
+    if (readId !== latestSignalsRead) return;
     signals.value = queue ?? [];
   } catch {
+    if (readId !== latestSignalsRead) return;
     signalsError.value = true;
     signals.value = [];
   } finally {
-    loadingSignals.value = false;
+    if (readId === latestSignalsRead) loadingSignals.value = false;
   }
 }
 

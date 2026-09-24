@@ -62,10 +62,18 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 const push = vi.fn();
-vi.mock("vue-router", () => ({
-  useRoute: () => ({ params: { responseId: "resp_1" } }),
-  useRouter: () => ({ push }),
+// Reactive, because the origin and history links change the id on THIS
+// instance; a plain object could never exercise that path.
+const routeState = vi.hoisted(() => ({
+  params: { responseId: "resp_1" } as Record<string, string>,
 }));
+vi.mock("vue-router", async () => {
+  const { reactive } = await import("vue");
+  return {
+    useRoute: () => reactive(routeState),
+    useRouter: () => ({ push }),
+  };
+});
 
 const service = vi.mocked(oncallService);
 const alerts = vi.mocked(alertsService);
@@ -321,6 +329,29 @@ describe("OnCallResponseDetail", () => {
   it("omits the routing row when no decision was recorded", async () => {
     const wrapper = await renderWith();
     expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("routingReason")).toBe(null);
+  });
+
+  /// Back to a record already read answers from the cache at once, so the
+  /// slower record for the id just left lands last — and must not be shown
+  /// under the other id's URL, where every action would act on the wrong page.
+  it("ignores a slower record for an id the route has already left", async () => {
+    const { reactive } = await import("vue");
+    const wrapper = await renderWith({ id: "resp_1", title: "First page" });
+    let answerSecond: (value: unknown) => void = () => {};
+    service.getResponse.mockImplementationOnce(
+      () => new Promise((resolve) => (answerSecond = resolve)),
+    );
+
+    reactive(routeState).params.responseId = "resp_2";
+    await flushPromises();
+    reactive(routeState).params.responseId = "resp_1";
+    await flushPromises();
+    answerSecond({
+      data: { response: record({ id: "resp_2", title: "Second page" }), events: [] },
+    });
+    await flushPromises();
+
+    expect((wrapper.vm as any).response?.id).toBe("resp_1");
   });
 
   it("loads the past firings alongside the causes", async () => {

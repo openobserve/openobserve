@@ -117,6 +117,31 @@ describe("the tab counts' freshness", () => {
     expect(service.getBadges).toHaveBeenCalledTimes(2);
   });
 
+  /// A later envelope in which every count failed must not push the last good
+  /// answer out of the cache: a fresh shell, with no snapshot of its own, would
+  /// otherwise paint seven blanks.
+  it("keeps the last good counts for a fresh shell when the fan-out answers nothing", async () => {
+    await useDbmTabCounts().load("acme", RELATIVE, WINDOW);
+    minutes(2);
+    service.getBadges.mockResolvedValue(unanswered());
+    const fresh = useDbmTabCounts();
+
+    await fresh.load("acme", RELATIVE, WINDOW);
+
+    expect(service.getBadges).toHaveBeenCalledTimes(2);
+    expect(fresh.counts.value.databaseCount).toBe(1);
+  });
+
+  /// An absolute range never moves, so its exact bounds are the key: two zooms
+  /// that start and end in the same minute are two different questions.
+  it("keys two absolute windows in the same minute apart", async () => {
+    const { load } = useDbmTabCounts();
+    await load("acme", ABSOLUTE, WINDOW);
+    await load("acme", { ...ABSOLUTE, startTime: ABSOLUTE.startTime + 10_000_000 }, WINDOW);
+
+    expect(service.getBadges).toHaveBeenCalledTimes(2);
+  });
+
   /// The refresh button: one real read, then the cache again.
   it("reaches the server once on a forced load, and serves the cache after", async () => {
     const { load } = useDbmTabCounts();

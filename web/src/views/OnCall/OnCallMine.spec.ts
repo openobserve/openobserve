@@ -84,6 +84,19 @@ describe("OnCallMine", () => {
     expect(deliveriesRefresh).toHaveBeenCalledTimes(1);
   });
 
+  /// A refresh that fails must not tell an on-call engineer they are off duty.
+  it("keeps the teams on screen when a refresh fails", async () => {
+    const wrapper = render();
+    await flushPromises();
+    service.myOnCall.mockRejectedValueOnce(new Error("boom"));
+
+    await wrapper.find('[data-test="oncall-mine-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-mine-team-team_1"]').text()).toContain("Payments");
+    expect(wrapper.find('[data-test="oncall-mine-no-teams"]').exists()).toBe(false);
+  });
+
   /// The entry fetch is the capability probe, so the cache layer has to hand the
   /// axios error through unwrapped — a 404 is on-call being off, not a failure.
   it("reads a 404 as the feature being off", async () => {

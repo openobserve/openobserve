@@ -28,9 +28,11 @@ export const dbMonitoringKeys = {
   all: (org: string) => orgKey(org, "db_monitoring"),
 
   /**
-   * The range the reader CHOSE, not the bounds it resolved to: the list pages
-   * re-pin the anchor on every load, so a key built from the timestamps would
-   * fork on each visit and never hit.
+   * A relative range is keyed by the period the reader CHOSE, not the bounds it
+   * resolved to: the list pages re-pin the anchor on every load, so a key built
+   * from those timestamps would fork on each visit and never hit. An absolute
+   * range never moves, so its exact bounds are the key: two zooms in the same
+   * minute are two different questions.
    */
   badges: (
     org: string,
@@ -42,7 +44,7 @@ export const dbMonitoringKeys = {
       "db_monitoring",
       "badges",
       range.type === "absolute"
-        ? { abs: quantizeRange(range.startTime, range.endTime) }
+        ? { abs: [range.startTime, range.endTime] }
         : { rel: range.relativeTimePeriod ?? "" },
       // Absent and empty fold together: both mean "no filter".
       stableFilters(filters as Record<string, unknown>),

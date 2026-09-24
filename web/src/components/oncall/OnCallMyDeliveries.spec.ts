@@ -198,6 +198,49 @@ describe("OnCallMyDeliveries", () => {
     expect(service.myDeliveries.mock.calls.at(-1)![0]).toMatchObject({ unread_only: true });
   });
 
+  /// Unticking answers from the cache at once, so the slower "unread only"
+  /// answer lands last and must not narrow an inbox the reader just widened.
+  it("ignores a slower answer for a filter the reader has already left", async () => {
+    const wrapper = render();
+    await flushPromises();
+    let answerUnread: (value: unknown) => void = () => {};
+    service.myDeliveries.mockImplementationOnce(
+      () => new Promise((resolve) => (answerUnread = resolve)),
+    );
+    const toggle = wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]');
+
+    await toggle.trigger("click");
+    await flushPromises();
+    await toggle.trigger("click");
+    await flushPromises();
+    answerUnread({
+      data: {
+        total: 2,
+        unread: 2,
+        deliveries: [delivery({ read: false }), delivery({ read: false })],
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(0);
+  });
+
+  /// A refresh that fails must not empty the inbox and zero the badge.
+  it("keeps the inbox on screen when a refresh fails", async () => {
+    service.myDeliveries.mockResolvedValue({
+      data: { total: 1, unread: 1, deliveries: [delivery({ read: false })] },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    service.myDeliveries.mockRejectedValueOnce(new Error("boom"));
+
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+    expect(wrapper.emitted("unread")?.at(-1)).toEqual([1]);
+  });
+
   describe("marking read", () => {
     it("clears the whole inbox in one call", async () => {
       service.myDeliveries.mockResolvedValue({

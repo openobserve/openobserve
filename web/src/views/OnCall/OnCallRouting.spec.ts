@@ -564,6 +564,28 @@ describe("OnCallRouting", () => {
     });
   });
 
+  /// The filter the reader returns to answers from the cache at once, so the
+  /// slower answer for the one they left lands last and must be ignored.
+  it("ignores a slower queue answer for a filter the reader has already left", async () => {
+    const wrapper = render();
+    await flushPromises();
+    await showSignals(wrapper);
+    let answerNobody: (value: unknown) => void = () => {};
+    service.unroutedSignals.mockImplementationOnce(
+      () => new Promise((resolve) => (answerNobody = resolve)),
+    );
+    const landing = wrapper.findAllComponents({ name: "OToggleGroup" })[1];
+
+    landing.vm.$emit("update:modelValue", "nobody");
+    await flushPromises();
+    landing.vm.$emit("update:modelValue", "both");
+    await flushPromises();
+    answerNobody({ data: [{ id: "sig_late", landing: "nobody", dimensions: {} }] });
+    await flushPromises();
+
+    expect(unrouted(wrapper).props("signals")).toEqual([]);
+  });
+
   /// Reported from the browser: "add rule does nothing — there is no save and
   /// no cancel". Every other test here stubs ODialog, so all of them stayed
   /// green while the real dialog rendered no footer at all: the call site

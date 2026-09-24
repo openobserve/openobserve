@@ -65,7 +65,7 @@
         variant="primary"
         size="sm-action"
         data-test="oncall-team-detail-edit-btn"
-        @click="editOpen = true"
+        @click="openTeamEdit"
       >
         {{ t("oncall.editTeam") }}
       </OButton>
@@ -336,7 +336,7 @@
               :rotations="teamRotations"
               :preview="preview"
               :loading="previewLoading"
-              @edit="editingPolicy = true"
+              @edit="openPolicyEditor"
               @open-members="activeTab = 'members'"
             />
 
@@ -516,8 +516,25 @@ const segmentsLoading = ref(false);
 /// at — never on a bulk editing mode with its own copy of the page.
 const scheduleIntent = ref<ScheduleEditorIntent | null>(null);
 
-function openScheduleEditor(intent: ScheduleEditorIntent) {
+async function openScheduleEditor(intent: ScheduleEditorIntent) {
+  if (!(await refreshScheduleForEdit())) return;
   scheduleIntent.value = intent;
+}
+
+async function openPolicyEditor() {
+  const fresh = await readForEdit<OnCallPolicy | null>(
+    teamPolicyQuery(orgId.value, teamId.value),
+    (value) => (policy.value = value),
+  );
+  if (fresh) editingPolicy.value = true;
+}
+
+async function openTeamEdit() {
+  const fresh = await readForEdit<OnCallTeam | null>(
+    oncallTeamQuery(orgId.value, teamId.value),
+    (value) => (team.value = value),
+  );
+  if (fresh) editOpen.value = true;
 }
 
 const coverOpen = ref(false);
@@ -684,6 +701,29 @@ async function read<T>(
   }
   return queryClient.fetchQuery(options as any) as Promise<T>;
 }
+
+/// Read-modify-write: an editor writes its record back whole, so its draft starts from the server's copy, never this page's cached one.
+async function readForEdit<T>(
+  options: { queryKey: readonly unknown[]; [k: string]: any },
+  assign: (value: T) => void,
+): Promise<boolean> {
+  try {
+    assign(await read<T>(options, true));
+    return true;
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.editorReadFailed"),
+    });
+    return false;
+  }
+}
+
+const refreshScheduleForEdit = () =>
+  readForEdit<OnCallSchedule | null>(
+    teamScheduleQuery(orgId.value, teamId.value),
+    (value) => (schedule.value = value),
+  );
 
 async function fetchAll(force = false) {
   loadError.value = null;
@@ -873,10 +913,14 @@ async function sendTestPage() {
 ///
 /// A team with no rotations is not asked at all. It answers `[]` rather than
 /// one long gap segment, so there is nothing to draw and no call to spend.
+// The newest read: a slower answer for a window the calendar has already left must not overwrite the lanes.
+let latestSegmentsRead = 0;
+
 async function fetchSegments(force = false) {
   const { from, to } = scheduleWindow.value;
   if (!from || !to) return;
   const rotations = schedule.value?.rotations ?? [];
+  const readId = ++latestSegmentsRead;
   if (!rotations.length) {
     segments.value = [];
     return;
@@ -891,6 +935,7 @@ async function fetchSegments(force = false) {
         ),
       ),
     );
+    if (readId !== latestSegmentsRead) return;
     // The primary may answer without echoing its own id, so the lane lookup
     // gets one it can match rather than an absent field.
     segments.value = answers.flatMap((lane, index) =>
@@ -900,13 +945,14 @@ async function fetchSegments(force = false) {
       })),
     );
   } catch (err: any) {
+    if (readId !== latestSegmentsRead) return;
     segments.value = [];
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.timelineLoadFailed"),
     });
   } finally {
-    segmentsLoading.value = false;
+    if (readId === latestSegmentsRead) segmentsLoading.value = false;
   }
 }
 
@@ -916,12 +962,13 @@ async function fetchSegments(force = false) {
 /// whether the team already has a secondary rotation to put people INTO. Both
 /// land on the same drawer, which is the point: the reader asked to staff the
 /// secondary, not to learn how this team models one.
-function onAssignSecondary() {
+async function onAssignSecondary() {
+  if (!(await refreshScheduleForEdit())) return;
   // A SECOND rotation, not one spelled "secondary". The old lookup asked for a
   // slot literally named that, so a team whose second position was called
   // anything else was offered a create it did not need.
   const existing = (schedule.value?.rotations ?? [])[1];
-  openScheduleEditor(existing ? { mode: "edit", id: existing.id } : { mode: "new" });
+  scheduleIntent.value = existing ? { mode: "edit", id: existing.id } : { mode: "new" };
 }
 
 /// Deleting a rotation is a schedule save with one layer removed — there is no
@@ -933,9 +980,10 @@ function onAssignSecondary() {
 /// which is the mode this tab has always used.
 async function deleteRotation() {
   const id = rotationToDelete.value;
-  const current = schedule.value;
   rotationToDelete.value = null;
-  if (!id || !current) return;
+  if (!id || !(await refreshScheduleForEdit())) return;
+  const current = schedule.value;
+  if (!current) return;
 
   // Filtered by id, not by name: two rotations may share a name, and deleting
   // "the Secondary" must not take a second one called the same thing with it.
@@ -1163,10 +1211,16 @@ async function loadPreview(priority: number, force: boolean): Promise<Escalation
   }
 }
 
+// The newest read: a slower dry run for a priority the reader has already left must not overwrite the current one.
+let latestPreviewRead = 0;
+
 async function fetchPreview(force = false) {
   const priority = Number(selectedPriority.value.replace(/\D/g, "")) || 1;
+  const readId = ++latestPreviewRead;
   previewLoading.value = true;
-  preview.value = await loadPreview(priority, force);
+  const answer = await loadPreview(priority, force);
+  if (readId !== latestPreviewRead) return;
+  preview.value = answer;
   previewLoading.value = false;
 }
 

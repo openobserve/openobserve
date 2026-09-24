@@ -13,10 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { flushPromises } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { effectScope } from "vue";
 
-import { loadDbmFleetInstances } from "@/composables/dbm/useDbmFleetInstances";
+import {
+  loadDbmFleetInstances,
+  refreshDbmFleet,
+  useDbmFleetInstances,
+} from "@/composables/dbm/useDbmFleetInstances";
 import dbMonitoringService from "@/services/db_monitoring";
+import { dbmInstancesQuery } from "@/services/db_monitoring.queries";
 
 vi.mock("@/services/db_monitoring", () => ({
   default: { getInstances: vi.fn() },
@@ -91,6 +98,30 @@ describe("loadDbmFleetInstances", () => {
 
     expect(failed).toEqual([]);
     expect(retried).toHaveLength(1);
+    expect(service.getInstances).toHaveBeenCalledTimes(2);
+  });
+
+  /// The picker falls back to the rows in hand, so retrying only delays that
+  /// fallback during an outage — and costs three requests where main cost one.
+  it("never retries a failed read", () => {
+    expect(dbmInstancesQuery("default", START, END).retry).toBe(false);
+  });
+
+  /// The DBM Refresh button must reach this read too: a new engine has to show
+  /// up in the picker without waiting out the tier.
+  it("re-reads the fleet for every mounted picker on refresh, and none once unmounted", async () => {
+    const scope = effectScope();
+    const picker = scope.run(() => useDbmFleetInstances())!;
+    await picker.load({ org: "default", startTime: START, endTime: END });
+    expect(service.getInstances).toHaveBeenCalledTimes(1);
+
+    refreshDbmFleet();
+    await flushPromises();
+    expect(service.getInstances).toHaveBeenCalledTimes(2);
+
+    scope.stop();
+    refreshDbmFleet();
+    await flushPromises();
     expect(service.getInstances).toHaveBeenCalledTimes(2);
   });
 });

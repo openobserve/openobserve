@@ -725,9 +725,11 @@ export const testPageMutation = (org: string) =>
  * as well as the rules themselves — today's delete paths never re-read that
  * queue, and dropping the scope is what fixes it.
  */
+// Every team, not one: a rule's "never matched" finding sits in its team's risk list, and an update can move a rule between teams.
 const ownershipWriteScopes = (org: string) => [
   oncallKeys.ownershipRulesAll(org),
   oncallKeys.unroutedAll(org),
+  oncallKeys.teamsAll(org),
 ];
 
 export const createOwnershipRuleMutation = (org: string) =>

@@ -19131,6 +19131,8 @@
     "rotationNobody": "Nobody on call",
     "edit": "Edit",
     "timelineLoadFailed": "Could not resolve the schedule for this window",
+    "editorReadFailed": "Could not load the latest copy to edit. Try again.",
+    "refreshFailed": "Could not refresh. What is shown may be out of date.",
     "scheduleDoneEditing": "Back to schedule",
     "coverWhoRequired": "Choose who is covering",
     "timelineCoverAria": "{who} is covering {rotation}, {from} to {to}",

@@ -1677,12 +1677,17 @@ function responseFilters() {
 /// already showing rows. `loading` would swap those rows for a skeleton over
 /// something that, from the reader's side, was not loading at all; `streaming`
 /// leaves them on screen with a quiet bottom bar instead.
+// The newest read: a slower answer for a filter the reader has already left must not overwrite the rows.
+let latestResponsesRead = 0;
+
 async function fetchResponses(opts: { background?: boolean; force?: boolean } = {}) {
   const busy = opts.background ? backgroundLoading : loading;
   busy.value = true;
+  const readId = ++latestResponsesRead;
   try {
     const options = pagedResponsesQuery(orgId.value, responseFilters());
     const walk = await read<{ rows: OnCallResponse[]; truncated: boolean }>(options, !!opts.force);
+    if (readId !== latestResponsesRead) return;
     responses.value = walk.rows;
     lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
     // From the payload, cache hit included: the cap describes these rows, not this request.
@@ -1696,6 +1701,7 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
     // so titles fill in behind it rather than holding up the table.
     void fetchIncidentTitles(!!opts.force);
   } catch (err) {
+    if (readId !== latestResponsesRead) return;
     // §G.8.1: the probe said "not here". Leaving `loaded` false keeps the
     // setup checklist away too — a build that cannot page must not be told
     // to create teams.
@@ -1705,7 +1711,7 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
     }
     loadError.value = errorMessage(err) || String(t("oncall.loadResponsesFailed"));
   } finally {
-    busy.value = false;
+    if (readId === latestResponsesRead) busy.value = false;
   }
 }
 
@@ -1849,13 +1855,13 @@ async function fetchEscalationProgress(force = false) {
 }
 
 /// The expanded row's timeline.
-async function fetchExpandedEvents(responseId: string) {
+async function fetchExpandedEvents(responseId: string, force = false) {
   expandedLoading.value = true;
   expandedEvents.value = [];
   try {
     const record = await read<{ events?: OnCallResponseEvent[] } | null>(
       responseQuery(orgId.value, responseId),
-      false,
+      force,
     );
     expandedEvents.value = record?.events ?? [];
   } catch {
@@ -1882,6 +1888,10 @@ async function addExpandedNote(responseId: string) {
   }
 }
 
+/// The response behind the one expanded row, if any.
+const expandedResponseId = () =>
+  rows.value.find((candidate) => candidate.rowKey === expandedIds.value[0])?.latest.id;
+
 async function loadAll(force = false) {
   await fetchResponses({ force });
   // The probe answered "not here" — every further call would 404/403 the
@@ -1890,6 +1900,9 @@ async function loadAll(force = false) {
   await fetchContext(force);
   await fetchTeamContext(force);
   await fetchEscalationProgress(force);
+  // The open timeline is part of what the reader sees, so a refresh reaches it too.
+  const open = expandedResponseId();
+  if (open) await fetchExpandedEvents(open, force);
 }
 
 // Named, not bound straight to the template: a click would pass `force` a MouseEvent.
@@ -1901,7 +1914,8 @@ watch(expandedIds, (ids) => {
   expandedNoteBody.value = "";
   expandedShowAllActivity.value = true;
   const row = rows.value.find((candidate) => candidate.rowKey === ids[0]);
-  if (row) void fetchExpandedEvents(row.latest.id);
+  // Fresh on every expand: the reader opened the timeline to see what has happened since.
+  if (row) void fetchExpandedEvents(row.latest.id, true);
   else expandedEvents.value = [];
 });
 

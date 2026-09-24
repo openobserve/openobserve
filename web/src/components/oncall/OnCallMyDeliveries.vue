@@ -230,21 +230,37 @@ async function read<T>(
   return queryClient.fetchQuery(options as any) as Promise<T>;
 }
 
+// The newest read: a slower answer for a filter the reader has already left must not overwrite the inbox.
+let latestDeliveriesRead = 0;
+let loadedOnce = false;
+
 async function fetchDeliveries(force = false) {
   loading.value = true;
+  const readId = ++latestDeliveriesRead;
   try {
     const data = await read<MyDeliveries | null>(
       myDeliveriesQuery(orgId.value, unreadOnly.value ? { unread_only: true } : {}),
       force,
     );
+    if (readId !== latestDeliveriesRead) return;
     rows.value = data?.deliveries ?? [];
     // The badge ignores the filter on purpose: "3 unread" must not change because somebody ticked "unread only".
     setUnread(data?.unread ?? 0);
-  } catch {
+    loadedOnce = true;
+  } catch (err: any) {
+    if (readId !== latestDeliveriesRead) return;
+    // A failed refresh keeps the inbox on screen rather than emptying it and zeroing the badge.
+    if (loadedOnce) {
+      toast({
+        variant: "error",
+        message: raw(err?.response?.data?.message) || t("oncall.refreshFailed"),
+      });
+      return;
+    }
     rows.value = [];
     setUnread(0);
   } finally {
-    loading.value = false;
+    if (readId === latestDeliveriesRead) loading.value = false;
   }
 }
 

@@ -35,4 +35,6 @@ export const dbmInstancesQuery = (org: string, startTime?: number, endTime?: num
     queryFn: async (): Promise<DbmInstanceHit[]> =>
       (await dbMonitoringService.getInstances(org, { startTime, endTime }))?.data?.hits ?? [],
     staleTime: MEDIUM_STALE_TIME,
+    // The picker falls back to the rows in hand, so a retry only delays that fallback during an outage.
+    retry: false,
   });

@@ -316,6 +316,21 @@ describe("what one page learns is visible from every tab", () => {
     ).toBe("1");
   });
 
+  /// The same window reloading — a tab switch past the tier, or Refresh — is
+  /// not a new question, so the page's more exact number stands until that
+  /// page re-measures and republishes.
+  it("keeps a page's published count when the same window reloads", async () => {
+    service.getBadges.mockResolvedValue({ data: envelope() });
+    const { counts, load, publishOwnCount } = useDbmTabCounts();
+
+    await load("acme", RANGE, WINDOW, { system: "postgresql" });
+    publishOwnCount("databaseCount", 6);
+    await load("acme", RANGE, WINDOW, { system: "postgresql" }, { force: true });
+
+    expect(service.getBadges).toHaveBeenCalledTimes(2);
+    expect(badgeCount(counts.value.databaseCount)).toBe("6");
+  });
+
   it("treats an empty breakdown beside total:0 as a MEASURED zero, not an unknown", async () => {
     // THE REPORTED BUG, at its source. Scoping Activity to `mssql-prod-1` —
     // an engine with no session sampler at all — returns

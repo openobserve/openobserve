@@ -173,6 +173,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
 import { myOnCallQuery } from "@/services/oncall.queries";
 import type { MyOnCall } from "@/ts/interfaces/oncall";
@@ -209,8 +210,20 @@ async function fetchMine(force = false) {
     }
     mine.value = await queryClient.fetchQuery(options);
     lastFetchedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
-  } catch (err) {
-    if (isOnCallUnavailable(err)) unavailable.value = true;
+  } catch (err: any) {
+    if (isOnCallUnavailable(err)) {
+      unavailable.value = true;
+      mine.value = null;
+      return;
+    }
+    // A failed refresh keeps what is on screen: blanking it would tell an on-call engineer they are off duty.
+    if (loaded.value) {
+      toast({
+        variant: "error",
+        message: raw(err?.response?.data?.message) || t("oncall.refreshFailed"),
+      });
+      return;
+    }
     mine.value = null;
   } finally {
     loaded.value = true;

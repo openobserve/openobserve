@@ -1043,14 +1043,19 @@ async function read<T>(
   return queryClient.fetchQuery(options as any) as Promise<T>;
 }
 
+// The newest read: a slower record for an id the route has already left must not overwrite the current one.
+let latestResponseRead = 0;
+
 // `force` reaches the record alone — it is the only thing a promote conflict moved.
 async function fetchResponse(force = false) {
   loading.value = true;
+  const readId = ++latestResponseRead;
   try {
     const data = await read<{
       response: OnCallResponse;
       events: OnCallResponseEvent[];
     } | null>(responseQuery(orgId.value, responseId.value), force);
+    if (readId !== latestResponseRead) return;
     response.value = data?.response ?? null;
     events.value = data?.events ?? [];
     lastFetchedAt.value =
@@ -1058,20 +1063,26 @@ async function fetchResponse(force = false) {
         ?.dataUpdatedAt ?? null;
     // Flip before the awaits below so the card skeletons instead of reading an empty roster as "nobody on call".
     onCallPositionsLoading.value = true;
-    await fetchTeamName();
-    await fetchSubjectAlert();
-    await fetchHandoffTargets();
-    await fetchPriorCauses();
-    await fetchEscalation();
-    await fetchDeliveries();
-    await fetchTeamContext();
+    for (const step of [
+      fetchTeamName,
+      fetchSubjectAlert,
+      fetchHandoffTargets,
+      fetchPriorCauses,
+      fetchEscalation,
+      fetchDeliveries,
+      fetchTeamContext,
+    ]) {
+      await step();
+      if (readId !== latestResponseRead) return;
+    }
   } catch (err: any) {
+    if (readId !== latestResponseRead) return;
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.loadResponseFailed"),
     });
   } finally {
-    loading.value = false;
+    if (readId === latestResponseRead) loading.value = false;
   }
 }
 

@@ -571,6 +571,20 @@ describe("OnCallTeamDetail", () => {
     });
   });
 
+  /// The form writes name, timezone and description back together, so it
+  /// starts from the server's team, not the copy this page cached.
+  it("reads the team from the server before the edit form opens", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const before = service.getTeam.mock.calls.length;
+
+    await wrapper.find('[data-test="oncall-team-detail-edit-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(service.getTeam.mock.calls.length).toBe(before + 1);
+    expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("open")).toBe(true);
+  });
+
   it("ignores a tab the URL invented", async () => {
     routeParams.tab = "not-a-tab";
     const wrapper = render();
@@ -620,6 +634,46 @@ describe("OnCallTeamDetail", () => {
       const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
       expect(editor.props("intent")).toEqual({ mode: "edit", id: "Primary" });
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
+    });
+
+    /// The editor's save writes the whole schedule back, so its draft has to
+    /// start from the server's copy: the cached one may be missing a rotation a
+    /// colleague added since, and saving over it deletes that rotation.
+    it("reads the schedule from the server before the editor opens", async () => {
+      const wrapper = await openSchedule();
+      const before = service.getSchedule.mock.calls.length;
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("edit", "Primary");
+      await flushPromises();
+
+      expect(service.getSchedule.mock.calls.length).toBe(before + 1);
+      expect(wrapper.findComponent({ name: "OnCallScheduleEditor" }).props("intent")).toEqual({
+        mode: "edit",
+        id: "Primary",
+      });
+    });
+
+    it("deletes from the schedule the server has now, not the cached copy", async () => {
+      service.setSchedule.mockResolvedValue({ data: {} });
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
+      } as any);
+      const wrapper = await openSchedule();
+      // A colleague added a rotation after this page cached its copy.
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: "UTC",
+          rotations: [rotation("rot_primary", "Primary"), rotation("rot_second", "Secondary")],
+        },
+      } as any);
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
+      await flushPromises();
+      deleteConfirm(wrapper)!.vm.$emit("update:ok");
+      await flushPromises();
+
+      const sent = service.setSchedule.mock.calls[0][0];
+      expect(sent.data.rotations.map((r: any) => r.name)).toEqual(["Secondary"]);
     });
 
     /// Until the lane menu carried it, a rotation could be created and never
@@ -733,6 +787,19 @@ describe("OnCallTeamDetail", () => {
       expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).exists()).toBe(true);
     });
 
+    /// Same rule as the schedule: the save replaces the whole policy, so the
+    /// draft starts from the server's copy rather than the page's cached one.
+    it("reads the policy from the server before the editor opens", async () => {
+      const wrapper = await openEscalation();
+      const before = service.getPolicy.mock.calls.length;
+
+      wrapper.findComponent({ name: "OnCallEscalationLadder" }).vm.$emit("edit");
+      await flushPromises();
+
+      expect(service.getPolicy.mock.calls.length).toBe(before + 1);
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("open")).toBe(true);
+    });
+
     /// The chips are labels ("P3"); the policy's rungs are numbered. Editing
     /// from P3 must open on P3, not send the reader back to find it.
     it("opens the drawer on the priority the ladder is showing", async () => {
@@ -774,6 +841,30 @@ describe("OnCallTeamDetail", () => {
       expect(service.escalationPreview).toHaveBeenLastCalledWith(
         expect.objectContaining({ priority: 3 }),
       );
+    });
+
+    /// Going back to a priority already read answers from the cache at once,
+    /// so the slower dry run for the one just left lands last — and must not
+    /// show its recipients under the other priority's chip.
+    it("ignores a slower dry run for a priority the reader has already left", async () => {
+      service.escalationPreview.mockResolvedValue({ data: { priority: 1 } } as any);
+      const wrapper = await openEscalation();
+      let answerP3: (value: unknown) => void = () => {};
+      service.escalationPreview.mockImplementationOnce(
+        () => new Promise((resolve) => (answerP3 = resolve)),
+      );
+      const ladder = wrapper.findComponent({ name: "OnCallEscalationLadder" });
+
+      ladder.vm.$emit("update:selected", "P3");
+      await flushPromises();
+      ladder.vm.$emit("update:selected", "P1");
+      await flushPromises();
+      answerP3({ data: { priority: 3 } });
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).props("preview")).toEqual({
+        priority: 1,
+      });
     });
   });
 
@@ -1034,6 +1125,37 @@ describe("OnCallTeamDetail", () => {
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).props("segments")).toEqual(
         [],
       );
+    });
+
+    /// Paging back to a week already read answers from the cache at once, so
+    /// the slower answer for the week just left lands last — and must not be
+    /// drawn on this week's axis.
+    it("ignores a slower answer for a window the calendar has already left", async () => {
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
+      } as any);
+      const thisWeek = { from: 0, to: 1, rotation: "Primary", user_email: "ana@o2.ai" };
+      service.resolvedSchedule.mockResolvedValue({ data: [thisWeek] } as any);
+      const wrapper = render();
+      await flushPromises();
+      await showWeek(wrapper);
+      let answerNext: (value: unknown) => void = () => {};
+      service.resolvedSchedule.mockImplementationOnce(
+        () => new Promise((resolve) => (answerNext = resolve)),
+      );
+      const timeline = wrapper.findComponent({ name: "OnCallScheduleTimeline" });
+
+      timeline.vm.$emit("update:window", { from: 2_000, to: 3_000 });
+      await flushPromises();
+      timeline.vm.$emit("update:window", { from: 1_000, to: 2_000 });
+      await flushPromises();
+      answerNext({ data: [{ ...thisWeek, from: 2_000, to: 3_000 }] });
+      await flushPromises();
+
+      const drawn = wrapper
+        .findComponent({ name: "OnCallScheduleTimeline" })
+        .props("segments") as any[];
+      expect(drawn.map((s) => [s.from, s.to])).toEqual([[0, 1]]);
     });
   });
 });

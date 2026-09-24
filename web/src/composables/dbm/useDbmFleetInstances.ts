@@ -52,7 +52,7 @@
  * key could never hit.
  */
 
-import { ref, type Ref } from "vue";
+import { getCurrentScope, onScopeDispose, ref, type Ref } from "vue";
 
 import { queryClient } from "@/composables/query/queryClient";
 import { type DbmInstanceHit } from "@/services/db_monitoring";
@@ -83,11 +83,36 @@ export interface DbmFleetInstancesReturn {
   load: (req: DbmFleetRequest) => Promise<void>;
 }
 
+// Every mounted picker, so a page's Refresh can reach a read it does not own.
+const mounted = new Set<() => void>();
+
+/// What the DBM Refresh button calls: every mounted picker re-reads its fleet from the server.
+export const refreshDbmFleet = (): void => {
+  for (const rerun of mounted) rerun();
+};
+
 export function useDbmFleetInstances(): DbmFleetInstancesReturn {
   const hits = ref<DbmInstanceHit[]>([]);
-  const load = async (req: DbmFleetRequest): Promise<void> => {
+  let lastRequest: DbmFleetRequest | null = null;
+  const load = async (req: DbmFleetRequest, force = false): Promise<void> => {
     if (!req.org) return;
+    lastRequest = req;
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: dbmInstancesQuery(req.org, req.startTime, req.endTime).queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
     hits.value = await loadDbmFleetInstances(req);
   };
+  const rerun = () => {
+    if (lastRequest) void load(lastRequest, true);
+  };
+  // Only inside a scope, so an entry is guaranteed to leave the set when its page unmounts.
+  if (getCurrentScope()) {
+    mounted.add(rerun);
+    onScopeDispose(() => mounted.delete(rerun));
+  }
   return { hits, load };
 }

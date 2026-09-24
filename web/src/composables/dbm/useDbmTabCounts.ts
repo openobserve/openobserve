@@ -450,8 +450,9 @@ const worthKeeping = (counts: DbmTabCounts): boolean =>
  * `db_monitoring.queries.ts`, so the two files never import each other.
  *
  * The search box must never reach this key: it narrows rows already in hand, so
- * keying on it would miss on every keystroke. A snapshot that learned nothing
- * gets `staleTime` 0, so blank badges are never served to the next tab.
+ * keying on it would miss on every keystroke. An envelope in which every count
+ * failed is an error, not an answer: it is never held, and the last good
+ * snapshot stays in the entry behind it.
  */
 export const dbmBadgesQuery = (
   org: string,
@@ -461,13 +462,12 @@ export const dbmBadgesQuery = (
 ) =>
   queryOptions({
     queryKey: dbMonitoringKeys.badges(org, range, filters),
-    queryFn: () => fetchDbmTabCounts(org, window, filters),
-    staleTime: (query) =>
-      query.state.data && worthKeeping(query.state.data)
-        ? range.type === "absolute"
-          ? NORMAL_STALE_TIME
-          : LIVE_STALE_TIME
-        : 0,
+    queryFn: async () => {
+      const counts = await fetchDbmTabCounts(org, window, filters);
+      if (!worthKeeping(counts)) throw new Error("every badge slice failed");
+      return counts;
+    },
+    staleTime: range.type === "absolute" ? NORMAL_STALE_TIME : LIVE_STALE_TIME,
     // Six pipelines ride one request: a retry against a struggling backend is the storm this strip exists to prevent.
     retry: false,
   });
@@ -476,9 +476,7 @@ export const dbmBadgesQuery = (
 const freshBadges = (options: ReturnType<typeof dbmBadgesQuery>): DbmTabCounts | undefined => {
   const query = queryClient.getQueryCache().find<DbmTabCounts>({ queryKey: options.queryKey });
   if (!query || query.state.data === undefined) return undefined;
-  const staleTime =
-    typeof options.staleTime === "function" ? options.staleTime(query as any) : options.staleTime;
-  return query.isStaleByTime(staleTime) ? undefined : query.state.data;
+  return query.isStaleByTime(options.staleTime as number) ? undefined : query.state.data;
 };
 
 /** The seven count fields, as distinct from the snapshot's array payloads. */
@@ -661,7 +659,10 @@ export function useDbmTabCounts(): DbmTabCountsSource {
         counts.value = cleaned;
         ownPublished.clear();
       }
-      counts.value = carryForward(value, counts.value);
+      const merged = carryForward(value, counts.value);
+      // Same window: a page's own count is more exact than the fan-out's and stands until that page re-measures.
+      if (!scopeMoved) for (const own of ownPublished) merged[own] = counts.value[own];
+      counts.value = merged;
       // The window this snapshot describes now owns the published overrides;
       // anything a page taught us about the PREVIOUS window is stale and must
       // not be painted beside these numbers.
@@ -671,6 +672,13 @@ export function useDbmTabCounts(): DbmTabCountsSource {
       // alone rather than blanking every badge over one error — a strip that
       // empties on a transient failure reads as seven quiet tabs. Nothing was
       // cached either, so the next attempt is a real one.
+      if (token !== latest) return;
+      // A fresh shell has no previous snapshot: the last good answer the cache still holds beats seven blanks.
+      const held = queryClient.getQueryData<DbmTabCounts>(query.queryKey);
+      if (held && worthKeeping(held)) {
+        counts.value = carryForward(held, counts.value);
+        publishedKey = key;
+      }
     } finally {
       if (token === latest) loading.value = false;
     }

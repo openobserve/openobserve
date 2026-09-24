@@ -234,8 +234,12 @@ function windowOf(cover: Override): string {
 /// Newest first, because that is the one in force where two overlap. The
 /// endpoint already answers in this order for the unfiltered read; sorting
 /// here keeps it true for the windowed one as well.
+// The newest read: a slower answer for a window the calendar has already left must not overwrite the list.
+let latestCoversRead = 0;
+
 async function fetchCovers(force = false) {
   loading.value = true;
+  const readId = ++latestCoversRead;
   try {
     const options = teamOverridesQuery(
       orgId.value,
@@ -252,18 +256,20 @@ async function fetchCovers(force = false) {
       });
     }
     const res = await queryClient.fetchQuery(options);
+    if (readId !== latestCoversRead) return;
     // Filtered here rather than per rotation: N requests to narrow a list already in hand.
     const all = props.rotationId
       ? res.filter((cover) => cover.rotation_id === props.rotationId)
       : res;
     covers.value = [...all].sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id));
   } catch {
+    if (readId !== latestCoversRead) return;
     // A cover list that cannot load is not worth an error over the calendar it
     // sits under — the calendar still answers who is on call, which is the
     // question people came with.
     covers.value = [];
   } finally {
-    loading.value = false;
+    if (readId === latestCoversRead) loading.value = false;
   }
 }
 

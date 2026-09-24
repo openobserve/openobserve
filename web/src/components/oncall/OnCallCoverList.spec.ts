@@ -159,6 +159,29 @@ describe("OnCallCoverList", () => {
     expect(call.to).toBeUndefined();
   });
 
+  /// Paging back to a week already read answers from the cache at once, so the
+  /// slower answer for the week just left lands last and must not be drawn.
+  it("ignores a slower answer for a window the calendar has already left", async () => {
+    const thisWeek = { from: FROM, to: FROM + 86_400_000_000 };
+    const nextWeek = { from: FROM + 86_400_000_000, to: FROM + 2 * 86_400_000_000 };
+    service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+    const wrapper = render({ window: thisWeek });
+    await flushPromises();
+    let answerNext: (value: unknown) => void = () => {};
+    service.listOverrides.mockImplementationOnce(
+      () => new Promise((resolve) => (answerNext = resolve)),
+    );
+
+    await wrapper.setProps({ window: nextWeek });
+    await flushPromises();
+    await wrapper.setProps({ window: thisWeek });
+    await flushPromises();
+    answerNext({ data: [cover({ id: "ovr_2" }), cover({ id: "ovr_3" })] });
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+  });
+
   /// The calendar above this list remounts on every tab and range change.
   it("serves a remount from the cache, and reaches the server on refresh", async () => {
     service.listOverrides.mockResolvedValue({ data: [cover()] } as any);

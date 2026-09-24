@@ -1419,6 +1419,66 @@ describe("OnCallResponses — the rows' own fields", () => {
       expect(service.listResponses).not.toHaveBeenCalled();
       expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
     });
+
+    /// A cached filter answers at once while a cold one is still on the wire,
+    /// so the cold answer lands LAST — and must not paint its rows under a
+    /// filter the reader has already left.
+    it("ignores a slower answer for a filter the reader has already left", async () => {
+      service.listTeams.mockResolvedValue({
+        data: [{ id: "team_1", name: "Platform" }],
+      } as any);
+      const wrapper = await withRows([row()]);
+      let answerTeam: (value: unknown) => void = () => {};
+      service.listResponses.mockImplementationOnce(
+        () => new Promise((resolve) => (answerTeam = resolve)),
+      );
+      const filter = wrapper.findComponent('[data-test="oncall-responses-team-filter"]');
+
+      filter.vm.$emit("update:modelValue", "team_1");
+      await flushPromises();
+      filter.vm.$emit("update:modelValue", "all");
+      await flushPromises();
+      answerTeam({ data: [row({ id: "resp_t1" }), row({ id: "resp_t2" })] });
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
+    });
+  });
+
+  /// A timeline is live state: the reader expands a row to see what has
+  /// happened since, so every expand and every Refresh reaches the server.
+  describe("the expanded row's timeline", () => {
+    const ROW_KEY = "alert:al_ckt";
+
+    async function withExpandedRow() {
+      service.getResponse.mockResolvedValue({ data: { response: row(), events: [] } } as any);
+      const wrapper = await withRows([row()]);
+      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:expandedIds", [ROW_KEY]);
+      await flushPromises();
+      expect(service.getResponse).toHaveBeenCalledTimes(1);
+      return wrapper;
+    }
+
+    it("reads the timeline fresh each time the row is expanded", async () => {
+      const wrapper = await withExpandedRow();
+      const table = wrapper.findComponent({ name: "OTable" });
+
+      table.vm.$emit("update:expandedIds", []);
+      await flushPromises();
+      table.vm.$emit("update:expandedIds", [ROW_KEY]);
+      await flushPromises();
+
+      expect(service.getResponse).toHaveBeenCalledTimes(2);
+    });
+
+    it("re-reads the open row's timeline on Refresh", async () => {
+      const wrapper = await withExpandedRow();
+
+      await wrapper.find('[data-test="oncall-responses-refresh"]').trigger("click");
+      await flushPromises();
+
+      expect(service.getResponse).toHaveBeenCalledTimes(2);
+    });
   });
 });
 
