@@ -38,9 +38,7 @@ pub async fn dispatch_recovery(alert: &Alert, event: &RecoveryEvent) {
         event.duration_micros()
     );
 
-    // On-call first: it is the consumer holding a human awake. Called once per
-    // episode rather than once per evaluation, which is the whole fix — the
-    // scheduler used to ask "is this alert non-firing?" every tick.
+    // Once per episode, not once per evaluation: that is the whole fix.
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::oncall::is_enabled()
         && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
@@ -63,8 +61,7 @@ pub async fn dispatch_recovery(alert: &Alert, event: &RecoveryEvent) {
         );
     }
 
-    // The incident path owns delivery for the alerts it correlated, firing and
-    // resolve alike, so a correlated alert's own destinations stay silent.
+    // Correlated alerts: the incident owns the resolve because it sent the trigger.
     if alert.notify_on_recovery
         && event.incident_id.is_none()
         && let Err(e) = crate::alerts::alert::send_recovery_notification(alert, event).await
@@ -76,9 +73,7 @@ pub async fn dispatch_recovery(alert: &Alert, event: &RecoveryEvent) {
     }
 
     #[cfg(feature = "enterprise")]
-    if !alert.workflows.is_empty()
-        && let Err(e) = crate::workflows::send_alert_resolved(alert, event).await
-    {
+    if let Err(e) = crate::workflows::send_alert_resolved(alert, event).await {
         log::error!(
             "[RECOVERY] workflow consumer failed for {}: {e}",
             event.alert_id

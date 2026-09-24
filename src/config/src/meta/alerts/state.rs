@@ -108,7 +108,6 @@ pub struct AlertState {
     /// The level of this group's last *successful* delivery — what
     /// `delivery_decision` measures escalation against.
     pub last_notified_level: Option<AlertLevel>,
-    // ── Firing episode (o2-enterprise#2690, DR-2) ───────────────────────────
     /// The open firing episode: minted on the first notification this episode
     /// delivered, cleared by the write that emits the recovery. A second emit
     /// then has nothing to reference, which is what makes recovery exactly-once

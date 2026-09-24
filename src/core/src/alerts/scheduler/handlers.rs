@@ -175,22 +175,17 @@ async fn persist_alert_run_state(
         now,
     );
 
-    // ── Firing episode (o2-enterprise#2690) ─────────────────────────────────
-    // Folded in AFTER the outcome and level axes so it reads this evaluation's
-    // verdict, and emitted only once `persist` has committed below: an event
-    // that outlived a rolled-back write would tell four consumers about a
-    // recovery the database does not record. The recorded level is what decides
-    // `firing`, not the raw match — a frozen evaluation carries the previous
-    // level forward and so must not read as a recovery.
+    // Applied after the outcome and level axes, and emitted only once `persist`
+    // has committed: an event that outlived a rolled-back write would tell four
+    // consumers about a recovery the database does not record.
     let recovered = update.state.as_mut().and_then(|state| {
         let firing = state.level.is_some_and(|l| l.is_firing());
-        config::meta::alerts::recovery::apply_episode(
-            state,
-            firing,
-            episode,
-            now,
-            config::ider::uuid,
-        )
+        config::meta::alerts::recovery::apply_episode(state, firing, episode, now, || {
+            episode
+                .episode_id
+                .clone()
+                .unwrap_or_else(config::ider::uuid)
+        })
     });
 
     // ── Availability ledger (S-16) ──────────────────────────────────────────
@@ -469,6 +464,7 @@ async fn dispatch_per_group(
                 // last so a label value containing `{...}` cannot expand.
                 Some(&item.labels),
                 &[],
+                None,
             )
             .await;
 
@@ -1080,6 +1076,7 @@ async fn handle_composite_alert_trigger(
                         Some(i32::from(evaluated.result) as f64),
                         None,
                         skip_destinations,
+                        None,
                     )
                     .await
             };
@@ -2311,24 +2308,6 @@ async fn handle_alert_triggers(
         matched_level,
     );
 
-    // Outside the fired branch: that branch runs only while firing, when recovery must not.
-    #[cfg(feature = "enterprise")]
-    if matched_level.is_none()
-        && o2_enterprise::enterprise::oncall::is_enabled()
-        && let Some(alert_id) = alert.id.as_ref()
-        && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
-            &alert.org_id,
-            &alert_id.to_string(),
-        )
-        .await
-    {
-        log::error!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] on-call recovery failed for {}/{}: {e}",
-            alert.org_id,
-            alert.name
-        );
-    }
-
     // T-9 value context: what was observed, against what, with which operator.
     //
     // Aggregation alerts carry their thresholds in `having` / `warning_value`,
@@ -2497,7 +2476,29 @@ async fn handle_alert_triggers(
     // The firing episode opens on a notification that actually landed, so these
     // record what this evaluation delivered rather than what it decided to.
     let mut episode_delivered = false;
+    // Only the enterprise correlation block assigns this.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
     let mut episode_incident_id: Option<String> = None;
+    // Read-or-mint BEFORE the send: a resolve only matches a key PagerDuty saw
+    // on the trigger, and the episode is not stored until this evaluation ends.
+    // A minted key the send never uses is simply discarded — nothing records it
+    // unless `episode_delivered` says a notification landed.
+    let episode_key: Option<String> = if alert.notify_on_recovery
+        && delivery.should_deliver()
+        && let Some(alert_id) = alert.id.as_ref()
+    {
+        let open = infra::table::alert_states::get(
+            &alert_id.to_string(),
+            config::meta::alerts::state::ROLLUP_GROUP_KEY,
+        )
+        .await
+        .ok()
+        .flatten()
+        .and_then(|state| state.episode_id);
+        Some(open.unwrap_or_else(config::ider::uuid))
+    } else {
+        None
+    };
 
     if let Some(data) = trigger_results.data
         && !data.is_empty()
@@ -2788,6 +2789,7 @@ async fn handle_alert_triggers(
                             delivered: episode_delivered,
                             incident_id: None,
                             keep_firing_for_secs: alert.keep_firing_for,
+                            episode_id: episode_key.clone(),
                         },
                     )
                     .await;
@@ -3132,6 +3134,7 @@ async fn handle_alert_triggers(
                     trigger_results.actual_value,
                     None,
                     skip_destinations,
+                    episode_key.clone(),
                 )
                 .await
             {
@@ -3397,6 +3400,7 @@ async fn handle_alert_triggers(
                 delivered: episode_delivered,
                 incident_id: episode_incident_id,
                 keep_firing_for_secs: alert.keep_firing_for,
+                episode_id: episode_key,
             },
         )
         .await;

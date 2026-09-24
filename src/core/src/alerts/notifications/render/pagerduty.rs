@@ -68,9 +68,7 @@ pub fn render_pagerduty(c: &RenderedContent, ctx: &NotificationContext) -> Value
         })
         .collect();
 
-    // A resolve carries the key and nothing else: PagerDuty matches it against
-    // the open alert and ignores any payload. Sent without a `dedup_key` it is
-    // dropped — with a `202 success` — so the key is the whole message.
+    // Sent without a `dedup_key` a resolve is dropped, and still answers 202.
     let mut event = if ctx.alert_status == super::super::STATUS_RESOLVED {
         json!({ "event_action": "resolve" })
     } else {

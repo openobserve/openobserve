@@ -100,12 +100,6 @@ export const makeDestinationsSchema = (t: Translator) =>
 /** creates_incident: optional boolean. */
 export const alertSettingsCreatesIncidentSchema = z.boolean().optional();
 
-/**
- * Shape object for composition — spread into a bigger `z.object({ ... })` so the
- * alert schema reuses the EXACT same field rules. The period rule is
- * unconditional here; the orchestrator overrides it with a mode-conditional
- * (scheduled-only) refinement.
- */
 export const alertSettingsNotifyOnRecoverySchema = z.boolean().optional();
 
 // Seconds the condition must stay clear before recovering. Same shape as the
@@ -117,6 +111,12 @@ export const makeKeepFiringForSchema = (t: Translator) =>
     .min(0, { message: t("alerts.alertSettings.keepFiringForInvalid") })
     .optional();
 
+/**
+ * Shape object for composition — spread into a bigger `z.object({ ... })` so the
+ * alert schema reuses the EXACT same field rules. The period rule is
+ * unconditional here; the orchestrator overrides it with a mode-conditional
+ * (scheduled-only) refinement.
+ */
 export const makeAlertSettingsShape = (t: Translator) =>
   ({
     trigger_condition: z.object({

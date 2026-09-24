@@ -77,6 +77,9 @@ pub struct EpisodeInput {
     pub incident_id: Option<String>,
     /// `keep_firing_for` in seconds; 0 recovers on the first clear evaluation.
     pub keep_firing_for_secs: i64,
+    /// The key the trigger carried, so the episode stores what PagerDuty saw
+    /// rather than a second id it has never been told about.
+    pub episode_id: Option<String>,
 }
 
 impl EpisodeInput {
@@ -87,6 +90,7 @@ impl EpisodeInput {
             delivered: false,
             incident_id: None,
             keep_firing_for_secs,
+            episode_id: None,
         }
     }
 }
@@ -122,21 +126,17 @@ pub fn apply_episode(
     new_episode_id: impl FnOnce() -> String,
 ) -> Option<ClosedEpisode> {
     if firing {
-        // A re-fire during the hold is the same episode, so the resolve still
-        // pairs with the trigger that opened it. Only a re-fire AFTER the
-        // recovery opens a new one — which is also what PagerDuty does with a
-        // trigger on a resolved dedup key.
+        // Same episode, so the resolve still pairs with the trigger that opened it.
         state.recovering_since = None;
         if input.delivered {
             if state.episode_id.is_none() {
                 state.episode_id = Some(new_episode_id());
                 state.episode_opened_at = Some(at);
-                state.episode_incident_id = input.incident_id.clone();
-            } else if state.episode_incident_id.is_none() {
-                // Correlation can adopt an episode that began on the alert
-                // path; the owner is whoever sent the LAST trigger.
-                state.episode_incident_id = input.incident_id.clone();
             }
+            // Re-read every delivery, not adopted once: correlation can take an
+            // episode over, hand it back, or move it to a different incident,
+            // and the resolve has to follow whoever sent the last trigger.
+            state.episode_incident_id = input.incident_id.clone();
         }
         return None;
     }
@@ -202,27 +202,43 @@ mod tests {
             delivered: true,
             incident_id: None,
             keep_firing_for_secs: 0,
+            episode_id: None,
         }
     }
 
     #[test]
-    fn a_suppressed_firing_opens_no_episode_and_recovers_nothing() {
+    fn a_suppressed_firing_neither_opens_an_episode_nor_disturbs_one() {
         let mut s = state();
-        assert!(
-            apply_episode(&mut s, true, &EpisodeInput::undelivered(0), 10, || "ep"
-                .into())
-            .is_none()
-        );
+        apply_episode(&mut s, true, &EpisodeInput::undelivered(0), 10, || {
+            "ep_1".into()
+        });
         assert!(
             s.episode_id.is_none(),
             "nothing was delivered, so nothing paged"
         );
         assert!(
-            apply_episode(&mut s, false, &EpisodeInput::undelivered(0), 20, || "ep"
+            apply_episode(&mut s, false, &EpisodeInput::undelivered(0), 20, || "x"
                 .into())
             .is_none(),
             "there is nothing to recover from"
         );
+
+        // The other half: a suppressed firing must not disturb the episode a
+        // delivered one already opened, or the resolve loses its dedup key.
+        apply_episode(&mut s, true, &delivered(), 30, || "ep_2".into());
+        apply_episode(&mut s, true, &EpisodeInput::undelivered(0), 40, || {
+            "ep_3".into()
+        });
+        assert_eq!(
+            s.episode_id.as_deref(),
+            Some("ep_2"),
+            "a suppressed firing must not mint a second id"
+        );
+        let closed = apply_episode(&mut s, false, &EpisodeInput::undelivered(0), 50, || {
+            "x".into()
+        })
+        .expect("the delivered episode still recovers");
+        assert_eq!(closed.episode_id, "ep_2");
     }
 
     #[test]
@@ -257,6 +273,7 @@ mod tests {
             delivered: false,
             incident_id: None,
             keep_firing_for_secs: 60,
+            episode_id: None,
         };
         let mut s = state();
         apply_episode(&mut s, true, &delivered(), 0, || "ep_1".into());
@@ -279,6 +296,7 @@ mod tests {
             delivered: false,
             incident_id: None,
             keep_firing_for_secs: 60,
+            episode_id: None,
         };
         let mut s = state();
         apply_episode(&mut s, true, &delivered(), 0, || "ep_1".into());
@@ -313,6 +331,7 @@ mod tests {
                 delivered: true,
                 incident_id: Some("inc_1".into()),
                 keep_firing_for_secs: 0,
+                episode_id: None,
             },
             10,
             || "ep_1".into(),

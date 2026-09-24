@@ -953,10 +953,6 @@ pub async fn correlate_external_event(
     Ok(Some(outcome))
 }
 
-/// Auto-resolve the open incident containing `external.id`, but only once every
-/// other `External`-kind alert already linked to that incident is also resolved
-/// in `external_alerts` — a single source clearing shouldn't close an incident
-/// that other still-firing sources are correlated into.
 /// Record that one of an incident's alerts recovered, and close the incident
 /// once they all have.
 ///
@@ -1029,6 +1025,10 @@ pub async fn resolve_alert_firing(
     Ok(())
 }
 
+/// Auto-resolve the open incident containing `external.id`, but only once every
+/// other `External`-kind alert already linked to that incident is also resolved
+/// in `external_alerts` — a single source clearing shouldn't close an incident
+/// that other still-firing sources are correlated into.
 pub async fn try_auto_resolve_incident_for_external_alert(
     org_id: &str,
     external_alert_id: &str,

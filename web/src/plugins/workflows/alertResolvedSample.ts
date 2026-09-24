@@ -15,10 +15,8 @@
 
 // The payload one recovered firing hands downstream steps.
 //
-// Deliberately smaller than the Alert Fired payload: there are no matched rows
-// to carry, because the query that produced them no longer matches. What it adds
-// is `episode_id`, the id of the firing this recovery answers — the same key the
-// firing sent to PagerDuty — so a workflow can join the two runs.
+// No `data` rows: the query that produced them no longer matches. `episode_id` is
+// the key the firing sent to PagerDuty, so a workflow can join the two runs.
 
 import { raw } from "@/types/i18n";
 

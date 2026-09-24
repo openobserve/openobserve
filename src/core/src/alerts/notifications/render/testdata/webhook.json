@@ -8,6 +8,7 @@
     "alert_end_time": "2026-08-01T10:10:00",
     "alert_level": "critical",
     "alert_status": "firing",
+    "alert_status": "firing",
     "alert_name": "CPU \"high\"",
     "alert_operator": ">=",
     "alert_period": "10",

@@ -316,10 +316,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFormSwitch name="notify_on_recovery" data-test="alert-notify-on-recovery-toggle" />
         </div>
 
-        <div
-          v-if="formData?.notify_on_recovery"
-          class="mb-4! flex items-start max-md:flex-col max-md:gap-1"
-        >
+        <!-- Always shown: the hold delays on-call and incident closure too, not
+             only the message `notify_on_recovery` gates. -->
+        <div class="mb-4! flex items-start max-md:flex-col max-md:gap-1">
           <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
             {{ t("alerts.alertSettings.keepFiringFor") }}
             <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />

@@ -41,6 +41,10 @@ pub struct Model {
     pub groups_firing_is_lower_bound: Option<bool>,
     /// Per-group silence window (§5.5 MN-2): suppress same-level re-delivery
     /// until this instant. Written only by the delivery callbacks.
+    pub silenced_until: Option<i64>,
+    /// `AlertLevel::to_i32` of this group's last *successful* delivery — what
+    /// escalation is measured against (§7.1 per group).
+    pub last_notified_level: Option<i32>,
     /// The open firing episode, minted on its first delivered notification and
     /// cleared by the write that emits the recovery. NULL = nothing was
     /// delivered, so there is nothing to recover from.
@@ -51,10 +55,6 @@ pub struct Model {
     /// When the condition first cleared, while `keep_firing_for` holds the
     /// episode open. NULL = not in the hold.
     pub recovering_since: Option<i64>,
-    pub silenced_until: Option<i64>,
-    /// `AlertLevel::to_i32` of this group's last *successful* delivery — what
-    /// escalation is measured against (§7.1 per group).
-    pub last_notified_level: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

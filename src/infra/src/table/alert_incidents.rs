@@ -392,7 +392,6 @@ pub async fn list(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
-/// Get alerts for an incident
 /// Mark every open firing of `alert_id` in this incident as recovered.
 ///
 /// Keyed on the alert rather than one `alert_fired_at` because the episode's
@@ -419,6 +418,7 @@ pub async fn resolve_alert_firings(
     Ok(res.rows_affected)
 }
 
+/// Get alerts for an incident
 pub async fn get_incident_alerts(
     incident_id: &str,
 ) -> Result<Vec<alert_incident_alerts::Model>, errors::Error> {
