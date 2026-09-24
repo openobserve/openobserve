@@ -286,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :viewOnly="false"
                   :allowAlertCreation="false"
                   :simplifiedPanelView="true"
+                  :hideAddPanel="true"
                   :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
                   @variablesManagerReady="onVariablesManagerReady"
                   @onDeletePanel="handlePanelDelete"
@@ -510,11 +511,15 @@ const selectedDimensions = ref<string[]>(getInitialDimensions());
 
 // Available dimensions for dropdown (all stream fields)
 const availableDimensions = computed(() => {
+  const allFieldName = store.state.zoConfig?.all_fields_name || "_all";
+  const timestampField = store.state.zoConfig?.timestamp_column || "_timestamp";
+
   return (props.streamFields || [])
     .map((f: any) => ({
       label: f.name || f,
       value: f.name || f,
     }))
+    .filter((f) => f.value !== allFieldName && f.value !== timestampField)
     .sort((a, b) => a.label.localeCompare(b.label));
 });
 
