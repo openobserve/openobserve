@@ -14,8 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
-import { substitutePlaceholders, withDefaultScheme } from "./placeholders";
+import { placeholderNames, substitutePlaceholders, withDefaultScheme } from "./placeholders";
 import { namedEnvironments } from "./scope";
+
+export interface ReplayNameStatus {
+  name: string;
+  state: "resolved" | "secret" | "missing";
+  steps: number[];
+}
 
 /** Plain shared values for one environment, its rows over the global ones; a secret hides a plain global. */
 export function sharedPlainValues(
@@ -63,4 +69,37 @@ export function replayInputs(
   const variables = mergeReplayVariables(checkVariables, sharedPlain);
   const values = Object.fromEntries(variables.map((v) => [v.name, v.value]));
   return { url: withDefaultScheme(substitutePlaceholders(url, values)), variables };
+}
+
+/** Each placeholder the texts use and whether replay can resolve it; precedence is check, supplied, environment, global. */
+export function classifyReplayNames(
+  texts: { step: number; texts: (string | undefined)[] }[],
+  checkVariables: { name: string; value: string }[],
+  environments: SyntheticsEnvironment[],
+  globals: SyntheticsVariable[],
+  environmentId: string,
+  supplied: Record<string, string>,
+): ReplayNameStatus[] {
+  const stepsByName = new Map<string, number[]>();
+  for (const entry of texts) {
+    for (const name of entry.texts.flatMap((text) => (text ? placeholderNames(text) : []))) {
+      const steps = stepsByName.get(name) ?? [];
+      if (!steps.includes(entry.step)) steps.push(entry.step);
+      stepsByName.set(name, steps);
+    }
+  }
+  const own = new Set(checkVariables.map((v) => v.name));
+  const envRows =
+    environments.find((env) => env.id === environmentId && !env.is_global)?.variables ?? [];
+  return [...stepsByName].map(([name, steps]) => {
+    if (own.has(name) || Object.prototype.hasOwnProperty.call(supplied, name)) {
+      return { name, state: "resolved" as const, steps };
+    }
+    const row = envRows.find((v) => v.name === name) ?? globals.find((v) => v.name === name);
+    if (row?.kind === "plain") return { name, state: "resolved" as const, steps };
+    if (row?.kind === "secret" && row.has_value !== false) {
+      return { name, state: "secret" as const, steps };
+    }
+    return { name, state: "missing" as const, steps };
+  });
 }

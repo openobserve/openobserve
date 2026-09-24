@@ -17,10 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BlockedReason, BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
-import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
+import useSyntheticsRecorder, {
+  UnresolvedVariableError,
+} from "@/composables/useSyntheticsRecorder";
 import { getUUIDv7 } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -64,8 +66,14 @@ import {
 const props = defineProps<{
   modelValue: BrowserStep[];
   readonly?: boolean;
-  /** The check's Starting URL: row 0's value and the page the recorder opens. */
+  /** The resolved Starting URL the recorder opens. */
   startUrl?: string;
+  /** The check's Starting URL as written; row 0 shows and edits it. */
+  startUrlTemplate?: string;
+  /** Where replay and recording resolve values, named for messages. */
+  replayEnvironmentLabel?: I18nText;
+  /** Names that resolve only to a stored secret the browser cannot read. */
+  secretNames?: ReadonlySet<string>;
   /** Names the check resolves; a step value naming anything else is warned about. */
   knownVariables?: ReadonlySet<string>;
   /**
@@ -134,7 +142,7 @@ const props = defineProps<{
   missingChildIds?: Set<string>;
   /** Names this check defines, so a child's undefined placeholder can be named before save. */
   definedNames?: string[];
-  /** The check's variables, substituted into the Starting URL before the recorder opens it. */
+  /** The variables recording resolves with: the check's own over the replay environment's plain values. */
   variables?: { name: string; value: string }[];
   /** The host's one child-journey cache, shared so the preview and the executed count never drift. */
   childrenCache?: Map<string, ChildJourney>;
@@ -722,6 +730,7 @@ defineExpose({
   // issues cannot use this channel — see the `fieldIssues` prop.
   validateStepSelectors: validateJourneySteps,
   revealCapNotice,
+  replayUpTo,
 });
 
 /**
@@ -744,7 +753,7 @@ async function startRecording() {
     recorder
       .startRecording(props.startUrl ?? "", props.testIdAttr, props.variables)
       .catch((err) => {
-        recorder.error.value = err instanceof Error ? err.message : String(err);
+        recorder.error.value = recordStartError(err);
       })
       .finally(() => {
         // A refused start leaves no session for the kept anchor's marker to describe.
@@ -773,8 +782,19 @@ async function startRecording() {
       variables: props.variables,
     })
     .catch((err) => {
-      recorder.error.value = err instanceof Error ? err.message : String(err);
+      recorder.error.value = recordStartError(err);
     });
+}
+
+/** An unresolved name says which value is missing and where, instead of the raw refusal. */
+function recordStartError(err: unknown): string {
+  if (!(err instanceof UnresolvedVariableError)) {
+    return err instanceof Error ? err.message : String(err);
+  }
+  const params = { name: err.variableName, environment: props.replayEnvironmentLabel ?? "" };
+  return props.secretNames?.has(err.variableName)
+    ? t("synthetics.journey.replayValues.secretUnreadable", params)
+    : t("synthetics.journey.replayValues.recordUnresolved", params);
 }
 
 /**
@@ -946,6 +966,11 @@ function requestReplay(upTo?: number) {
   replayedUpTo.value = upTo ?? null;
   if (upTo === undefined) emit("replay");
   else emit("replay-up-to", upTo);
+}
+
+/** The host's "Replay anyway": the same up-to path, so the banner's count stays right. */
+function replayUpTo(upTo: number) {
+  requestReplay(upTo);
 }
 
 function onReplayButtonClick() {
@@ -1367,7 +1392,11 @@ const executedTotal = computed(() => {
 /** Row 0 — the Starting URL as a navigate-shaped row — exactly when the run opens it (skip rule A1). */
 const startRow = computed<BrowserStep | null>(() =>
   opensStartingUrl(props.modelValue, childrenCache.value)
-    ? { id: START_LOAD_STEP_ID, action: "navigate", value: props.startUrl ?? "" }
+    ? {
+        id: START_LOAD_STEP_ID,
+        action: "navigate",
+        value: props.startUrlTemplate ?? props.startUrl ?? "",
+      }
     : null,
 );
 

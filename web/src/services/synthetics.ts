@@ -40,7 +40,8 @@ function apiOrigin(): string {
 export interface SyntheticsVariablePayload {
   name: string;
   value?: string;
-  kind: "plain" | "secret";
+  /** Fixed once created, so an update may leave it out. */
+  kind?: "plain" | "secret";
   description?: string;
   example?: string;
   tags?: string[];

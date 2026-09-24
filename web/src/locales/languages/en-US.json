@@ -14264,6 +14264,25 @@
         "capOwn": "{count} of its own",
         "capChild": "{count} from \"{name}\"",
         "capRemedy": "Remove a subtest, or shorten this test's own steps."
+      },
+      "replayValues": {
+        "secretUnreadable": "{name} is a secret in {environment}. A replay runs in your browser, which can't read a stored secret.",
+        "recordUnresolved": "Recording can't start: {name} has no value in {environment}.",
+        "global": "Global",
+        "saveFailed": "Could not save the value"
+      },
+      "missingValue": {
+        "title": "{name} isn't defined in {environment}",
+        "body": "Step {steps} uses {placeholder}. {environment}, Global and this test have no value for it, so scheduled runs in {environment} will fail too. | Steps {steps} use {placeholder}. {environment}, Global and this test have no value for it, so scheduled runs in {environment} will fail too.",
+        "bodyStartingUrl": "The Starting URL uses {placeholder}. {environment}, Global and this test have no value for it, so scheduled runs in {environment} will fail too.",
+        "valueLabel": "Value for {name} in {environment}",
+        "valueRequired": "Enter a value",
+        "storeAsSecret": "Store as a secret",
+        "kindLocked": "This variable is already stored as {kind}.",
+        "sharedWarning": "{environment} is shared by {count} check. The value is saved now and used by all of them; it does not wait for Save & Exit. | {environment} is shared by {count} checks. The value is saved now and used by all of them; it does not wait for Save & Exit.",
+        "globalWarning": "Global values apply to every check. The value is saved now and used by all of them; it does not wait for Save & Exit.",
+        "replayAnyway": "Replay anyway",
+        "saveAndReplay": "Save & replay"
       }
     },
     "labels": {

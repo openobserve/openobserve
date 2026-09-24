@@ -39,6 +39,17 @@ import {
   START_LOAD_STEP_ID,
 } from "@/constants/synthetics";
 
+/** A `{{NAME}}` no variable binds; the name lets a caller say which value is missing. */
+export class UnresolvedVariableError extends Error {
+  readonly variableName: string;
+
+  constructor(variableName: string) {
+    super(`unresolved variable {{${variableName}}}`);
+    this.name = "UnresolvedVariableError";
+    this.variableName = variableName;
+  }
+}
+
 /**
  * Encapsulates all communication with the OpenObserve Extension (playwright-crx)
  * via the content-script bridge (window.postMessage). Works on any origin —
@@ -72,7 +83,7 @@ function assertResolved(texts: (string | undefined)[], vars: Record<string, stri
     const name = text
       ? placeholderNames(text).find((n) => !Object.prototype.hasOwnProperty.call(vars, n))
       : undefined;
-    if (name) throw new Error(`unresolved variable {{${name}}}`);
+    if (name) throw new UnresolvedVariableError(name);
   }
 }
 

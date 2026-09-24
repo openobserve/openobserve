@@ -30,7 +30,7 @@ import {
   onBeforeRouteUpdate,
   type NavigationGuard,
 } from "vue-router";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   BrowserCheck,
@@ -38,6 +38,7 @@ import type {
   SyntheticsLocation,
   SyntheticsDevice,
   SyntheticsFolder,
+  SyntheticsEnvironment,
   AgentSetup,
   BlockedReason,
   ReplayResponse,
@@ -48,16 +49,20 @@ import { fetchChildJourney } from "@/utils/synthetics/fetchChildJourney";
 import type { WireStep } from "@/types/synthetics";
 import { buildResolvedGrouped } from "@/components/synthetics/variables/resolved";
 import {
+  classifyReplayNames,
   defaultReplayEnvironmentId,
   replayInputs,
   sharedPlainValues,
+  type ReplayNameStatus,
 } from "@/components/synthetics/variables/replayInputs";
+import { serverMessage } from "@/components/synthetics/variables/serverMessage";
 import { useSharedVariables } from "@/components/synthetics/variables/useSharedVariables";
 import {
   expandJourney,
   loadChildren,
   opensStartingUrl,
   placeholdersIn,
+  translateStepId,
   type ChildJourney,
   type ExpansionMap,
 } from "@/utils/synthetics/expandJourney";
@@ -101,6 +106,7 @@ import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
 import ExtractSubtestDialog from "@/components/synthetics/journey/ExtractSubtestDialog.vue";
+import MissingValueDialog from "@/components/synthetics/journey/MissingValueDialog.vue";
 import type { ExtractForm } from "@/components/synthetics/journey/ExtractSubtestDialog.schema";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import CheckVariablesPanel from "@/components/synthetics/configure/CheckVariablesPanel.vue";
@@ -1295,6 +1301,8 @@ const {
   environments: sharedEnvironments,
   globals: sharedGlobals,
   loaded: sharedVariablesLoaded,
+  environmentsLoaded: sharedEnvironmentsLoaded,
+  refreshing: sharedVariablesRefreshing,
   refresh: fetchSharedVariables,
 } = useSharedVariables();
 onMounted(fetchSharedVariables);
@@ -1318,14 +1326,28 @@ const replayEnvironmentId = computed(
     defaultReplayEnvironmentId(check.value.environments ?? [], sharedEnvironments.value),
 );
 
+/** A readable named environment, or undefined for Global. */
+function namedEnvironment(id: string | undefined): SyntheticsEnvironment | undefined {
+  return sharedEnvironments.value.find((env) => env.id === id && !env.is_global);
+}
+
+function environmentLabel(id: string | undefined): I18nText {
+  const env = namedEnvironment(id);
+  return env ? raw(env.name) : t("synthetics.journey.replayValues.global");
+}
+
+const replayEnvironmentLabel = computed(() => environmentLabel(replayEnvironmentId.value));
+
+/** The url and variables one environment resolves, with `supplied` over its shared values. */
+function replayInputsFor(environmentId: string | undefined, supplied: Record<string, string>) {
+  return replayInputs(check.value.url, check.value.variables ?? [], {
+    ...sharedPlainValues(sharedEnvironments.value, sharedGlobals.value, environmentId),
+    ...supplied,
+  });
+}
+
 /** The url and variables replay and recording run with, resolved against that environment. */
-const replayInputsForCheck = computed(() =>
-  replayInputs(
-    check.value.url,
-    check.value.variables ?? [],
-    sharedPlainValues(sharedEnvironments.value, sharedGlobals.value, replayEnvironmentId.value),
-  ),
-);
+const replayInputsForCheck = computed(() => replayInputsFor(replayEnvironmentId.value, {}));
 
 /** Every name the check resolves in any of its environments; undefined until the shared tiers load. */
 const knownVariableNames = computed(() => {
@@ -1343,31 +1365,220 @@ const knownVariableNames = computed(() => {
   );
 });
 
+/** The texts replay substitutes, keyed by authored step number; 0 is the Starting URL. */
+function replayTexts(authored: BrowserStep[], wire: WireStep[], map: ExpansionMap) {
+  return [
+    { step: 0, texts: [check.value.url] },
+    ...wire.map((w) => ({
+      step: authored.findIndex((s) => s.id === translateStepId(map, w.id)) + 1,
+      texts: [w.url, w.value, w.text, w.key, w.selector, w.name],
+    })),
+  ];
+}
+
+/** The current journey's texts, expanded from the child cache; an unloaded child contributes none. */
+const journeyReplayTexts = computed(() => {
+  try {
+    const { steps, map } = expandJourney(check.value.journey, childrenCache.value);
+    return replayTexts(check.value.journey, journeyToWireSteps(steps), map);
+  } catch {
+    return replayTexts(check.value.journey, [], new Map());
+  }
+});
+
+function classifyFor(
+  texts: ReturnType<typeof replayTexts>,
+  environmentId: string | undefined,
+  supplied: Record<string, string>,
+): ReplayNameStatus[] {
+  return classifyReplayNames(
+    texts,
+    check.value.variables ?? [],
+    sharedEnvironments.value,
+    sharedGlobals.value,
+    environmentId ?? "",
+    supplied,
+  );
+}
+
+/** Names recording can only reach through a stored secret, so its refusal can say so. */
+const replaySecretNames = computed(
+  () =>
+    new Set(
+      classifyFor(journeyReplayTexts.value, replayEnvironmentId.value, {})
+        .filter((s) => s.state === "secret")
+        .map((s) => s.name),
+    ),
+);
+
+/** One replay request, fixed when it is classified so an open dialog never follows the selector. */
+interface PendingReplay {
+  journey: BrowserStep[];
+  wire: WireStep[];
+  map: ExpansionMap;
+  envId: string | undefined;
+  supplied: Record<string, string>;
+}
+
+const missingPrompt = ref<{ pending: PendingReplay; status: ReplayNameStatus } | null>(null);
+const missingOpen = ref(false);
+
+const missingDialogProps = computed(() => {
+  const prompt = missingPrompt.value;
+  if (!prompt) return null;
+  const env = namedEnvironment(prompt.pending.envId);
+  const rows = env ? env.variables : sharedGlobals.value;
+  const { steps } = prompt.status;
+  return {
+    name: prompt.status.name,
+    environmentName: environmentLabel(prompt.pending.envId),
+    isGlobal: !env,
+    steps,
+    sharedByChecks: env?.checks_count ?? 0,
+    canReplayAnyway: !steps.includes(0) && steps[0] > 1,
+    existingKind: rows.find((v) => v.name === prompt.status.name)?.kind ?? null,
+  };
+});
+
+// The view's recorder error has no banner; a silent failure reads as a dead button.
+function toastReplayError(err: unknown) {
+  toast({ variant: "error", message: raw(err instanceof Error ? err.message : String(err)) });
+}
+
+/** Resolves once no shared-list refresh is in flight, so a gate never judges a half-loaded list. */
+function sharedListsSettled(): Promise<void> {
+  if (!sharedVariablesRefreshing.value) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const stop = watch(sharedVariablesRefreshing, (busy) => {
+      if (busy) return;
+      stop();
+      resolve();
+    });
+  });
+}
+
 /** Expanded before shipping, so the runner never sees `subtest`; `expansionMap` folds results back. */
 async function runReplay(journey: BrowserStep[]) {
-  let expanded = journey;
   expansionMap.value = undefined;
+  let wire: WireStep[];
+  let map: ExpansionMap;
   try {
     const children = await loadChildren(journey, loadChild);
     const result = expandJourney(journey, children);
-    expanded = result.steps;
+    map = result.map;
     expansionMap.value = result.map;
+    wire = journeyToWireSteps(result.steps);
   } catch (err) {
-    recorder.error.value = err instanceof Error ? err.message : String(err);
+    toastReplayError(err);
     return;
   }
-  const steps = journeyToWireSteps(expanded);
-  if (steps.length === 0) return;
-  startReplay(steps);
+  if (wire.length === 0) return;
+  await sharedListsSettled();
+  gateReplay({ journey, wire, map, envId: replayEnvironmentId.value, supplied: {} });
 }
 
-function startReplay(steps: WireStep[]) {
-  const { url, variables } = replayInputsForCheck.value;
-  recorder
-    .replay(steps, url, variables, check.value.auth, check.value.headers, check.value.cookies)
-    .catch((err) => {
-      recorder.error.value = err instanceof Error ? err.message : String(err);
+/** Asks for what the replay cannot resolve, one dialog at a time, then replays. */
+function gateReplay(pending: PendingReplay) {
+  // Without the environment list a verdict would be a guess, so replay as before and let a failure speak.
+  if (!sharedEnvironmentsLoaded.value) {
+    startReplay(pending);
+    return;
+  }
+  const statuses = classifyFor(
+    replayTexts(pending.journey, pending.wire, pending.map),
+    pending.envId,
+    pending.supplied,
+  );
+  const missing = statuses.find((s) => s.state === "missing");
+  if (missing) {
+    missingPrompt.value = { pending, status: missing };
+    missingOpen.value = true;
+    return;
+  }
+  const secret = statuses.find((s) => s.state === "secret");
+  if (secret) {
+    toast({
+      variant: "error",
+      message: t("synthetics.journey.replayValues.secretUnreadable", {
+        name: secret.name,
+        environment: environmentLabel(pending.envId),
+      }),
     });
+    return;
+  }
+  startReplay(pending);
+}
+
+function startReplay(pending: PendingReplay) {
+  const { url, variables } = replayInputsFor(pending.envId, pending.supplied);
+  recorder
+    .replay(
+      pending.wire,
+      url,
+      variables,
+      check.value.auth,
+      check.value.headers,
+      check.value.cookies,
+    )
+    .catch(toastReplayError);
+}
+
+/** Writes the value into the replay's environment (or Global), then re-runs the gate with it supplied. */
+async function onMissingValueSubmit(values: { value: string; secret: boolean }) {
+  const prompt = missingPrompt.value;
+  if (!prompt) return;
+  const { pending } = prompt;
+  const { name } = prompt.status;
+  try {
+    await saveReplayValue(namedEnvironment(pending.envId), name, values);
+  } catch (err) {
+    // Never logged: an axios error's `config.data` carries the typed value.
+    toast({
+      variant: "error",
+      message: serverMessage(err) ?? t("synthetics.journey.replayValues.saveFailed"),
+    });
+    return;
+  }
+  await fetchSharedVariables();
+  pending.supplied = { ...pending.supplied, [name]: values.value };
+  missingOpen.value = false;
+  await nextTick();
+  gateReplay(pending);
+}
+
+/** An existing row keeps its metadata and kind; a new one takes the chosen kind (Global holds no secrets). */
+async function saveReplayValue(
+  env: SyntheticsEnvironment | undefined,
+  name: string,
+  { value, secret }: { value: string; secret: boolean },
+) {
+  const org = store.state.selectedOrganization.identifier;
+  const row = (env ? env.variables : sharedGlobals.value).find((v) => v.name === name);
+  if (row) {
+    const body = {
+      name,
+      value,
+      description: row.description,
+      example: row.example,
+      tags: row.tags,
+    };
+    if (env) await syntheticsService.updateEnvironmentVariable(org, env.name, row.id, body);
+    else await syntheticsService.updateGlobalVariable(org, row.id, body);
+    return;
+  }
+  if (env) {
+    const kind = secret ? "secret" : "plain";
+    await syntheticsService.createEnvironmentVariable(org, env.name, { name, value, kind });
+  } else {
+    await syntheticsService.createGlobalVariable(org, { name, value, kind: "plain" });
+  }
+}
+
+async function onReplayAnyway() {
+  const steps = missingPrompt.value?.status.steps ?? [];
+  missingOpen.value = false;
+  await nextTick();
+  if (steps[0] > 1) journeyRef.value?.replayUpTo(steps[0] - 1);
 }
 
 /** The `loadChildren` fetcher: throws on failure, after recording a refusal or a deletion for the rows. */
@@ -1604,6 +1815,9 @@ function onClearResults() {
                     ref="journeyRef"
                     v-model="check.journey"
                     :start-url="replayInputsForCheck.url"
+                    :start-url-template="check.url"
+                    :replay-environment-label="replayEnvironmentLabel"
+                    :secret-names="replaySecretNames"
                     :known-variables="knownVariableNames"
                     :extension-ready="extensionReady"
                     :can-record-from="canRecordFrom"
@@ -1620,7 +1834,7 @@ function onClearResults() {
                     :own-step-count="executedStepCount"
                     :journey-budget-ms="journeyBudgetMs"
                     :defined-names="definedNames"
-                    :variables="check.variables"
+                    :variables="replayInputsForCheck.variables"
                     :children-cache="childrenCache"
                     :refused-child-ids="refusedChildIds"
                     :missing-child-ids="missingChildIds"
@@ -1939,6 +2153,14 @@ function onClearResults() {
         <p class="m-0">{{ t("synthetics.save.blockedBody") }}</p>
       </div>
     </ODialog>
+
+    <MissingValueDialog
+      v-if="missingDialogProps"
+      v-model:open="missingOpen"
+      v-bind="missingDialogProps"
+      :on-submit="onMissingValueSubmit"
+      @replay-anyway="onReplayAnyway"
+    />
 
     <!-- Unsaved changes dialog (route leave) — rendered at top level so it's
        available in ALL phases (gate, extension-setup, editor), not just editor. -->
