@@ -337,6 +337,11 @@ const baseStubs = {
     props: ["open", "mode", "environmentName", "secrets", "failedAtStep", "onSubmit"],
     emits: ["update:open", "forget"],
   },
+  JourneyUsedByPopover: {
+    name: "JourneyUsedByPopover",
+    template: '<div data-test="synthetics-journey-used-by-stub" />',
+    props: ["references", "hidden", "folders", "orgIdentifier"],
+  },
   MissingValueDialog: {
     name: "MissingValueDialog",
     template: '<div data-test="synthetics-missing-value-dialog-stub" :data-open="open" />',
@@ -431,7 +436,8 @@ const baseStubs = {
 // ── Missing component stubs required by OPageLayout ──────────────────────
 const pageLayoutStubs = {
   OPageLayout: {
-    template: '<div><slot name="title" /><slot /></div>',
+    template:
+      '<div><slot name="title" /><div data-test="page-actions"><slot name="actions" /></div><slot /></div>',
     props: ["title", "subtitle", "back", "class", "bleed"],
   },
 };
@@ -1538,15 +1544,31 @@ describe("CreateBrowserTest", () => {
       );
     });
 
-    it("shows the used-by count without blocking anything", async () => {
+    it("shows Used by N tests in the page header, not the footer", async () => {
+      const references = [{ id: "p1", name: "One", folder_id: "f1" }];
       mockServiceReferencedBy.mockResolvedValue({
-        data: { references: [{ id: "p1", name: "One" }], hidden_reference_count: 2 },
+        data: { references, hidden_reference_count: 2 },
       });
       wrapper = await mountEdit();
 
-      expect(wrapper.find('[data-test="synthetics-used-by-indicator"]').text()).toBe(
-        "Used by 3 tests",
-      );
+      const usedBy = wrapper
+        .find('[data-test="page-actions"]')
+        .findComponent('[data-test="synthetics-journey-used-by-stub"]') as VueWrapper<any>;
+      expect(usedBy.exists()).toBe(true);
+      expect(usedBy.props("references")).toEqual(references);
+      expect(usedBy.props("hidden")).toBe(2);
+      expect(usedBy.props("orgIdentifier")).toBe("default");
+      expect(wrapper.find('[data-test="synthetics-used-by-indicator"]').exists()).toBe(false);
+    });
+
+    it("no Used by button when nothing uses the test, and in create mode", async () => {
+      wrapper = await mountEdit();
+      expect(wrapper.find('[data-test="synthetics-journey-used-by-stub"]').exists()).toBe(false);
+      wrapper.unmount();
+
+      wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-journey-used-by-stub"]').exists()).toBe(false);
     });
 
     it("asks nothing on a save that adds no placeholder", async () => {
@@ -1607,6 +1629,99 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage();
       await flushPromises();
       expect(mockServiceReferencedBy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("edit mode — unsaved changes", () => {
+    const DOT = '[data-test="synthetics-journey-unsaved-indicator"]';
+    const saved = [typeStep("s1", "hello"), typeStep("s2", "world")];
+    const journeyStub = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-browser-journey"]') as VueWrapper<any>;
+
+    async function mountSaved() {
+      mockGetFoldersListByType.mockResolvedValue([{ folderId: "folder-1", name: "Checkout" }]);
+      mockServiceGet.mockResolvedValue({
+        data: {
+          name: "Checkout",
+          url: "https://shop.test",
+          folder: "folder-1",
+          environments: [],
+          journey: saved.map((step) => ({ ...step })),
+        },
+      });
+      const w = mountPage({ editId: "check-123" });
+      await flushPromises();
+      return w;
+    }
+
+    async function setJourney(w: VueWrapper, journey: BrowserStep[]) {
+      journeyStub(w).vm.$emit("update:modelValue", journey);
+      await flushPromises();
+    }
+
+    const renamed = () => [{ ...saved[0], name: "Renamed" }, { ...saved[1] }];
+
+    it("no unsaved dot right after an edit-mode load", async () => {
+      wrapper = await mountSaved();
+
+      expect(wrapper.find(DOT).exists()).toBe(false);
+      expect(leaveAsks()).toBe(false);
+    });
+
+    it("the unsaved dot shows after renaming a step", async () => {
+      wrapper = await mountSaved();
+
+      await setJourney(wrapper, renamed());
+
+      expect(wrapper.find(DOT).exists()).toBe(true);
+      expect(wrapper.find(DOT).text()).toContain("Unsaved changes");
+    });
+
+    it("the unsaved dot disappears when an edit is undone", async () => {
+      wrapper = await mountSaved();
+      await setJourney(wrapper, renamed());
+      expect(wrapper.find(DOT).exists()).toBe(true);
+
+      await setJourney(
+        wrapper,
+        saved.map((step) => ({ ...step })),
+      );
+
+      expect(wrapper.find(DOT).exists()).toBe(false);
+    });
+
+    it("the unsaved dot shows after changing environments in the pill", async () => {
+      wrapper = await mountSaved();
+
+      (
+        wrapper.findComponent('[data-test="synthetics-journey-start-pill-stub"]') as VueWrapper<any>
+      ).vm.$emit("update:selected-ids", ["prod"]);
+      await flushPromises();
+
+      expect(wrapper.find(DOT).exists()).toBe(true);
+    });
+
+    it("the unsaved dot clears after Save & Continue", async () => {
+      wrapper = await mountSaved();
+      await setJourney(wrapper, renamed());
+      expect(wrapper.find(DOT).exists()).toBe(true);
+
+      await wrapper.find('[data-test="synthetics-create-save-continue-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+      expect(wrapper.find(DOT).exists()).toBe(false);
+      expect(leaveAsks()).toBe(false);
+    });
+
+    it("leaving after only a step rename asks to discard", async () => {
+      wrapper = await mountSaved();
+      expect(leaveAsks()).toBe(false);
+
+      await setJourney(wrapper, renamed());
+
+      expect(leaveAsks()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-unsaved-dialog"]').exists()).toBe(true);
     });
   });
 
