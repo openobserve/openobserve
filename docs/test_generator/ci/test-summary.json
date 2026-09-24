@@ -1,7 +1,0 @@
-[
-  {
-    "title": "should clear print mode and restore the app shell when leaving the dashboard via browser Back",
-    "action": "append",
-    "verifies": "the onBeforeRouteLeave guard resets printMode so the app shell (header + left nav) reappears after leaving the dashboard via browser Back"
-  }
-]
