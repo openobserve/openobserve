@@ -418,14 +418,22 @@ const tableProps = computed(() =>
       },
 );
 
+const clearSearch = () => (search.value = "");
+
 const tableEvents = computed(() =>
   tab.value === "rules"
     ? {
         add: openAdd,
         edit: openEdit,
         remove: (rule: OwnershipRuleStats) => (ruleToDelete.value = rule),
+        "clear-search": clearSearch,
       }
-    : { claim: openClaim, dismiss: dismissSignal, retry: retrySignals },
+    : {
+        claim: openClaim,
+        dismiss: dismissSignal,
+        retry: retrySignals,
+        "clear-search": clearSearch,
+      },
 );
 
 function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {

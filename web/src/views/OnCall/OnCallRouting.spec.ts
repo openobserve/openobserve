@@ -495,6 +495,24 @@ describe("OnCallRouting", () => {
     expect(unrouted(wrapper).props("search")).toBe("");
   });
 
+  // The tables' Clear filters asks the page, which owns the search box.
+  it("empties the search box when either table asks to clear it", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const search = () => wrapper.findComponent({ name: "OSearchInput" });
+
+    await search().vm.$emit("update:modelValue", "nothing");
+    rulesPanel(wrapper).vm.$emit("clear-search");
+    await flushPromises();
+    expect(search().props("modelValue")).toBe("");
+
+    await showSignals(wrapper);
+    await search().vm.$emit("update:modelValue", "nothing");
+    unrouted(wrapper).vm.$emit("clear-search");
+    await flushPromises();
+    expect(search().props("modelValue")).toBe("");
+  });
+
   /// §G.8.1: 404 = feature flag off, 403 "Not Supported" = OSS build. Both are
   /// a fact about the deployment — never an error state, never a retry, and
   /// the two must be indistinguishable on screen.

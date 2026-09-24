@@ -171,7 +171,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Silence here is the good outcome, so it gets a sentence rather than
            an empty panel somebody has to interpret. -->
       <template #empty>
+        <!-- An empty search result says nothing about whether alerts reached a team. -->
         <OEmptyState
+          v-if="search"
+          size="hero"
+          preset="no-data"
+          :filtered="!!search"
+          data-test="oncall-unrouted-empty"
+          @action="onEmptyAction"
+        />
+        <OEmptyState
+          v-else
           size="inline"
           preset="no-data"
           :title="t('oncall.unroutedNoneTitle')"
@@ -236,6 +246,7 @@ const emit = defineEmits<{
   (e: "claim-all", signals: UnroutedSignal[]): void;
   (e: "dismiss", signal: UnroutedSignal): void;
   (e: "retry"): void;
+  (e: "clear-search"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -315,5 +326,9 @@ function teamNameOf(teamId: string): string {
 function routablePathOf(signal: UnroutedSignal): string {
   const kept = identityDimensions(signal.dimensions);
   return Object.keys(kept).length ? dimensionsSentence(kept) : pathOf(signal);
+}
+
+function onEmptyAction(id?: string) {
+  if (id === "clear-filters") emit("clear-search");
 }
 </script>

@@ -33,7 +33,7 @@ const stubs = {
       "persistColumns",
       "tableId",
     ],
-    template: `<div><slot name="toolbar" /><slot name="toolbar-trailing" /><div v-for="row in data" :key="row.rule_id">
+    template: `<div><slot name="toolbar" /><slot name="toolbar-trailing" /><slot v-if="!data.length" name="empty" /><div v-for="row in data" :key="row.rule_id">
       <slot name="cell-match" :row="row" />
       <slot name="cell-specificity" :row="row" />
       <slot name="cell-caught" :row="row" />
@@ -41,7 +41,12 @@ const stubs = {
       <slot name="cell-health" :row="row" />
     </div></div>`,
   },
-  OEmptyState: { name: "OEmptyState", template: "<div />" },
+  OEmptyState: {
+    name: "OEmptyState",
+    props: ["size", "preset", "filtered", "description"],
+    emits: ["action"],
+    template: "<div />",
+  },
   OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
   OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
   OText: { name: "OText", template: "<span><slot /></span>" },
@@ -248,6 +253,33 @@ describe("OnCallOwnershipRules", () => {
       expect(column(wrapper, "health").accessorFn(rows(wrapper)[0])).toBe(
         String(i18n.global.t("oncall.ruleNeverUsed")),
       );
+    });
+
+    // A search that matched nothing is not an org without rules: the Teams page's no-results state.
+    it("shows the no-results state under a search, and asks the host to clear it", () => {
+      const wrapper = mount(OnCallOwnershipRules, {
+        props: { rules: [], search: "nothing-matches" },
+        global: { plugins: [i18n, store], stubs },
+      });
+      const empty = wrapper.findComponent({ name: "OEmptyState" });
+      expect(empty.props("filtered")).toBe(true);
+      expect(empty.props("size")).toBe("hero");
+      expect(empty.props("description")).toBeUndefined();
+
+      empty.vm.$emit("action", "clear-filters");
+      expect(wrapper.emitted("clear-search")).toHaveLength(1);
+      expect(wrapper.emitted("add")).toBeUndefined();
+    });
+
+    it("keeps the no-rules state and its add action when nothing is searched", () => {
+      const wrapper = render([]);
+      const empty = wrapper.findComponent({ name: "OEmptyState" });
+      expect(empty.props("filtered")).toBeFalsy();
+      expect(empty.props("description")).toBeTruthy();
+
+      empty.vm.$emit("action", "create");
+      expect(wrapper.emitted("add")).toHaveLength(1);
+      expect(wrapper.emitted("clear-search")).toBeUndefined();
     });
   });
 });

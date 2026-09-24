@@ -178,6 +178,23 @@ describe("OnCallUnroutedQueue", () => {
   });
 
   describe("the toolbar every other table has", () => {
+    // An empty search result says nothing about whether alerts reached a team.
+    it("shows the no-results state under a search, and asks the host to clear it", async () => {
+      const wrapper = mount(OnCallUnroutedQueue, {
+        props: { signals: [signal()], search: "nothing-matches" },
+        global: { plugins: [i18n, store], stubs },
+      });
+      const empty = wrapper.find('[data-test="oncall-unrouted-empty"]');
+      expect(empty.exists()).toBe(true);
+      expect(empty.text()).not.toContain(String(i18n.global.t("oncall.unroutedNone")));
+
+      const clear = empty
+        .findAll("button")
+        .find((b) => b.text().includes(String(i18n.global.t("emptyState.filtered.action"))));
+      await clear!.trigger("click");
+      expect(wrapper.emitted("clear-search")).toHaveLength(1);
+    });
+
     it("filters its rows by the host's search", () => {
       const wrapper = mount(OnCallUnroutedQueue, {
         props: {

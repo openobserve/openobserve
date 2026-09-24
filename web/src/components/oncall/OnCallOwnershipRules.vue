@@ -131,7 +131,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #empty>
+        <!-- A search that matched nothing is not an org without rules. -->
         <OEmptyState
+          v-if="search"
+          size="hero"
+          preset="no-oncall-rules"
+          :filtered="!!search"
+          data-test="oncall-ownership-empty"
+          @action="onEmptyAction"
+        />
+        <OEmptyState
+          v-else
           size="block"
           preset="no-oncall-rules"
           :description="emptyDescription"
@@ -188,6 +198,7 @@ const emit = defineEmits<{
   (e: "add"): void;
   (e: "edit", rule: OwnershipRuleStats): void;
   (e: "remove", rule: OwnershipRuleStats): void;
+  (e: "clear-search"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -307,5 +318,13 @@ function healthLabel(rule: OwnershipRuleStats): I18nText {
     if (who) return t("oncall.ruleAlsoClaimedBy", { team: raw(who) });
   }
   return rule.health === "never_used" ? t("oncall.ruleNeverUsed") : t("oncall.ruleActive");
+}
+
+function onEmptyAction(id?: string) {
+  if (id === "clear-filters") {
+    emit("clear-search");
+    return;
+  }
+  emit("add");
 }
 </script>
