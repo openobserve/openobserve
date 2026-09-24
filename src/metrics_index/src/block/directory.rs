@@ -15,7 +15,7 @@
 
 use std::ops::Range;
 
-use crate::BlockMeta;
+use super::BlockMeta;
 
 #[derive(Debug)]
 pub struct BlockDirectory {

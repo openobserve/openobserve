@@ -33,7 +33,6 @@ hashlink.workspace = true
 infra.workspace = true
 itertools.workspace = true
 log.workspace = true
-metrics_block.workspace = true
 md5.workspace = true
 memchr.workspace = true
 metrics_index.workspace = true

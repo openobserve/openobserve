@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{Context, Result, ensure};
 use arrow::{
@@ -21,11 +21,11 @@ use arrow::{
         Array, ArrayRef, BooleanArray, Int64Array, RecordBatch, RecordBatchOptions, UInt32Array,
         UInt64Array,
     },
-    datatypes::{DataType, Schema},
+    datatypes::Schema,
 };
 use bytes::Bytes;
 
-use crate::*;
+use super::*;
 
 pub struct BlockDecoder {
     decoder: zstd::bulk::Decompressor<'static>,
@@ -141,44 +141,96 @@ impl BlockDecoder {
     }
 }
 
-pub fn read_footer(bytes: &[u8], file_size: u64) -> Result<Footer> {
+/// Decodes the directory and requested labels from the bytes of `header.column_ranges(labels)`.
+pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Result<Index> {
+    let (projection, missing) = header.projection(labels)?;
     ensure!(
-        bytes.len() == FOOTER_LEN && file_size >= FOOTER_LEN as u64,
-        "invalid footer length"
+        columns.len() == projection.len() + 1,
+        "MIDX column count mismatch"
     );
-    let version = read_u32(bytes, 0)?;
+    let directory = header.directory_range();
     ensure!(
-        version == VERSION && &bytes[24..] == MAGIC,
-        "unsupported block-index version/magic"
+        columns[0].len() as u64 == directory.end - directory.start,
+        "MIDX directory byte length mismatch"
     );
-    ensure!(
-        read_u32(bytes, 4)? == 0,
-        "unsupported block-index reserved field"
-    );
-    let offset = read_u64(bytes, 8)?;
-    let length = read_u64(bytes, 16)?;
-    ensure!(length > 0, "metadata size limit");
-    let end = offset
-        .checked_add(length)
-        .context("metadata range overflow")?;
-    ensure!(
-        end.checked_add(FOOTER_LEN as u64) == Some(file_size),
-        "metadata/footer outside file bounds"
-    );
-    Ok(Footer {
-        version,
-        metadata_range: offset..end,
-        payload_end: offset,
+    let rows = header.blocks;
+    let mut decoder = super::compact::frame_decoder()?;
+    let mut arrays = Vec::with_capacity(DIRECTORY_FIELDS);
+    for (column, kind) in header.directory.iter().zip(DIRECTORY_TYPES) {
+        let start = usize::try_from(column.range.start - directory.start)?;
+        let end = usize::try_from(column.range.end - directory.start)?;
+        arrays.push(super::compact::decode_frame(
+            &mut decoder,
+            &columns[0][start..end],
+            column.raw,
+            &kind,
+            rows,
+        )?);
+    }
+    let blocks = decode_directory(&arrays, &header.parent, header.payload_end)?;
+    let mut fields = Vec::with_capacity(projection.len());
+    let mut label_columns: Vec<ArrayRef> = Vec::with_capacity(projection.len());
+    for (bytes, index) in columns[1..].iter().zip(&projection) {
+        let label = &header.labels[*index];
+        ensure!(
+            bytes.len() as u64 == label.column.range.end - label.column.range.start,
+            "MIDX label byte length mismatch"
+        );
+        let field = header.source_schema.field_with_name(&label.name)?;
+        let column = super::compact::decode_frame(
+            &mut decoder,
+            bytes,
+            label.column.raw,
+            field.data_type(),
+            rows,
+        )?;
+        ensure!(
+            field.is_nullable() || column.null_count() == 0,
+            "null in non-nullable MIDX label"
+        );
+        fields.push(Arc::new(
+            field.clone().with_data_type(column.data_type().clone()),
+        ));
+        label_columns.push(column);
+    }
+    let labels = RecordBatch::try_new_with_options(
+        Arc::new(Schema::new(fields)),
+        label_columns,
+        &RecordBatchOptions::new().with_row_count(Some(rows)),
+    )?;
+    for i in 1..rows {
+        if blocks.block(i).hash == blocks.block(i - 1).hash {
+            for column in labels.columns() {
+                ensure!(
+                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
+                    "label metadata changes within one series"
+                );
+            }
+        }
+    }
+    Ok(Index {
+        row_group_size: header.row_group_size,
+        parent: header.parent.clone(),
+        source_schema: Arc::clone(&header.source_schema),
+        blocks,
+        labels,
+        missing,
     })
 }
 
-pub fn decode_index(
-    metadata: Bytes,
-    footer: &Footer,
-    expected: &ParentMetadata,
-    requested_labels: &[String],
-) -> Result<Index> {
-    decode_index_inner(metadata, footer, expected, requested_labels)
+/// Decodes an index from the complete bytes of one MIDX file.
+pub fn decode_file(file: &[u8], expected: &ParentMetadata, labels: &[String]) -> Result<Index> {
+    let header = Header::parse(file, file.len() as u64, expected)?;
+    let columns = header
+        .column_ranges(labels)?
+        .into_iter()
+        .map(|range| {
+            file.get(usize::try_from(range.start)?..usize::try_from(range.end)?)
+                .map(Bytes::copy_from_slice)
+                .context("MIDX column outside file")
+        })
+        .collect::<Result<Vec<_>>>()?;
+    decode_index(&header, &columns, labels)
 }
 
 pub fn decode_block(payload: &[u8], block: &BlockMeta) -> Result<DecodedBlock> {
@@ -190,229 +242,45 @@ pub fn decode_block(payload: &[u8], block: &BlockMeta) -> Result<DecodedBlock> {
     })
 }
 
-fn decode_index_inner(
-    metadata: Bytes,
-    footer: &Footer,
-    expected: &ParentMetadata,
-    requested_labels: &[String],
-) -> Result<Index> {
-    ensure!(
-        u64::try_from(metadata.len())?
-            == footer
-                .metadata_range
-                .end
-                .checked_sub(footer.metadata_range.start)
-                .context("reversed metadata range")?,
-        "metadata byte length mismatch"
-    );
-    ensure!(
-        footer.version == VERSION && footer.metadata_range.start == footer.payload_end,
-        "invalid metadata footer"
-    );
-    let compact = crate::compact::CompactMetadata::parse(&metadata)?;
-    let schema = compact.schema();
-    ensure!(
-        schema.fields().len() <= DIRECTORY_FIELDS + MAX_LABEL_COLUMNS,
-        "too many index fields"
-    );
-    let properties = schema.metadata();
-    ensure!(
-        properties
-            .get(VERSION_KEY)
-            .is_some_and(|v| v == &VERSION.to_string()),
-        "metadata version mismatch"
-    );
-    let parent: ParentMetadata = serde_json::from_str(
-        properties
-            .get(PARENT_KEY)
-            .context("missing parent metadata")?,
-    )?;
-    ensure!(
-        &parent == expected && parent.rows > 0 && parent.compressed_size > 0,
-        "parent metadata mismatch"
-    );
-    ensure!(
-        u64::try_from(compact.rows())? <= expected.rows,
-        "block count limit"
-    );
-    let source_schema: Schema = serde_json::from_str(
-        properties
-            .get(SCHEMA_KEY)
-            .context("missing source schema")?,
-    )?;
-    ensure!(
-        source_schema.fields().len() <= MAX_LABEL_COLUMNS + 3 + NON_IDENTITY.len(),
-        "source schema too large"
-    );
-    let label_names: Vec<String> =
-        serde_json::from_str(properties.get(LABELS_KEY).context("missing labels")?)?;
-    ensure!(
-        label_names.len() <= MAX_LABEL_COLUMNS
-            && schema.fields().len() == DIRECTORY_FIELDS + label_names.len(),
-        "label directory mismatch"
-    );
-    let source_labels = identity_label_columns(&source_schema)?;
-    ensure!(
-        source_labels.len() == label_names.len()
-            && source_labels
-                .iter()
-                .all(|label| label_names.contains(label)),
-        "incomplete source identity labels"
-    );
-    let expected_fields = [
-        ("__oo_midx_hash", DataType::UInt64),
-        ("__oo_midx_row_start", DataType::UInt64),
-        ("__oo_midx_row_count", DataType::UInt32),
-        ("__oo_midx_min_ts", DataType::Int64),
-        ("__oo_midx_max_ts", DataType::Int64),
-        ("__oo_midx_offset", DataType::UInt64),
-        ("__oo_midx_length", DataType::UInt32),
-        ("__oo_midx_strict", DataType::Boolean),
-    ];
-    for (index, (name, kind)) in expected_fields.iter().enumerate() {
-        let field = schema.field(index);
-        ensure!(
-            field.name().as_str() == *name && field.data_type() == kind && !field.is_nullable(),
-            "invalid directory field"
-        );
-    }
-    let mut known = HashSet::new();
-    for (index, name) in label_names.iter().enumerate() {
-        ensure!(known.insert(name), "duplicate label name");
-        let field = schema.field(DIRECTORY_FIELDS + index);
-        ensure!(
-            field.name() == name && is_label_type(field.data_type()),
-            "invalid label field"
-        );
-        ensure!(
-            source_schema.field_with_name(name)? == field,
-            "source label schema mismatch"
-        );
-    }
-    ensure!(
-        requested_labels.len() <= MAX_LABEL_COLUMNS,
-        "too many requested labels"
-    );
-    let mut projection: Vec<_> = (0..DIRECTORY_FIELDS).collect();
-    let mut requested = Vec::new();
-    for name in requested_labels {
-        if requested.contains(name) {
-            continue;
-        }
-        if let Some(index) = label_names.iter().position(|v| v == name) {
-            projection.push(DIRECTORY_FIELDS + index);
-        } else {
-            ensure!(
-                source_schema.field_with_name(name).is_err(),
-                "requested source field lacks identity label metadata"
-            );
-        }
-        requested.push(name.clone());
-    }
-    projection.sort_unstable();
-    let batch = compact.compact_batch(&projection)?;
-    let count = batch.num_rows();
-    ensure!(
-        count > 0 && count as u64 <= expected.rows,
-        "block count limit"
-    );
-    let row_group_size = properties
-        .get(ROW_GROUP_SIZE_KEY)
-        .map(|value| value.parse::<u32>())
-        .transpose()?;
-    ensure!(row_group_size != Some(0), "invalid parent row group size");
-    let blocks = decode_directory(&batch, expected, footer)?;
-    let mut missing = Vec::new();
-    let mut fields = Vec::new();
-    let mut columns: Vec<ArrayRef> = Vec::new();
-    for name in requested {
-        if let Some(column) = batch.column_by_name(&name) {
-            fields.push(Arc::new(batch.schema().field_with_name(&name)?.clone()));
-            columns.push(Arc::clone(column));
-        } else {
-            missing.push(name);
-        }
-    }
-    let labels = RecordBatch::try_new_with_options(
-        Arc::new(Schema::new(fields)),
-        columns,
-        &RecordBatchOptions::new().with_row_count(Some(count)),
-    )?;
-    for i in 1..count {
-        if blocks.block(i).hash == blocks.block(i - 1).hash {
-            for column in labels.columns() {
-                ensure!(
-                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
-                    "label metadata changes within one series"
-                );
-            }
-        }
-    }
-    Ok(Index {
-        row_group_size,
-        parent,
-        source_schema: Arc::new(source_schema),
-        blocks,
-        labels,
-        missing,
-    })
-}
-
 fn decode_directory(
-    batch: &RecordBatch,
+    columns: &[ArrayRef],
     parent: &ParentMetadata,
-    footer: &Footer,
+    payload_end: u64,
 ) -> Result<BlockDirectory> {
-    let count = batch.num_rows();
-    ensure!(
-        count > 0 && count as u64 <= parent.rows,
-        "block count limit"
-    );
-    for i in 0..DIRECTORY_FIELDS {
-        ensure!(batch.column(i).null_count() == 0, "null block descriptor");
-    }
-    let hashes = batch
-        .column(0)
+    let count = columns[0].len();
+    let hashes = columns[0]
         .as_any()
         .downcast_ref::<UInt64Array>()
         .context("hash type")?;
-    let row_starts = batch
-        .column(1)
+    let row_starts = columns[1]
         .as_any()
         .downcast_ref::<UInt64Array>()
         .context("row offset type")?;
-    let counts = batch
-        .column(2)
+    let counts = columns[2]
         .as_any()
         .downcast_ref::<UInt32Array>()
         .context("count type")?;
-    let min_times = batch
-        .column(3)
+    let min_times = columns[3]
         .as_any()
         .downcast_ref::<Int64Array>()
         .context("min time type")?;
-    let max_times = batch
-        .column(4)
+    let max_times = columns[4]
         .as_any()
         .downcast_ref::<Int64Array>()
         .context("max time type")?;
-    let offsets = batch
-        .column(5)
+    let offsets = columns[5]
         .as_any()
         .downcast_ref::<UInt64Array>()
         .context("offset type")?;
-    let lengths = batch
-        .column(6)
+    let lengths = columns[6]
         .as_any()
         .downcast_ref::<UInt32Array>()
         .context("length type")?;
-    let strict = batch
-        .column(7)
+    let strict = columns[7]
         .as_any()
         .downcast_ref::<BooleanArray>()
         .context("strict type")?;
-    let mut blocks =
-        crate::directory::DirectoryBuilder::new(count, parent.rows, footer.payload_end);
+    let mut blocks = super::directory::DirectoryBuilder::new(count, parent.rows, payload_end);
     let mut next_row = 0u64;
     let mut next_offset = 0u64;
     let mut previous: Option<(u64, i64)> = None;
@@ -469,37 +337,17 @@ fn decode_directory(
             .checked_add(u64::from(block.block_length))
             .context("payload end overflow")?;
         ensure!(
-            next_row <= parent.rows && next_offset <= footer.payload_end,
+            next_row <= parent.rows && next_offset <= payload_end,
             "block outside parent bounds"
         );
         previous = Some((block.hash, block.max_timestamp));
         blocks.push(block);
     }
     ensure!(
-        next_row == parent.rows && next_offset == footer.payload_end,
+        next_row == parent.rows && next_offset == payload_end,
         "directory does not tile source rows and payload"
     );
     Ok(blocks.finish())
-}
-
-fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
-    let end = offset.checked_add(4).context("integer offset overflow")?;
-    Ok(u32::from_le_bytes(
-        bytes
-            .get(offset..end)
-            .context("truncated integer")?
-            .try_into()?,
-    ))
-}
-
-fn read_u64(bytes: &[u8], offset: usize) -> Result<u64> {
-    let end = offset.checked_add(8).context("integer offset overflow")?;
-    Ok(u64::from_le_bytes(
-        bytes
-            .get(offset..end)
-            .context("truncated integer")?
-            .try_into()?,
-    ))
 }
 
 #[cfg(test)]

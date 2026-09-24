@@ -13,31 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    io::Write,
-    sync::Arc,
-};
+use std::{collections::HashSet, io::Write, sync::Arc};
 
 use anyhow::{Context, Result, anyhow, ensure};
 use arrow::{
     array::{
         Array, ArrayRef, BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch,
-        RecordBatchOptions, StringArray, StringViewArray, UInt32Array, UInt64Array,
+        StringArray, StringViewArray, UInt32Array, UInt64Array,
     },
-    datatypes::{DataType, Field, Schema, SchemaRef},
+    datatypes::{DataType, SchemaRef},
 };
 use parquet::{
     arrow::arrow_reader::{ArrowReaderMetadata, ArrowReaderOptions},
     file::metadata::ParquetMetaData,
 };
 
-use crate::*;
+use super::{
+    header::{HeaderData, LabelSection},
+    *,
+};
 
 pub struct BlockWriter<W: Write> {
     output: W,
     schema: SchemaRef,
     parent: Option<ParentMetadata>,
+    row_group_size: Option<u32>,
     label_indices: Vec<usize>,
     hash_index: usize,
     time_index: usize,
@@ -52,7 +52,6 @@ pub struct BlockWriter<W: Write> {
     offset: u64,
     blocks: Vec<BlockMeta>,
     labels: Vec<Vec<Option<String>>>,
-    metadata_properties: HashMap<String, String>,
     failed: bool,
 }
 
@@ -105,29 +104,57 @@ impl<W: Write> BlockWriter<W> {
 
     pub fn finish(mut self) -> Result<W> {
         ensure!(!self.failed, "writer is poisoned");
-        ensure!(
-            self.rows
-                == self
-                    .parent
-                    .as_ref()
-                    .context("parent metadata is not bound")?
-                    .rows,
-            "source/parent row count mismatch"
-        );
+        let parent = self
+            .parent
+            .clone()
+            .context("parent metadata is not bound")?;
+        ensure!(self.rows == parent.rows, "source/parent row count mismatch");
         self.flush_block()?;
         self.current_labels.clear();
-        let batch = self.metadata_batch()?;
-        let metadata = crate::compact::encode(&batch)?;
-        let metadata_len = u64::try_from(metadata.len())?;
-        let mut footer = [0u8; FOOTER_LEN];
-        footer[..4].copy_from_slice(&VERSION.to_le_bytes());
-        footer[8..16].copy_from_slice(&self.offset.to_le_bytes());
-        footer[16..24].copy_from_slice(&metadata_len.to_le_bytes());
-        footer[24..].copy_from_slice(MAGIC);
-        self.output.write_all(&metadata)?;
-        self.output.write_all(&footer[..24])?;
+        ensure!(!self.blocks.is_empty(), "MIDX without sample blocks");
+        let mut header = HeaderData {
+            parent,
+            row_group_size: self.row_group_size,
+            source_schema: self.schema.as_ref().clone(),
+            blocks: u64::try_from(self.blocks.len())?,
+            labels: Vec::with_capacity(self.label_indices.len()),
+            directory: Vec::with_capacity(DIRECTORY_FIELDS),
+        };
+        for (name, column) in self.label_columns()? {
+            let (section, frame) = super::compact::encode_frame(column.as_ref())?;
+            self.output.write_all(&frame)?;
+            header.labels.push(LabelSection { name, section });
+        }
+        for column in self.directory_columns() {
+            let (section, frame) = super::compact::encode_frame(column.as_ref())?;
+            self.output.write_all(&frame)?;
+            header.directory.push(section);
+        }
+        let encoded = header.encode()?;
+        if encoded.len() as u64 > HEADER_PROBE_BYTES {
+            log::warn!(
+                "MIDX header is {} bytes, larger than the {HEADER_PROBE_BYTES}-byte read probe; cold loads need one more request",
+                encoded.len()
+            );
+        }
+        let trailer = MidxTrailer {
+            label_len: header
+                .labels
+                .iter()
+                .map(|label| label.section.compressed)
+                .sum(),
+            directory_len: header
+                .directory
+                .iter()
+                .map(|section| section.compressed)
+                .sum(),
+            header_len: u32::try_from(encoded.len())?,
+        }
+        .encode();
+        self.output.write_all(&encoded)?;
+        self.output.write_all(&trailer[..24])?;
         self.output.flush()?;
-        self.output.write_all(&footer[24..])?;
+        self.output.write_all(&trailer[24..])?;
         self.output.flush()?;
         Ok(self.output)
     }
@@ -151,16 +178,7 @@ impl<W: Write> BlockWriter<W> {
             "stored source schema changed"
         );
         self.schema = stored_schema;
-        self.metadata_properties
-            .insert(PARENT_KEY.to_owned(), serde_json::to_string(&parent)?);
-        self.metadata_properties
-            .insert(SCHEMA_KEY.to_owned(), canonical_schema_json(&self.schema)?);
-        if let Some(size) = row_group_size {
-            self.metadata_properties
-                .insert(ROW_GROUP_SIZE_KEY.to_owned(), size.to_string());
-        } else {
-            self.metadata_properties.remove(ROW_GROUP_SIZE_KEY);
-        }
+        self.row_group_size = row_group_size;
         self.parent = Some(parent);
         self.finish()
     }
@@ -175,33 +193,15 @@ impl<W: Write> BlockWriter<W> {
         if let Some(parent) = &parent {
             validate_parent(parent)?;
         }
-        capacity(
-            schema.fields().len() <= MAX_LABEL_COLUMNS + 3 + NON_IDENTITY.len(),
-            "MAX_LABEL_COLUMNS",
-        )?;
         ensure!(
             max_block_rows > 0 && max_block_rows <= MAX_BLOCK_ROWS,
             "invalid max block rows"
         );
-        capacity(
-            label_columns.len() <= MAX_LABEL_COLUMNS,
-            "MAX_LABEL_COLUMNS",
-        )?;
-        let mut metadata_properties: HashMap<String, String> = [
-            (VERSION_KEY.to_owned(), VERSION.to_string()),
-            (
-                SCHEMA_KEY.to_owned(),
-                canonical_schema_json(schema.as_ref())?,
-            ),
-            (
-                LABELS_KEY.to_owned(),
-                serde_json::to_string(&label_columns)?,
-            ),
-        ]
-        .into_iter()
-        .collect();
-        if let Some(parent) = &parent {
-            metadata_properties.insert(PARENT_KEY.to_owned(), serde_json::to_string(parent)?);
+        if label_columns.len() > WARN_LABEL_COLUMNS {
+            log::warn!(
+                "metrics schema has {} identity labels, more than {WARN_LABEL_COLUMNS}; building its MIDX may use a lot of memory",
+                label_columns.len()
+            );
         }
         let source_labels = identity_label_columns(&schema)?;
         ensure!(
@@ -249,6 +249,7 @@ impl<W: Write> BlockWriter<W> {
             output,
             schema,
             parent,
+            row_group_size: None,
             label_indices,
             hash_index,
             time_index,
@@ -263,7 +264,6 @@ impl<W: Write> BlockWriter<W> {
             offset: 0,
             blocks: Vec::new(),
             labels: Vec::new(),
-            metadata_properties,
             failed: false,
         })
     }
@@ -381,19 +381,8 @@ impl<W: Write> BlockWriter<W> {
         Ok(())
     }
 
-    fn metadata_batch(&self) -> Result<RecordBatch> {
-        let fields = vec![
-            Field::new("__oo_midx_hash", DataType::UInt64, false),
-            Field::new("__oo_midx_row_start", DataType::UInt64, false),
-            Field::new("__oo_midx_row_count", DataType::UInt32, false),
-            Field::new("__oo_midx_min_ts", DataType::Int64, false),
-            Field::new("__oo_midx_max_ts", DataType::Int64, false),
-            Field::new("__oo_midx_offset", DataType::UInt64, false),
-            Field::new("__oo_midx_length", DataType::UInt32, false),
-            Field::new("__oo_midx_strict", DataType::Boolean, false),
-        ];
-        let mut fields: Vec<_> = fields.into_iter().map(Arc::new).collect();
-        let mut columns: Vec<ArrayRef> = vec![
+    fn directory_columns(&self) -> Vec<ArrayRef> {
+        vec![
             Arc::new(UInt64Array::from_iter_values(
                 self.blocks.iter().map(|b| b.hash),
             )),
@@ -421,10 +410,13 @@ impl<W: Write> BlockWriter<W> {
                     .map(|b| b.strictly_increasing)
                     .collect::<Vec<_>>(),
             )),
-        ];
+        ]
+    }
+
+    fn label_columns(&self) -> Result<Vec<(String, ArrayRef)>> {
+        let mut columns = Vec::with_capacity(self.label_indices.len());
         for (j, index) in self.label_indices.iter().enumerate() {
             let field = self.schema.field(*index);
-            fields.push(Arc::new(field.clone()));
             let values = self.labels.iter().map(|row| row[j].as_deref());
             let column: ArrayRef = match field.data_type() {
                 DataType::Utf8 => Arc::new(StringArray::from_iter(values)),
@@ -432,15 +424,9 @@ impl<W: Write> BlockWriter<W> {
                 DataType::Utf8View => Arc::new(StringViewArray::from_iter(values)),
                 _ => return Err(anyhow!("unsupported label type")),
             };
-            columns.push(column);
+            columns.push((field.name().clone(), column));
         }
-        let metadata = self.metadata_properties.clone();
-        let schema = Arc::new(Schema::new_with_metadata(fields, metadata));
-        Ok(RecordBatch::try_new_with_options(
-            schema,
-            columns,
-            &RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
-        )?)
+        Ok(columns)
     }
 }
 
@@ -475,10 +461,4 @@ fn verified_row_group_size(metadata: &ParquetMetaData) -> Result<Option<u32>> {
             }
         }))
     .then_some(size))
-}
-
-fn canonical_schema_json(schema: &Schema) -> Result<String> {
-    let mut value = serde_json::to_value(schema)?;
-    value.sort_all_objects();
-    Ok(serde_json::to_string(&value)?)
 }

@@ -15,7 +15,10 @@
 
 //! Metrics index layout, label pruning, and row-selection caching.
 
+pub mod block;
 mod cache;
+#[cfg(test)]
+mod io_tests;
 pub mod layout;
 mod pruner;
 mod reader;
@@ -214,16 +217,16 @@ mod tests {
         }
         let schema = Arc::new(Schema::new(fields));
         let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
-        let mut writer = metrics_block::BlockWriter::new_pending(
+        let mut writer = crate::block::BlockWriter::new_pending(
             Vec::new(),
             schema.clone(),
-            metrics_block::MAX_BLOCK_ROWS,
+            crate::block::MAX_BLOCK_ROWS,
         )
         .unwrap();
         writer.write(&batch).unwrap();
         let bytes = writer
             .finish_for_vortex(
-                metrics_block::ParentMetadata {
+                crate::block::ParentMetadata {
                     rows: rows as u64,
                     compressed_size: 123,
                 },
