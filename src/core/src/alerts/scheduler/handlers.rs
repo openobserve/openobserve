@@ -2308,6 +2308,30 @@ async fn handle_alert_triggers(
         matched_level,
     );
 
+    // Grouped alerts keep the pre-episode recovery path, because they have no
+    // episode: a group's delivery is recorded after the send, not by this
+    // evaluation, so nothing here can open one. Dropping this call for them
+    // would leave the on-call record open for ever — and an open record is what
+    // stops the alert paging again, so the alert would page once and then never
+    // again. Noisy until the idempotency guard lands; a paging outage without.
+    #[cfg(feature = "enterprise")]
+    if alert.query_condition.multi_alert_enabled()
+        && matched_level.is_none()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+        && let Some(alert_id) = alert.id.as_ref()
+        && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
+            &alert.org_id,
+            &alert_id.to_string(),
+        )
+        .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] on-call recovery failed for {}/{}: {e}",
+            alert.org_id,
+            alert.name
+        );
+    }
+
     // T-9 value context: what was observed, against what, with which operator.
     //
     // Aggregation alerts carry their thresholds in `having` / `warning_value`,
