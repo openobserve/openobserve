@@ -154,6 +154,25 @@ describe("JourneyStartPill", () => {
     expect(half.find('[data-icon="language"]').exists()).toBe(true);
   });
 
+  it("the URL button shows its text at normal weight, with or without a URL", () => {
+    wrapper = mountPill();
+    const urlSpan = wrapper
+      .get(URL_HALF)
+      .findAll("span")
+      .filter((s) => s.text() === "{{BASE_URL}}/login")
+      .at(-1);
+    expect(urlSpan?.classes()).toContain("font-normal");
+    wrapper.unmount();
+
+    wrapper = mountPill({ url: "" });
+    const emptySpan = wrapper
+      .get(URL_HALF)
+      .findAll("span")
+      .filter((s) => s.text() === "Set a Starting URL")
+      .at(-1);
+    expect(emptySpan?.classes()).toContain("font-normal");
+  });
+
   it("the URL button is not monospaced; the popover input is", async () => {
     wrapper = mountPill();
     const half = wrapper.get(URL_HALF);

@@ -120,8 +120,8 @@ function onToggleEnvironment(id: string) {
           data-test="synthetics-journey-start-pill-url"
         >
           <OIcon name="language" size="sm" aria-hidden="true" />
-          <span v-if="url" class="max-w-72 truncate">{{ url }}</span>
-          <span v-else>{{ t("synthetics.journey.startPill.noUrl") }}</span>
+          <span v-if="url" class="max-w-72 truncate font-normal">{{ url }}</span>
+          <span v-else class="font-normal">{{ t("synthetics.journey.startPill.noUrl") }}</span>
           <OTooltip :content="t('synthetics.journey.startPill.editUrl')" side="bottom" />
         </OButton>
       </template>
