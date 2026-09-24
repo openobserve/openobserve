@@ -99,6 +99,7 @@ pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
 
 /// Enumerate v8 panels → queries and materialize each. Non-v8 dashboards are
 /// not supported in this cut (they yield an empty panel set).
+#[allow(clippy::too_many_arguments)]
 async fn build_panels(
     org: &str,
     publisher: &str,

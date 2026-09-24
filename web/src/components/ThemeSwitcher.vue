@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton
-    variant="ghost"
-    size="icon-toolbar"
+    :variant="bordered ? 'outline' : 'ghost'"
+    :size="bordered ? 'icon-sm' : 'icon-toolbar'"
     data-test="navbar-theme-toggle-btn"
     @click="toggleDarkMode"
   >
@@ -44,6 +44,10 @@ import { switchThemeMode } from "@/utils/theme";
 
 export default defineComponent({
   components: { OButton, OIcon, OTooltip },
+  props: {
+    // Outlined 32px square, for headers whose other controls are outlined buttons.
+    bordered: { type: Boolean, default: false },
+  },
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();
