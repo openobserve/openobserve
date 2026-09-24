@@ -45,6 +45,13 @@
           data-test="slos-slodetail-health"
         />
         <OTag
+          v-if="corrections.length"
+          type="downtimeStatus"
+          value="active"
+          :label="t('alerts.downtimes.corrected')"
+          data-test="slos-slodetail-corrected"
+        />
+        <OTag
           v-for="tag in slo?.tags || []"
           :key="tag"
           variant="default-soft"
@@ -105,6 +112,34 @@
       >
         <span class="font-bold">{{ frozenBanner.title }}</span>
         {{ frozenBanner.body }}
+      </OBanner>
+
+      <OBanner
+        v-if="corrections.length"
+        variant="info"
+        icon="notifications-paused"
+        dense
+        class="mb-3"
+        data-test="slos-slodetail-corrections-banner"
+      >
+        <span class="inline-flex flex-wrap items-center gap-1">
+          <span>{{ t("alerts.downtimes.sloCorrections.title") }}</span>
+          <OButton
+            v-for="c in corrections"
+            :key="c.downtime_id"
+            variant="ghost-primary"
+            size="xs"
+            :data-test="`slos-slodetail-correction-${c.downtime_id}`"
+            @click="openDowntime(c.downtime_id)"
+          >
+            {{
+              t("alerts.downtimes.sloCorrections.item", {
+                name: c.name,
+                status: t(`components.badge.downtimeStatus.${c.status}`),
+              })
+            }}
+          </OButton>
+        </span>
       </OBanner>
 
       <OStatStrip v-if="slo" :items="stats" data-test="slos-slodetail-stats" />
@@ -323,6 +358,13 @@ const store = useStore();
 
 const slo = ref<Slo | null>(null);
 const status = ref<SloStatus | null>(null);
+const corrections = computed(() => status.value?.corrections ?? []);
+const openDowntime = (id: string) =>
+  router.push({
+    name: "downtimeDetail",
+    params: { id },
+    query: { org_identifier: store.state.selectedOrganization?.identifier },
+  });
 const groups = ref<SloStatus[]>([]);
 const groupsLoading = ref(false);
 const notFound = ref(false);

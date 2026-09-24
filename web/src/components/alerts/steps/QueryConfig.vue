@@ -1776,6 +1776,7 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
+import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
@@ -2795,24 +2796,13 @@ export default defineComponent({
     // display ref, leaving the stored value untouched until the user entered cron
     // mode (onFrequencyUnitChange still seeds it there). defaultAlertValue()
     // already seeds `timezone: "UTC"`, so the control is never blank anyway.
-    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    const browserTime = raw("Browser Time (" + browserTz + ")");
-    const initTimezones = () => {
-      try {
-        // @ts-ignore
-        const zones: string[] =
-          typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function"
-            ? // @ts-ignore
-              Intl.supportedValuesOf("timeZone")
-            : [cronTimezone.value || "UTC"];
-        // Convenience shortcuts first (matching the reports picker), then every
-        // IANA zone. This only populates OPTIONS — it must not seed cronTimezone.
-        filteredTimezones.value = [browserTime, "UTC", ...zones];
-      } catch {
-        filteredTimezones.value = ["UTC"];
-      }
-    };
-    initTimezones();
+    const {
+      browserTz,
+      browserTimeValue: browserTime,
+      zones: timezoneZones,
+    } = useTimezoneOptions({ browserEntry: true });
+    // Only the OPTIONS are populated here; this must not seed cronTimezone.
+    filteredTimezones.value = timezoneZones.length ? [...timezoneZones] : ["UTC"];
 
     const timezoneSelectOptions = computed(() =>
       filteredTimezones.value.map((tz: string) =>

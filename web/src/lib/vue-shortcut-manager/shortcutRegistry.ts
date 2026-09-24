@@ -130,6 +130,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.alertSources",
       "shortcuts.pages.alertTemplates",
       "shortcuts.pages.alertIncidents",
+      "shortcuts.pages.downtimes",
     ],
   },
   {
@@ -771,6 +772,18 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         key: "r",
         descriptionKey: "shortcuts.actions.alertIncidentsRefresh",
       },
+    ],
+  },
+
+  // ── Downtimes ───────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.downtimes",
+    scope: "downtimes",
+    visible: enterpriseOrCloud,
+    shortcuts: [
+      { id: "downtimesCreate", key: "n", descriptionKey: "shortcuts.actions.downtimesCreate" },
+      { id: "downtimesRefresh", key: "r", descriptionKey: "shortcuts.actions.downtimesRefresh" },
+      { id: "downtimesFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
 

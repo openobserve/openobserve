@@ -1036,6 +1036,9 @@ pub struct AckResponse {
     pub usage_events: Vec<UsageData>,
     /// Environments of this run that did not pass, worst first, by name.
     pub failing_environments: Vec<String>,
+    /// The downtime that muted this run; server-side only, since the ack body goes to a probe.
+    #[serde(skip)]
+    pub suppressed_by: Option<String>,
 }
 
 /// The notification a completed run should send, resolved against the check's
@@ -1382,6 +1385,7 @@ fn stale_lease_response(
         passing_locations: Vec::new(),
         failing_environments: Vec::new(),
         usage_events: Vec::new(),
+        suppressed_by: None,
     }
 }
 
@@ -1563,7 +1567,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
     // Decide the notification, once per RUN. Per-job would alert once per
     // location for the same outage, and would advance the failure streak by the
     // fan-out factor rather than by one.
-    let (alert, consecutive_failures) = if run_complete {
+    let (alert, consecutive_failures, suppressed_by) = if run_complete {
         resolve_alert(
             conn,
             &check.synthetics_id,
@@ -1578,7 +1582,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         )
         .await
     } else {
-        (AlertDecision::Silent, 0)
+        (AlertDecision::Silent, 0, None)
     };
 
     // Which locations broke and which came back. Only worth a query when the run
@@ -1625,6 +1629,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         passing_locations,
         usage_events,
         failing_environments,
+        suppressed_by,
     })
 }
 
@@ -1691,7 +1696,7 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
     outcome: RunOutcome<'_>,
     check: &config::meta::synthetics::Synthetic,
     now_us: i64,
-) -> (AlertDecision, i32) {
+) -> (AlertDecision, i32, Option<String>) {
     // See `alerting::classify`. Four outcomes, not two: an outage accumulates and
     // drives the streak, a degradation does not (a certificate is not "more
     // expired" on the twentieth check), and `error` is an outage rather than a
@@ -1705,10 +1710,10 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
 
     let prior = match infra::table::synthetics_checks::get_alert_state(conn, synthetics_id).await {
         Ok(Some(state)) => state,
-        Ok(None) => return (AlertDecision::Silent, 0), // deleted mid-run
+        Ok(None) => return (AlertDecision::Silent, 0, None), // deleted mid-run
         Err(e) => {
             tracing::warn!(%synthetics_id, "[synthetics] get_alert_state: {e}");
-            return (AlertDecision::Silent, 0);
+            return (AlertDecision::Silent, 0, None);
         }
     };
 
@@ -1737,7 +1742,7 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
         {
             tracing::warn!(%synthetics_id, "[synthetics] clear_alert_state: {e}");
         }
-        return (AlertDecision::Silent, 0);
+        return (AlertDecision::Silent, 0, None);
     }
 
     let (outcome, next) = crate::alerting::decide(
@@ -1747,6 +1752,16 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
         check.cooldown_mins,
         now_us,
     );
+    let suppressed_by = if outcome == crate::alerting::AlertOutcome::Silent {
+        None
+    } else {
+        crate::alerting::muted_by(&check.org_id, &check.id, &check.folder_id, &check.tags).await
+    };
+    let next = if suppressed_by.is_some() {
+        crate::alerting::suppressed_state(prior, next)
+    } else {
+        next
+    };
 
     // Compare-and-swap on the state we decided against. `resolve_alert` is a
     // read-modify-write with no transaction, and two runs of the same check can
@@ -1770,7 +1785,7 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
                     %synthetics_id,
                     "[synthetics] alert state changed under us; another run decided this one"
                 );
-                return (AlertDecision::Silent, next.consecutive_failures);
+                return (AlertDecision::Silent, next.consecutive_failures, None);
             }
             Err(e) => tracing::warn!(%synthetics_id, "[synthetics] update_alert_state: {e}"),
         }
@@ -1783,7 +1798,7 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
         crate::alerting::AlertOutcome::Degraded => AlertDecision::Degraded,
         crate::alerting::AlertOutcome::Recovered => AlertDecision::Recovered,
     };
-    (decision, next.consecutive_failures)
+    (decision, next.consecutive_failures, suppressed_by)
 }
 
 #[cfg(test)]

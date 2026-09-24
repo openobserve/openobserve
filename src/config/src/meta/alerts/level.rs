@@ -348,7 +348,7 @@ pub fn level_for_completed_evaluation(
 }
 
 /// What a completed evaluation should do about notification (§7.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeliveryDecision {
     /// Deliver, and (re)start the silence window from now.
     Deliver,
@@ -362,6 +362,8 @@ pub enum DeliveryDecision {
     NotFiring,
     /// Currently in pending state
     SuppressedByPending,
+    /// Condition matched inside a window of this downtime.
+    SuppressedByDowntime(String),
 }
 
 impl DeliveryDecision {
@@ -372,6 +374,13 @@ impl DeliveryDecision {
     /// Escalation restarts the silence window; an ordinary delivery starts it.
     pub fn resets_silence(&self) -> bool {
         self.should_deliver()
+    }
+
+    pub fn downtime_id(&self) -> Option<&str> {
+        match self {
+            Self::SuppressedByDowntime(id) => Some(id),
+            _ => None,
+        }
     }
 }
 
@@ -1094,6 +1103,15 @@ mod tests {
             None,
         );
         assert!(!d.should_deliver());
+    }
+
+    #[test]
+    fn a_downtime_suppression_never_delivers_and_names_its_downtime() {
+        let d = DeliveryDecision::SuppressedByDowntime("2f9K".to_string());
+        assert!(!d.should_deliver());
+        assert!(!d.resets_silence());
+        assert_eq!(d.downtime_id(), Some("2f9K"));
+        assert_eq!(DeliveryDecision::Deliver.downtime_id(), None);
     }
 
     // ── D11: notify_on_warning ──────────────────────────────────────────────

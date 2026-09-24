@@ -84,6 +84,7 @@ pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
         return Ok(ChunkOutcome::Done);
     }
 
+    let remeasure = job.kind == jobs::KIND_REMEASURE;
     let Some((start, end)) = next_chunk(
         job.done_through,
         job.range_start,
@@ -91,12 +92,15 @@ pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
         cfg.slo.backfill_chunk_secs,
         slo.definition.slice_interval_secs,
     ) else {
-        jobs::mark_done(db, &slo.id, slo.definition_generation).await?;
+        finish(slo, remeasure).await?;
         return Ok(ChunkOutcome::Done);
     };
 
-    let written =
-        super::job::run_range(slo, start, end, config::meta::slo::slice::Writer::Backfill).await?;
+    let written = if remeasure {
+        super::job::remeasure_range(slo, start, end).await?
+    } else {
+        super::job::run_range(slo, start, end, config::meta::slo::slice::Writer::Backfill).await?
+    };
 
     // `done_through` moves to the chunk's START, because the walk is
     // backwards: everything from here to the end of the range is filled.
@@ -110,10 +114,24 @@ pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
     .await?;
 
     if start <= job.range_start {
-        jobs::mark_done(db, &slo.id, slo.definition_generation).await?;
+        finish(slo, remeasure).await?;
         return Ok(ChunkOutcome::Done);
     }
     Ok(ChunkOutcome::More)
+}
+
+/// A re-measure applied no deltas, so `reconcile` rebuilds the aggregate before done.
+async fn finish(slo: &Slo, remeasure: bool) -> Result<(), anyhow::Error> {
+    if remeasure {
+        super::reconcile::reconcile(slo).await?;
+    }
+    jobs::mark_done(
+        get_orm_client_rw().await,
+        &slo.id,
+        slo.definition_generation,
+    )
+    .await?;
+    Ok(())
 }
 
 /// The range a new backfill should cover: the SLO's window, ending where the

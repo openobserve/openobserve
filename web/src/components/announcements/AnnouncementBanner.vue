@@ -25,6 +25,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     {{ banner.message }}
 
+    <template v-if="isDowntime(banner) && banner.remaining_secs !== null" #meta>
+      <span
+        class="text-xs font-medium whitespace-nowrap tabular-nums"
+        :data-test="`announcement-banner-countdown-${banner.id}`"
+      >
+        {{ countdownText(banner.remaining_secs, t) }}
+      </span>
+    </template>
+
+    <template v-if="banner.counts?.length" #footer>
+      <div class="flex flex-wrap gap-1" :data-test="`announcement-banner-counts-${banner.id}`">
+        <OTag
+          v-for="c in banner.counts"
+          :key="c.module"
+          type="downtimeTarget"
+          :value="c.module"
+          :label="countChipLabel(c, t)"
+        />
+      </div>
+    </template>
+
     <template v-if="banner.cta || banner.dismissible" #actions>
       <div class="flex flex-wrap items-center gap-3">
         <OButton
@@ -58,13 +79,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { onMounted } from "vue";
 
-import { useAnnouncementBanners, type Banner } from "@/composables/useAnnouncementBanners";
+import {
+  useAnnouncementBanners,
+  type Banner,
+  type RenderedBanner,
+} from "@/composables/useAnnouncementBanners";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { countChipLabel, countdownText } from "@/utils/downtimes/banner";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 const { banners, dismiss, start } = useAnnouncementBanners();
+
+// Generated per org and per window by the announcements endpoint (D19).
+const isDowntime = (banner: RenderedBanner) => banner.id.startsWith("downtime:");
 
 /** Our severities are operator-facing; OBanner's variants are visual. */
 const bannerVariant = (banner: Banner) => {

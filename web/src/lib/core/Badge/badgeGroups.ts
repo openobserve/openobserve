@@ -161,6 +161,34 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // One chip per downtime target, plus the shared condition. The caller always supplies the label.
+  downtimeTarget: {
+    mode: "icon",
+    shape: "pill",
+    values: {
+      condition: { variant: "primary-soft", icon: "tune" },
+      alerts: { variant: "default-soft", icon: "shield-alert-outline" },
+      anomalydetections: { variant: "default-soft", icon: "query-stats" },
+      synthetics: { variant: "default-soft", icon: "radar" },
+      slos: { variant: "default-soft", icon: "target" },
+    },
+  },
+
+  // Downtime lifecycle. Active is amber, not green: notifications are off while it runs.
+  downtimeStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: { variant: "blue-soft", labelKey: "components.badge.downtimeStatus.scheduled" },
+      active: { variant: "warning-soft", labelKey: "components.badge.downtimeStatus.active" },
+      ended: { variant: "default-soft", labelKey: "components.badge.downtimeStatus.ended" },
+      cancelled: {
+        variant: "default-outline",
+        labelKey: "components.badge.downtimeStatus.cancelled",
+      },
+    },
+  },
+
   // Alert PRIORITY (Feature 2, PT-3) — how much humans care about this alert,
   // set at configuration time.
   //

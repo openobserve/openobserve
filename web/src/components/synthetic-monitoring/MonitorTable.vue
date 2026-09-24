@@ -72,6 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
           <span class="cursor-pointer truncate">{{ (row as any).name || "—" }}</span>
+          <MutedChip
+            v-if="(row as any).active_downtime"
+            :downtime="(row as any).active_downtime"
+            :data-test="`${dataTest}-${(row as any).id}-muted`"
+          />
         </div>
       </OTooltip>
       <span v-else class="truncate">—</span>
@@ -369,6 +374,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("synthetics.table.move") }}
           </ODropdownItem>
 
+          <template v-if="downtimesEnabled">
+            <ODropdownSeparator />
+            <MuteMenuItems
+              :data-test-prefix="`${dataTest}-mute`"
+              @preset="(secs) => muteRows([row], secs)"
+              @until="openMuteDialog([row])"
+            />
+          </template>
+
           <ODropdownSeparator />
 
           <ODropdownItem
@@ -465,6 +479,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="emit('move-selected')"
             >{{ t("synthetics.table.move") }}</OButton
           >
+          <ODropdown v-if="downtimesEnabled" side="top">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm"
+                icon-left="notifications-paused"
+                :data-test="`${dataTest}-mute-selected-btn`"
+              >
+                {{ t("alerts.downtimes.mute.bulk") }}
+              </OButton>
+            </template>
+            <MuteMenuItems
+              :data-test-prefix="`${dataTest}-bulk-mute`"
+              @preset="(secs) => muteRows(selectedRows, secs)"
+              @until="openMuteDialog(selectedRows)"
+            />
+          </ODropdown>
           <OButton
             variant="outline-destructive"
             size="sm"
@@ -478,6 +509,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
   </OTable>
+
+  <QuickMuteDialog
+    v-if="downtimesEnabled"
+    v-model:open="muteDialogOpen"
+    :selection="muteSelection"
+  />
 
   <!-- Spark bar detail tooltip -->
   <Teleport to="body">
@@ -549,6 +586,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
+import MuteMenuItems from "@/components/alerts/downtimes/MuteMenuItems.vue";
+import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
+import { useRowMute } from "@/composables/downtimes/useRowMute";
 
 type Mode = "all" | "browser";
 
@@ -652,6 +693,16 @@ const localSelectedIds = computed({
   get: () => props.selectedIds ?? [],
   set: (val: string[]) => emit("update:selectedIds", val),
 });
+
+const { downtimesEnabled, muteDialogOpen, muteSelection, muteRows, openMuteDialog } =
+  useRowMute<any>(
+    () => "synthetics",
+    (row) => String(row.id),
+  );
+
+const selectedRows = computed(() =>
+  props.data.filter((row: any) => localSelectedIds.value.includes(String(row.id))),
+);
 
 // ── Column definitions per mode ─────────────────────────────────────
 

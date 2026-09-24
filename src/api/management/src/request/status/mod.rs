@@ -207,6 +207,7 @@ struct ConfigResponse<'a> {
     query_values_default_num: i64,
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
+    downtimes_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
@@ -468,6 +469,7 @@ pub async fn zo_config(
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
     let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled);
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
@@ -595,6 +597,7 @@ pub async fn zo_config(
         query_values_default_num: cfg.limit.query_values_default_num,
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
+        downtimes_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
@@ -1755,6 +1758,7 @@ const CACHE_MODULES: &[&str] = &[
     "realtime_triggers",
     "org_users",
     "compact_retention",
+    "downtimes",
 ];
 
 // Helper function to reload cache for a specific module
@@ -1774,6 +1778,7 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "org_users" => db::org_users::cache().await,
         "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
         "compact_retention" => db::compact::retention::cache().await,
+        "downtimes" => db::downtimes::cache().await,
         _ => Err(anyhow::anyhow!("unsupported module")),
     }
 }

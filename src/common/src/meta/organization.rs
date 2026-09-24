@@ -324,7 +324,8 @@ impl TriggerStatus {
                     usage::RunOutcome::Firing
                     | usage::RunOutcome::Normal
                     | usage::RunOutcome::Succeeded
-                    | usage::RunOutcome::Pending => status.healthy += 1,
+                    | usage::RunOutcome::Pending
+                    | usage::RunOutcome::Suppressed => status.healthy += 1,
                     usage::RunOutcome::Error | usage::RunOutcome::NotifyFailed => {
                         status.failed += 1
                     }

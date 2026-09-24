@@ -29,6 +29,7 @@
 use config::{
     get_config,
     meta::{
+        downtimes::{CorrectionWindow, TargetModule},
         search::{Query, Request, RequestEncoding, SearchEventContext},
         slo::{
             CountSource, QueryLanguage, SliConfig, Slo,
@@ -153,6 +154,14 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
     // would be missing from the exact overall row.
     let filled = fill_missing(&slo.definition.sli_config, &result.slices, &params);
     result.slices.extend(filled);
+    // Before the empty-result return: a downtime over a silent service finds nothing.
+    let windows = correction_windows(slo, range.start, range.end).await;
+    super::corrections::apply(
+        &mut result.slices,
+        &windows,
+        slo.definition.sli_config.sli_type(),
+        &params,
+    );
 
     if !group_by.is_empty() {
         let rollup = exact_rollup(&result.slices, &params);
@@ -769,6 +778,7 @@ async fn write_slices(org: &str, slices: &[SliceRow], now_secs: i64) -> Result<(
                 good: s.good,
                 total: s.total,
                 rev: s.rev,
+                corrected_by: s.corrected_by.clone().unwrap_or_default(),
             })
             .unwrap_or(json::Value::Null)
         })
@@ -785,24 +795,7 @@ async fn commit_status(
 ) -> Result<slo_table::WriteOutcome, anyhow::Error> {
     // SQLite opens the read-only pool with read_only(true), and this path always writes.
     let db = get_orm_client_rw().await;
-    let mut by_group: std::collections::BTreeMap<String, (f64, f64, i32)> = Default::default();
-    for s in &result.slices {
-        let e = by_group.entry(s.group_key.clone()).or_insert((0.0, 0.0, 0));
-        e.0 += s.good;
-        e.1 += s.total;
-        e.2 += 1;
-    }
-    let deltas = by_group
-        .into_iter()
-        .map(
-            |(group_key, (good, total, covered))| slo_table::GroupDelta {
-                group_key,
-                good_delta: good,
-                total_delta: total,
-                covered_slices_delta: covered,
-            },
-        )
-        .collect();
+    let deltas = group_deltas(&result.slices);
 
     // The burn-window cache (§6b.4c). Computed here rather than at alert time
     // so five alerts on one SLO cost zero extra scans (§6b.9). A failure to
@@ -901,55 +894,14 @@ pub async fn run_range(
     end: i64,
     writer: config::meta::slo::slice::Writer,
 ) -> Result<usize, anyhow::Error> {
-    let cfg = get_config();
     let db = get_orm_client_rw().await;
-
-    let group_by = slo.definition.group_by.clone().unwrap_or_default();
-    let params = PassParams {
-        slo_id: slo.id.clone(),
-        definition_generation: slo.definition_generation,
-        range_start: start,
-        range_end: end,
-        slice_interval_secs: slo.definition.slice_interval_secs,
-        rev: end,
-        max_groups: cfg.slo.max_groups,
-    };
-    let range = config::meta::slo::window::IngestRange { start, end };
-
-    let (rows, query_rejects) = fetch_rows(slo, &group_by, &range, &params).await?;
-    let mut result = build_slices(&slo.definition.sli_config, rows, &params);
-    result.rejected.extend(query_rejects);
-    let filled = fill_missing(&slo.definition.sli_config, &result.slices, &params);
-    result.slices.extend(filled);
-    if !group_by.is_empty() {
-        let rollup = exact_rollup(&result.slices, &params);
-        result.slices.extend(rollup);
-    }
+    let result = measure_range(slo, start, end, end).await?;
     if result.slices.is_empty() {
         return Ok(0);
     }
-
     let now_secs = now_micros() / 1_000_000;
-    write_slices(&slo.org, &result.slices, now_secs).await?;
 
-    let mut by_group: std::collections::BTreeMap<String, (f64, f64, i32)> = Default::default();
-    for s in &result.slices {
-        let e = by_group.entry(s.group_key.clone()).or_insert((0.0, 0.0, 0));
-        e.0 += s.good;
-        e.1 += s.total;
-        e.2 += 1;
-    }
-    let deltas = by_group
-        .into_iter()
-        .map(
-            |(group_key, (good, total, covered))| slo_table::GroupDelta {
-                group_key,
-                good_delta: good,
-                total_delta: total,
-                covered_slices_delta: covered,
-            },
-        )
-        .collect();
+    let deltas = group_deltas(&result.slices);
 
     slo_table::apply_status(
         db,
@@ -971,6 +923,95 @@ pub async fn run_range(
     .await?;
 
     Ok(result.slices.len())
+}
+
+/// [`run_range`] with `rev = now` to win the dedupe, and no delta: `reconcile` sets totals.
+pub async fn remeasure_range(slo: &Slo, start: i64, end: i64) -> Result<usize, anyhow::Error> {
+    let rev = now_micros() / 1_000_000;
+    Ok(measure_range(slo, start, end, rev).await?.slices.len())
+}
+
+/// Fetch, build, fill, correct, roll up and write `[start, end)` under `rev`.
+async fn measure_range(
+    slo: &Slo,
+    start: i64,
+    end: i64,
+    rev: i64,
+) -> Result<PassResult, anyhow::Error> {
+    let cfg = get_config();
+    let group_by = slo.definition.group_by.clone().unwrap_or_default();
+    let params = PassParams {
+        slo_id: slo.id.clone(),
+        definition_generation: slo.definition_generation,
+        range_start: start,
+        range_end: end,
+        slice_interval_secs: slo.definition.slice_interval_secs,
+        rev,
+        max_groups: cfg.slo.max_groups,
+    };
+    let range = config::meta::slo::window::IngestRange { start, end };
+
+    let (rows, query_rejects) = fetch_rows(slo, &group_by, &range, &params).await?;
+    let mut result = build_slices(&slo.definition.sli_config, rows, &params);
+    result.rejected.extend(query_rejects);
+    let filled = fill_missing(&slo.definition.sli_config, &result.slices, &params);
+    result.slices.extend(filled);
+    let windows = correction_windows(slo, start, end).await;
+    super::corrections::apply(
+        &mut result.slices,
+        &windows,
+        slo.definition.sli_config.sli_type(),
+        &params,
+    );
+    if !group_by.is_empty() {
+        let rollup = exact_rollup(&result.slices, &params);
+        result.slices.extend(rollup);
+    }
+    if !result.slices.is_empty() {
+        write_slices(&slo.org, &result.slices, now_micros() / 1_000_000).await?;
+    }
+    Ok(result)
+}
+
+/// The downtime windows over `[start, end)`; none without a cached downtime that targets SLOs.
+async fn correction_windows(slo: &Slo, start: i64, end: i64) -> Vec<CorrectionWindow> {
+    let corrects_slos = db::downtimes::list_cached(&slo.org).iter().any(|row| {
+        row.targets
+            .iter()
+            .any(|target| target.module == TargetModule::Slos)
+    });
+    if !corrects_slos {
+        return Vec::new();
+    }
+    let dims = crate::alerts::downtimes::dimensions_for_slo(slo).await;
+    crate::alerts::downtimes::corrections_for_slo(
+        slo,
+        &dims,
+        start.saturating_mul(1_000_000),
+        end.saturating_mul(1_000_000),
+    )
+}
+
+/// One delta per group; a corrected slice counts as covered and adds `0 / 0`.
+fn group_deltas(slices: &[SliceRow]) -> Vec<slo_table::GroupDelta> {
+    let mut by_group: std::collections::BTreeMap<String, (f64, f64, i32)> = Default::default();
+    for s in slices {
+        let e = by_group.entry(s.group_key.clone()).or_insert((0.0, 0.0, 0));
+        e.0 += s.good;
+        e.1 += s.total;
+        e.2 += 1;
+    }
+    by_group
+        .into_iter()
+        .map(
+            |(group_key, (good, total, covered))| slo_table::GroupDelta {
+                group_key,
+                good_delta: good,
+                total_delta: total,
+                covered_slices_delta: covered,
+            },
+        )
+        .collect()
 }
 
 /// Schedule the next pass for an SLO.
@@ -1985,6 +2026,82 @@ mod promql_value_rows_tests {
         assert_eq!(
             (from_sql.slices[0].good, from_sql.slices[0].total),
             (300.0, 300.0)
+        );
+    }
+}
+
+#[cfg(test)]
+mod downtime_correction_tests {
+    use config::meta::{
+        downtimes::{CorrectionWindow, SloCorrectionMode},
+        slo::SliType,
+    };
+
+    use super::*;
+
+    const SLICE: i64 = 300;
+
+    fn pass_params() -> PassParams {
+        PassParams {
+            slo_id: "slo1".to_string(),
+            definition_generation: 1,
+            range_start: 0,
+            range_end: 4 * SLICE,
+            slice_interval_secs: SLICE,
+            rev: 7,
+            max_groups: 500,
+        }
+    }
+
+    fn slice(start: i64, good: f64, total: f64) -> SliceRow {
+        SliceRow {
+            slo_id: "slo1".to_string(),
+            definition_generation: 1,
+            group_key: String::new(),
+            slice_start: start,
+            good,
+            total,
+            rev: 7,
+            corrected_by: None,
+        }
+    }
+
+    /// The service is down from 300 to 900: one bucket is bad, the next has no data at all.
+    #[test]
+    fn a_pass_with_a_window_writes_corrected_rows_that_stay_covered_and_weigh_nothing() {
+        let mut slices = vec![
+            slice(0, 300.0, 300.0),
+            slice(SLICE, 0.0, 300.0),
+            slice(3 * SLICE, 300.0, 300.0),
+        ];
+        let windows = [CorrectionWindow {
+            downtime_id: "dt".to_string(),
+            start: SLICE * 1_000_000,
+            end: 3 * SLICE * 1_000_000,
+            mode: SloCorrectionMode::Exclude,
+        }];
+        let added = crate::slo::corrections::apply(
+            &mut slices,
+            &windows,
+            SliType::TimeSlice,
+            &pass_params(),
+        );
+        assert_eq!(added, 1, "the empty bucket inside the window gets a row");
+        for s in slices
+            .iter()
+            .filter(|s| (SLICE..3 * SLICE).contains(&s.slice_start))
+        {
+            assert_eq!(s.corrected_by.as_deref(), Some("dt"));
+            assert_eq!((s.good, s.total), (0.0, 0.0));
+        }
+        assert_eq!(
+            group_deltas(&slices),
+            vec![slo_table::GroupDelta {
+                group_key: String::new(),
+                good_delta: 600.0,
+                total_delta: 600.0,
+                covered_slices_delta: 4,
+            }]
         );
     }
 }

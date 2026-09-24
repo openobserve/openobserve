@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { CorrectionRef } from "@/services/downtimes";
+
 /** What the API returns for one SLO's measurement.
  *
  *  Every derived field is nullable, and that is load-bearing: below the
@@ -47,6 +49,8 @@ export interface SloStatus {
    *  before its source's ledger begins, so a low coverage number there is
    *  expected rather than a symptom. */
   measuring_since?: number | null;
+  /** Downtimes that correct this SLO; absent in the OSS build. */
+  corrections?: CorrectionRef[];
 }
 
 /** One candidate source alert for an `alert` SLI, as the picker sees it. */

@@ -45,6 +45,8 @@ pub struct Model {
     /// `AlertLevel::to_i32` of this group's last *successful* delivery — what
     /// escalation is measured against (§7.1 per group).
     pub last_notified_level: Option<i32>,
+    /// Rollup row only: the downtime that suppressed the latest firing run.
+    pub last_downtime_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

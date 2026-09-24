@@ -41,17 +41,19 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             stable_dimensions: group_values,
             first_alert_at,
             title,
+            muted_by_downtime_id,
         } => {
             log::debug!(
                 "[SUPER_CLUSTER:incidents] Create incident org={org_id} key_type={key_type}"
             );
-            alert_incidents::create(
+            alert_incidents::create_with_mute(
                 &org_id,
                 &severity,
                 group_values,
                 &key_type,
                 first_alert_at,
                 title,
+                muted_by_downtime_id,
             )
             .await?;
         }
@@ -85,6 +87,16 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
                 &correlation_reason,
             )
             .await?;
+        }
+        IncidentMessage::Unmute { org, incident_id } => {
+            log::debug!("[SUPER_CLUSTER:incidents] Unmute org={org} id={incident_id}");
+            if let Some(downtime_id) = alert_incidents::get(&org, &incident_id)
+                .await?
+                .and_then(|incident| incident.muted_by_downtime_id)
+            {
+                alert_incidents::clear_muted_by_downtime_id(&org, &incident_id, &downtime_id)
+                    .await?;
+            }
         }
     }
     Ok(())

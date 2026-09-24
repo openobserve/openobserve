@@ -45,6 +45,20 @@ pub(crate) fn folder_type_into_i16(folder_type: FolderType) -> i16 {
         FolderType::Reports => 2,
         FolderType::Synthetics => 3,
         FolderType::Workflows => 4,
+        FolderType::Downtimes => 5,
+    }
+}
+
+/// The inverse of [folder_type_into_i16].
+pub fn folder_type_from_i16(value: i16) -> Option<FolderType> {
+    match value {
+        0 => Some(FolderType::Dashboards),
+        1 => Some(FolderType::Alerts),
+        2 => Some(FolderType::Reports),
+        3 => Some(FolderType::Synthetics),
+        4 => Some(FolderType::Workflows),
+        5 => Some(FolderType::Downtimes),
+        _ => None,
     }
 }
 
@@ -320,6 +334,23 @@ mod tests {
         assert_eq!(folder_type_into_i16(FolderType::Dashboards), 0);
         assert_eq!(folder_type_into_i16(FolderType::Alerts), 1);
         assert_eq!(folder_type_into_i16(FolderType::Reports), 2);
+        assert_eq!(folder_type_into_i16(FolderType::Downtimes), 5);
+    }
+
+    #[test]
+    fn every_folder_type_round_trips_through_its_stored_number() {
+        for folder_type in [
+            FolderType::Dashboards,
+            FolderType::Alerts,
+            FolderType::Reports,
+            FolderType::Synthetics,
+            FolderType::Workflows,
+            FolderType::Downtimes,
+        ] {
+            let n = folder_type_into_i16(folder_type);
+            assert_eq!(folder_type_from_i16(n), Some(folder_type));
+        }
+        assert_eq!(folder_type_from_i16(6), None);
     }
 
     #[test]

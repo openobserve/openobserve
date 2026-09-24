@@ -444,6 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { ActiveDowntime } from "@/services/downtimes";
 import { syntheticsKeys } from "@/services/synthetics.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { useQuery } from "@tanstack/vue-query";
@@ -543,6 +544,7 @@ interface ApiMonitor {
   last_triggered_at: number;
   last_check_at: number | null;
   last_response_ms: number | null;
+  active_downtime?: ActiveDowntime | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -593,6 +595,7 @@ function mapMonitor(m: ApiMonitor) {
     history: [] as unknown[],
     folderId: m.folder_id,
     lastTriggeredAt: m.last_triggered_at,
+    active_downtime: m.active_downtime ?? null,
   };
 }
 

@@ -86,7 +86,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 87: add input_preview to llm_annotation_queue_items.
 // 88: add iam password policy tables.
 // 89: add level_half_width_seconds to anomaly_detection_config.
-pub const DB_SCHEMA_VERSION: u64 = 89;
+// 90: create downtimes; add muted_by_downtime_id and last_downtime_id.
+// 91: add kind to slo_backfill_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 91;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

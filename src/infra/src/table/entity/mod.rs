@@ -19,6 +19,7 @@ pub mod compactor_manual_jobs;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_value_fields;
+pub mod downtimes;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod external_alerts;

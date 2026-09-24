@@ -135,6 +135,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>
               {{ row.title || formatDimensions(row.group_values) }}
             </span>
+            <OTag
+              v-if="row.muted_by_downtime_id"
+              type="downtimeStatus"
+              value="active"
+              :label="
+                t('alerts.downtimes.incident.mutedBy', { name: nameOf(row.muted_by_downtime_id) })
+              "
+              data-test="incident-list-muted"
+            />
           </div>
         </template>
         <template #cell-dimensions="{ row }">
@@ -300,6 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { incidentsQuery } from "@/services/incidents.queries";
@@ -356,6 +366,7 @@ export default defineComponent({
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
+    const { nameOf } = useDowntimeLookup(true);
     const router = useRouter();
     const route = useRoute();
     const { confirm } = useConfirmDialog();
@@ -933,6 +944,7 @@ export default defineComponent({
     ]);
 
     return {
+      nameOf,
       raw,
       t,
       loading,

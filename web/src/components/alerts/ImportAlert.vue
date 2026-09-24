@@ -293,6 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -436,19 +437,12 @@ export default defineComponent({
 
     const userSelectedTimezone = ref<string[]>([]);
 
-    // @ts-ignore
-    let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
-      return tz;
-    });
-    const filteredTimezone = ref<any>([]);
-    filteredTimezone.value = [...timezoneOptions];
-
-    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const browserTime = raw("Browser Time (" + browserTz + ")");
-
-    // Add the UTC option
-    timezoneOptions.unshift("UTC");
-    timezoneOptions.unshift(browserTime);
+    const {
+      browserTz,
+      browserTimeValue: browserTime,
+      zones: timezoneOptions,
+    } = useTimezoneOptions({ browserEntry: true });
+    const filteredTimezone = ref<any>([...timezoneOptions]);
 
     const timezoneSelectOptions = computed(() =>
       (filteredTimezone.value as string[]).map((tz: string) =>
@@ -560,7 +554,6 @@ export default defineComponent({
 
     const importAnomalyConfig = async (jsonObj: any, index: number) => {
       try {
-        const org = store.state.selectedOrganization.identifier;
         // Convert the exported anomaly config (GET format) back to the create (POST) format.
         const payload: any = {
           alert_type: "anomaly_detection",

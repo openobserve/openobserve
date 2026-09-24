@@ -707,6 +707,7 @@ describe("GATE_PREDICATES", () => {
     serviceStreams: true,
     onlineEvals: false,
     databaseMonitoring: false,
+    downtimesEnabled: false,
     hiddenMenus: new Set<string>(),
     ...over,
   });
@@ -719,6 +720,30 @@ describe("GATE_PREDICATES", () => {
     ).toBe(true);
     expect(GATE_PREDICATES.databaseMonitoring(ctx({ isEnterprise: true }))).toBe(false);
     expect(GATE_PREDICATES.databaseMonitoring(ctx())).toBe(false);
+  });
+
+  it("downtimes needs enterprise or cloud AND the runtime flag", () => {
+    expect(GATE_PREDICATES.downtimes(ctx({ isEnterprise: true, downtimesEnabled: true }))).toBe(
+      true,
+    );
+    expect(GATE_PREDICATES.downtimes(ctx({ isCloud: true, downtimesEnabled: true }))).toBe(true);
+    expect(GATE_PREDICATES.downtimes(ctx({ downtimesEnabled: true }))).toBe(false);
+    expect(GATE_PREDICATES.downtimes(ctx({ isEnterprise: true }))).toBe(false);
+  });
+
+  it("puts Downtimes after Incidents when the rail carries a downtimes item", () => {
+    const entries = groupNavLinks(
+      [link("home"), link("alertList"), link("incidentList"), link("downtimes")],
+      undefined,
+      oncallOff,
+    );
+    const reliability = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "reliability",
+    );
+    const names = reliability?.children.map((c) => c.name) ?? [];
+    expect(names.indexOf("downtimes")).toBe(names.indexOf("incidentList") + 1);
+    expect(keysWithoutInfra(entries)).toEqual(["link:home", "linkGroup:reliability"]);
   });
 
   it("enterpriseMeta (e.g. Nodes) needs BOTH enterprise and meta-org", () => {

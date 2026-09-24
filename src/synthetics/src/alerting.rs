@@ -24,7 +24,22 @@
 //! Pure decision logic, separated from the ack path so it is testable without a
 //! database: state in, state and an outcome out.
 
+use std::{future::Future, pin::Pin, sync::OnceLock};
+
 use infra::table::synthetics_checks::AlertState;
+
+/// The same shape as `futures::future::BoxFuture`, which this crate does not depend on.
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+/// The id of the downtime muting a check; the server registers it, as this crate cannot.
+pub type MuteCheck = fn(
+    org: &str,
+    check_id: &str,
+    folder_id: &str,
+    tags: &[String],
+) -> BoxFuture<'static, Option<String>>;
+
+static MUTE_CHECK: OnceLock<MuteCheck> = OnceLock::new();
 
 /// What a completed run is, before any suppression is applied.
 ///
@@ -167,6 +182,31 @@ const MICROS_PER_MINUTE: i64 = 60 * 1_000_000;
 /// restated daily. A longer `cooldown_mins` wins, on the principle that an
 /// explicit setting beats a built-in default.
 const DEGRADED_REMINDER_US: i64 = 24 * 60 * MICROS_PER_MINUTE;
+
+pub fn register_mute_check(f: MuteCheck) {
+    let _ = MUTE_CHECK.set(f);
+}
+
+/// `None` when nothing is registered, so an OSS build never mutes.
+pub async fn muted_by(
+    org: &str,
+    check_id: &str,
+    folder_id: &str,
+    tags: &[String],
+) -> Option<String> {
+    let check = MUTE_CHECK.get()?;
+    check(org, check_id, folder_id, tags).await
+}
+
+/// A muted run moves only the streak: `alerting` means someone was told, so it stays as it was.
+pub fn suppressed_state(prior: AlertState, next: AlertState) -> AlertState {
+    AlertState {
+        last_alert_at: prior.last_alert_at,
+        alerting: prior.alerting,
+        degraded_notified_at: prior.degraded_notified_at,
+        ..next
+    }
+}
 
 /// Decides the outcome for one completed run and returns the state to persist.
 ///
@@ -686,5 +726,77 @@ mod tests {
         // It comes back, still degraded — that is worth saying again.
         let (outcome, _) = decide(failing, RunClass::Degraded, 1, 0, 1020 * MIN);
         assert_eq!(outcome, AlertOutcome::Degraded);
+    }
+
+    #[test]
+    fn a_muted_failure_keeps_the_streak_and_leaves_last_alert_at_alone() {
+        let prior = state(2, 0, false);
+        let (outcome, next) = decide(prior, RunClass::Failing, 3, 30, 10 * MIN);
+        assert_eq!(outcome, AlertOutcome::Firing);
+        let muted = suppressed_state(prior, next);
+        assert_eq!(muted.consecutive_failures, 3);
+        assert!(
+            !muted.alerting,
+            "nobody was told, so no RECOVERED may follow"
+        );
+        assert_eq!(muted.last_alert_at, 0);
+    }
+
+    #[test]
+    fn a_muted_failure_of_an_announced_outage_keeps_alerting() {
+        let prior = state(4, MIN, true);
+        let (outcome, next) = decide(prior, RunClass::Failing, 3, 30, 40 * MIN);
+        assert_eq!(outcome, AlertOutcome::Firing);
+        let muted = suppressed_state(prior, next);
+        assert!(muted.alerting);
+        assert_eq!(muted.last_alert_at, MIN);
+    }
+
+    #[test]
+    fn a_recovery_inside_the_window_is_sent_by_the_first_pass_after_it() {
+        let paged = state(3, MIN, true);
+        let (outcome, next) = decide(paged, RunClass::Healthy, 3, 30, 45 * MIN);
+        assert_eq!(outcome, AlertOutcome::Recovered);
+        let muted = suppressed_state(paged, next);
+        assert!(muted.alerting, "the recovery is still owed");
+        assert_eq!(muted.consecutive_failures, 0);
+        let (outcome, after) = decide(muted, RunClass::Healthy, 3, 30, 61 * MIN);
+        assert_eq!(outcome, AlertOutcome::Recovered);
+        assert!(!after.alerting);
+    }
+
+    #[test]
+    fn an_outage_muted_from_start_to_recovery_sends_nothing_after_the_window() {
+        let prior = state(2, 0, false);
+        let (_, next) = decide(prior, RunClass::Failing, 3, 30, 10 * MIN);
+        let muted = suppressed_state(prior, next);
+        let (outcome, next) = decide(muted, RunClass::Healthy, 3, 30, 20 * MIN);
+        assert_eq!(outcome, AlertOutcome::Silent);
+        let (outcome, _) = decide(next, RunClass::Healthy, 3, 30, 61 * MIN);
+        assert_eq!(outcome, AlertOutcome::Silent);
+    }
+
+    #[test]
+    fn the_first_failure_after_the_window_notifies_without_cooldown() {
+        let prior = state(2, 0, false);
+        let (_, next) = decide(prior, RunClass::Failing, 3, 30, 10 * MIN);
+        let muted = suppressed_state(prior, next);
+        let (outcome, _) = decide(muted, RunClass::Failing, 3, 30, 11 * MIN);
+        assert_eq!(outcome, AlertOutcome::Firing);
+    }
+
+    #[test]
+    fn a_muted_degradation_is_restated_after_the_window() {
+        let prior = state(0, 0, false);
+        let (outcome, next) = decide(prior, RunClass::Degraded, 3, 30, MIN);
+        assert_eq!(outcome, AlertOutcome::Degraded);
+        let muted = suppressed_state(prior, next);
+        let (outcome, _) = decide(muted, RunClass::Degraded, 3, 30, 2 * MIN);
+        assert_eq!(outcome, AlertOutcome::Degraded);
+    }
+
+    #[tokio::test]
+    async fn nothing_registered_mutes_nothing() {
+        assert_eq!(muted_by("default", "c1", "default", &[]).await, None);
     }
 }

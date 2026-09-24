@@ -61,6 +61,10 @@ pub struct AlertHistoryQuery {
     pub sort_by: Option<String>,
     /// Sort order (asc or desc, default: desc)
     pub sort_order: Option<String>,
+    /// Only runs this downtime suppressed; also reads synthetics and anomaly runs.
+    pub downtime_id: Option<String>,
+    /// Filter by run outcome, for example `suppressed`.
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -118,6 +122,9 @@ pub struct AlertHistoryEntry {
     /// §7.5) — the UI renders "≥ N". Absent = exact.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value_is_lower_bound: Option<bool>,
+    /// The downtime that suppressed this run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub downtime_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -409,6 +416,7 @@ pub async fn get_alert_history(
                     threshold_operator: None,
                     group_label: None,
                     value_is_lower_bound: None,
+                    downtime_id: None,
                 }
             })
             .collect();
@@ -559,9 +567,18 @@ pub async fn get_alert_history(
     // Build SQL WHERE clause for the _meta organization's triggers stream.
     // Composites publish with module = "composite" and share the ordinary
     // alert outcome vocabulary, so include them in the same history read.
+    let modules = if query.downtime_id.is_some() {
+        "'alert', 'composite', 'anomaly_detection', 'synthetics'"
+    } else {
+        "'alert', 'composite'"
+    };
     let mut where_clause = format!(
-        "module IN ('alert', 'composite') AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+        "module IN ({modules}) AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
+    where_clause.push_str(&downtime_filters(
+        query.downtime_id.as_deref(),
+        query.status.as_deref(),
+    ));
 
     // Add alert ID filter if provided
     // The key field contains the alert ID in the format "alert_name/alert_id"
@@ -663,7 +680,7 @@ pub async fn get_alert_history(
          threshold_operator, group_label, value_is_lower_bound, is_realtime, is_silenced, \
          start_time, end_time, retries, \
          delay_in_secs, evaluation_took_in_secs, \
-         source_node, query_took, error \
+         source_node, query_took, error, downtime_id \
          FROM \"{TRIGGERS_STREAM}\" \
          WHERE {where_clause} \
          ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
@@ -797,6 +814,11 @@ pub async fn get_alert_history(
                 .filter(|s| !s.is_empty())
                 .map(String::from),
             value_is_lower_bound: hit.get("value_is_lower_bound").and_then(|v| v.as_bool()),
+            downtime_id: hit
+                .get("downtime_id")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(String::from),
         });
     }
 
@@ -809,6 +831,18 @@ pub async fn get_alert_history(
     };
 
     MetaHttpResponse::json(response)
+}
+
+/// The downtime filters of the history read, quoted with the same single-quote escaping.
+fn downtime_filters(downtime_id: Option<&str>, status: Option<&str>) -> String {
+    let mut clause = String::new();
+    if let Some(id) = downtime_id.filter(|id| !id.is_empty()) {
+        clause.push_str(&format!(" AND downtime_id = '{}'", id.replace('\'', "''")));
+    }
+    if let Some(status) = status.filter(|status| !status.is_empty()) {
+        clause.push_str(&format!(" AND status = '{}'", status.replace('\'', "''")));
+    }
+    clause
 }
 
 /// Bulk anomaly history query — returns the most recent N hits per anomaly config in one request.
@@ -1043,6 +1077,8 @@ mod tests {
             size: None,
             sort_by: None,
             sort_order: None,
+            downtime_id: None,
+            status: None,
         };
 
         assert!(query.alert_id.is_none());
@@ -1085,6 +1121,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
 
         assert_eq!(entry.alert_name, "test_alert");
@@ -1142,6 +1179,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1188,6 +1226,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
 
         assert_eq!(entry.status, "error");
@@ -1209,6 +1248,8 @@ mod tests {
             size: Some(25),
             sort_by: None,
             sort_order: None,
+            downtime_id: None,
+            status: None,
         };
 
         assert_eq!(query.from.unwrap(), 100);
@@ -1244,6 +1285,8 @@ mod tests {
                 size: None,
                 sort_by: Some(field.to_string()),
                 sort_order: Some("asc".to_string()),
+                downtime_id: None,
+                status: None,
             };
 
             assert_eq!(query.sort_by, Some(field.to_string()));
@@ -1263,6 +1306,8 @@ mod tests {
             size: None,
             sort_by: Some("timestamp".to_string()),
             sort_order: Some("asc".to_string()),
+            downtime_id: None,
+            status: None,
         };
         assert_eq!(query_asc.sort_order, Some("asc".to_string()));
 
@@ -1276,6 +1321,8 @@ mod tests {
             size: None,
             sort_by: Some("timestamp".to_string()),
             sort_order: Some("desc".to_string()),
+            downtime_id: None,
+            status: None,
         };
         assert_eq!(query_desc.sort_order, Some("desc".to_string()));
     }
@@ -1408,6 +1455,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
 
         let json = serde_json::to_string(&entry).unwrap();
@@ -1451,6 +1499,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1500,6 +1549,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
@@ -1542,6 +1592,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
@@ -1551,5 +1602,23 @@ mod tests {
         assert!(obj.contains_key("grouped"));
         assert!(obj.contains_key("group_size"));
         assert!(obj.contains_key("anomaly_count"));
+    }
+
+    #[test]
+    fn downtime_filters_quote_and_combine() {
+        assert_eq!(downtime_filters(None, None), "");
+        assert_eq!(
+            downtime_filters(Some("2f9K"), None),
+            " AND downtime_id = '2f9K'"
+        );
+        assert_eq!(
+            downtime_filters(None, Some("suppressed")),
+            " AND status = 'suppressed'"
+        );
+        assert_eq!(
+            downtime_filters(Some("a'b"), Some("suppressed")),
+            " AND downtime_id = 'a''b' AND status = 'suppressed'"
+        );
+        assert_eq!(downtime_filters(Some(""), Some("")), "");
     }
 }

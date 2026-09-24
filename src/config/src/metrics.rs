@@ -1404,6 +1404,19 @@ pub static ALERT_DEDUP_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static ALERT_RUNS_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_runs_suppressed_total",
+            "Total number of runs whose notification a downtime suppressed",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org", "module"],
+    )
+    .expect("Metric created")
+});
+
 // Alert grouping/batching metrics
 pub static ALERT_GROUPING_BATCHES_PENDING: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -2945,6 +2958,9 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(ALERT_DEDUP_ERRORS_TOTAL.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_RUNS_SUPPRESSED_TOTAL.clone()))
+        .expect("Metric registered");
 
     // alert grouping metrics
     registry
@@ -3607,6 +3623,7 @@ mod tests {
         let _ = ALERT_DEDUP_SUPPRESSED_TOTAL.clone();
         let _ = ALERT_DEDUP_PASSED_TOTAL.clone();
         let _ = ALERT_DEDUP_ERRORS_TOTAL.clone();
+        let _ = ALERT_RUNS_SUPPRESSED_TOTAL.clone();
         let _ = ALERT_GROUPING_BATCHES_PENDING.clone();
         let _ = ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL.clone();
         let _ = ALERT_GROUPING_BATCH_SIZE.clone();

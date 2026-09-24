@@ -373,6 +373,11 @@ async fn step_delete_file_list(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Delete every downtime through the db layer, so every node cache and every region drops it.
+async fn delete_org_downtimes(org_id: &str) -> Result<(), anyhow::Error> {
+    crate::db::downtimes::delete_by_org(org_id).await
+}
+
 /// Delete every alert in an org through the service layer so the ALERTS /
 /// STREAM_ALERTS caches evict cluster-wide (via the coordinator delete event) and
 /// each alert's scheduler trigger + OFGA ownership is removed — none of which a
@@ -492,6 +497,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     delete_org_alerts(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alerts: {e}"))?;
+    // downtimes.folder_id has a FK (downtimes_folder_fk) → folders.id.
+    delete_org_downtimes(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/downtimes: {e}"))?;
     // timed_annotation_panels cascade from timed_annotations; both are deleted here
     // via the three-hop join: folders.org → dashboards.folder_id → timed_annotations.dashboard_id
     // Must run BEFORE dashboards::delete_by_org or the join finds no rows.
@@ -1224,6 +1233,14 @@ mod tests {
         for call in SLO_DELETES {
             position_of(call);
         }
+    }
+
+    #[test]
+    fn test_downtimes_are_deleted_before_their_folders() {
+        assert!(
+            position_of("delete_org_downtimes(org_id)")
+                < position_of("folders::delete_by_org(org_id)")
+        );
     }
 
     #[test]

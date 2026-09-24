@@ -3385,6 +3385,50 @@ fn anomaly_alert_payload(
 
 /// Send an anomaly alert (or recovery message) to the configured destination.
 ///
+/// The downtime check the anomaly scheduler asks before it sends, registered next to the sender.
+#[cfg(feature = "enterprise")]
+pub fn downtime_is_muted(
+    org_id: &str,
+    anomaly_id: &str,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<String>> + Send>> {
+    let (org_id, anomaly_id) = (org_id.to_string(), anomaly_id.to_string());
+    Box::pin(async move { muted_by_downtime(&org_id, &anomaly_id).await })
+}
+
+/// `custom_sql` equalities, then `key:value` tags, matched on the Anomaly detections target.
+#[cfg(feature = "enterprise")]
+async fn muted_by_downtime(org_id: &str, anomaly_id: &str) -> Option<String> {
+    if !crate::alerts::downtimes::any_for(
+        org_id,
+        config::meta::downtimes::TargetModule::AnomalyDetections,
+    ) {
+        return None;
+    }
+    let row = anomaly_config_table::get_by_id(get_orm_client_rw().await, org_id, anomaly_id)
+        .await
+        .ok()
+        .flatten()?;
+    let folder_id = pk_to_name(Some(&row.folder_id)).await;
+    let tags: Vec<String> = row
+        .tags
+        .and_then(|tags| serde_json::from_value(tags).ok())
+        .unwrap_or_default();
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let dims = o2_enterprise::enterprise::downtimes::scope::anomaly_dimensions(
+        row.custom_sql.as_deref(),
+        &tags,
+        &semantic_groups,
+    );
+    crate::alerts::downtimes::active_for_anomaly(
+        org_id,
+        anomaly_id,
+        &folder_id,
+        &dims,
+        config::utils::time::now_micros(),
+    )
+    .map(|downtime| downtime.id)
+}
+
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
 /// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap

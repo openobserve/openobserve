@@ -745,6 +745,30 @@ export default defineComponent({
       }
     };
 
+    // Absorbed into the Reliability flyout (navGroups.ts), which places it after Incidents.
+    const isDowntimesEnabled = computed(
+      () =>
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig?.downtimes_enabled === true,
+    );
+    const updateDowntimesMenu = () => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === "downtimes");
+      if (!isDowntimesEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+      const anchor = linksList.value.findIndex((link) => link.name === "alertList");
+      if (anchor === -1) return;
+      linksList.value.splice(anchor + 1, 0, {
+        title: t("menu.downtimes"),
+        icon: "notifications-paused",
+        link: "/downtimes",
+        name: "downtimes",
+      });
+    };
+    watch(isDowntimesEnabled, () => updateDowntimesMenu(), { immediate: false });
+
     // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
       const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
@@ -863,6 +887,7 @@ export default defineComponent({
     // sync.
     const filterMenus = () => {
       updateIncidentsMenu();
+      updateDowntimesMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();
       updateProfilesMenu();

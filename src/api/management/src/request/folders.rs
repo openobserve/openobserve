@@ -52,6 +52,9 @@ fn folder_error_response(value: FolderError) -> Response {
         FolderError::DeleteWithWorkflows => MetaHttpResponse::bad_request(
             "Folder contains workflows, please move/delete workflows from folder",
         ),
+        FolderError::DeleteWithDowntimes => MetaHttpResponse::bad_request(
+            "Folder contains downtimes, please move/delete downtimes from folder",
+        ),
         FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
         FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
         FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),

@@ -18,8 +18,8 @@
 //! Provides CRUD operations for incidents and incident-alert associations.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
     sea_query::{Expr, LockType},
 };
 use svix_ksuid::KsuidLike;
@@ -39,6 +39,7 @@ fn new_incident(
     key_type: &str,
     first_alert_at: i64,
     title: Option<String>,
+    muted_by_downtime_id: Option<String>,
 ) -> alert_incidents::ActiveModel {
     let now = chrono::Utc::now().timestamp_micros();
 
@@ -60,6 +61,7 @@ fn new_incident(
         acknowledged_at: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
+        muted_by_downtime_id: Set(muted_by_downtime_id),
     }
 }
 
@@ -83,6 +85,28 @@ pub async fn create(
     first_alert_at: i64,
     title: Option<String>,
 ) -> Result<alert_incidents::Model, errors::Error> {
+    create_with_mute(
+        org_id,
+        severity,
+        group_values,
+        key_type,
+        first_alert_at,
+        title,
+        None,
+    )
+    .await
+}
+
+/// [`create`] for an incident opened by a firing that a downtime suppressed (D3).
+pub async fn create_with_mute(
+    org_id: &str,
+    severity: &str,
+    group_values: serde_json::Value,
+    key_type: &str,
+    first_alert_at: i64,
+    title: Option<String>,
+    muted_by_downtime_id: Option<String>,
+) -> Result<alert_incidents::Model, errors::Error> {
     let client = get_orm_client_rw().await;
 
     new_incident(
@@ -92,6 +116,7 @@ pub async fn create(
         key_type,
         first_alert_at,
         title,
+        muted_by_downtime_id,
     )
     .insert(client)
     .await
@@ -132,6 +157,7 @@ pub async fn create_and_attach_to_oncall_response(
         key_type,
         first_alert_at,
         title,
+        None,
     )
     .insert(&txn)
     .await
@@ -302,6 +328,39 @@ pub async fn acknowledge(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     get(org_id, id).await
+}
+
+/// Clears the mute only while it names `downtime_id`, so one of two concurrent firings sees `true`.
+pub async fn clear_muted_by_downtime_id(
+    org_id: &str,
+    id: &str,
+    downtime_id: &str,
+) -> Result<bool, errors::Error> {
+    clear_muted_by_downtime_id_with(get_orm_client_rw().await, org_id, id, downtime_id).await
+}
+
+/// [`clear_muted_by_downtime_id`] on a given connection.
+pub async fn clear_muted_by_downtime_id_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    downtime_id: &str,
+) -> Result<bool, errors::Error> {
+    let res = alert_incidents::Entity::update_many()
+        .col_expr(
+            alert_incidents::Column::MutedByDowntimeId,
+            Expr::value(Option::<String>::None),
+        )
+        .col_expr(
+            alert_incidents::Column::UpdatedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
+        .filter(alert_incidents::Column::Id.eq(id))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::MutedByDowntimeId.eq(downtime_id))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected == 1)
 }
 
 /// Update incident title
@@ -817,7 +876,75 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{Database, DatabaseConnection, Schema};
+
     use super::*;
+
+    async fn incidents_db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incidents::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        db
+    }
+
+    async fn muted_incident(db: &DatabaseConnection, downtime_id: &str) -> alert_incidents::Model {
+        new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({"service": "payments"}),
+            "service",
+            1,
+            None,
+            Some(downtime_id.to_string()),
+        )
+        .insert(db)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn two_concurrent_unmutes_clear_the_incident_once() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        let (a, b) = tokio::join!(
+            clear_muted_by_downtime_id_with(&db, "acme", &incident.id, "dt-1"),
+            clear_muted_by_downtime_id_with(&db, "acme", &incident.id, "dt-1"),
+        );
+        let winners = [a.unwrap(), b.unwrap()].iter().filter(|won| **won).count();
+        assert_eq!(
+            winners, 1,
+            "exactly one firing sends the opened notification"
+        );
+        let row = alert_incidents::Entity::find_by_id(incident.id.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.muted_by_downtime_id, None);
+    }
+
+    #[tokio::test]
+    async fn an_unmute_for_another_downtime_or_org_changes_nothing() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        assert!(
+            !clear_muted_by_downtime_id_with(&db, "acme", &incident.id, "dt-2")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !clear_muted_by_downtime_id_with(&db, "other", &incident.id, "dt-1")
+                .await
+                .unwrap()
+        );
+        let row = alert_incidents::Entity::find_by_id(incident.id.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.muted_by_downtime_id.as_deref(), Some("dt-1"));
+    }
 
     #[test]
     fn test_ksuid_generation() {

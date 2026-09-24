@@ -54,6 +54,8 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // isEnterprise conjunct at this level would take the four OSS tabs down with
   // them and hide the section from a build that still serves most of it.
   databaseMonitoring: (c) => c.databaseMonitoring,
+  // Enterprise/cloud plus `/config` `downtimes_enabled`, the same rule as the route guard.
+  downtimes: (c) => (c.isEnterprise || c.isCloud) && c.downtimesEnabled,
 };
 
 /**
@@ -133,7 +135,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     titleKey: "menu.reliability",
     icon: "shield",
     parentLink: "/alerts",
-    absorbs: ["alertList", "sloList", "incidentList", "onCallResponses"],
+    absorbs: ["alertList", "sloList", "incidentList", "downtimes", "onCallResponses"],
     children: [
       // ── Alerts ──────────────────────────────────────────────────────────
       // These four are the alerting cluster, and they carry a peer tab strip
@@ -193,6 +195,14 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "notifications-active",
         name: "incidentList",
         requires: "incidentList",
+      },
+      {
+        titleKey: "menu.downtimes",
+        icon: "notifications-paused",
+        name: "downtimes",
+        requires: "downtimes",
+        gate: "downtimes",
+        activeOnRoutes: ["addDowntime", "editDowntime", "downtimeDetail"],
       },
       // A page is where an alert escalates to a person, so On-Call sits in the
       // same workflow tile rather than as its own rail entry. Pages, Teams and

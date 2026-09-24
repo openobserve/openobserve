@@ -103,6 +103,8 @@ export interface NavGateContext {
   oncallEnabled: boolean;
   /** `zoConfig.database_monitoring_enabled`. OSS feature — no build gate. */
   databaseMonitoring: boolean;
+  /** `/config` `downtimes_enabled` (enterprise `O2_DOWNTIMES_ENABLED`). */
+  downtimesEnabled: boolean;
   /** Raw `custom_hide_menus` entries (split on ",") — matches how pages test it. */
   hiddenMenus: Set<string>;
 }

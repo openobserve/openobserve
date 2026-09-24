@@ -77,6 +77,9 @@ pub enum RunOutcome {
     /// transitioning to firing
     #[serde(rename = "pending")]
     Pending,
+    /// Condition matched inside a downtime window; nothing was delivered.
+    #[serde(rename = "suppressed")]
+    Suppressed,
 }
 
 impl RunOutcome {
@@ -98,6 +101,7 @@ impl RunOutcome {
             Self::Skipped => 4,
             Self::NotifyFailed => 5,
             Self::Pending => 6,
+            Self::Suppressed => 7,
         }
     }
 
@@ -110,6 +114,7 @@ impl RunOutcome {
             4 => Some(Self::Skipped),
             5 => Some(Self::NotifyFailed),
             6 => Some(Self::Pending),
+            7 => Some(Self::Suppressed),
             _ => None,
         }
     }
@@ -123,6 +128,7 @@ impl RunOutcome {
             Self::Skipped => "skipped",
             Self::NotifyFailed => "notify_failed",
             Self::Pending => "pending",
+            Self::Suppressed => "suppressed",
         }
     }
 }
@@ -165,6 +171,7 @@ pub fn normalize_outcome(
         "skipped" => Some(RunOutcome::Skipped),
         "notify_failed" => Some(RunOutcome::NotifyFailed),
         "pending" => Some(RunOutcome::Pending),
+        "suppressed" => Some(RunOutcome::Suppressed),
 
         // ── legacy vocabulary ──
         "condition_not_satisfied" => Some(RunOutcome::Normal),
@@ -296,6 +303,8 @@ pub struct TriggerData {
     /// The venue the failed synthetics slot was scheduled for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synthetics_location: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub downtime_id: Option<String>,
 }
 
 impl Default for TriggerData {
@@ -335,6 +344,7 @@ impl Default for TriggerData {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
         }
     }
 }
@@ -385,6 +395,7 @@ impl TriggerData {
             value_is_lower_bound: Some(false),
             synthetics_error_source: Some(String::new()),
             synthetics_location: Some(String::new()),
+            downtime_id: Some(String::new()),
         }
     }
 
@@ -1107,6 +1118,8 @@ mod run_outcome_tests {
         assert_eq!(RunOutcome::from_i32(3), Some(RunOutcome::Error));
         assert_eq!(RunOutcome::from_i32(4), Some(RunOutcome::Skipped));
         assert_eq!(RunOutcome::from_i32(5), Some(RunOutcome::NotifyFailed));
+        assert_eq!(RunOutcome::Suppressed.to_i32(), 7);
+        assert_eq!(RunOutcome::from_i32(7), Some(RunOutcome::Suppressed));
     }
 
     #[test]
@@ -1118,6 +1131,8 @@ mod run_outcome_tests {
             RunOutcome::Error,
             RunOutcome::Skipped,
             RunOutcome::NotifyFailed,
+            RunOutcome::Pending,
+            RunOutcome::Suppressed,
         ] {
             let n = outcome.to_i32();
             assert_eq!(
@@ -1126,6 +1141,30 @@ mod run_outcome_tests {
                 "i32 roundtrip failed for {outcome:?} (got {n})"
             );
         }
+    }
+
+    #[test]
+    fn a_suppressed_run_carries_its_downtime_id_through_serde() {
+        assert_eq!(
+            serde_json::to_string(&RunOutcome::Suppressed).unwrap(),
+            "\"suppressed\""
+        );
+        assert_eq!(
+            normalize_outcome("suppressed", &TriggerDataType::Alert, None),
+            Some(RunOutcome::Suppressed)
+        );
+        let td = TriggerData {
+            status: RunOutcome::Suppressed,
+            downtime_id: Some("2f9K".to_string()),
+            ..TriggerData::default()
+        };
+        let json = serde_json::to_value(&td).unwrap();
+        assert_eq!(json["status"], "suppressed");
+        assert_eq!(json["downtime_id"], "2f9K");
+        assert_eq!(serde_json::from_value::<TriggerData>(json).unwrap(), td);
+        let bare = serde_json::to_value(TriggerData::default()).unwrap();
+        assert!(bare.get("downtime_id").is_none());
+        assert!(TriggerData::get_field_names().contains(&"downtime_id".to_string()));
     }
 
     #[test]
@@ -1659,6 +1698,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();

@@ -19,7 +19,10 @@ use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::synthetics_variables::{placeholder_names, substitute_placeholders};
+use super::{
+    downtimes::ActiveDowntime,
+    synthetics_variables::{placeholder_names, substitute_placeholders},
+};
 
 // ── Frequency ─────────────────────────────────────────────────────────────────
 
@@ -574,6 +577,8 @@ pub struct SyntheticListItem {
     pub status: SyntheticStatus,
     pub last_check_at: Option<i64>,
     pub last_response_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_downtime: Option<ActiveDowntime>,
 }
 
 // ── Query params / responses ──────────────────────────────────────────────────

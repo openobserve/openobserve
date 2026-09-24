@@ -390,6 +390,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
         };
 
         let result = queue
@@ -940,6 +941,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
         };
 
         let error_data = error::ErrorData {
@@ -1016,6 +1018,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
         };
 
         let trigger_data2 = TriggerData {
@@ -1082,6 +1085,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
         };
 
         // Should succeed when queue has space

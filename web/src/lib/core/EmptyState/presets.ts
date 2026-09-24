@@ -665,6 +665,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-downtimes": {
+    illustration: "schedule",
+    variant: "create",
+    titleKey: "emptyState.noDowntimes.title",
+    descriptionKey: "emptyState.noDowntimes.description",
+    actions: [
+      {
+        id: "create",
+        icon: "notifications-paused",
+        titleKey: "emptyState.noDowntimes.action",
+        descriptionKey: "emptyState.noDowntimes.actionDesc",
+      },
+    ],
+  },
   "no-pipeline-destinations": {
     illustration: "pipeline",
     variant: "create",

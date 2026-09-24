@@ -123,7 +123,11 @@ pub fn observe(read: WindowRead, coverage_floor: f64, watermark_stale: bool) -> 
 pub fn evaluation_is_measured(outcome: &RunOutcome) -> bool {
     match outcome {
         // Computed a level — the same set §7.6 refreshes `level_at` for.
-        RunOutcome::Firing | RunOutcome::Normal | RunOutcome::NotifyFailed => true,
+        // A suppressed run computed its level; only the delivery was skipped.
+        RunOutcome::Firing
+        | RunOutcome::Normal
+        | RunOutcome::NotifyFailed
+        | RunOutcome::Suppressed => true,
         // Observed nothing: the query failed, the run was skipped, or the
         // outcome belongs to a non-condition module.
         RunOutcome::Error | RunOutcome::Skipped | RunOutcome::Succeeded | RunOutcome::Pending => {
@@ -346,6 +350,11 @@ mod tests {
     #[test]
     fn a_skipped_evaluation_is_not_a_measurement() {
         assert!(!evaluation_is_measured(&RunOutcome::Skipped));
+    }
+
+    #[test]
+    fn a_suppressed_evaluation_is_a_measurement() {
+        assert!(evaluation_is_measured(&RunOutcome::Suppressed));
     }
 
     /// An interval in which the source alert was **paused** has no records at

@@ -534,6 +534,12 @@
       "description": "A remote task is an HTTP service your experiments call to produce outputs. Publish it once, prove the connection works, and every experiment can pin the exact version it ran against.",
       "action": "New Task",
       "actionDesc": "Point OpenObserve at your endpoint and test the connection."
+    },
+    "noDowntimes": {
+      "title": "No downtimes yet",
+      "description": "A downtime keeps alerts, anomaly detections and synthetics checks running and stops their notifications for a window that you schedule.",
+      "action": "Schedule a downtime",
+      "actionDesc": "One-time, daily or weekly. For a quick mute, use Mute in the alert list."
     }
   },
   "common": {
@@ -1288,7 +1294,8 @@
     "hosts": "Hosts",
     "kubernetes": "Kubernetes",
     "topQueries": "Top Queries",
-    "profiles": "Profiles"
+    "profiles": "Profiles",
+    "downtimes": "Downtimes"
   },
   "profiles": {
     "title": "Profiles",
@@ -7940,7 +7947,357 @@
     "sloKind": "Condition type",
     "sloLongWindow": "Long window",
     "sloShortWindow": "Short window",
-    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
+    "downtimes": {
+      "newTitle": "New downtime",
+      "editTitle": "Edit downtime",
+      "detailTitle": "Downtime",
+      "modules": {
+        "alerts": "Alerts",
+        "anomaly_detections": "Anomaly detections",
+        "synthetics": "Synthetics checks",
+        "slos": "SLOs"
+      },
+      "modulesShort": {
+        "alerts": "Alerts",
+        "anomaly_detections": "Anomaly",
+        "synthetics": "Synthetics",
+        "slos": "SLOs"
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}s",
+        "condition": "condition",
+        "allFolders": "all folders",
+        "oneFolder": "{name} folder",
+        "nFolders": "{count} folder | {count} folders",
+        "tags": "tag {tags}",
+        "nItems": "{count} item | {count} items",
+        "asGood": "as good",
+        "chip": "{module} · {text}"
+      },
+      "duration": {
+        "days": "{count} d",
+        "hours": "{count} h",
+        "minutes": "{count} min"
+      },
+      "schedule": {
+        "windowRange": "{start} to {end} {zone}",
+        "onceSentence": "Once · {start} to {end} · {zone}",
+        "dailySentence": "Daily · {time} for {duration} · {zone}",
+        "weeklySentence": "Weekly on {days} · {time} for {duration} · {zone}"
+      },
+      "validation": {
+        "conditionRequired": "Add a condition, or remove the condition block.",
+        "pairKey": "Choose a dimension for every row.",
+        "pairOperator": "Use = or != in a downtime condition.",
+        "pairValue": "Enter a value for every row.",
+        "loneStar": "A value cannot be a lone *.",
+        "innerStar": "A * is allowed only at the end of a value.",
+        "emptyGroup": "A condition group cannot be empty.",
+        "tooDeep": "A condition can nest groups at most 3 levels deep.",
+        "tooManyPairs": "A condition can hold at most 32 pairs.",
+        "needsEq": "Add at least one = condition. A condition made only of != rows would silence everything else.",
+        "modulesRequired": "Choose at least one module.",
+        "foldersRequired": "Choose All folders or at least one folder.",
+        "tagsRequired": "Add a tag, or remove the tags block.",
+        "idsRequired": "Pick an item, or remove the specific items block.",
+        "idOutsideFolders": "Some chosen items are not in the chosen folders.",
+        "nameTooLong": "A name can be at most 256 characters.",
+        "timezoneRequired": "Choose a timezone.",
+        "startRequired": "Enter a start date and time.",
+        "endRequired": "Enter an end date and time.",
+        "endAfterStart": "The end must be after the start.",
+        "windowTooLong": "A window can last at most 7 days.",
+        "windowTooShort": "A window must last at least 1 minute.",
+        "startTimeRequired": "Enter a start time as HH:MM.",
+        "durationInvalid": "Enter a duration such as 90m or 1h 30m.",
+        "weekdaysRequired": "Choose at least one day.",
+        "untilAfterStart": "Repeat until must be on or after the first day.",
+        "confirmRequired": "Tick the box to confirm that this downtime silences whole modules."
+      },
+      "title": "Downtimes",
+      "subtitle": "Scheduled windows that keep alerts, anomaly detections and synthetics checks running but stop their notifications",
+      "newDowntime": "New downtime",
+      "filterAll": "All",
+      "filterOnce": "One-time",
+      "filterRecurring": "Recurring",
+      "search": "Search by name, dimension or creator",
+      "searchAcross": "Search all folders",
+      "thisFolder": "This folder",
+      "allFolders": "All folders",
+      "thisFolderTooltip": "Search in the selected folder",
+      "allFoldersTooltip": "Search in every folder",
+      "stats": {
+        "active": "Active",
+        "scheduled": "Scheduled",
+        "recurring": "Recurring",
+        "ended": "Ended",
+        "cancelled": "Cancelled",
+        "total": "Total"
+      },
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "targets": "Targets",
+        "schedule": "Schedule",
+        "when": "Ends / next",
+        "matched": "Matched",
+        "createdBy": "Created by",
+        "folder": "Folder"
+      },
+      "oneTime": "One-time",
+      "recurring": "Recurring",
+      "bannerOn": "A banner shows to everyone in the org while this downtime is active",
+      "endsLabel": "ends",
+      "nextLabel": "next",
+      "matched": {
+        "alerts": "{count} alert | {count} alerts",
+        "anomalies": "{count} anomaly | {count} anomalies",
+        "synthetics": "{count} check | {count} checks",
+        "slos": "{count} SLO | {count} SLOs"
+      },
+      "actions": {
+        "endNow": "End now",
+        "edit": "Edit",
+        "duplicate": "Duplicate",
+        "moveToFolder": "Move to folder",
+        "cancel": "Cancel downtime",
+        "delete": "Delete",
+        "more": "More actions",
+        "muteForHour": "Mute now for 1 h"
+      },
+      "selectedCount": "{count} of {total} selected",
+      "totalCount": "{count} downtime | {count} downtimes",
+      "confirmCancel": {
+        "title": "Cancel downtime",
+        "message": "Notifications resume at once. The downtime stays in the list for history.",
+        "bulkMessage": "Cancel {count} downtime? Notifications resume at once. | Cancel {count} downtimes? Notifications resume at once."
+      },
+      "confirmDelete": {
+        "title": "Delete downtime",
+        "message": "The downtime and its history are removed. This cannot be undone."
+      },
+      "copyOf": "Copy of {name}",
+      "form": {
+        "matches": {
+          "alerts": "{count} alert matches | {count} alerts match",
+          "anomaly_detections": "{count} detection matches | {count} detections match",
+          "synthetics": "{count} check matches | {count} checks match",
+          "slos": "{count} SLO matches | {count} SLOs match"
+        },
+        "alertFolders": "Alert folders",
+        "syntheticsFolders": "Synthetics folders",
+        "tags": "Tags",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "Every tag must be on the check.",
+        "removeBlock": "Remove this block",
+        "specificItems": "Specific items",
+        "itemsHint": "Only items in the chosen folders are offered.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Add tags",
+        "addItems": "Add specific items",
+        "sloMode": "SLO score inside the window",
+        "sloExclude": "Exclude the window",
+        "sloCountAsGood": "Count the window as good",
+        "sloExcludeCaption": "Time inside the window counts neither as good nor as bad. Burn-rate alerts on these SLOs do not fire for it.",
+        "sloCountAsGoodCaption": "Time in the window counts as fully good. Use this only when your SLO contract says planned maintenance is uptime.",
+        "cardCaption": "Folders first, then the optional blocks narrow further. The dimension condition above applies to this module too.",
+        "noConditionForChecks": "The dimension condition above does not apply to checks.",
+        "appliesTo": "Applies to",
+        "tabTargets": "Targets",
+        "tabSchedule": "Schedule",
+        "tabAdvanced": "Advanced",
+        "modeInFolder": "{mode} in",
+        "newMode": "New downtime",
+        "editMode": "Edit downtime",
+        "namePlaceholder": "Downtime name",
+        "nameLabel": "Downtime name",
+        "renameHint": "Click to rename",
+        "reason": "Reason",
+        "reasonHelp": "Optional. Shown in the list, on the detail page and in the Muted tooltip.",
+        "cancel": "Cancel",
+        "save": "Save",
+        "activeBanner": "This downtime is active. An edit takes effect at the next evaluation, and a change to the SLO mode re-measures the windows that already started.",
+        "noModule": "Choose a module in Applies to."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "alerts",
+          "anomaly_detections": "anomaly detections",
+          "synthetics": "synthetics checks",
+          "slos": "SLOs"
+        },
+        "whenOnce": "Once, from {start} to {end} {zone}",
+        "whenDaily": "Every day at {time} {zone}, for {duration}",
+        "whenWeekly": "Every {days} at {time} {zone}, for {duration}",
+        "inFolders": "in the folder {names} | in the folders {names}",
+        "withCondition": "with {condition}",
+        "tagged": "tagged {tags}",
+        "named": "limited to {count} named item | limited to {count} named items",
+        "stopNotifying": "{when}: {targets} stop notifying.",
+        "nothingMuted": "{when}: no alert or check is muted.",
+        "sloUnchanged": "SLO scores are not changed.",
+        "sloExcluded": "{slos} exclude the window from their score.",
+        "sloAsGood": "{slos} count the window as good time."
+      },
+      "autoName": {
+        "once": "once",
+        "onceOn": "once {date}",
+        "daily": "daily",
+        "weekly": "weekly"
+      },
+      "condition": {
+        "none": "No dimension condition",
+        "add": "Add",
+        "title": "Dimension condition",
+        "onePer": "One per downtime",
+        "remove": "Remove the dimension condition",
+        "caption": "Applies to alerts, anomaly detections and SLOs. Synthetics checks have no dimensions and use tags. All pairs must match. Use an OR group for alternatives. A value can end in *."
+      },
+      "resources": {
+        "refineBy": "Refine by resource",
+        "load": "Load resources",
+        "needsEq": "Add at least one = condition before refining by resource.",
+        "tooMany": "{count} values co-occur with this condition. Narrow the condition to pick resources.",
+        "lastSeen": "Last seen",
+        "streams": "Streams",
+        "footer": "{selected} of {total} selected · {source}",
+        "fromRegistry": "from the service registry",
+        "fromSearch": "from the last 24 hours of data",
+        "apply": "Apply",
+        "loadFailed": "Could not load the resources"
+      },
+      "scheduleForm": {
+        "once": "Once",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "startDate": "Start date",
+        "startTime": "Start time",
+        "endDate": "End date",
+        "endTime": "End time",
+        "days": "Days",
+        "startsAt": "Starts at",
+        "duration": "Duration",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "Up to 7 days, for example 90m or 1h 30m.",
+        "until": "Repeat until",
+        "untilPlaceholder": "No end date",
+        "timezone": "Timezone",
+        "noWindow": "No window starts in the next 8 days.",
+        "nextWindow": "Next window: {window}. A window can cross midnight.",
+        "nextWindowWithUtc": "Next window: {window} ({utc}). A window can cross midnight."
+      },
+      "preview": {
+        "title": "Preview",
+        "failed": "The preview could not be loaded.",
+        "andMore": "and {count} more",
+        "noMatch": "Nothing matches now",
+        "fireTime": "{count} alert resolves its identity at fire time | {count} alerts resolve their identity at fire time",
+        "undecidable": "Cannot be told apart by {key}",
+        "showAll": "Show the full list",
+        "showLess": "Show less"
+      },
+      "summaryPane": {
+        "title": "Summary",
+        "filedIn": "Filed in",
+        "window": "Window",
+        "nextWindow": "Next window",
+        "inUtc": "In UTC",
+        "largeMatch": "{modules}: the downtime matches more than half of the items. Most of this org will not notify inside the window.",
+        "confirm": "I understand that this downtime silences whole modules",
+        "confirmCaption": "Required when a module has All folders and no other narrowing, whatever the match size.",
+        "whatHappens": "What happens",
+        "keepRunning": "Evaluations and checks keep running and keep their history.",
+        "noNotifications": "Notifications, on-call pages and workflows stop.",
+        "mutedIncidents": "Incidents open muted and notify after the window."
+      },
+      "band": {
+        "now": "now",
+        "none": "No window has run yet and none is planned.",
+        "active": "Active",
+        "next": "Next",
+        "past": "Ran",
+        "track": "Windows",
+        "aria": "{kind}: {start} to {end}"
+      },
+      "detail": {
+        "overview": "Overview",
+        "affected": "Affected · {count}",
+        "suppressed": "Suppressed · {count}",
+        "details": "Details",
+        "condition": "Condition",
+        "noTarget": "No target",
+        "banner": "Banner",
+        "bannerOn": "Shown to the org while active",
+        "bannerOff": "No banner",
+        "occurrences": "Occurrences",
+        "nextWindow": "Next window: {window}. Your time: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Matched by",
+        "matchedBy": {
+          "query": "Query",
+          "source_alert": "Source alert",
+          "tag": "Tag",
+          "id": "Named",
+          "folder": "Folder",
+          "org": "Whole org"
+        },
+        "source": "Source",
+        "wouldHaveNotified": "Would have notified",
+        "noSuppressed": "Nothing has been suppressed yet",
+        "muteHourName": "{name} · mute 1 h"
+      },
+      "mute": {
+        "title": {
+          "alerts": "Mute {count} alert | Mute {count} alerts",
+          "anomaly_detections": "Mute {count} anomaly detection | Mute {count} anomaly detections",
+          "synthetics": "Mute {count} check | Mute {count} checks",
+          "slos": "Mute {count} SLO | Mute {count} SLOs",
+          "items": "Mute {count} item | Mute {count} items"
+        },
+        "subtitle": "They keep running and keep their history. Notifications, pages and workflows stop until the window ends.",
+        "muteFor": "Mute for",
+        "presets": {
+          "30m": "30 min",
+          "1h": "1 h",
+          "2h": "2 h",
+          "4h": "4 h",
+          "custom": "Custom"
+        },
+        "endsAt": "Ends on",
+        "endsIn": "In {duration}.",
+        "confirm": "Mute",
+        "confirmUntil": "Mute until {time}",
+        "menu": "Mute notifications",
+        "until": "Until…",
+        "bulk": "Mute",
+        "muted": "Muted · ends in {duration}",
+        "mutedTooltip": "Muted by {name} until {end}",
+        "exclude": "Exclude a window…"
+      },
+      "corrected": "Corrected",
+      "correctedBy": "Score corrected by {names}",
+      "incident": {
+        "mutedBy": "Muted · {name}",
+        "banner": "Muted by {name}. Nobody was paged. The first firing after the window sends the delayed opened notification.",
+        "bannerUntil": "Muted by {name} until {end}. Nobody was paged. The first firing after the window sends the delayed opened notification."
+      },
+      "banner": {
+        "ended": "ended",
+        "endsInUnderMinute": "ends in under a minute",
+        "endsIn": "ends in {duration}",
+        "count": "{module} {count}",
+        "showBanner": "Show a banner to everyone in the org while this downtime is active",
+        "showBannerCaption": "The banner shows the name, the affected counts and the time left. It never names an alert.",
+        "preview": "Preview",
+        "previewMessage": "{name} is active.",
+        "tooLong": "A banner is only available for windows of up to 7 days."
+      },
+      "sloCorrections": {
+        "title": "Status corrections:",
+        "item": "{name} ({status})"
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -15154,7 +15511,8 @@
       "rumSessions": "{product} — Sessions",
       "sourceMaps": "RUM — Source Maps",
       "oncall": "On-Call",
-      "oncallDetail": "On-Call Page"
+      "oncallDetail": "On-Call Page",
+      "downtimes": "Downtimes"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -15262,7 +15620,9 @@
       "oncallAck": "Acknowledge",
       "oncallEscalate": "Escalate",
       "oncallSnooze": "Snooze",
-      "oncallResolve": "Resolve"
+      "oncallResolve": "Resolve",
+      "downtimesCreate": "New downtime",
+      "downtimesRefresh": "Refresh downtimes"
     }
   },
   "components": {
@@ -15690,6 +16050,12 @@
         "belowTopN": "below top-N",
         "truncated": "truncated",
         "gap": "gap"
+      },
+      "downtimeStatus": {
+        "scheduled": "Scheduled",
+        "active": "Active",
+        "ended": "Ended",
+        "cancelled": "Cancelled"
       }
     }
   },
@@ -16083,6 +16449,20 @@
     },
     "iam": {
       "userSaveFailed": "Could not save the user"
+    },
+    "downtimes": {
+      "cancelled": "Downtime cancelled",
+      "cancelledMany": "{count} downtime cancelled | {count} downtimes cancelled",
+      "cancelFailed": "Could not cancel the downtime",
+      "deleted": "Downtime deleted",
+      "deleteFailed": "Could not delete the downtime",
+      "created": "Downtime created",
+      "updated": "Downtime saved",
+      "saveFailed": "Could not save the downtime",
+      "muted": "Muted {count} item until {time}. Filed in {folder}. | Muted {count} items until {time}. Filed in {folder}.",
+      "muteFailed": "Could not create the mute",
+      "viewDowntime": "View downtime",
+      "itemsDropped": "{count} chosen item is outside the chosen folders and was removed. | {count} chosen items are outside the chosen folders and were removed."
     }
   },
   "cipherKeys": {
@@ -16374,7 +16754,9 @@
       "budgetNote": "The last point equals the Budget remaining tile above. The dashed line at 0% is exhaustion; below it the SLO has spent more errors than the target allows. Gaps are buckets with nothing measured, which is not the same as zero.",
       "burnExplain": "How fast the budget is burning in each bucket on its own, as a multiple of the budget-neutral rate.",
       "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis (the same line read as SLI):\nSLI = 100% − burn rate × (100% − target)",
-      "burnNote": "×1 spends the budget exactly at the end of the window, ×2 in half of it; under ×1 the budget is being banked. Because it is per bucket and not cumulative, a spike here stays visible instead of being averaged away. The right axis counts downward: up the chart is more burn, which is a lower SLI."
+      "burnNote": "×1 spends the budget exactly at the end of the window, ×2 in half of it; under ×1 the budget is being banked. Because it is per bucket and not cumulative, a spike here stays visible instead of being averaged away. The right axis counts downward: up the chart is more burn, which is a lower SLI.",
+      "corrected": "Corrected by a downtime",
+      "correctedTooltip": "Corrected by a downtime: excluded, so the budget line is flat"
     },
     "alerts": {
       "title": "Alerts",

@@ -109,6 +109,84 @@ pub async fn get_rollups(alert_ids: &[String]) -> Result<Vec<AlertState>, errors
         .collect())
 }
 
+/// Records on the rollup row which downtime suppressed the latest firing run, or clears it.
+pub async fn set_last_downtime_id(
+    alert_id: &str,
+    downtime_id: Option<&str>,
+) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    set_last_downtime_id_with(client, alert_id, downtime_id).await
+}
+
+/// [`set_last_downtime_id`] against a caller-supplied connection.
+pub async fn set_last_downtime_id_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    downtime_id: Option<&str>,
+) -> Result<u64, errors::Error> {
+    let mut update = alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::LastDowntimeId,
+            sea_orm::sea_query::Expr::value(downtime_id.map(str::to_string)),
+        )
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.eq(ROLLUP_GROUP_KEY));
+    if downtime_id.is_none() {
+        update = update.filter(alert_states::Column::LastDowntimeId.is_not_null());
+    }
+    let res = update.exec(conn).await?;
+    Ok(res.rows_affected)
+}
+
+/// Forgets a downtime every alert recorded, because an edit changed what it covers.
+pub async fn clear_last_downtime_id(downtime_id: &str) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    clear_last_downtime_id_with(client, downtime_id).await
+}
+
+/// [`clear_last_downtime_id`] against a caller-supplied connection.
+pub async fn clear_last_downtime_id_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    downtime_id: &str,
+) -> Result<u64, errors::Error> {
+    let res = alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::LastDowntimeId,
+            sea_orm::sea_query::Expr::value(Option::<String>::None),
+        )
+        .filter(alert_states::Column::LastDowntimeId.eq(downtime_id))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
+/// `alert_id -> last_downtime_id` for the alerts of a list page that carry one.
+pub async fn last_downtime_ids(
+    alert_ids: &[String],
+) -> Result<std::collections::HashMap<String, String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    last_downtime_ids_with(client, alert_ids).await
+}
+
+/// [`last_downtime_ids`] against a caller-supplied connection.
+pub async fn last_downtime_ids_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_ids: &[String],
+) -> Result<std::collections::HashMap<String, String>, errors::Error> {
+    if alert_ids.is_empty() {
+        return Ok(Default::default());
+    }
+    Ok(alert_states::Entity::find()
+        .filter(alert_states::Column::AlertId.is_in(alert_ids.to_vec()))
+        .filter(alert_states::Column::GroupKey.eq(ROLLUP_GROUP_KEY))
+        .filter(alert_states::Column::LastDowntimeId.is_not_null())
+        .all(conn)
+        .await?
+        .into_iter()
+        .filter_map(|m| m.last_downtime_id.map(|id| (m.alert_id, id)))
+        .collect())
+}
+
 /// All per-group rows for one alert.
 pub async fn list_groups(alert_id: &str) -> Result<Vec<AlertState>, errors::Error> {
     let client = get_orm_client_ro().await;
@@ -549,6 +627,7 @@ where
         groups_firing_is_lower_bound: Set(state.groups_firing_is_lower_bound),
         silenced_until: Set(state.silenced_until),
         last_notified_level: Set(state.last_notified_level.map(|l| l.to_i32())),
+        last_downtime_id: sea_orm::ActiveValue::NotSet,
     };
 
     // Upsert on the composite primary key — rows are created lazily on an
@@ -856,6 +935,7 @@ mod tests {
             groups_firing_is_lower_bound: None,
             silenced_until: None,
             last_notified_level: None,
+            last_downtime_id: None,
         }
     }
 
@@ -1211,6 +1291,36 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(count_transitions(&db).await, 2);
+    }
+
+    #[tokio::test]
+    async fn last_downtime_id_is_kept_by_state_writes_and_cleared_on_demand() {
+        let db = db().await;
+        persist_with(&db, &update_for("alert-1", ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_for("alert-2", ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        let ids = vec!["alert-1".to_string(), "alert-2".to_string()];
+
+        assert_eq!(
+            set_last_downtime_id_with(&db, "alert-1", Some("dt-1"))
+                .await
+                .unwrap(),
+            1
+        );
+        persist_with(&db, &update_for("alert-1", ROLLUP_GROUP_KEY, 2_000), None)
+            .await
+            .unwrap();
+        let found = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found.get("alert-1").map(String::as_str), Some("dt-1"));
+
+        set_last_downtime_id_with(&db, "alert-1", None)
+            .await
+            .unwrap();
+        assert!(last_downtime_ids_with(&db, &ids).await.unwrap().is_empty());
     }
 
     /// ...and on the group. One evaluation writes every group's transition at
@@ -1578,5 +1688,53 @@ mod tests {
         assert_eq!(count_states(&db).await, 1);
         assert_eq!(count_transitions(&db).await, 1);
         assert_eq!(count_intervals(&db).await, 1);
+    }
+
+    async fn recorded(db: &sea_orm::DatabaseConnection, alert_id: &str, downtime_id: &str) {
+        use sea_orm::IntoActiveModel;
+
+        alert_states::Model {
+            alert_id: alert_id.to_string(),
+            last_downtime_id: Some(downtime_id.to_string()),
+            ..model(Some(RunOutcome::Suppressed.to_i32()))
+        }
+        .into_active_model()
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_edited_downtime_is_forgotten_by_every_alert_that_recorded_it() {
+        let db = db().await;
+        recorded(&db, "alert-1", "dt-1").await;
+        recorded(&db, "alert-2", "dt-1").await;
+        recorded(&db, "alert-3", "dt-2").await;
+        assert_eq!(clear_last_downtime_id_with(&db, "dt-1").await.unwrap(), 2);
+        let ids: Vec<String> = ["alert-1", "alert-2", "alert-3"].map(String::from).to_vec();
+        let left = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left.get("alert-3").map(String::as_str), Some("dt-2"));
+    }
+
+    #[tokio::test]
+    async fn an_unsuppressed_firing_clears_the_recorded_downtime_once() {
+        let db = db().await;
+        recorded(&db, "alert-1", "dt-1").await;
+        assert_eq!(
+            set_last_downtime_id_with(&db, "alert-1", None)
+                .await
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            set_last_downtime_id_with(&db, "alert-1", None)
+                .await
+                .unwrap(),
+            0,
+            "a row with nothing recorded is not rewritten"
+        );
+        let ids = vec!["alert-1".to_string()];
+        assert!(last_downtime_ids_with(&db, &ids).await.unwrap().is_empty());
     }
 }

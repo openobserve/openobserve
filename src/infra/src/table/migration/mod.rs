@@ -193,8 +193,12 @@ mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
 mod m20260916_000001_add_folder_id_to_workflow_drafts;
 mod m20260917_000001_add_env_to_synthetics_jobs;
+mod m20260917_000001_create_downtimes;
 mod m20260917_000001_create_llm_experiment_slot_retries;
 mod m20260917_000001_create_synthetics_shared_variables;
+mod m20260917_000002_add_muted_by_downtime_id_to_alert_incidents;
+mod m20260917_000003_add_last_downtime_id_to_alert_states;
+mod m20260917_000004_add_kind_to_slo_backfill_jobs;
 mod m20260920_000001_add_anomaly_level_half_width;
 mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
 mod m20260922_000001_add_password_policy_columns_to_users;
@@ -293,6 +297,9 @@ pub(crate) async fn create_slo_tables_for_test(
     use sea_orm_migration::MigrationTrait;
     let manager = SchemaManager::new(db);
     m20260727_000001_create_slo_tables::Migration
+        .up(&manager)
+        .await?;
+    m20260917_000004_add_kind_to_slo_backfill_jobs::Migration
         .up(&manager)
         .await
 }
@@ -485,6 +492,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20260922_000002_create_user_password_history_table::Migration),
             Box::new(m20260922_000003_create_user_auth_state_table::Migration),
             Box::new(m20260920_000001_add_anomaly_level_half_width::Migration),
+            Box::new(m20260917_000001_create_downtimes::Migration),
+            Box::new(m20260917_000002_add_muted_by_downtime_id_to_alert_incidents::Migration),
+            Box::new(m20260917_000003_add_last_downtime_id_to_alert_states::Migration),
+            Box::new(m20260917_000004_add_kind_to_slo_backfill_jobs::Migration),
         ]
     }
 }
@@ -533,6 +544,8 @@ mod tests {
         ),
         (88, "m20260922_000003_create_user_auth_state_table"),
         (89, "m20260920_000001_add_anomaly_level_half_width"),
+        (90, "m20260917_000003_add_last_downtime_id_to_alert_states"),
+        (91, "m20260917_000004_add_kind_to_slo_backfill_jobs"),
     ];
 
     #[test]
@@ -607,6 +620,22 @@ mod tests {
             (
                 "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
                 "m20260922_000001_add_password_policy_columns_to_users",
+            ),
+            (
+                "m20250109_092400_recreate_tables_with_ksuids",
+                "m20260917_000001_create_downtimes",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20260917_000002_add_muted_by_downtime_id_to_alert_incidents",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20260917_000003_add_last_downtime_id_to_alert_states",
+            ),
+            (
+                "m20260727_000001_create_slo_tables",
+                "m20260917_000004_add_kind_to_slo_backfill_jobs",
             ),
         ] {
             assert!(

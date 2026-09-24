@@ -1011,6 +1011,7 @@ pub async fn group_status(
                 cfg.slo.min_coverage,
                 now_secs,
                 cfg.slo.recompute_slices.max(1),
+                Vec::new(),
             )
         })
         .collect())
@@ -1037,6 +1038,7 @@ async fn rollup_view(
         cfg.slo.min_coverage,
         now_secs,
         cfg.slo.recompute_slices.max(1),
+        correction_refs(slo).await,
     );
     // Only the rollup carries this, like the watermark: it describes the SLO's
     // whole window, not one group's slice of it.
@@ -1046,6 +1048,15 @@ async fn rollup_view(
     )))
 }
 
+/// The active and scheduled downtimes that correct this SLO, for its detail page (WP11).
+async fn correction_refs(slo: &Slo) -> Vec<config::meta::downtimes::CorrectionRef> {
+    if db::downtimes::list_cached(&slo.org).is_empty() {
+        return Vec::new();
+    }
+    let dims = crate::alerts::downtimes::dimensions_for_slo(slo).await;
+    crate::alerts::downtimes::corrections_refs_for_slo(slo, &dims, now_micros())
+}
+
 /// The earliest instant this SLO's window is actually measured from, epoch
 /// seconds — the clamp PR 4's backfill was queued under, read back.
 ///
@@ -1053,13 +1064,30 @@ async fn rollup_view(
 /// range that was really filled, so the banner cannot disagree with the data.
 /// `None` for every non-alert SLI, and for an alert SLI whose job row is gone —
 /// in both cases there is nothing to explain.
-async fn measurement_floor(db: &sea_orm::DatabaseConnection, slo: &Slo) -> Option<i64> {
+pub(crate) async fn measurement_floor(db: &sea_orm::DatabaseConnection, slo: &Slo) -> Option<i64> {
     source_alert_id(slo)?;
-    backfill_jobs::get(db, &slo.id, slo.definition_generation)
+    let job = backfill_jobs::get(db, &slo.id, slo.definition_generation)
         .await
         .ok()
-        .flatten()
-        .map(|job| job.range_start)
+        .flatten()?;
+    if job.kind == backfill_jobs::KIND_BACKFILL {
+        return Some(job.range_start);
+    }
+    // A downtime re-measure reuses the row and its range, so the clamp is computed again.
+    let reset_time = slos_table::generation_reset_time(db, &slo.id)
+        .await
+        .ok()
+        .flatten()?;
+    let (start, end) = super::backfill::backfill_range(
+        slo.definition.window_secs,
+        reset_time,
+        slo.definition.slice_interval_secs,
+    );
+    Some(alert_source_floor(db, slo).await.clamp_start(
+        start,
+        end,
+        slo.definition.slice_interval_secs,
+    ))
 }
 
 fn view_of(
@@ -1068,13 +1096,14 @@ fn view_of(
     coverage_floor: f64,
     now_secs: i64,
     stale_k: i64,
+    corrections: Vec<config::meta::downtimes::CorrectionRef>,
 ) -> config::meta::slo::SloStatusView {
     let expected = config::meta::slo::window::expected_slices(
         0,
         slo.definition.window_secs,
         slo.definition.slice_interval_secs,
     );
-    let view = config::meta::slo::SloStatusView::derive(
+    let mut view = config::meta::slo::SloStatusView::derive(
         row.group_key.clone(),
         row.good,
         row.total,
@@ -1085,6 +1114,7 @@ fn view_of(
         coverage_floor,
         row.computed_at,
     );
+    view.corrections = corrections;
     // The watermark lives ONLY on the rollup row (`apply_status_in_txn`), so a
     // group row's absent watermark says nothing about staleness — reporting it
     // as stale would flag every group of every healthy SLO.
@@ -1217,6 +1247,17 @@ async fn alert_source_floor(db: &sea_orm::DatabaseConnection, slo: &Slo) -> Sour
         ledger_start_secs: ledger_start.map(|us| us / 1_000_000),
         last_edit_secs: last_edit.map(|us| us / 1_000_000),
     }
+}
+
+/// Wakes the backfill lane for a downtime re-measure (WP11).
+pub(crate) async fn push_backfill_trigger(slo: &Slo) {
+    push_trigger(
+        &slo.org,
+        &slo.id,
+        crate::db::scheduler::TriggerModule::SloBackfill,
+        now_micros(),
+    )
+    .await;
 }
 
 /// Add or remove the ingest trigger to match `enabled`.
@@ -2787,7 +2828,7 @@ mod tests {
             let slo = alert_slo();
             // K=3 at 300s slices = 900s of tolerance; this is 4100s past it.
             let row = covered_row(Some(100_000));
-            let view = view_of(&slo, &row, 0.9, 105_000, 3);
+            let view = view_of(&slo, &row, 0.9, 105_000, 3, Vec::new());
             assert!(
                 !view.no_data,
                 "coverage is full, so the floor is not tripped"
@@ -2800,7 +2841,7 @@ mod tests {
         fn a_moving_watermark_is_not_a_freeze() {
             let slo = alert_slo();
             let row = covered_row(Some(100_000));
-            let view = view_of(&slo, &row, 0.9, 100_600, 3);
+            let view = view_of(&slo, &row, 0.9, 100_600, 3, Vec::new());
             assert!(!view.stale_watermark);
             assert!(!view.no_data);
         }
@@ -2810,7 +2851,7 @@ mod tests {
         #[test]
         fn an_absent_watermark_reads_as_stale() {
             let slo = alert_slo();
-            let view = view_of(&slo, &covered_row(None), 0.9, 105_000, 3);
+            let view = view_of(&slo, &covered_row(None), 0.9, 105_000, 3, Vec::new());
             assert!(view.stale_watermark);
             assert_eq!(view.watermark_end, None);
         }
@@ -2823,7 +2864,7 @@ mod tests {
             let slo = alert_slo();
             let mut row = covered_row(Some(100_000));
             row.covered_slices = Some(1);
-            let view = view_of(&slo, &row, 0.9, 100_600, 3);
+            let view = view_of(&slo, &row, 0.9, 100_600, 3, Vec::new());
             assert!(view.no_data);
             assert!(!view.stale_watermark);
         }
@@ -2836,7 +2877,7 @@ mod tests {
             let slo = alert_slo();
             let mut row = covered_row(None);
             row.group_key = "region=eu".into();
-            let view = view_of(&slo, &row, 0.9, 105_000, 3);
+            let view = view_of(&slo, &row, 0.9, 105_000, 3, Vec::new());
             assert!(!view.stale_watermark);
             assert_eq!(view.watermark_end, None);
         }
@@ -2849,7 +2890,7 @@ mod tests {
             let slo = alert_slo();
             let mut row = covered_row(Some(100_000));
             row.covered_slices = Some(1);
-            let view = view_of(&slo, &row, 0.9, 105_000, 3);
+            let view = view_of(&slo, &row, 0.9, 105_000, 3, Vec::new());
             assert!(view.no_data);
             assert!(view.stale_watermark);
         }

@@ -911,6 +911,24 @@ pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
     cron_exp
 }
 
+/// `zo_alert_runs_suppressed_total`: one per run a downtime kept silent.
+pub fn count_suppressed_run(org: &str, module: &str) {
+    config::metrics::ALERT_RUNS_SUPPRESSED_TOTAL
+        .with_label_values(&[org, module])
+        .inc();
+}
+
+/// A run a downtime kept silent: `Suppressed` with the downtime id, and counted.
+pub fn record_suppressed_run(
+    data: &mut config::meta::self_reporting::usage::TriggerData,
+    module: &str,
+    downtime_id: String,
+) {
+    data.status = config::meta::self_reporting::usage::RunOutcome::Suppressed;
+    data.downtime_id = Some(downtime_id);
+    count_suppressed_run(&data.org, module);
+}
+
 /// Creates a new alert in the specified folder.
 pub async fn create<C: TransactionTrait>(
     conn: &C,
@@ -1982,6 +2000,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             now,
             // Manual triggers evaluate nothing; no level to map.
             None,
+            None,
         )
         .await
         {
@@ -2082,6 +2101,7 @@ pub async fn trigger_by_name(
             notify,
             now,
             // Manual triggers evaluate nothing; no level to map.
+            None,
             None,
         )
         .await
@@ -7140,6 +7160,25 @@ mod tests {
     fn test_workflow_alert_count_falls_back_to_rows_len() {
         let alert = Alert::default();
         assert_eq!(workflow_alert_count(&alert, 25, None), json!(25u64));
+    }
+
+    #[test]
+    fn a_suppressed_run_is_recorded_with_its_downtime_and_counted() {
+        use config::meta::self_reporting::usage::{RunOutcome, TriggerData};
+
+        let org = "org_suppressed_run_record";
+        let counter =
+            || config::metrics::ALERT_RUNS_SUPPRESSED_TOTAL.with_label_values(&[org, "alerts"]);
+        let before = counter().get();
+        let mut data = TriggerData {
+            org: org.to_string(),
+            status: RunOutcome::Firing,
+            ..Default::default()
+        };
+        record_suppressed_run(&mut data, "alerts", "dt-1".to_string());
+        assert_eq!(data.status, RunOutcome::Suppressed);
+        assert_eq!(data.downtime_id.as_deref(), Some("dt-1"));
+        assert_eq!(counter().get(), before + 1);
     }
 }
 

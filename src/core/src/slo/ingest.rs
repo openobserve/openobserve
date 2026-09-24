@@ -190,6 +190,7 @@ pub fn build_slices(sli: &SliConfig, rows: Vec<QueryRow>, params: &PassParams) -
             good,
             total,
             rev: params.rev,
+            corrected_by: None,
         });
     }
 
@@ -247,6 +248,7 @@ pub fn fill_missing(sli: &SliConfig, present: &[SliceRow], params: &PassParams) 
                     good: 0.0,
                     total: fill_total,
                     rev: params.rev,
+                    corrected_by: None,
                 });
             }
             t += params.slice_interval_secs;
@@ -281,6 +283,7 @@ pub fn exact_rollup(slices: &[SliceRow], params: &PassParams) -> Vec<SliceRow> {
             good,
             total,
             rev: params.rev,
+            corrected_by: None,
         })
         .collect()
 }
@@ -488,6 +491,7 @@ mod tests {
             good: 5.0,
             total: 5.0,
             rev: 7,
+            corrected_by: None,
         }];
         let filled = fill_missing(&count_sli(), &present, &params());
         assert_eq!(filled.len(), 2, "buckets 300 and 600");
@@ -525,6 +529,7 @@ mod tests {
                 good: 1.0,
                 total: 1.0,
                 rev: 7,
+                corrected_by: None,
             },
             SliceRow {
                 slo_id: SLO.into(),
@@ -534,6 +539,7 @@ mod tests {
                 good: 1.0,
                 total: 1.0,
                 rev: 7,
+                corrected_by: None,
             },
         ];
         let filled = fill_missing(&count_sli(), &present, &params());
@@ -555,6 +561,7 @@ mod tests {
                 good: 30_000.0,
                 total: 30_000.0,
                 rev: 7,
+                corrected_by: None,
             },
             SliceRow {
                 slo_id: SLO.into(),
@@ -564,6 +571,7 @@ mod tests {
                 good: 0.0,
                 total: 3.0,
                 rev: 7,
+                corrected_by: None,
             },
         ];
         let rollup = exact_rollup(&slices, &params());
@@ -587,6 +595,7 @@ mod tests {
             good,
             total,
             rev: 7,
+            corrected_by: None,
         };
         let rollup = exact_rollup(&[mk(0, 1.0, 2.0), mk(300, 3.0, 4.0)], &params());
         assert_eq!(rollup.len(), 2);
@@ -605,6 +614,7 @@ mod tests {
             good,
             total,
             rev: 7,
+            corrected_by: None,
         };
         let rollup = exact_rollup(&[mk("region=eu", 1.0, 2.0), mk("", 1.0, 2.0)], &params());
         assert_eq!((rollup[0].good, rollup[0].total), (1.0, 2.0));
@@ -680,6 +690,7 @@ mod absent_is_bad_fill_tests {
             good: 300.0,
             total: 300.0,
             rev: 7,
+            corrected_by: None,
         }
     }
 

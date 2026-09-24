@@ -262,11 +262,12 @@ async fn load(
     rt.watermark = rt.watermark.max(max_updated);
     let states: Vec<table::CheckStateRow> = rt.check_state.values().cloned().collect();
 
-    let snoozed = table::list_active_snoozes(conn, now)
+    let mut snoozed: HashSet<String> = table::list_active_snoozes(conn, now)
         .await?
         .into_iter()
         .map(|s| s.synthetics_id)
         .collect();
+    snoozed.extend(muted_checks(conn, &mappings).await);
     let notices = table::list_notices_since(conn, now - RESOLVED_LOOKBACK_MICROS).await?;
     Ok(TickData {
         pages,
@@ -276,6 +277,36 @@ async fn load(
         snoozed,
         notices,
     })
+}
+
+/// A check a downtime mutes opens no auto-notice, exactly like a snoozed one.
+async fn muted_checks(
+    conn: &sea_orm::DatabaseConnection,
+    mappings: &[infra::table::entity::status_page_component_checks::Model],
+) -> HashSet<String> {
+    let mut seen = HashSet::new();
+    let mut muted = HashSet::new();
+    for mapping in mappings {
+        if !seen.insert(mapping.synthetics_id.as_str()) {
+            continue;
+        }
+        let Ok(Some(check)) = infra::table::synthetics_checks::get_cached(
+            conn,
+            &mapping.org_id,
+            &mapping.synthetics_id,
+        )
+        .await
+        else {
+            continue;
+        };
+        if crate::alerting::muted_by(&mapping.org_id, &check.id, &check.folder_id, &check.tags)
+            .await
+            .is_some()
+        {
+            muted.insert(check.id);
+        }
+    }
+    muted
 }
 
 async fn apply_engine_actions(

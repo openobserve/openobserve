@@ -239,6 +239,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
                   <span class="truncate">{{ row.name || "--" }}</span>
+                  <MutedChip
+                    v-if="row.active_downtime"
+                    :downtime="row.active_downtime"
+                    :data-test="`alert-list-${row.name}-muted`"
+                  />
                   <template v-if="row.alert_type === 'Composite'">
                     <OTag
                       variant="warning-soft"
@@ -643,6 +648,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       {{ t("common.move") }}
                     </ODropdownItem>
+                    <template v-if="downtimesEnabled">
+                      <ODropdownSeparator />
+                      <MuteMenuItems
+                        :data-test-prefix="`alert-list-${row.name}-mute`"
+                        @preset="(secs) => muteRows([row], secs)"
+                        @until="openMuteDialog([row])"
+                      />
+                    </template>
                     <ODropdownSeparator />
                     <ODropdownItem
                       :data-test="`alert-list-${row.name}-delete-alert`"
@@ -782,6 +795,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="bulkToggleAlerts('resume')"
                     >{{ t("alerts.resume") }}</OButton
                   >
+                  <ODropdown v-if="selectedAlerts.length > 0 && downtimesEnabled" side="top">
+                    <template #trigger>
+                      <OButton
+                        variant="outline"
+                        size="sm"
+                        icon-left="notifications-paused"
+                        data-test="alert-list-mute-alerts-btn"
+                      >
+                        {{ t("alerts.downtimes.mute.bulk") }}
+                      </OButton>
+                    </template>
+                    <MuteMenuItems
+                      data-test-prefix="alert-list-bulk-mute"
+                      @preset="(secs) => muteRows(selectedAlerts, secs)"
+                      @until="openMuteDialog(selectedAlerts)"
+                    />
+                  </ODropdown>
                   <OButton
                     v-if="selectedAlerts.length > 0"
                     data-test="alert-list-delete-alerts-btn"
@@ -905,6 +935,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-move-to-another-folder-dialog"
       />
     </template>
+    <QuickMuteDialog
+      v-if="downtimesEnabled"
+      v-model:open="muteDialogOpen"
+      :selection="muteSelection"
+    />
     <ExportResourceDialog
       v-model:open="showExportDialog"
       :items="alertsToExport"
@@ -983,6 +1018,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
+import MutedChip from "./downtimes/MutedChip.vue";
+import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
+import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
+import { useRowMute } from "@/composables/downtimes/useRowMute";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import useBreakpoint from "@/composables/useBreakpoint";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
@@ -1022,6 +1061,9 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "AlertList",
   components: {
+    MutedChip,
+    MuteMenuItems,
+    QuickMuteDialog,
     OPageLayout,
     AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
     OEmptyState,
@@ -1062,6 +1104,11 @@ export default defineComponent({
     // On-call is separately gated, so the column and its lookup vanish with it
     // rather than showing a header nothing can ever fill.
     const oncallEnabled = computed(() => store.state.zoConfig?.oncall_enabled === true);
+    const { downtimesEnabled, muteDialogOpen, muteSelection, muteRows, openMuteDialog } =
+      useRowMute<any>(
+        (row) => (row.type === "anomaly" ? "anomaly_detections" : "alerts"),
+        (row) => String(row.type === "anomaly" ? row.anomaly_id : row.alert_id),
+      );
     const oncallTeams = ref<OnCallTeam[]>([]);
 
     /// The alert stores a team id; a woken engineer needs the name. Falls back
@@ -1806,6 +1853,7 @@ export default defineComponent({
     const normalizeAnomalyToAlertRow = (anomaly: any, _num?: number): any => ({
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
+      active_downtime: anomaly.active_downtime ?? null,
       name: anomaly.name,
       alert_type: "anomaly_detection",
       stream_name: anomaly.stream_name || "--",
@@ -2033,6 +2081,7 @@ export default defineComponent({
             groups_firing_is_lower_bound: data.groups_firing_is_lower_bound,
             last_outcome_at: data.last_outcome_at ?? null,
             last_outcome_since: data.last_outcome_since ?? null,
+            active_downtime: data.active_downtime ?? null,
             selected: false,
             type: data.condition.type,
             // The SLO this alert belongs to (Feature 5, Phase 2). Read from the
@@ -3697,6 +3746,11 @@ export default defineComponent({
     ]);
 
     return {
+      downtimesEnabled,
+      muteDialogOpen,
+      muteSelection,
+      muteRows,
+      openMuteDialog,
       oncallEnabled,
       oncallTeamName,
       lgUp,

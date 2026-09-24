@@ -233,6 +233,22 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.org_id,
             alert.name
         );
+        if let Some(downtime) = realtime_downtime(alert, val, now).await {
+            log::info!(
+                "Realtime alert {}/{} suppressed by downtime {}",
+                alert.org_id,
+                alert.name,
+                downtime.id
+            );
+            crate::alerts::alert::record_suppressed_run(
+                &mut trigger_data_stream,
+                "alerts",
+                downtime.id,
+            );
+            trigger_data_stream.end_time = Utc::now().timestamp_micros();
+            trigger_usage_reports.push(trigger_data_stream);
+            continue;
+        }
         match alert
             .send_notification(&trace_id, val, now, None, now, None, None, None, &[])
             .await
@@ -811,6 +827,40 @@ pub fn refactor_map(
     }
 
     new_map
+}
+
+/// The downtime that silences a real-time firing, decided on the ingested row (D2).
+#[cfg(feature = "enterprise")]
+async fn realtime_downtime(
+    alert: &Alert,
+    rows: &[Map<String, Value>],
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    if !crate::alerts::downtimes::any_for(
+        &alert.org_id,
+        config::meta::downtimes::TargetModule::Alerts,
+    ) {
+        return None;
+    }
+    let alert_id = alert.id.as_ref()?.to_string();
+    let (folder, _) = alert::get_alert_from_cache(&alert.org_id, &alert_id).await?;
+    let identity = crate::alerts::scheduler::handlers::alert_identity(alert, rows).await;
+    crate::alerts::downtimes::active_for_alert(
+        &alert.org_id,
+        &alert_id,
+        &folder.folder_id,
+        identity.first()?,
+        now,
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn realtime_downtime(
+    _alert: &Alert,
+    _rows: &[Map<String, Value>],
+    _now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    None
 }
 
 /// The span of one write partition, which a record's time bucket is counted in.

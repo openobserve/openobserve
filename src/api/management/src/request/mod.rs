@@ -34,6 +34,7 @@ pub mod db_monitoring;
 pub mod discovery;
 #[cfg(feature = "enterprise")]
 pub mod domain_management;
+pub mod downtimes;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
 #[cfg(feature = "enterprise")]

@@ -367,6 +367,7 @@ pub async fn list_synthetics(
             status: m.last_check_status,
             last_check_at: (m.last_triggered_at > 0).then_some(m.last_triggered_at),
             last_response_ms: None,
+            active_downtime: None,
         });
     }
 

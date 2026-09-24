@@ -804,6 +804,7 @@ mod tests {
             retrain_interval_days: 1,
             threshold: 95,
             alert_budget_per_day: None,
+            level_half_width_seconds: None,
             seasonality: "none".to_string(),
             is_trained: false,
             training_started_at: None,

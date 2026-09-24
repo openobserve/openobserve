@@ -663,6 +663,7 @@ fn composite_list_item(
         child_count: None,
         referenced_by_composite_count: None,
         expression_summary: None,
+        active_downtime: None,
     })
 }
 
@@ -2890,6 +2891,7 @@ pub async fn list_alerts(
     let mut list = list;
     enrich_with_run_state(&mut list).await;
     enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
+    crate::models::alerts::responses::fill_active_downtimes(&org_id, &mut list).await;
 
     // Feature-scoped fields: keep destinations/template off the default list path
     // (bytes + module-scoped names) unless the dependency view explicitly opted in.

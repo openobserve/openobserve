@@ -229,6 +229,8 @@ const alerts = {
     const params = new URLSearchParams();
     if (query.anomaly_id) params.append("anomaly_id", query.anomaly_id);
     if (query.alert_id) params.append("alert_id", query.alert_id);
+    if (query.downtime_id) params.append("downtime_id", query.downtime_id);
+    if (query.status) params.append("status", query.status);
     if (query.start_time) params.append("start_time", query.start_time);
     if (query.end_time) params.append("end_time", query.end_time);
     params.append("from", query.from || "0");
@@ -327,6 +329,8 @@ export interface AlertHistoryQuery {
   from: string | number;
   size: string | number;
   alert_id?: string;
+  downtime_id?: string;
+  status?: string;
   sort_by?: string;
   sort_order?: string;
   [extra: string]: unknown;

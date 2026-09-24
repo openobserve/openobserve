@@ -225,6 +225,19 @@ async fn enforce_usage_stream_retention() {
     }
 }
 
+/// Repairs a missed coordinator event within a minute.
+#[cfg(feature = "enterprise")]
+async fn reload_downtimes_cache() {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+    interval.tick().await;
+    loop {
+        interval.tick().await;
+        if let Err(e) = db::downtimes::cache().await {
+            log::error!("[DOWNTIMES] cache reload failed: {e}");
+        }
+    }
+}
+
 #[cfg(feature = "cloud")]
 async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
     if !LOCAL_NODE.is_scheduler() {
@@ -567,6 +580,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
     tokio::task::spawn(db::alerts::alert::watch());
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().downtimes.enabled {
+        tokio::task::spawn(db::downtimes::watch());
+    }
     // Synthetics config caches (checks, locations, probe tokens, agents) live on
     // every node, so every node must hear invalidations — including routers,
     // which serve the probe auth path.
@@ -687,6 +704,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::alert::cache()
         .await
         .expect("alerts cache failed");
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().downtimes.enabled {
+        db::downtimes::cache()
+            .await
+            .expect("downtimes cache failed");
+        tokio::task::spawn(reload_downtimes_cache());
+        openobserve_synthetics::alerting::register_mute_check(
+            openobserve_core::synthetics::downtime_mute_check,
+        );
+    }
     // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
     // processing node so that get_coverage_deficit returns accurate data from startup
     // rather than always returning (0, 0) until files happen to be processed.
@@ -1035,6 +1062,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 })
             },
         );
+
+        if get_o2_config().downtimes.enabled {
+            o2_enterprise::enterprise::anomaly_detection::query_executor::register_is_muted(
+                openobserve_core::anomaly_detection::downtime_is_muted,
+            );
+        }
 
         // When training completes, reset the scheduled_jobs trigger to now so
         // detection starts immediately rather than waiting for the next retry cycle.

@@ -85,6 +85,12 @@ async fn persist_alert_run_state(
 ) -> bool {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
 
+    // Every delivery path persists here, the grouped, deduplicated and pending ones included.
+    #[cfg(feature = "enterprise")]
+    if clears_recorded_mute(outcome) {
+        record_last_downtime(&alert.org_id, alert_id, None).await;
+    }
+
     // ── Per-group fan-out (M-1/M-2/M-3) ─────────────────────────────────────
     // Only reachable for an alert that opted in (M-9); everything else falls
     // through to the single-row path below, unchanged.
@@ -293,11 +299,14 @@ struct GroupDispatchOutcome {
     /// and the caller would advance the trigger as if the alert had been
     /// handled — no notification, no error recorded, no retry.
     state_failed: bool,
+    /// The first downtime that kept one of the groups silent.
+    downtime_id: Option<String>,
 }
 
 #[allow(clippy::too_many_arguments)]
 async fn dispatch_per_group(
     alert: &config::meta::alerts::alert::Alert,
+    folder_id: &str,
     trace_id: &str,
     classification: Option<&config::meta::alerts::grouping::GroupClassification>,
     records: &[config::utils::json::Map<String, config::utils::json::Value>],
@@ -351,6 +360,7 @@ async fn dispatch_per_group(
             errors: vec!["group state did not commit".to_string()],
             delivered_groups: Default::default(),
             state_failed: true,
+            downtime_id: None,
         });
     }
 
@@ -365,6 +375,7 @@ async fn dispatch_per_group(
                 errors: vec![format!("group state read failed: {e}")],
                 delivered_groups: Default::default(),
                 state_failed: true,
+                downtime_id: None,
             });
         }
     };
@@ -424,7 +435,20 @@ async fn dispatch_per_group(
     let (mut delivered, mut failed) = (0usize, 0usize);
     let mut errors: Vec<String> = Vec::new();
     let mut delivered_groups: std::collections::HashSet<String> = Default::default();
+    let (mut downtime_suppressed, mut downtime_id) = (0usize, None);
     for item in &plan.items {
+        // One group muted, the others notify: no send and no silence window for this group.
+        if let Some(downtime) = group_downtime(alert, &alert_id, folder_id, &item.row).await {
+            log::info!(
+                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: suppressed by downtime {}",
+                item.group_key,
+                downtime.id
+            );
+            crate::alerts::alert::count_suppressed_run(&alert.org_id, "alerts");
+            downtime_suppressed += 1;
+            downtime_id.get_or_insert(downtime.id);
+            continue;
+        }
         // The group's OWN row, level and value — never the worst group's
         // (MN-3). One send per group is what makes host-a and host-b page
         // independently.
@@ -515,7 +539,7 @@ async fn dispatch_per_group(
 
     log::info!(
         "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
-         pending={} failed={failed} suppressed={} candidates={}",
+         pending={} failed={failed} suppressed={} downtime={downtime_suppressed} candidates={}",
         plan.suppressed,
         plan.pending,
         plan.items.len()
@@ -527,7 +551,39 @@ async fn dispatch_per_group(
         errors,
         delivered_groups,
         state_failed: false,
+        downtime_id,
     })
+}
+
+/// The downtime of one group of a multi-alert, from that group's own row.
+#[cfg(feature = "enterprise")]
+async fn group_downtime(
+    alert: &config::meta::alerts::alert::Alert,
+    alert_id: &str,
+    folder_id: &str,
+    row: &config::utils::json::Map<String, config::utils::json::Value>,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    if !alert_downtimes_in(&alert.org_id) {
+        return None;
+    }
+    let identity = alert_identity(alert, std::slice::from_ref(row)).await;
+    crate::alerts::downtimes::active_for_alert(
+        &alert.org_id,
+        alert_id,
+        folder_id,
+        identity.first()?,
+        now_micros(),
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn group_downtime(
+    _alert: &config::meta::alerts::alert::Alert,
+    _alert_id: &str,
+    _folder_id: &str,
+    _row: &config::utils::json::Map<String, config::utils::json::Value>,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    None
 }
 
 /// Confirm this evaluation's dedup reservations once a notification landed
@@ -958,13 +1014,20 @@ async fn handle_composite_alert_trigger(
     transaction.commit().await?;
 
     let mut delivery_retry_at = None;
+    let downtime = if evaluated.result {
+        composite_downtime(&definition.definition, now)
+    } else {
+        None
+    };
     if evaluated.result {
         scheduled_data.last_satisfied_at = Some(now);
         // Hoisted: correlation runs in the deliverable branch, but paging needs the answer.
         #[cfg(feature = "enterprise")]
         let mut composite_incident_handled = false;
 
-        let delivery = if matches!(outcome, RunOutcome::Pending) {
+        let delivery = if let Some(downtime) = downtime.as_ref() {
+            DeliveryDecision::SuppressedByDowntime(downtime.id.clone())
+        } else if matches!(outcome, RunOutcome::Pending) {
             DeliveryDecision::SuppressedByPending
         } else {
             config::meta::alerts::level::delivery_decision(
@@ -1009,6 +1072,7 @@ async fn handle_composite_alert_trigger(
                     &rows,
                     now,
                     Some(evaluated.level),
+                    None,
                 )
                 .await
                 .map(|outcome| outcome.is_some())
@@ -1086,9 +1150,32 @@ async fn handle_composite_alert_trigger(
             }
         }
 
+        #[cfg(feature = "enterprise")]
+        if let Some(downtime) = downtime.as_ref() {
+            let notification_alert = composite_notification_alert(&definition.definition);
+            let rows = [composite_notification_row(
+                &definition.definition.expression,
+                evaluated.result,
+                &evaluated.children,
+            )];
+            correlate_muted_incident(
+                trace_id,
+                &notification_alert,
+                &rows,
+                now,
+                Some(evaluated.level),
+                downtime,
+            )
+            .await;
+            crate::alerts::alert::count_suppressed_run(&trigger.org, "alerts");
+        }
+
         // Outside the deliverable branch: a silenced composite never reaches correlation.
         #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::oncall::is_enabled() && !composite_incident_handled {
+        if o2_enterprise::enterprise::oncall::is_enabled()
+            && !composite_incident_handled
+            && downtime.is_none()
+        {
             let notification_alert = composite_notification_alert(&definition.definition);
             let rows = [composite_notification_row(
                 &definition.definition.expression,
@@ -1110,7 +1197,12 @@ async fn handle_composite_alert_trigger(
             "{}/{}",
             definition.definition.name, definition.definition.id
         ),
-        status: outcome.clone(),
+        status: if downtime.is_some() {
+            RunOutcome::Suppressed
+        } else {
+            outcome.clone()
+        },
+        downtime_id: downtime.as_ref().map(|d| d.id.clone()),
         actual_value: Some(i32::from(evaluated.result) as f64),
         level: Some(evaluated.level.to_i32()),
         scheduler_trace_id: Some(trace_id.to_string()),
@@ -1195,6 +1287,38 @@ fn should_dispatch_after_incident(
     has_workflows: bool,
 ) -> bool {
     !incident_destinations_handled || has_workflows
+}
+
+/// A composite has no query and no row, so its `key:value` tags are its identity.
+#[cfg(feature = "enterprise")]
+fn composite_downtime(
+    definition: &infra::table::entity::alert_composites::Model,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    if !alert_downtimes_in(&definition.org) {
+        return None;
+    }
+    let tags: Vec<String> = definition
+        .tags
+        .clone()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    let dims = o2_enterprise::enterprise::downtimes::scope::composite_dimensions(&tags);
+    crate::alerts::downtimes::active_for_alert(
+        &definition.org,
+        &definition.id,
+        &definition.folder_id,
+        &dims,
+        now,
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn composite_downtime(
+    _definition: &infra::table::entity::alert_composites::Model,
+    _now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    None
 }
 
 fn composite_notification_alert(
@@ -1349,6 +1473,8 @@ async fn handle_anomaly_detection_triggers(
 
     // Run detection via enterprise and track outcome for the triggers stream.
     let run_start_us = now_micros();
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut downtime_id: Option<String> = None;
     let (trigger_status, trigger_error, trigger_success_response, anomaly_count) = {
         #[cfg(feature = "enterprise")]
         {
@@ -1360,16 +1486,27 @@ async fn handle_anomaly_detection_triggers(
                 // The outcome now carries whether anything was FOUND, not merely
                 // that detection ran. This is what lets the history API stop
                 // deriving `anomaly`/`normal` from `success_response`.
-                Ok(count) => (
-                    if count > 0 {
+                Ok(run) => {
+                    let count = run.anomaly_count;
+                    downtime_id = run.suppressed_by;
+                    let status = if downtime_id.is_some() {
+                        crate::alerts::alert::count_suppressed_run(
+                            &trigger.org,
+                            "anomaly_detections",
+                        );
+                        RunOutcome::Suppressed
+                    } else if count > 0 {
                         RunOutcome::Firing
                     } else {
                         RunOutcome::Normal
-                    },
-                    None,
-                    Some(serde_json::json!({ "anomalies_found": count }).to_string()),
-                    count,
-                ),
+                    };
+                    (
+                        status,
+                        None,
+                        Some(serde_json::json!({ "anomalies_found": count }).to_string()),
+                        count,
+                    )
+                }
                 Err(e) => {
                     log::error!("[anomaly_detection] detection failed for {anomaly_id}: {e}");
                     (RunOutcome::Error, Some(e.to_string()), None, 0i32)
@@ -1406,6 +1543,7 @@ async fn handle_anomaly_detection_triggers(
         error: trigger_error,
         success_response: trigger_success_response,
         evaluation_took_in_secs: Some((run_end_us - run_start_us) as f64 / 1_000_000.0),
+        downtime_id,
         ..Default::default()
     });
 
@@ -1426,9 +1564,7 @@ async fn handle_anomaly_detection_triggers(
     // processed by the training scheduler yet, or processed but status not yet
     // flipped), move it to Active so the UI reflects the real state.
     #[cfg(feature = "enterprise")]
-    // "Detection ran cleanly" is now either Firing or Normal — both mean the
-    // model executed; they differ only in whether anomalies were found.
-    if matches!(trigger_status, RunOutcome::Firing | RunOutcome::Normal) && config.is_trained {
+    if detection_ran(&trigger_status) && config.is_trained {
         use o2_enterprise::enterprise::anomaly_detection::types::Status as AnomalyStatus;
         if config.status != AnomalyStatus::Active.to_i32() {
             use infra::table::entity::anomaly_detection_config as anomaly_entity;
@@ -1464,6 +1600,15 @@ async fn handle_anomaly_detection_triggers(
     db::scheduler::update_trigger(trigger, true, "").await?;
 
     Ok(())
+}
+
+/// The model executed: anomalies found, none found, or found and muted by a downtime.
+#[cfg(feature = "enterprise")]
+fn detection_ran(outcome: &RunOutcome) -> bool {
+    matches!(
+        outcome,
+        RunOutcome::Firing | RunOutcome::Normal | RunOutcome::Suppressed
+    )
 }
 
 /// Stamp the run outcome onto the trigger, the only per-row record of it —
@@ -1665,30 +1810,19 @@ pub(crate) async fn page_blast_radius(
     }
 }
 
-/// Shared by the scheduled-alert, composite and manual-trigger producers so `creates_incident`
-/// cannot drift.
+/// Stage A of on-call routing, one map per group; paging and the downtime check both read it.
 #[cfg(feature = "enterprise")]
-pub(crate) async fn page_for_alert_firing(
-    trace_id: &str,
+pub(crate) async fn alert_identity(
     alert: &config::meta::alerts::alert::Alert,
     rows: &[config::utils::json::Map<String, config::utils::json::Value>],
-) {
-    let (Some(first_row), Some(alert_id)) = (rows.first(), alert.id.as_ref()) else {
-        // Nothing fired, or the signal has no stable id to key a record on.
-        return;
-    };
-    // Decided in the engine, on the key the record is stored under; the bare alert id is not it.
+) -> Vec<HashMap<String, String>> {
     let semantic_groups =
         crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+    let empty_row = config::utils::json::Map::new();
+    let first_row = rows.first().unwrap_or(&empty_row);
     // Row first, then the alert's conditions: an aggregating alert has no identity columns.
-    let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
-        &semantic_groups,
-        &alert.query_condition,
-        first_row,
-    );
-    // One row per group key, as `dispatch_per_group` reduces: `rows.first()` woke one group.
-    let mut group_dimensions: Vec<std::collections::HashMap<String, String>> =
-        if alert.query_condition.multi_alert_enabled() {
+    let mut identity: Vec<HashMap<String, String>> =
+        if alert.query_condition.multi_alert_enabled() && !rows.is_empty() {
             let group_by = alert
                 .query_condition
                 .aggregation
@@ -1712,26 +1846,61 @@ pub(crate) async fn page_for_alert_firing(
                 })
                 .collect()
         } else {
-            vec![dimensions.clone()]
+            vec![
+                o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
+                    &semantic_groups,
+                    &alert.query_condition,
+                    first_row,
+                ),
+            ]
         };
     // Last resort, matching the incident path so a checkbox about incidents cannot reroute.
-    if group_dimensions.iter().all(|d| d.is_empty())
+    if !rows.is_empty()
+        && identity.iter().all(|d| d.is_empty())
         && let Some(service) =
             crate::alerts::incidents::correlated_service_for_routing(&alert.org_id, first_row).await
     {
-        for dims in &mut group_dimensions {
+        for dims in &mut identity {
             dims.insert(
                 config::meta::oncall::SERVICE_DIMENSION.to_string(),
                 service.clone(),
             );
         }
         log::debug!(
-            "[SCHEDULER trace_id {trace_id}] {}/{}: no identity fields in the result row; routing \
-             on the correlated service `{service}`",
+            "{}/{}: no identity fields in the result row; using the correlated service \
+             `{service}`",
             alert.org_id,
             alert.name,
         );
     }
+    identity
+}
+
+/// Shared by the composite and manual-trigger producers so `creates_incident` cannot drift.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn page_for_alert_firing(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) {
+    if rows.is_empty() || alert.id.is_none() {
+        // Nothing fired, or the signal has no stable id to key a record on.
+        return;
+    }
+    let group_dimensions = alert_identity(alert, rows).await;
+    page_for_alert_identity(trace_id, alert, &group_dimensions).await;
+}
+
+/// Pages on maps `alert_identity` built, so paging and the downtime check read the same identity.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn page_for_alert_identity(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    group_dimensions: &[HashMap<String, String>],
+) {
+    let Some(alert_id) = alert.id.as_ref() else {
+        return;
+    };
     // Single-sourced with the incident path: `creates_incident` must not change the severity.
     let priority = alert
         .priority
@@ -1742,7 +1911,7 @@ pub(crate) async fn page_for_alert_firing(
         &alert.name,
         priority,
         alert.oncall_team.as_deref(),
-        &group_dimensions,
+        group_dimensions,
     )
     .await
     {
@@ -1767,6 +1936,207 @@ pub(crate) async fn page_for_alert_firing(
                 alert.name
             );
         }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn alert_downtimes_in(org: &str) -> bool {
+    crate::alerts::downtimes::any_for(org, config::meta::downtimes::TargetModule::Alerts)
+}
+
+/// The downtime silencing a matched run (D2); a multi-alert only when every group is muted.
+#[cfg(feature = "enterprise")]
+async fn downtime_decision(
+    alert: &config::meta::alerts::alert::Alert,
+    folder_id: &str,
+    rows: Option<&[config::utils::json::Map<String, config::utils::json::Value>]>,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    let rows = rows?;
+    if !alert_downtimes_in(&alert.org_id) {
+        return None;
+    }
+    let alert_id = alert.id.as_ref()?.to_string();
+    // An SLO alert runs no query, so its identity is its SLO's (D9).
+    let identity = match alert.query_condition.slo_condition.as_ref() {
+        Some(slo_condition) => vec![slo_dimensions(&alert.org_id, &slo_condition.slo_id).await],
+        None => alert_identity(alert, rows).await,
+    };
+    muted_in_every_group(&identity, |dims| {
+        crate::alerts::downtimes::active_for_alert(&alert.org_id, &alert_id, folder_id, dims, now)
+    })
+}
+
+/// The first group's downtime when every group has one; else `dispatch_per_group` decides.
+#[cfg(feature = "enterprise")]
+fn muted_in_every_group(
+    identity: &[HashMap<String, String>],
+    mut active: impl FnMut(&HashMap<String, String>) -> Option<config::meta::downtimes::ActiveDowntime>,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    let mut decision = None;
+    for dims in identity {
+        let downtime = active(dims)?;
+        decision.get_or_insert(downtime);
+    }
+    decision
+}
+
+/// The Stage A maps of the unmuted groups, so a muted group of a multi-alert is not paged.
+#[cfg(feature = "enterprise")]
+async fn unmuted_identity(
+    alert: &config::meta::alerts::alert::Alert,
+    folder_id: &str,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    now: i64,
+) -> Vec<HashMap<String, String>> {
+    let mut identity = alert_identity(alert, rows).await;
+    if let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string())
+        && alert_downtimes_in(&alert.org_id)
+    {
+        identity.retain(|dims| {
+            crate::alerts::downtimes::active_for_alert(
+                &alert.org_id,
+                &alert_id,
+                folder_id,
+                dims,
+                now,
+            )
+            .is_none()
+        });
+    }
+    identity
+}
+
+/// The rows of a multi-alert's unmuted groups for incident correlation; `None` keeps every row.
+#[cfg(feature = "enterprise")]
+async fn unmuted_group_rows(
+    alert: &config::meta::alerts::alert::Alert,
+    folder_id: &str,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    now: i64,
+) -> Option<Vec<config::utils::json::Map<String, config::utils::json::Value>>> {
+    let alert_id = alert.id.as_ref()?.to_string();
+    if !alert.creates_incident
+        || !alert.query_condition.multi_alert_enabled()
+        || !alert_downtimes_in(&alert.org_id)
+    {
+        return None;
+    }
+    let mut kept = Vec::with_capacity(rows.len());
+    for row in rows {
+        let identity = alert_identity(alert, std::slice::from_ref(row)).await;
+        let muted = identity.first().is_some_and(|dims| {
+            crate::alerts::downtimes::active_for_alert(
+                &alert.org_id,
+                &alert_id,
+                folder_id,
+                dims,
+                now,
+            )
+            .is_some()
+        });
+        if !muted {
+            kept.push(row.clone());
+        }
+    }
+    Some(kept)
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn downtime_decision(
+    _alert: &config::meta::alerts::alert::Alert,
+    _folder_id: &str,
+    _rows: Option<&[config::utils::json::Map<String, config::utils::json::Value>]>,
+    _now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    None
+}
+
+#[cfg(feature = "enterprise")]
+async fn slo_dimensions(org: &str, slo_id: &str) -> HashMap<String, String> {
+    match infra::table::slos::get(get_orm_client_ro().await, org, slo_id).await {
+        Ok(Some(slo)) => crate::alerts::downtimes::dimensions_for_slo(&slo).await,
+        Ok(None) => HashMap::new(),
+        Err(e) => {
+            log::warn!("[SCHEDULER] SLO {org}/{slo_id} unreadable for the downtime check: {e}");
+            HashMap::new()
+        }
+    }
+}
+
+/// A suppressed firing still correlates, into an incident that opens muted (D3).
+#[cfg(feature = "enterprise")]
+async fn correlate_muted_incident(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    triggered_at: i64,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    downtime: &config::meta::downtimes::ActiveDowntime,
+) {
+    let Some(first_row) = rows.first() else {
+        return;
+    };
+    if !alert.creates_incident
+        || !o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .enabled
+    {
+        return;
+    }
+    if let Err(e) = crate::alerts::incidents::correlate_alert_to_incident(
+        alert,
+        first_row,
+        rows,
+        triggered_at,
+        eval_level,
+        Some(downtime),
+    )
+    .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] muted incident correlation failed for {}/{}: {e}",
+            alert.org_id,
+            alert.name
+        );
+    }
+}
+
+/// D6: only a delivered firing opens the silence, so the run after a downtime delivers.
+fn starts_silence_window(
+    condition_matched: bool,
+    suppressed_by_downtime: bool,
+    silence_minutes: i64,
+    evaluates_through_silence: bool,
+) -> bool {
+    condition_matched
+        && !suppressed_by_downtime
+        && silence_minutes > 0
+        && !evaluates_through_silence
+}
+
+/// Whether this run moves `last_notified_level` and the delivery silence window.
+fn records_delivery_state(alert_level_delivery: bool, delivery: &DeliveryDecision) -> bool {
+    alert_level_delivery && delivery.resets_silence()
+}
+
+/// A run that matched and was not suppressed ends any Muted chip a firing recorded.
+#[cfg(feature = "enterprise")]
+fn clears_recorded_mute(outcome: &RunOutcome) -> bool {
+    matches!(
+        outcome,
+        RunOutcome::Firing | RunOutcome::NotifyFailed | RunOutcome::Pending
+    )
+}
+
+/// The Muted chip of a condition-scoped downtime, recorded or cleared at run time.
+#[cfg(feature = "enterprise")]
+async fn record_last_downtime(org: &str, alert_id: &str, downtime_id: Option<&str>) {
+    if !alert_downtimes_in(org) {
+        return;
+    }
+    if let Err(e) = infra::table::alert_states::set_last_downtime_id(alert_id, downtime_id).await {
+        log::warn!("[SCHEDULER] could not record the downtime of {alert_id}: {e}");
     }
 }
 
@@ -1795,10 +2165,11 @@ async fn handle_alert_triggers(
     };
 
     // here it can be alert id or alert name
-    let alert = if let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) {
+    let (folder_id, alert) = if let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key)
+    {
         let client = get_orm_client_rw().await;
         match db::alerts::alert::get_by_id(client, &trigger.org, alert_id).await {
-            Ok(Some((_, alert))) => alert,
+            Ok(Some((folder, alert))) => (folder.folder_id, alert),
             Ok(None) => {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Alert not found for module_key: {}, deleting this trigger job",
@@ -2385,10 +2756,16 @@ async fn handle_alert_triggers(
         alert.query_condition.multi_alert_enabled(),
         multi_level,
     );
-    if trigger_results.data.is_some()
-        && alert.trigger_condition.silence > 0
-        && !evaluates_through_silence
-    {
+    // Decided after the query, from the fired rows, and never from the definition alone.
+    let downtime =
+        downtime_decision(&alert, &folder_id, trigger_results.data.as_deref(), now).await;
+    // D6: a suppressed run starts no silence window, so the first run after the window delivers.
+    if starts_silence_window(
+        trigger_results.data.is_some(),
+        downtime.is_some(),
+        alert.trigger_condition.silence,
+        evaluates_through_silence,
+    ) {
         new_trigger.next_run_at =
             alert
                 .trigger_condition
@@ -2421,7 +2798,9 @@ async fn handle_alert_triggers(
         alert.query_condition.multi_alert_enabled(),
         multi_level,
     );
-    let delivery = if alert_level_delivery {
+    let delivery = if let Some(downtime) = downtime.as_ref() {
+        DeliveryDecision::SuppressedByDowntime(downtime.id.clone())
+    } else if alert_level_delivery {
         config::meta::alerts::level::delivery_decision(
             recorded_level,
             trigger_data
@@ -2434,7 +2813,7 @@ async fn handle_alert_triggers(
     } else {
         config::meta::alerts::level::DeliveryDecision::Deliver
     };
-    if !delivery.should_deliver() && alert_level_delivery {
+    if !delivery.should_deliver() && (alert_level_delivery || downtime.is_some()) {
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] delivery suppressed ({delivery:?}) for {}/{}",
             new_trigger.org,
@@ -2456,7 +2835,7 @@ async fn handle_alert_triggers(
     // harmless now that nothing reads them for this path, but writing them
     // would resurrect the alert-level window the moment anything did.
     let record_delivery = |trigger_data: &mut ScheduledTriggerData| {
-        if alert_level_delivery && delivery.resets_silence() {
+        if records_delivery_state(alert_level_delivery, &delivery) {
             trigger_data.last_notified_level = eval_level.map(|l| l.to_i32());
             trigger_data.delivery_silenced_until = if alert.trigger_condition.silence > 0 {
                 Some(
@@ -2479,6 +2858,21 @@ async fn handle_alert_triggers(
     // notification is skipped.
     let condition_matched = trigger_results.data.is_some();
     let payload_empty = trigger_results.data.as_ref().is_none_or(|d| d.is_empty());
+
+    #[cfg(feature = "enterprise")]
+    if let Some(downtime) = downtime.as_ref()
+        && let Some(rows) = trigger_results.data.as_deref()
+    {
+        correlate_muted_incident(
+            &scheduler_trace_id,
+            &alert,
+            rows,
+            triggered_at,
+            eval_level,
+            downtime,
+        )
+        .await;
+    }
 
     if let Some(data) = trigger_results.data
         && !data.is_empty()
@@ -2862,18 +3256,23 @@ async fn handle_alert_triggers(
         // }
 
         #[cfg(feature = "enterprise")]
+        let unmuted_rows = unmuted_group_rows(&alert, &folder_id, &data, now).await;
+        #[cfg(feature = "enterprise")]
+        let correlation_rows = unmuted_rows.as_deref().unwrap_or(data.as_slice());
+        #[cfg(feature = "enterprise")]
         let incident_handled_notification = if alert.creates_incident
             && o2_enterprise::enterprise::common::config::get_config()
                 .incidents
                 .enabled
-            && let Some(first_row) = data.first()
+            && let Some(first_row) = correlation_rows.first()
         {
             match crate::alerts::incidents::correlate_alert_to_incident(
                 &alert,
                 first_row,
-                &data,
+                correlation_rows,
                 triggered_at,
                 eval_level,
+                None,
             )
             .await
             {
@@ -2915,7 +3314,10 @@ async fn handle_alert_triggers(
         // Asked after correlation, not predicted: a prediction suppresses a page nobody made.
         #[cfg(feature = "enterprise")]
         if o2_enterprise::enterprise::oncall::is_enabled() && !incident_handled_notification {
-            page_for_alert_firing(&scheduler_trace_id, &alert, &data).await;
+            let identity = unmuted_identity(&alert, &folder_id, &data, now).await;
+            if !identity.is_empty() {
+                page_for_alert_identity(&scheduler_trace_id, &alert, &identity).await;
+            }
         }
 
         let vars = get_row_column_map(&data);
@@ -2961,6 +3363,7 @@ async fn handle_alert_triggers(
         } else if !incident_handled_notification
             && let Some(dispatch) = dispatch_per_group(
                 &alert,
+                &folder_id,
                 &scheduler_trace_id,
                 trigger_results.group_classification.as_ref(),
                 &data,
@@ -3031,6 +3434,14 @@ async fn handle_alert_triggers(
                 trigger_data_stream.error = Some(dispatch.errors.join("; "));
             }
 
+            if dispatch.delivered == 0
+                && dispatch.failed == 0
+                && dispatch.pending == 0
+                && let Some(downtime_id) = dispatch.downtime_id.clone()
+            {
+                trigger_data_stream.status = RunOutcome::Suppressed;
+                trigger_data_stream.downtime_id = Some(downtime_id);
+            }
             if dispatch.delivered == 0 && dispatch.failed == 0 && dispatch.pending != 0 {
                 // this is when no group was fired, but some were pending,
                 // in which case mark the whole alert in pending state
@@ -3291,6 +3702,13 @@ async fn handle_alert_triggers(
                 new_trigger.org,
                 new_trigger.module_key
             );
+            if let Some(downtime) = downtime.as_ref() {
+                crate::alerts::alert::record_suppressed_run(
+                    &mut trigger_data_stream,
+                    "alerts",
+                    downtime.id.clone(),
+                );
+            }
         } else if trigger_results.frozen {
             // Frozen is not Normal: nothing was measured (§7.6). `Skipped` is
             // the outcome `should_persist` drops entirely, so BOTH state axes
@@ -3347,6 +3765,13 @@ async fn handle_alert_triggers(
             trigger_results.group_classification.as_ref(),
         )
         .await;
+    }
+    #[cfg(feature = "enterprise")]
+    if let (Some(alert_id), Some(downtime_id)) = (
+        alert.id.as_ref(),
+        trigger_data_stream.downtime_id.as_deref(),
+    ) {
+        record_last_downtime(&alert.org_id, &alert_id.to_string(), Some(downtime_id)).await;
     }
 
     log::debug!(
@@ -7147,5 +7572,134 @@ mod tests {
             assert!(trigger.data.contains("\"normal\""));
             assert!(!trigger.data.contains("\"error\""));
         }
+    }
+
+    #[tokio::test]
+    async fn a_run_that_matched_nothing_takes_no_downtime_decision() {
+        let alert = config::meta::alerts::alert::Alert::default();
+        assert!(
+            downtime_decision(&alert, "default", None, now_micros())
+                .await
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn a_downtime_suppression_never_starts_the_silence_window() {
+        let decision = DeliveryDecision::SuppressedByDowntime("dt-1".to_string());
+        assert!(!decision.should_deliver());
+        assert!(!decision.resets_silence());
+        assert_eq!(decision.downtime_id(), Some("dt-1"));
+    }
+
+    #[test]
+    fn a_suppressed_run_opens_no_silence_window_and_keeps_its_cadence() {
+        assert!(starts_silence_window(true, false, 10, false));
+        assert!(
+            !starts_silence_window(true, true, 10, false),
+            "a suppressed run must leave next_run_at at now + frequency"
+        );
+        assert!(!starts_silence_window(false, false, 10, false));
+        assert!(!starts_silence_window(true, false, 10, true));
+    }
+
+    #[test]
+    fn a_suppressed_run_leaves_the_last_notified_level_alone() {
+        let muted = DeliveryDecision::SuppressedByDowntime("dt-1".to_string());
+        assert!(!records_delivery_state(true, &muted));
+        assert!(records_delivery_state(true, &DeliveryDecision::Deliver));
+        assert!(!records_delivery_state(false, &DeliveryDecision::Deliver));
+    }
+
+    #[test]
+    fn the_first_run_after_the_window_delivers_without_a_cooldown() {
+        use config::meta::alerts::level::{AlertLevel, delivery_decision};
+
+        const MINUTE: i64 = 60_000_000;
+        // Delivered at t=0, silence 10 min; suppressed runs to t=2h wrote no delivery state.
+        let last_notified = Some(AlertLevel::Critical);
+        let silenced_until = Some(10 * MINUTE);
+        let after_window = 121 * MINUTE;
+        let decision = delivery_decision(
+            AlertLevel::Critical,
+            last_notified,
+            silenced_until,
+            after_window,
+            None,
+        );
+        assert_eq!(decision, DeliveryDecision::Deliver);
+        let never_notified =
+            delivery_decision(AlertLevel::Critical, None, None, after_window, None);
+        assert!(never_notified.should_deliver());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_multi_alert_is_muted_at_alert_level_only_when_every_group_is() {
+        let group = |host: &str| HashMap::from([("host".to_string(), host.to_string())]);
+        let downtime = |id: &str| config::meta::downtimes::ActiveDowntime {
+            id: id.to_string(),
+            name: id.to_string(),
+            ends_at: 1,
+        };
+        let identity = [group("a"), group("b")];
+        let only_a = muted_in_every_group(&identity, |dims| {
+            (dims["host"] == "a").then(|| downtime("d1"))
+        });
+        assert!(only_a.is_none(), "host b still notifies, per group");
+        let both = muted_in_every_group(&identity, |dims| {
+            Some(downtime(if dims["host"] == "a" { "d1" } else { "d2" }))
+        });
+        assert_eq!(both.map(|d| d.id).as_deref(), Some("d1"));
+        assert!(muted_in_every_group(&[], |_| Some(downtime("d1"))).is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn only_an_unsuppressed_matched_run_clears_the_recorded_mute() {
+        assert!(clears_recorded_mute(&RunOutcome::Firing));
+        assert!(clears_recorded_mute(&RunOutcome::NotifyFailed));
+        assert!(clears_recorded_mute(&RunOutcome::Pending));
+        assert!(!clears_recorded_mute(&RunOutcome::Suppressed));
+        assert!(!clears_recorded_mute(&RunOutcome::Normal));
+        assert!(!clears_recorded_mute(&RunOutcome::Skipped));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_muted_anomaly_run_still_counts_as_a_detection_that_ran() {
+        assert!(detection_ran(&RunOutcome::Suppressed));
+        assert!(detection_ran(&RunOutcome::Firing));
+        assert!(detection_ran(&RunOutcome::Normal));
+        assert!(!detection_ran(&RunOutcome::Error));
+    }
+
+    #[test]
+    fn a_composite_with_downtimes_off_is_never_suppressed() {
+        let definition = infra::table::entity::alert_composites::Model {
+            id: "2f9K".to_string(),
+            org: "default".to_string(),
+            folder_id: "default".to_string(),
+            name: "c".to_string(),
+            description: None,
+            expression: "{a}".to_string(),
+            warning_counts_as_firing: false,
+            stale_child_policy: 0,
+            destinations: serde_json::json!([]),
+            template: None,
+            context_attributes: None,
+            enabled: true,
+            silence_seconds: 0,
+            creates_incident: false,
+            workflows: serde_json::json!([]),
+            priority: None,
+            tags: Some(serde_json::json!(["service:payments"])),
+            owner: None,
+            last_edited_by: None,
+            updated_at: None,
+            evaluation_generation: 0,
+            pending_period_sec: 0,
+        };
+        assert!(composite_downtime(&definition, now_micros()).is_none());
     }
 }

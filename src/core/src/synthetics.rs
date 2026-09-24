@@ -463,6 +463,103 @@ pub async fn create_default_probe_token(
     Ok(())
 }
 
+/// The synthetics mute check over the downtimes cache, for `register_mute_check`.
+pub fn downtime_mute_check(
+    org: &str,
+    check_id: &str,
+    folder_id: &str,
+    tags: &[String],
+) -> openobserve_synthetics::alerting::BoxFuture<'static, Option<String>> {
+    let (org, check_id, folder_id, tags) = (
+        org.to_string(),
+        check_id.to_string(),
+        folder_id.to_string(),
+        tags.to_vec(),
+    );
+    Box::pin(async move {
+        if !crate::alerts::downtimes::any_for(
+            &org,
+            config::meta::downtimes::TargetModule::Synthetics,
+        ) {
+            return None;
+        }
+        let folder_id = public_folder_id(&folder_id).await;
+        crate::alerts::downtimes::active_for_synthetic(
+            &org,
+            &check_id,
+            &folder_id,
+            &tags,
+            config::utils::time::now_micros(),
+        )
+        .map(|downtime| downtime.id)
+    })
+}
+
+/// Sets the Muted chip on each listed check a downtime silences now.
+#[cfg(feature = "enterprise")]
+pub fn fill_active_downtimes(
+    org_id: &str,
+    items: &mut [config::meta::synthetics::SyntheticListItem],
+) {
+    if !crate::alerts::downtimes::any_for(org_id, config::meta::downtimes::TargetModule::Synthetics)
+    {
+        return;
+    }
+    let now = config::utils::time::now_micros();
+    for item in items.iter_mut() {
+        item.active_downtime = crate::alerts::downtimes::active_for_synthetic(
+            org_id,
+            &item.id,
+            &item.folder_id,
+            &item.tags,
+            now,
+        );
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn fill_active_downtimes(
+    _org_id: &str,
+    _items: &mut [config::meta::synthetics::SyntheticListItem],
+) {
+}
+
+/// Stored checks hold the folder primary key, while downtime targets name the public id.
+async fn public_folder_id(folder_id: &str) -> String {
+    infra::table::folders::get_name_by_pk(folder_id)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| folder_id.to_string())
+}
+
+/// The destinations of the unmuted checks; a location whose checks are all muted notifies nobody.
+#[cfg(feature = "enterprise")]
+async fn unmuted_destinations(
+    org_id: &str,
+    checks: &[config::meta::synthetics::Synthetic],
+) -> Vec<String> {
+    let now = config::utils::time::now_micros();
+    let mut destinations = Vec::new();
+    for check in checks {
+        let folder_id = public_folder_id(&check.folder_id).await;
+        if crate::alerts::downtimes::active_for_synthetic(
+            org_id,
+            &check.id,
+            &folder_id,
+            &check.tags,
+            now,
+        )
+        .is_none()
+        {
+            destinations.extend(check.destinations.iter().cloned());
+        }
+    }
+    destinations.sort();
+    destinations.dedup();
+    destinations
+}
+
 // ── Private-location staleness watcher ────────────────────────────────────────
 
 /// Ticks every 60s on scheduler nodes. A private location whose registered
@@ -533,10 +630,7 @@ pub async fn location_staleness_watcher() {
                 }
             }
 
-            let mut destinations: Vec<String> =
-                checks.iter().flat_map(|c| c.destinations.clone()).collect();
-            destinations.sort();
-            destinations.dedup();
+            let destinations = unmuted_destinations(&org_id, &checks).await;
             log::warn!(
                 "[synthetics] private location down: {} ({}) org={} affected_checks={} destinations={}",
                 loc.label,

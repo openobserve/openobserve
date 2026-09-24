@@ -173,6 +173,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!loading && incidentDetails"
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
+        <div v-if="incidentDetails.muted_by_downtime_id" class="shrink-0 px-3 pt-2">
+          <OBanner
+            variant="warning"
+            dense
+            inline-actions
+            icon="notifications-paused"
+            data-test="incident-detail-muted-banner"
+          >
+            {{ mutedBannerText }}
+            <template #actions>
+              <OButton
+                variant="ghost"
+                size="sm"
+                data-test="incident-detail-muted-view"
+                @click="openMutingDowntime"
+              >
+                {{ t("toastMessages.downtimes.viewDowntime") }}
+              </OButton>
+            </template>
+          </OBanner>
+        </div>
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
           <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
@@ -1472,6 +1493,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
+import { formatWindowTime } from "@/utils/downtimes/schedule";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import {
@@ -1553,11 +1577,13 @@ export default defineComponent({
     OIcon,
     OTag,
     OInlineEdit,
+    OBanner,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
+    const { downtimeOf, nameOf } = useDowntimeLookup(true);
     const router = useRouter();
     const route = useRoute();
     const { confirm } = useConfirmDialog();
@@ -1592,6 +1618,31 @@ export default defineComponent({
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
       null,
     );
+
+    const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const mutedBannerText = computed(() => {
+      const id = incidentDetails.value?.muted_by_downtime_id;
+      if (!id) return "";
+      const end = downtimeOf(id)?.current_window?.end;
+      return end
+        ? t("alerts.downtimes.incident.bannerUntil", {
+            name: nameOf(id),
+            end: formatWindowTime(end, viewerZone),
+          })
+        : t("alerts.downtimes.incident.banner", { name: nameOf(id) });
+    });
+    const openMutingDowntime = () => {
+      const id = incidentDetails.value?.muted_by_downtime_id;
+      if (!id) return;
+      void router.push({
+        name: "downtimeDetail",
+        params: { id },
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+          folder: downtimeOf(id)?.folder_id,
+        },
+      });
+    };
     // The on-call record this incident paged, if any. Null in OSS, when
     // on-call is off, and when nothing was routed — all of which mean the
     // panel simply does not render.
@@ -3573,6 +3624,8 @@ export default defineComponent({
     };
 
     return {
+      mutedBannerText,
+      openMutingDowntime,
       raw,
       t,
       store,

@@ -64,6 +64,8 @@ pub struct SliceRow {
     /// Monotonic within the generation; higher wins on the same key. Exists
     /// for late-data re-emission, not for publication ordering.
     pub rev: i64,
+    /// The downtime whose window zeroed or filled this slice (D8).
+    pub corrected_by: Option<String>,
 }
 
 /// Whether a row is visible to readers.
@@ -271,6 +273,7 @@ mod tests {
             good,
             total,
             rev,
+            corrected_by: None,
         }
     }
 

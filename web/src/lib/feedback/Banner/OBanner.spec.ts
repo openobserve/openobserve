@@ -40,3 +40,24 @@ describe("OBanner — preserveWhitespace", () => {
     expect(content.classes()).toContain("wrap-break-word");
   });
 });
+
+describe("OBanner — meta and footer slots", () => {
+  it("renders neither wrapper when the slots are not used", () => {
+    const wrapper = mount(OBanner, { slots: { default: "Message" }, global: { stubs } });
+    expect(wrapper.find('[data-test="o-banner-meta"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="o-banner-footer"]').exists()).toBe(false);
+  });
+
+  it("puts meta to the right of the message and footer under it", () => {
+    const wrapper = mount(OBanner, {
+      props: { variant: "warning" },
+      slots: { default: "Message", meta: "ends in 1 h", footer: "Alerts 7" },
+      global: { stubs },
+    });
+    const row = wrapper.get(":scope > div:first-child");
+    expect(row.get(":scope > div:last-child").text()).toBe("ends in 1 h");
+    const content = wrapper.get('[data-test="o-banner-footer"]');
+    expect(content.text()).toBe("Alerts 7");
+    expect(content.element.parentElement?.textContent).toContain("Message");
+  });
+});

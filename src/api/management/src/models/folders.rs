@@ -56,6 +56,7 @@ pub enum FolderType {
     Reports,
     Synthetics,
     Workflows,
+    Downtimes,
 }
 
 /// Common folder fields used in HTTP request and response bodies.
@@ -109,6 +110,7 @@ impl From<FolderType> for config::meta::folder::FolderType {
             FolderType::Reports => Self::Reports,
             FolderType::Synthetics => Self::Synthetics,
             FolderType::Workflows => Self::Workflows,
+            FolderType::Downtimes => Self::Downtimes,
         }
     }
 }
@@ -160,6 +162,15 @@ mod tests {
         assert_eq!(
             config::meta::folder::FolderType::from(FolderType::Reports),
             config::meta::folder::FolderType::Reports
+        );
+    }
+
+    #[test]
+    fn the_downtimes_path_segment_maps_to_the_downtimes_folder_type() {
+        let parsed: FolderType = serde_json::from_str("\"downtimes\"").unwrap();
+        assert_eq!(
+            config::meta::folder::FolderType::from(parsed),
+            config::meta::folder::FolderType::Downtimes
         );
     }
 

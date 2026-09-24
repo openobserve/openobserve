@@ -17,14 +17,31 @@
 //!
 //! Handles periodic tasks for incident lifecycle management:
 //! - Auto-resolution of stale incidents
+//! - Retention of ended and cancelled downtimes
 
 use config::spawn_pausable_job;
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+
+const DOWNTIMES_SWEEP_INTERVAL_SECS: u64 = 24 * 3600;
+const MICROS_PER_DAY: i64 = 86_400 * 1_000_000;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
         let config = get_o2_config();
+        if config.downtimes.enabled {
+            spawn_pausable_job!(
+                "downtimes_retention",
+                DOWNTIMES_SWEEP_INTERVAL_SECS,
+                {
+                    if let Err(e) = sweep_ended_downtimes().await {
+                        log::error!("[DOWNTIMES::JOB] Retention sweep failed: {e}");
+                    }
+                },
+                sleep_after
+            );
+        }
+
         if !config.incidents.enabled {
             log::info!("[INCIDENTS::JOB] Incident correlation is disabled");
             return Ok(());
@@ -84,12 +101,8 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
 
         // Emit Resolved events for each auto-resolved incident
         for (org_id, incident_id) in &resolved_ids {
-            if let Err(e) = openobserve_core::incidents::append_event(
-                org_id,
-                incident_id,
-                config::meta::alerts::incidents::IncidentEvent::resolved(None),
-            )
-            .await
+            if let Err(e) =
+                openobserve_core::alerts::incidents::record_auto_resolved(org_id, incident_id).await
             {
                 log::warn!(
                     "[INCIDENTS::JOB] Failed to record auto-resolve event for {}: {e}",
@@ -102,4 +115,36 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+/// Each region sweeps its own table, so nothing is sent to other regions.
+#[cfg(feature = "enterprise")]
+async fn sweep_ended_downtimes() -> Result<(), anyhow::Error> {
+    let cutoff = retention_cutoff(
+        config::utils::time::now_micros(),
+        get_o2_config().downtimes.retention_days,
+    );
+    let removed = db::downtimes::delete_ended_before(cutoff).await?;
+    if removed > 0 {
+        log::info!("[DOWNTIMES::JOB] Removed {removed} ended or cancelled downtimes");
+    }
+    Ok(())
+}
+
+fn retention_cutoff(now: i64, retention_days: i64) -> i64 {
+    now.saturating_sub(retention_days.saturating_mul(MICROS_PER_DAY))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_cutoff_is_retention_days_before_now() {
+        assert_eq!(
+            retention_cutoff(100 * MICROS_PER_DAY, 90),
+            10 * MICROS_PER_DAY
+        );
+        assert_eq!(retention_cutoff(0, i64::MAX), -i64::MAX);
+    }
 }

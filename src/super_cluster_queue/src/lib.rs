@@ -24,6 +24,7 @@ mod dashboards;
 mod destinations;
 mod distinct_values;
 mod domain_management;
+mod downtimes;
 mod enrichment_table;
 mod eval_annotation_queues;
 mod eval_datasets;
@@ -123,6 +124,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_incident_msg: incidents::process,
         on_anomaly_detection_msg: anomaly_detection::process,
         on_alert_state_msg: alert_states::process,
+        on_downtime_msg: downtimes::process,
     };
     // On-call rides the scheduler topic with the triggers it belongs to, so a
     // response record always lands before the escalation timer that names it.

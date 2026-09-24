@@ -174,6 +174,23 @@
             size="xs"
             :label="t('slos.paused')"
           />
+          <span v-if="activeCorrections(row).length" class="inline-flex">
+            <OTag
+              type="downtimeStatus"
+              value="active"
+              :label="t('alerts.downtimes.corrected')"
+              :data-test="`slos-slolist-corrected-${row.name}`"
+            />
+            <OTooltip
+              :content="
+                t('alerts.downtimes.correctedBy', {
+                  names: activeCorrections(row)
+                    .map((c) => c.name)
+                    .join(', '),
+                })
+              "
+            />
+          </span>
         </div>
       </template>
 
@@ -282,6 +299,16 @@
             @click="openExport([row])"
           />
           <OButton
+            v-if="downtimesEnabled"
+            variant="ghost"
+            size="icon-sm"
+            icon-left="notifications-paused"
+            class="max-md:hidden"
+            :title="t('alerts.downtimes.mute.exclude')"
+            :data-test="`slos-slolist-exclude-${row.name}`"
+            @click="excludeWindow(row)"
+          />
+          <OButton
             variant="ghost"
             size="icon-sm"
             icon-left="delete"
@@ -332,6 +359,15 @@
               @select="openExport([row])"
             >
               <span>{{ t("common.export") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="downtimesEnabled"
+              icon-left="notifications-paused"
+              class="md:hidden"
+              :data-test="`slos-slolist-exclude-${row.name}-menu`"
+              @select="excludeWindow(row)"
+            >
+              <span>{{ t("alerts.downtimes.mute.exclude") }}</span>
             </ODropdownItem>
             <ODropdownItem
               icon-left="delete"
@@ -471,6 +507,7 @@ import { slosQuery } from "@/services/slos.queries";
 // stays off the query layer and calls the endpoint directly.
 import sloService from "@/services/slos";
 import { computed, onMounted, ref, nextTick, watch } from "vue";
+import config from "@/aws-exports";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -484,6 +521,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
@@ -956,6 +994,24 @@ async function doMove() {
 // Spreads the list's own query (page, folder, …) forward so the editor's `backTarget` has something to restore.
 function goToNew() {
   router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
+}
+
+// Enterprise or cloud plus `downtimes_enabled`, the rule of the downtimes route guard.
+const downtimesEnabled = computed(
+  () =>
+    (config.isEnterprise == "true" || config.isCloud == "true") &&
+    store.state.zoConfig?.downtimes_enabled === true,
+);
+
+const activeCorrections = (row: SloListItem) =>
+  (row.status?.corrections ?? []).filter((c) => c.status === "active");
+
+// Pre-filled from the row: only the SLOs module, all folders, and this SLO in Specific items.
+function excludeWindow(row: SloListItem) {
+  router.push({
+    name: "addDowntime",
+    query: { org_identifier: org.value, module: "slos", ids: row.id },
+  });
 }
 
 function goToEdit(row: SloListItem) {

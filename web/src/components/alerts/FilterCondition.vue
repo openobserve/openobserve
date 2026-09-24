@@ -154,6 +154,12 @@ const props = defineProps({
     default: "",
     required: false,
   },
+  /** Operator values to offer; falls back to ConditionBuilder's, then to the full list. */
+  operators: {
+    type: Array as PropType<string[]>,
+    default: undefined,
+    required: false,
+  },
 });
 
 import { ref, computed, watch, inject, type PropType } from "vue";
@@ -162,6 +168,7 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import { CONDITION_OPERATORS_KEY } from "./conditionOperators";
 
 const emits = defineEmits(["input:update"]);
 
@@ -189,7 +196,7 @@ const form = inject(FORM_CONTEXT_KEY, null);
 
 // Operator `value`s are the backend wire format (serde renames); labels stay
 // raw English like the rest of the list.
-const triggerOperators: SelectOptionInput[] = [
+const allOperators: SelectOptionInput[] = [
   "=",
   "!=",
   ">=",
@@ -203,6 +210,15 @@ const triggerOperators: SelectOptionInput[] = [
   { label: raw("Is Empty"), value: "is_empty" },
   { label: raw("Is Not Empty"), value: "is_not_empty" },
 ];
+
+const injectedOperators = inject(CONDITION_OPERATORS_KEY, null);
+const triggerOperators = computed<SelectOptionInput[]>(() => {
+  const allowed = props.operators ?? injectedOperators?.value;
+  if (!allowed) return allOperators;
+  return allOperators.filter((op) =>
+    allowed.includes(typeof op === "object" && op !== null ? String(op.value) : String(op)),
+  );
+});
 
 // Null checks take no value; drop a stale one so it can't leak into the payload.
 const onOperatorChange = (operator: unknown) => {

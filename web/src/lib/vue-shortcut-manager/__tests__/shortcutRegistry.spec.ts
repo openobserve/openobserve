@@ -66,6 +66,7 @@ const GATED_IN_OSS = [
   "shortcuts.pages.searchSchedulers",
   "shortcuts.pages.alertSources",
   "shortcuts.pages.alertIncidents",
+  "shortcuts.pages.downtimes",
   "shortcuts.pages.pipelineDestinations",
   "shortcuts.pages.iamRoles",
   "shortcuts.pages.iamGroups",

@@ -426,6 +426,7 @@ pub async fn list_synthetics(
     match openobserve_synthetics::service::list_synthetics(&org_id, &params).await {
         Ok(mut resp) => {
             last_check::enrich(&org_id, &mut resp.checks).await;
+            openobserve_core::synthetics::fill_active_downtimes(&org_id, &mut resp.checks);
             MetaHttpResponse::json(resp)
         }
         Err(e) => {
@@ -1202,12 +1203,20 @@ async fn process_ack(
         key: format!("{}/{}", resp.synthetics_name, resp.synthetics_id),
         start_time: checked_at,
         end_time: checked_at,
-        status: config::meta::self_reporting::usage::RunOutcome::Succeeded,
+        status: if resp.suppressed_by.is_some() {
+            config::meta::self_reporting::usage::RunOutcome::Suppressed
+        } else {
+            config::meta::self_reporting::usage::RunOutcome::Succeeded
+        },
+        downtime_id: resp.suppressed_by.clone(),
         success_response: Some(status.clone()),
         error: error.clone(),
         evaluation_took_in_secs: Some(response_time_ms / 1000.0),
         ..Default::default()
     });
+    if resp.suppressed_by.is_some() {
+        openobserve_core::alerts::alert::count_suppressed_run(&resp.org_id, "synthetics");
+    }
 
     // Notify once per run, not once per job ack — and only when the check's own
     // `alert_if_fails` / `cooldown_mins` settings say so. This used to fire on
@@ -1225,7 +1234,8 @@ async fn process_ack(
     #[cfg(feature = "enterprise")]
     let degraded = matches!(resp.alert, AlertDecision::Degraded);
     #[cfg(feature = "enterprise")]
-    let should_notify = !matches!(resp.alert, AlertDecision::Silent);
+    let should_notify =
+        !matches!(resp.alert, AlertDecision::Silent) && resp.suppressed_by.is_none();
     // Enterprise-gated because alert *destinations* are: the dispatch it ends in
     // (`alerts::alert::dispatch_notification`) is not built in OSS. An OSS build
     // runs the check, records the run and serves the result — it just has
@@ -1858,6 +1868,7 @@ mod tests {
             passing_locations: Vec::new(),
             failing_environments: Vec::new(),
             usage_events,
+            suppressed_by: None,
         }
     }
 
