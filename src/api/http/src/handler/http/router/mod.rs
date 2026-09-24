@@ -469,6 +469,15 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         // Call next
         let mut response = next.run(request).await;
 
+        let error_msg = response
+            .headers()
+            .get(ERROR_HEADER)
+            .and_then(|h| h.to_str().ok())
+            .map(|s| s.to_string());
+
+        // ERROR_HEADER is an internal detail channel for the auditor and must never reach a client.
+        response.headers_mut().remove(ERROR_HEADER);
+
         if response.status().is_success() || response.status().is_redirection() {
             let body = if is_remote_task_secret_write(&http_method, &path) {
                 "[REDACTED: remote task secret write]".to_string()
@@ -477,13 +486,6 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             } else {
                 String::from_utf8(request_body).unwrap_or_default()
             };
-
-            let error_header = response.headers().get(ERROR_HEADER);
-            let error_msg = error_header
-                .and_then(|h| h.to_str().ok())
-                .map(|s| s.to_string());
-
-            response.headers_mut().remove(ERROR_HEADER);
 
             audit(AuditMessage {
                 user_email,

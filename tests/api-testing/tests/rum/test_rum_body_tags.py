@@ -58,6 +58,16 @@ def _ingest_params(rum_token: str) -> dict[str, str]:
     }
 
 
+def _ingest_params_o2_only(rum_token: str) -> dict[str, str]:
+    """RUM ingest params using ONLY the o2 spellings -- no oo- param anywhere."""
+    return {
+        "o2source": "browser",
+        "o2-api-key": rum_token,
+        "o2-request-id": str(uuid.uuid4()),
+        "o2-evp-origin": "browser",
+    }
+
+
 def _ingest(
     client: OpenObserveClient,
     rum_token: str,
@@ -173,3 +183,31 @@ def test_body_tag_value_containing_a_colon_is_preserved(client: OpenObserveClien
 
     hit = _hit_for_marker(client, marker)
     assert hit.get("env") == env, f"colon in tag value was truncated: {hit!r}"
+
+
+def test_pure_o2_payload_produces_no_oo_fields(client: OpenObserveClient):
+    """A payload using ONLY o2 spellings (o2source/o2-api-key/o2tags-in-body) must
+    ingest a record with no `oo`-prefixed field anywhere -- regression test for the
+    middleware bug where `extractor_middleware` re-inserted body tags under the
+    hardcoded key `ootags` even when the SDK sent `o2tags` (o2-enterprise#2724)."""
+    marker = f"pytest-pure-o2-{uuid.uuid4()}"
+    env = f"env-{uuid.uuid4().hex[:8]}"
+    payload = {**RUM_DATA_TEMPLATE, "type": marker, "o2tags": f"env:{env},version:0.0.1"}
+    payload["_o2"] = payload.pop("_oo")
+
+    resp = requests.post(
+        f"{client.base_url}rum/v1/{ORG_ID}/rum",
+        params=_ingest_params_o2_only(_rum_token(client)),
+        json=payload,
+        headers={"X-Forwarded-For": "182.70.14.246"},
+        timeout=10,
+    )
+    assert resp.status_code == 202, f"rum ingest failed: {resp.status_code} {resp.text}"
+
+    hit = _hit_for_marker(client, marker)
+    assert hit.get("env") == env, f"env from body o2tags missing or wrong: {hit!r}"
+    oo_fields = [
+        key for key in hit
+        if key.lower().startswith("oo") or key.lower().startswith("_oo")
+    ]
+    assert not oo_fields, f"pure-o2 payload must not produce any oo-prefixed field, got: {oo_fields}"

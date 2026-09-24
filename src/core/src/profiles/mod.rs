@@ -316,6 +316,9 @@ pub async fn handle_otlp_request(
         }
     }
 
+    #[cfg(feature = "vectorscan")]
+    apply_redaction(org_id, &stream_name, &mut all_records).await;
+
     if !all_records.is_empty() {
         buffer_records(
             org_id,
@@ -457,6 +460,57 @@ async fn buffer_records(
         hour_buf.records_size += record_str_len;
     }
     Ok(())
+}
+
+/// Redacts flattened profile records before they are buffered for the WAL.
+#[cfg(feature = "vectorscan")]
+async fn apply_redaction(
+    org_id: &str,
+    stream_name: &str,
+    records: &mut Vec<json::Map<String, json::Value>>,
+) {
+    if records.is_empty()
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(
+            org_id,
+            stream_name,
+            StreamType::Profiles,
+        )
+    {
+        return;
+    }
+    let mut rows: Vec<(i64, json::Map<String, json::Value>)> = std::mem::take(records)
+        .into_iter()
+        .map(|record| {
+            let ts = record
+                .get(TIMESTAMP_COL_NAME)
+                .and_then(json::Value::as_i64)
+                .unwrap_or_default();
+            (ts, record)
+        })
+        .collect();
+    match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+        Ok(pattern_manager) => {
+            if let Err(e) = pattern_manager.process_at_ingestion(
+                org_id,
+                StreamType::Profiles,
+                stream_name,
+                &mut rows,
+            ) {
+                log::error!("[PROFILES] error applying SDR patterns for stream {stream_name}: {e}");
+            }
+        }
+        Err(e) => {
+            log::error!("[PROFILES] failed to get pattern manager for SDR redaction: {e}");
+            crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                org_id,
+                StreamType::Profiles,
+                std::iter::once((stream_name, rows.as_slice())),
+                config::meta::self_reporting::redaction::FailPosture::Open,
+            )
+            .await;
+        }
+    }
+    records.extend(rows.into_iter().map(|(_, record)| record));
 }
 
 /// `rejected_profiles` counts whole OTLP Profile messages, not flattened samples.
@@ -685,10 +739,11 @@ fn build_sample_records(
                 record.insert(key.clone(), value.clone());
             }
 
+            // `stack` is excluded: redaction runs later, so its digest would outlive the text.
             let event_id = format!(
                 "{:x}",
                 md5::compute(format!(
-                    "{org_id}/{stream_name}/{timestamp}/{profile_id}/{sample_idx}/{obs_idx}/{stack}/{value}"
+                    "{org_id}/{stream_name}/{timestamp}/{profile_id}/{sample_idx}/{obs_idx}/{value}"
                 ))
             );
             record.insert("event_id".to_string(), json::Value::String(event_id));
