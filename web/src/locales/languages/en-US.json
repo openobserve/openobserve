@@ -14338,13 +14338,15 @@
         "step": "Step",
         "stepHint": "A single action",
         "subtest": "Subtest",
-        "subtestHint": "Reuse a shared flow"
+        "subtestHint": "Reuse a shared flow",
+        "addSubtest": "Add subtest"
       },
       "usedBy": {
         "aria": "Tests that use this one",
         "help": "They run these steps on their own page. This test's Starting URL, environments and secrets are not used there.",
         "viewAll": "View all {count} tests",
-        "subtitle": "{folder} · used by {count} test | {folder} · used by {count} tests"
+        "subtitle": "{folder} · used by {count} test | {folder} · used by {count} tests",
+        "subtitleNoFolder": "Used by {count} test | Used by {count} tests"
       },
       "recordingIn": "Recording in {environment}",
       "needsDesktopRecorder": "Needs the desktop recorder extension",

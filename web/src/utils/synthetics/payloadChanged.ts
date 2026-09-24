@@ -16,19 +16,15 @@
 import { cloneDeep, isEqual } from "lodash-es";
 import type { BrowserCheck } from "@/types/synthetics";
 import { buildCreateBrowserTestPayload } from "./buildPayload";
-
-/** The same condition `computeStart` uses to take the start from the schedule fields. */
-function startFromFields({ schedule }: BrowserCheck): boolean {
-  if (!schedule) return false;
-  return schedule.startType === "later" && !!schedule.startDate && !!schedule.startTime;
-}
+import { startFromScheduleFields } from "./scheduleStart";
 
 /** Whether saving `current` would send something other than `saved`. */
 export function browserCheckChanged(current: BrowserCheck, saved: BrowserCheck): boolean {
   const next = buildCreateBrowserTestPayload(cloneDeep(current));
   const before = buildCreateBrowserTestPayload(cloneDeep(saved));
   // Schedule Now reads `start`/`tz_offset` off the clock; Schedule Later derives them from the author's fields.
-  if (startFromFields(current) || startFromFields(saved)) return !isEqual(next, before);
+  if (startFromScheduleFields(current) || startFromScheduleFields(saved))
+    return !isEqual(next, before);
   const { start: _start, tz_offset: _tz, ...rest } = next;
   const { start: _savedStart, tz_offset: _savedTz, ...savedRest } = before;
   return !isEqual(rest, savedRest);

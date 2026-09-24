@@ -189,7 +189,6 @@ const emit = defineEmits<{
   "toggle-variables-panel": [];
   /** Open the referenced check's editor; the host owns the router. */
   "open-child": [child: ChildJourney];
-  /** Change the typed secrets of the run that failed at `failedAtStep`. */
   "edit-secrets": [failedAtStep: number];
 }>();
 
@@ -1276,7 +1275,6 @@ const addDisabled = computed(
   () => !!props.readonly || isRecording.value || isRestoring.value || isReplayLocked.value,
 );
 
-/** The add actions, shared by the toolbar's add menu and the phone menu. */
 const addMenuItems = computed(() => [
   {
     key: "step",
@@ -1293,7 +1291,7 @@ const addMenuItems = computed(() => [
     key: "subtest",
     icon: "account-tree" as const,
     label: t("synthetics.journey.addMenu.subtest"),
-    phoneLabel: t("synthetics.journey.addMenu.subtest"),
+    phoneLabel: t("synthetics.journey.addMenu.addSubtest"),
     hint: isCompositionEnabled.value
       ? t("synthetics.journey.addMenu.subtestHint")
       : t("synthetics.journey.subtest.disabledTooltip"),

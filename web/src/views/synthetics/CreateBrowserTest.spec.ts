@@ -1803,6 +1803,23 @@ describe("CreateBrowserTest", () => {
       wrapper = await mountUsedBy(2);
       expect(subtitle(wrapper)).toBe("Checkout · used by 3 tests");
     });
+
+    it("on a phone a test in the default folder shows the used-by count alone", async () => {
+      mockBreakpoint.mobile = true;
+      mockServiceReferencedBy.mockResolvedValue({
+        data: {
+          references: [{ id: "p1", name: "One", folder_id: "f1" }],
+          hidden_reference_count: 0,
+        },
+      });
+      mockServiceGet.mockResolvedValue({
+        data: { name: "Test Check", url: "https://example.com", folder: "default", journey: [] },
+      });
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      expect(subtitle(wrapper)).toBe("Used by 1 test");
+    });
   });
 
   // The host already computes the executed count, so Save refuses before any request is sent.

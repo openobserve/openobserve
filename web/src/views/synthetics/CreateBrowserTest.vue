@@ -181,15 +181,12 @@ const folderName = computed(() => {
 });
 const { isMobile } = useBreakpoint();
 /** A phone has no room for the header's Used by button, so the count joins the subtitle. */
-const headerSubtitle = computed(() =>
-  isMobile.value && referencedByCount.value > 0
-    ? t(
-        "synthetics.journey.usedBy.subtitle",
-        { folder: folderName.value, count: referencedByCount.value },
-        referencedByCount.value,
-      )
-    : raw(folderName.value),
-);
+const headerSubtitle = computed(() => {
+  const count = referencedByCount.value;
+  if (!isMobile.value || count === 0) return raw(folderName.value);
+  if (!folderName.value) return t("synthetics.journey.usedBy.subtitleNoFolder", { count }, count);
+  return t("synthetics.journey.usedBy.subtitle", { folder: folderName.value, count }, count);
+});
 /**
  * Where every exit from this wizard lands.
  *
@@ -1641,7 +1638,6 @@ function startReplay(pending: PendingReplay) {
     .catch(toastReplayError);
 }
 
-/** Writes the value into the replay's environment (or Global), then re-runs the gate with it supplied. */
 async function onMissingValueSubmit(values: { value: string; secret: boolean }) {
   const prompt = missingPrompt.value;
   if (!prompt) return;
