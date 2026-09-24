@@ -225,6 +225,42 @@ describe("alert_destination service", () => {
         `/api/${params.org_identifier}/alerts/destinations?page_num=3&page_size=100&sort_by=name&desc=true`,
       );
     });
+
+    it("should append include_usage when requested", async () => {
+      const params = {
+        org_identifier: "org123",
+        page_num: 1,
+        page_size: 100000,
+        desc: false,
+        sort_by: "name",
+        module: "alert",
+        include_usage: true,
+      };
+
+      mockHttpInstance.get.mockResolvedValue({ data: [] });
+
+      await destination.list(params);
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        `/api/${params.org_identifier}/alerts/destinations?page_num=${params.page_num}&page_size=${params.page_size}&sort_by=${params.sort_by}&desc=${params.desc}&module=${params.module}&include_usage=true`,
+      );
+    });
+
+    it("should not append include_usage when not requested", async () => {
+      const params = {
+        org_identifier: "org123",
+        page_num: 1,
+        page_size: 100,
+        desc: false,
+        sort_by: "name",
+      };
+
+      mockHttpInstance.get.mockResolvedValue({ data: [] });
+
+      await destination.list(params);
+
+      expect(mockHttpInstance.get.mock.calls[0][0]).not.toContain("include_usage");
+    });
   });
 
   describe("get_by_name", () => {

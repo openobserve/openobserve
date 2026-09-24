@@ -47,6 +47,7 @@ pub mod composite_graph_lock;
 #[cfg(feature = "enterprise")]
 pub mod deduplication;
 pub mod derived_streams;
+pub mod destination_usage;
 pub mod destinations;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
