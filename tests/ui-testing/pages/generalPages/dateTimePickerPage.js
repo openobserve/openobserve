@@ -51,11 +51,15 @@ export class DateTimePickerPage {
         // Apply button — rendered only when the host sets autoApply=false.
         this.applyBtn = page.locator('[data-test="date-time-apply-btn"]');
 
-        // Custom relative row — value input + unit select. DateTime.vue forwards
-        // these data-tests to OInput/OSelect, which derive `-field` / `-trigger` /
-        // `-option` on the real controls (see DateTime.vue custom row, ~198-222).
-        this.customValueInput = page.locator('[data-test="date-time-relative-custom-value-field"]');
-        this.customPeriodTrigger = page.locator('[data-test="date-time-relative-custom-period-trigger"]');
+        // Custom relative row — value input + unit select. The product DateTime.vue
+        // renders these controls WITHOUT a data-test (testability-only), so scope
+        // structurally: the custom row is the `.relative-row` that holds the native
+        // number input; the unit select is the single combobox inside that row.
+        this.customRow = page
+            .locator('#date-time-menu .relative-row')
+            .filter({ has: page.locator('input[type="number"]') });
+        this.customValueInput = this.customRow.locator('input[type="number"]');
+        this.customPeriodTrigger = this.customRow.locator('[role="combobox"]');
 
         // ==================== Expected toast messages ====================
         // Values of common.dateRangeCopied / dateRangePasted / dateRangePasteError
@@ -76,11 +80,15 @@ export class DateTimePickerPage {
         return this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
     }
 
-    /** Unit option in the custom period select; unit is one of s/m/h/d/w/M. */
+    /**
+     * Unit option in the custom period select; unit is one of s/m/h/d/w/M.
+     * The OSelect renders each option (ListboxItem/OSelectItem) with the option
+     * value mirrored onto `data-test-value`, so the option is addressable without
+     * the (absent) parent data-test. Only one select's dropdown is open at a time,
+     * so a bare `data-test-value` match is unambiguous.
+     */
     customPeriodOption(unit) {
-        return this.page.locator(
-            `[data-test="date-time-relative-custom-period-option"][data-test-value="${unit}"]`
-        );
+        return this.page.locator(`[data-test-value="${unit}"]`);
     }
 
     // ==================== Panel open / close ====================
