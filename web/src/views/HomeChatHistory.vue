@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import { useChatHistory } from "@/composables/useChatHistory";
+import useAiChat from "@/composables/useAiChat";
 import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -20,6 +21,7 @@ const { loadHistory, deleteChatById, clearAllHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",
   () => store.state.selectedOrganization.identifier ?? "",
   t,
+  useAiChat().chatHistoryServer(),
 );
 
 const { confirm } = useConfirmDialog();

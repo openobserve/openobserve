@@ -285,6 +285,23 @@ pub async fn get(email: &str) -> Result<UserRecord, errors::Error> {
     Ok(UserRecord::from(record))
 }
 
+/// The stable `users.id` for an email, or `None` when no such user exists.
+///
+/// Not cached on purpose: an email that is removed and registered again gets
+/// a new id, and anything owned by the old one must not follow it.
+pub async fn get_id_by_email(email: &str) -> Result<Option<String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let id = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
+        .into_tuple::<String>()
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(id)
+}
+
 pub async fn get_root_user() -> Result<UserRecord, errors::Error> {
     let client = get_orm_client_ro().await;
     let record = Entity::find()
