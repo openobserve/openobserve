@@ -1532,6 +1532,13 @@ const missingDialogProps = computed(() => {
   };
 });
 
+/** A Global replay of a check pinned to an environment this user cannot read. */
+function pinsUnreadableForGlobal(envId: string): boolean {
+  return (
+    envId === GLOBAL_ONLY && (check.value.environments ?? []).some((id) => !namedEnvironment(id))
+  );
+}
+
 // The view's recorder error has no banner; a silent failure reads as a dead button.
 function toastReplayError(err: unknown) {
   toast({ variant: "error", message: raw(err instanceof Error ? err.message : String(err)) });
@@ -1577,8 +1584,8 @@ async function runReplay(journey: BrowserStep[]) {
 
 /** Asks for what the replay cannot resolve, one dialog at a time, then replays. */
 function gateReplay(pending: PendingReplay) {
-  // Without the environment list a verdict would be a guess, so replay as before and let a failure speak.
-  if (!sharedEnvironmentsLoaded.value) {
+  // Without the environment list, or with a pinned one hidden from this user, a verdict would be a guess.
+  if (!sharedEnvironmentsLoaded.value || pinsUnreadableForGlobal(pending.envId)) {
     lastReplayTypedSecrets.value = null;
     startReplay(pending);
     return;

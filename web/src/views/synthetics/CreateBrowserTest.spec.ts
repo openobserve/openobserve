@@ -2484,6 +2484,18 @@ describe("CreateBrowserTest", () => {
       expect(replayedVariables()).toContainEqual({ name: "API_KEY", value: "k" });
     });
 
+    it("replays as today, without the missing-value dialog, when every pinned environment is unreadable", async () => {
+      mockServiceListGlobalVariables.mockResolvedValue({
+        data: [variable("BASE_URL", "https://global.test")],
+      });
+      wrapper = await mountTemplatedCheck(["hidden"], { journey: [typeStep("s1", "{{API_KEY}}")] });
+
+      await replayJourney(wrapper);
+
+      expect(missingDialogOpen(wrapper)).toBe(false);
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+    });
+
     it("replays as today, without the missing-value dialog, when the environment list is refused", async () => {
       mockServiceListEnvironments.mockRejectedValue({ response: { status: 403 } });
       wrapper = await mountLoadedCheck(["stg"], { journey: [typeStep("s1", "{{API_KEY}}")] });
