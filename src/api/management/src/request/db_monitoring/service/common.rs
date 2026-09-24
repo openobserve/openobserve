@@ -346,12 +346,7 @@ impl ScopeFilters {
 
 /// Read one record family from `_o2_db_stats`.
 ///
-/// Time semantics: rollup `_timestamp` is the window END, so the read must keep
-/// windows ending inside `(start_time, end_time)` — the window whose END lands
-/// exactly on `start_time` belongs to the PREVIOUS range, and admitting it
-/// double-counts one window at every adjacent range boundary (the paging /
-/// refresh case where two successive reads share an edge). The UPPER edge is
-/// exclusive too; see [`stats_read_range`] for why.
+/// Rows are stamped at their window END; [`stats_read_range`] owns both edges.
 ///
 /// **No builder here spells a `_timestamp` bound** — this one used to, and the
 /// inline `_timestamp > start AND _timestamp <= end` it carried was measured to
@@ -365,10 +360,7 @@ impl ScopeFilters {
 /// The window is therefore carried solely by the request payload, which the
 /// planner pushes down as a physical `_timestamp >= start AND _timestamp < end`
 /// FilterExec per scan (`search/src/datafusion/table_provider/helpers.rs`).
-/// [`stats_read_range`] converts the caller's range into that payload:
-/// `_timestamp` is integer µs, so on integers `> start` ≡ `>= start + 1`, and
-/// `< end` is already exclusive, making the payload `[start + 1, end)` exactly
-/// the intended `(start, end)`.
+/// [`stats_read_range`] converts the caller's range into that payload.
 pub(crate) fn build_stats_sql(org_id: &str, record_type: &str, preds: &str) -> String {
     build_stats_sql_projected(org_id, record_type, preds, "*")
 }
@@ -393,30 +385,52 @@ pub(crate) fn build_stats_sql_projected(
 /// The payload window for a `_o2_db_stats` read: the ONLY thing that bounds
 /// these scans (see [`build_stats_sql`]).
 ///
-/// Rollup `_timestamp` is the window END, so a stats read wants the OPEN span
-/// `(start, end)` — BOTH edges exclusive, for the same reason at each end:
-///
-/// * a window ending exactly on `start_time` finished before the range opened; it is the PREVIOUS
-///   range's last window.
-/// * a window ending exactly on `end_time` has not finished inside the range; it is the NEXT
-///   range's first window. The caller's `[start, end)` is a half-open span of wall clock, so its
-///   own last window is the one ending one grid step BEFORE `end_time`.
-///
-/// Counting either edge makes two adjacent reads (paging, refresh, the Δ
-/// baseline) both claim the same window.
-///
-/// The payload filter is `>= lo AND < hi` and `_timestamp` is integer µs, so
-/// `> start` ≡ `>= start + 1`, and `< end` is already exclusive: `(start, end)`
-/// is the payload `[start + 1, end)`.
-///
-/// The upper edge stays EXCLUSIVE: `hi` is `end_time`, not `end_time + 1`.
-/// Admitting the window that ends exactly at `end_time` over-counts by one
-/// window (a uniform +33% on a 1h window against 900s rollups). See
-/// `test_stats_read_range_excludes_window_ending_at_end_time`.
-///
-/// Saturating, so an `i64::MAX` end cannot wrap the window inside out.
+/// Row `E` covers `[E - w, E)`, so it lies in `[start, end)` iff `E ∈ (start, end]`.
 pub(crate) fn stats_read_range(start_time: i64, end_time: i64) -> (i64, i64) {
-    (start_time.saturating_add(1), end_time)
+    (start_time.saturating_add(1), end_time.saturating_add(1))
+}
+
+/// How a stats read may use the result cache, which never re-reads below a cached end.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum StatsCachePlan {
+    Uncached,
+    Cached,
+    /// `(start, cut]` is final and cached; `(cut, end]` may still gain rows.
+    Split(i64),
+}
+
+pub(crate) fn plan_stats_cache(
+    start_time: i64,
+    end_time: i64,
+    settled: Option<i64>,
+) -> StatsCachePlan {
+    match settled {
+        Some(cut) if cut >= end_time => StatsCachePlan::Cached,
+        Some(cut) if cut > start_time => StatsCachePlan::Split(cut),
+        _ => StatsCachePlan::Uncached,
+    }
+}
+
+/// The offset every live stream has rolled up through; a deleted stream's key is never removed.
+pub(crate) fn stats_settled(
+    offsets: &std::collections::HashMap<String, (i64, String)>,
+    live_streams: &[String],
+    unclaimed_eligible: bool,
+) -> Option<i64> {
+    if unclaimed_eligible {
+        return None;
+    }
+    live_streams
+        .iter()
+        .filter_map(|s| offsets.get(s).map(|o| o.0))
+        .min()
+}
+
+/// Two halves each carry the LIMIT, so re-apply it to keep the single read's cap.
+pub(crate) fn merge_stats_rows(mut cached: Vec<Value>, fresh: Vec<Value>) -> Vec<Value> {
+    cached.extend(fresh);
+    cached.truncate(STATS_READ_SIZE);
+    cached
 }
 
 /// The subset of `wanted` columns actually present on the `_o2_db_stats`
@@ -794,15 +808,6 @@ pub(crate) struct TailData {
 /// window the rollup has not covered. Returns `None` when the delta is
 /// disabled.
 ///
-/// NOT memoised here. There was a process-local cache keyed `(org, stream)` +
-/// offset, with its own TTL and single-flight lock; the search RESULT cache
-/// replaced it. That cache keys on the query AND its time range — which is what
-/// identifies a delta now that the window comes from the request rather than
-/// the clock — and it is shared across the cluster, where the old one was per
-/// process (N queriers meant N cold misses on the same window). It also needs no
-/// invalidation of its own: once the rollup advances, `delta_start` moves and
-/// the read is simply a different query.
-///
 /// `offset` is the stream's rollup offset, resolved by the caller — the whole
 /// fleet's offsets come from ONE prefix read in [`collect_tails`].
 async fn compute_tail(
@@ -833,7 +838,11 @@ async fn compute_tail(
     // `data_through` and `tail_start` is covered by neither source — which is
     // exactly what `tail_covers_from` reports, and what the UI's staleness
     // banner is for.
-    let tail_start = rollup::delta_start(offset, q_start, q_end);
+    let budget = rollup::delta_budget(
+        rollup::rollup_interval_secs() as i64 * 1_000_000,
+        config::get_config().limit.cache_delay_secs * 1_000_000,
+    );
+    let tail_start = rollup::delta_start(offset, q_start, q_end, budget);
     let tail_end = q_end;
 
     // Schema gate: a stream without the DBM columns contributes no delta.
@@ -856,11 +865,6 @@ async fn compute_tail(
 
     // The BOUNDED two-stage form (§5.2), reusing the rollup's own builders —
     // never the raw unbounded aggregate.
-    // Stamp the delta rows on the SAME grid the rollup writes to: the window
-    // the rollup will itself write once it catches up, so a cached delta row
-    // and the eventual rollup row are the same window on the same lattice —
-    // comparable, and not double-counted. Derived from the request's end, not
-    // the clock, so the stamp is stable for a given window.
     let grid_stamp = rollup::floor_to_grid(tail_end);
     let rank_sql = rollup::build_rank_sql(stream, rollup::ROLLUP_TOP_N, has_rows_col, grid_stamp);
     let totals_sql = rollup::build_totals_sql(stream, has_rows_col, grid_stamp);
@@ -873,9 +877,10 @@ async fn compute_tail(
     };
     // Rank and totals are independent stages of the same bounded form — run
     // them concurrently rather than back to back.
+    // Uncached: the SQL omits `tail_start`, so a cached tail re-adds windows rolled up since.
     let (rank_rows, totals_rows) = tokio::join!(
-        rollup::run_dbm_search(org_id, None, rank_sql, tail_start, tail_end, true),
-        rollup::run_dbm_search(org_id, None, totals_sql, tail_start, tail_end, true),
+        rollup::run_dbm_search(org_id, None, rank_sql, tail_start, tail_end, false),
+        rollup::run_dbm_search(org_id, None, totals_sql, tail_start, tail_end, false),
     );
     match (rank_rows, totals_rows) {
         (Ok(rank), Ok(totals)) => {
@@ -934,15 +939,54 @@ pub(super) async fn run_stats_search(
     if !infra::schema::exists(org_id, StreamType::Logs, O2_DB_STATS_STREAM).await {
         return Ok(Vec::new());
     }
+    let settled = stats_settled_offset(org_id).await;
+    match plan_stats_cache(start_time, end_time, settled) {
+        StatsCachePlan::Uncached => {
+            stats_search_once(org_id, user_id, sql, start_time, end_time, false).await
+        }
+        StatsCachePlan::Cached => {
+            stats_search_once(org_id, user_id, sql, start_time, end_time, true).await
+        }
+        StatsCachePlan::Split(cut) => {
+            let (cached, fresh) = tokio::join!(
+                stats_search_once(org_id, user_id, sql.clone(), start_time, cut, true),
+                stats_search_once(org_id, user_id, sql, cut, end_time, false)
+            );
+            Ok(merge_stats_rows(cached?, fresh?))
+        }
+    }
+}
+
+/// `None` (nothing cacheable) on a meta read error or while an eligible stream has no offset yet.
+async fn stats_settled_offset(org_id: &str) -> Option<i64> {
+    let offsets = db::db_monitoring::list_offsets(org_id).await.ok()?;
+    let live = db::schema::list_streams_from_cache(org_id, StreamType::Traces).await;
+    let mut unclaimed_eligible = false;
+    for stream in live.iter().filter(|s| !offsets.contains_key(*s)) {
+        unclaimed_eligible = match infra::schema::get(org_id, stream, StreamType::Traces).await {
+            Ok(schema) => openobserve_core::db_monitoring::stream_supports_db_monitoring(&schema),
+            Err(_) => true,
+        };
+        if unclaimed_eligible {
+            break;
+        }
+    }
+    stats_settled(&offsets, &live, unclaimed_eligible)
+}
+
+async fn stats_search_once(
+    org_id: &str,
+    user_id: Option<&str>,
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+    use_cache: bool,
+) -> Result<Vec<Value>, anyhow::Error> {
     // The window is carried ENTIRELY by the payload — no stats SQL string spells
     // a `_timestamp` bound — and it is shifted to `(start, end]` here, at the one
     // chokepoint every stats read passes through, so no call site can forget.
     let (lo, hi) = stats_read_range(start_time, end_time);
-    // Cached. The range is the CALLER'S (shifted to `(start, end]` above), so
-    // every viewer of the same window asks the identical question and the
-    // result cache can answer it — the rollup read is the cheap half, but it is
-    // also the one every DBM tab issues on every load.
-    let req = rollup::dbm_search_request(sql, lo, hi, STATS_READ_SIZE as i64, 30, true);
+    let req = rollup::dbm_search_request(sql, lo, hi, STATS_READ_SIZE as i64, 30, use_cache);
     // The caller's identity is carried into the search, not dropped. It does NOT
     // authorize the read — `search_service` performs no permission check; that is
     // the handler's job (see `can_read_stream`). What it does carry is the
@@ -2286,6 +2330,151 @@ mod tests {
         assert_stream_rejected(blocking.expect_err("blocking must 400 on a non-DBM stream")).await;
     }
 
+    // A cached tail overlapping a since-rolled-up window would count that window twice.
+    #[test]
+    fn live_tail_searches_bypass_the_result_cache() {
+        let src = dbm_prod_source();
+        let start = src.find("async fn compute_tail(").expect("compute_tail");
+        let body = src[start..].split("\n}\n").next().expect("body");
+        let calls: Vec<&str> = body
+            .match_indices("rollup::run_dbm_search(")
+            .map(|(i, _)| {
+                let call = &body[i..];
+                &call[..call
+                    .find("),")
+                    .or_else(|| call.find(");"))
+                    .expect("call end")]
+            })
+            .collect();
+        assert_eq!(calls.len(), 2, "rank + totals tail searches");
+        for call in calls {
+            assert!(
+                call.trim_end()
+                    .trim_end_matches(',')
+                    .rsplit(',')
+                    .next()
+                    .map(str::trim)
+                    == Some("false"),
+                "the live tail must not use the result cache: {call}"
+            );
+        }
+    }
+
+    // The cacher resumes after a cached end, so a row landing below it is never read.
+    #[test]
+    fn a_stats_range_cached_before_its_window_landed_never_rereads_it() {
+        let (w, delay) = (900_000_000_i64, 300_000_000_i64);
+        let e = 1_700_000_900_000_000_i64;
+        let (lo, t1) = (e - 4 * w, e + delay + 100_000_000);
+        let meta = infra::cache::meta::ResultCacheMeta {
+            start_time: lo,
+            end_time: t1 - delay,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        let t2 = e + delay + w;
+        let mut deltas = Vec::new();
+        search_service::cache::cacher::calculate_deltas(&meta, lo, t2 + 1, 0, &mut deltas);
+        assert!(meta.end_time >= e, "row E falls inside the cached segment");
+        assert!(
+            deltas.iter().all(|d| d.delta_start_time > e),
+            "no delta re-reads row E: {deltas:?}"
+        );
+    }
+
+    #[test]
+    fn stats_cache_plan_caches_only_below_the_settled_offset() {
+        let (w, e) = (900_000_000_i64, 1_700_000_900_000_000_i64);
+        let start = e - 4 * w;
+        assert_eq!(plan_stats_cache(start, e, None), StatsCachePlan::Uncached);
+        assert_eq!(
+            plan_stats_cache(start, e, Some(start)),
+            StatsCachePlan::Uncached
+        );
+        assert_eq!(plan_stats_cache(start, e, Some(e)), StatsCachePlan::Cached);
+        assert_eq!(
+            plan_stats_cache(start, e, Some(e + w)),
+            StatsCachePlan::Cached
+        );
+        assert_eq!(
+            plan_stats_cache(start, e, Some(e - w)),
+            StatsCachePlan::Split(e - w)
+        );
+        // A row stamped exactly at the cut is read by exactly one half.
+        let cut = e - w;
+        let (_, cached_hi) = stats_read_range(start, cut);
+        let (fresh_lo, _) = stats_read_range(cut, e);
+        assert_eq!(cached_hi, fresh_lo, "halves are contiguous and disjoint");
+        assert!(cut < cached_hi, "row at the cut is in the cached half");
+    }
+
+    #[test]
+    fn stats_settled_counts_only_live_streams() {
+        let (w, e) = (900_000_000_i64, 1_700_000_900_000_000_i64);
+        let offsets: std::collections::HashMap<String, (i64, String)> = [
+            ("a".to_string(), (e, String::new())),
+            ("b".to_string(), (e + w, "n".to_string())),
+            ("gone".to_string(), (e - 100 * w, String::new())),
+        ]
+        .into();
+        let live = |names: &[&str]| names.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            stats_settled(&offsets, &live(&["a", "b"]), false),
+            Some(e),
+            "a deleted stream's frozen offset must not pin the cut"
+        );
+        assert_eq!(
+            stats_settled(&offsets, &live(&["a", "b", "gone"]), false),
+            Some(e - 100 * w)
+        );
+        assert_eq!(
+            stats_settled(&offsets, &live(&["a", "b"]), true),
+            None,
+            "an eligible stream not yet claimed may land its first window anywhere"
+        );
+        assert_eq!(stats_settled(&offsets, &live(&[]), false), None);
+        let claimed: std::collections::HashMap<String, (i64, String)> =
+            [("a".to_string(), (0, "n".to_string()))].into();
+        assert_eq!(
+            plan_stats_cache(e - w, e, stats_settled(&claimed, &live(&["a"]), false)),
+            StatsCachePlan::Uncached,
+            "claimed but not yet advanced"
+        );
+    }
+
+    #[test]
+    fn merged_stats_halves_keep_the_single_read_cap() {
+        let rows = |n: usize| vec![json!({}); n];
+        assert_eq!(merge_stats_rows(rows(3), rows(2)).len(), 5);
+        assert_eq!(
+            merge_stats_rows(rows(STATS_READ_SIZE), rows(7)).len(),
+            STATS_READ_SIZE
+        );
+    }
+
+    #[test]
+    fn stats_reads_cache_only_rolled_up_ranges() {
+        let src = dbm_prod_source();
+        let start = src
+            .find("async fn run_stats_search(")
+            .expect("run_stats_search");
+        let body = src[start..].split("\n}\n").next().expect("body");
+        for needle in [
+            "stats_settled_offset(",
+            "plan_stats_cache(",
+            "merge_stats_rows(",
+        ] {
+            assert!(
+                body.contains(needle),
+                "the stats read must split the cache at the rollup offset: {needle}"
+            );
+        }
+        assert!(
+            !body.contains("STATS_READ_SIZE as i64, 30, true)"),
+            "an unconditional cached stats read undercounts windows written after caching"
+        );
+    }
+
     /// A role granting the `db_monitoring` MODULE
     /// (`{"object":"db_monitoring:_all_default","permission":"AllowAll"}`) and
     /// nothing else must reach all ten DBM endpoints.
@@ -2587,83 +2776,41 @@ mod tests {
         }
     }
 
-    // Rollup `_timestamp` is the window
-    // END, so a row stamped exactly on `start_time` is the PREVIOUS range's
-    // last window: two adjacent reads sharing an edge must not both count it.
-    // The payload filter is `>= lo AND < hi`, so excluding that row requires
-    // `lo == start_time + 1` — which is what `stats_read_range` produces.
+    /// A row stamped `E` covers `[E - w, E)`, so it lies inside `[S, T)` exactly when `E ∈ (S, T]`.
     #[test]
-    fn test_stats_read_range_excludes_row_at_start_time() {
+    fn test_stats_read_range_admits_exactly_the_windows_inside_the_request() {
         let (start, end) = (1_786_512_485_424_263_i64, 1_786_999_999_000_000_i64);
         let (lo, hi) = stats_read_range(start, end);
-
-        // A row stamped EXACTLY at start_time is excluded by `>= lo`.
-        assert!(
-            start < lo,
-            "a window ending exactly at start_time must be excluded: {start} >= {lo}"
-        );
-        // The first row that must survive is one µs later.
-        assert!(start + 1 >= lo, "start_time + 1 must be admitted");
-        // The upper edge is EXCLUSIVE for the mirror-image reason: a window
-        // ending exactly at end_time has not finished inside the caller's
-        // half-open `[start, end)` — it is the NEXT range's first window.
-        assert!(
-            end >= hi,
-            "a window ending exactly at end_time must be excluded: {end} < {hi}"
-        );
-        assert!(end - 1 < hi, "one µs before end_time must be kept");
-    }
-
-    /// REGRESSION (measured live: every database uniformly 4/3 = +33% on a
-    /// narrow window). Rollup `_timestamp` is the window END, and the caller's
-    /// `[start_time, end_time)` is a HALF-OPEN span of wall clock: the window
-    /// ending exactly at `end_time` has not finished inside the range, it is
-    /// the FIRST window of the NEXT range. Counting it here counts it twice
-    /// across two adjacent reads — the same double-count `lo` guards at the
-    /// bottom edge, unguarded at the top.
-    ///
-    /// Before the inline predicate was removed, the effective range was the
-    /// INTERSECTION of the payload `[start, end)` and the inline
-    /// `(start, end]`, i.e. the OPEN span `(start, end)`. The payload alone
-    /// must reproduce that, so `hi == end_time`, NOT `end_time + 1`.
-    ///
-    /// The blast radius is worst exactly where it was measured: a request whose
-    /// width is a whole number of rollup windows AND is phase-aligned to the
-    /// rollup grid admits one extra window out of N. At the 1h window / 900s
-    /// rollup of the live check that is 4 windows counted where 3 belong.
-    #[test]
-    fn test_stats_read_range_excludes_window_ending_at_end_time() {
-        let w = 900_i64 * 1_000_000; // rollup::ROLLUP_INTERVAL_SECS
-        let start = 1_786_512_485_424_263_i64;
-        let end = start + 4 * w; // exactly 4 windows wide, grid-phase-aligned
-        let (lo, hi) = stats_read_range(start, end);
-
-        // The window ending EXACTLY at end_time belongs to the next range.
-        assert!(
-            !(lo..hi).contains(&end),
-            "window ending exactly at end_time must be excluded: {end} in [{lo},{hi})"
-        );
-        // ...while the range's own last window (one grid step earlier) stays.
-        assert!(
-            (lo..hi).contains(&(end - w)),
-            "the range's last window must be kept: {} not in [{lo},{hi})",
-            end - w
-        );
-        // The bottom edge keeps its existing exclusive semantics.
         assert!(
             !(lo..hi).contains(&start),
-            "window ending exactly at start_time must be excluded"
+            "a window ending at start_time ended before the range opened"
         );
+        assert!((lo..hi).contains(&(start + 1)));
+        assert!(
+            (lo..hi).contains(&end),
+            "a window ending at end_time lies wholly inside [start, end)"
+        );
+        assert!(!(lo..hi).contains(&(end + 1)));
+    }
 
-        // The count itself: 3 windows, not 4. This is the measured 4/3 inflation.
-        let admitted = (0..=4)
+    /// The old `[S + 1, T)` payload admitted 3 of these 4 windows (−25%) on every aligned read.
+    #[test]
+    fn test_stats_read_range_aligned_4w_request_admits_4_windows() {
+        let w = 900_i64 * 1_000_000;
+        let start = 1_786_512_000_000_000_i64 / w * w;
+        let end = start + 4 * w;
+        let (lo, hi) = stats_read_range(start, end);
+        let admitted = (0..=5)
             .map(|i| start + i * w)
             .filter(|t| (lo..hi).contains(t))
             .count();
         assert_eq!(
-            admitted, 3,
-            "a 4-window-wide aligned request must admit 3 grid windows, not 4"
+            admitted, 4,
+            "a 4-window aligned request must admit 4 windows"
         );
+        // Adjacent reads still never share a window.
+        let (next_lo, _) = stats_read_range(end, end + 4 * w);
+        assert!(hi <= next_lo);
     }
 
     #[test]
