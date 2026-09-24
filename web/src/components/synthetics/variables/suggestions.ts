@@ -32,6 +32,7 @@ export interface CheckVariableLike {
   secure?: boolean;
 }
 
+/** Check-tier rows first, then inherited rows minus those a check variable overrides. */
 export function buildVariableSuggestions(
   grouped: ResolvedVariablesGrouped,
   checkVariables: CheckVariableLike[],

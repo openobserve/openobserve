@@ -74,6 +74,7 @@ import type { VariableSuggestion } from "./suggestions";
 
 const props = defineProps<{
   suggestion: VariableSuggestion;
+  /** The row holds the keyboard highlight, not a committed selection. */
   active: boolean;
 }>();
 
