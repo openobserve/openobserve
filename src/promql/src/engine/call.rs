@@ -143,7 +143,7 @@ impl Engine {
                     .await?;
                 let mut source_labels = vec![];
                 for each_src in args.args[3..].iter() {
-                    if let Value::String(label) = self.exec_expr(each_src).await.unwrap() {
+                    if let Value::String(label) = self.exec_expr(each_src).await? {
                         source_labels.push(label);
                     };
                 }
@@ -538,6 +538,34 @@ mod tests {
                 matches!(result, Err(DataFusionError::NotImplemented(message)) if message == expected)
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_label_replace_copies_value_like_prometheus() {
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        let query = r#"label_replace(label_replace(label_replace(vector(1), "instance", "a", "", ""), "__name__", "mem_usage", "", ""), "host", "$1", "instance", "(.*)")"#;
+        let expr = promql_parser::parser::parse(query).unwrap();
+        let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+            panic!("expected matrix");
+        };
+        assert_eq!(series.len(), 1);
+        let labels: Vec<_> = series[0]
+            .labels
+            .iter()
+            .map(|label| (label.name.as_str(), label.value.as_str()))
+            .collect();
+        assert_eq!(
+            labels,
+            vec![("__name__", "mem_usage"), ("host", "a"), ("instance", "a")]
+        );
     }
 
     #[tokio::test]

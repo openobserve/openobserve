@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use config::meta::promql::value::{Label, LabelsExt, Value};
 use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use regex::Regex;
+
+use super::set_label;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_replace
 pub(crate) fn label_replace(
@@ -28,32 +28,25 @@ pub(crate) fn label_replace(
     source_label: &str,
     regex: &str,
 ) -> Result<Value> {
+    if !Label::is_valid_label_name(dest_label) {
+        return Err(DataFusionError::NotImplemented(format!(
+            "label_replace: invalid destination label provided {dest_label}"
+        )));
+    }
+    let re = Regex::new(&format!("^(?s:{regex})$")).map_err(|_e| {
+        DataFusionError::NotImplemented(format!("label_replace: invalid regex found {regex}"))
+    })?;
+
     match data {
         Value::Matrix(mut matrix) => {
-            // Check if the destination label is a valid name
-            if !Label::is_valid_label_name(dest_label) {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "label_replace: invalid destination label provided {dest_label}"
-                )));
-            }
-
-            let re = Regex::new(regex)
-                .map_err(|_e| DataFusionError::NotImplemented("Invalid regex found".into()))?;
-
             matrix.par_iter_mut().for_each(|range_value| {
-                let labels = &mut range_value.labels;
-                if replacement.is_empty() {
-                    labels.retain(|label| label.name != dest_label);
-                } else {
-                    let label_value = labels.get_value(source_label);
-                    let output_value = re.replace_all(&label_value, replacement);
-                    if output_value != label_value {
-                        labels.push(Arc::new(Label {
-                            name: dest_label.to_string(),
-                            value: output_value.to_string(),
-                        }));
-                    }
-                }
+                let source_value = range_value.labels.get_value(source_label);
+                let Some(captures) = re.captures(&source_value) else {
+                    return;
+                };
+                let mut output = String::new();
+                captures.expand(replacement, &mut output);
+                set_label(&mut range_value.labels, dest_label, &output);
             });
             Ok(Value::Matrix(matrix))
         }
@@ -66,7 +59,159 @@ pub(crate) fn label_replace(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use config::meta::promql::value::{Labels, RangeValue, Sample, labels_value};
+
     use super::*;
+
+    fn series(labels: &[(&str, &str)]) -> Value {
+        let mut labels: Labels = labels
+            .iter()
+            .map(|(name, value)| Arc::new(Label::new(*name, *value)))
+            .collect();
+        labels.sort();
+        Value::Matrix(vec![RangeValue {
+            labels,
+            samples: vec![Sample::new(1000, 1.0)],
+            exemplars: None,
+            time_window: None,
+        }])
+    }
+
+    fn replace_labels(
+        data: Value,
+        dest: &str,
+        replacement: &str,
+        source: &str,
+        regex: &str,
+    ) -> Vec<(String, String)> {
+        let Value::Matrix(matrix) = label_replace(data, dest, replacement, source, regex).unwrap()
+        else {
+            panic!("expected matrix");
+        };
+        assert_eq!(matrix.len(), 1);
+        matrix[0]
+            .labels
+            .iter()
+            .map(|label| (label.name.clone(), label.value.clone()))
+            .collect()
+    }
+
+    fn pairs(labels: &[(&str, &str)]) -> Vec<(String, String)> {
+        labels
+            .iter()
+            .map(|(name, value)| (name.to_string(), value.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn test_label_replace_copies_unchanged_value() {
+        let data = series(&[("__name__", "mem_usage"), ("instance", "a")]);
+        let labels = replace_labels(data, "host", "$1", "instance", "(.*)");
+        assert_eq!(
+            labels,
+            pairs(&[("__name__", "mem_usage"), ("host", "a"), ("instance", "a")])
+        );
+    }
+
+    #[test]
+    fn test_label_replace_regex_is_fully_anchored() {
+        let data = series(&[("instance", "server-1:9090")]);
+        let labels = replace_labels(data, "host", "$1", "instance", r"server-(\d+)");
+        assert_eq!(labels, pairs(&[("instance", "server-1:9090")]));
+    }
+
+    #[test]
+    fn test_label_replace_expands_template_once() {
+        let data = series(&[("instance", "foo-bar")]);
+        let labels = replace_labels(data, "swapped", "${2}_$1-${1}x", "instance", "(.*)-(.*)");
+        assert_eq!(
+            labels,
+            pairs(&[("instance", "foo-bar"), ("swapped", "bar_foo-foox")])
+        );
+
+        let data = series(&[("instance", "abc")]);
+        let labels = replace_labels(data, "dst", "x", "instance", ".*");
+        assert_eq!(labels, pairs(&[("dst", "x"), ("instance", "abc")]));
+    }
+
+    #[test]
+    fn test_label_replace_dot_matches_newline() {
+        let data = series(&[("src", "a\nb")]);
+        let labels = replace_labels(data, "dst", "$1", "src", "(a.b)");
+        assert_eq!(labels, pairs(&[("dst", "a\nb"), ("src", "a\nb")]));
+    }
+
+    #[test]
+    fn test_label_replace_named_capture_group() {
+        let data = series(&[("instance", "host-7")]);
+        let labels = replace_labels(data, "id", "${num}", "instance", r"host-(?P<num>\d+)");
+        assert_eq!(labels, pairs(&[("id", "7"), ("instance", "host-7")]));
+    }
+
+    #[test]
+    fn test_label_replace_overwrites_existing_dest_without_duplicates() {
+        let data = series(&[("instance", "a:9090"), ("job", "api")]);
+        let labels = replace_labels(data, "instance", "$1", "instance", "(.*):.*");
+        assert_eq!(labels, pairs(&[("instance", "a"), ("job", "api")]));
+    }
+
+    #[test]
+    fn test_label_replace_keeps_labels_sorted() {
+        let data = series(&[("__name__", "m"), ("instance", "a"), ("job", "api")]);
+        let Value::Matrix(matrix) = label_replace(data, "zone", "z-$1", "job", "(.*)").unwrap()
+        else {
+            panic!("expected matrix");
+        };
+        let matrix = label_replace(Value::Matrix(matrix), "app", "$1", "job", "(.*)").unwrap();
+        let Value::Matrix(matrix) = matrix else {
+            panic!("expected matrix");
+        };
+        let labels = &matrix[0].labels;
+        assert!(labels.windows(2).all(|pair| pair[0].name < pair[1].name));
+        assert_eq!(labels_value(labels, "app").as_deref(), Some("api"));
+        assert_eq!(labels_value(labels, "zone").as_deref(), Some("z-api"));
+        assert_eq!(labels_value(labels, "__name__").as_deref(), Some("m"));
+    }
+
+    #[test]
+    fn test_label_replace_empty_expansion_deletes_dest() {
+        let data = series(&[("dst", "old"), ("src", "")]);
+        let labels = replace_labels(data, "dst", "$1", "src", "(.*)");
+        assert_eq!(labels, pairs(&[("src", "")]));
+    }
+
+    #[test]
+    fn test_label_replace_no_match_with_empty_replacement_keeps_dest() {
+        let data = series(&[("dst", "old"), ("src", "value")]);
+        let labels = replace_labels(data, "dst", "", "src", r"\d+");
+        assert_eq!(labels, pairs(&[("dst", "old"), ("src", "value")]));
+    }
+
+    #[test]
+    fn test_label_replace_missing_source_matches_empty_string() {
+        let data = series(&[("job", "api")]);
+        let labels = replace_labels(data, "dst", "x$1", "missing", "(.*)");
+        assert_eq!(labels, pairs(&[("dst", "x"), ("job", "api")]));
+    }
+
+    #[test]
+    fn test_label_replace_metric_name_as_dest() {
+        let data = series(&[("__name__", "old_name"), ("job", "api")]);
+        let labels = replace_labels(data, "__name__", "new_$1", "__name__", "old_(.*)");
+        assert_eq!(labels, pairs(&[("__name__", "new_name"), ("job", "api")]));
+
+        let data = series(&[("__name__", "old_name"), ("job", "api")]);
+        let labels = replace_labels(data, "__name__", "", "job", ".*");
+        assert_eq!(labels, pairs(&[("job", "api")]));
+    }
+
+    #[test]
+    fn test_label_replace_validates_args_before_input() {
+        assert!(label_replace(Value::None, "1bad", "$1", "src", ".*").is_err());
+        assert!(label_replace(Value::None, "dst", "$1", "src", "(").is_err());
+    }
 
     #[test]
     fn test_label_replace_value_none_input() {

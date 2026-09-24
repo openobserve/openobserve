@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::{
-    CounterSeries, EvalContext, ExtrapolationKind, LabelsExt, RangeValue, Sample, Value,
+    CounterSeries, EvalContext, ExtrapolationKind, Label, Labels, LabelsExt, RangeValue, Sample,
+    Value,
 };
 use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
@@ -491,6 +492,15 @@ pub(crate) fn advance_sample_window<'a>(
         *end_index += 1;
     }
     &samples[*start_index..*end_index]
+}
+
+/// Upserts a label keeping labels sorted by name; an empty value deletes it, as Prometheus does.
+pub(crate) fn set_label(labels: &mut Labels, name: &str, value: &str) {
+    labels.retain(|label| label.name != name);
+    if !value.is_empty() {
+        labels.push(Arc::new(Label::new(name, value)));
+    }
+    labels.sort();
 }
 
 fn map_samples(data: Value, operation: &str, map: impl Fn(&Sample) -> f64 + Sync) -> Result<Value> {
