@@ -50,7 +50,7 @@ cloud = [
     "openobserve-jobs/cloud",
 ]
 mimalloc = ["dep:mimalloc"]
-jemalloc = ["dep:tikv-jemallocator"]
+jemalloc = ["dep:tikv-jemallocator", "dep:tikv-jemalloc-ctl"]
 profiling = [
     "jemalloc",
     "openobserve-api-http/profiling",
@@ -179,6 +179,7 @@ tikv-jemallocator = { version = "0.6", optional = true, features = [
     "stats",
     "unprefixed_malloc_on_supported_platforms",
 ] }
+tikv-jemalloc-ctl = { workspace = true, optional = true }
 tempfile.workspace = true
 tiktoken-rs.workspace = true
 tokio.workspace = true

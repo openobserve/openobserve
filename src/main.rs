@@ -43,6 +43,8 @@ use utoipa::OpenApi;
 #[cfg(feature = "enterprise")]
 use {config::Config, o2_enterprise::enterprise::common::config::O2Config};
 
+mod allocator_stats;
+
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -292,6 +294,8 @@ async fn run() -> Result<(), anyhow::Error> {
 
     // Start runtime metrics collector
     openobserve_node::runtime_metrics::start_metrics_collector().await;
+    openobserve_node::memory_metrics::start();
+    allocator_stats::start();
 
     // let node online
     cluster::set_online().await?;
