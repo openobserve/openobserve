@@ -509,7 +509,8 @@ export class LogsPage {
         // useLogsHighlighter marks FTS matches with .log-highlighted inside the result cell.
         this.highlightedMatch = '[data-test="logs-search-result-logs-table"] .log-highlighted';
         // The "=" icon is revealed on hover over its sidebar field row.
-        this.fieldListItem = (field) => `[data-test="logs-field-list-item-${field}"]`;
+        this.fieldListItemPrefix = 'logs-field-list-item-';
+        this.logDetailRowPrefix = 'log-detail-row-';
         this.fieldEqualsButton = (field) => `[data-test="log-search-index-list-filter-${field}-field-btn"]`;
         this.logDetailRow = (field) => `[data-test="log-detail-row-${field}"]`;
         this.logDetailFieldMenuTrigger = '[data-test="log-details-include-exclude-field-btn"]';
@@ -2061,10 +2062,10 @@ export class LogsPage {
     /** Sidebar fields that offer an "=" filter, in render order; the set varies by dataset. */
     async getFilterableSidebarFields(count = 2) {
         const fields = await this.page
-            .locator('[data-test^="logs-field-list-item-"]')
-            .evaluateAll((items) =>
-                items.map((i) => (i.getAttribute('data-test') || '').replace('logs-field-list-item-', '')),
-            );
+            .locator(`[data-test^="${this.fieldListItemPrefix}"]`)
+            .evaluateAll((items, prefix) =>
+                items.map((i) => (i.getAttribute('data-test') || '').replace(prefix, '')),
+            this.fieldListItemPrefix);
         const usable = fields.filter((f) => f && f !== '_timestamp');
         if (usable.length < count) {
             throw new Error(`need ${count} filterable sidebar fields, saw: ${fields.join(', ')}`);
@@ -2087,9 +2088,11 @@ export class LogsPage {
 
     /** First expanded-row field that offers the add/remove action; timestamp never does. */
     async getFirstActionableDetailField() {
-        const fields = await this.page.locator('[data-test^="log-detail-row-"]').evaluateAll((rows) =>
-            rows.map((r) => (r.getAttribute('data-test') || '').replace('log-detail-row-', '')),
-        );
+        const fields = await this.page
+            .locator(`[data-test^="${this.logDetailRowPrefix}"]`)
+            .evaluateAll((rows, prefix) =>
+                rows.map((r) => (r.getAttribute('data-test') || '').replace(prefix, '')),
+            this.logDetailRowPrefix);
         const field = fields.find((f) => f && f !== '_timestamp');
         if (!field) throw new Error(`no actionable field in the expanded row, saw: ${fields.join(', ')}`);
         return field;
