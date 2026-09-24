@@ -4997,7 +4997,7 @@
     "colorLightToDarkBlue": "Light To Dark Blue (By Value)",
     "colorPaletteClassicBySeries": "Palette-Classic (By Series)",
     "drilldown": "Drilldown",
-    "drilldownTooltip": "Navigate to a another dashboard or specified URL, carrying over all current variables for seamless data exploration.",
+    "drilldownTooltip": "Navigate to another dashboard or specified URL, carrying over all current variables for seamless data exploration.",
     "colorBySeriesTitle": "Color by series",
     "colorBySeriesTooltip": "Apply colors to series for better visual distinction in charts. Customize colors for each series to enhance data visualization.",
     "editColorBySeries": " Edit color by series",
