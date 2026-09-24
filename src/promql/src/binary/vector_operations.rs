@@ -111,6 +111,7 @@ fn vector_scalar_op(
 ) -> Result<Value> {
     let is_comparison_operator = expr.op.is_comparison_operator();
     let return_bool = expr.return_bool();
+    let drop_metric_name = return_bool || DROP_METRIC_BIN_OP.contains(&expr.op.id());
     let output: Vec<RangeValue> = left
         .into_par_iter()
         .filter_map(|mut range| {
@@ -148,7 +149,7 @@ fn vector_scalar_op(
                 None
             } else {
                 let mut labels = std::mem::take(&mut range.labels);
-                if return_bool || DROP_METRIC_BIN_OP.contains(&expr.op.id()) {
+                if drop_metric_name {
                     labels = labels.without_metric_name();
                 }
                 range.labels = labels;
@@ -158,6 +159,9 @@ fn vector_scalar_op(
         })
         .collect();
 
+    if drop_metric_name {
+        return Ok(Value::Matrix(merge_same_labelset(output)?));
+    }
     Ok(Value::Matrix(output))
 }
 
@@ -434,10 +438,15 @@ fn merge_matched_series(matched: Vec<MatchedSeries>, one_to_one: bool) -> Result
         }
     }
 
-    let mut output: Vec<RangeValue> = Vec::with_capacity(matched.len());
-    let mut merged = vec![false; matched.len()];
-    let mut by_labels: HashMap<u64, usize> = HashMap::with_capacity(matched.len());
-    for MatchedSeries { range, .. } in matched {
+    merge_same_labelset(matched.into_iter().map(|series| series.range).collect())
+}
+
+/// Merges series left with the same labels, rejecting two samples of one labelset at a timestamp.
+fn merge_same_labelset(series: Vec<RangeValue>) -> Result<Vec<RangeValue>> {
+    let mut output: Vec<RangeValue> = Vec::with_capacity(series.len());
+    let mut merged = vec![false; series.len()];
+    let mut by_labels: HashMap<u64, usize> = HashMap::with_capacity(series.len());
+    for range in series {
         match by_labels.entry(range.labels.signature()) {
             Entry::Occupied(entry) => {
                 output[*entry.get()].samples.extend(range.samples);
@@ -451,7 +460,6 @@ fn merge_matched_series(matched: Vec<MatchedSeries>, one_to_one: bool) -> Result
     }
     for (range, _) in output.iter_mut().zip(merged).filter(|(_, merged)| *merged) {
         range.samples.sort_unstable_by_key(|s| s.timestamp);
-        // on(__name__) matches can collide after the metric name is dropped
         if range
             .samples
             .windows(2)
@@ -473,33 +481,36 @@ fn result_labels(
     one_side: &Labels,
     matching_labels: &[String],
 ) -> Labels {
-    let mut labels = if expr.return_bool() || DROP_METRIC_BIN_OP.contains(&expr.op.id()) {
+    let mut labels = if DROP_METRIC_BIN_OP.contains(&expr.op.id()) {
         labels.without_metric_name()
     } else {
         labels
     };
-    let Some(modifier) = expr.modifier.as_ref() else {
-        return labels;
-    };
-    if modifier.card == VectorMatchCardinality::OneToOne {
-        return if expr.is_matching_on() {
-            labels.keep(matching_labels)
-        } else {
-            labels.delete(matching_labels)
-        };
-    }
-    // group_labels from the `group_x` modifier are taken from the "one"-side.
-    if let Some(group_labels) = modifier.card.labels() {
-        for ln in group_labels.labels.iter() {
-            labels = labels.without_label(ln);
-            let value = one_side.get_value(ln);
-            if !value.is_empty() {
-                labels.set(ln, &value);
+    if let Some(modifier) = expr.modifier.as_ref() {
+        if modifier.card == VectorMatchCardinality::OneToOne {
+            labels = if expr.is_matching_on() {
+                labels.keep(matching_labels)
+            } else {
+                labels.delete(matching_labels)
+            };
+        } else if let Some(group_labels) = modifier.card.labels() {
+            // group_labels from the `group_x` modifier are taken from the "one"-side.
+            for ln in group_labels.labels.iter() {
+                labels = labels.without_label(ln);
+                let value = one_side.get_value(ln);
+                if !value.is_empty() {
+                    labels.set(ln, &value);
+                }
             }
+            labels.sort();
         }
-        labels.sort();
     }
-    labels
+    // bool drops the name only now, so a __name__ copied by group_x is removed too
+    if expr.return_bool() {
+        labels.without_metric_name()
+    } else {
+        labels
+    }
 }
 
 fn format_labels(labels: &Labels) -> String {
@@ -1250,5 +1261,81 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("many-to-many matching not allowed"), "{err}");
+    }
+
+    fn eval_scalar_bin_op(query: &str, left: Vec<RangeValue>) -> Result<Vec<RangeValue>> {
+        let promql_parser::parser::Expr::Binary(expr) =
+            promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("not a binary expression: {query}");
+        };
+        match vector_scalar_bin_op(&expr, left, 1.0, false)? {
+            Value::Matrix(matrix) => Ok(matrix),
+            other => panic!("expected a matrix, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_scalar_op_dropping_name_rejects_same_labelset() {
+        let left = vec![
+            range_at(&[(1, 1.0)], vec![("__name__", "a"), ("job", "x")]),
+            range_at(&[(1, 2.0)], vec![("__name__", "b"), ("job", "x")]),
+        ];
+        let err = eval_scalar_bin_op(r#"{__name__=~"a|b"} atan2 1"#, left)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("same labelset"), "{err}");
+    }
+
+    #[test]
+    fn test_scalar_op_dropping_name_merges_disjoint_timestamps() {
+        let left = vec![
+            range_at(&[(2, 2.0)], vec![("__name__", "b"), ("job", "x")]),
+            range_at(&[(1, 1.0)], vec![("__name__", "a"), ("job", "x")]),
+        ];
+        let result = eval_scalar_bin_op(r#"{__name__=~"a|b"} + 1"#, left).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(label_pairs(&result[0]), pairs(&[("job", "x")]));
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 2.0), (2, 3.0)]);
+    }
+
+    #[test]
+    fn test_scalar_comparison_keeps_distinct_names() {
+        let left = vec![
+            range_at(&[(1, 5.0)], vec![("__name__", "a"), ("job", "x")]),
+            range_at(&[(1, 5.0)], vec![("__name__", "b"), ("job", "x")]),
+        ];
+        let result = eval_scalar_bin_op(r#"{__name__=~"a|b"} > 1"#, left).unwrap();
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_bool_drops_name_copied_by_group_left() {
+        let left = vec![range_at(
+            &[(1, 5.0)],
+            vec![("__name__", "a"), ("instance", "i1"), ("job", "x")],
+        )];
+        let right = vec![range_at(&[(1, 1.0)], vec![("__name__", "b"), ("job", "x")])];
+        let result = eval_bin_op("a > bool on (job) group_left (__name__) b", left, right);
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            label_pairs(&result[0]),
+            pairs(&[("instance", "i1"), ("job", "x")])
+        );
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 1.0)]);
+    }
+
+    #[test]
+    fn test_arithmetic_keeps_name_copied_by_group_left() {
+        let left = vec![range_at(
+            &[(1, 5.0)],
+            vec![("__name__", "a"), ("instance", "i1"), ("job", "x")],
+        )];
+        let right = vec![range_at(&[(1, 1.0)], vec![("__name__", "b"), ("job", "x")])];
+        let result = eval_bin_op("a * on (job) group_left (__name__) b", left, right);
+        assert_eq!(
+            label_pairs(&result[0]),
+            pairs(&[("__name__", "b"), ("instance", "i1"), ("job", "x")])
+        );
     }
 }
