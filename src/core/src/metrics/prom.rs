@@ -1025,23 +1025,15 @@ pub fn label_values_metric_name(selector: Option<&parser::VectorSelector>) -> Re
 }
 
 pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
-    match &selector.name {
-        Some(name) => {
-            // `match[]` argument contains a metric name, e.g.
-            // `match[]=zo_response_code{method="GET"}`
-            Some(name.clone())
-        }
-        None => {
-            // `match[]` argument does not contain a metric name.
-            // Check if there is `__name__` among the matchers,
-            // e.g. `match[]={__name__="zo_response_code",method="GET"}`
-            selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .map(|m| m.value.clone())
-        }
+    if let Some(name) = &selector.name {
+        return (!name.is_empty()).then(|| name.clone());
     }
+    selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .into_iter()
+        .find(|matcher| matches!(matcher.op, MatchOp::Equal) && !matcher.value.is_empty())
+        .map(|matcher| matcher.value)
 }
 
 /// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
@@ -1467,6 +1459,26 @@ mod tests {
     }
 
     #[test]
+    fn test_try_into_metric_name_rejects_non_exact_names() {
+        for query in [
+            r#"{__name__!="up",job="x"}"#,
+            r#"{__name__=~"up.*",job="x"}"#,
+            r#"{__name__=~"up",job="x"}"#,
+            r#"{__name__!~"up.*",job="x"}"#,
+            r#"{__name__="",job="x"}"#,
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected vector selector: {query}");
+            };
+            assert_eq!(try_into_metric_name(&selector), None, "{query}");
+            assert!(
+                label_values_metric_name(Some(&selector)).is_err(),
+                "{query}"
+            );
+        }
+    }
+
+    #[test]
     fn test_try_into_metric_name_none_when_no_name_or_name_label() {
         let sel = VectorSelector {
             name: None,
@@ -1587,11 +1599,7 @@ mod tests {
             ("up", "up"),
             (r#"up{job="prometheus"}"#, "up"),
             (r#"{__name__="up"}"#, "up"),
-            (r#"{__name__=~"up.*"}"#, "up.*"),
-            (r#"{__name__!="up",job="prometheus"}"#, "up"),
-            (r#"{__name__!~"up.*",job="prometheus"}"#, "up.*"),
-            (r#"{__name__="",job="prometheus"}"#, ""),
-            (r#"{__name__=~"up.*",__name__="up"}"#, "up.*"),
+            (r#"{__name__=~"up.*",__name__="up"}"#, "up"),
             (r#"up{job="prometheus" or job="other"}"#, "up"),
         ] {
             let parser::Expr::VectorSelector(selector) = parser::parse(matcher).unwrap() else {

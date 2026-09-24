@@ -1225,13 +1225,8 @@ fn validate_metadata_params(
                 return Err(err);
             }
             Ok(parser::Expr::VectorSelector(sel)) => {
-                let err = if sel.name.is_none()
-                    && sel
-                        .matchers
-                        .find_matchers(config::meta::promql::NAME_LABEL)
-                        .is_empty()
-                {
-                    Some("match[] argument must start with a metric name, e.g. `match[]=up`")
+                let err = if metrics::prom::try_into_metric_name(&sel).is_none() {
+                    Some("match[] must specify a metric name or a non-empty exact __name__ matcher")
                 } else if sel.offset.is_some() {
                     Some("match[]: unexpected offset modifier")
                 } else if sel.at.is_some() {
@@ -1745,7 +1740,14 @@ mod tests {
     fn test_validate_label_values_params() {
         assert!(validate_label_values_params("__name__", None, None, None).is_ok());
         assert!(validate_label_values_params("job", None, None, None).is_err());
-        for matcher in ["", r#"{job="prometheus"}"#] {
+        for matcher in [
+            "",
+            r#"{job="prometheus"}"#,
+            r#"{__name__=~"up.*"}"#,
+            r#"{__name__!="up",job="prometheus"}"#,
+            r#"{__name__!~"up.*",job="prometheus"}"#,
+            r#"{__name__="",job="prometheus"}"#,
+        ] {
             assert!(
                 validate_label_values_params("job", Some(matcher.to_owned()), None, None).is_err(),
                 "{matcher}"
@@ -1754,10 +1756,6 @@ mod tests {
         for matcher in [
             "up",
             r#"{__name__="up"}"#,
-            r#"{__name__=~"up.*"}"#,
-            r#"{__name__!="up",job="prometheus"}"#,
-            r#"{__name__!~"up.*",job="prometheus"}"#,
-            r#"{__name__="",job="prometheus"}"#,
             r#"up{job="prometheus" or job="other"}"#,
         ] {
             assert!(
@@ -1790,6 +1788,45 @@ mod tests {
         assert_eq!(body["status"], "error");
         assert_eq!(body["errorType"], "bad_data");
         assert!(body["error"].as_str().unwrap().contains("match[]"));
+    }
+
+    #[test]
+    fn test_validate_metadata_params_rejects_non_exact_metric_names() {
+        for query in [
+            r#"{__name__!="up",job="x"}"#,
+            r#"{__name__=~"up.*",job="x"}"#,
+            r#"{__name__=~"up",job="x"}"#,
+            r#"{__name__!~"up.*",job="x"}"#,
+            r#"{__name__="",job="x"}"#,
+            r#"{job="x"}"#,
+        ] {
+            let err = validate_metadata_params(Some(query.to_string()), None, None).unwrap_err();
+            assert_eq!(
+                err, "match[] must specify a metric name or a non-empty exact __name__ matcher",
+                "{query}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_metadata_params_accepts_exact_metric_names() {
+        for query in ["up", r#"up{job="x"}"#, r#"{__name__="up",job="x"}"#] {
+            let (selector, ..) =
+                validate_metadata_params(Some(query.to_string()), None, None).unwrap();
+            assert_eq!(
+                selector
+                    .as_ref()
+                    .and_then(metrics::prom::try_into_metric_name),
+                Some("up".to_string()),
+                "{query}"
+            );
+        }
+        assert!(
+            validate_metadata_params(None, None, None)
+                .unwrap()
+                .0
+                .is_none()
+        );
     }
 
     #[test]
