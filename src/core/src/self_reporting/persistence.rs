@@ -18,6 +18,7 @@ use config::{
     meta::{
         self_reporting::{
             ReportingData,
+            redaction::{EvidenceScope, GapReason, REDACTION_EVIDENCE_STREAM, RedactionEvidence},
             usage::{ERROR_STREAM, TRIGGERS_STREAM, TriggerData},
         },
         stream::{StreamParams, StreamType},
@@ -38,6 +39,15 @@ impl usage_reporting::BatchPublisher for CoreBatchPublisher {
     }
 }
 
+#[derive(Default)]
+struct BufferedData {
+    usages: Vec<config::meta::self_reporting::usage::UsageData>,
+    triggers: Vec<json::Value>,
+    errors: Vec<json::Value>,
+    raw_errors: Vec<config::meta::self_reporting::error::ErrorData>,
+    redactions: Vec<RedactionEvidence>,
+}
+
 fn collect_additional_reporting_orgs(configured: &str) -> Vec<String> {
     let mut orgs: Vec<String> = configured
         .split(',')
@@ -51,28 +61,41 @@ fn collect_additional_reporting_orgs(configured: &str) -> Vec<String> {
     orgs
 }
 
+fn partition_buffered_data(buffered: Vec<ReportingData>) -> BufferedData {
+    let mut out = BufferedData::default();
+    for item in buffered {
+        match item {
+            ReportingData::Usage(usage) => out.usages.push(*usage),
+            ReportingData::Trigger(trigger) => out.triggers.push(json::to_value(*trigger).unwrap()),
+            ReportingData::Error(error) => {
+                let error_data = *error;
+                // Keep raw error data for DB batching
+                out.errors.push(json::to_value(&error_data).unwrap());
+                out.raw_errors.push(error_data);
+            }
+            ReportingData::Redaction(evidence) => out.redactions.push(*evidence),
+        }
+    }
+    out
+}
+
 async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     log::debug!(
         "[SELF-REPORTING] thread_{thread_id} ingests {} buffered data",
         buffered.len()
     );
 
-    let (usages, triggers, errors, raw_errors) = buffered.into_iter().fold(
-        (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-        |(mut usages, mut triggers, mut errors, mut raw_errors), item| {
-            match item {
-                ReportingData::Usage(usage) => usages.push(*usage),
-                ReportingData::Trigger(trigger) => triggers.push(json::to_value(*trigger).unwrap()),
-                ReportingData::Error(error) => {
-                    let error_data = *error;
-                    // Keep raw error data for DB batching
-                    errors.push(json::to_value(&error_data).unwrap());
-                    raw_errors.push(error_data);
-                }
-            }
-            (usages, triggers, errors, raw_errors)
-        },
-    );
+    let BufferedData {
+        usages,
+        triggers,
+        errors,
+        raw_errors,
+        redactions,
+    } = partition_buffered_data(buffered);
+
+    if !redactions.is_empty() {
+        ingest_redaction_evidence(redactions).await;
+    }
 
     let cfg = get_config();
 
@@ -229,8 +252,50 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     }
 }
 
+/// Groups by the record's own org: evidence belongs to the tenant, never to `_meta`.
+fn group_redactions_by_org(
+    redactions: Vec<RedactionEvidence>,
+) -> HashMap<String, Vec<RedactionEvidence>> {
+    let mut per_org: HashMap<String, Vec<RedactionEvidence>> = HashMap::new();
+    for evidence in redactions {
+        per_org
+            .entry(evidence.org_id.clone())
+            .or_default()
+            .push(evidence);
+    }
+    per_org
+}
+
+async fn ingest_redaction_evidence(redactions: Vec<RedactionEvidence>) {
+    for (org, rows) in group_redactions_by_org(redactions) {
+        if let Err(e) =
+            super::redaction_schema::ensure_redaction_evidence_stream_initialized(&org).await
+        {
+            log::warn!(
+                "[SDR-EVIDENCE] Failed to ensure {REDACTION_EVIDENCE_STREAM} initialized for {org}: {e}"
+            );
+        }
+
+        let scope = EvidenceScope::new(&org, REDACTION_EVIDENCE_STREAM, StreamType::Logs);
+        let dropped = rows.len() as u64;
+        let values: Vec<_> = rows
+            .iter()
+            .filter_map(|row| json::to_value(row).ok())
+            .collect();
+        let stream = StreamParams::new(&org, REDACTION_EVIDENCE_STREAM, StreamType::Logs);
+
+        // Never re-enqueue: a duplicated audit count is worse than a dropped one.
+        if let Err(e) = super::ingestion::ingest_reporting_data(values, stream).await {
+            log::error!("[SDR-EVIDENCE] Failed to ingest redaction evidence for {org}: {e}");
+            super::redaction_evidence::record_gap(&scope, GapReason::PersistFailed, dropped);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use config::meta::self_reporting::redaction::{DataWindow, FieldOutcome};
+
     use super::*;
 
     #[test]
@@ -259,5 +324,67 @@ mod tests {
         assert!(orgs.contains(&"default".to_string()));
         assert!(orgs.contains(&META_ORG_ID.to_string()));
         assert!(!orgs.contains(&"other".to_string()));
+    }
+
+    #[test]
+    fn buffered_data_partitions_redaction_into_its_own_bucket() {
+        let scope = EvidenceScope::new("tenant", "payments", StreamType::Logs);
+        let buffered = vec![
+            ReportingData::Redaction(Box::new(RedactionEvidence::redaction(
+                &scope,
+                "message",
+                "Redact",
+                FieldOutcome {
+                    redacted_regions: 2,
+                    ..Default::default()
+                },
+                DataWindow::default(),
+            ))),
+            ReportingData::Trigger(Box::new(TriggerData::init_for_reflection())),
+        ];
+
+        let partitioned = partition_buffered_data(buffered);
+        assert_eq!(partitioned.redactions.len(), 1);
+        assert_eq!(partitioned.triggers.len(), 1);
+        assert!(partitioned.usages.is_empty());
+        assert!(partitioned.errors.is_empty());
+        assert!(partitioned.raw_errors.is_empty());
+        assert_eq!(partitioned.redactions[0].redacted_regions, 2);
+    }
+
+    #[test]
+    fn redaction_evidence_is_grouped_by_its_own_org_and_never_into_meta() {
+        let tenant = EvidenceScope::new("tenant", "payments", StreamType::Logs);
+        let other = EvidenceScope::new("other", "payments", StreamType::Logs);
+        let rows = vec![
+            RedactionEvidence::redaction(
+                &tenant,
+                "message",
+                "Redact",
+                FieldOutcome::default(),
+                DataWindow::default(),
+            ),
+            RedactionEvidence::redaction(
+                &tenant,
+                "body",
+                "Hash",
+                FieldOutcome::default(),
+                DataWindow::default(),
+            ),
+            RedactionEvidence::redaction(
+                &other,
+                "message",
+                "Redact",
+                FieldOutcome::default(),
+                DataWindow::default(),
+            ),
+        ];
+
+        let grouped = group_redactions_by_org(rows);
+        assert_eq!(grouped.len(), 2);
+        assert_eq!(grouped["tenant"].len(), 2);
+        assert_eq!(grouped["other"].len(), 1);
+        // collect_additional_reporting_orgs would have added _meta; this must not.
+        assert!(!grouped.contains_key(META_ORG_ID));
     }
 }

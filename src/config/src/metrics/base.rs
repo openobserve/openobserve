@@ -2089,6 +2089,34 @@ pub static SELF_REPORTING_QUEUE_DEPTH: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// SDR liveness only; the audit source is the _redaction_evidence stream, not these.
+pub static SDR_REDACTED_REGIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "sdr_redacted_regions_total",
+            "Total field-content regions replaced by the redaction engine",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        // No stream, field or pattern label: each would be unbounded.
+        &["organization", "stream_type", "policy"],
+    )
+    .expect("Metric created")
+});
+
+pub static SDR_EVIDENCE_DROPPED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "sdr_evidence_dropped_total",
+            "Redaction evidence rows dropped before persistence",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
+
 // service streams cache stats
 pub static SERVICE_STREAMS_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -3005,6 +3033,12 @@ pub(crate) fn register(registry: &Registry) {
     registry
         .register(Box::new(SELF_REPORTING_QUEUE_DEPTH.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(SDR_REDACTED_REGIONS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SDR_EVIDENCE_DROPPED_TOTAL.clone()))
+        .expect("Metric registered");
 
     // service streams cache
     registry
@@ -3318,5 +3352,45 @@ mod tests {
         let _ = TOKIO_RUNTIME_WORKER_METRICS.clone();
         let _ = TOKIO_RUNTIME_WORKER_DURATION_SECONDS.clone();
         let _ = TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS.clone();
+    }
+
+    #[test]
+    fn sdr_metric_labels_stay_low_cardinality() {
+        // A stream, field or pattern label here is an unbounded-cardinality OOM.
+        SDR_REDACTED_REGIONS_TOTAL
+            .with_label_values(&["org", "logs", "Redact"])
+            .inc();
+        SDR_EVIDENCE_DROPPED_TOTAL
+            .with_label_values(&["org", "queue_full"])
+            .inc();
+        let registry = Registry::new();
+        registry
+            .register(Box::new(SDR_REDACTED_REGIONS_TOTAL.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(SDR_EVIDENCE_DROPPED_TOTAL.clone()))
+            .unwrap();
+
+        let const_labels = create_const_labels();
+        for family in registry.gather() {
+            let labels: Vec<String> = family.get_metric()[0]
+                .get_label()
+                .iter()
+                .map(|label| label.name().to_string())
+                .filter(|name| !const_labels.contains_key(name))
+                .collect();
+            let expected: Vec<String> = if family.name().ends_with("sdr_redacted_regions_total") {
+                ["organization", "policy", "stream_type"]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect()
+            } else {
+                ["organization", "reason"]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect()
+            };
+            assert_eq!(labels, expected, "{}", family.name());
+        }
     }
 }
