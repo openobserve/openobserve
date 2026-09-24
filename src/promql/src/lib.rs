@@ -48,6 +48,7 @@ pub const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
 pub const MAX_DATA_POINTS: i64 = 256; // Width of panel: window.innerWidth / 4
 pub const DEFAULT_MAX_POINTS_PER_SERIES: usize = 30000; // Maximum number of points per series
 const DEFAULT_STEP: Duration = Duration::from_secs(15); // default step in seconds
+const DEFAULT_SUBQUERY_STEP: Duration = Duration::from_secs(60); // Prometheus' default evaluation interval
 const MIN_TIMESERIES_POINTS_FOR_TIME_ROUNDING: i64 = 10; // Adjust this value as needed
 
 #[async_trait]

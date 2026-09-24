@@ -196,7 +196,11 @@ mod m20260916_000001_add_folder_id_to_workflow_drafts;
 mod m20260917_000001_add_env_to_synthetics_jobs;
 mod m20260917_000001_create_llm_experiment_slot_retries;
 mod m20260917_000001_create_synthetics_shared_variables;
+mod m20260920_000001_add_anomaly_level_half_width;
 mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
+mod m20260922_000001_add_password_policy_columns_to_users;
+mod m20260922_000002_create_user_password_history_table;
+mod m20260922_000003_create_user_auth_state_table;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -450,12 +454,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20260818_000002_create_llm_remote_tasks::Migration),
             Box::new(m20260820_000001_add_icon_to_folders::Migration),
             Box::new(m20260820_000003_create_llm_secrets::Migration),
+            Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
             Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
             Box::new(m20260825_000001_add_alert_pending_period_col::Migration),
-            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
-            Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
+            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
             Box::new(m20260806_000001_create_oncall_tables::Migration),
             Box::new(m20260807_000001_create_oncall_ownership::Migration),
             Box::new(m20260811_000001_create_oncall_unrouted_signals::Migration),
@@ -478,6 +482,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20260917_000001_create_synthetics_shared_variables::Migration),
             Box::new(m20260917_000001_add_env_to_synthetics_jobs::Migration),
             Box::new(m20260921_000001_add_input_preview_to_llm_annotation_queue_items::Migration),
+            Box::new(m20260922_000001_add_password_policy_columns_to_users::Migration),
+            Box::new(m20260922_000002_create_user_password_history_table::Migration),
+            Box::new(m20260922_000003_create_user_auth_state_table::Migration),
+            Box::new(m20260920_000001_add_anomaly_level_half_width::Migration),
             Box::new(m20260908_000001_create_synthetics_refs::Migration),
         ]
     }
@@ -525,7 +533,9 @@ mod tests {
             87,
             "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
         ),
-        (88, "m20260908_000001_create_synthetics_refs"),
+        (88, "m20260922_000003_create_user_auth_state_table"),
+        (89, "m20260920_000001_add_anomaly_level_half_width"),
+        (90, "m20260908_000001_create_synthetics_refs"),
     ];
 
     #[test]
@@ -596,6 +606,10 @@ mod tests {
             (
                 "m20260812_000001_create_composite_alerts",
                 "m20260825_000001_create_status_page_custom_domains",
+            ),
+            (
+                "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
+                "m20260922_000001_add_password_policy_columns_to_users",
             ),
         ] {
             assert!(

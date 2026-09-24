@@ -47,7 +47,11 @@ export type CredentialValidatorResult = true | ValidationMessage;
 export interface CredentialField {
   key: string;
   labelKey: I18nKey;
-  type: "text" | "password" | "email" | "select" | "toggle";
+  /**
+   * `email-multi` renders as a multi-select picker (not free text) and holds a
+   * `string[]` in the credentials record; every other type holds a string.
+   */
+  type: "text" | "password" | "email" | "email-multi" | "select" | "toggle";
   required: boolean;
   /**
    * Helper text that reads identically in every language — a URL or an example

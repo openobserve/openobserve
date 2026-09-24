@@ -84,8 +84,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 85: create llm_experiment_slot_retries.
 // 86: create synthetics shared variables tables; add env to synthetics_jobs.
 // 87: add input_preview to llm_annotation_queue_items.
-// 88: create synthetics_refs.
-pub const DB_SCHEMA_VERSION: u64 = 88;
+// 88: add iam password policy tables.
+// 89: add level_half_width_seconds to anomaly_detection_config.
+// 90: create synthetics_refs.
+pub const DB_SCHEMA_VERSION: u64 = 90;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2956,7 +2958,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_METRICS_INDEX_ENABLED",
         default = false,
-        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor writes the configured Parquet or Vortex format and merges the pending files of an open hour into size-split `hash-merged-v1-` files and a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+        help = "Enable experimental metrics indexing and sample blocks for newly written metrics data."
     )]
     pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds

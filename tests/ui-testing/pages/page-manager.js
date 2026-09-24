@@ -20,6 +20,7 @@ import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
 import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
+import DashboardPrintPage from "./dashboardPages/dashboard-print";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
 import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
@@ -127,6 +128,9 @@ const FunctionsFormValidationPage = require("./functionsPages/functionsFormValid
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
 
+// ===== ONLINE EVALS PAGE OBJECTS =====
+import { LlmProvidersPage } from "./onlineEvalsPages/llmProvidersPage.js";
+
 class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
@@ -156,6 +160,7 @@ class PageManager {
     this.dashboardFilter = new DashboardFilter(page);
     this.dashboardImport = new DashboardImport(page);
     this.dashboardShareExport = new DashboardShareExportPage(page);
+    this.dashboardPrint = new DashboardPrintPage(page);
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
     this.dateTimeHelper = new DateTimeHelper(page);
     this.dashboardPanelTime = new DashboardPanelTime(page);
@@ -265,6 +270,9 @@ class PageManager {
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
+
+    // ===== ONLINE EVALS PAGE OBJECTS =====
+    this.llmProvidersPage = new LlmProvidersPage(page);
 
     // ===== RUM PAGE OBJECTS =====
     this.rumFormValidation = new RumFormValidationPage(page);

@@ -55,10 +55,6 @@ profiling = [
     "openobserve-api-http/profiling",
     "openobserve-jobs/profiling",
     "openobserve-core/profiling",
-    "dep:tikv-jemalloc-ctl",
-    "dep:tikv-jemalloc-sys",
-    "dep:jemalloc_pprof",
-    "dep:pprof",
 ]
 tokio-console = ["dep:console-subscriber"]
 
@@ -87,10 +83,9 @@ inherits = "release"
 debug = true
 strip = false
 
-# tikv-jemalloc-sys is a link-time dependency; prettytable-rs exposes the
-# `prettytable` crate name, which cargo-machete does not associate with it.
+# prettytable-rs exposes the `prettytable` crate name, which cargo-machete does not associate with it.
 [package.metadata.cargo-machete]
-ignored = ["prettytable-rs", "tikv-jemalloc-sys"]
+ignored = ["prettytable-rs"]
 
 [dependencies]
 axum.workspace = true
@@ -183,10 +178,6 @@ tikv-jemallocator = { version = "0.6", optional = true, features = [
     "stats",
     "unprefixed_malloc_on_supported_platforms",
 ] }
-tikv-jemalloc-ctl = { workspace = true, optional = true }
-tikv-jemalloc-sys = { workspace = true, optional = true }
-jemalloc_pprof = { workspace = true, optional = true }
-pprof = { workspace = true, optional = true }
 tempfile.workspace = true
 tiktoken-rs.workspace = true
 tokio.workspace = true
@@ -289,6 +280,7 @@ members = [
     "src/usage_reporting",
     "src/audit",
     "src/promql",
+    "src/metrics_block",
     "src/metrics_index",
     "src/promql_service",
     "src/jobs",
@@ -346,6 +338,7 @@ search_service = { path = "src/search_service" }
 usage_reporting = { path = "src/usage_reporting" }
 audit = { path = "src/audit" }
 promql = { path = "src/promql" }
+metrics_block = { path = "src/metrics_block" }
 metrics_index = { path = "src/metrics_index" }
 promql-service = { path = "src/promql_service" }
 openobserve-api-common = { path = "src/api/common" }
@@ -395,7 +388,6 @@ tikv-jemalloc-ctl = { version = "0.6", features = [
     "stats",
     "profiling",
 ] }
-tikv-jemalloc-sys = { version = "0.6", features = ["profiling"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = [
     "cors",

@@ -71,6 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
           </OFormInput>
+          <PasswordRequirementList
+            :requirements="passwordRequirements"
+            :password="formPassword || ''"
+            data-test="user-password-requirements"
+          />
         </div>
 
         <OFormInput
@@ -166,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             required
             class="showLabelOnTop mt-2"
             data-test="user-new-password-field"
+            @update:model-value="clearServerErrors"
           >
             <template #icon-right>
               <OIcon
@@ -176,7 +182,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
           </OFormInput>
+          <PasswordRequirementList
+            v-if="changePassword"
+            :requirements="passwordRequirements"
+            :password="formNewPassword || ''"
+            data-test="user-new-password-requirements"
+          />
         </div>
+        <!-- Unlock is STAGED, not sent: one PUT carries it alongside any other edit. -->
+        <OBanner
+          v-if="lockout?.locked"
+          variant="warning"
+          icon="lock"
+          dense
+          inline-actions
+          class="mt-4"
+          data-test="user-lockout-banner"
+        >
+          <div class="font-medium">{{ t("user.lockout.locked") }}</div>
+          <div class="text-xs">
+            {{
+              unlockStaged
+                ? t("user.lockout.staged")
+                : t("user.lockout.autoUnlock", {
+                    duration: raw(durationFormatter(lockout.retry_after_secs ?? 0)),
+                  })
+            }}
+          </div>
+          <template #actions>
+            <OButton
+              :variant="unlockStaged ? 'ghost' : 'outline'"
+              size="sm"
+              data-test="user-lockout-unlock-btn"
+              @click="unlockStaged = !unlockStaged"
+            >
+              {{ unlockStaged ? t("user.lockout.undo") : t("user.lockout.unlock") }}
+            </OButton>
+          </template>
+        </OBanner>
         <OFormInput
           v-if="!beingUpdated && userRole != 'member' && organization == 'other'"
           name="other_organization"
@@ -224,14 +267,21 @@ import {
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
 
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddUserSchema, type AddUserForm } from "./AddUser.schema";
+import { usePasswordComplexity } from "@/composables/usePasswordComplexity";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import PasswordRequirementList from "@/components/common/PasswordRequirementList.vue";
+import { durationFormatter } from "@/utils/formatters";
+import { reuseRejection } from "@/utils/passwordComplexity";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -249,7 +299,18 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { ODialog, ODrawer, OIcon, OForm, OFormInput, OFormSelect, OFormSwitch },
+  components: {
+    ODialog,
+    ODrawer,
+    OBanner,
+    OButton,
+    OIcon,
+    OForm,
+    OFormInput,
+    OFormSelect,
+    OFormSwitch,
+    PasswordRequirementList,
+  },
   props: {
     open: {
       type: Boolean,
@@ -320,6 +381,10 @@ export default defineComponent({
     const organization = ref(store.state.selectedOrganization.identifier);
     const editRecord: any = ref(null);
     const isExternalUser = ref(false);
+    // The edited user's lockout state, read once when the dialog opens on someone else's row.
+    const lockout = ref<{ locked: boolean; retry_after_secs?: number } | null>(null);
+    const unlockStaged = ref(false);
+    const { confirm } = useConfirmDialog();
 
     const blankForm = (): AddUserForm => ({
       email: "",
@@ -381,6 +446,16 @@ export default defineComponent({
           delete payload.old_password;
           delete payload.new_password;
         }
+        // A security-relevant action on someone else's account confirms before the write.
+        if (unlockStaged.value) {
+          const confirmed = await confirm({
+            title: t("user.lockout.confirmTitle", { email: raw(userEmail) }),
+            message: t("user.lockout.confirmMessage"),
+            confirmLabel: t("user.lockout.unlock"),
+          });
+          if (!confirmed) return;
+          payload.remove_lockout = true;
+        }
         try {
           const res: any = await userServiece.update(payload, selectedOrg, userEmail);
           if (
@@ -393,10 +468,15 @@ export default defineComponent({
             emit("update:open", false);
           }
         } catch (err: any) {
-          toast({
-            variant: "error",
-            message: err.response.data.message,
-          });
+          const reused = reuseRejection(err, t);
+          if (reused) {
+            setServerFieldErrors(form, { new_password: reused });
+          } else {
+            toast({
+              variant: "error",
+              message: raw(err.response?.data?.message) || t("toastMessages.iam.userSaveFailed"),
+            });
+          }
         }
         track("Button Click", { button: "Update User", page: "Add User" });
       } else if (existingUser.value) {
@@ -428,7 +508,7 @@ export default defineComponent({
             if (err.response?.status != 403 || err?.status != 403) {
               toast({
                 variant: "error",
-                message: err.response.data.message,
+                message: raw(err.response?.data?.message) || t("toastMessages.iam.userSaveFailed"),
               });
             }
           }
@@ -452,7 +532,7 @@ export default defineComponent({
         } catch (err: any) {
           toast({
             variant: "error",
-            message: err.response.data.message,
+            message: raw(err.response?.data?.message) || t("toastMessages.iam.userSaveFailed"),
           });
         }
         track("Button Click", { button: "Create User", page: "Add User" });
@@ -464,6 +544,14 @@ export default defineComponent({
     // via <OForm :form="form"> — ONE source of truth. The schema takes a context
     // GETTER so a single stable instance follows mode flips (e.g. the 422
     // add-existing → create-new switch) with no remount.
+
+    // The instance policy, not a hardcoded rule: a fixed mirror would drift from what the server enforces.
+    const {
+      complexity: passwordComplexity,
+      requirements: passwordRequirements,
+      load: loadPasswordComplexity,
+    } = usePasswordComplexity();
+
     const addUserSchema = makeAddUserSchema(
       () => ({
         existingUser: existingUser.value,
@@ -472,6 +560,7 @@ export default defineComponent({
         loggedInUserEmail: loggedInUserEmail.value,
         modelEmail: props.modelValue?.email ?? "",
         organization: organization.value,
+        complexity: passwordComplexity.value,
       }),
       t,
     );
@@ -488,6 +577,29 @@ export default defineComponent({
     const formEmail = form.useStore((s: any) => s.values.email);
     const formRole = form.useStore((s: any) => s.values.role);
     const formCustomRole = form.useStore((s: any) => s.values.custom_role);
+    // Read live so the requirement rows tick while typing, the same way the reset dialog does.
+    const formPassword = form.useStore((s: any) => s.values.password);
+    const formNewPassword = form.useStore((s: any) => s.values.new_password);
+
+    // A server error is not re-validated on change, so it would block every later submit unless cleared.
+    const clearServerErrors = () => {
+      setServerFieldErrors(form, {});
+    };
+
+    // Only when administering someone else: a locked-out user must not lift their own lock.
+    const loadLockoutState = (email: string) => {
+      lockout.value = null;
+      unlockStaged.value = false;
+      if (config.isEnterprise != "true" || email === loggedInUserEmail.value) return;
+      userServiece
+        .get(organization.value, email)
+        .then((response: any) => {
+          lockout.value = response.data?.lockout ?? null;
+        })
+        .catch(() => {
+          lockout.value = null;
+        });
+    };
 
     watch(
       () => props.customRoles,
@@ -500,7 +612,9 @@ export default defineComponent({
       organization.value = store.state.selectedOrganization.identifier;
     });
 
-    onBeforeMount(() => setOrganizationOptions());
+    onBeforeMount(() => {
+      setOrganizationOptions();
+    });
 
     watch(
       () => store.state.organizations,
@@ -528,6 +642,7 @@ export default defineComponent({
           password: "",
         };
         isExternalUser.value = !!newVal.is_external;
+        loadLockoutState(newVal.email);
         // Seed the form via reset(values) — never a per-field setFieldValue loop.
         form.reset({
           ...blankForm(),
@@ -565,6 +680,7 @@ export default defineComponent({
       (isOpen, wasOpen) => {
         if (isOpen && !wasOpen) {
           resetFormFromModelValue(props.modelValue);
+          loadPasswordComplexity();
         }
       },
       { immediate: true },
@@ -604,6 +720,14 @@ export default defineComponent({
       formEmail,
       formRole,
       formCustomRole,
+      formPassword,
+      formNewPassword,
+      passwordRequirements,
+      clearServerErrors,
+      lockout,
+      unlockStaged,
+      durationFormatter,
+      raw,
       isPwd,
       isNewPwd,
       isOldPwd,

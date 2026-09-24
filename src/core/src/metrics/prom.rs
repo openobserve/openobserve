@@ -35,6 +35,7 @@ use config::{
         flatten::format_label_name_cow,
         json,
         schema::format_stream_name,
+        sql::{quote_identifier, quote_sql_string},
         time::{now_micros, parse_i64_to_timestamp_micros},
     },
 };
@@ -727,51 +728,9 @@ pub async fn get_series(
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
 
-    // Comma-separated list of label names
-    let label_names = schema
-        .fields()
-        .iter()
-        .map(|f| f.name().as_str())
-        .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
-        .collect::<Vec<_>>()
-        .join("\", \"");
-    if label_names.is_empty() {
+    let Some(sql) = series_sql(&metric_name, &schema, selector.as_ref()) else {
         return Ok(vec![]);
-    }
-
-    let mut sql = format!("SELECT DISTINCT({HASH_LABEL}), \"{label_names}\" FROM {metric_name}");
-    let mut sql_where = Vec::new();
-    if let Some(selector) = selector {
-        for mat in selector.matchers.matchers.iter() {
-            // `__name__` already picked the stream; the stored column may hold the
-            // pre-`format_stream_name` metric name, so filtering on it drops all rows.
-            if mat.name == TIMESTAMP_COL_NAME
-                || mat.name == VALUE_LABEL
-                || mat.name == NAME_LABEL
-                || schema.field_with_name(&mat.name).is_err()
-            {
-                continue;
-            }
-            match &mat.op {
-                MatchOp::Equal => {
-                    sql_where.push(format!("{} = '{}'", mat.name, mat.value));
-                }
-                MatchOp::NotEqual => {
-                    sql_where.push(format!("{} != '{}'", mat.name, mat.value));
-                }
-                MatchOp::Re(_re) => {
-                    sql_where.push(format!("re_match({}, '{}')", mat.name, mat.value));
-                }
-                MatchOp::NotRe(_re) => {
-                    sql_where.push(format!("re_not_match({}, '{}')", mat.name, mat.value));
-                }
-            }
-        }
-        if !sql_where.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&sql_where.join(" AND "));
-        }
-    }
+    };
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -929,14 +888,7 @@ pub async fn get_label_values(
         return Ok(label_values);
     }
 
-    let metric_name = match opt_metric_name {
-        Some(name) => name,
-        None => {
-            // HACK: in the ideal world we would have queried all the metric streams
-            // and collected label names from them.
-            return Ok(vec![]);
-        }
-    };
+    let metric_name = label_values_metric_name(selector.as_ref())?;
 
     let schema = infra::schema::get(org_id, &metric_name, stream_type)
         .await
@@ -949,40 +901,7 @@ pub async fn get_label_values(
         return Ok(vec![]);
     }
 
-    // Build SQL query with optional WHERE clause based on selector matchers
-    let mut sql = format!("SELECT DISTINCT({label_name}) FROM {metric_name}");
-    let mut sql_where = Vec::new();
-
-    if let Some(selector) = selector {
-        for mat in selector.matchers.matchers.iter() {
-            // Skip special fields and fields that don't exist in the schema
-            if mat.name == TIMESTAMP_COL_NAME
-                || mat.name == VALUE_LABEL
-                || mat.name == NAME_LABEL
-                || schema.field_with_name(&mat.name).is_err()
-            {
-                continue;
-            }
-            match &mat.op {
-                MatchOp::Equal => {
-                    sql_where.push(format!("{} = '{}'", mat.name, mat.value));
-                }
-                MatchOp::NotEqual => {
-                    sql_where.push(format!("{} != '{}'", mat.name, mat.value));
-                }
-                MatchOp::Re(_re) => {
-                    sql_where.push(format!("re_match({}, '{}')", mat.name, mat.value));
-                }
-                MatchOp::NotRe(_re) => {
-                    sql_where.push(format!("re_not_match({}, '{}')", mat.name, mat.value));
-                }
-            }
-        }
-        if !sql_where.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&sql_where.join(" AND "));
-        }
-    }
+    let sql = metadata_sql(&metric_name, &[&label_name], &schema, selector.as_ref());
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -1021,24 +940,87 @@ pub async fn get_label_values(
     Ok(label_values)
 }
 
+pub fn label_values_metric_name(selector: Option<&parser::VectorSelector>) -> Result<String> {
+    let metric_name = selector.and_then(try_into_metric_name);
+    metric_name.ok_or_else(|| {
+        Error::Message(
+            "match[] must specify a metric for label values, e.g. match[]=up; querying all metrics streams is not supported"
+                .to_owned(),
+        )
+    })
+}
+
 pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
-    match &selector.name {
-        Some(name) => {
-            // `match[]` argument contains a metric name, e.g.
-            // `match[]=zo_response_code{method="GET"}`
-            Some(name.clone())
-        }
-        None => {
-            // `match[]` argument does not contain a metric name.
-            // Check if there is `__name__` among the matchers,
-            // e.g. `match[]={__name__="zo_response_code",method="GET"}`
-            selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .map(|m| m.value.clone())
-        }
+    if let Some(name) = &selector.name {
+        return (!name.is_empty()).then(|| name.clone());
     }
+    selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .into_iter()
+        .find(|matcher| matches!(matcher.op, MatchOp::Equal) && !matcher.value.is_empty())
+        .map(|matcher| matcher.value)
+}
+
+fn series_sql(
+    metric_name: &str,
+    schema: &Schema,
+    selector: Option<&parser::VectorSelector>,
+) -> Option<String> {
+    let mut columns = vec![HASH_LABEL];
+    columns.extend(
+        schema
+            .fields()
+            .iter()
+            .map(|f| f.name().as_str())
+            .filter(|&name| {
+                name != TIMESTAMP_COL_NAME && name != VALUE_LABEL && name != HASH_LABEL
+            }),
+    );
+    (columns.len() > 1).then(|| metadata_sql(metric_name, &columns, schema, selector))
+}
+
+fn metadata_sql(
+    metric_name: &str,
+    columns: &[&str],
+    schema: &Schema,
+    selector: Option<&parser::VectorSelector>,
+) -> String {
+    let columns = columns
+        .iter()
+        .map(|name| quote_identifier(name))
+        .collect::<Vec<_>>();
+    let mut sql = format!(
+        "SELECT DISTINCT {} FROM {}",
+        columns.join(", "),
+        quote_identifier(metric_name)
+    );
+    let predicates = selector
+        .into_iter()
+        .flat_map(|selector| &selector.matchers.matchers)
+        .filter(|mat| {
+            // The stored metric name can differ from the stream selected by __name__.
+            mat.name != TIMESTAMP_COL_NAME
+                && mat.name != VALUE_LABEL
+                && mat.name != NAME_LABEL
+                && schema.field_with_name(&mat.name).is_ok()
+        })
+        .map(|mat| {
+            let name = quote_identifier(&mat.name);
+            let value = quote_sql_string(&mat.value);
+            match &mat.op {
+                MatchOp::Equal => format!("{name} = {value}"),
+                MatchOp::NotEqual => format!("{name} != {value}"),
+                MatchOp::Re(_) => format!("re_match({name}, {value})"),
+                MatchOp::NotRe(_) => format!("re_not_match({name}, {value})"),
+            }
+        })
+        .collect::<Vec<_>>();
+    if !predicates.is_empty() {
+        sql.push_str(" WHERE ");
+        sql.push_str(&predicates.join(" AND "));
+    }
+    sql
 }
 
 /// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
@@ -1263,6 +1245,200 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn metadata_sql_round_trips_matcher_values() {
+        use datafusion::sql::sqlparser::{
+            ast::{Expr, Value, visit_expressions_mut},
+            dialect::{Dialect, GenericDialect, PostgreSqlDialect},
+            parser::Parser,
+        };
+
+        let schema = Schema::new(vec![datafusion::arrow::datatypes::Field::new(
+            "job",
+            datafusion::arrow::datatypes::DataType::Utf8,
+            true,
+        )]);
+        let values = [
+            "worker's",
+            r"worker\\path",
+            r"worker\d+'s.*",
+            "x' OR '1'='1",
+            "x'; SELECT 'other' --",
+            "x' UNION SELECT 'other",
+        ];
+        for op in ["=", "!=", "=~", "!~"] {
+            for value in values {
+                let promql = format!("up{{job{op}{}}}", serde_json::to_string(value).unwrap());
+                let parser::Expr::VectorSelector(selector) = parser::parse(&promql).unwrap() else {
+                    panic!("expected a vector selector");
+                };
+                // The parser retains escape text, so SQL must preserve Matcher.value verbatim.
+                let encoded = serde_json::to_string(value).unwrap();
+                let parsed_value = &encoded[1..encoded.len() - 1];
+                assert_eq!(selector.matchers.matchers[0].value, parsed_value);
+                for (sql, projection) in [
+                    (
+                        metadata_sql("up", &["job"], &schema, Some(&selector)),
+                        "\"job\"",
+                    ),
+                    (
+                        series_sql("up", &schema, Some(&selector)).unwrap(),
+                        "\"__hash__\", \"job\"",
+                    ),
+                ] {
+                    for dialect in [&GenericDialect {} as &dyn Dialect, &PostgreSqlDialect {}] {
+                        let mut statements = Parser::parse_sql(dialect, &sql).unwrap();
+                        assert_eq!(statements.len(), 1);
+                        let mut literals = 0;
+                        let _ = visit_expressions_mut(&mut statements, |expr| {
+                            if let Expr::Value(literal) = expr {
+                                assert_eq!(
+                                    literal.value,
+                                    Value::SingleQuotedString(parsed_value.into())
+                                );
+                                literal.value = Value::SingleQuotedString(String::new());
+                                literals += 1;
+                            }
+                            std::ops::ControlFlow::<()>::Continue(())
+                        });
+                        assert_eq!(literals, 1);
+                        let predicate = match op {
+                            "=" => "\"job\" = ''",
+                            "!=" => "\"job\" <> ''",
+                            "=~" => "re_match(\"job\", '')",
+                            "!~" => "re_not_match(\"job\", '')",
+                            _ => unreachable!(),
+                        };
+                        assert_eq!(
+                            statements[0].to_string(),
+                            format!("SELECT DISTINCT {projection} FROM \"up\" WHERE {predicate}")
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_sql_executes_matchers_without_changing_selected_rows() {
+        use std::sync::Arc;
+
+        use datafusion::{
+            arrow::{array::StringArray, record_batch::RecordBatch},
+            common::TableReference,
+            prelude::SessionContext,
+        };
+        use search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
+
+        for (op, pattern, matching) in [
+            ("=", "x' OR '1'='1", "x' OR '1'='1"),
+            ("!=", r"worker's\path", r"worker's\\path"),
+            ("=~", r"worker\\path's.*", r"worker\\path'suffix"),
+            ("!~", r"worker\\path's.*", r"worker\\path'suffix"),
+        ] {
+            let ctx = SessionContext::new();
+            ctx.register_udf(REGEX_MATCH_UDF.clone());
+            ctx.register_udf(REGEX_NOT_MATCH_UDF.clone());
+            let batch = RecordBatch::try_from_iter(vec![
+                (HASH_LABEL, Arc::new(StringArray::from(vec!["a", "b"])) as _),
+                (
+                    "job",
+                    Arc::new(StringArray::from(vec![matching, "other"])) as _,
+                ),
+            ])
+            .unwrap();
+            let schema = batch.schema();
+            ctx.register_batch(TableReference::bare("metric\"name"), batch)
+                .unwrap();
+            let promql = format!(
+                "{{__name__='metric\"name',job{op}{}}}",
+                serde_json::to_string(pattern).unwrap()
+            );
+            let parser::Expr::VectorSelector(selector) = parser::parse(&promql).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            let metric = try_into_metric_name(&selector).unwrap();
+            for sql in [
+                metadata_sql(&metric, &["job"], &schema, Some(&selector)),
+                series_sql(&metric, &schema, Some(&selector)).unwrap(),
+            ] {
+                let batches = ctx.sql(&sql).await.unwrap().collect().await.unwrap();
+                let values = batches
+                    .iter()
+                    .flat_map(|batch| {
+                        batch
+                            .column_by_name("job")
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap()
+                            .iter()
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    values,
+                    vec![Some(if op.starts_with('!') {
+                        "other"
+                    } else {
+                        matching
+                    })],
+                    "{sql}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn metadata_sql_quotes_identifiers_and_preserves_field_selection() {
+        use datafusion::{
+            arrow::datatypes::{DataType, Field},
+            sql::sqlparser::{dialect::GenericDialect, parser::Parser},
+        };
+
+        let parser::Expr::VectorSelector(selector) = parser::parse(
+            r#"{__name__='metric"name',job="ok",missing="skip",_timestamp="skip",value="skip"}"#,
+        )
+        .unwrap() else {
+            panic!("expected a vector selector");
+        };
+        let metric = try_into_metric_name(&selector).unwrap();
+        assert_eq!(metric, "metric\"name");
+        let schema = Schema::new(
+            [
+                HASH_LABEL,
+                TIMESTAMP_COL_NAME,
+                VALUE_LABEL,
+                NAME_LABEL,
+                "job",
+                "label\"field",
+                "select",
+            ]
+            .into_iter()
+            .map(|name| Field::new(name, DataType::Utf8, true))
+            .collect::<Vec<_>>(),
+        );
+        for (sql, expected) in [
+            (
+                metadata_sql(&metric, &["label\"field"], &schema, Some(&selector)),
+                r#"SELECT DISTINCT "label""field" FROM "metric""name" WHERE "job" = 'ok'"#,
+            ),
+            (
+                series_sql(&metric, &schema, Some(&selector)).unwrap(),
+                r#"SELECT DISTINCT "__hash__", "__name__", "job", "label""field", "select" FROM "metric""name" WHERE "job" = 'ok'"#,
+            ),
+        ] {
+            let statements = Parser::parse_sql(&GenericDialect {}, &sql).unwrap();
+            assert_eq!(statements.len(), 1);
+            assert_eq!(statements[0].to_string(), expected);
+        }
+        assert!(series_sql(&metric, &Schema::empty(), Some(&selector)).is_none());
+        assert_eq!(
+            metadata_sql(&metric, &["select"], &schema, None),
+            r#"SELECT DISTINCT "select" FROM "metric""name""#
+        );
+    }
+
     fn schema_with_metadata(blob: &str) -> Schema {
         Schema::empty().with_metadata(
             [(METADATA_LABEL.to_string(), blob.to_string())]
@@ -1464,6 +1640,26 @@ mod tests {
     }
 
     #[test]
+    fn test_try_into_metric_name_rejects_non_exact_names() {
+        for query in [
+            r#"{__name__!="up",job="x"}"#,
+            r#"{__name__=~"up.*",job="x"}"#,
+            r#"{__name__=~"up",job="x"}"#,
+            r#"{__name__!~"up.*",job="x"}"#,
+            r#"{__name__="",job="x"}"#,
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected vector selector: {query}");
+            };
+            assert_eq!(try_into_metric_name(&selector), None, "{query}");
+            assert!(
+                label_values_metric_name(Some(&selector)).is_err(),
+                "{query}"
+            );
+        }
+    }
+
+    #[test]
     fn test_try_into_metric_name_none_when_no_name_or_name_label() {
         let sel = VectorSelector {
             name: None,
@@ -1569,5 +1765,38 @@ mod tests {
             Some(&json::json!(recomputed))
         );
         assert_eq!(json_data[1].0.get(HASH_LABEL), Some(&json::json!(7_u64)));
+    }
+
+    #[test]
+    fn test_label_values_metric_name() {
+        assert!(label_values_metric_name(None).is_err());
+        let parser::Expr::VectorSelector(selector) =
+            parser::parse(r#"{job="prometheus"}"#).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        assert!(label_values_metric_name(Some(&selector)).is_err());
+        for (matcher, expected) in [
+            ("up", "up"),
+            (r#"up{job="prometheus"}"#, "up"),
+            (r#"{__name__="up"}"#, "up"),
+            (r#"{__name__=~"up.*",__name__="up"}"#, "up"),
+            (r#"up{job="prometheus" or job="other"}"#, "up"),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(matcher).unwrap() else {
+                panic!("expected vector selector");
+            };
+            assert_eq!(
+                label_values_metric_name(Some(&selector)).unwrap(),
+                expected,
+                "{matcher}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_label_values_requires_metric() {
+        let result = get_label_values("default", "job".to_owned(), None, 0, 1).await;
+        assert!(result.unwrap_err().to_string().contains("match[]"));
     }
 }
