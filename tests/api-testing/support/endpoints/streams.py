@@ -22,6 +22,30 @@ class StreamsAPI:
     def delete(self, name: str, *, type_: str = "logs", org: str | None = None) -> requests.Response:
         return self.c.delete(f"streams/{name}?type={type_}", org=org)
 
+    def update_settings(
+        self,
+        name: str,
+        *,
+        type_: str = "logs",
+        org: str | None = None,
+        **overrides: Any,
+    ) -> requests.Response:
+        """PUT stream settings. The endpoint replaces the whole document, so the
+        add/remove lists have to be sent even when only one scalar is changing."""
+        payload: dict[str, Any] = {
+            "partition_keys": {"add": [], "remove": []},
+            "index_fields": {"add": [], "remove": []},
+            "full_text_search_keys": {"add": [], "remove": []},
+            "bloom_filter_fields": {"add": [], "remove": []},
+            "defined_schema_fields": {"add": [], "remove": []},
+            "extended_retention_days": {"add": [], "remove": []},
+            "data_retention": 3650,
+            "store_original_data": False,
+            "approx_partition": False,
+        }
+        payload.update(overrides)
+        return self.c.put(f"streams/{name}/settings?type={type_}", json=payload, org=org)
+
     def ingest_json(
         self,
         stream: str,

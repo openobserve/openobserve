@@ -380,6 +380,49 @@ def test_otlp_protobuf_truncated_poisoned_payload_still_returns_400(
         f"truncated payload should be 400, got {resp.status_code}: {resp.text[:300]}"
 
 
+def test_otlp_protobuf_repair_precedes_the_original_data_snapshot(
+    client: OpenObserveClient, temp_stream_name: str
+):
+    """`store_original_data` takes a different branch, and the ordering matters.
+
+    With the setting on, `need_original` flips `normalize_keys` off and the
+    record is snapshotted into `_original` before flattening. `_original` is
+    documented as a verbatim copy of what the customer sent, so the repair has
+    to have happened before the snapshot is taken — otherwise the column would
+    hold raw invalid bytes, which is not even representable as JSON.
+
+    The snapshot is also the only place the pre-flatten key spelling is
+    observable: `_original` keeps `bad_key_?` where the flattened column reads
+    `bad_key__`.
+    """
+    ingest(client, temp_stream_name, otlp.simple_logs_request([record(b"seed record")]))
+    hits(client, temp_stream_name, expected=1)
+
+    resp = client.streams.update_settings(temp_stream_name, store_original_data=True)
+    assert resp.status_code == 200, resp.text[:300]
+
+    attr = otlp.key_value(b"bad_key_\xe9", otlp.any_string(b"bad_value_\xe9"))
+    ingest(client, temp_stream_name, otlp.simple_logs_request([
+        record(b"original \xe9 path", attributes=[attr])
+    ]))
+
+    def poisoned_hit():
+        rows = client.search.hits(
+            f'SELECT _timestamp, body, _original FROM "{temp_stream_name}"',
+            minutes=SEARCH_WINDOW_MINUTES,
+        )
+        return next((r for r in rows if r.get("body") == "original ? path"), None)
+
+    hit = wait_until(
+        poisoned_hit,
+        timeout=INGEST_TIMEOUT,
+        msg=f"repaired record queryable in {temp_stream_name}",
+    )
+    original = json.loads(hit["_original"])
+    assert original["body"] == "original ? path"
+    assert original["bad_key_?"] == "bad_value_?", f"wire-spelling key missing from {original}"
+
+
 # ----- neighbouring paths the fix must not have disturbed -----
 
 
