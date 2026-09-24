@@ -1,4 +1,4 @@
-"""OTLP ingestion endpoint wrappers (/v1/logs, /v1/traces, /v1/metrics)."""
+"""OTLP ingestion endpoint wrappers (/v1/logs, /v1/traces)."""
 from __future__ import annotations
 
 from typing import Any

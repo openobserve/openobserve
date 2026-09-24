@@ -400,6 +400,14 @@ def test_otlp_protobuf_repair_precedes_the_original_data_snapshot(
 
     resp = client.streams.update_settings(temp_stream_name, store_original_data=True)
     assert resp.status_code == 200, resp.text[:300]
+    # Ingest reads the setting from the schema cache. Posting before it has
+    # propagated writes a record with no `_original` at all, which would only
+    # surface later as a timeout on a record that was never going to appear.
+    wait_until(
+        lambda: client.streams.schema(temp_stream_name)["settings"].get("store_original_data") is True,
+        timeout=30.0,
+        msg=f"store_original_data visible on {temp_stream_name}",
+    )
 
     attr = otlp.key_value(b"bad_key_\xe9", otlp.any_string(b"bad_value_\xe9"))
     ingest(client, temp_stream_name, otlp.simple_logs_request([
@@ -475,17 +483,26 @@ def test_otlp_traces_protobuf_still_rejects_invalid_utf8(
     deliberately. This test is expected to fail the day that changes — which is
     the signal to extend the repair, not to delete the assertion.
     """
-    span = (
-        otlp.delimited(1, TRACE_ID)
-        + otlp.delimited(2, SPAN_ID)
-        + otlp.delimited(5, b"span \xe9 name")
-        + otlp.fixed64_field(7, now_nanos())
-        + otlp.fixed64_field(8, now_nanos())
-    )
-    scope_spans = otlp.delimited(2, span)
-    payload = otlp.delimited(1, otlp.delimited(2, scope_spans))
+    def trace_payload(span_name: bytes) -> bytes:
+        span = (
+            otlp.delimited(1, TRACE_ID)
+            + otlp.delimited(2, SPAN_ID)
+            + otlp.delimited(5, span_name)
+            + otlp.fixed64_field(7, now_nanos())
+            + otlp.fixed64_field(8, now_nanos())
+        )
+        return otlp.delimited(1, otlp.delimited(2, otlp.delimited(2, span)))
 
-    resp = client.otlp.traces_protobuf(payload, stream=temp_stream_name)
+    # The control: the same payload shape with a clean name must be accepted, so
+    # the 400 below is attributable to the UTF-8 and cannot be earned by an
+    # unrelated break in this path or a mistake in the hand-built span.
+    control = client.otlp.traces_protobuf(trace_payload(b"span name"), stream=temp_stream_name)
+    resp = client.otlp.traces_protobuf(trace_payload(b"span \xe9 name"), stream=temp_stream_name)
+    # The control creates a TRACES stream, which temp_stream_name's logs-typed
+    # cleanup would not reach. Dropped before the asserts so a failure cannot leak it.
+    client.streams.delete(temp_stream_name, type_="traces")
 
+    assert control.status_code == 200, \
+        f"clean trace payload should be accepted, got {control.status_code}: {control.text[:300]}"
     assert resp.status_code == 400, \
         f"traces are outside the fix's scope and should still 400, got {resp.status_code}: {resp.text[:300]}"
