@@ -1085,20 +1085,6 @@ describe("BrowserJourney Add Subtest button", () => {
     expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeDefined();
   });
 
-  it("should leave the toolbar with Add Step while a replay locks the journey", () => {
-    wrapper = mountJourney({ replayPhase: "running" });
-
-    expect(wrapper.find(ADD_STEP).exists()).toBe(false);
-    expect(wrapper.find(ADD_SUBTEST).exists()).toBe(false);
-  });
-
-  it("should leave the toolbar with Add Step while a replay is stopping", () => {
-    wrapper = mountJourney({ replayPhase: "stopping" });
-
-    expect(wrapper.find(ADD_STEP).exists()).toBe(false);
-    expect(wrapper.find(ADD_SUBTEST).exists()).toBe(false);
-  });
-
   it("should append a step whose action is already subtest", async () => {
     wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }]);
     await wrapper.find(ADD_SUBTEST).trigger("click");
@@ -2432,7 +2418,9 @@ describe("BrowserJourney — stopping a replay", () => {
   it("should keep the journey locked against edits while stopping", () => {
     // The player may still be unwinding, so editing a step would race it.
     wrapper = mountWithDots({ replayPhase: "stopping" });
-    expect(wrapper.find('[data-test="synthetics-journey-add-step-btn"]').exists()).toBe(false);
+    const addStep = wrapper.find('[data-test="synthetics-journey-add-step-btn"]');
+    expect(addStep.exists()).toBe(true);
+    expect(addStep.attributes("disabled")).toBeDefined();
   });
 });
 
@@ -3733,6 +3721,126 @@ describe("BrowserJourney typed secrets", () => {
     expect(banner.text()).not.toContain("replaySecrets");
     expect(banner.find(CHANGE).exists()).toBe(false);
     expect(banner.find(RERUN).exists()).toBe(false);
+  });
+});
+
+describe("BrowserJourney toolbar while recording", () => {
+  let wrapper: VueWrapper;
+
+  const ADD_STEP = '[data-test="synthetics-journey-add-step-btn"]';
+  const ADD_MENU = '[data-test="synthetics-journey-add-menu-trigger"]';
+  const REPLAY = '[data-test="synthetics-journey-replay-btn"]';
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test/" },
+    { id: "s2", action: "click", name: "Sign in", selector: "#login" },
+  ] as any[];
+
+  beforeEach(() => {
+    mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+    mockT.mockClear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    mockStoreState.zoConfig = {};
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  function mountToolbar(props: Record<string, unknown> = {}, slots: Record<string, any> = {}) {
+    return mount(BrowserJourney, {
+      props: { modelValue: journey, replayPhase: "idle", extensionReady: true, ...props },
+      slots,
+      global: { stubs: STUBS },
+    }) as VueWrapper;
+  }
+
+  async function startRecording(w: VueWrapper) {
+    await w.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+  }
+
+  async function stopRecording(w: VueWrapper) {
+    await w.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+  }
+
+  const RECORD_CONTROLS = new Set([
+    "synthetics-journey-record-btn",
+    "synthetics-journey-cancel-btn",
+    "synthetics-journey-stop-btn",
+  ]);
+  const toolbarControls = (w: VueWrapper) =>
+    Array.from(w.element.firstElementChild!.querySelectorAll("[data-test]"))
+      .map((el) => el.getAttribute("data-test")!)
+      .filter((dt) => !RECORD_CONTROLS.has(dt));
+
+  it("while recording, Add and Replay stay in the toolbar but are disabled", async () => {
+    const slot = (p: { disabled: boolean }) =>
+      h("span", { "data-test": "replay-menu-slot", "data-disabled": String(p.disabled) });
+    wrapper = mountToolbar({}, { "replay-menu": slot });
+    await startRecording(wrapper);
+
+    for (const sel of [ADD_STEP, ADD_MENU, REPLAY]) {
+      const el = wrapper.find(sel);
+      expect(el.exists(), `${sel} left the toolbar`).toBe(true);
+      expect(el.attributes("disabled"), `${sel} is enabled`).toBeDefined();
+    }
+    expect(wrapper.find('[data-test="replay-menu-slot"]').attributes("data-disabled")).toBe("true");
+  });
+
+  it("while a replay runs, the Add group stays in the toolbar but is disabled", () => {
+    for (const replayPhase of ["running", "stopping"]) {
+      wrapper = mountToolbar({ replayPhase });
+
+      for (const sel of [ADD_STEP, ADD_MENU]) {
+        const el = wrapper.find(sel);
+        expect(el.exists(), `${sel} left the toolbar (${replayPhase})`).toBe(true);
+        expect(el.attributes("disabled"), `${sel} is enabled (${replayPhase})`).toBeDefined();
+      }
+      wrapper.unmount();
+    }
+  });
+
+  it("after recording stops the toolbar has the same buttons in the same order", async () => {
+    wrapper = mountToolbar();
+    const before = toolbarControls(wrapper);
+    expect(before).toContain("synthetics-journey-add-step-btn");
+
+    await startRecording(wrapper);
+    expect(toolbarControls(wrapper)).toEqual(before);
+
+    await stopRecording(wrapper);
+    expect(toolbarControls(wrapper)).toEqual(before);
+  });
+
+  it("the recording status names the environment", async () => {
+    wrapper = mountToolbar({ replayEnvironmentLabel: "Staging" });
+    await startRecording(wrapper);
+
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.recordingIn", {
+      environment: "Staging",
+    });
+  });
+
+  it("the Starting URL pill is disabled while recording", async () => {
+    const slot = (p: { locked: boolean }) =>
+      h("span", { "data-test": "start-pill-slot", "data-locked": String(p.locked) });
+    wrapper = mountToolbar({}, { "start-pill": slot });
+    const pill = () => wrapper.find('[data-test="start-pill-slot"]');
+    expect(pill().exists()).toBe(true);
+    expect(pill().attributes("data-locked")).toBe("false");
+
+    await startRecording(wrapper);
+
+    expect(pill().attributes("data-locked")).toBe("true");
   });
 });
 
