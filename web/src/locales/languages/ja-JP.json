@@ -4997,7 +4997,7 @@
     "colorLightToDarkBlue": "ライトブルーからダークブルー (値別)",
     "colorPaletteClassicBySeries": "パレット-クラシック (シリーズ別)",
     "drilldown": "ドリルダウン",
-    "drilldownTooltip": "別のダッシュボードまたは指定した URL に移動し、現在の変数をすべて引き継いでシームレスにデータを探索できます。",
+    "drilldownTooltip": "別のダッシュボードまたは指定した URL に移動し、現在のすべての変数を引き継いでシームレスにデータを探索できます。",
     "colorBySeriesTitle": "シリーズ別カラー",
     "colorBySeriesTooltip": "系列に色を適用すると、グラフが見やすくなります。各系列の色をカスタマイズして、データの視覚化を強化します。",
     "editColorBySeries": " シリーズ別に色を編集",

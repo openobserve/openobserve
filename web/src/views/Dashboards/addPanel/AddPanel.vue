@@ -584,9 +584,20 @@ export default defineComponent({
       panelId: currentPanelId.value,
     }));
 
-    // this is used to activate the watcher only after on mounted
-    let isPanelConfigWatcherActivated = false;
-    const isPanelConfigChanged = ref(false);
+    let isUnsavedTrackingActive = false;
+    let panelBaseline: unknown = null;
+
+    // Mutations before the user's first input are the editor loading itself (defaults, stream auto-select), not edits.
+    const captureBaselineOnFirstInput = () => {
+      if (isUnsavedTrackingActive && panelBaseline === null) {
+        panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      }
+    };
+
+    const hasUnsavedChanges = () =>
+      isUnsavedTrackingActive &&
+      panelBaseline !== null &&
+      !isEqual(panelBaseline, JSON.parse(JSON.stringify(dashboardPanelData.data)));
 
     // @submit fires only after the schema passes (title required+trim). Write
     // the validated `value` into the editor state, then run the existing save
@@ -605,6 +616,8 @@ export default defineComponent({
 
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
+      window.removeEventListener("pointerdown", captureBaselineOnFirstInput, true);
+      window.removeEventListener("keydown", captureBaselineOnFirstInput, true);
 
       removeAiContextHandler();
 
@@ -673,9 +686,10 @@ export default defineComponent({
         // set the value of the date time after the reset
         updateDateTime();
       }
-      // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
-      isPanelConfigWatcherActivated = true;
+      isUnsavedTrackingActive = true;
+      window.addEventListener("pointerdown", captureBaselineOnFirstInput, true);
+      window.addEventListener("keydown", captureBaselineOnFirstInput, true);
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
@@ -1167,20 +1181,9 @@ export default defineComponent({
       });
     };
 
-    //watch dashboardpaneldata when changes, isUpdated will be true
-    watch(
-      () => dashboardPanelData.data,
-      () => {
-        if (isPanelConfigWatcherActivated) {
-          isPanelConfigChanged.value = true;
-        }
-      },
-      { deep: true },
-    );
-
     const beforeUnloadHandler = (e: any) => {
       //check is data updated or not
-      if (isPanelConfigChanged.value) {
+      if (hasUnsavedChanges()) {
         // Display a confirmation message
         const confirmMessage = t("dashboard.unsavedMessage"); // Some browsers require a return statement to display the message
         e.returnValue = confirmMessage;
@@ -1201,7 +1204,7 @@ export default defineComponent({
       }
 
       // else continue to warn user
-      if (from.path === "/dashboards/add_panel" && isPanelConfigChanged.value) {
+      if (from.path === "/dashboards/add_panel" && hasUnsavedChanges()) {
         const confirmMessage = t("dashboard.unsavedMessage");
         if (window.confirm(confirmMessage)) {
           // User confirmed navigation - clean up variables created during this session
@@ -1393,8 +1396,7 @@ export default defineComponent({
           }
         }
 
-        isPanelConfigWatcherActivated = false;
-        isPanelConfigChanged.value = false;
+        isUnsavedTrackingActive = false;
 
         // Clear variables created during session since panel is being saved
         variablesCreatedInSession.value = [];
