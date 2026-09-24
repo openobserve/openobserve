@@ -51,6 +51,12 @@ export class DateTimePickerPage {
         // Apply button — rendered only when the host sets autoApply=false.
         this.applyBtn = page.locator('[data-test="date-time-apply-btn"]');
 
+        // Custom relative row — value input + unit select. DateTime.vue forwards
+        // these data-tests to OInput/OSelect, which derive `-field` / `-trigger` /
+        // `-option` on the real controls (see DateTime.vue custom row, ~198-222).
+        this.customValueInput = page.locator('[data-test="date-time-relative-custom-value-field"]');
+        this.customPeriodTrigger = page.locator('[data-test="date-time-relative-custom-period-trigger"]');
+
         // ==================== Expected toast messages ====================
         // Values of common.dateRangeCopied / dateRangePasted / dateRangePasteError
         // in web/src/locales/languages/en-US.json.
@@ -68,6 +74,13 @@ export class DateTimePickerPage {
 
     relativePeriodBtn(suffix) {
         return this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
+    }
+
+    /** Unit option in the custom period select; unit is one of s/m/h/d/w/M. */
+    customPeriodOption(unit) {
+        return this.page.locator(
+            `[data-test="date-time-relative-custom-period-option"][data-test-value="${unit}"]`
+        );
     }
 
     // ==================== Panel open / close ====================
@@ -205,6 +218,68 @@ export class DateTimePickerPage {
 
     async getTriggerLabel() {
         return (await this.triggerBtn.innerText()).trim();
+    }
+
+    // ==================== Custom relative value ====================
+
+    /** Fills the custom value input and blurs so the clamp commits. */
+    async setCustomValue(value) {
+        await expect(this.customValueInput).toBeVisible();
+        await this.customValueInput.fill(String(value));
+        await this.customValueInput.blur();
+    }
+
+    /** Focuses (snapshots lastValidCustomValue), empties, then blurs to restore. */
+    async clearCustomValue() {
+        await expect(this.customValueInput).toBeVisible();
+        await this.customValueInput.fill('');
+        await this.customValueInput.blur();
+    }
+
+    async expectCustomValue(expected) {
+        await expect(this.customValueInput).toHaveValue(String(expected));
+    }
+
+    /** Opens the custom period select and picks a unit (s/m/h/d/w/M). */
+    async selectCustomPeriod(unit) {
+        await expect(this.customPeriodTrigger).toBeVisible();
+        await this.customPeriodTrigger.click();
+        await expect(this.customPeriodOption(unit)).toBeVisible();
+        await this.customPeriodOption(unit).click();
+    }
+
+    /**
+     * Opens the period select, asserts which units are offered (present) and
+     * dropped (absent), then selects `unit` — all in one popover open so the
+     * absent checks are never satisfied by a not-yet-open popover. The
+     * `toHaveCount(0)` on dropped units also acts as the deterministic settle
+     * gate while the stream's max_query_range restriction propagates.
+     */
+    async selectCustomPeriodExpectingUnits(unit, presentUnits, absentUnits) {
+        await expect(this.customPeriodTrigger).toBeVisible();
+        await this.customPeriodTrigger.click();
+        for (const u of presentUnits) {
+            await expect(this.customPeriodOption(u)).toHaveCount(1);
+        }
+        for (const u of absentUnits) {
+            await expect(this.customPeriodOption(u)).toHaveCount(0);
+        }
+        await expect(this.customPeriodOption(unit)).toBeVisible();
+        await this.customPeriodOption(unit).click();
+    }
+
+    async expectPresetDisabled(suffix) {
+        await expect(this.relativePeriodBtn(suffix)).toBeDisabled();
+    }
+
+    /**
+     * Waits for the transient pre-load restriction to clear. Before the selected
+     * stream's fields settle, `queryRangeRestrictionInHour` is seeded at 100000,
+     * which stamps a `max` attribute onto the custom input; once it resolves to
+     * -1 (no restriction) the max is removed.
+     */
+    async waitForNoRestriction() {
+        await expect(this.customValueInput).not.toHaveAttribute('max', /[0-9]+/);
     }
 
     // ==================== Manual-apply mode ====================

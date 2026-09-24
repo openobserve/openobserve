@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/dateTimeCustomRange.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/datetime-picker-copy-paste.spec.js",
+    "web/src/components/DateTime.spec.ts"
+  ],
+  "needs_registration": true,
+  "register_in": "tests/ui-testing/ci-matrix/ci_matrix.json",
+  "register_entry": "GeneralTests.run_files",
+  "rationale": "The only E2E spec that touches the shared DateTime picker is datetime-picker-copy-paste.spec.js, and it is scoped to the Copy/Paste feature (PR #13374) — its describe blocks, fixtures and assertions are all about clipboard round-trips. Custom relative-range validation (min-1 clamp, decimal truncation, per-unit ~10-year cap, empty/blur restore, unit re-cap, and the max_query_range restriction clamp) is a distinct feature with no existing E2E coverage (the only changed test is the Vitest unit spec web/src/components/DateTime.spec.ts, which is not E2E). Folding these into the copy/paste spec would make a two-feature Frankenstein file. run-context.json already assigns the dedicated spec_path, so create a new GeneralTests spec and register it in the existing GeneralTests run_files entry."
+}

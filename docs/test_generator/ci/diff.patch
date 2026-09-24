@@ -1,0 +1,189 @@
+===== COMPLETE LIST OF CHANGED FILES (2 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/DateTime.spec.ts
+web/src/components/DateTime.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/DateTime.spec.ts b/web/src/components/DateTime.spec.ts
+index c2bf18e1e9e..f46fec1e13a 100644
+--- a/web/src/components/DateTime.spec.ts
++++ b/web/src/components/DateTime.spec.ts
+@@ -537,6 +537,71 @@ describe("DateTime Component", () => {
+       expect(wrapper.emitted("on:date-change")).toBeTruthy();
+     });
+ 
++    it("should cap a huge custom value at the per-unit maximum", async () => {
++      wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
++      store.state.savedViewFlag = false;
++      wrapper.vm.selectedType = "relative";
++      wrapper.vm.relativePeriod = "m";
++      wrapper.vm.relativeValue = 40000000000000000000;
++
++      wrapper.vm.onCustomPeriodSelect();
++      await wrapper.vm.$nextTick();
++
++      expect(wrapper.vm.relativeValue).toBe(5_256_000);
++    });
++
++    it("should re-cap the custom value when the unit changes", async () => {
++      wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
++      store.state.savedViewFlag = false;
++      wrapper.vm.selectedType = "relative";
++      wrapper.vm.relativeValue = 5000;
++      wrapper.vm.relativePeriod = "M";
++
++      wrapper.vm.onCustomPeriodSelect();
++      await wrapper.vm.$nextTick();
++
++      expect(wrapper.vm.relativeValue).toBe(120);
++    });
++
++    it.each([0, -5, 2.7])(
++      "should clamp custom value %s to a whole number of at least 1",
++      async (typed) => {
++        wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
++        store.state.savedViewFlag = false;
++        wrapper.vm.selectedType = "relative";
++        wrapper.vm.relativePeriod = "m";
++        wrapper.vm.relativeValue = typed;
++
++        wrapper.vm.onCustomPeriodSelect();
++        await wrapper.vm.$nextTick();
++
++        expect(wrapper.vm.relativeValue).toBe(Math.max(1, Math.trunc(typed)));
++      },
++    );
++
++    it("should not apply an emptied custom value and restore the last applied one on blur", async () => {
++      wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
++      store.state.savedViewFlag = false;
++      wrapper.vm.selectedType = "relative";
++      wrapper.vm.relativePeriod = "m";
++      wrapper.vm.relativeValue = 30;
++      wrapper.vm.onCustomValueFocus();
++      wrapper.vm.relativeValue = 45;
++      wrapper.vm.onCustomPeriodSelect();
++      const emittedBefore = wrapper.emitted("on:date-change")?.length ?? 0;
++
++      wrapper.vm.relativeValue = "";
++      wrapper.vm.onCustomPeriodSelect();
++      await wrapper.vm.$nextTick();
++
++      expect(wrapper.emitted("on:date-change")?.length ?? 0).toBe(emittedBefore);
++      expect(wrapper.vm.getDisplayValue).toContain("45");
++      expect(wrapper.vm.getDisplayValue).not.toContain("NaN");
++
++      wrapper.vm.onCustomValueBlur();
++      expect(wrapper.vm.relativeValue).toBe(45);
++    });
++
+     it("should test setRelativeDate with autoApply", async () => {
+       wrapper = createWrapper({ autoApply: true });
+       store.state.savedViewFlag = false;
+diff --git a/web/src/components/DateTime.vue b/web/src/components/DateTime.vue
+index 8e9f84f74ec..0a9cff079d8 100644
+--- a/web/src/components/DateTime.vue
++++ b/web/src/components/DateTime.vue
+@@ -206,6 +206,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                             : undefined
+                         "
+                         @update:model-value="onCustomPeriodSelect"
++                        @focus="onCustomValueFocus"
++                        @blur="onCustomValueBlur"
+                       />
+                     </div>
+                     <div class="flex min-w-0 flex-1 flex-col">
+@@ -368,6 +370,15 @@ import useBreakpoint from "@/composables/useBreakpoint";
+ import { toZonedTime, fromZonedTime } from "date-fns-tz";
+ 
+ const MICROS_PER_SECOND = 1_000_000;
++// Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
++const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
++  s: 315_360_000,
++  m: 5_256_000,
++  h: 87_600,
++  d: 3_650,
++  w: 520,
++  M: 120,
++};
+ 
+ interface ConsumableDateTime {
+   startTime: number;
+@@ -478,6 +489,7 @@ export default defineComponent({
+     });
+     const relativePeriod = ref("m");
+     const relativeValue = ref(15);
++    const lastValidCustomValue = ref(15);
+     const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+     const timezone = ref(currentTimezone);
+     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
+@@ -701,24 +713,39 @@ export default defineComponent({
+       if (props.autoApply) saveDate("relative");
+     };
+ 
++    const isValidCustomValue = (value: unknown) =>
++      value !== "" && value !== null && Number.isFinite(Number(value));
++
+     const onCustomPeriodSelect = () => {
++      // An emptied or non-numeric field is mid-edit: apply nothing until a number is typed.
++      if (!isValidCustomValue(relativeValue.value)) return;
++
++      let value = Math.max(1, Math.trunc(Number(relativeValue.value)));
++      const restrictedMax = relativePeriodsMaxValue.value[relativePeriod.value];
+       if (
+         selectedType.value == "relative" &&
+         props.queryRangeRestrictionInHour > 0 &&
+-        relativeValue.value > relativePeriodsMaxValue.value[relativePeriod.value]
++        value > restrictedMax
+       ) {
+-        relativeValue.value =
+-          relativePeriodsMaxValue.value[relativePeriod.value] > -1
+-            ? relativePeriodsMaxValue.value[relativePeriod.value]
+-            : 15;
++        value = restrictedMax > -1 ? restrictedMax : 15;
+       }
+-
+-      // relativeValue can hold a string at runtime (text input); parseInt coerces
+-      relativeValue.value = parseInt(relativeValue.value as unknown as string);
++      relativeValue.value = Math.min(
++        value,
++        MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? value,
++      );
++      lastValidCustomValue.value = relativeValue.value;
+ 
+       if (props.autoApply) saveDate("relative-custom");
+     };
+ 
++    const onCustomValueFocus = () => {
++      lastValidCustomValue.value = relativeValue.value;
++    };
++    const onCustomValueBlur = () => {
++      if (!isValidCustomValue(relativeValue.value))
++        relativeValue.value = lastValidCustomValue.value;
++    };
++
+     const setRelativeTime = (period: string) => {
+       const periodString = period?.match(/(\d+)([smhdwM])/);
+ 
+@@ -1086,7 +1113,10 @@ export default defineComponent({
+ 
+     const getDisplayValue = computed(() => {
+       if (!props.disableRelative && selectedType.value === "relative") {
+-        return t(pastPeriodKey.value, { count: relativeValue.value });
++        const count = isValidCustomValue(relativeValue.value)
++          ? relativeValue.value
++          : lastValidCustomValue.value;
++        return t(pastPeriodKey.value, { count });
+       } else {
+         if (selectedDate.value != null) {
+           // Here as if multiple dates is selected we get object with from and to keys
+@@ -1472,6 +1502,8 @@ export default defineComponent({
+       datetimeBtn,
+       getImageURL,
+       onCustomPeriodSelect,
++      onCustomValueFocus,
++      onCustomValueBlur,
+       setRelativeDate,
+       relativePeriods,
+       relativeDates,
