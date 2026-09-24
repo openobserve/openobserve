@@ -506,6 +506,8 @@ export class LogsPage {
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
         this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
+        // useLogsHighlighter marks FTS matches with .log-highlighted inside the result cell.
+        this.highlightedMatch = '[data-test="logs-search-result-logs-table"] .log-highlighted';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -2021,6 +2023,32 @@ export class LogsPage {
         }
         // Final attempt — let it throw if it still fails
         await expect(searchResult).toContainText(expectedPattern, { timeout: 15000 });
+    }
+
+    /** Choose a page size without asserting the banner, for tests that assert rows instead. */
+    async selectRecordsPerPage(size) {
+        const dropdown = this.page.locator(this.recordsPerPageDropdown);
+        await dropdown.waitFor({ state: 'visible', timeout: 15000 });
+        await dropdown.click({ force: true });
+        const option = this.page.locator(this.recordsPerPageOption(size)).first();
+        await option.waitFor({ state: 'visible', timeout: 10000 });
+        await option.click({ force: true });
+        await expect(this.page.locator(this.paginationRowCountTitle))
+            .toContainText(`1 to ${size}`, { timeout: 30000 });
+    }
+
+    /** The "1 to N out of M events" banner, used to compare the claim against rendered rows. */
+    async getResultTitleText() {
+        return (await this.page.locator(this.paginationRowCountTitle).first().innerText()).trim();
+    }
+
+    /** #9542: match_all matches must render highlighted, not plain. */
+    async expectHighlightedMatchesRendered() {
+        await expect(this.page.locator(this.highlightedMatch).first()).toBeVisible({ timeout: 20000 });
+    }
+
+    async getHighlightedMatchCount() {
+        return await this.page.locator(this.highlightedMatch).count();
     }
 
     async pageNotVisible() {

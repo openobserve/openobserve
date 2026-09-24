@@ -5,7 +5,8 @@
     "browser": "chrome",
     "run_files": [
       "logs-bugs.spec.js",
-      "logs-query-editor-resize-bounds.spec.js"
+      "logs-query-editor-resize-bounds.spec.js",
+      "logs-result-display.spec.js"
     ],
     "disabled": []
   },
