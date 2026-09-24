@@ -567,20 +567,20 @@ export default defineComponent({
           name: jsonObj.name,
           stream_name: jsonObj.stream_name,
           stream_type: jsonObj.stream_type,
-          destinations: [],
+          // Destinations ride the flattened Alert; nested in anomaly_config they are dropped unread.
+          destinations: jsonObj.alert_destinations ?? [],
           anomaly_config: {
             detection_function: jsonObj.detection_function,
             histogram_interval: jsonObj.histogram_interval,
             schedule_interval: jsonObj.schedule_interval,
             detection_window_seconds: jsonObj.detection_window_seconds,
             training_window_days: jsonObj.training_window_days,
-            retrain_interval_days: jsonObj.retrain_interval_days ?? 0,
+            // Absent must mean the create path's default, not the operator's explicit "Never" (0).
+            retrain_interval_days: jsonObj.retrain_interval_days ?? 7,
             threshold: jsonObj.threshold ?? 97,
-            seasonality: jsonObj.seasonality ?? "none",
             query_mode: jsonObj.query_mode ?? "filters",
             filters: jsonObj.filters ?? [],
             custom_sql: jsonObj.custom_sql ?? "",
-            alert_destinations: jsonObj.alert_destinations ?? [],
             alert_enabled: jsonObj.alert_enabled ?? true,
           },
         };

@@ -5004,7 +5004,7 @@
     "colorLightToDarkBlue": "Azul claro a escuro (por valor)",
     "colorPaletteClassicBySeries": "Palette-Classic (por série)",
     "drilldown": "Detalhamento",
-    "drilldownTooltip": "Navegue até outro painel ou URL especificado, transferindo todas as variáveis atuais para uma exploração perfeita dos dados.",
+    "drilldownTooltip": "Navegue para outro painel ou URL especificado, transportando todas as variáveis atuais para uma exploração de dados contínua.",
     "colorBySeriesTitle": "Colorir por série",
     "colorBySeriesTooltip": "Aplique cores às séries para obter uma melhor distinção visual nos gráficos. Personalize as cores de cada série para aprimorar a visualização dos dados.",
     "editColorBySeries": " Editar cor por série",
@@ -7967,7 +7967,18 @@
     "enabled": "Ativado",
     "paused": "Pausado",
     "impactTemplate": "Usado por {destinations} · {alerts}",
-    "impactDestination": "Usado por {alerts}"
+    "impactDestination": "Usado por {consumers}",
+    "impactUnused": "Não usado",
+    "noConsumers": "Nenhum consumidor.",
+    "countCompositeAlert": "{count} alerta composto | {count} alertas compostos",
+    "countPipeline": "{count} oleoduto | {count} oleodutos",
+    "countSyntheticCheck": "{count} verificação sintética | {count} verificações sintéticas",
+    "countOncallPolicy": "{count} política de escalonamento | {count} políticas de escalonamento",
+    "countOncallTeamChannel": "{count} canal de equipe | {count} canais de equipe",
+    "countWorkflow": "{count} fluxo de trabalho | {count} fluxos de trabalho",
+    "countAnomalyDetection": "{count} detector de anomalias | {count} detectores de anomalias",
+    "countIncidentIntegration": "{count} integração de incidentes | {count} integrações de incidentes",
+    "sectionOtherConsumers": "Também usado por"
   },
   "alert_library": {
     "header": "Biblioteca de Alertas",

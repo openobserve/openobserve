@@ -106,7 +106,12 @@ import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
-import { anomalyBudgetPerDay } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
+import {
+  anomalyBudgetPerDay,
+  anomalyIntervalSeconds,
+  type AnomalyIntervalUnit,
+  type AnomalyStoredIntervals,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 // ─── Default Values ─────────────────────────────────────────────────────────
 
@@ -199,6 +204,69 @@ export const defaultAlertValue: any = () => {
   };
 };
 
+// Anchored so "90s" is ninety SECONDS — the old parser read any non-"h" suffix as minutes.
+const ANOMALY_INTERVAL_RE = /^(\d+)(s|m|h|d)$/;
+
+/** Parses a stored interval string on the one s/m/h/d grammar; `parsed: false` falls back to the given default. */
+export const parseAnomalyInterval = (
+  raw: unknown,
+  defaultValue: number,
+  defaultUnit: AnomalyIntervalUnit,
+): { value: number; unit: AnomalyIntervalUnit; parsed: boolean } => {
+  const match = typeof raw === "string" ? ANOMALY_INTERVAL_RE.exec(raw.trim()) : null;
+  if (!match || Number(match[1]) <= 0)
+    return { value: defaultValue, unit: defaultUnit, parsed: false };
+  return { value: Number(match[1]), unit: match[2] as AnomalyIntervalUnit, parsed: true };
+};
+
+/** Largest s/m/h/d unit that renders the seconds count losslessly — the dirty check compares these values. */
+export const anomalyWindowSecondsToParts = (
+  secs: number,
+): { value: number; unit: AnomalyIntervalUnit } => {
+  if (secs % 86400 === 0) return { value: secs / 86400, unit: "d" };
+  if (secs % 3600 === 0) return { value: secs / 3600, unit: "h" };
+  if (secs % 60 === 0) return { value: secs / 60, unit: "m" };
+  return { value: secs, unit: "s" };
+};
+
+/** The three governing payload fields; an untouched stored field round-trips its raw wire value VERBATIM (N11). */
+export const anomalyIntervalPayload = (
+  c: {
+    histogram_interval_value: number | string;
+    histogram_interval_unit: string;
+    schedule_interval_value: number | string;
+    schedule_interval_unit: string;
+    detection_window_value: number | string;
+    detection_window_unit: string;
+  },
+  stored: AnomalyStoredIntervals | null,
+): { histogram_interval: string; schedule_interval: string; detection_window_seconds: number } => {
+  const untouched = (f: { value: number; unit: string }, v: unknown, u: unknown) =>
+    Number(v) === f.value && u === f.unit;
+  const histogram_interval =
+    stored !== null &&
+    typeof stored.histogram.raw === "string" &&
+    untouched(stored.histogram, c.histogram_interval_value, c.histogram_interval_unit)
+      ? stored.histogram.raw
+      : `${c.histogram_interval_value}${c.histogram_interval_unit}`;
+  const schedule_interval =
+    stored !== null &&
+    typeof stored.schedule.raw === "string" &&
+    untouched(stored.schedule, c.schedule_interval_value, c.schedule_interval_unit)
+      ? stored.schedule.raw
+      : `${c.schedule_interval_value}${c.schedule_interval_unit}`;
+  const detection_window_seconds =
+    stored !== null &&
+    typeof stored.window.raw === "number" &&
+    untouched(stored.window, c.detection_window_value, c.detection_window_unit)
+      ? stored.window.raw
+      : (anomalyIntervalSeconds(
+          Number(c.detection_window_value),
+          String(c.detection_window_unit),
+        ) ?? 0);
+  return { histogram_interval, schedule_interval, detection_window_seconds };
+};
+
 export const defaultAnomalyConfig = () => ({
   name: "",
   description: "",
@@ -210,11 +278,12 @@ export const defaultAnomalyConfig = () => ({
   detection_function: "count",
   detection_function_field: "",
   histogram_interval_value: 5,
-  histogram_interval_unit: "m" as "m" | "h",
+  histogram_interval_unit: "m" as AnomalyIntervalUnit,
   schedule_interval_value: 1,
-  schedule_interval_unit: "h" as "m" | "h",
-  detection_window_value: 1,
-  detection_window_unit: "h" as "m" | "h",
+  schedule_interval_unit: "h" as AnomalyIntervalUnit,
+  // 3h is the smallest round window meeting §4.3's recommendation (2×(1h+5m) + the absence allowance).
+  detection_window_value: 3,
+  detection_window_unit: "h" as AnomalyIntervalUnit,
   training_window_days: 14,
   retrain_interval_days: 7,
   threshold: 97,
@@ -227,6 +296,8 @@ export const defaultAnomalyConfig = () => ({
   is_trained: false,
   enabled: true,
   last_error: undefined as string | undefined,
+  // Set only by the config API (§4.8); the UI keys the health badge on it, never on error-string prefixes.
+  notice_class: null as "window_floor" | "window_skip" | "hybrid_fallback" | "retrain" | null,
   last_detection_run: undefined as number | undefined,
   next_run_at: undefined as number | undefined,
   // Feature 2: anomaly configs carry the same triage metadata as alerts.
@@ -427,6 +498,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // ── Anomaly Detection State ─────────────────────────────────────────────
 
   const anomalyConfig = ref(defaultAnomalyConfig());
+  // Captured ONCE from the edit-fetch response — never from anomalyConfig, which the form live-mutates (D4).
+  const anomalyStoredIntervals = ref<AnomalyStoredIntervals | null>(null);
   const anomalyStep2Ref = ref<any>(null);
   const showAnomalySummary = ref(true);
   const anomalyEditMode = ref(false);
@@ -489,15 +562,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     () =>
       `${anomalyConfig.value.histogram_interval_value}${anomalyConfig.value.histogram_interval_unit}`,
   );
-  const anomalyScheduleInterval = computed(
-    () =>
-      `${anomalyConfig.value.schedule_interval_value}${anomalyConfig.value.schedule_interval_unit}`,
-  );
-  const anomalyDetectionWindowSeconds = computed(() => {
-    const mult = anomalyConfig.value.detection_window_unit === "h" ? 3600 : 60;
-    return anomalyConfig.value.detection_window_value * mult;
-  });
-
   const anomalyPreviewSql = computed(() => {
     const c = anomalyConfig.value;
     if (c.query_mode === "custom_sql") {
@@ -1938,9 +2002,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             c.query_mode === "filters" && c.detection_function !== "count"
               ? c.detection_function_field || undefined
               : undefined,
-          histogram_interval: anomalyHistogramInterval.value,
-          schedule_interval: anomalyScheduleInterval.value,
-          detection_window_seconds: anomalyDetectionWindowSeconds.value,
+          ...anomalyIntervalPayload(c, anomalyStoredIntervals.value),
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
           // Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
@@ -2841,27 +2903,26 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           routeAnomalyId,
         );
         const data = res.data;
-        const parseInterval = (raw: string, defaultValue: number, defaultUnit: "m" | "h") => {
-          if (!raw) return { value: defaultValue, unit: defaultUnit };
-          if (raw.endsWith("h"))
-            return {
-              value: parseInt(raw) || defaultValue,
-              unit: "h" as const,
-            };
-          return {
-            value: parseInt(raw) || defaultValue,
-            unit: "m" as const,
-          };
+        const histInterval = parseAnomalyInterval(data.histogram_interval, 5, "m");
+        const sched = parseAnomalyInterval(data.schedule_interval, 1, "h");
+        const winSecs =
+          typeof data.detection_window_seconds === "number" && data.detection_window_seconds > 0
+            ? data.detection_window_seconds
+            : null;
+        const win = anomalyWindowSecondsToParts(
+          winSecs ?? anomalyIntervalSeconds(sched.value, sched.unit) ?? 3600,
+        );
+        anomalyStoredIntervals.value = {
+          histogram: {
+            raw: typeof data.histogram_interval === "string" ? data.histogram_interval : null,
+            ...histInterval,
+          },
+          schedule: {
+            raw: typeof data.schedule_interval === "string" ? data.schedule_interval : null,
+            ...sched,
+          },
+          window: { raw: winSecs, value: win.value, unit: win.unit, parsed: winSecs !== null },
         };
-        const parseSeconds = (secs: number) => {
-          if (secs >= 3600 && secs % 3600 === 0) return { value: secs / 3600, unit: "h" as const };
-          return { value: Math.round(secs / 60), unit: "m" as const };
-        };
-        const histInterval = parseInterval(data.histogram_interval || "5m", 5, "m");
-        const sched = parseInterval(data.schedule_interval || "1h", 1, "h");
-        const win = data.detection_window_seconds
-          ? parseSeconds(data.detection_window_seconds)
-          : parseSeconds(sched.value * (sched.unit === "h" ? 3600 : 60));
         const rawDestIds =
           data.alert_destinations ?? data.alert_destination_ids ?? data.alert_destination_id;
         const destIds: string[] = Array.isArray(rawDestIds)
@@ -2990,6 +3051,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     // Anomaly state
     anomalyConfig,
+    anomalyStoredIntervals,
     anomalyStep2Ref,
     showAnomalySummary,
     anomalyEditMode,

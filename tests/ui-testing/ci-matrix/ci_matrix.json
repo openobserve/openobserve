@@ -23,7 +23,10 @@
       "alerts-composite-preview.spec.js",
       "alerts-composite-detail.spec.js",
       "alerts-evaluation-chart.spec.js",
-      "alerts-chart-error-state.spec.js"
+      "alerts-chart-error-state.spec.js",
+      "alertsPagination.spec.js",
+      "alertTemplatesPagination.spec.js",
+      "alertDestinationsPagination.spec.js"
     ],
     "disabled": [
       {
@@ -100,7 +103,8 @@
       "crossLinkMultiStream.spec.js",
       "dashboards-form-validation.spec.js",
       "dashboard-refresh-without-cache.spec.js",
-      "dashboard-print-layout.spec.js"
+      "dashboard-print-layout.spec.js",
+      "dashboardPagination.spec.js"
     ],
     "disabled": [
       {

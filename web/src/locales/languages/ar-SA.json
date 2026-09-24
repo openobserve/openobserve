@@ -7967,7 +7967,18 @@
     "enabled": "مفعل",
     "paused": "توقف",
     "impactTemplate": "مستخدم من قبل {destinations} · {alerts}",
-    "impactDestination": "استخدمها {alerts}"
+    "impactDestination": "يُستخدم بواسطة {consumers}",
+    "impactUnused": "غير مستخدم",
+    "noConsumers": "لا يوجد مستهلكون.",
+    "countCompositeAlert": "{count} تنبيه مركّب | {count} تنبيهات مركّبة",
+    "countPipeline": "{count} مسار معالجة | {count} مسارات معالجة",
+    "countSyntheticCheck": "{count} فحص اصطناعي | {count} فحوصات اصطناعية",
+    "countOncallPolicy": "{count} سياسة تصعيد | {count} سياسات تصعيد",
+    "countOncallTeamChannel": "{count} قناة فريق | {count} قنوات فريق",
+    "countWorkflow": "{count} سير عمل | {count} سير عمل",
+    "countAnomalyDetection": "{count} كاشف شذوذ | {count} كواشف شذوذ",
+    "countIncidentIntegration": "{count} تكامل حوادث | {count} تكاملات حوادث",
+    "sectionOtherConsumers": "يُستخدم أيضًا بواسطة"
   },
   "alert_library": {
     "header": "مكتبة التنبيه",

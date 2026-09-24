@@ -7967,7 +7967,18 @@
     "enabled": "활성화됨",
     "paused": "일시 중지됨",
     "impactTemplate": "사용 중: {destinations} · {alerts}",
-    "impactDestination": "사용처: {alerts}"
+    "impactDestination": "{consumers}에서 사용",
+    "impactUnused": "사용되지 않음",
+    "noConsumers": "사용하는 항목이 없습니다.",
+    "countCompositeAlert": "{count}개의 복합 알림 | {count}개의 복합 알림",
+    "countPipeline": "{count}개의 파이프라인 | {count}개의 파이프라인",
+    "countSyntheticCheck": "{count}개의 Synthetics 검사 | {count}개의 Synthetics 검사",
+    "countOncallPolicy": "{count}개의 에스컬레이션 정책 | {count}개의 에스컬레이션 정책",
+    "countOncallTeamChannel": "{count}개의 팀 채널 | {count}개의 팀 채널",
+    "countWorkflow": "{count}개의 워크플로우 | {count}개의 워크플로우",
+    "countAnomalyDetection": "{count}개의 이상 탐지기 | {count}개의 이상 탐지기",
+    "countIncidentIntegration": "{count}개의 인시던트 통합 | {count}개의 인시던트 통합",
+    "sectionOtherConsumers": "다음에서도 사용"
   },
   "alert_library": {
     "header": "알림 라이브러리",
