@@ -19,6 +19,7 @@ import { expandJourney, translateStepId } from "@/utils/synthetics/expandJourney
 import {
   classifyReplayNames,
   defaultReplayEnvironmentId,
+  environmentStartUrls,
   mergeReplayVariables,
   replayInputs,
   sharedPlainValues,
@@ -123,6 +124,33 @@ describe("replayInputs", () => {
   it("adds the default scheme to a resolved url that has none, as the server does", () => {
     const { url } = replayInputs("{{BASE_URL}}/login", [], { BASE_URL: "prod.test" });
     expect(url).toBe("https://prod.test/login");
+  });
+});
+
+describe("environmentStartUrls", () => {
+  const envs = [
+    env("prod", [plain("BASE_URL", "https://prod.test")]),
+    env("stg", [plain("BASE_URL", "https://stg.test")]),
+  ];
+
+  it("resolves the URL per environment", () => {
+    expect(environmentStartUrls("{{BASE_URL}}/login", [], envs, [], ["prod", "stg"])).toEqual([
+      { id: "prod", url: "https://prod.test/login" },
+      { id: "stg", url: "https://stg.test/login" },
+    ]);
+  });
+
+  it("adds the default scheme", () => {
+    const bare = [env("prod", [plain("BASE_URL", "prod.test")])];
+    expect(environmentStartUrls("{{BASE_URL}}/login", [], bare, [], ["prod"])).toEqual([
+      { id: "prod", url: "https://prod.test/login" },
+    ]);
+  });
+
+  it("leaves an unknown placeholder literal", () => {
+    expect(environmentStartUrls("{{BASE_URL}}/{{PATH}}", [], envs, [], ["prod"])).toEqual([
+      { id: "prod", url: "https://prod.test/{{PATH}}" },
+    ]);
   });
 });
 

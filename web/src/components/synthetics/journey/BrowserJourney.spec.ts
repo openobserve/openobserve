@@ -3290,169 +3290,83 @@ describe("BrowserJourney replayUpTo", () => {
   });
 });
 
-// Surfaces the start row and its edit channel, so the skip rule is assertable without the table.
+// Surfaces the start row prop, so its absence is assertable without the table.
 const JourneyStepsStubWithStartRow = {
   props: ["data", "mode", "selectedIds", "expandedIds", "startRow"],
-  emits: ["update:start-url"],
   template: `
-    <div class="journey-steps-stub" :data-start-url="startRow ? startRow.value : ''">
-      <input
-        v-if="startRow"
-        data-test="synthetics-journey-start-url-input"
-        :value="startRow.value"
-        @input="$emit('update:start-url', $event.target.value)"
-      />
+    <div class="journey-steps-stub" :data-has-start-row="String(!!startRow)">
       <div v-for="item in data" :key="item.id" class="step-row">{{ item.name }}</div>
     </div>`,
 };
 
-describe("BrowserJourney ghost row 0", () => {
+describe("BrowserJourney Starting URL pill slot", () => {
   let wrapper: VueWrapper;
 
-  const click = (id: string, name: string) => ({
-    id,
-    action: "click",
-    name,
-    locator: { candidates: [{ kind: "css", value: "#x" }] },
-  });
-  const nav = (id: string) => ({
-    id,
-    action: "navigate",
-    name: "Open",
-    value: "https://app.test/",
-  });
-  const ref = (id: string, child: string) => ({
-    id,
-    action: "subtest",
-    name: "Log in (shared)",
-    subtest: { id: child },
-  });
-  const navFirst: ChildJourney = {
-    id: "login-test",
-    name: "Login",
-    steps: [nav("c1"), click("c2", "submit")] as BrowserStep[],
-  };
-  const clickFirst: ChildJourney = {
-    id: "consent-test",
-    name: "Consent",
-    steps: [click("k1", "accept"), click("k2", "close")] as BrowserStep[],
-  };
+  const PILL = '[data-test="start-pill-slot-content"]';
+  const FILTER = '[data-test="synthetics-journey-filter-input"]';
 
-  function mountWithStartRow(props: Record<string, unknown>) {
-    return mount(BrowserJourney, {
-      props: { startUrl: "https://app.test/{{path}}", ...props },
-      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithStartRow } },
-    }) as VueWrapper;
-  }
-
-  function startRowProp(w: VueWrapper) {
-    return w.findComponent(JourneyStepsStubWithStartRow).props("startRow");
-  }
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+  });
 
   afterEach(() => {
     wrapper?.unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
-  it("shows row 0 carrying the Starting URL when the first Step is not a navigate", () => {
-    wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in")] });
+  function mountWithPill(props: Record<string, unknown> = {}) {
+    const w = mount(BrowserJourney, {
+      props: {
+        modelValue: [],
+        "onUpdate:modelValue": (steps: BrowserStep[]) => w.setProps({ modelValue: steps }),
+        ...props,
+      },
+      slots: { "start-pill": '<span data-test="start-pill-slot-content" />' },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithStartRow } },
+    }) as VueWrapper;
+    return w;
+  }
 
-    expect(startRowProp(wrapper)).toMatchObject({
-      id: "_start",
-      value: "https://app.test/{{path}}",
+  it("renders the start-pill slot in the toolbar, also with no steps", () => {
+    wrapper = mountWithPill();
+
+    const pill = wrapper.find(PILL);
+    expect(pill.exists()).toBe(true);
+    const filter = wrapper.find(FILTER).element;
+    expect(pill.element.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it("step 1 is always the first table row after a recording drops its navigate", async () => {
+    wrapper = mountWithPill({ extensionReady: true, startUrl: "https://app.test/" });
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    emitStreamEvent({ method: "recordingStarted", tabId: 1, url: "https://app.test/" });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [
+        { id: "n1", action: "navigate", url: "https://app.test/", name: "Open app" },
+        { id: "n2", action: "click", selector: "#consent", name: "Accept cookies" },
+      ],
     });
-  });
+    await flushPromises();
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
 
-  it("hides row 0 when the first Step navigates", () => {
-    wrapper = mountWithStartRow({ modelValue: [nav("s1"), click("s2", "Sign in")] });
-
-    expect(startRowProp(wrapper)).toBeFalsy();
-  });
-
-  it("hides row 0 when a leading Subtest's child starts with a navigate", () => {
-    wrapper = mountWithStartRow({
-      modelValue: [ref("s1", "login-test"), click("s2", "Logs")],
-      childrenCache: new Map([["login-test", navFirst]]),
-    });
-
-    expect(startRowProp(wrapper)).toBeFalsy();
-  });
-
-  it("shows row 0 when a leading Subtest's child starts with a click", () => {
-    wrapper = mountWithStartRow({
-      modelValue: [ref("s1", "consent-test"), nav("s2")],
-      childrenCache: new Map([["consent-test", clickFirst]]),
-    });
-
-    expect(startRowProp(wrapper)).toMatchObject({ id: "_start" });
-  });
-
-  // An unresolved child cannot claim the navigate, so the run still opens the Starting URL.
-  it("shows row 0 when a leading Subtest's child is not in the cache", () => {
-    wrapper = mountWithStartRow({
-      modelValue: [ref("s1", "login-test"), click("s2", "Logs")],
-      childrenCache: new Map(),
-    });
-
-    expect(startRowProp(wrapper)).toMatchObject({ id: "_start" });
-  });
-
-  it("shows row 0 when a leading Subtest's child was refused", () => {
-    wrapper = mountWithStartRow({
-      modelValue: [ref("s1", "login-test"), click("s2", "Logs")],
-      childrenCache: new Map(),
-      refusedChildIds: new Set(["login-test"]),
-    });
-
-    expect(startRowProp(wrapper)).toMatchObject({ id: "_start" });
-  });
-
-  it("re-evaluates the skip rule when the journey changes", async () => {
-    wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in")] });
-    expect(startRowProp(wrapper)).toBeTruthy();
-
-    await wrapper.setProps({ modelValue: [nav("s0"), click("s1", "Sign in")] });
-
-    expect(startRowProp(wrapper)).toBeFalsy();
-  });
-
-  // Configure → row 0: the Starting URL is a prop, so the row follows it.
-  it("shows the Starting URL as written, with its placeholder", () => {
-    wrapper = mountWithStartRow({
-      modelValue: [click("s1", "Sign in")],
-      startUrl: "https://stg.test/x",
-      startUrlTemplate: "{{BASE_URL}}/x",
-    });
-
-    expect(startRowProp(wrapper)).toMatchObject({ value: "{{BASE_URL}}/x" });
-  });
-
-  it("follows Configure's Starting URL", async () => {
-    wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in")] });
-
-    await wrapper.setProps({ startUrl: "https://other.test/" });
-
-    expect(startRowProp(wrapper)).toMatchObject({ value: "https://other.test/" });
-  });
-
-  // Row 0 → Configure: the host's `check.url` is the one value both views read.
-  it("emits the edited URL as update:startUrl", async () => {
-    wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in")] });
-
-    const input = wrapper.find('[data-test="synthetics-journey-start-url-input"]');
-    expect(input.exists(), "no start row rendered").toBe(true);
-    await input.setValue("https://app.test/login");
-
-    expect(wrapper.emitted("update:startUrl")).toEqual([["https://app.test/login"]]);
-    // The Steps are untouched: the Starting URL is not one of them.
-    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
-  });
-
-  it("never counts row 0 in the step badge", () => {
-    wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in"), click("s2", "Submit")] });
-
-    expect(startRowProp(wrapper)).toBeTruthy();
-    const heading = wrapper.findAll("h3").find((h) => h.text() === "synthetics.journey.steps");
-    expect(heading?.element.nextElementSibling?.textContent?.trim()).toBe("2");
+    const steps = (wrapper.props() as Record<string, unknown>).modelValue as BrowserStep[];
+    expect(steps.map((s) => s.action)).toEqual(["click"]);
+    const table = wrapper.findComponent(JourneyStepsStubWithStartRow);
+    expect(table.exists()).toBe(true);
+    expect(table.props("startRow")).toBeFalsy();
   });
 });
 

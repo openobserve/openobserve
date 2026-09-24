@@ -319,6 +319,12 @@ const baseStubs = {
       replayUpTo: (...args: unknown[]) => mockReplayUpTo(...args),
     },
   },
+  JourneyStartPill: {
+    name: "JourneyStartPill",
+    template: '<div data-test="synthetics-journey-start-pill-stub" />',
+    props: ["url", "environments", "selectedIds", "checkVariables", "globals", "disabled"],
+    emits: ["update:url", "update:selected-ids"],
+  },
   MissingValueDialog: {
     name: "MissingValueDialog",
     template: '<div data-test="synthetics-missing-value-dialog-stub" :data-open="open" />',
@@ -522,6 +528,22 @@ const typeStep = (id: string, value: string): BrowserStep => ({
 });
 const toWire = (steps: BrowserStep[]) =>
   steps.map((s) => ({ id: s.id, action: s.action, value: s.value }));
+
+/** Whether leaving this editor for another test would stop and ask to discard. */
+function leaveAsks() {
+  const guard = mockOnBeforeRouteUpdate.mock.calls[0][0] as (
+    to: unknown,
+    from: unknown,
+    next: (arg?: unknown) => void,
+  ) => void;
+  const next = vi.fn();
+  guard(
+    { fullPath: "/web/synthetics/edit/other", params: { id: "other" }, query: {} },
+    { fullPath: "/web/synthetics/edit/check-123", params: { id: "check-123" }, query: {} },
+    next,
+  );
+  return next.mock.calls[0]?.[0] === false;
+}
 
 describe("CreateBrowserTest", () => {
   let wrapper: VueWrapper;
@@ -2152,7 +2174,6 @@ describe("CreateBrowserTest", () => {
       wrapper = await mountTemplatedCheck(["stg"]);
 
       expect(journeyStub(wrapper).props("startUrl")).toBe("https://stg.test/login");
-      expect(journeyStub(wrapper).props("startUrlTemplate")).toBe("{{BASE_URL}}/login");
     });
   });
 
@@ -2441,6 +2462,8 @@ describe("CreateBrowserTest", () => {
     const journeyStub = (w: VueWrapper) =>
       w.findComponent('[data-test="synthetics-browser-journey"]') as VueWrapper<any>;
     const configureStub = (w: VueWrapper) => w.findComponent(baseStubs.CheckConfigure);
+    const pill = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-journey-start-pill-stub"]') as VueWrapper<any>;
     const HINT = "Not opened — the first Step navigates.";
     const click: BrowserStep = {
       id: "s1",
@@ -2545,38 +2568,54 @@ describe("CreateBrowserTest", () => {
       expect(configureStub(wrapper).props("targetHint")).toBe(HINT);
     });
 
-    it("writes an edit from row 0 into the check's Starting URL", async () => {
-      wrapper = await mountEditWith({ journey: [click] });
+    it("an Apply in the Starting URL popover updates the check's URL and marks it unsaved", async () => {
+      wrapper = await mountEditWith({});
+      expect(leaveAsks()).toBe(false);
 
-      journeyStub(wrapper).vm.$emit("update:startUrl", "https://example.com/edited");
+      pill(wrapper).vm.$emit("update:url", "{{BASE_URL}}/x");
       await flushPromises();
 
-      // The prop the journey reads is the same value it just wrote.
-      expect(journeyStub(wrapper).props("startUrl")).toBe("https://example.com/edited");
+      expect(pill(wrapper).props("url")).toBe("{{BASE_URL}}/x");
+      expect(leaveAsks()).toBe(true);
       await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
       await flushPromises();
-      expect(mockServiceUpdate).toHaveBeenCalledWith(
-        "default",
-        "check-123",
-        expect.objectContaining({ url: "https://example.com/edited" }),
-        "folder-1",
-      );
-    });
-
-    it("keeps the placeholder when row 0 is edited", async () => {
-      wrapper = await mountEditWith({ journey: [click] });
-
-      journeyStub(wrapper).vm.$emit("update:startUrl", "{{BASE_URL}}/x");
-      await flushPromises();
-      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
-      await flushPromises();
-
       expect(mockServiceUpdate).toHaveBeenCalledWith(
         "default",
         "check-123",
         expect.objectContaining({ url: "{{BASE_URL}}/x" }),
         "folder-1",
       );
+    });
+
+    it("choosing environments in the pill saves them with the test", async () => {
+      mockServiceListEnvironments.mockResolvedValue({ data: orgEnvironments() });
+      wrapper = await mountEditWith({ environments: ["prod"] });
+      expect(pill(wrapper).props("selectedIds")).toEqual(["prod"]);
+
+      pill(wrapper).vm.$emit("update:selected-ids", ["prod", "stg"]);
+      await flushPromises();
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).toHaveBeenCalledWith(
+        "default",
+        "check-123",
+        expect.objectContaining({ environments: ["prod", "stg"] }),
+        "folder-1",
+      );
+    });
+
+    it("Configure shows the environments chosen on the Journey step", async () => {
+      mockServiceListEnvironments.mockResolvedValue({ data: orgEnvironments() });
+      wrapper = await mountEditWith({ environments: [] });
+
+      pill(wrapper).vm.$emit("update:selected-ids", ["stg"]);
+      await flushPromises();
+      await goToConfigure(wrapper);
+
+      expect(
+        (configureStub(wrapper).props("check") as { environments?: string[] }).environments,
+      ).toEqual(["stg"]);
     });
 
     it("warns, and still saves, when no navigate shares the Starting URL's host", async () => {

@@ -1248,152 +1248,17 @@ describe("JourneySteps", () => {
       expect(dataRows(wrapper)).toHaveLength(2);
     });
 
-    it("renders the editor start row above Step 1 without renumbering the Steps", async () => {
+    // The Starting URL lives on the toolbar pill; the editor table starts at Step 1.
+    it("never renders a Starting URL row in editor mode", async () => {
       wrapper = mount(JourneySteps, {
         props: { data: makeSteps(2), mode: "editor", startRow: editorStartRow() } as any,
         global: { stubs: STUBS },
       });
       await flushPromises();
 
-      const row0 = startRow(wrapper);
-      expect(row0.exists()).toBe(true);
-      const step1 = wrapper.find('[data-test="o2-table-row-0"]');
-      expect(precedes(row0.element, step1.element)).toBe(true);
-      // Row 0 is not a data row, so it neither shifts nor renumbers the Steps.
+      expect(startRow(wrapper).exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-start-url-input"]').exists()).toBe(false);
       expect(dataRows(wrapper)).toHaveLength(2);
-      expect(step1.text()).toContain("1");
-      // The C1 copy: the row says what happens, the field says where.
-      expect(row0.text()).toContain("Opens");
-    });
-
-    it("shows the Starting URL in an editable field on the editor start row", async () => {
-      wrapper = mount(JourneySteps, {
-        props: { data: makeSteps(2), mode: "editor", startRow: editorStartRow() } as any,
-        global: { stubs: STUBS },
-      });
-      await flushPromises();
-
-      const input = requireStartRow(wrapper).find<HTMLInputElement>("input");
-      expect(input.exists()).toBe(true);
-      expect(input.element.value).toBe(START_URL);
-    });
-
-    // One value, two views: an edit here is an edit of the check's Starting URL.
-    it("emits update:start-url when the start row's URL is edited", async () => {
-      wrapper = mount(JourneySteps, {
-        props: { data: makeSteps(2), mode: "editor", startRow: editorStartRow() } as any,
-        global: { stubs: STUBS },
-      });
-      await flushPromises();
-
-      await requireStartRow(wrapper).find("input").setValue("https://app.test/login");
-
-      const emitted = wrapper.emitted("update:start-url");
-      expect(emitted).toBeTruthy();
-      expect(emitted![emitted!.length - 1]).toEqual(["https://app.test/login"]);
-    });
-
-    it("follows the Starting URL when the prop changes", async () => {
-      wrapper = mount(JourneySteps, {
-        props: { data: makeSteps(2), mode: "editor", startRow: editorStartRow() } as any,
-        global: { stubs: STUBS },
-      });
-      await flushPromises();
-
-      await wrapper.setProps({
-        startRow: { id: "_start", action: "navigate", value: "https://other.test/" },
-      } as any);
-
-      expect(requireStartRow(wrapper).find<HTMLInputElement>("input").element.value).toBe(
-        "https://other.test/",
-      );
-    });
-
-    // The running session already consumed the URL, so an edit mid-replay would describe nothing.
-    it("locks the start row's URL while the table is locked", async () => {
-      wrapper = mount(JourneySteps, {
-        props: {
-          data: makeSteps(2),
-          mode: "editor",
-          startRow: editorStartRow(),
-          locked: true,
-        } as any,
-        global: { stubs: STUBS },
-      });
-      await flushPromises();
-
-      const input = requireStartRow(wrapper).find<HTMLInputElement>("input");
-      expect(input.element.readOnly).toBe(true);
-    });
-
-    it("gives the editor start row no name, no action picker and no locator", async () => {
-      wrapper = mount(JourneySteps, {
-        props: {
-          data: makeSteps(2),
-          mode: "editor",
-          startRow: editorStartRow(),
-          detailKey: "selector",
-        } as any,
-        global: { stubs: STUBS },
-      });
-      await flushPromises();
-
-      const row0 = requireStartRow(wrapper);
-      // Exactly one control: the URL. A name field or a locator field would be a second.
-      expect(row0.findAll("input, select, textarea")).toHaveLength(1);
-      // The action label badge every Step carries is absent — the row is not an action.
-      expect(row0.findAllComponents(OBadgeStub)).toHaveLength(0);
-      expect(row0.text()).not.toContain(enUS.synthetics.journey.actionLabels.navigate);
-    });
-
-    it("cannot be moved, selected, deleted or recorded before", async () => {
-      wrapper = mount(JourneySteps, {
-        props: {
-          data: makeSteps(2),
-          mode: "editor",
-          startRow: editorStartRow(),
-          enableReorder: true,
-          selectionEnabled: true,
-        } as any,
-        global: { stubs: STUBS },
-      });
-      await flushPromises();
-
-      // The Steps still have their handles and checkboxes — the row 0 rule is not a global one.
-      expect(wrapper.findAll('[data-test="o2-table-row-drag-handle"]').length).toBeGreaterThan(0);
-      expect(wrapper.findAll('[data-test="o2-table-select-cell"]').length).toBeGreaterThan(0);
-
-      const row0 = requireStartRow(wrapper);
-      for (const dt of [
-        "o2-table-row-drag-handle",
-        "o2-table-select-cell",
-        "o2-table-expand-cell",
-        "synthetics-journey-step-record-before-btn",
-        "synthetics-journey-step-delete-btn",
-        "synthetics-journey-step-record-before-btn-menu",
-        "synthetics-journey-step-delete-btn-menu",
-      ]) {
-        expect(row0.find(`[data-test="${dt}"]`).exists(), `${dt} rendered on row 0`).toBe(false);
-      }
-    });
-
-    it("emits no row-click or selection for the start row", async () => {
-      wrapper = mount(JourneySteps, {
-        props: {
-          data: makeSteps(2),
-          mode: "editor",
-          startRow: editorStartRow(),
-          selectionEnabled: true,
-        } as any,
-        global: { stubs: STUBS },
-      });
-      await flushPromises();
-
-      await requireStartRow(wrapper).trigger("click");
-
-      expect(wrapper.emitted("row-click")).toBeFalsy();
-      expect(wrapper.emitted("update:selected-ids")).toBeFalsy();
-      expect(wrapper.emitted("update:expanded-ids")).toBeFalsy();
     });
 
     // Against the REAL OTable spine: a result keyed `_start` lands on row 0 and nowhere else.
