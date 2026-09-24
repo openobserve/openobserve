@@ -22,6 +22,16 @@
 //! schema plumbing, which sits above the enterprise crate in the dependency
 //! graph. It is injected into a turn as a
 //! [`ChatStore`](o2_enterprise::enterprise::ai::chat::ChatStore).
+//!
+//! Index/stream consistency (design §12). The stream is written first and the
+//! index watermark second, so the only divergence a crash can leave is events
+//! stored past the watermark. That needs no repair job: readers stop at the
+//! watermark (the extra events are invisible), and the next turn re-sends from
+//! the watermark — o2-ai forwards `seq > known_seq` — so those events are
+//! written again byte-identically and the reader deduplicates them. A watermark
+//! ahead of readable data (the other direction) is reported as an integrity
+//! error and never papered over. Index rows of chats whose events aged out are
+//! removed by the `ai_chat_retention` job.
 
 use std::{
     collections::BTreeMap,
@@ -198,6 +208,19 @@ pub async fn read_committed_events(
     row: &ai_chat_sessions::Model,
     after_seq: i64,
 ) -> std::result::Result<Vec<DurableEvent>, ReadError> {
+    Ok(read_verified(row, after_seq)
+        .await?
+        .into_iter()
+        .map(|(_, event)| event)
+        .collect())
+}
+
+/// [`read_committed_events`], as the stored rows (each verified) with the
+/// events they hold.
+async fn read_verified(
+    row: &ai_chat_sessions::Model,
+    after_seq: i64,
+) -> std::result::Result<Vec<(AiChatEventRecord, DurableEvent)>, ReadError> {
     let result = read_committed_inner(row, after_seq).await;
     if let Err(e) = &result {
         metrics::AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL
@@ -217,7 +240,7 @@ pub async fn read_committed_events(
 async fn read_committed_inner(
     row: &ai_chat_sessions::Model,
     after_seq: i64,
-) -> std::result::Result<Vec<DurableEvent>, ReadError> {
+) -> std::result::Result<Vec<(AiChatEventRecord, DurableEvent)>, ReadError> {
     let last = row.last_committed_seq;
     if last <= after_seq.max(NO_SEQ) {
         return Ok(Vec::new());
@@ -325,7 +348,7 @@ fn verify_window(
     rows: Vec<AiChatEventRecord>,
     lo: i64,
     hi: i64,
-) -> std::result::Result<Vec<DurableEvent>, ReadError> {
+) -> std::result::Result<Vec<(AiChatEventRecord, DurableEvent)>, ReadError> {
     let mut by_seq: BTreeMap<i64, AiChatEventRecord> = BTreeMap::new();
     for row in rows {
         if row.seq <= lo || row.seq > hi {
@@ -347,17 +370,17 @@ fn verify_window(
         }
     }
     let mut events = Vec::with_capacity(by_seq.len());
-    for (expected, (seq, row)) in (lo + 1..=hi).zip(by_seq.iter()) {
-        if *seq != expected {
+    for (expected, (seq, row)) in (lo + 1..=hi).zip(by_seq) {
+        if seq != expected {
             return Err(ReadError::Gap {
                 expected,
-                found: Some(*seq),
+                found: Some(seq),
             });
         }
-        events.push(
-            row.to_verified_event()
-                .map_err(|e| ReadError::Corrupt(e.to_string()))?,
-        );
+        let event = row
+            .to_verified_event()
+            .map_err(|e| ReadError::Corrupt(e.to_string()))?;
+        events.push((row, event));
     }
     if events.len() as i64 != hi - lo {
         return Err(ReadError::Gap {
@@ -367,6 +390,44 @@ fn verify_window(
     }
     Ok(events)
 }
+
+/// Rewrite a chat's committed history with fresh timestamps so it does not
+/// age out of the chat-events stream while the chat is in use (see the
+/// `ai_chat_retention` job). The copies are byte-identical rows — same seq,
+/// same hash — so readers deduplicate them; once all are written, the chat's
+/// read window moves to them. The caller holds the chat's turn lease.
+/// Returns how many events were rewritten.
+pub async fn refresh_chat_history(
+    row: &ai_chat_sessions::Model,
+    retention_days: i64,
+) -> Result<usize> {
+    let records = read_verified(row, NO_SEQ).await?;
+    if records.is_empty() {
+        return Ok(0);
+    }
+    ensure_stream_initialized(&row.org_id, retention_days).await;
+    let stream = StreamParams::new(&row.org_id, AI_CHAT_EVENTS_STREAM, StreamType::Logs);
+    let first = now_micros();
+    let mut last = first;
+    for chunk in records.chunks(REFRESH_BATCH) {
+        last = now_micros().max(last);
+        let values = chunk
+            .iter()
+            .map(|(record, _)| {
+                let mut copy = record.clone();
+                copy.timestamp = last;
+                json::to_value(copy)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        crate::self_reporting::ingest_internal_logs(values, stream.clone()).await?;
+    }
+    ai_chat_sessions::set_refreshed_range(&row.org_id, &row.session_id, first, last)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    Ok(records.len())
+}
+
+const REFRESH_BATCH: usize = 500;
 
 /// Split a chat's events into chunks of whole turns, each at most
 /// `max_events` long unless a single turn is longer. A turn starts at the
@@ -574,7 +635,7 @@ mod tests {
         ];
         let events = verify_window(rows, 0, 3).unwrap();
         assert_eq!(
-            events.iter().map(|e| e.seq).collect::<Vec<_>>(),
+            events.iter().map(|(_, e)| e.seq).collect::<Vec<_>>(),
             vec![1, 2, 3]
         );
     }

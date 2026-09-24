@@ -88,6 +88,12 @@ fn create_statement() -> TableCreateStatement {
         )
         .col(ColumnDef::new(AiChatSessions::Title).text().not_null())
         .col(
+            ColumnDef::new(AiChatSessions::TitleSource)
+                .string_len(16)
+                .not_null()
+                .default(""),
+        )
+        .col(
             ColumnDef::new(AiChatSessions::Status)
                 .string_len(16)
                 .not_null(),
@@ -159,6 +165,7 @@ enum AiChatSessions {
     OpencodeSessionId,
     AgentType,
     Title,
+    TitleSource,
     Status,
     CreatedAt,
     UpdatedAt,

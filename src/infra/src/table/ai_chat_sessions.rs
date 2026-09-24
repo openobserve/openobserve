@@ -39,6 +39,12 @@ use crate::{
     errors,
 };
 
+/// Where a chat's title came from; a later source only replaces an earlier
+/// one in this order, and a title the user chose is never replaced.
+pub const TITLE_FROM_PROMPT: &str = "prompt";
+pub const TITLE_GENERATED: &str = "generated";
+pub const TITLE_FROM_USER: &str = "user";
+
 pub const STATUS_ACTIVE: &str = "active";
 pub const STATUS_DELETED: &str = "deleted";
 /// "No durable event committed": opencode's `seq` is 0-based.
@@ -62,6 +68,19 @@ pub enum Binding {
 pub struct ListCursor {
     pub updated_at: i64,
     pub session_id: String,
+}
+
+/// `column` moved forward to `value`, never back (NULL counts as unset). The
+/// reader's time window ends at `last_event_at`, so it must never shrink
+/// under events already written (a history refresh and a turn can race).
+fn not_before(column: Column, value: i64) -> sea_orm::sea_query::SimpleExpr {
+    sea_orm::sea_query::CaseStatement::new()
+        .case(
+            Condition::any().add(column.is_null()).add(column.lt(value)),
+            Expr::value(value),
+        )
+        .finally(Expr::col(column))
+        .into()
 }
 
 fn db_err(e: impl ToString) -> errors::Error {
@@ -129,6 +148,7 @@ pub async fn get_or_create_with<C: ConnectionTrait>(
         opencode_session_id: Set(None),
         agent_type: Set(agent_type.to_string()),
         title: Set(String::new()),
+        title_source: Set(String::new()),
         status: Set(STATUS_ACTIVE.to_string()),
         created_at: Set(now),
         updated_at: Set(now),
@@ -337,7 +357,10 @@ pub async fn advance_watermark_with<C: ConnectionTrait>(
 ) -> Result<bool, errors::Error> {
     let result = Entity::update_many()
         .col_expr(Column::LastCommittedSeq, Expr::value(new_seq))
-        .col_expr(Column::LastEventAt, Expr::value(last_event_at))
+        .col_expr(
+            Column::LastEventAt,
+            not_before(Column::LastEventAt, last_event_at),
+        )
         .col_expr(
             Column::FirstEventAt,
             Func::coalesce([
@@ -358,8 +381,42 @@ pub async fn advance_watermark_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
-/// Set the title opencode generated — only while the chat has none, so a
-/// title the user chose ([`rename`]) is never overwritten.
+/// A provisional title from the chat's first prompt, so a new chat is never
+/// listed untitled. Only while the chat has no title at all.
+pub async fn set_prompt_title(
+    org_id: &str,
+    session_id: &str,
+    title: &str,
+    now: i64,
+) -> Result<(), errors::Error> {
+    set_prompt_title_with(get_orm_client_rw().await, org_id, session_id, title, now).await
+}
+
+pub async fn set_prompt_title_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    title: &str,
+    now: i64,
+) -> Result<(), errors::Error> {
+    Entity::update_many()
+        .col_expr(Column::Title, Expr::value(title.to_string()))
+        .col_expr(
+            Column::TitleSource,
+            Expr::value(TITLE_FROM_PROMPT.to_string()),
+        )
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::TitleSource.eq(""))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(())
+}
+
+/// The title opencode generated. Replaces a provisional one; never a title
+/// the user chose ([`rename`]).
 pub async fn set_auto_title(
     org_id: &str,
     session_id: &str,
@@ -378,10 +435,15 @@ pub async fn set_auto_title_with<C: ConnectionTrait>(
 ) -> Result<(), errors::Error> {
     Entity::update_many()
         .col_expr(Column::Title, Expr::value(title.to_string()))
+        .col_expr(
+            Column::TitleSource,
+            Expr::value(TITLE_GENERATED.to_string()),
+        )
         .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
-        .filter(Column::Title.eq(""))
+        .filter(Column::TitleSource.ne(TITLE_FROM_USER))
+        .filter(Column::Title.ne(title))
         .exec(conn)
         .await
         .map_err(db_err)?;
@@ -418,6 +480,10 @@ pub async fn rename_with<C: ConnectionTrait>(
 ) -> Result<bool, errors::Error> {
     let result = Entity::update_many()
         .col_expr(Column::Title, Expr::value(title.to_string()))
+        .col_expr(
+            Column::TitleSource,
+            Expr::value(TITLE_FROM_USER.to_string()),
+        )
         .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
@@ -461,8 +527,13 @@ pub async fn mark_deleted_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
-/// Tombstone every active chat `user_id` owns in `org_id`; returns how many.
-pub async fn mark_all_deleted(org_id: &str, user_id: &str, now: i64) -> Result<u64, errors::Error> {
+/// Tombstone every active chat `user_id` owns in `org_id`; returns their
+/// session ids (so the caller can drop the replicas' working copies too).
+pub async fn mark_all_deleted(
+    org_id: &str,
+    user_id: &str,
+    now: i64,
+) -> Result<Vec<String>, errors::Error> {
     mark_all_deleted_with(get_orm_client_rw().await, org_id, user_id, now).await
 }
 
@@ -471,17 +542,158 @@ pub async fn mark_all_deleted_with<C: ConnectionTrait>(
     org_id: &str,
     user_id: &str,
     now: i64,
-) -> Result<u64, errors::Error> {
-    let result = Entity::update_many()
-        .col_expr(Column::Status, Expr::value(STATUS_DELETED.to_string()))
-        .col_expr(Column::UpdatedAt, Expr::value(now))
+) -> Result<Vec<String>, errors::Error> {
+    let session_ids: Vec<String> = Entity::find()
+        .select_only()
+        .column(Column::SessionId)
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::UserId.eq(user_id))
         .filter(Column::Status.eq(STATUS_ACTIVE))
+        .into_tuple()
+        .all(conn)
+        .await
+        .map_err(db_err)?;
+    let mut deleted = Vec::with_capacity(session_ids.len());
+    // Bounded statements: a user with thousands of chats must not produce
+    // one unbounded IN list.
+    for chunk in session_ids.chunks(500) {
+        Entity::update_many()
+            .col_expr(Column::Status, Expr::value(STATUS_DELETED.to_string()))
+            .col_expr(Column::UpdatedAt, Expr::value(now))
+            .filter(Column::OrgId.eq(org_id))
+            .filter(Column::UserId.eq(user_id))
+            .filter(Column::Status.eq(STATUS_ACTIVE))
+            .filter(Column::SessionId.is_in(chunk.iter().cloned()))
+            .exec(conn)
+            .await
+            .map_err(db_err)?;
+        deleted.extend_from_slice(chunk);
+    }
+    Ok(deleted)
+}
+
+/// Orgs that have chat index rows (for the retention sweep).
+pub async fn orgs_with_chats() -> Result<Vec<String>, errors::Error> {
+    orgs_with_chats_with(get_orm_client_ro().await).await
+}
+
+pub async fn orgs_with_chats_with<C: ConnectionTrait>(
+    conn: &C,
+) -> Result<Vec<String>, errors::Error> {
+    Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .distinct()
+        .into_tuple()
+        .all(conn)
+        .await
+        .map_err(db_err)
+}
+
+/// Remove the index rows of `org_id` whose oldest stored events have aged out
+/// of the chat-events stream (`first_event_at` before `cutoff`, micros),
+/// active or tombstoned alike: an active row would claim history that no
+/// longer reads back, and a tombstone is only needed while its events still
+/// exist (it keeps a deleted chat from being continued). Chats in use are kept
+/// clear of this by [`refresh candidates`](due_for_refresh) being rewritten.
+/// Returns how many rows were removed.
+pub async fn purge_expired(org_id: &str, cutoff: i64) -> Result<u64, errors::Error> {
+    purge_expired_with(get_orm_client_rw().await, org_id, cutoff).await
+}
+
+pub async fn purge_expired_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    cutoff: i64,
+) -> Result<u64, errors::Error> {
+    let result = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(
+            Condition::any()
+                .add(Column::FirstEventAt.lt(cutoff))
+                // Never committed anything: its age is its last update.
+                .add(
+                    Condition::all()
+                        .add(Column::FirstEventAt.is_null())
+                        .add(Column::UpdatedAt.lt(cutoff)),
+                ),
+        )
         .exec(conn)
         .await
         .map_err(db_err)?;
     Ok(result.rows_affected)
+}
+
+/// Active chats of `org_id` in use since `active_since` whose oldest stored
+/// events predate `stale_before`: their committed history is rewritten with
+/// fresh timestamps so it never ages out while the chat is in use. At most
+/// `limit` rows, oldest first.
+pub async fn due_for_refresh(
+    org_id: &str,
+    stale_before: i64,
+    active_since: i64,
+    limit: u64,
+) -> Result<Vec<Model>, errors::Error> {
+    due_for_refresh_with(
+        get_orm_client_ro().await,
+        org_id,
+        stale_before,
+        active_since,
+        limit,
+    )
+    .await
+}
+
+pub async fn due_for_refresh_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    stale_before: i64,
+    active_since: i64,
+    limit: u64,
+) -> Result<Vec<Model>, errors::Error> {
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.eq(STATUS_ACTIVE))
+        .filter(Column::FirstEventAt.lt(stale_before))
+        .filter(Column::LastEventAt.gte(active_since))
+        .order_by_asc(Column::FirstEventAt)
+        .limit(limit)
+        .all(conn)
+        .await
+        .map_err(db_err)
+}
+
+/// After a chat's history was rewritten between `first` and `last` (micros):
+/// the read window starts at the rewritten copies (the old ones may age out)
+/// and reaches at least their end.
+pub async fn set_refreshed_range(
+    org_id: &str,
+    session_id: &str,
+    first: i64,
+    last: i64,
+) -> Result<(), errors::Error> {
+    set_refreshed_range_with(get_orm_client_rw().await, org_id, session_id, first, last).await
+}
+
+pub async fn set_refreshed_range_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    first: i64,
+    last: i64,
+) -> Result<(), errors::Error> {
+    Entity::update_many()
+        .col_expr(
+            Column::FirstEventAt,
+            not_before(Column::FirstEventAt, first),
+        )
+        .col_expr(Column::LastEventAt, not_before(Column::LastEventAt, last))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(())
 }
 
 /// One page of a user's active chats, most recently active first, keyset
@@ -707,18 +919,39 @@ mod tests {
         );
     }
 
+    async fn title_of(db: &sea_orm::DatabaseConnection) -> (String, String) {
+        let row = get_with(db, ORG, SID).await.unwrap().unwrap();
+        (row.title, row.title_source)
+    }
+
     #[tokio::test]
-    async fn auto_titles_never_overwrite_a_user_rename() {
+    async fn titles_go_prompt_then_generated_and_a_rename_always_wins() {
         let db = db().await;
         chat(&db, SID, ALICE, 10).await;
-        set_auto_title_with(&db, ORG, SID, "Why is p99 up?", 20)
+        set_prompt_title_with(&db, ORG, SID, "why is p99 up since", 11)
+            .await
+            .unwrap();
+        // A second prompt never replaces the first.
+        set_prompt_title_with(&db, ORG, SID, "and now?", 12)
             .await
             .unwrap();
         assert_eq!(
-            get_with(&db, ORG, SID).await.unwrap().unwrap().title,
-            "Why is p99 up?"
+            title_of(&db).await,
+            ("why is p99 up since".into(), TITLE_FROM_PROMPT.into())
         );
-        // Only the owner can rename.
+        set_auto_title_with(&db, ORG, SID, "p99 latency spike", 20)
+            .await
+            .unwrap();
+        assert_eq!(
+            title_of(&db).await,
+            ("p99 latency spike".into(), TITLE_GENERATED.into())
+        );
+        set_prompt_title_with(&db, ORG, SID, "later prompt", 21)
+            .await
+            .unwrap();
+        assert_eq!(title_of(&db).await.0, "p99 latency spike");
+
+        // Only the owner can rename, and a rename is never replaced.
         assert!(!rename_with(&db, ORG, SID, BOB, "mine", 30).await.unwrap());
         assert!(
             rename_with(&db, ORG, SID, ALICE, "p99 regression", 31)
@@ -729,8 +962,101 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            get_with(&db, ORG, SID).await.unwrap().unwrap().title,
-            "p99 regression"
+            title_of(&db).await,
+            ("p99 regression".into(), TITLE_FROM_USER.into())
+        );
+    }
+
+    #[tokio::test]
+    async fn only_rows_whose_oldest_events_aged_out_are_purged() {
+        let db = db().await;
+        // (session, first event, last event)
+        for (sid, first, last) in [("old", 50, 100), ("recent", 600, 900), ("deleted", 50, 60)] {
+            chat(&db, sid, ALICE, 10).await;
+            assert!(
+                advance_watermark_with(&db, ORG, sid, 1, NO_SEQ, 3, first, last, last)
+                    .await
+                    .unwrap()
+            );
+        }
+        // Oldest events gone even though it was used lately: purged too.
+        chat(&db, "long-lived", ALICE, 10).await;
+        assert!(
+            advance_watermark_with(&db, ORG, "long-lived", 1, NO_SEQ, 3, 50, 900, 900)
+                .await
+                .unwrap()
+        );
+        chat(&db, "empty-old", ALICE, 20).await; // never committed anything
+        chat(&db, "empty-new", ALICE, 800).await;
+        assert!(
+            mark_deleted_with(&db, ORG, "deleted", ALICE, 70)
+                .await
+                .unwrap()
+        );
+        get_or_create_with(&db, "other-org", "old", ALICE, "a@x", "o2-ai", 10)
+            .await
+            .unwrap();
+
+        assert_eq!(purge_expired_with(&db, ORG, 500).await.unwrap(), 4);
+        let mut left = Vec::new();
+        for sid in [
+            "old",
+            "recent",
+            "deleted",
+            "long-lived",
+            "empty-old",
+            "empty-new",
+        ] {
+            if get_with(&db, ORG, sid).await.unwrap().is_some() {
+                left.push(sid);
+            }
+        }
+        assert_eq!(left, vec!["recent", "empty-new"]);
+        assert!(get_with(&db, "other-org", "old").await.unwrap().is_some());
+        let mut orgs = orgs_with_chats_with(&db).await.unwrap();
+        orgs.sort();
+        assert_eq!(orgs, vec!["org", "other-org"]);
+    }
+
+    #[tokio::test]
+    async fn chats_in_use_with_old_history_are_due_for_refresh() {
+        let db = db().await;
+        for (sid, first, last) in [("in-use", 50, 900), ("idle", 50, 100), ("fresh", 700, 900)] {
+            chat(&db, sid, ALICE, 10).await;
+            assert!(
+                advance_watermark_with(&db, ORG, sid, 1, NO_SEQ, 3, first, last, last)
+                    .await
+                    .unwrap()
+            );
+        }
+        let due = due_for_refresh_with(&db, ORG, 500, 500, 10).await.unwrap();
+        assert_eq!(
+            due.iter()
+                .map(|r| r.session_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["in-use"]
+        );
+
+        // The rewrite moves the window forward; a turn committing meanwhile
+        // with an earlier timestamp never pulls its end back.
+        set_refreshed_range_with(&db, ORG, "in-use", 1000, 1010)
+            .await
+            .unwrap();
+        assert!(
+            advance_watermark_with(&db, ORG, "in-use", 1, 3, 5, 950, 950, 950)
+                .await
+                .unwrap()
+        );
+        let row = get_with(&db, ORG, "in-use").await.unwrap().unwrap();
+        assert_eq!(
+            (row.first_event_at, row.last_event_at),
+            (Some(1000), Some(1010))
+        );
+        assert!(
+            due_for_refresh_with(&db, ORG, 500, 500, 10)
+                .await
+                .unwrap()
+                .is_empty()
         );
     }
 
@@ -763,10 +1089,9 @@ mod tests {
         assert!(!mark_deleted_with(&db, ORG, "s2", BOB, 600).await.unwrap());
 
         // Clearing everything touches only the caller's own chats.
-        assert_eq!(
-            mark_all_deleted_with(&db, ORG, ALICE, 700).await.unwrap(),
-            4
-        );
+        let mut cleared = mark_all_deleted_with(&db, ORG, ALICE, 700).await.unwrap();
+        cleared.sort();
+        assert_eq!(cleared, vec!["s0", "s2", "s3", "s4"]);
         assert!(
             list_for_user_with(&db, ORG, ALICE, None, 10)
                 .await

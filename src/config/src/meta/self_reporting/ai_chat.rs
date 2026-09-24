@@ -25,10 +25,13 @@
 //! It is internal. The `_o2_` prefix puts it under the un-gated
 //! [`super::usage::is_internal_rollup_stream`] guard (no user ingestion in
 //! any edition). Every SQL query is resolved to its streams in
-//! `search::sql::Sql::new_with_options`, which refuses this stream unless the
-//! caller runs inside [`as_chat_history_reader`] — so UI searches,
+//! `search::sql::Sql::resolve`, which refuses this stream (as "not found")
+//! unless the caller runs inside [`as_chat_history_reader`] — so UI searches,
 //! dashboards, alerts, reports and scheduled pipelines all stay out, and the
-//! Chat API (which scopes by owner) is the only reader.
+//! Chat API (which scopes by owner) is the only reader. The query is planned
+//! again in spawned tasks, where the task-local is gone, so the leader
+//! carries the mark on the internal request
+//! (`datafusion::request::Request::chat_history_reader`).
 //! [`is_protected_ai_chat_stream`] additionally keeps it out of stream
 //! listing/management and realtime pipelines.
 

@@ -29,6 +29,8 @@ use crate::common::meta::user::{UserOrgRole, UserRequest};
 
 #[cfg(feature = "enterprise")]
 mod agent_signals;
+#[cfg(feature = "enterprise")]
+mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
@@ -1258,6 +1260,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Replayable SDK requests are retained for 24h; reclaim the lapsed ones.
     #[cfg(feature = "enterprise")]
     llm_idempotency_purge::run();
+    // AI chat index rows whose events aged out of the chat-events stream.
+    #[cfg(feature = "enterprise")]
+    ai_chat_retention::run();
     // Early Experiment deletion marks the head and leaves the removal to this
     // sweep, which retries until the Experiment's own storage is gone.
     #[cfg(feature = "enterprise")]

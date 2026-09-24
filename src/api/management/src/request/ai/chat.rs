@@ -875,6 +875,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 persist_turn_id.as_deref(),
                 &user_id,
                 agent_type,
+                &query_req.query,
                 &trace_id,
             )
             .await

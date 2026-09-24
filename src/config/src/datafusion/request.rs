@@ -33,6 +33,12 @@ pub struct Request {
     pub use_cache: bool,
     pub overwrite_cache: bool,
     pub histogram_interval: i64,
+    /// Issued by the AI Chat API's history reader, the only reader allowed on
+    /// the protected chat-events stream. Set server-side from
+    /// `self_reporting::ai_chat::is_chat_history_reader()` and carried on the
+    /// request because the query is planned again in spawned tasks, where
+    /// that task-local is gone. Never derived from client input.
+    pub chat_history_reader: bool,
 }
 
 impl Default for Request {
@@ -52,6 +58,7 @@ impl Default for Request {
             use_cache: default_use_cache(),
             overwrite_cache: false,
             histogram_interval: 0,
+            chat_history_reader: false,
         }
     }
 }
@@ -84,6 +91,7 @@ impl Request {
             use_cache: default_use_cache(),
             overwrite_cache,
             histogram_interval,
+            chat_history_reader: false,
         }
     }
 
@@ -102,6 +110,12 @@ impl Request {
 
     pub fn set_use_cache(&mut self, use_cache: bool) {
         self.use_cache = use_cache;
+    }
+
+    /// Mark the request as the AI Chat API's history reader when — and only
+    /// when — it is issued from inside that reader's scope.
+    pub fn mark_chat_history_reader(&mut self) {
+        self.chat_history_reader = crate::meta::self_reporting::ai_chat::is_chat_history_reader();
     }
 }
 
@@ -122,6 +136,8 @@ impl From<FlightSearchRequest> for Request {
             use_cache: req.search_info.use_cache,
             overwrite_cache: req.search_info.clear_cache,
             histogram_interval: req.search_info.histogram_interval,
+            // Never carried across nodes.
+            chat_history_reader: false,
         }
     }
 }

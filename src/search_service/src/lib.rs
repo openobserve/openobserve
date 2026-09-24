@@ -167,6 +167,8 @@ pub async fn search(
         request.set_local_mode(Some(v));
     }
     request.set_use_cache(in_req.use_cache);
+    // Before the query is planned again in spawned tasks (cluster::http).
+    request.mark_chat_history_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
 
     #[cfg(feature = "enterprise")]
@@ -1067,17 +1069,6 @@ pub fn generate_search_schema_diff(
 
 #[inline]
 pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), Error> {
-    // The AI chat-events stream holds every user's conversations for the org.
-    // It is read only through the Chat API (which scopes by owner); user
-    // searches — dashboards, alerts, the MCP tools the assistant itself runs
-    // as the user — must not reach it. All editions.
-    if _stream.is_some_and(config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream) {
-        return Err(Error::Message(format!(
-            "stream '{}' is internal and cannot be searched directly",
-            _stream.unwrap_or_default()
-        )));
-    }
-
     #[cfg(feature = "enterprise")]
     {
         // for meta org usage and audit stream, we should always allow search
@@ -1110,18 +1101,6 @@ mod tests {
     use hashbrown::HashMap;
 
     use super::*;
-
-    #[test]
-    fn the_ai_chat_events_stream_cannot_be_searched_directly() {
-        // It holds every user's conversations for the org; the Chat API is
-        // the only reader, and it scopes by owner.
-        let denied = check_search_allowed(
-            "default",
-            Some(config::meta::self_reporting::ai_chat::AI_CHAT_EVENTS_STREAM),
-        );
-        assert!(denied.is_err());
-        assert!(denied.unwrap_err().to_string().contains("internal"));
-    }
 
     #[test]
     fn test_flatten_vrl_result_filters_null_and_preserves_nested_records() {

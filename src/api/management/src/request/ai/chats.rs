@@ -50,6 +50,19 @@ const MAX_TITLE_CHARS: usize = 200;
 const DEFAULT_PAGE: u64 = 50;
 const MAX_PAGE: u64 = 200;
 
+/// A new chat's provisional title: the first line of its first prompt,
+/// trimmed to [`PROMPT_TITLE_CHARS`] characters.
+fn prompt_title(prompt: &str) -> Option<String> {
+    let line = prompt.lines().map(str::trim).find(|l| !l.is_empty())?;
+    let mut title: String = line.chars().take(PROMPT_TITLE_CHARS).collect();
+    if line.chars().count() > PROMPT_TITLE_CHARS {
+        title.push('…');
+    }
+    Some(title)
+}
+
+const PROMPT_TITLE_CHARS: usize = 80;
+
 fn is_uuid(value: &str) -> bool {
     value.len() == 36 && uuid::Uuid::try_parse(value).is_ok()
 }
@@ -105,6 +118,7 @@ pub async fn admit_turn(
     turn_id: Option<&str>,
     user_email: &str,
     agent_type: &str,
+    prompt: &str,
     trace_id: &str,
 ) -> Result<AdmittedTurn, Response> {
     // The session id is the key every stored event and the index row hang
@@ -180,12 +194,22 @@ pub async fn admit_turn(
     };
 
     match ai_chat_sessions::begin_turn(org_id, session_id, &turn_id, now).await {
-        Ok(true) => Ok(AdmittedTurn {
-            row,
-            owner,
-            turn_id,
-            lease,
-        }),
+        Ok(true) => {
+            if row.title_source.is_empty()
+                && let Some(title) = prompt_title(prompt)
+                && let Err(e) =
+                    ai_chat_sessions::set_prompt_title(org_id, session_id, &title, now).await
+            {
+                // Cosmetic: the generated title replaces it shortly anyway.
+                log::warn!("[AI-CHAT] cannot set the initial title of {session_id}: {e}");
+            }
+            Ok(AdmittedTurn {
+                row,
+                owner,
+                turn_id,
+                lease,
+            })
+        }
         Ok(false) => {
             lease.release().await;
             Err(MetaHttpResponse::conflict(
@@ -606,15 +630,40 @@ pub async fn delete_all(Path(org_id): Path<String>, in_req: axum::extract::Reque
         Err(resp) => return resp,
     };
     let now = config::utils::time::now_micros();
-    match ai_chat_sessions::mark_all_deleted(&org_id, &owner, now).await {
-        // Replica copies are left to o2-ai's own cleanup: they are never
-        // served again, and one call per chat would not scale here.
-        Ok(deleted) => MetaHttpResponse::json(serde_json::json!({ "deleted": deleted })),
+    let session_ids = match ai_chat_sessions::mark_all_deleted(&org_id, &owner, now).await {
+        Ok(ids) => ids,
         Err(e) => {
             log::error!("[AI-CHAT] cannot clear chats of {org_id}/{owner}: {e}");
-            MetaHttpResponse::service_unavailable("Chat history is unavailable; please retry")
+            return MetaHttpResponse::service_unavailable(
+                "Chat history is unavailable; please retry",
+            );
         }
+    };
+    let deleted = session_ids.len();
+    // Drop the replicas' working copies in the background, a few at a time:
+    // the chats are already unreadable, this only reclaims o2-ai's disk.
+    if !session_ids.is_empty()
+        && let Some(client) = get_agent_client()
+    {
+        let (parts, _) = in_req.into_parts();
+        let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+        tokio::spawn(async move {
+            use futures::StreamExt;
+            futures::stream::iter(session_ids)
+                .for_each_concurrent(4, |session_id| {
+                    let (client, org_id, auth) = (client.clone(), org_id.clone(), auth.clone());
+                    async move {
+                        if let Err(e) = client.delete_session(&session_id, &org_id, &auth).await {
+                            log::warn!(
+                                "[AI-CHAT] cached copy of deleted chat {session_id} not removed: {e:#}"
+                            );
+                        }
+                    }
+                })
+                .await;
+        });
     }
+    MetaHttpResponse::json(serde_json::json!({ "deleted": deleted }))
 }
 
 fn user_email(req: &axum::extract::Request) -> Option<String> {
@@ -628,6 +677,19 @@ fn user_email(req: &axum::extract::Request) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prompt_titles_take_the_first_line_and_are_bounded() {
+        assert_eq!(
+            prompt_title("\n  why is p99 up?\nmore"),
+            Some("why is p99 up?".into())
+        );
+        assert_eq!(prompt_title("   \n"), None);
+        let long = "x".repeat(200);
+        let title = prompt_title(&long).unwrap();
+        assert_eq!(title.chars().count(), PROMPT_TITLE_CHARS + 1);
+        assert!(title.ends_with('…'));
+    }
 
     #[test]
     fn cursors_round_trip_and_reject_garbage() {
