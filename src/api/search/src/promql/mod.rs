@@ -1088,7 +1088,7 @@ async fn labels(
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
     summary = "Get label values",
-    description = "Returns values for a label within the specified time range. Labels other than __name__ require match[] to specify a single metric name; queries across all metrics streams return 400.",
+    description = "Returns values for a label within the specified time range. Labels other than __name__ require match[] to identify a metric; requests without a metric return 400 because querying all metrics streams is unsupported.",
     security(
         ("Authorization"= [])
     ),
@@ -1107,7 +1107,7 @@ async fn labels(
                "prometheus"
             ]
         })),
-        (status = 400, description = "Invalid parameters or match[] does not specify a single metric", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid parameters or match[] does not identify a metric", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1745,18 +1745,21 @@ mod tests {
     fn test_validate_label_values_params() {
         assert!(validate_label_values_params("__name__", None, None, None).is_ok());
         assert!(validate_label_values_params("job", None, None, None).is_err());
-        for matcher in [
-            "",
-            r#"{job="prometheus"}"#,
-            r#"{__name__=~"up.*"}"#,
-            r#"{__name__!="up"}"#,
-        ] {
+        for matcher in ["", r#"{job="prometheus"}"#] {
             assert!(
                 validate_label_values_params("job", Some(matcher.to_owned()), None, None).is_err(),
                 "{matcher}"
             );
         }
-        for matcher in ["up", r#"{__name__="up"}"#] {
+        for matcher in [
+            "up",
+            r#"{__name__="up"}"#,
+            r#"{__name__=~"up.*"}"#,
+            r#"{__name__!="up",job="prometheus"}"#,
+            r#"{__name__!~"up.*",job="prometheus"}"#,
+            r#"{__name__="",job="prometheus"}"#,
+            r#"up{job="prometheus" or job="other"}"#,
+        ] {
             assert!(
                 validate_label_values_params("job", Some(matcher.to_owned()), None, None).is_ok(),
                 "{matcher}"
