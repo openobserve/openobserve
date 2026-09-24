@@ -235,3 +235,24 @@ describe("useModuleNavigation - navigation [characterization]", () => {
     expect(nav.openFolder.value).toBe(nav.folder);
   });
 });
+
+describe("useModuleNavigation - a list that fails to load", () => {
+  // openModule and openFolderRow are new call sites; without a catch the rejection escapes unhandled.
+  it("does not reject when a module's rows fail to load", async () => {
+    const nav = setup();
+    nav.getResourceEntities.mockRejectedValueOnce(new Error("boom"));
+
+    await expect(nav.openModule("dfolder")).resolves.toBeUndefined();
+    expect(nav.loadingFor.value).toBe("");
+  });
+
+  it("does not reject when a folder fails to open", async () => {
+    const nav = setup();
+    nav.activeModule.value = "dfolder";
+    await flushPromises();
+    nav.getResourceEntities.mockRejectedValueOnce(new Error("boom"));
+
+    await expect(nav.openFolderRow(nav.folder)).resolves.toBeUndefined();
+    expect(nav.loadingFor.value).toBe("");
+  });
+});

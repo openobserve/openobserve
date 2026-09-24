@@ -100,6 +100,9 @@ export const useModuleNavigation = (deps: NavigationDeps) => {
     loadingFor.value = moduleKey;
     try {
       await getResourceEntities(resourceMapper.value[module.key]);
+    } catch (err) {
+      // Same swallow as the old expandPermission; without it the rejection escapes unhandled.
+      console.log(err);
     } finally {
       // Only the newest open clears the flag, or a slower module would hide the one on screen.
       if (loadingFor.value === moduleKey) loadingFor.value = "";
@@ -116,6 +119,8 @@ export const useModuleNavigation = (deps: NavigationDeps) => {
     loadingFor.value = child.name;
     try {
       await getResourceEntities(child);
+    } catch (err) {
+      console.log(err);
     } finally {
       if (loadingFor.value === child.name) loadingFor.value = "";
     }
