@@ -19149,6 +19149,8 @@
     "rotationNobody": "無人值班",
     "edit": "編輯",
     "timelineLoadFailed": "無法解析此時間範圍的班表",
+    "editorReadFailed": "無法載入最新副本以進行編輯。請再試一次。",
+    "refreshFailed": "無法重新整理。顯示的內容可能已過期。",
     "scheduleDoneEditing": "返回班表",
     "coverWhoRequired": "選擇由誰代班",
     "timelineCoverAria": "{who} 正在為 {rotation} 代班，{from} 至 {to}",
