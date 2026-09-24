@@ -13,14 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
 use config::meta::promql::{
     NAME_LABEL,
-    value::{Label, LabelsExt, RangeValue, Sample, Value},
+    value::{Labels, LabelsExt, RangeValue, Sample, Value},
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
@@ -213,113 +210,119 @@ fn vector_arithmetic_operators(
     right: Vec<RangeValue>,
 ) -> Result<Value> {
     let operator = expr.op.id();
-
     let return_bool = expr.return_bool();
     let comparison_operator = expr.op.is_comparison_operator();
 
-    // These are here so that we can generate signatures based on these labels.
-    let mut labels_to_include_set = vec![];
-    let mut labels_to_exclude_set = vec![NAME_LABEL.to_string()];
-
     let is_matching_on = expr.is_matching_on();
-    if is_matching_on {
-        let modifier = expr.modifier.as_ref().unwrap();
-        if modifier.is_matching_on() {
-            labels_to_include_set = modifier.matching.as_ref().unwrap().labels().labels.clone();
-            labels_to_include_set.sort();
-        } else {
-            let excluded_labels = modifier.matching.as_ref().unwrap().labels().labels.clone();
-            labels_to_exclude_set.extend(excluded_labels);
-            labels_to_exclude_set.sort();
-        }
-    }
+    let matching_labels: Vec<String> = expr
+        .modifier
+        .as_ref()
+        .and_then(|modifier| modifier.matching.as_ref())
+        .map(|matching| matching.labels().labels.clone())
+        .unwrap_or_default();
+    let mut excluded_labels = matching_labels.clone();
+    excluded_labels.push(NAME_LABEL.to_string());
 
-    // These labels should be used to compare values between lhs - rhs
-    let labels_to_compare = |labels: &Vec<Arc<Label>>| {
+    let match_signature = |labels: &Labels| {
         if is_matching_on {
-            labels.keep(&labels_to_include_set)
+            labels.keep(&matching_labels).signature()
         } else {
-            labels.delete(&labels_to_exclude_set)
+            labels.delete(&excluded_labels).signature()
         }
     };
 
-    // Get the hash for the labels on the right
-    let rhs_sig: HashMap<u64, RangeValue> = right
+    // group_right makes the lhs the "one" side, so the rhs series drive the output
+    let one_to_many = matches!(
+        expr.modifier.as_ref().map(|modifier| &modifier.card),
+        Some(VectorMatchCardinality::OneToMany(_))
+    );
+    let (many, one) = if one_to_many {
+        (right, left)
+    } else {
+        (left, right)
+    };
+
+    let one_sig: HashMap<u64, RangeValue> = one
         .into_par_iter()
-        .map(|range| {
-            let signature = labels_to_compare(&range.labels).signature();
-            (signature, range)
-        })
+        .map(|range| (match_signature(&range.labels), range))
         .collect();
 
-    // Iterate over left and pick up the corresponding range from rhs
-    let output: Vec<RangeValue> = left
+    let output: Vec<RangeValue> = many
         .into_par_iter()
-        .filter_map(|range| {
-            let left_sig = labels_to_compare(&range.labels).signature();
-            rhs_sig.get(&left_sig).map(|rhs_range| (range, rhs_range))
-        })
-        .filter_map(|(mut lhs_range, rhs_range)| {
-            // Build a map of timestamps from rhs for quick lookup
-            let rhs_map: HashMap<i64, f64> = rhs_range
+        .filter_map(|mut range| {
+            let one_range = one_sig.get(&match_signature(&range.labels))?;
+            let one_values: HashMap<i64, f64> = one_range
                 .samples
                 .iter()
                 .map(|s| (s.timestamp, s.value))
                 .collect();
 
-            // Apply operation to matching timestamps
-            let new_samples: Vec<Sample> = lhs_range
+            let new_samples: Vec<Sample> = range
                 .samples
-                .into_iter()
-                .filter_map(|lhs_sample| {
-                    rhs_map.get(&lhs_sample.timestamp).and_then(|&rhs_value| {
-                        scalar_binary_operations(
-                            operator,
-                            lhs_sample.value,
-                            rhs_value,
-                            return_bool,
-                            comparison_operator,
-                        )
+                .iter()
+                .filter_map(|sample| {
+                    let one_value = *one_values.get(&sample.timestamp)?;
+                    let (lhs, rhs) = if one_to_many {
+                        (one_value, sample.value)
+                    } else {
+                        (sample.value, one_value)
+                    };
+                    scalar_binary_operations(operator, lhs, rhs, return_bool, comparison_operator)
                         .ok()
                         .map(|value| Sample {
-                            timestamp: lhs_sample.timestamp,
+                            timestamp: sample.timestamp,
                             value,
                         })
-                    })
                 })
                 .collect();
 
             if new_samples.is_empty() {
-                None
-            } else {
-                let mut labels = std::mem::take(&mut lhs_range.labels);
-                if return_bool || DROP_METRIC_BIN_OP.contains(&operator) {
-                    labels = labels.without_metric_name();
-                }
-
-                if let Some(modifier) = expr.modifier.as_ref() {
-                    if modifier.card == VectorMatchCardinality::OneToOne {
-                        labels = labels_to_compare(&labels);
-                    }
-
-                    // group_labels from the `group_x` modifier are taken from the "one"-side.
-                    if let Some(group_labels) = modifier.card.labels() {
-                        for ln in group_labels.labels.iter() {
-                            let value = rhs_range.labels.get_value(ln);
-                            if !value.is_empty() {
-                                labels.set(ln, &value);
-                            }
-                        }
-                    }
-                }
-                lhs_range.labels = labels;
-                lhs_range.samples = new_samples;
-                Some(lhs_range)
+                return None;
             }
+            let labels = std::mem::take(&mut range.labels);
+            range.labels = result_labels(expr, labels, &one_range.labels, &matching_labels);
+            range.samples = new_samples;
+            Some(range)
         })
         .collect();
 
     Ok(Value::Matrix(output))
+}
+
+/// Output labels of a matched pair, following Prometheus' `resultMetric`.
+fn result_labels(
+    expr: &BinaryExpr,
+    labels: Labels,
+    one_side: &Labels,
+    matching_labels: &[String],
+) -> Labels {
+    let mut labels = if expr.return_bool() || DROP_METRIC_BIN_OP.contains(&expr.op.id()) {
+        labels.without_metric_name()
+    } else {
+        labels
+    };
+    let Some(modifier) = expr.modifier.as_ref() else {
+        return labels;
+    };
+    if modifier.card == VectorMatchCardinality::OneToOne {
+        return if expr.is_matching_on() {
+            labels.keep(matching_labels)
+        } else {
+            labels.delete(matching_labels)
+        };
+    }
+    // group_labels from the `group_x` modifier are taken from the "one"-side.
+    if let Some(group_labels) = modifier.card.labels() {
+        for ln in group_labels.labels.iter() {
+            labels = labels.without_label(ln);
+            let value = one_side.get_value(ln);
+            if !value.is_empty() {
+                labels.set(ln, &value);
+            }
+        }
+        labels.sort();
+    }
+    labels
 }
 
 /// Implement binary operations between two matrices
@@ -739,5 +742,166 @@ mod tests {
         for i in 1..value.samples.len() {
             assert!(value.samples[i].timestamp > value.samples[i - 1].timestamp);
         }
+    }
+
+    fn eval_bin_op(query: &str, left: Vec<RangeValue>, right: Vec<RangeValue>) -> Vec<RangeValue> {
+        let promql_parser::parser::Expr::Binary(expr) =
+            promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("not a binary expression: {query}");
+        };
+        match vector_bin_op(&expr, left, right).unwrap() {
+            Value::Matrix(matrix) => matrix,
+            other => panic!("expected a matrix, got {other:?}"),
+        }
+    }
+
+    fn label_pairs(range: &RangeValue) -> Vec<(String, String)> {
+        range
+            .labels
+            .iter()
+            .map(|l| (l.name.clone(), l.value.clone()))
+            .collect()
+    }
+
+    fn sorted_results(matrix: Vec<RangeValue>) -> Vec<(Vec<(String, String)>, f64)> {
+        let mut results: Vec<_> = matrix
+            .iter()
+            .map(|range| (label_pairs(range), range.samples[0].value))
+            .collect();
+        results.sort_by(|a, b| a.0.cmp(&b.0));
+        results
+    }
+
+    fn pairs(labels: &[(&str, &str)]) -> Vec<(String, String)> {
+        labels
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    fn per_code() -> Vec<RangeValue> {
+        vec![
+            create_test_range_value(vec![3.0], vec![("code", "200")]),
+            create_test_range_value(vec![1.0], vec![("code", "500")]),
+        ]
+    }
+
+    fn total() -> Vec<RangeValue> {
+        vec![create_test_range_value(vec![4.0], vec![])]
+    }
+
+    #[test]
+    fn test_ignoring_group_left_matches_label_less_rhs() {
+        let query = "sum(rate(http_requests_total[5m])) by (code) / ignoring (code) group_left sum(rate(http_requests_total[5m]))";
+        let results = sorted_results(eval_bin_op(query, per_code(), total()));
+        assert_eq!(
+            results,
+            vec![
+                (pairs(&[("code", "200")]), 0.75),
+                (pairs(&[("code", "500")]), 0.25),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_on_empty_group_left_matches_label_less_rhs() {
+        let results = sorted_results(eval_bin_op("a / on () group_left b", per_code(), total()));
+        assert_eq!(
+            results,
+            vec![
+                (pairs(&[("code", "200")]), 0.75),
+                (pairs(&[("code", "500")]), 0.25),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_group_right_keeps_rhs_series_and_operand_order() {
+        for query in [
+            "a / on () group_right b",
+            "a / ignoring (code) group_right b",
+        ] {
+            let results = sorted_results(eval_bin_op(query, total(), per_code()));
+            assert_eq!(
+                results,
+                vec![
+                    (pairs(&[("code", "200")]), 4.0 / 3.0),
+                    (pairs(&[("code", "500")]), 4.0),
+                ],
+                "{query}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_group_right_comparison_filters_on_lhs_value() {
+        let results = sorted_results(eval_bin_op(
+            "a > on () group_right b",
+            vec![create_test_range_value(vec![2.0], vec![])],
+            per_code(),
+        ));
+        assert_eq!(results, vec![(pairs(&[("code", "500")]), 2.0)]);
+    }
+
+    #[test]
+    fn test_ignoring_one_to_one_drops_ignored_labels() {
+        let left = vec![create_test_range_value(
+            vec![5.0],
+            vec![("__name__", "a"), ("code", "200"), ("job", "api")],
+        )];
+        let right = vec![create_test_range_value(
+            vec![2.0],
+            vec![("__name__", "b"), ("job", "api")],
+        )];
+        let results = sorted_results(eval_bin_op("a - ignoring (code) b", left, right));
+        assert_eq!(results, vec![(pairs(&[("job", "api")]), 3.0)]);
+    }
+
+    #[test]
+    fn test_ignoring_comparison_keeps_metric_name() {
+        let left = vec![create_test_range_value(
+            vec![5.0],
+            vec![("__name__", "a"), ("code", "200"), ("job", "api")],
+        )];
+        let right = vec![create_test_range_value(
+            vec![2.0],
+            vec![("__name__", "b"), ("job", "api")],
+        )];
+        let results = sorted_results(eval_bin_op("a > ignoring (code) b", left, right));
+        assert_eq!(
+            results,
+            vec![(pairs(&[("__name__", "a"), ("job", "api")]), 5.0)]
+        );
+    }
+
+    #[test]
+    fn test_group_left_labels_replace_many_side_values() {
+        let left = vec![
+            create_test_range_value(
+                vec![1.0],
+                vec![("instance", "a"), ("job", "api"), ("version", "old")],
+            ),
+            create_test_range_value(vec![2.0], vec![("instance", "b"), ("job", "db")]),
+        ];
+        let right = vec![
+            create_test_range_value(vec![10.0], vec![("job", "api"), ("version", "v2")]),
+            create_test_range_value(vec![10.0], vec![("job", "db")]),
+        ];
+        let results = sorted_results(eval_bin_op(
+            "a * on (job) group_left (version) b",
+            left,
+            right,
+        ));
+        assert_eq!(
+            results,
+            vec![
+                (
+                    pairs(&[("instance", "a"), ("job", "api"), ("version", "v2")]),
+                    10.0
+                ),
+                (pairs(&[("instance", "b"), ("job", "db")]), 20.0),
+            ]
+        );
     }
 }
