@@ -243,6 +243,7 @@ pub async fn get_search_profile(
                         use_all_org: false,
                         use_self_context: false,
                         use_self_parent: true,
+                        feature: None,
                     },
                     user.role,
                     user.is_external,

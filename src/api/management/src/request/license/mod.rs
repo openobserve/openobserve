@@ -89,6 +89,7 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
                 use_all_org: true,
                 use_self_context: false,
                 use_self_parent: false,
+                feature: None,
             },
             user.role,
             user.is_external,

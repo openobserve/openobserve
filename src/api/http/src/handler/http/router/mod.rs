@@ -49,10 +49,14 @@ use {
     audit::audit,
     axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     config::utils::time::now_micros,
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
+    o2_enterprise::enterprise::{
+        common::{
+            auditor::{AuditMessage, Protocol, ResponseMeta},
+            config::get_config as get_o2_config,
+        },
+        license::features_enabled,
     },
     openobserve_api_management::request::{
         ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
@@ -273,6 +277,21 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
         Ok(result) => result,
         Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
     };
+
+    // Outside oo_validator so the license gate holds with OpenFGA off and on bypass routes.
+    #[cfg(feature = "enterprise")]
+    if let Some(fs) = auth_info.feature
+        && !features_enabled(fs)
+    {
+        let missing: Vec<&str> = fs
+            .iter()
+            .filter(|f| !features_enabled(std::slice::from_ref(f)))
+            .map(|f| (*f).into())
+            .collect();
+        return MetaHttpResponse::forbidden(format!(
+            "features {missing:?} are not included in your license"
+        ));
+    }
 
     // Insert user_id into request headers for downstream handlers
     parts.headers.insert(

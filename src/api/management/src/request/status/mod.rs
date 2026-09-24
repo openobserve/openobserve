@@ -648,6 +648,7 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
             use_all_org: true,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         },
         user.role,
         user.is_external,
