@@ -2249,28 +2249,33 @@ describe("BrowserJourney step cap", () => {
   const executedBadge = (wrapper: VueWrapper) =>
     wrapper.find('[data-test="synthetics-journey-executed-badge"]');
 
-  it("renders no executed badge for a journey without a reference", async () => {
+  it("renders no executed badge, with or without a reference", async () => {
     w = mountWithRealSteps({ modelValue: plainJourney, ownStepCount: 3 });
     await flushPromises();
     expect(executedBadge(w).exists()).toBe(false);
+    w.unmount();
+
+    for (const ownStepCount of [50, 51]) {
+      w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount });
+      await flushPromises();
+      expect(executedBadge(w).exists()).toBe(false);
+      w.unmount();
+    }
+    expect(mockT).not.toHaveBeenCalledWith(
+      "synthetics.journey.subtest.executedBadge",
+      expect.anything(),
+    );
   });
 
-  it("shows the executed count beside the authored one, in the error variant past the cap", async () => {
-    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 50 });
-    await flushPromises();
-    expect(executedBadge(w).exists()).toBe(true);
-    expect(executedBadge(w).attributes("variant")).toBe("default");
-    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.executedBadge", { count: 50 });
-    w.unmount();
-
+  it("keeps the Steps heading for screen readers only, with no count badge in the toolbar", async () => {
     w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 51 });
     await flushPromises();
-    expect(executedBadge(w).attributes("variant")).toBe("error");
-    w.unmount();
 
-    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache() });
-    await flushPromises();
-    expect(executedBadge(w).exists()).toBe(false);
+    const heading = w.findAll("h3").find((h) => h.text() === "synthetics.journey.steps");
+    expect(heading).toBeDefined();
+    expect(heading!.classes()).toEqual(["sr-only"]);
+    const badges = w.findAllComponents(OBadgeStub).map((b) => b.text());
+    expect(badges).not.toContain(String(journey.length));
   });
 
   it("renders no notice at or under the limit, and none when the count is unknown", async () => {
@@ -4777,6 +4782,29 @@ describe("BrowserJourney toolbar on a phone", () => {
 
     expect(wrapper.find(TOGGLE).exists()).toBe(true);
     expect(hiddenOnPhone(wrapper, TOGGLE)).toBe(false);
+  });
+
+  const STEP_COUNT = '[data-test="synthetics-journey-toolbar-step-count"]';
+  const SELECT_ALL = '[data-test="synthetics-journey-select-all"]';
+
+  it("on a phone, the step count sits next to select-all", () => {
+    wrapper = mountAt("phone");
+
+    const count = wrapper.find(STEP_COUNT);
+    expect(count.exists()).toBe(true);
+    expect(count.element.parentElement).toBe(wrapper.find(SELECT_ALL).element.parentElement);
+    expect(hiddenOnPhone(wrapper, STEP_COUNT)).toBe(false);
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.stepCount.caption", { count: 2 }, 2);
+  });
+
+  it("on tablet and desktop, the toolbar step count is hidden", () => {
+    for (const viewport of ["tablet", "desktop"] as const) {
+      wrapper = mountAt(viewport);
+
+      expect(wrapper.find(STEP_COUNT).exists(), `no step count on ${viewport}`).toBe(true);
+      expect(hiddenFromMdUp(wrapper, STEP_COUNT), `step count shows on ${viewport}`).toBe(true);
+      wrapper.unmount();
+    }
   });
 
   it("on tablet and desktop, no phone-only toolbar items are rendered", () => {

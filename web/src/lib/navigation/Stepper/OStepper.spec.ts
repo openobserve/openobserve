@@ -218,3 +218,52 @@ describe("OStepper", () => {
     expect(wrapper.text()).toContain("Step 3 content");
   });
 });
+
+describe("OStepper description slot", () => {
+  function mountWithDescription(initial: string) {
+    const Wrapper = defineComponent({
+      components: { OStepper, OStep },
+      setup() {
+        const active = ref(2);
+        const caption = ref(initial);
+        return { active, caption };
+      },
+      template: `
+        <OStepper v-model="active" :animated="false">
+          <OStep :name="1" title="First" :done="true">
+            <template #description><span data-test="caption">{{ caption }}</span></template>
+            Step 1 content
+          </OStep>
+          <OStep :name="2" title="Second">Step 2 content</OStep>
+        </OStepper>
+      `,
+    });
+    return mount(Wrapper, { attachTo: document.body });
+  }
+
+  it("renders a step's description slot under its title in the horizontal header", async () => {
+    const wrapper = mountWithDescription("4 steps");
+    await wrapper.vm.$nextTick();
+
+    const header = wrapper.find('[role="list"]');
+    const caption = header.find('[data-test="caption"]');
+    expect(caption.exists()).toBe(true);
+    expect(caption.text()).toBe("4 steps");
+    expect(wrapper.text()).not.toContain("Step 1 content");
+    wrapper.unmount();
+  });
+
+  it("updates the header when the description slot content changes", async () => {
+    const wrapper = mountWithDescription("4 steps");
+    await wrapper.vm.$nextTick();
+
+    (wrapper.vm as unknown as { caption: string }).caption = "5 steps";
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    const caption = wrapper.find('[role="list"] [data-test="caption"]');
+    expect(caption.exists()).toBe(true);
+    expect(caption.text()).toBe("5 steps");
+    wrapper.unmount();
+  });
+});

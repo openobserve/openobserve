@@ -290,8 +290,10 @@ const baseStubs = {
     template: '<div class="o-stepper-stub"><slot /></div>',
     props: ["modelValue", "navigable", "class"],
   },
+  // The header caption renders on every step, as OStepper's header does.
   OStep: {
-    template: '<div v-if="isActivePanel"><slot /></div>',
+    template:
+      '<div :data-test="`o-step-description-${name}`"><slot name="description" /></div><div v-if="isActivePanel"><slot /></div>',
     props: ["name", "title", "icon", "done", "class"],
     computed: {
       isActivePanel(): boolean {
@@ -1946,6 +1948,101 @@ describe("CreateBrowserTest", () => {
         query: { org_identifier: "default", folder: "folder-1" },
       });
       expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ message: CAP_TOAST }));
+    });
+  });
+
+  describe("Journey step — step count", () => {
+    const STEPPER_COUNT =
+      '[data-test="o-step-description-1"] [data-test="synthetics-journey-stepper-step-count"]';
+    const OTooltipStub = {
+      props: ["content"],
+      template: '<span data-test="step-count-tooltip" :data-tooltip="content" />',
+    };
+    const click = (id: string): BrowserStep => ({
+      id,
+      action: "click",
+      name: `Click ${id}`,
+      locator: { candidates: [{ kind: "css", value: `#${id}` }] },
+    });
+    const childOf = (id: string, name: string, count: number): ChildJourney => ({
+      id,
+      name,
+      folderId: "shared",
+      steps: Array.from({ length: count }, (_, i) => click(`${id}-${i + 1}`)),
+    });
+
+    const isRed = (el: ReturnType<VueWrapper["find"]>) =>
+      el.classes().includes("text-status-error-text") ||
+      el.find(".text-status-error-text").exists();
+
+    async function mountWithJourney(journey: BrowserStep[]) {
+      mockServiceGet.mockResolvedValue({
+        data: { name: "Test Check", url: "https://example.com", folder: "folder-1", journey },
+      });
+      const w = mount(CreateBrowserTest, {
+        global: {
+          plugins: [i18n, store],
+          stubs: { ...baseStubs, ...pageLayoutStubs, OTooltip: OTooltipStub },
+        },
+        props: { editId: "check-123" },
+      });
+      await flushPromises();
+      return w;
+    }
+
+    it("shows the row count under Journey for a test without subtests", async () => {
+      wrapper = await mountWithJourney([click("s1"), click("s2"), click("s3"), click("s4")]);
+
+      const count = wrapper.find(STEPPER_COUNT);
+      expect(count.exists()).toBe(true);
+      expect(count.text()).toBe("4 steps");
+      expect(wrapper.find('[data-test="step-count-tooltip"]').exists()).toBe(false);
+    });
+
+    it("shows the executed count and the subtests under Journey, red over the limit, with the tooltip", async () => {
+      wrapper = await mountWithJourney([]);
+      const cache = (wrapper.vm as any).childrenCache as Map<string, ChildJourney>;
+      cache.set("a", childOf("a", "Login (shared)", 31));
+      cache.set("b", childOf("b", "Add items to cart", 17));
+      (wrapper.vm as any).check.journey = [
+        click("s1"),
+        {
+          id: "s2",
+          action: "subtest",
+          name: "Login",
+          subtest: { id: "a", name: "Login (shared)" },
+        },
+        click("s3"),
+        { id: "s4", action: "subtest", name: "Items", subtest: { id: "b", name: "Add items" } },
+        click("s5"),
+      ];
+      await flushPromises();
+
+      const count = wrapper.find(STEPPER_COUNT);
+      expect(count.exists()).toBe(true);
+      expect(count.text().replace(/\s+/g, " ").trim()).toBe("51 steps (including 2 subtests)");
+      expect(isRed(count)).toBe(true);
+      expect(wrapper.find('[data-test="step-count-tooltip"]').attributes("data-tooltip")).toBe(
+        '3 steps in this test, 31 from "Login (shared)", and 17 from "Add items to cart". This test executes 51 of the 50 allowed.',
+      );
+    });
+
+    it("shows no count under Journey while the test has no steps, and one once a step is added", async () => {
+      wrapper = await mountWithJourney([]);
+      expect(wrapper.find('[data-test="o-step-description-1"]').text()).toBe("");
+
+      (wrapper.vm as any).check.journey = [click("s1")];
+      await flushPromises();
+
+      expect(wrapper.find(STEPPER_COUNT).exists()).toBe(true);
+      expect(wrapper.find(STEPPER_COUNT).text()).toBe("1 step");
+    });
+
+    it("hides the stepper count on a phone", async () => {
+      wrapper = await mountWithJourney([click("s1"), click("s2")]);
+
+      expect(wrapper.find(STEPPER_COUNT).exists()).toBe(true);
+      expect(wrapper.find(STEPPER_COUNT).classes()).toContain("max-md:hidden");
     });
   });
 
