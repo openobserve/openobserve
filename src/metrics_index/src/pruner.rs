@@ -38,9 +38,9 @@ use futures::{StreamExt, stream};
 use promql_parser::label::{MatchOp, Matchers};
 
 use crate::{
-    cache::METRICS_INDEX_SELECTION_CACHE,
     layout::MetricsFileLayout,
     reader::{IndexLabels, evaluate_metrics_index, load_metrics_index_file},
+    selection_cache::METRICS_INDEX_SELECTION_CACHE,
 };
 
 /// Apply the `.midx` metrics indexes of indexed metrics files in `files` before

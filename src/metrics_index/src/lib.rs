@@ -17,11 +17,11 @@
 
 pub mod block;
 pub mod block_cache;
-mod cache;
 pub mod layout;
 mod matcher;
 mod pruner;
 mod reader;
+mod selection_cache;
 
 pub use layout::{
     METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_enabled, metrics_index_stream,
