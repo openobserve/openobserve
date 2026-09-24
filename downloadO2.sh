@@ -50,6 +50,11 @@ if [ -z "$VERSION" ]; then
         exit 1
     fi
 fi
+# Release tags are v-prefixed; accept "1.0.4" as well as "v1.0.4".
+case "$VERSION" in
+    v*) ;;
+    *) VERSION="v$VERSION" ;;
+esac
 echo "Version: $VERSION"
 
 # 3. Detect platform
@@ -90,13 +95,18 @@ fi
 echo "Extracting..."
 if [ "$EXT" = "zip" ]; then
     if command -v unzip >/dev/null 2>&1; then
-        unzip -o -q "$ARCHIVE" || exit 1
+        unzip -o -q "$ARCHIVE"
     else
-        tar -xf "$ARCHIVE" || exit 1
+        tar -xf "$ARCHIVE"
     fi
 else
-    tar -xzf "$ARCHIVE" || exit 1
+    tar -xzf "$ARCHIVE"
 fi
+STATUS=$?
 rm -f "$ARCHIVE"
+if [ "$STATUS" -ne 0 ]; then
+    echo "Error: extraction failed." >&2
+    exit 1
+fi
 
 echo "✅ Download and extraction complete!"
