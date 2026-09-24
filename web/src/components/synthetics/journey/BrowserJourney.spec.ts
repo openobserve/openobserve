@@ -3453,6 +3453,156 @@ describe("BrowserJourney replay environment", () => {
   });
 });
 
+describe("BrowserJourney typed secrets", () => {
+  let wrapper: VueWrapper;
+
+  const REPLAY = '[data-test="synthetics-journey-replay-btn"]';
+  const PASSED = '[data-test="synthetics-journey-passed-banner"]';
+  const FAILED = '[data-test="synthetics-journey-failed-banner"]';
+  const CHANGE = '[data-test="synthetics-journey-failed-change-secret-btn"]';
+  const RERUN = '[data-test="synthetics-journey-failed-rerun-btn"]';
+
+  const OIconWithNameStub = {
+    props: ["name"],
+    template: '<i :data-icon-name="name" />',
+  };
+  const OTooltipWithContentStub = {
+    props: ["content"],
+    template: '<div :data-tooltip="content" />',
+  };
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test/" },
+    { id: "s2", action: "fill", name: "Password", selector: "#pw", value: "{{PASSWORD}}" },
+    { id: "s3", action: "click", name: "Sign in", selector: "#go" },
+  ] as any[];
+
+  const pass = (id: string) => [id, { stepId: id, stepName: id, passed: true, durationMs: 10 }];
+  const fail = (id: string) => [
+    id,
+    { stepId: id, stepName: id, passed: false, durationMs: 10, error: "timeout" },
+  ];
+
+  beforeEach(() => {
+    mockT.mockClear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  function mountSecrets(props: Record<string, unknown>) {
+    return mount(BrowserJourney, {
+      props: { modelValue: journey, replayPhase: "idle", ...props },
+      global: {
+        stubs: { ...STUBS, OIcon: OIconWithNameStub, OTooltip: OTooltipWithContentStub },
+      },
+    }) as VueWrapper;
+  }
+
+  it("shows a key on Replay when the replay uses typed secrets", () => {
+    wrapper = mountSecrets({ replayEnvironmentLabel: "QA" });
+    expect(wrapper.find(`${REPLAY} [data-icon-name="key"]`).exists()).toBe(false);
+    wrapper.unmount();
+
+    wrapper = mountSecrets({ replayEnvironmentLabel: "QA", usesTypedSecrets: true });
+
+    expect(wrapper.find(`${REPLAY} [data-icon-name="key"]`).exists()).toBe(true);
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replaySecrets.usesTyped", {
+      environment: "QA",
+    });
+    const tooltips = wrapper.findAll("[data-tooltip]").map((t) => t.attributes("data-tooltip"));
+    expect(tooltips).toContain("synthetics.journey.replaySecrets.usesTyped");
+  });
+
+  it("passed banner says the stored secret was not tested", () => {
+    wrapper = mountSecrets({
+      replayPhase: "passed",
+      stepResults: new Map([pass("s1"), pass("s2"), pass("s3")] as any),
+      typedSecretReport: { names: ["PASSWORD"], stepByName: { PASSWORD: [2] } },
+      replayEnvironmentLabel: "QA",
+    });
+
+    expect(wrapper.find(PASSED).text()).toContain("synthetics.journey.replaySecrets.passedNote");
+  });
+
+  it("failed banner names the step that used the typed secret and offers Change value and Re-run", async () => {
+    wrapper = mountSecrets({
+      replayPhase: "failed",
+      stepResults: new Map([pass("s1"), pass("s2"), fail("s3")] as any),
+      typedSecretReport: { names: ["PASSWORD"], stepByName: { PASSWORD: [2] } },
+      replayEnvironmentLabel: "QA",
+    });
+
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replaySecrets.failedTitle", {
+      environment: "QA",
+      failed: 3,
+      total: 3,
+    });
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replaySecrets.failedNote", {
+      step: 2,
+      name: "PASSWORD",
+    });
+    const banner = wrapper.find(FAILED);
+    expect(banner.text()).toContain("synthetics.journey.replaySecrets.failedNote");
+
+    await banner.find(CHANGE).trigger("click");
+    expect(wrapper.emitted("edit-secrets")).toBeTruthy();
+    await banner.find(RERUN).trigger("click");
+    expect(wrapper.emitted("replay")).toBeTruthy();
+  });
+
+  it("failed banner names the subtest's reference row when a child step failed", () => {
+    const withRef = [
+      journey[0],
+      { id: "s2", action: "subtest", name: "Log in (shared)", subtest: { id: "login-test" } },
+      journey[2],
+    ];
+    const map: ExpansionMap = new Map([
+      ["s2_c1", { authoredStepId: "s2", childIndex: 0, childStepName: "fill pw", childCount: 3 }],
+      ["s2_c2", { authoredStepId: "s2", childIndex: 1, childStepName: "check", childCount: 3 }],
+      ["s2_c3", { authoredStepId: "s2", childIndex: 2, childStepName: "submit", childCount: 3 }],
+    ]);
+    wrapper = mountSecrets({
+      modelValue: withRef,
+      expansionMap: map,
+      replayPhase: "failed",
+      stepResults: new Map([pass("s1"), pass("s2_c1"), pass("s2_c2"), fail("s2_c3")] as any),
+      typedSecretReport: { names: ["PASSWORD"], stepByName: { PASSWORD: [2, 3] } },
+      replayEnvironmentLabel: "QA",
+    });
+
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replaySecrets.failedNote", {
+      step: 2,
+      name: "PASSWORD",
+    });
+    expect(mockT).not.toHaveBeenCalledWith("synthetics.journey.replaySecrets.failedNote", {
+      step: 3,
+      name: "PASSWORD",
+    });
+  });
+
+  it("banners are unchanged when no typed secret was used", () => {
+    wrapper = mountSecrets({
+      replayPhase: "passed",
+      stepResults: new Map([pass("s1"), pass("s2"), pass("s3")] as any),
+    });
+    expect(wrapper.find(PASSED).text()).not.toContain("replaySecrets");
+    wrapper.unmount();
+
+    wrapper = mountSecrets({
+      replayPhase: "failed",
+      stepResults: new Map([pass("s1"), pass("s2"), fail("s3")] as any),
+    });
+    const banner = wrapper.find(FAILED);
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replayFailed", { failed: 3, total: 3 });
+    expect(banner.text()).not.toContain("replaySecrets");
+    expect(banner.find(CHANGE).exists()).toBe(false);
+    expect(banner.find(RERUN).exists()).toBe(false);
+  });
+});
+
 // ── When a restore does not reach the recording point ──────────────────────
 //
 // A restore ends early for two quite different reasons, and the surface has to

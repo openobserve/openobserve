@@ -328,8 +328,14 @@ const baseStubs = {
   ReplayEnvironmentMenu: {
     name: "ReplayEnvironmentMenu",
     template: '<div data-test="synthetics-journey-replay-menu-stub" />',
-    props: ["options", "selectedId", "disabled"],
-    emits: ["update:selected-id"],
+    props: ["options", "selectedId", "disabled", "secretsNeeded", "secretsEntered", "secretFailed"],
+    emits: ["update:selected-id", "edit-secrets"],
+  },
+  ReplaySecretsDialog: {
+    name: "ReplaySecretsDialog",
+    template: '<div data-test="synthetics-replay-secrets-dialog-stub" :data-open="open" />',
+    props: ["open", "mode", "environmentName", "secrets", "failedAtStep", "onSubmit"],
+    emits: ["update:open", "forget"],
   },
   MissingValueDialog: {
     name: "MissingValueDialog",
@@ -1836,6 +1842,24 @@ describe("CreateBrowserTest", () => {
       replayMenu(w).vm.$emit("update:selected-id", id);
       await flushPromises();
     }
+    const secretsDialog = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-replay-secrets-dialog-stub"]') as VueWrapper<any>;
+    const secretsDialogOpen = (w: VueWrapper) =>
+      secretsDialog(w).exists() && secretsDialog(w).props("open") === true;
+    const qaEnvironments = () => [
+      ...orgEnvironments(),
+      environment("qa", [
+        variable("BASE_URL", "https://qa.test"),
+        variable("PASSWORD", undefined, "secret"),
+      ]),
+    ];
+    /** Replays once so the secrets dialog asks, and answers it. */
+    async function typeSecret(w: VueWrapper, values: Record<string, string>) {
+      await replayJourney(w);
+      expect(secretsDialogOpen(w)).toBe(true);
+      await (secretsDialog(w).props("onSubmit") as (v: unknown) => Promise<void> | void)(values);
+      await flushPromises();
+    }
     const replayedVariables = (call = 0) =>
       mockRecorderReplay.mock.calls[call]?.[2] as { name: string; value: string }[];
     const errorToasts = () =>
@@ -1980,20 +2004,6 @@ describe("CreateBrowserTest", () => {
       expect(mockRecorderReplay.mock.calls[0]?.[1]).toBe("https://prod.test/login");
     });
 
-    it("does not start a replay when a step needs a stored secret, and says why", async () => {
-      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{PASSWORD}}")] });
-
-      await replayJourney(wrapper);
-
-      expect(mockRecorderReplay).not.toHaveBeenCalled();
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-          message: expect.stringMatching(/PASSWORD.*stg/),
-        }),
-      );
-    });
-
     it("opens the missing-value dialog instead of replaying when a variable has no value", async () => {
       wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{API_KEY}}")] });
 
@@ -2086,6 +2096,7 @@ describe("CreateBrowserTest", () => {
       expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
       expect(replayedVariables()).toContainEqual({ name: "API_KEY", value: "k" });
       expect(errorToasts()).toHaveLength(0);
+      expect(secretsDialogOpen(wrapper)).toBe(false);
     });
 
     it("writes to the environment the replay was started in, even if the selector changes while the dialog is open", async () => {
@@ -2255,6 +2266,156 @@ describe("CreateBrowserTest", () => {
 
       expect(errorToasts()).toHaveLength(1);
       expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("asks for a stored secret before the first replay, then replays with the typed value", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{PASSWORD}}")] });
+
+      await replayJourney(wrapper);
+
+      expect(secretsDialogOpen(wrapper)).toBe(true);
+      expect(secretsDialog(wrapper).props("mode")).toBe("ask");
+      expect(secretsDialog(wrapper).props("environmentName")).toBe("stg");
+      expect(secretsDialog(wrapper).props("secrets")).toEqual([
+        expect.objectContaining({ name: "PASSWORD", steps: [1] }),
+      ]);
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+
+      await (secretsDialog(wrapper).props("onSubmit") as (v: unknown) => Promise<void> | void)({
+        PASSWORD: "p",
+      });
+      await flushPromises();
+
+      expect(secretsDialogOpen(wrapper)).toBe(false);
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      expect(replayedVariables()).toContainEqual({ name: "PASSWORD", value: "p" });
+    });
+
+    it("does not ask again in the same session", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{PASSWORD}}")] });
+      await typeSecret(wrapper, { PASSWORD: "p" });
+      mockRecorderReplay.mockClear();
+
+      await replayJourney(wrapper);
+
+      expect(secretsDialogOpen(wrapper)).toBe(false);
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      expect(replayedVariables()).toContainEqual({ name: "PASSWORD", value: "p" });
+    });
+
+    it("asks again in another environment", async () => {
+      wrapper = await mountTemplatedCheck(
+        ["stg"],
+        { journey: [typeStep("s1", "{{PASSWORD}}")] },
+        qaEnvironments(),
+      );
+      await typeSecret(wrapper, { PASSWORD: "p" });
+      mockRecorderReplay.mockClear();
+
+      await chooseReplayEnvironment(wrapper, "qa");
+      await replayJourney(wrapper);
+
+      expect(secretsDialogOpen(wrapper)).toBe(true);
+      expect(secretsDialog(wrapper).props("environmentName")).toBe("qa");
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("forgets a typed secret on Forget value", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{PASSWORD}}")] });
+      await typeSecret(wrapper, { PASSWORD: "p" });
+
+      replayMenu(wrapper).vm.$emit("edit-secrets");
+      await flushPromises();
+      expect(secretsDialogOpen(wrapper)).toBe(true);
+      expect(secretsDialog(wrapper).props("mode")).toBe("change");
+      secretsDialog(wrapper).vm.$emit("forget", ["PASSWORD"]);
+      await flushPromises();
+      mockRecorderReplay.mockClear();
+      await replayJourney(wrapper);
+
+      expect(secretsDialogOpen(wrapper)).toBe(true);
+      expect(secretsDialog(wrapper).props("mode")).toBe("ask");
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("typed secrets are gone after the editor remounts", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{PASSWORD}}")] });
+      await typeSecret(wrapper, { PASSWORD: "p" });
+      wrapper.unmount();
+      mockRecorderReplay.mockClear();
+
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{PASSWORD}}")] });
+      await replayJourney(wrapper);
+
+      expect(secretsDialogOpen(wrapper)).toBe(true);
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("a missing value is asked before a secret, in a second dialog after the first closes", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], {
+        journey: [typeStep("s1", "{{PASSWORD}}"), typeStep("s2", "{{API_KEY}}")],
+      });
+      await replayJourney(wrapper);
+      expect(missingDialogOpen(wrapper)).toBe(true);
+      expect(secretsDialogOpen(wrapper)).toBe(false);
+      mockServiceListEnvironments.mockResolvedValue({
+        data: orgEnvironments([variable("API_KEY", "k")]),
+      });
+
+      await submitMissing(wrapper, { value: "k", secret: false });
+      await flushPromises();
+
+      expect(missingDialogOpen(wrapper)).toBe(false);
+      expect(missingDialogLog.at(-1)).toBe("closed");
+      expect(secretsDialogOpen(wrapper)).toBe(true);
+      expect(secretsDialog(wrapper).props("secrets")).toEqual([
+        expect.objectContaining({ name: "PASSWORD" }),
+      ]);
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("a check-level secure variable replays without a prompt", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], {
+        journey: [typeStep("s1", "{{PASSWORD}}")],
+        variables: [{ name: "PASSWORD", value: "s3cret", secure: true }],
+      });
+
+      await replayJourney(wrapper);
+
+      expect(secretsDialogOpen(wrapper)).toBe(false);
+      expect(missingDialogOpen(wrapper)).toBe(false);
+      expect(mockRecorderReplay).toHaveBeenCalledTimes(1);
+      expect(replayedVariables()).toContainEqual(
+        expect.objectContaining({ name: "PASSWORD", value: "s3cret" }),
+      );
+    });
+
+    it("recording receives a typed secret", async () => {
+      wrapper = await mountTemplatedCheck(["stg"], { journey: [typeStep("s1", "{{PASSWORD}}")] });
+      expect([...(journeyStub(wrapper).props("secretNames") ?? [])]).toContain("PASSWORD");
+
+      await typeSecret(wrapper, { PASSWORD: "p" });
+
+      expect(journeyStub(wrapper).props("variables")).toContainEqual({
+        name: "PASSWORD",
+        value: "p",
+      });
+      expect([...(journeyStub(wrapper).props("secretNames") ?? [])]).not.toContain("PASSWORD");
+    });
+
+    it("the Replay key shows only when a needed secret is typed for the current environment", async () => {
+      wrapper = await mountTemplatedCheck(
+        ["stg"],
+        { journey: [typeStep("s1", "{{PASSWORD}}")] },
+        qaEnvironments(),
+      );
+      expect(journeyStub(wrapper).props("usesTypedSecrets")).toBe(false);
+
+      await typeSecret(wrapper, { PASSWORD: "p" });
+      expect(journeyStub(wrapper).props("usesTypedSecrets")).toBe(true);
+
+      await chooseReplayEnvironment(wrapper, "qa");
+      expect(journeyStub(wrapper).props("usesTypedSecrets")).toBe(false);
     });
 
     it("should hand the journey the resolved starting URL for recording", async () => {

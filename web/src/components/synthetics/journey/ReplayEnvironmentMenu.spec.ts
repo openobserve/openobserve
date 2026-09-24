@@ -178,4 +178,45 @@ describe("ReplayEnvironmentMenu", () => {
     expect(wrapper.text()).toContain("Replay and record in");
     expect(wrapper.text()).toContain("This session only — not saved with the test.");
   });
+
+  describe("secrets", () => {
+    const SECRETS = '[data-test="synthetics-journey-replay-menu-secrets"]';
+
+    it("shows Secrets · 1 of 2 entered only when secrets are needed", async () => {
+      wrapper = mountMenu({ secretsNeeded: 2, secretsEntered: 1 });
+      const entry = wrapper.get(SECRETS);
+      expect(entry.text()).toContain("Secrets · 1 of 2 entered");
+      expect(entry.attributes("aria-label")).toBe(
+        "Secrets for Staging replays: 1 of 2 entered. Edit",
+      );
+
+      await entry.trigger("click");
+      expect(wrapper.emitted("edit-secrets")).toHaveLength(1);
+
+      wrapper.unmount();
+      wrapper = mountMenu({ secretsNeeded: 0, secretsEntered: 0 });
+      expect(wrapper.find(SECRETS).exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Secrets ·");
+    });
+
+    it("shows a red dot when a typed secret failed in the last replay", () => {
+      wrapper = mountMenu({ secretsNeeded: 1, secretsEntered: 1, secretFailed: true });
+      expect(wrapper.get(SECRETS).find(".bg-status-error-text").exists()).toBe(true);
+
+      wrapper.unmount();
+      wrapper = mountMenu({ secretsNeeded: 1, secretsEntered: 1, secretFailed: false });
+      expect(wrapper.get(SECRETS).find(".bg-status-error-text").exists()).toBe(false);
+    });
+
+    it("shows the arrow when the org has one environment but secrets are needed", () => {
+      wrapper = mountMenu({
+        options: [PROD],
+        selectedId: "env-prod",
+        secretsNeeded: 1,
+        secretsEntered: 0,
+      });
+      expect(wrapper.find(TRIGGER).exists()).toBe(true);
+      expect(wrapper.find(SECRETS).exists()).toBe(true);
+    });
+  });
 });
