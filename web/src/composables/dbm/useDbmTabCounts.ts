@@ -661,7 +661,12 @@ export function useDbmTabCounts(): DbmTabCountsSource {
       }
       const merged = carryForward(value, counts.value);
       // Same window: a page's own count is more exact than the fan-out's and stands until that page re-measures.
-      if (!scopeMoved) for (const own of ownPublished) merged[own] = counts.value[own];
+      if (!scopeMoved) {
+        for (const own of ownPublished) {
+          // Same field on both sides; TS cannot see that through a dynamic key.
+          (merged[own] as DbmTabCounts[typeof own]) = counts.value[own] as DbmTabCounts[typeof own];
+        }
+      }
       counts.value = merged;
       // The window this snapshot describes now owns the published overrides;
       // anything a page taught us about the PREVIOUS window is stale and must
