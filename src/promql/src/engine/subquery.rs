@@ -220,6 +220,7 @@ mod tests {
             ("deriv(timestamp(vector(1))[10m:1m])", 1.0),
             ("predict_linear(vector(5)[1m:1s], 10)", 5.0),
             ("rate(timestamp(vector(1))[10m:1m])", 1.0),
+            ("sum_over_time(vector(scalar(vector(2)))[10m:1m])", 20.0),
             // nested: each outer step holds a count of 6 inner steps
             (
                 "sum_over_time(count_over_time(vector(1)[1m:10s])[5m:1m])",
