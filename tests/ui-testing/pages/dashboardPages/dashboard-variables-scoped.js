@@ -752,20 +752,6 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Wait until the dashboard tab with this title is the active one.
-   * @param {string} tabTitle - Tab title (e.g., "Tab1")
-   * @param {Object} options - Wait options
-   * @param {number} options.timeout - Timeout in ms (default: 10000)
-   */
-  async waitForTabActive(tabTitle, options = {}) {
-    const { timeout = 10000 } = options;
-    await this.page
-      .locator('[role="tab"][data-state="active"]')
-      .filter({ has: this.page.locator(getTabSelector(tabTitle)) })
-      .waitFor({ state: "visible", timeout });
-  }
-
-  /**
    * Wait for tab content to load (empty add-panel button OR any panel visible)
    * @param {Object} options - Wait options
    * @param {number} options.timeout - Timeout in ms (default: 5000)
@@ -938,34 +924,6 @@ export default class DashboardVariablesScoped {
    */
   async getFilterValueOptionTexts() {
     return await this.getFilterValueOptions().allTextContents();
-  }
-
-  /**
-   * Locator for the filter-value dependency option that references a variable.
-   * @param {string} variableName - Variable name (without the `$` prefix)
-   * @returns {import('@playwright/test').Locator}
-   */
-  getFilterValueOption(variableName) {
-    return this.page.locator(
-      `[data-test*="filter-value-selector"][data-test$="-option"][data-test-value="$${variableName}"]`
-    );
-  }
-
-  /**
-   * Open the last filter-value OCombobox and wait until its listbox is open, even when it has no options.
-   * @returns {Promise<import('@playwright/test').Locator>} the open listbox
-   */
-  async openFilterValueOptions() {
-    const input = this.getFilterValueInput();
-    await input.waitFor({ state: "visible", timeout: 10000 });
-    await input.click();
-    // Reka mirrors the open state on the input, so this holds for an empty list too.
-    if ((await input.getAttribute("aria-expanded")) !== "true") await input.click();
-    await expect(input).toHaveAttribute("aria-expanded", "true", { timeout: 5000 });
-    const listboxId = await input.getAttribute("aria-controls");
-    const listbox = this.page.locator(`[id="${listboxId}"]`);
-    await listbox.waitFor({ state: "visible", timeout: 5000 });
-    return listbox;
   }
 
   /**
