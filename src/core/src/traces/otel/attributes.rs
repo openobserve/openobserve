@@ -76,6 +76,8 @@ impl GenAiAttributes {
 
     // Gen-AI Prompt
     pub const PROMPT_NAME: &'static str = "gen_ai.prompt.name";
+    pub const PROMPT_VERSION: &'static str = "gen_ai.prompt.version";
+    pub const PROMPT_LABEL: &'static str = "gen_ai.prompt.label";
 
     // Gen-AI Input/Output
     pub const INPUT_MESSAGES: &'static str = "gen_ai.input.messages";
@@ -254,6 +256,8 @@ impl LangfuseAttributes {
 
     // Prompt Name
     pub const PROMPT_NAME: &'static str = "langfuse.observation.prompt.name";
+    pub const PROMPT_VERSION: &'static str = "langfuse.observation.prompt.version";
+    pub const PROMPT_LABEL: &'static str = "langfuse.observation.prompt.label";
 
     // Metadata (contains tool info and other metadata)
     pub const METADATA: &'static str = "langfuse.observation.metadata";
@@ -421,6 +425,14 @@ mod tests {
         assert_eq!(
             LangfuseAttributes::PROMPT_NAME,
             "langfuse.observation.prompt.name"
+        );
+        assert_eq!(
+            LangfuseAttributes::PROMPT_VERSION,
+            "langfuse.observation.prompt.version"
+        );
+        assert_eq!(
+            LangfuseAttributes::PROMPT_LABEL,
+            "langfuse.observation.prompt.label"
         );
     }
 

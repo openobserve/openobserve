@@ -10933,7 +10933,8 @@
       "scorers": "Bộ chấm điểm",
       "scoreConfigs": "Cấu hình điểm",
       "remoteTasks": "Tác vụ từ xa",
-      "playground": "Sân chơi"
+      "playground": "Sân chơi",
+      "prompts": "Lời nhắc"
     },
     "subtitle": {
       "llmInsights": "Theo dõi độ trễ, lỗi, token và chi phí trên lưu lượng LLM của bạn",
@@ -11394,6 +11395,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "Lời nhắc nội tuyến",
+          "prompt_ref": "Lời nhắc được quản lý",
           "remote": "Từ xa",
           "sdk": "SDK"
         },

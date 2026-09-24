@@ -34,9 +34,8 @@ export const MAX_TRIAL_COUNT = 10;
 /** Dataset item origins — the fixed set `datasetFilter.sources` accepts. */
 export const EXPERIMENT_ROW_SOURCES = ["trace", "annotation", "manual"] as const;
 
-/** The two task kinds the create form offers. `sdk` is reported to the API by
- *  customer code, never authored here. */
-export const EXPERIMENT_TASK_TYPES = ["inline_prompt", "remote"] as const;
+/** Task kinds authored in the create form. `sdk` is reported by customer code. */
+export const EXPERIMENT_TASK_TYPES = ["inline_prompt", "prompt_ref", "remote"] as const;
 export type ExperimentTaskType = (typeof EXPERIMENT_TASK_TYPES)[number];
 
 const requiredText = (message: string) =>
@@ -55,6 +54,10 @@ export const makeExperimentSchema = (t: (_key: string) => string) =>
       model: z.string().optional().default(""),
       systemPrompt: z.string().optional().default(""),
       userPrompt: z.string().optional().default(""),
+      promptId: z.string().optional().default(""),
+      promptSelectionMode: z.enum(["label", "version"]).default("label"),
+      promptLabel: z.string().optional().default("production"),
+      promptVersion: z.string().optional().default(""),
       /** Pinned `name@version` of a published Remote Task. Never a bare name. */
       taskRef: z.string().optional().default(""),
       taskTimeoutSeconds: z.string().optional().default(""),
@@ -94,6 +97,23 @@ export const makeExperimentSchema = (t: (_key: string) => string) =>
         }
         return;
       }
+      if (values.taskType === "prompt_ref") {
+        if (!values.providerId.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["providerId"],
+            message: t("aiObservability.experiments.form.validation.providerRequired"),
+          });
+        }
+        if (!values.promptId.trim() || Number(values.promptVersion) < 1) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["promptId"],
+            message: t("aiObservability.experiments.form.validation.promptRefRequired"),
+          });
+        }
+        return;
+      }
 
       // A remote task must name a PUBLISHED version. The server resolves the
       // ref against the registry and refuses a bare name, so a value without
@@ -117,6 +137,10 @@ export interface ExperimentFormPrefill {
   temperature?: string;
   systemPrompt?: string;
   userPrompt?: string;
+  promptId?: string;
+  promptSelectionMode?: "label" | "version";
+  promptLabel?: string;
+  promptVersion?: string;
 }
 
 /** An `sdk` task is reported by customer code and has no controls here, so a
@@ -145,6 +169,18 @@ export function experimentFormFromExperiment(source: LlmExperiment, name: string
     trialCount: source.trialCount,
   };
   const task = source.task;
+  if (task.type === "prompt_ref") {
+    return {
+      ...common,
+      taskType: "prompt_ref",
+      promptId: task.id,
+      promptSelectionMode: "version",
+      promptVersion: String(task.version),
+      providerId: task.providerId,
+      model: task.paramsOverrides?.model ?? "",
+      temperature: Number(task.paramsOverrides?.params?.temperature) || 0,
+    };
+  }
   if (task.type === "remote") {
     return {
       ...common,
@@ -187,6 +223,10 @@ export const experimentFormDefaults = (
   // an ABSENT key falls back to the placeholder.
   userPrompt: prefill.userPrompt ?? "{{ input }}",
   temperature: Number(prefill.temperature) || 0,
+  promptId: prefill.promptId ?? "",
+  promptSelectionMode: prefill.promptSelectionMode ?? "label",
+  promptLabel: prefill.promptLabel ?? "production",
+  promptVersion: prefill.promptVersion ?? "",
   taskRef: "",
   taskTimeoutSeconds: "",
   taskMaxConcurrency: "",

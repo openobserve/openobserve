@@ -10933,7 +10933,8 @@
       "scorers": "Marcatori",
       "scoreConfigs": "Configurazioni dei punteggi",
       "remoteTasks": "Attività remote",
-      "playground": "Playground"
+      "playground": "Playground",
+      "prompts": "Prompt"
     },
     "subtitle": {
       "llmInsights": "Tieni traccia della latenza, degli errori, dei token e dei costi nel tuo traffico LLM",
@@ -11394,6 +11395,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "Prompt inline",
+          "prompt_ref": "Prompt gestito",
           "remote": "Remota",
           "sdk": "SDK"
         },

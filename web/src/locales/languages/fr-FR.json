@@ -10945,7 +10945,8 @@
       "scorers": "Buteurs",
       "scoreConfigs": "Configurations de score",
       "remoteTasks": "Tâches distantes",
-      "playground": "Bac à sable"
+      "playground": "Bac à sable",
+      "prompts": "Prompts"
     },
     "subtitle": {
       "llmInsights": "Suivez la latence, les erreurs, les jetons et les coûts sur l'ensemble de votre trafic LLM",
@@ -11406,6 +11407,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "Invite intégrée",
+          "prompt_ref": "Prompt géré",
           "remote": "Distant",
           "sdk": "SDK"
         },

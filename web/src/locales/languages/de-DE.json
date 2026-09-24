@@ -10945,7 +10945,8 @@
       "scorers": "Torschützen",
       "scoreConfigs": "Score-Konfigurationen",
       "remoteTasks": "Remote-Tasks",
-      "playground": "Playground"
+      "playground": "Playground",
+      "prompts": "Prompts"
     },
     "subtitle": {
       "llmInsights": "Verfolgen Sie Latenz, Fehler, Tokens und Kosten in Ihrem gesamten LLM-Traffic",
@@ -11406,6 +11407,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "Inline-Prompt",
+          "prompt_ref": "Verwalteter Prompt",
           "remote": "Remote",
           "sdk": "SDK"
         },

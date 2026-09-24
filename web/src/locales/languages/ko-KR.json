@@ -10933,7 +10933,8 @@
       "scorers": "득점자",
       "scoreConfigs": "스코어 구성",
       "remoteTasks": "원격 태스크",
-      "playground": "플레이그라운드"
+      "playground": "플레이그라운드",
+      "prompts": "프롬프트"
     },
     "subtitle": {
       "llmInsights": "LLM 트래픽 전반에서 지연 시간, 오류, 토큰 및 비용을 추적할 수 있습니다.",
@@ -11394,6 +11395,7 @@
         "datasetVersion": "{dataset} v{version}",
         "taskType": {
           "inline_prompt": "인라인 프롬프트",
+          "prompt_ref": "관리형 프롬프트",
           "remote": "원격",
           "sdk": "SDK"
         },

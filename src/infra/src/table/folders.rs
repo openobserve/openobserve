@@ -45,6 +45,7 @@ pub(crate) fn folder_type_into_i16(folder_type: FolderType) -> i16 {
         FolderType::Reports => 2,
         FolderType::Synthetics => 3,
         FolderType::Workflows => 4,
+        FolderType::Prompts => 5,
     }
 }
 
@@ -220,6 +221,19 @@ pub async fn get_pk_by_name(
         .map(|m| m.id))
 }
 
+/// Resolves a public folder ID to the physical `folders.id` within the
+/// caller's connection or transaction.
+pub async fn get_pk<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    folder_id: &str,
+    folder_type: FolderType,
+) -> Result<Option<String>, sea_orm::DbErr> {
+    Ok(get_model(db, org_id, folder_id, folder_type)
+        .await?
+        .map(|model| model.id))
+}
+
 /// Returns the folder name (`folder_id` column) for the given primary-key `id`.
 ///
 /// Used to translate the stored PK back to the user-visible name when building
@@ -230,6 +244,17 @@ pub async fn get_name_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
         .one(client)
         .await?
         .map(|m| m.folder_id))
+}
+/// Resolves a physical folder primary key to its public folder ID through the
+/// caller's connection or transaction.
+pub async fn get_public_id_by_pk<C: ConnectionTrait>(
+    db: &C,
+    pk: &str,
+) -> Result<Option<String>, sea_orm::DbErr> {
+    Ok(Entity::find_by_id(pk)
+        .one(db)
+        .await?
+        .map(|model| model.folder_id))
 }
 
 /// Returns `(folder name, display name)` for the given primary-key `id`.
@@ -247,7 +272,7 @@ pub async fn get_name_and_display_name_by_pk(
 }
 
 /// Gets a folder ORM entity by its `folder_id`.
-pub(crate) async fn get_model<C: ConnectionTrait>(
+pub async fn get_model<C: ConnectionTrait>(
     db: &C,
     org_id: &str,
     folder_id: &str,
