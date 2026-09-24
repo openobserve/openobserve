@@ -83,8 +83,9 @@ pub(crate) fn time(eval_ctx: &EvalContext) -> Value {
     )])
 }
 
+// Prometheus timestamps are whole milliseconds, so the microseconds below that are dropped
 fn seconds(micros: i64) -> f64 {
-    micros as f64 / 1_000_000.0
+    micros.div_euclid(1_000) as f64 / 1_000.0
 }
 
 /// Given a timestamp, get the component from it
@@ -118,6 +119,23 @@ mod tests {
     fn test_time_ops_invalid_input_returns_err() {
         assert!(minute(Value::Float(1.0)).is_err());
         assert!(timestamp(Value::Float(1.0)).is_err());
+    }
+
+    #[test]
+    fn test_time_and_timestamp_truncate_to_milliseconds() {
+        let instant = 1_640_995_200_123_456;
+        let eval_ctx = EvalContext::new(instant, instant, 0, "test".into());
+        assert!(matches!(time(&eval_ctx), Value::Float(t) if t == 1_640_995_200.123));
+
+        let data = Value::Matrix(vec![RangeValue::new(
+            vec![],
+            [Sample::new(instant, 0.0), Sample::new(-1_500, 0.0)],
+        )]);
+        let Value::Matrix(matrix) = timestamp(data).unwrap() else {
+            panic!("expected matrix");
+        };
+        let values: Vec<f64> = matrix[0].samples.iter().map(|s| s.value).collect();
+        assert_eq!(values, [1_640_995_200.123, -0.002]);
     }
 
     #[test]
