@@ -64,6 +64,11 @@ export class ServiceGraphPage {
     this.tableHeader = (columnId) => `thead th[data-test="o2-table-th-${columnId}"]`;
     this.tableCell = (columnId) => `tbody td[data-test="o2-table-cell-${columnId}"]`;
     this.nodePanelTabPrefix = '[data-test^="service-graph-node-panel-tab-"]';
+    // Resource tabs and their tables are generated per detected OTEL field, so both
+    // data-tests carry a dynamic id (k8s-pod-name, k8s-node-name, ...), never 'pods'/'nodes'.
+    this.resourceTab = (tabId) => `[data-test="service-graph-node-panel-tab-${tabId}"]`;
+    this.resourceTable = (tabId) => `[data-test="service-graph-side-panel-${tabId}-table"]`;
+    this.fixedPanelTabs = ['operations', 'behavior', 'metrics'];
 
     // ===== TELEMETRY CORRELATION (Metrics tab) =====
     this.metricsTab = '[data-test="service-graph-node-panel-tab-metrics"]';
@@ -562,12 +567,18 @@ export class ServiceGraphPage {
       );
   }
 
-  async expectNodesTableVisible() {
-    await expect(this.page.locator(this.nodesTable)).toBeVisible({ timeout: 15000 });
+  /** Tab ids for the generated resource tabs, with the fixed tabs removed. */
+  async getResourceTabIds() {
+    const tabIds = await this.getSidePanelTabIds();
+    return tabIds.filter((id) => id && !this.fixedPanelTabs.includes(id));
   }
 
-  async expectPodsTableVisible() {
-    await expect(this.page.locator(this.podsTable)).toBeVisible({ timeout: 15000 });
+  async switchToResourceTab(tabId) {
+    await this.page.locator(this.resourceTab(tabId)).click();
+  }
+
+  async expectResourceTableVisible(tabId) {
+    await expect(this.page.locator(this.resourceTable(tabId))).toBeVisible({ timeout: 15000 });
   }
 
   async getResourceTableColumnIds(tableSelector) {

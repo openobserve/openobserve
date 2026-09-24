@@ -101,30 +101,25 @@ test.describe('Service Graph Side Panel Regression', () => {
   test('Resource tabs carry the operations table columns', {
     tag: ['@bug-11360', '@P2', '@regression', '@serviceGraph', '@tracesRegressionEnt', '@enterprise'],
   }, async () => {
-    // Resource tabs are generated from the OTEL attributes present, so a dataset
-    // without pod/node attributes legitimately renders neither tab.
-    const tabIds = await pm.serviceGraphPage.getSidePanelTabIds();
-    testLogger.info(`Side panel tabs: ${tabIds.join(', ')}`);
-    test.skip(!tabIds.includes('nodes') && !tabIds.includes('pods'),
-      `no node/pod resource tab in this dataset, tabs were: ${tabIds.join(', ')}`);
+    // Tab ids are derived from the OTEL fields present (k8s-pod-name, k8s-node-name, ...),
+    // so the set is discovered rather than hardcoded.
+    const resourceTabIds = await pm.serviceGraphPage.getResourceTabIds();
+    testLogger.info(`Resource tabs: ${resourceTabIds.join(', ')}`);
 
-    if (tabIds.includes('nodes')) {
-      await pm.serviceGraphPage.switchToNodesTab();
-      await pm.serviceGraphPage.expectNodesTableVisible();
-      const nodeColumns = await pm.serviceGraphPage.getResourceTableColumnIds(pm.serviceGraphPage.nodesTable);
-      testLogger.info(`Nodes table columns: ${nodeColumns.join(', ')}`);
-      for (const expected of ['requests', 'errors', ...LATENCY_COLUMNS]) {
-        expect(nodeColumns, `nodes table must expose the ${expected} column`).toContain(expected);
-      }
-    }
+    expect(resourceTabIds.length, 'seeded traces carry k8s pod and node identity, so resource tabs must render')
+      .toBeGreaterThan(0);
 
-    if (tabIds.includes('pods')) {
-      await pm.serviceGraphPage.switchToPodsTab();
-      await pm.serviceGraphPage.expectPodsTableVisible();
-      const podColumns = await pm.serviceGraphPage.getResourceTableColumnIds(pm.serviceGraphPage.podsTable);
-      testLogger.info(`Pods table columns: ${podColumns.join(', ')}`);
+    for (const tabId of resourceTabIds) {
+      await pm.serviceGraphPage.switchToResourceTab(tabId);
+      await pm.serviceGraphPage.expectResourceTableVisible(tabId);
+
+      const columnIds = await pm.serviceGraphPage.getResourceTableColumnIds(
+        pm.serviceGraphPage.resourceTable(tabId),
+      );
+      testLogger.info(`${tabId} table columns: ${columnIds.join(', ')}`);
+
       for (const expected of ['requests', 'errors', ...LATENCY_COLUMNS]) {
-        expect(podColumns, `pods table must expose the ${expected} column`).toContain(expected);
+        expect(columnIds, `${tabId} table must expose the ${expected} column`).toContain(expected);
       }
     }
   });
