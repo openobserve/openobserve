@@ -339,6 +339,7 @@ fn match_series(
     let comparison_operator = expr.op.is_comparison_operator();
 
     let mut per_one_series: Vec<(usize, Vec<Sample>)> = vec![];
+    let mut positions: HashMap<usize, usize> = HashMap::new();
     for sample in &range.samples {
         let Some(&(idx, one_value)) = group.samples.get(&sample.timestamp) else {
             continue;
@@ -357,9 +358,15 @@ fn match_series(
             timestamp: sample.timestamp,
             value,
         };
-        match per_one_series.iter_mut().find(|(i, _)| *i == idx) {
-            Some((_, samples)) => samples.push(sample),
-            None => per_one_series.push((idx, vec![sample])),
+        match per_one_series.last_mut() {
+            Some((last, samples)) if *last == idx => samples.push(sample),
+            _ => match positions.entry(idx) {
+                Entry::Occupied(entry) => per_one_series[*entry.get()].1.push(sample),
+                Entry::Vacant(entry) => {
+                    entry.insert(per_one_series.len());
+                    per_one_series.push((idx, vec![sample]));
+                }
+            },
         }
     }
 
@@ -1337,5 +1344,33 @@ mod tests {
             label_pairs(&result[0]),
             pairs(&[("__name__", "b"), ("instance", "i1"), ("job", "x")])
         );
+    }
+
+    #[test]
+    fn test_one_side_series_alternating_over_time_keep_their_samples() {
+        let left = vec![range_at(
+            &[(1, 10.0), (2, 20.0), (3, 30.0)],
+            vec![("job", "api")],
+        )];
+        let right = vec![
+            range_at(
+                &[(1, 2.0), (3, 3.0)],
+                vec![("instance", "x"), ("job", "api")],
+            ),
+            range_at(&[(2, 4.0)], vec![("instance", "y"), ("job", "api")]),
+        ];
+        let mut result = eval_bin_op(
+            "a / ignoring (instance) group_left (instance) b",
+            left,
+            right,
+        );
+        result.sort_by_key(label_pairs);
+        assert_eq!(result.len(), 2);
+        assert_eq!(
+            label_pairs(&result[0]),
+            pairs(&[("instance", "x"), ("job", "api")])
+        );
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 5.0), (3, 10.0)]);
+        assert_eq!(sample_pairs(&result[1]), vec![(2, 5.0)]);
     }
 }
