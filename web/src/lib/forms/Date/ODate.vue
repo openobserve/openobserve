@@ -232,7 +232,7 @@ const wrapperClasses = computed(() => [
       <DatePickerContent
         :side-offset="4"
         align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 border p-3 shadow-md"
+        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-10001 border p-3 shadow-md"
       >
         <DatePickerCalendar v-slot="{ weekDays, grid }">
           <DatePickerHeader class="mb-3 flex items-center justify-between">
