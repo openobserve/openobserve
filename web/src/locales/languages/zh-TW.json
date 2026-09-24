@@ -2765,6 +2765,13 @@
         "desc": "當警示觸發時執行",
         "intro": "當連結的警示觸發時，每個下游步驟都會收到此負載。"
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "事故事件",
         "tab": "事件",
@@ -7408,7 +7415,12 @@
         "alertTriggerTimeSeconds": "觸發時間（epoch 秒）",
         "alertTriggerTimeStr": "觸發時間（可讀格式）",
         "rows": "所有符合的列，由列範本格式化"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds"
     },
     "advanced": {
       "addVariable": "新增變數",
@@ -7923,7 +7935,8 @@
     "sloKind": "條件類型",
     "sloLongWindow": "長視窗",
     "sloShortWindow": "短視窗",
-    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。"
+    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "開啟",

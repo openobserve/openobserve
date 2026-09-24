@@ -2783,6 +2783,9 @@ fn anomaly_alert_payload(
     serde_json::json!({
         "text": message,
         "alert_type": alert_type,
+        // The same field an alert recovery carries, so one webhook can read
+        // both message classes without knowing which produced it.
+        "alert_status": if ctx.kind == AnomalyAlertKind::Recovery { "resolved" } else { "firing" },
         "kind": ctx.kind,
         "anomaly_id": ctx.anomaly_id,
         "config_name": ctx.config_name,

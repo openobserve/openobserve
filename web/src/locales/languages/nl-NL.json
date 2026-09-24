@@ -2765,6 +2765,13 @@
         "desc": "Uitvoeren wanneer een alert afgaat",
         "intro": "Wanneer een gekoppelde alert afgaat, ontvangt elke downstream-stap deze payload."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "Incident event",
         "tab": "Incidenten",
@@ -7413,7 +7420,12 @@
         "alertTriggerTimeSeconds": "Triggentijd in epoch-seconden",
         "alertTriggerTimeStr": "Triggentijd, mensleesbaar",
         "rows": "Alle overeenkomende rijen, opgemaakt door de rijtemplate"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds"
     },
     "advanced": {
       "addVariable": "Variabele toevoegen",
@@ -7928,7 +7940,8 @@
     "sloKind": "Conditietype",
     "sloLongWindow": "Lang venster",
     "sloShortWindow": "Kort venster",
-    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond."
+    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "Openen",

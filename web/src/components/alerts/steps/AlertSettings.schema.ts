@@ -106,6 +106,17 @@ export const alertSettingsCreatesIncidentSchema = z.boolean().optional();
  * unconditional here; the orchestrator overrides it with a mode-conditional
  * (scheduled-only) refinement.
  */
+export const alertSettingsNotifyOnRecoverySchema = z.boolean().optional();
+
+// Seconds the condition must stay clear before recovering. Same shape as the
+// silence field: a non-negative integer, 0 meaning "recover immediately".
+export const makeKeepFiringForSchema = (t: Translator) =>
+  z.coerce
+    .number({ message: t("alerts.alertSettings.keepFiringForInvalid") })
+    .int({ message: t("alerts.alertSettings.keepFiringForInvalid") })
+    .min(0, { message: t("alerts.alertSettings.keepFiringForInvalid") })
+    .optional();
+
 export const makeAlertSettingsShape = (t: Translator) =>
   ({
     trigger_condition: z.object({
@@ -115,6 +126,8 @@ export const makeAlertSettingsShape = (t: Translator) =>
     _ui: z.object({ pendingPeriod: makePendingPeriodSchema(t) }).optional(),
     destinations: makeDestinationsSchema(t),
     creates_incident: alertSettingsCreatesIncidentSchema,
+    notify_on_recovery: alertSettingsNotifyOnRecoverySchema,
+    keep_firing_for: makeKeepFiringForSchema(t),
   }) as const;
 
 // ── Mode-conditional composite ──────────────────────────────────────────────

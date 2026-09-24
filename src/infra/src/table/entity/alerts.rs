@@ -82,6 +82,12 @@ pub struct Model {
     pub creates_incident: bool,
     pub workflows: Json,
     pub pending_period_sec: i64,
+    /// Send a recovery notification when this alert stops firing. NULL means
+    /// the alert predates the feature, which is the same as `false`.
+    pub notify_on_recovery: Option<bool>,
+    /// How long the condition must stay clear before the episode recovers.
+    /// NULL or 0 recovers on the first clear evaluation.
+    pub keep_firing_for_seconds: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -164,6 +170,8 @@ mod tests {
             creates_incident: false,
             workflows: serde_json::json!(vec!["abc123"]),
             pending_period_sec: 0,
+            notify_on_recovery: None,
+            keep_firing_for_seconds: None,
         };
         assert_eq!(m.id, "alert-1");
         assert_eq!(m.name, "High Error Rate");

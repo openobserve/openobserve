@@ -55,6 +55,8 @@ export interface PayloadFormData {
   row_template?: string;
   row_template_type?: string;
   creates_incident?: boolean;
+  notify_on_recovery?: boolean;
+  keep_firing_for?: number;
   /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
   priority?: number | string | null;
   tags?: string[];

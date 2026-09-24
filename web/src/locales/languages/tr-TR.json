@@ -2765,6 +2765,13 @@
         "desc": "Bir uyarı tetiklendiğinde çalıştır",
         "intro": "Bağlı bir uyarı tetiklendiğinde, aşağı akıştaki her adım bu veri yükünü alır."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "Olay etkinliği",
         "tab": "Incidents",
@@ -7413,7 +7420,12 @@
         "alertTriggerTimeSeconds": "Epoch saniye cinsinden tetikleme zamanı",
         "alertTriggerTimeStr": "İnsan tarafından okunabilir tetikleme zamanı",
         "rows": "Satır şablonuna göre biçimlendirilmiş tüm eşleşen satırlar"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds"
     },
     "advanced": {
       "addVariable": "Değişken Ekle",
@@ -7928,7 +7940,8 @@
     "sloKind": "Koşul türü",
     "sloLongWindow": "Uzun pencere",
     "sloShortWindow": "Kısa pencere",
-    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz."
+    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "Aç",

@@ -1065,6 +1065,49 @@ pub async fn send_workflow_trigger(
 
 /// The 4-part positional run-history key. Display, not Debug: a Debug-formatted
 /// variant would put braces and spaces into a key the history API parses.
+/// Run an alert's workflows for the resolve half of a firing.
+///
+/// Carries the episode id so a workflow can join the two runs, and the same
+/// identity keys the firing sent, so a Branch written against `meta_alert_name`
+/// keeps working without knowing which half it is looking at.
+pub async fn send_alert_resolved(
+    alert: &config::meta::alerts::alert::Alert,
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+) -> Result<(), anyhow::Error> {
+    let source_id = alert.id.as_ref().map_or_else(
+        || format!("{}/{}", alert.org_id, alert.name),
+        |v| v.to_string(),
+    );
+    let metadata: HashMap<String, Value> = vec![
+        ("org_id", alert.org_id.clone().into()),
+        ("stream_type", alert.stream_type.to_string().into()),
+        ("stream_name", alert.stream_name.clone().into()),
+        ("alert_name", alert.name.clone().into()),
+        ("alert_status", "resolved".into()),
+        ("episode_id", event.episode_id.clone().into()),
+        ("alert_start_time", event.opened_at.into()),
+        ("alert_end_time", event.recovered_at.into()),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect();
+
+    let trace_id = config::ider::generate_trace_id();
+    for workflow in alert.workflows.iter() {
+        send_workflow_trigger(
+            &trace_id,
+            &alert.org_id,
+            source_id.clone(),
+            WorkflowTriggerType::AlertResolved,
+            workflow,
+            metadata.clone(),
+            &[],
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 pub fn workflow_history_key(
     workflow_id: &str,
     trigger_type: WorkflowTriggerType,

@@ -2765,6 +2765,13 @@
         "desc": "اهرب عندما يطلق تنبيه",
         "intro": "عندما يطلق تنبيه مرتبط، تستقبل كل خطوة لاحقة هذه الحمولة."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "حدث الحادث",
         "tab": "Incidents",
@@ -7413,7 +7420,12 @@
         "alertTriggerTimeSeconds": "زمن التفعيل بثوان العصر",
         "alertTriggerTimeStr": "وقت التفعيل، يمكن للبشر القراءة",
         "rows": "جميع الصفوف المتطابقة، منسقة حسب قالب الصف"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds"
     },
     "advanced": {
       "addVariable": "إضافة متغير",
@@ -7926,7 +7938,8 @@
     "sloKind": "نوع الحالة",
     "sloLongWindow": "نافذة طويلة",
     "sloShortWindow": "نافذة قصيرة",
-    "sloCloneDisabled": "تنبيهات SLO تنشأ على صفحة SLO الخاصة بهم، لذا لا يمكن استنساخها من هنا."
+    "sloCloneDisabled": "تنبيهات SLO تنشأ على صفحة SLO الخاصة بهم، لذا لا يمكن استنساخها من هنا.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "مفتوح",

@@ -40,6 +40,7 @@ import { buildIncidentSample, INCIDENT_EVENT_TYPES, INCIDENT_COMMON_KEYS } from 
 import { ALERT_PAYLOAD_FIELDS } from "./alertFields";
 import type { WorkflowFieldOption } from "./alertFields";
 import { INCIDENT_PAYLOAD_FIELDS } from "./incidentFields";
+import { buildAlertResolvedSample, ALERT_RESOLVED_PAYLOAD_FIELDS } from "./alertResolvedSample";
 
 // A selectable variant of a trigger's sample payload. When a kind defines more
 // than one (e.g. an incident's lifecycle event_types), the trigger drawer shows
@@ -146,6 +147,20 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     buildSample: buildTestSample,
     conditionFields: ALERT_PAYLOAD_FIELDS,
     payloadNoteKey: "workflow.node.triggerDataExampleNote",
+    linksAlerts: true,
+  },
+  {
+    kind: "alert_resolved",
+    triggerType: "AlertResolved",
+    enabled: true,
+    icon: "check-circle",
+    labelKey: "workflow.triggerKind.alertResolved.label",
+    tabLabelKey: "workflow.triggerKind.alertResolved.tab",
+    nodeTitleKey: "workflow.triggerKind.alertResolved.node",
+    descKey: "workflow.triggerKind.alertResolved.desc",
+    introKey: "workflow.triggerKind.alertResolved.intro",
+    buildSample: buildAlertResolvedSample,
+    conditionFields: ALERT_RESOLVED_PAYLOAD_FIELDS,
     linksAlerts: true,
   },
   {

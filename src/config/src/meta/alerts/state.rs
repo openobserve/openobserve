@@ -108,6 +108,24 @@ pub struct AlertState {
     /// The level of this group's last *successful* delivery — what
     /// `delivery_decision` measures escalation against.
     pub last_notified_level: Option<AlertLevel>,
+    // ── Firing episode (o2-enterprise#2690, DR-2) ───────────────────────────
+    /// The open firing episode: minted on the first notification this episode
+    /// delivered, cleared by the write that emits the recovery. A second emit
+    /// then has nothing to reference, which is what makes recovery exactly-once
+    /// without a guard every consumer has to remember. `None` = nothing was
+    /// delivered, so there is nothing to recover from.
+    #[serde(default)]
+    pub episode_id: Option<String>,
+    #[serde(default)]
+    pub episode_opened_at: Option<i64>,
+    /// The incident that owned firing delivery, so a resolve goes back to
+    /// whoever sent the trigger. `None` = the alert path owns it.
+    #[serde(default)]
+    pub episode_incident_id: Option<String>,
+    /// When the condition first cleared, while `keep_firing_for` holds the
+    /// episode open. `None` = not in the hold.
+    #[serde(default)]
+    pub recovering_since: Option<i64>,
 }
 
 impl AlertState {
@@ -130,6 +148,10 @@ impl AlertState {
             groups_firing_is_lower_bound: None,
             silenced_until: None,
             last_notified_level: None,
+            episode_id: None,
+            episode_opened_at: None,
+            episode_incident_id: None,
+            recovering_since: None,
         }
     }
 
@@ -398,6 +420,10 @@ pub fn apply_outcome(
         // Delivery state is the callbacks' to write; evaluation only carries it.
         silenced_until: prev.and_then(|p| p.silenced_until),
         last_notified_level: prev.and_then(|p| p.last_notified_level),
+        episode_id: prev.and_then(|p| p.episode_id.clone()),
+        episode_opened_at: prev.and_then(|p| p.episode_opened_at),
+        episode_incident_id: prev.and_then(|p| p.episode_incident_id.clone()),
+        recovering_since: prev.and_then(|p| p.recovering_since),
     };
 
     // A change on EITHER axis is a transition — an escalation while still
@@ -444,6 +470,10 @@ mod tests {
             groups_firing_is_lower_bound: None,
             silenced_until: None,
             last_notified_level: None,
+            episode_id: None,
+            episode_opened_at: None,
+            episode_incident_id: None,
+            recovering_since: None,
         }
     }
 
@@ -704,6 +734,10 @@ mod tests {
             groups_firing_is_lower_bound: None,
             silenced_until: None,
             last_notified_level: None,
+            episode_id: None,
+            episode_opened_at: None,
+            episode_incident_id: None,
+            recovering_since: None,
         };
         let update = apply_outcome(
             "alert-1",
@@ -747,6 +781,10 @@ mod tests {
                 groups_firing_is_lower_bound: Some(false),
                 silenced_until: Some(1_750_000_600_000_006),
                 last_notified_level: Some(AlertLevel::Warning),
+                episode_id: None,
+                episode_opened_at: None,
+                episode_incident_id: None,
+                recovering_since: None,
             }),
             transition: Some(StateTransition {
                 alert_id: "alert-1".to_string(),

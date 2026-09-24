@@ -2765,6 +2765,13 @@
         "desc": "Run when an alert fires",
         "intro": "When a linked alert fires, every downstream step receives this payload."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "Incident Event",
         "tab": "Incidents",
@@ -7413,7 +7420,12 @@
         "alertTriggerTimeSeconds": "Trigger time in epoch seconds",
         "alertTriggerTimeStr": "Trigger time, human-readable",
         "rows": "All matching rows, formatted by the row template"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds"
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -7928,7 +7940,8 @@
     "sloKind": "Condition type",
     "sloLongWindow": "Long window",
     "sloShortWindow": "Short window",
-    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "Open",

@@ -2765,6 +2765,13 @@
         "desc": "Chạy khi một cảnh báo được kích hoạt",
         "intro": "Khi một cảnh báo được liên kết kích hoạt, mọi bước hạ nguồn đều nhận được payload này."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "Sự kiện sự cố",
         "tab": "Sự cố",
@@ -7413,7 +7420,12 @@
         "alertTriggerTimeSeconds": "Thời gian kích hoạt theo epoch giây",
         "alertTriggerTimeStr": "Thời gian kích hoạt, dễ đọc cho con người",
         "rows": "Tất cả các hàng khớp, được định dạng theo mẫu hàng"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds"
     },
     "advanced": {
       "addVariable": "Thêm biến",
@@ -7928,7 +7940,8 @@
     "sloKind": "Loại điều kiện",
     "sloLongWindow": "Cửa sổ dài",
     "sloShortWindow": "Cửa sổ ngắn",
-    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây."
+    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "Mở",

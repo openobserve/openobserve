@@ -63,6 +63,10 @@ impl From<alert_states::Model> for AlertState {
             groups_firing_is_lower_bound: m.groups_firing_is_lower_bound,
             silenced_until: m.silenced_until,
             last_notified_level: m.last_notified_level.and_then(AlertLevel::from_i32),
+            episode_id: m.episode_id,
+            episode_opened_at: m.episode_opened_at,
+            episode_incident_id: m.episode_incident_id,
+            recovering_since: m.recovering_since,
         }
     }
 }
@@ -549,6 +553,10 @@ where
         groups_firing_is_lower_bound: Set(state.groups_firing_is_lower_bound),
         silenced_until: Set(state.silenced_until),
         last_notified_level: Set(state.last_notified_level.map(|l| l.to_i32())),
+        episode_id: Set(state.episode_id.clone()),
+        episode_opened_at: Set(state.episode_opened_at),
+        episode_incident_id: Set(state.episode_incident_id.clone()),
+        recovering_since: Set(state.recovering_since),
     };
 
     // Upsert on the composite primary key — rows are created lazily on an
@@ -856,6 +864,10 @@ mod tests {
             groups_firing_is_lower_bound: None,
             silenced_until: None,
             last_notified_level: None,
+            episode_id: None,
+            episode_opened_at: None,
+            episode_incident_id: None,
+            recovering_since: None,
         }
     }
 

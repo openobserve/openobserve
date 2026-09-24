@@ -957,6 +957,78 @@ pub async fn correlate_external_event(
 /// other `External`-kind alert already linked to that incident is also resolved
 /// in `external_alerts` — a single source clearing shouldn't close an incident
 /// that other still-firing sources are correlated into.
+/// Record that one of an incident's alerts recovered, and close the incident
+/// once they all have.
+///
+/// The measured recovery, not the staleness clock, is what should end an
+/// incident: `auto_resolve_after_minutes` only knows that nothing has fired
+/// lately, which is also true of an alert whose delivery is being suppressed.
+/// It stays as the backstop for a source that went silent entirely.
+///
+/// Deliberately narrow about which incidents close this way. One member alert
+/// recovering is not the incident being over, so every linked alert must be
+/// clear; and an incident somebody has acknowledged or assigned is theirs to
+/// close, because by then it is an organisational object with a postmortem
+/// attached, not just a correlation.
+pub async fn resolve_alert_firing(
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+) -> Result<(), anyhow::Error> {
+    let Some(incident_id) = event.incident_id.as_deref() else {
+        return Ok(());
+    };
+    infra::table::alert_incidents::resolve_alert_firings(
+        incident_id,
+        &event.alert_id,
+        event.recovered_at,
+    )
+    .await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_resolve_alert(
+            &event.org_id,
+            incident_id,
+            &event.alert_id,
+            event.recovered_at,
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish incident resolve_alert: {e}");
+    }
+
+    let Some(incident) = infra::table::alert_incidents::get(&event.org_id, incident_id).await?
+    else {
+        return Ok(());
+    };
+    if incident.status == "resolved" {
+        return Ok(());
+    }
+    if incident.acknowledged_by.is_some() || incident.assigned_to.is_some() {
+        return Ok(());
+    }
+
+    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+    if links.is_empty() || links.iter().any(|l| l.resolved_at.is_none()) {
+        return Ok(());
+    }
+
+    update_status(
+        &event.org_id,
+        incident_id,
+        "resolved",
+        "system@openobserve.ai",
+    )
+    .await?;
+    log::info!(
+        "[incidents] Auto-resolved incident {incident_id} — all {} contributing alert(s) recovered",
+        links.len()
+    );
+    Ok(())
+}
+
 pub async fn try_auto_resolve_incident_for_external_alert(
     org_id: &str,
     external_alert_id: &str,

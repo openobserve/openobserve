@@ -2765,6 +2765,13 @@
         "desc": "Esegui quando un avviso scatta",
         "intro": "Quando un avviso collegato scatta, ogni step a valle riceve questo payload."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "Evento di incidente",
         "tab": "Incidenti",
@@ -7413,7 +7420,12 @@
         "alertTriggerTimeSeconds": "Orario di attivazione in secondi epoch",
         "alertTriggerTimeStr": "Orario di attivazione, leggibile",
         "rows": "Tutte le righe corrispondenti, formattate dal modello di riga"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds"
     },
     "advanced": {
       "addVariable": "Aggiungi variabile",
@@ -7928,7 +7940,8 @@
     "sloKind": "Tipo di condizione",
     "sloLongWindow": "Finestra lunga",
     "sloShortWindow": "Finestra breve",
-    "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui."
+    "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "Apri",

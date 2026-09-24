@@ -68,16 +68,26 @@ pub fn render_pagerduty(c: &RenderedContent, ctx: &NotificationContext) -> Value
         })
         .collect();
 
-    let mut event = json!({
-        "event_action": "trigger",
-        "payload": {
-            "summary": super::clamp(&c.title, SUMMARY_MAX),
-            "source": ctx.stream_name,
-            "severity": pagerduty_severity(c.severity),
-            "custom_details": custom_details,
-        },
-        "links": links,
-    });
+    // A resolve carries the key and nothing else: PagerDuty matches it against
+    // the open alert and ignores any payload. Sent without a `dedup_key` it is
+    // dropped — with a `202 success` — so the key is the whole message.
+    let mut event = if ctx.alert_status == super::super::STATUS_RESOLVED {
+        json!({ "event_action": "resolve" })
+    } else {
+        json!({
+            "event_action": "trigger",
+            "payload": {
+                "summary": super::clamp(&c.title, SUMMARY_MAX),
+                "source": ctx.stream_name,
+                "severity": pagerduty_severity(c.severity),
+                "custom_details": custom_details,
+            },
+            "links": links,
+        })
+    };
+    if let Some(episode_id) = &ctx.episode_id {
+        event["dedup_key"] = json!(episode_id);
+    }
 
     // Metric-history chart (Events API v2 `images` array). PagerDuty fetches
     // the signed render URL when the incident is displayed; after expiry the

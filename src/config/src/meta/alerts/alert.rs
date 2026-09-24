@@ -152,6 +152,20 @@ pub struct Alert {
 
     #[serde(default)]
     pub pending_period_sec: i64,
+
+    /// Send one notification when this alert stops firing, to the destinations
+    /// the firing went to. Off by default: a recovery is a new outbound message
+    /// class, so the operator opts in, and an existing template that never
+    /// mentions `{alert_status}` would otherwise render the firing wording
+    /// twice.
+    #[serde(default)]
+    pub notify_on_recovery: bool,
+
+    /// Seconds the condition must stay clear before the episode recovers.
+    /// 0 recovers on the first clear evaluation, which is what every alert does
+    /// today. Named after Prometheus' `keep_firing_for`, with the same meaning.
+    #[serde(default)]
+    pub keep_firing_for: i64,
 }
 
 /// Accept a runbook link, or say why not.
@@ -252,6 +266,8 @@ impl Default for Alert {
             priority: None,
             tags: vec![],
             pending_period_sec: 0,
+            notify_on_recovery: false,
+            keep_firing_for: 0,
         }
     }
 }

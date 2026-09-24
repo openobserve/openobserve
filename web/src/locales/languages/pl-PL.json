@@ -2765,6 +2765,13 @@
         "desc": "Uruchom, gdy alert się wyzwoli",
         "intro": "Gdy powiązany alert się wyzwoli, każdy kolejny krok otrzyma ten ładunek."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "Zdarzenie incydentu",
         "tab": "Incydenty",
@@ -7413,7 +7420,12 @@
         "alertTriggerTimeSeconds": "Czas wyzwolenia w sekundach epoch",
         "alertTriggerTimeStr": "Czas wyzwolenia (czytelny dla człowieka)",
         "rows": "Wszystkie pasujące wiersze, sformatowane według szablonu wiersza"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds"
     },
     "advanced": {
       "addVariable": "Dodaj zmienną",
@@ -7928,7 +7940,8 @@
     "sloKind": "Typ warunku",
     "sloLongWindow": "Długie okno",
     "sloShortWindow": "Krótkie okno",
-    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować."
+    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "Otwórz",

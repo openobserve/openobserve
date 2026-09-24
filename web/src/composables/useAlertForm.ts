@@ -184,6 +184,10 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    // Off by default: a recovery is a new outbound message class, so it is opted into.
+    notify_on_recovery: false,
+    // Seconds the condition must stay clear before recovering. 0 = immediately.
+    keep_firing_for: 0,
     // Feature 2 (PT-1/PT-6). `null` (not 0) is unset — 0 is not a valid
     // priority id, and the payload layer drops null so pre-Feature-2 alerts
     // serialize unchanged.

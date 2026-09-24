@@ -2765,6 +2765,13 @@
         "desc": "当告警触发时运行",
         "intro": "当关联的告警触发时，每个下游步骤都会收到此载荷。"
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "故障事件",
         "tab": "事件",
@@ -7413,7 +7420,12 @@
         "alertTriggerTimeSeconds": "触发时间（epoch 秒）",
         "alertTriggerTimeStr": "人类可读的触发时间",
         "rows": "所有匹配行，按行模板格式化"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds"
     },
     "advanced": {
       "addVariable": "添加变量",
@@ -7928,7 +7940,8 @@
     "sloKind": "条件类型",
     "sloLongWindow": "长窗口",
     "sloShortWindow": "短窗口",
-    "sloCloneDisabled": "SLO 告警是在其 SLO 页面上创建的，因此无法从此处克隆。"
+    "sloCloneDisabled": "SLO 告警是在其 SLO 页面上创建的，因此无法从此处克隆。",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "打开",

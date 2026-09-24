@@ -30,6 +30,11 @@ pub mod render;
 pub mod resolve;
 pub mod test_send;
 
+/// `{alert_status}` while the condition holds.
+pub const STATUS_FIRING: &str = "firing";
+/// `{alert_status}` once the episode has recovered.
+pub const STATUS_RESOLVED: &str = "resolved";
+
 pub use context::{NotificationContext, build_row_columns};
 pub use custom::apply_custom_template;
 pub use format::{ChannelFormat, derive_channel_format, teams_format_for_url};

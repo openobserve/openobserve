@@ -656,6 +656,10 @@ mod tests {
             groups_firing_is_lower_bound: None,
             silenced_until,
             last_notified_level: last_notified,
+            episode_id: None,
+            episode_opened_at: None,
+            episode_incident_id: None,
+            recovering_since: None,
         }
     }
 

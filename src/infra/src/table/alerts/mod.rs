@@ -216,6 +216,9 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.runbook_url = value.runbook_url;
 
         alert.pending_period_sec = value.pending_period_sec;
+        // NULL predates the feature, which is the same as off / no hold.
+        alert.notify_on_recovery = value.notify_on_recovery.unwrap_or(false);
+        alert.keep_firing_for = value.keep_firing_for_seconds.unwrap_or(0);
 
         Ok(alert)
     }
@@ -974,6 +977,8 @@ fn update_mutable_fields(
     let updated_at: i64 = chrono::Utc::now().timestamp_micros();
     let workflows = serde_json::to_value(alert.workflows)?;
     let pending_periond_sec = alert.pending_period_sec;
+    let notify_on_recovery = alert.notify_on_recovery;
+    let keep_firing_for_seconds = alert.keep_firing_for;
 
     // Handle deduplication configuration
     // Note: time_window_minutes is stored in a separate column, not in the JSON config
@@ -1046,6 +1051,8 @@ fn update_mutable_fields(
     alert_am.creates_incident = Set(alert.creates_incident);
     alert_am.workflows = Set(workflows);
     alert_am.pending_period_sec = Set(pending_periond_sec);
+    alert_am.notify_on_recovery = Set(Some(notify_on_recovery));
+    alert_am.keep_firing_for_seconds = Set(Some(keep_firing_for_seconds));
     Ok(())
 }
 
@@ -1127,6 +1134,8 @@ pub(super) mod tests {
             creates_incident: false,
             workflows: serde_json::json!(["abc123"]),
             pending_period_sec: 0,
+            notify_on_recovery: None,
+            keep_firing_for_seconds: None,
         }
     }
 

@@ -2414,6 +2414,7 @@ impl AlertExt for Alert {
                         level,
                         actual_value,
                         group_labels,
+                        None,
                     )
                     .await,
                 );
@@ -2617,6 +2618,7 @@ async fn build_send_context(
     level: Option<config::meta::alerts::level::AlertLevel>,
     actual_value: Option<f64>,
     group_labels: Option<&std::collections::BTreeMap<String, String>>,
+    recovered_episode_id: Option<String>,
 ) -> NotificationContext {
     let org_name = if let Some(org) = ORGANIZATIONS.read().await.get(&alert.org_id) {
         org.name.clone()
@@ -2648,10 +2650,84 @@ async fn build_send_context(
             is_email: false,
             level,
             actual_value,
+            recovered_episode_id,
         },
         group_labels,
     )
     .await
+}
+
+/// Send the resolve half of a firing, to the destinations its trigger went to.
+///
+/// Destinations are not re-chosen: a resolve that lands somewhere the trigger
+/// did not is the mis-pairing PagerDuty drops and a Slack channel reads as an
+/// outage nobody reported. `skip_destinations` is therefore absent by design —
+/// the firing's ledger is about retries within one attempt, not about which
+/// destinations own this episode.
+///
+/// There are no rows: the query that would produce them no longer matches.
+/// `{alert_count}` renders 0 and `{rows}` renders empty, which is the truth.
+pub async fn send_recovery_notification(
+    alert: &Alert,
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+) -> Result<(), AlertError> {
+    let rows: Vec<Map<String, Value>> = Vec::new();
+    let mut ctx = build_send_context(
+        alert,
+        &rows,
+        event.recovered_at,
+        Some(event.opened_at),
+        event.recovered_at,
+        Some(config::meta::alerts::level::AlertLevel::Ok),
+        None,
+        None,
+        Some(event.episode_id.clone()),
+    )
+    .await;
+
+    let mut failures = String::new();
+    for dest_name in alert.destinations.iter() {
+        let (destination_type, dest_template) =
+            match destinations::get_with_template(&alert.org_id, dest_name).await {
+                Ok((dest, tpl)) => match dest.module {
+                    Module::Alert {
+                        destination_type, ..
+                    } => (destination_type, tpl),
+                    _ => continue,
+                },
+                Err(e) => {
+                    failures = format!("{failures} destination {dest_name}: {e};");
+                    continue;
+                }
+            };
+        let explicit = choose_template(
+            match alert.template.as_ref() {
+                Some(name) => db::alerts::templates::get(&alert.org_id, name).await.ok(),
+                None => None,
+            }
+            .as_ref(),
+            dest_template.as_ref(),
+        )
+        .cloned();
+        let effective = crate::alerts::notifications::org_default::resolve_effective_template(
+            &alert.org_id,
+            explicit,
+        )
+        .await;
+        if let Err(e) =
+            send_to_destination(alert, &destination_type, effective.template(), &mut ctx).await
+        {
+            failures = format!("{failures} destination {dest_name}: {e};");
+        }
+    }
+
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(AlertError::SendNotificationError {
+            error_message: failures,
+        })
+    }
 }
 
 /// Render and dispatch one notification to one destination.
@@ -3295,6 +3371,10 @@ struct ProcessTemplateOptions {
     pub level: Option<config::meta::alerts::level::AlertLevel>,
     /// Exact evaluated observation (T-9); `{alert_count}` for count alerts.
     pub actual_value: Option<f64>,
+    /// The firing episode being recovered. `Some` turns this render into the
+    /// resolve half of a pair: `{alert_status}` becomes `resolved` and the key
+    /// is what lets PagerDuty match it to the trigger it closes.
+    pub recovered_episode_id: Option<String>,
 }
 
 /// Numeric `alert_count` for workflow metadata; a workflow Branch compares it
@@ -3385,6 +3465,7 @@ async fn build_notification_context(
         is_email: _,
         level,
         actual_value,
+        recovered_episode_id,
     } = options;
     // {alert_count}: for count-family alerts, the EXACT evaluated count —
     // hybrid evaluation (§4.4c) samples only PAYLOAD_SAMPLE_ROWS rows for the
@@ -3589,6 +3670,13 @@ async fn build_notification_context(
         alert_count,
         alert_agg_value: format_agg_value(actual_value),
         alert_level: level.map(|l| l.to_string()).unwrap_or_default(),
+        alert_status: if recovered_episode_id.is_some() {
+            crate::alerts::notifications::STATUS_RESOLVED
+        } else {
+            crate::alerts::notifications::STATUS_FIRING
+        }
+        .to_string(),
+        episode_id: recovered_episode_id,
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
         alert_tags: alert.tags.join(","),
         alert_threshold_crit: fmt_observed(family_crit),
@@ -5277,6 +5365,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
 
         let result = process_dest_template(
@@ -5326,6 +5415,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
 
         let result = process_dest_template(
@@ -5369,6 +5459,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
 
         let result = process_dest_template(
@@ -5418,6 +5509,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
 
         let result = process_dest_template(
@@ -5507,6 +5599,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
 
         let result = process_dest_template(
@@ -5565,6 +5658,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
 
         let result = process_dest_template(
@@ -5610,6 +5704,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
 
         let result = process_dest_template(
@@ -6142,6 +6237,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
 
         let result = process_dest_template(
@@ -6178,6 +6274,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
 
         let result = process_dest_template(
@@ -6213,6 +6310,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: Some(48213.0), // exact COUNT(*)
+            recovered_episode_id: None,
         };
         let result = process_dest_template(
             "test_org",
@@ -6243,6 +6341,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
         let result = process_dest_template(
             "test_org",
@@ -6273,6 +6372,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
         let result = process_dest_template(
             "test_org",
@@ -6301,6 +6401,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
         let result = process_dest_template(
             "test_org",
@@ -6342,6 +6443,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: Some(91.2),
+            recovered_episode_id: None,
         };
         let result = process_dest_template(
             "test_org",
@@ -6383,6 +6485,7 @@ mod tests {
                 is_email: false,
                 level: None,
                 actual_value: None,
+                recovered_episode_id: None,
             },
             &hashbrown::HashMap::new(),
             Some(&labels),
@@ -6420,6 +6523,7 @@ mod tests {
                 is_email: false,
                 level: None,
                 actual_value: None,
+                recovered_episode_id: None,
             },
             &hashbrown::HashMap::new(),
             Some(&labels),
@@ -6460,6 +6564,7 @@ mod tests {
                 is_email: false,
                 level: None,
                 actual_value: None,
+                recovered_episode_id: None,
             },
             &hashbrown::HashMap::new(),
             Some(&labels),
@@ -6482,6 +6587,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         };
 
         let result = process_dest_template(
@@ -6539,6 +6645,7 @@ mod tests {
                 is_email: false,
                 level: None,
                 actual_value: None,
+                recovered_episode_id: None,
             },
             &hashbrown::HashMap::new(),
             None,
@@ -6610,6 +6717,7 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            recovered_episode_id: None,
         }
     }
 
