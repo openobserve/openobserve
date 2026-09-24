@@ -7425,7 +7425,8 @@
       "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
       "keepFiringFor": "Keep firing for",
       "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
-      "keepFiringForInvalid": "Enter 0 or more seconds"
+      "keepFiringForInvalid": "Enter 0 or more seconds",
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
     },
     "advanced": {
       "addVariable": "[変数を追加]",

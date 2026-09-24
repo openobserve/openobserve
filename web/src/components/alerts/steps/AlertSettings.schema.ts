@@ -109,7 +109,7 @@ export const makeKeepFiringForSchema = (t: Translator) =>
     .number({ message: t("alerts.alertSettings.keepFiringForInvalid") })
     .int({ message: t("alerts.alertSettings.keepFiringForInvalid") })
     .min(0, { message: t("alerts.alertSettings.keepFiringForInvalid") })
-    .max(86400, { message: t("alerts.alertSettings.keepFiringForInvalid") })
+    .max(86400, { message: t("alerts.alertSettings.keepFiringForTooLong") })
     .optional();
 
 /**
@@ -160,6 +160,8 @@ export const createAlertSettingsSchema = (
     destinations: allowWorkflows ? z.array(z.string()).optional() : makeDestinationsSchema(t),
     workflows: z.array(z.string()).optional(),
     creates_incident: alertSettingsCreatesIncidentSchema,
+    notify_on_recovery: alertSettingsNotifyOnRecoverySchema,
+    keep_firing_for: makeKeepFiringForSchema(t),
   });
 
   if (!allowWorkflows) return base;

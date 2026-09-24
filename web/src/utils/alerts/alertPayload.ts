@@ -167,6 +167,11 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
 
+  // A `type="number"` input hands back a STRING, and the API takes an i64 — an
+  // uncoerced "60" is rejected by serde before any validation runs, so the user
+  // sees a deserialization error instead of the field's own rule.
+  payload.keep_firing_for = parseInt(formData.keep_firing_for as any, 10) || 0;
+
   // Minutes on the form, seconds on the wire. Forced to 0 for realtime even
   // though the field is unreachable in that template — same belt-and-suspenders
   // as the warning_threshold strip below, in case a stale value survives a

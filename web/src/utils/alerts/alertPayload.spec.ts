@@ -138,6 +138,25 @@ describe("alertPayload", () => {
       expect(typeof payload.trigger_condition.threshold).toBe("number");
     });
 
+    it("coerces keep_firing_for, which the number input hands back as a string", () => {
+      // An uncoerced "60" is refused by serde before the field's own 0..=86400
+      // rule runs, so the user sees a deserialization error instead of the cap.
+      const formData: any = createBaseFormData();
+      formData.keep_firing_for = "60";
+
+      const payload = getAlertPayload(formData, createBaseContext());
+
+      expect(payload.keep_firing_for).toBe(60);
+      expect(typeof payload.keep_firing_for).toBe("number");
+    });
+
+    it("sends 0 for keep_firing_for when the field was never touched", () => {
+      const formData: any = createBaseFormData();
+      delete formData.keep_firing_for;
+
+      expect(getAlertPayload(formData, createBaseContext()).keep_firing_for).toBe(0);
+    });
+
     it("should trim the description", () => {
       const formData = createBaseFormData();
       const context = createBaseContext();
