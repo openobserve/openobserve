@@ -44,6 +44,17 @@ const test = baseTest.extend({
         });
       }
       
+      // A storageState older than a day makes the cloud day-2 Slack invite modal open on every page load.
+      await context.addInitScript(() => {
+        try {
+          for (const key of Object.keys(localStorage)) {
+            if (key.startsWith('slackCommunityInvite:')) {
+              localStorage.setItem(key, JSON.stringify({ status: 'resolved', shownAt: null, dismissCount: 0 }));
+            }
+          }
+        } catch (_) {}
+      });
+
       // Add coverage collection (from original baseFixtures)
       await context.addInitScript(() =>
         window.addEventListener('beforeunload', () => {

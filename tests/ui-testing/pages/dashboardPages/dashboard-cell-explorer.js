@@ -249,12 +249,17 @@ export default class DashboardCellExplorerPage {
     await expect(this.detailPrevBtn).toBeDisabled({ timeout: 10000 });
   }
 
+  // The spec reads the counter with a non-retrying assertion right after the click.
   async clickNext() {
+    const before = await this.getPositionCurrent();
     await this.detailNextBtn.click();
+    await expect.poll(() => this.getPositionCurrent(), { timeout: 10000 }).toBe(before + 1);
   }
 
   async clickPrev() {
+    const before = await this.getPositionCurrent();
     await this.detailPrevBtn.click();
+    await expect.poll(() => this.getPositionCurrent(), { timeout: 10000 }).toBe(before - 1);
   }
 
   // ── Shareable URL / copy-link ────────────────────────────────────────────
