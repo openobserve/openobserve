@@ -35,15 +35,32 @@ def _upload(session, base_url, data: bytes, filename: str):
     )
 
 
+def _listed_count(session, base_url) -> int:
+    r = session.get(f"{base_url}api/{ORG_ID}/sourcemaps")
+    if r.status_code != 200:
+        return -1
+    body = r.json()
+    rows = body if isinstance(body, list) else body.get("data", body.get("list", []))
+    return len(rows) if isinstance(rows, list) else -1
+
+
 def test_zip_without_any_sourcemap_is_rejected(create_session, base_url):
     session = create_session
     data = _zip({"README.txt": "no maps here", "notes/other.md": "# nothing"})
+    before = _listed_count(session, base_url)
     resp = _upload(session, base_url, data, f"nomaps_{uuid.uuid4().hex[:6]}.zip")
     logger.info("no-sourcemap ZIP answered %s: %s", resp.status_code, resp.text[:160])
 
     # Reporting success for a ZIP with nothing usable inside was the defect.
     assert resp.status_code >= 400, \
         f"a ZIP with no sourcemap must be rejected, got {resp.status_code}: {resp.text[:300]}"
+    assert "sourcemap" in resp.text.lower(), \
+        f"the error should say what was missing, got {resp.text[:300]}"
+
+    # A status alone would not catch a build that errored yet still stored something.
+    after = _listed_count(session, base_url)
+    assert after == before, \
+        f"a rejected upload must store nothing: sourcemap count went {before} -> {after}"
 
 
 def test_zip_with_a_valid_sourcemap_is_accepted(create_session, base_url):
@@ -54,8 +71,14 @@ def test_zip_with_a_valid_sourcemap_is_accepted(create_session, base_url):
         '"names":[],"mappings":"AAAA","sourcesContent":["console.log(1)"]}'
     )
     data = _zip({"app.min.js.map": smap, "app.min.js": "console.log(1)\n"})
+    before = _listed_count(session, base_url)
     resp = _upload(session, base_url, data, f"withmap_{uuid.uuid4().hex[:6]}.zip")
     logger.info("valid ZIP answered %s: %s", resp.status_code, resp.text[:160])
 
     assert resp.status_code < 400, \
         f"a ZIP containing a real sourcemap must be accepted, got {resp.status_code}: {resp.text[:300]}"
+
+    # Accepting and then storing nothing would be the same failure wearing a 2xx.
+    after = _listed_count(session, base_url)
+    assert after > before, \
+        f"an accepted upload must store the map: sourcemap count went {before} -> {after}"

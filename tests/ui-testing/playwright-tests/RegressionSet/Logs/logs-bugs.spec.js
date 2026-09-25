@@ -1978,7 +1978,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     tag: ['@bug-13990', '@P1', '@regression', '@logsRegression', '@savedViews', '@queryBuilder']
   }, async ({ page }) => {
     testLogger.info('Test: Builder saved view restores its own stream (Bug #13990)');
-    test.setTimeout(180000);
 
     const savedViewName = `streamslog_build_13990_${Date.now()}`;
     const otherStream = 'e2e_13990_other_' + Math.random().toString(36).slice(2, 7);
@@ -1994,7 +1993,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.goto(`${logData.logsUrl}?org_identifier=${orgId}`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
-    await page.waitForTimeout(1000);
+    await pm.logsPage.expectLogsSearchIndexListContainsText('e2e_automate');
 
     await createBuilderSavedView(pm, page, savedViewName, 'line');
 
