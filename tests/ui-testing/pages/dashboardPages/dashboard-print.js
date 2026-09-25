@@ -1,5 +1,7 @@
 // Dashboard Print Layout page object — print mode entry/exit + layout state.
 const { expect } = require("@playwright/test");
+const { gotoWithRetry } = require("../../playwright-tests/utils/navigation.js");
+const { getOrgIdentifier } = require("../../playwright-tests/utils/cloud-auth.js");
 
 export default class DashboardPrintPage {
   constructor(page) {
@@ -22,9 +24,14 @@ export default class DashboardPrintPage {
   }
 
   async navigateToDashboardView(dashboardId, folderId, print = false) {
-    let url = `${process.env.ZO_BASE_URL}/web/dashboards/view?org_identifier=${process.env.ORGNAME}&dashboard=${dashboardId}&folder=${folderId}`;
+    let url = `${process.env.ZO_BASE_URL}/web/dashboards/view?org_identifier=${getOrgIdentifier()}&dashboard=${dashboardId}&folder=${folderId}`;
     if (print) url += "&print=true";
-    await this.page.goto(url, { waitUntil: "domcontentloaded" });
+    await gotoWithRetry(this.page, url, { waitUntil: "domcontentloaded" });
+  }
+
+  // Re-navigating to the current URL is a reload that survives transient network blips.
+  async reload() {
+    await gotoWithRetry(this.page, this.page.url(), { waitUntil: "domcontentloaded" });
   }
 
   async clickPrintButton() {

@@ -15,7 +15,6 @@ const testLogger = require("../utils/test-logger.js");
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager.js";
 import { waitForDashboardPage, deleteDashboard, addSimplePanel } from "./utils/dashCreation.js";
-import { trackPanelReload, waitForAllPanelsToLoad } from "../utils/variable-helpers.js";
 const { safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 
 /**
@@ -43,7 +42,7 @@ async function createLoadedDashboardWithPanel(page, pm, suffix) {
   await pm.dashboardVariablesScoped.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
   await pm.dashboardVariablesScoped.waitForDashboardReady();
   await safeWaitForNetworkIdle(page, { timeout: 5000 });
-  await waitForAllPanelsToLoad(page, 1);
+  await pm.dashboardVariablesScoped.waitForPanelIdle("Panel1");
 
   return dashboardName;
 }
@@ -86,6 +85,7 @@ test.describe("Dashboard Refresh Without Cache testcases", () => {
 
       // Close before the helper reopens it — Reka UI dropdowns close on Escape.
       await page.keyboard.press("Escape");
+      await expect(item).toBeHidden();
 
       const requestUrl =
         await pm.dashboardVariablesScoped.clickRefreshWithoutCacheAndWaitForClearCache();
@@ -94,7 +94,7 @@ test.describe("Dashboard Refresh Without Cache testcases", () => {
         "dashboard-wide Refresh Cache & Reload must bypass the cache (clear_cache=true)"
       ).toBe("true");
 
-      await waitForAllPanelsToLoad(page, 1);
+      await pm.dashboardVariablesScoped.waitForPanelIdle("Panel1");
 
       await cleanupDashboard(page, pm, dashboardName);
       testLogger.info("Test completed");
@@ -115,7 +115,7 @@ test.describe("Dashboard Refresh Without Cache testcases", () => {
         "panel-level Refresh Cache & Reload must bypass the cache (clear_cache=true)"
       ).toBe("true");
 
-      await waitForAllPanelsToLoad(page, 1);
+      await pm.dashboardVariablesScoped.waitForPanelIdle("Panel1");
 
       await cleanupDashboard(page, pm, dashboardName);
       testLogger.info("Test completed");
@@ -135,7 +135,7 @@ test.describe("Dashboard Refresh Without Cache testcases", () => {
         "standard Refresh must NOT bypass the cache (clear_cache absent)"
       ).toBeNull();
 
-      await waitForAllPanelsToLoad(page, 1);
+      await pm.dashboardVariablesScoped.waitForPanelIdle("Panel1");
 
       await cleanupDashboard(page, pm, dashboardName);
       testLogger.info("Test completed");
@@ -165,30 +165,28 @@ test.describe("Dashboard Refresh Without Cache testcases", () => {
       await pm.dashboardPanelActions.savePanel();
 
       await pm.dashboardVariablesScoped.getAnyPanel(1).waitFor({ state: "visible", timeout: 15000 });
-      await waitForAllPanelsToLoad(page, 2);
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
+      // A still-loading sibling would leak its initial query into the capture window.
+      await pm.dashboardVariablesScoped.waitForPanelIdle("Panel1");
+      await pm.dashboardVariablesScoped.waitForPanelIdle("Panel2");
+      const panelId2 = await pm.dashboardVariablesScoped
+        .getPanelContainerByTitle("Panel2")
+        .getAttribute("data-test-panel-id");
 
-      const reloadTracker = trackPanelReload(
-        page,
-        panelId1,
-        async () => {
-          await pm.dashboardVariablesScoped.clickPanelRefreshWithoutCacheAndWaitForClearCache(
-            "Panel1"
-          );
-        },
-        15000
-      );
+      const queriedPanelIds = await pm.dashboardVariablesScoped.capturePanelQueryIds(async () => {
+        await pm.dashboardVariablesScoped.clickPanelRefreshWithoutCacheAndWaitForClearCache("Panel1");
+        await pm.dashboardVariablesScoped.waitForPanelIdle("Panel1");
+      });
 
-      const result = await reloadTracker;
-      expect(result.reloaded, "Panel1 must re-query after its cache reload").toBe(true);
+      expect(queriedPanelIds, "Panel1 must re-query after its cache reload").toContain(panelId1);
       expect(
-        result.queryCount,
+        queriedPanelIds,
+        "panel-level cache refresh must not re-query Panel2"
+      ).not.toContain(panelId2);
+      expect(
+        [...new Set(queriedPanelIds)],
         "panel-level cache refresh must re-query only the target panel"
-      ).toBe(1);
-      expect(
-        result.calls[0]?.url,
-        "the re-queried panel must be Panel1 (request URL must carry panel_id=<Panel1 id>)"
-      ).toContain(`panel_id=${panelId1}`);
+      ).toEqual([panelId1]);
 
       await cleanupDashboard(page, pm, dashboardName);
       testLogger.info("Test completed");
