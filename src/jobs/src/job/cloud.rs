@@ -15,15 +15,22 @@
 
 use std::collections::HashMap;
 
+use common::meta::organization::BudgetNotificationConfiguration;
 use config::{
-    meta::{destinations::Email, self_reporting::usage::USAGE_STREAM},
+    meta::{
+        destinations::Email,
+        self_reporting::usage::{DATA_RETENTION_USAGE_STREAM, USAGE_STREAM},
+        user::UserRole,
+    },
     utils::{
         json,
         time::{hour_micros, now_micros},
     },
 };
+use db::{org_users::list_users_by_org, organization::get_org_setting};
 use hashbrown::HashSet;
 use infra::table::org_users::get_admin;
+use o2_enterprise::enterprise::cloud::billings::{MeteringDetail, MeteringProvider};
 use stream::get_streams;
 
 use crate::{
@@ -52,12 +59,44 @@ const EXPIRY_WARNING_STAGES: &[(
     &[(1, OneDay), (7, SevenDay), (30, ThirtyDay)]
 };
 
+const BUDGET_WARNING_INTERVAL: u64 = 3600;
+
+macro_rules! calculate_subcost {
+    ($total:ident, $events:ident, $name:literal, $field:expr) => {
+        if let Some(amt) = $events.get($name) {
+            let mut base = (*amt / $field.unit_divisor) * $field.base_cost;
+            if let Some(discount) = $field.percent_discount
+                && discount > 0.0
+            {
+                base = base * (100.0 - discount) / 100.;
+            }
+            $total += base;
+        }
+    };
+    ($total:ident, $amt:expr, $field:expr) => {
+        let mut base = ($amt / $field.unit_divisor) * $field.base_cost;
+        if let Some(discount) = $field.percent_discount
+            && discount > 0.0
+        {
+            base = base * (100.0 - discount) / 100.;
+        }
+        $total += base;
+    };
+}
+
+#[derive(serde::Deserialize)]
+struct UsageRecords {
+    event: String,
+    size: f64,
+}
+
 pub fn start() {
     tokio::spawn(async move { run_no_ingestion_period().await });
     tokio::spawn(async move { run_no_ingestion_daily().await });
     tokio::spawn(async move { run_org_expiry_daily().await });
     tokio::spawn(async move { run_ai_quota_check().await });
     tokio::spawn(async move { run_external_contract_expiry_check().await });
+    tokio::spawn(async move { run_budget_warning_emails().await });
 }
 
 /// Start trial quota background jobs (flush + cluster sync).
@@ -578,6 +617,281 @@ fn find_pending_expiry_stage(
             days_remaining <= *threshold && current_stage.is_none_or(|s| s < *stage)
         })
         .map(|(_, stage)| *stage)
+}
+
+async fn run_budget_warning_emails() {
+    let mut interval =
+        tokio::time::interval(tokio::time::Duration::from_secs(BUDGET_WARNING_INTERVAL));
+    loop {
+        // we will skip first tick, which is ok, and we anyways want this at top, so we can continue
+        // from the loop
+        interval.tick().await;
+        let now = now_micros();
+        log::info!("starting budget warning emails checks at {now}");
+        let billed_orgs =
+            match o2_enterprise::enterprise::cloud::customer_billings::list_customer_billings()
+                .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "error getting customer billings list : {e}, skipping {now} iteration"
+                    );
+                    continue;
+                }
+            };
+        let stripe_orgs: Vec<_> = billed_orgs
+            .into_iter()
+            .filter(|v| v.provider == MeteringProvider::Stripe)
+            .collect();
+        for org in stripe_orgs {
+            let settings = match get_org_setting(&org.org_id).await {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "error getting settings for org {} for budget warning, skipping : {e}",
+                        org.org_id
+                    );
+                    continue;
+                }
+            };
+            if !settings.budget_config.is_empty() {
+                if let Err(e) =
+                    send_budget_warning_emails(&org.org_id, settings.budget_config).await
+                {
+                    log::error!(
+                        "error in sending warning emails for budget config for org {} : {e}",
+                        org.org_id
+                    );
+                }
+            }
+        }
+    }
+}
+
+async fn send_budget_warning_emails(
+    org_id: &str,
+    config: Vec<BudgetNotificationConfiguration>,
+) -> Result<(), anyhow::Error> {
+    let member_orgs =
+        o2_enterprise::enterprise::cloud::billing_group::list_billing_group_members_of(org_id)
+            .await?;
+
+    let upcoming_invoice =
+        o2_enterprise::enterprise::cloud::billings::get_upcoming_invoice_details(org_id).await?;
+
+    let member_orgs: HashSet<_> = member_orgs.into_iter().map(|v| v.member_org_id).collect();
+    let allowed_configs: Vec<_> = config
+        .into_iter()
+        .filter(|v| {
+            let allowed = v.org_id == org_id || member_orgs.contains(&v.org_id);
+            if !allowed {
+                log::warn!(
+                    "skipping org {} for org {}, as not a member nor the same org",
+                    v.org_id,
+                    org_id
+                );
+            }
+            allowed
+        })
+        .collect();
+
+    let own_config = allowed_configs.iter().filter(|v| v.org_id == org_id).next();
+    let child_configs: Vec<_> = allowed_configs
+        .iter()
+        .filter(|v| v.org_id != org_id)
+        .collect();
+
+    let start_str = chrono::DateTime::from_timestamp_micros(upcoming_invoice.cycle_start)
+        .unwrap()
+        .to_utc()
+        .to_rfc2822();
+    let end_str = chrono::DateTime::from_timestamp_micros(upcoming_invoice.cycle_end)
+        .unwrap()
+        .to_utc()
+        .to_rfc2822();
+
+    if let Some(own) = own_config
+        && !own.paused
+    {
+        if own.warn_at_amount <= upcoming_invoice.total_cost {
+            send_warning_email(
+                org_id,
+                None,
+                &start_str,
+                &end_str,
+                own.total_budget_amount,
+                own.warn_at_amount,
+                upcoming_invoice.total_cost,
+            )
+            .await?;
+        }
+    }
+
+    for child_config in child_configs {
+        if child_config.paused {
+            continue;
+        }
+
+        let res = get_usage(
+            format!("select sum(size) as size, event from \"{USAGE_STREAM}\" where org_id='{}' group by event",child_config.org_id),
+            upcoming_invoice.cycle_start * 1_000_000,
+            upcoming_invoice.cycle_end * 1_000_000,
+            false,
+        )
+        .await?;
+
+        let res: Vec<_> = res
+            .into_iter()
+            .map(|v| serde_json::from_value::<UsageRecords>(v))
+            .collect::<Result<Vec<_>, _>>()?;
+        let event_map: HashMap<_, _> = res.into_iter().map(|v| (v.event, v.size)).collect();
+
+        let retention = get_usage(
+            format!(
+                "select sum(mb_hours) as size, 'retention' as event from \"{DATA_RETENTION_USAGE_STREAM}\" where org_id='{}'", 
+                child_config.org_id
+            ),
+        upcoming_invoice.cycle_start,
+        upcoming_invoice.cycle_end,
+        false
+        ).await?;
+
+        let retention: Vec<_> = retention
+            .into_iter()
+            .map(|v| serde_json::from_value::<UsageRecords>(v))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let retention_amt = match retention.get(0) {
+            Some(v) => v.size,
+            None => {
+                log::warn!(
+                    "no retention record found for org {} child of org {} for budget notification, marking as 0",
+                    child_config.org_id,
+                    org_id
+                );
+                0.0
+            }
+        };
+
+        let total_cost = calculate_total_cost(event_map, &upcoming_invoice, retention_amt);
+
+        if child_config.warn_at_amount <= total_cost {
+            send_warning_email(
+                org_id,
+                Some(&child_config.org_id),
+                &start_str,
+                &end_str,
+                child_config.total_budget_amount,
+                child_config.warn_at_amount,
+                total_cost,
+            )
+            .await?;
+        }
+    }
+
+    Ok(())
+}
+
+fn calculate_total_cost(
+    events: HashMap<String, f64>,
+    cost_details: &MeteringDetail,
+    retention_amt: f64,
+) -> f64 {
+    let mut total_cost = 0.0;
+
+    calculate_subcost!(total_cost, events, "Ingestion", cost_details.ingestion);
+    calculate_subcost!(total_cost, events, "Search", cost_details.query);
+    calculate_subcost!(total_cost, events, "Pipeline", cost_details.pipeline);
+    calculate_subcost!(
+        total_cost,
+        events,
+        "RemotePipeline",
+        cost_details.remote_pipeline
+    );
+    calculate_subcost!(total_cost, retention_amt, cost_details.retention);
+    calculate_subcost!(total_cost, events, "AiCredits", cost_details.ai);
+    calculate_subcost!(
+        total_cost,
+        events,
+        "SyntheticsBrowserSteps",
+        cost_details.synthetics_browser
+    );
+    calculate_subcost!(
+        total_cost,
+        events,
+        "SyntheticsProtocolSteps",
+        cost_details.synthetics_protocol
+    );
+
+    total_cost
+}
+
+async fn send_warning_email(
+    org_id: &str,
+    child_org: Option<&str>,
+    cycle_start: &str,
+    cycle_end: &str,
+    total: f64,
+    warn: f64,
+    actual: f64,
+) -> Result<(), anyhow::Error> {
+    let admins = list_users_by_org(org_id)
+        .await?
+        .into_iter()
+        .filter(|v| matches!(v.role, UserRole::Admin))
+        .map(|v| v.email)
+        .collect();
+
+    let email = Email { recipients: admins };
+
+    let subject = format!(
+        "Openobserve Cloud: Budget Warning notification for {} org",
+        child_org.unwrap_or(org_id)
+    );
+    let body = format!(
+        r#"Hello,
+    This is a notification email based on configured cost budget for org id <b>{}</b>.
+    You have configured a total budget of <b>${}</b>, with warning starting at </b>${}</b> or <b>{:.2}%<b>.
+    The org has reached estimated cost of <b>${}</b> or <b>{:.2}%</b> of the total budget, exceeding the warning level.
+    These amounts are for current billing cycle ranging from <b>{}</b> (UTC) to <b>{}</b> (UTC).
+
+    These notifications will now continue till end of the cycle, and you can pause them from the Budget tab of the Usage section in Openobserve Cloud.
+
+    Regards,"#,
+        child_org.unwrap_or(org_id),
+        total,
+        warn,
+        (warn / total) * 100.0,
+        actual,
+        (actual / total) * 100.0,
+        cycle_start,
+        cycle_end
+    );
+
+    match openobserve_core::alerts::alert::send_email_notification(
+        &subject,
+        &email,
+        body.clone(),
+        body,
+    )
+    .await
+    {
+        Ok(_) => {
+            log::info!(
+                "budget warning notification successfully sent for {} (via org {org_id})",
+                child_org.unwrap_or(org_id)
+            );
+        }
+        Err(e) => {
+            log::error!(
+                "error sending budget notification for {} (via org {org_id}) : {e}",
+                child_org.unwrap_or(org_id)
+            );
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
