@@ -336,7 +336,8 @@ import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatInZone, formatMinuteOfDay, MINUTES_PER_DAY, rotationMembers } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
-import usersService from "@/services/users";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgUsersQuery } from "@/services/users.queries";
 
 const props = withDefaults(
   defineProps<{
@@ -399,8 +400,7 @@ function nameOf(email: string): string {
 onMounted(async () => {
   try {
     const orgId = store.state.selectedOrganization.identifier;
-    const res = await usersService.orgUsers(orgId);
-    orgUsers.value = res.data?.data ?? [];
+    orgUsers.value = await queryClient.fetchQuery(orgUsersQuery(orgId));
   } catch {
     // Labels fall back to the raw email, which is what they showed before.
     orgUsers.value = [];

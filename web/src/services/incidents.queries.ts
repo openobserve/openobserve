@@ -25,6 +25,13 @@ export const incidentsQuery = (org: string, status: string, limit: number, offse
     staleTime: LIVE_STALE_TIME,
   });
 
+export const incidentQuery = (org: string, id: string) =>
+  queryOptions({
+    queryKey: incidentKeys.detail(org, id),
+    queryFn: async () => (await incidents.get(org, id)).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 /** Dropping the scope is what repaints the list: its `shouldRefresh` store flag only lands on a remount, which the drawer's back button often skips. */
