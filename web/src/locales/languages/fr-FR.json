@@ -2133,7 +2133,6 @@
     "userName": "Nom d'utilisateur",
     "searchRole": "Rôle de recherche",
     "searchGroup": "Groupe de recherche",
-    "object": "Objet",
     "serviceAccounts": "Comptes de service",
     "ingestionTokens": "Jetons d'ingestion",
     "syntheticsTokens": "Jetons de synthèse",
@@ -2331,16 +2330,6 @@
       "bulkDeletePartial": "{count} rôle supprimé. Échec de la suppression de {unsuccessful}. | {count} rôles supprimés. Échec de la suppression de {unsuccessful}.",
       "bulkDeleteFailed": "Échec de la suppression de {count} rôle(s)",
       "bulkDeleteRolesError": "Erreur lors de la suppression des rôles"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "Aucune permission sélectionnée",
-      "loadingResources": "Chargement des ressources...",
-      "showing": "Affichage",
-      "top50": "Top 50",
-      "resourcesSearchHint": "ressources (Rechercher pour obtenir une ressource spécifique)",
-      "noResourcesPresent": "Aucune ressource présente",
-      "objectResource": "Ressource",
-      "objectType": "Type"
     },
     "addUser": {
       "passwordChanged": "Mot de passe modifié",

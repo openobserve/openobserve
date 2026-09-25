@@ -2133,7 +2133,6 @@
     "userName": "Kullanıcı Adı",
     "searchRole": "Arama Rolü",
     "searchGroup": "Arama Grubu",
-    "object": "Nesne",
     "serviceAccounts": "Hizmet Hesapları",
     "ingestionTokens": "Yutma Jetonları",
     "syntheticsTokens": "Sentetik Token'lar",
@@ -2331,16 +2330,6 @@
       "bulkDeletePartial": "{count} rol silindi. {unsuccessful} silinemedi. | {count} rol silindi. {unsuccessful} silinemedi.",
       "bulkDeleteFailed": "{count} rol silinemedi",
       "bulkDeleteRolesError": "Roller silinirken hata oluştu"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "İzin Seçilmedi",
-      "loadingResources": "Kaynaklar Yükleniyor...",
-      "showing": "Gösteriliyor",
-      "top50": "İlk 50",
-      "resourcesSearchHint": "kaynak (Belirli kaynağı bulmak için arayın)",
-      "noResourcesPresent": "Kaynak Yok",
-      "objectResource": "Kaynak",
-      "objectType": "Tür"
     },
     "addUser": {
       "passwordChanged": "Şifre Değiştirildi",

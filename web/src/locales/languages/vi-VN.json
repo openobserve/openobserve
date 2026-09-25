@@ -2133,7 +2133,6 @@
     "userName": "Tên người dùng",
     "searchRole": "Tìm kiếm vai trò",
     "searchGroup": "Tìm kiếm nhóm người dùng",
-    "object": "Đối tượng",
     "serviceAccounts": "Tài khoản dịch vụ",
     "ingestionTokens": "Token nạp dữ liệu",
     "syntheticsTokens": "Mã thông báo Synthetics",
@@ -2331,16 +2330,6 @@
       "bulkDeletePartial": "Đã xóa {count} vai trò. Không xóa được {unsuccessful}. | Đã xóa {count} vai trò. Không xóa được {unsuccessful}.",
       "bulkDeleteFailed": "Không thể xóa {count} vai trò",
       "bulkDeleteRolesError": "Lỗi khi xóa các vai trò"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "Chưa chọn quyền nào",
-      "loadingResources": "Đang tải tài nguyên...",
-      "showing": "Hiển thị",
-      "top50": "50 đầu",
-      "resourcesSearchHint": "tài nguyên (Tìm kiếm để lấy tài nguyên cụ thể)",
-      "noResourcesPresent": "Không có tài nguyên nào",
-      "objectResource": "Tài nguyên",
-      "objectType": "Loại"
     },
     "addUser": {
       "passwordChanged": "Mật khẩu đã thay đổi",

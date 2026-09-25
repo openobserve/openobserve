@@ -2133,7 +2133,6 @@
     "userName": "사용자 이름",
     "searchRole": "검색 역할",
     "searchGroup": "검색 그룹",
-    "object": "오브젝트",
     "serviceAccounts": "서비스 계정",
     "ingestionTokens": "인제스트 토큰",
     "syntheticsTokens": "Synthetics 토큰",
@@ -2331,16 +2330,6 @@
       "bulkDeletePartial": "{count}개 역할을 삭제했습니다. {unsuccessful}개 삭제에 실패했습니다. | {count}개 역할을 삭제했습니다. {unsuccessful}개 삭제에 실패했습니다.",
       "bulkDeleteFailed": "{count}개의 역할 삭제 실패",
       "bulkDeleteRolesError": "역할 삭제 중 오류 발생"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "선택된 권한 없음",
-      "loadingResources": "리소스 로드 중...",
-      "showing": "표시 중",
-      "top50": "상위 50개",
-      "resourcesSearchHint": "리소스 (검색하여 특정 리소스 찾기)",
-      "noResourcesPresent": "리소스 없음",
-      "objectResource": "리소스",
-      "objectType": "유형"
     },
     "addUser": {
       "passwordChanged": "비밀번호 변경됨",

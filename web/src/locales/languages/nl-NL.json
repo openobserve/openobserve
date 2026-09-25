@@ -2133,7 +2133,6 @@
     "userName": "Gebruikersnaam",
     "searchRole": "Zoekrol",
     "searchGroup": "Zoekgroep",
-    "object": "Voorwerp",
     "serviceAccounts": "Serviceaccounts",
     "ingestionTokens": "Tokens voor inname",
     "syntheticsTokens": "Synthetics-tokens",
@@ -2331,16 +2330,6 @@
       "bulkDeletePartial": "{count} rol verwijderd. {unsuccessful} niet verwijderd. | {count} rollen verwijderd. {unsuccessful} niet verwijderd.",
       "bulkDeleteFailed": "Niet gelukt om {count} rol(len) te verwijderen",
       "bulkDeleteRolesError": "Fout bij het verwijderen van rollen"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "Geen machtigingen geselecteerd",
-      "loadingResources": "Resources laden...",
-      "showing": "Toont",
-      "top50": "Top 50",
-      "resourcesSearchHint": "resources (Zoek om specifieke resource te krijgen)",
-      "noResourcesPresent": "Geen resources aanwezig",
-      "objectResource": "Resource",
-      "objectType": "Type"
     },
     "addUser": {
       "passwordChanged": "Wachtwoord gewijzigd",

@@ -2133,7 +2133,6 @@
     "userName": "用户名",
     "searchRole": "搜索角色",
     "searchGroup": "搜索组",
-    "object": "对象",
     "serviceAccounts": "服务账号",
     "ingestionTokens": "写入令牌",
     "syntheticsTokens": "Synthetics 令牌",
@@ -2331,16 +2330,6 @@
       "bulkDeletePartial": "已删除 {count} 个角色，{unsuccessful} 个删除失败。 | 已删除 {count} 个角色，{unsuccessful} 个删除失败。",
       "bulkDeleteFailed": "未能删除{count}个角色",
       "bulkDeleteRolesError": "删除角色时出错"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "未选择权限",
-      "loadingResources": "正在加载资源...",
-      "showing": "显示",
-      "top50": "前50",
-      "resourcesSearchHint": "资源（搜索以获取特定资源）",
-      "noResourcesPresent": "没有可用资源",
-      "objectResource": "资源",
-      "objectType": "类型"
     },
     "addUser": {
       "passwordChanged": "密码已更改",

@@ -2133,7 +2133,6 @@
     "userName": "Nome utente",
     "searchRole": "Ruolo di ricerca",
     "searchGroup": "Cerca gruppo utenti",
-    "object": "Oggetto",
     "serviceAccounts": "Account di servizio",
     "ingestionTokens": "Token di ingestione",
     "syntheticsTokens": "Token sintetici",
@@ -2331,16 +2330,6 @@
       "bulkDeletePartial": "Eliminato {count} ruolo. Impossibile eliminare {unsuccessful}. | Eliminati {count} ruoli. Impossibile eliminare {unsuccessful}.",
       "bulkDeleteFailed": "Impossibile eliminare {count} ruolo/i",
       "bulkDeleteRolesError": "Errore durante l'eliminazione dei ruoli"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "Nessun permesso selezionato",
-      "loadingResources": "Caricamento risorse...",
-      "showing": "Mostrando",
-      "top50": "Top 50",
-      "resourcesSearchHint": "risorse (Cerca per ottenere una risorsa specifica)",
-      "noResourcesPresent": "Nessuna risorsa presente",
-      "objectResource": "Risorsa",
-      "objectType": "Tipo"
     },
     "addUser": {
       "passwordChanged": "Password modificata",
