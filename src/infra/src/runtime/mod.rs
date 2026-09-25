@@ -56,6 +56,9 @@ pub static DATAFUSION_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
             .thread_name("datafusion_runtime")
             .thread_stack_size(THREAD_STACK_SIZE)
             .worker_threads(get_config().limit.cpu_num)
+            .max_blocking_threads(config::config::default_blocking_worker_num(
+                get_config().limit.cpu_num,
+            ))
             .enable_all()
             .build()
             .unwrap(),
@@ -88,6 +91,7 @@ pub static WAL_RUNTIME: Lazy<Option<Arc<Runtime>>> = Lazy::new(|| {
         .thread_name("wal-runtime")
         .thread_stack_size(THREAD_STACK_SIZE)
         .worker_threads(thread_num)
+        .max_blocking_threads(config::config::default_blocking_worker_num(total_cpus))
         .enable_all()
         .build()
         .ok()

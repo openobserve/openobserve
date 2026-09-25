@@ -52,6 +52,9 @@ pub static VORTEX_RUNTIME: LazyLock<Arc<Runtime>> = LazyLock::new(|| {
         tokio::runtime::Builder::new_multi_thread()
             .thread_name("vortex_runtime")
             .worker_threads(config::get_config().limit.vortex_thread_num)
+            .max_blocking_threads(config::config::default_blocking_worker_num(
+                config::get_config().limit.cpu_num,
+            ))
             .thread_stack_size(16 * 1024 * 1024)
             .enable_all()
             .build()
