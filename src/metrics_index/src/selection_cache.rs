@@ -125,7 +125,7 @@ fn block_key(file: &FileKey, matchers: &Matchers) -> String {
 }
 
 pub fn cached_blocks(file: &FileKey, matchers: &Matchers) -> Option<Arc<Vec<usize>>> {
-    if !get_config().search.metrics_index_selection_cache_enabled {
+    if !get_config().search.metrics_selection_cache_enabled {
         return None;
     }
     metrics::promql::INDEX_SELECTION_CACHE_REQUESTS_TOTAL
@@ -144,7 +144,7 @@ pub fn cached_blocks(file: &FileKey, matchers: &Matchers) -> Option<Arc<Vec<usiz
 }
 
 pub fn cache_blocks(file: &FileKey, matchers: &Matchers, ids: Arc<Vec<usize>>) {
-    if get_config().search.metrics_index_selection_cache_enabled {
+    if get_config().search.metrics_selection_cache_enabled {
         METRICS_INDEX_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|error| error.into_inner())

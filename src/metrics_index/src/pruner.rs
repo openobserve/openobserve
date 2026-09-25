@@ -115,7 +115,7 @@ pub async fn search(
     // Keep the complete matcher set in the key. A short hash collision could
     // otherwise reuse physical row ranges selected by a different query.
     let filter_key = format!("{matchers:?}");
-    let selection_cache_enabled = get_config().search.metrics_index_selection_cache_enabled;
+    let selection_cache_enabled = get_config().search.metrics_selection_cache_enabled;
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
         // Zero size means this finalized file was published without a sidecar.
