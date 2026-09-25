@@ -236,6 +236,13 @@ impl PipelineExt for Workflow {
                 } else {
                     // there is a fn name, so ue that fn
                     let transform = get_transforms(&self.org_id, &func_params.name).await?;
+                    // Otherwise the body hits compile_js_function as an opaque syntax error.
+                    if !transform.is_js() {
+                        return Err(anyhow!(
+                            "Only JavaScript functions can be used in workflows. Function '{}' is not a JavaScript function. Please use JS functions instead.",
+                            func_params.name
+                        ));
+                    }
                     let res_arr = transform.is_result_array_js();
                     (transform.function, res_arr)
                 };
@@ -5157,5 +5164,49 @@ mod tests {
             result.outputs.contains_key("arm"),
             "the downstream condition must match against the nested shape"
         );
+    }
+
+    #[tokio::test]
+    async fn workflow_rejects_a_function_that_is_not_javascript() {
+        // execute_workflow and retry_run skip validate_workflow, so this path must refuse both.
+        let org = "org-1";
+        for (name, trans_type) in [("null_typed_fn", None), ("vrl_typed_fn", Some(0))] {
+            QUERY_FUNCTIONS.insert(
+                format!("{org}/{name}"),
+                config::meta::function::Transform {
+                    function: ".a = 1 \n .".to_string(),
+                    name: name.to_string(),
+                    params: "row".to_string(),
+                    num_args: 1,
+                    trans_type,
+                    streams: None,
+                },
+            );
+
+            let node = Node::new(
+                "fn-1".to_string(),
+                NodeData::Function(config::meta::pipeline::components::FunctionParams {
+                    name: name.to_string(),
+                    after_flatten: false,
+                    num_args: 1,
+                    raw_fn: None,
+                }),
+                0.0,
+                0.0,
+                "default".to_string(),
+            );
+            let workflow = test_workflow(vec![node], vec![]);
+
+            let result = workflow.register_functions().await;
+            QUERY_FUNCTIONS.remove(&format!("{org}/{name}"));
+
+            let err = result
+                .expect_err("a non-JS function must be rejected by name")
+                .to_string();
+            assert!(
+                err.contains(name) && err.contains("JavaScript"),
+                "error should name the function and the reason, got: {err}"
+            );
+        }
     }
 }
