@@ -152,8 +152,10 @@ import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
-import oncallService from "@/services/oncall";
-import type { MyDelivery } from "@/ts/interfaces/oncall";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import { markDeliveriesReadMutation, myDeliveriesQuery } from "@/services/oncall.queries";
+import type { MyDeliveries, MyDelivery } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatInZone } from "@/utils/oncall";
 
@@ -211,22 +213,54 @@ const columns = computed<OTableColumnDef<MyDelivery>[]>(() => [
   },
 ]);
 
-async function fetchDeliveries() {
-  loading.value = true;
-  try {
-    const res = await oncallService.myDeliveries({
-      org_identifier: orgId.value,
-      ...(unreadOnly.value ? { unread_only: true } : {}),
+const markWrite = useMutation(() => markDeliveriesReadMutation(orgId.value));
+
+/// Expiring the entry before the fetch keeps a forced read at one request rather than two.
+async function read<T>(
+  options: { queryKey: readonly unknown[]; [k: string]: any },
+  force: boolean,
+): Promise<T> {
+  if (force) {
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
     });
-    rows.value = res.data?.deliveries ?? [];
-    // `unread` ignores the filter on purpose — it is the badge, and it must not
-    // change because somebody ticked "unread only".
-    setUnread(res.data?.unread ?? 0);
-  } catch {
+  }
+  return queryClient.fetchQuery(options as any) as Promise<T>;
+}
+
+// The newest read: a slower answer for a filter the reader has already left must not overwrite the inbox.
+let latestDeliveriesRead = 0;
+let loadedOnce = false;
+
+async function fetchDeliveries(force = false) {
+  loading.value = true;
+  const readId = ++latestDeliveriesRead;
+  try {
+    const data = await read<MyDeliveries | null>(
+      myDeliveriesQuery(orgId.value, unreadOnly.value ? { unread_only: true } : {}),
+      force,
+    );
+    if (readId !== latestDeliveriesRead) return;
+    rows.value = data?.deliveries ?? [];
+    // The badge ignores the filter on purpose: "3 unread" must not change because somebody ticked "unread only".
+    setUnread(data?.unread ?? 0);
+    loadedOnce = true;
+  } catch (err: any) {
+    if (readId !== latestDeliveriesRead) return;
+    // A failed refresh keeps the inbox on screen rather than emptying it and zeroing the badge.
+    if (loadedOnce) {
+      toast({
+        variant: "error",
+        message: raw(err?.response?.data?.message) || t("oncall.refreshFailed"),
+      });
+      return;
+    }
     rows.value = [];
     setUnread(0);
   } finally {
-    loading.value = false;
+    if (readId === latestDeliveriesRead) loading.value = false;
   }
 }
 
@@ -245,8 +279,9 @@ function setUnreadOnly(on: boolean) {
 async function mark(data: { event_ids?: string[]; all?: boolean; read?: boolean }) {
   marking.value = true;
   try {
-    const res = await oncallService.markDeliveriesRead({ org_identifier: orgId.value, data });
+    const res = await markWrite.mutateAsync(data);
     setUnread(res.data?.unread ?? unread.value);
+    // Unforced: the write already expired this scope, so the re-read that repaints the rows costs one request.
     await fetchDeliveries();
   } catch (err: any) {
     toast({
@@ -272,7 +307,10 @@ function openPage(row: MyDelivery) {
   });
 }
 
+/// A caller reaching for this has written something the cache cannot know about, so it forces.
+const refresh = () => fetchDeliveries(true);
+
 onMounted(fetchDeliveries);
 
-defineExpose({ refresh: fetchDeliveries });
+defineExpose({ refresh });
 </script>

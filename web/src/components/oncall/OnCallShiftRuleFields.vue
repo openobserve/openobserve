@@ -235,23 +235,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText variant="meta">{{ t("oncall.rotationRetireHint") }}</OText>
           <div
             v-if="isRetired(rule)"
-            class="flex gap-2 pt-1"
+            class="flex flex-col gap-1 pt-1"
             :data-test="`oncall-schedule-retire-at-${ruleIndex}`"
           >
-            <ODate
-              class="min-w-0 flex-1"
-              :model-value="retiredAtDate"
-              :label="t('oncall.rotationRetiredOn')"
-              :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(timezone) })"
-              :data-test="`oncall-schedule-retire-at-${ruleIndex}-date`"
-              @update:model-value="setRetiredAtDate"
-            />
-            <OTime
-              class="min-w-0 flex-1"
-              :model-value="retiredAtTime"
-              :data-test="`oncall-schedule-retire-at-${ruleIndex}-time`"
-              @update:model-value="setRetiredAtTime"
-            />
+            <span class="o-input-label text-sm leading-tight font-semibold">
+              {{ t("oncall.rotationRetiredOn") }}
+            </span>
+            <div class="flex gap-2">
+              <ODate
+                class="min-w-0 flex-1"
+                :model-value="retiredAtDate"
+                :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(timezone) })"
+                :data-test="`oncall-schedule-retire-at-${ruleIndex}-date`"
+                @update:model-value="setRetiredAtDate"
+              />
+              <OTime
+                class="min-w-0 flex-1"
+                :model-value="retiredAtTime"
+                :data-test="`oncall-schedule-retire-at-${ruleIndex}-time`"
+                @update:model-value="setRetiredAtTime"
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -19154,6 +19154,8 @@
     "rotationNobody": "无人值班",
     "edit": "编辑",
     "timelineLoadFailed": "无法解析此时间范围的值班安排",
+    "editorReadFailed": "无法加载最新副本进行编辑。请重试。",
+    "refreshFailed": "无法刷新。显示的内容可能已过期。",
     "scheduleDoneEditing": "返回值班安排",
     "coverWhoRequired": "选择谁来代班",
     "timelineCoverAria": "{who} 在 {from} 至 {to} 期间为 {rotation} 代班",

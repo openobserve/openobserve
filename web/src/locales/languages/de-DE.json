@@ -19154,6 +19154,8 @@
     "rotationNobody": "Niemand in Bereitschaft",
     "edit": "Bearbeiten",
     "timelineLoadFailed": "Der Dienstplan für dieses Zeitfenster konnte nicht ermittelt werden.",
+    "editorReadFailed": "Die neueste Version zum Bearbeiten konnte nicht geladen werden. Versuchen Sie es erneut.",
+    "refreshFailed": "Die Aktualisierung ist fehlgeschlagen. Die Anzeige ist möglicherweise veraltet.",
     "scheduleDoneEditing": "Zurück zum Dienstplan",
     "coverWhoRequired": "Wählen Sie aus, wer die Vertretung übernimmt",
     "timelineCoverAria": "{who} übernimmt {rotation} von {from} bis {to}",

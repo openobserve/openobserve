@@ -21,6 +21,8 @@ vi.mock("@/services/service_streams", () => ({
 }));
 
 import { loadSemanticGroups, clearSemanticGroupsCache } from "./semanticGroupsCache";
+import { queryClient } from "@/composables/query/queryClient";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 
 describe("semanticGroupsCache — concurrent failure reporting", () => {
   beforeEach(() => {
@@ -74,5 +76,32 @@ describe("semanticGroupsCache — concurrent failure reporting", () => {
     expect(b).toEqual(groups);
     expect(firstErrors).toEqual([]);
     expect(secondErrors).toEqual([]);
+  });
+});
+
+describe("semanticGroupsCache — the fresh-hit fast path", () => {
+  const groups = [{ id: "host", display: "Host", fields: ["host_name"] }];
+
+  beforeEach(() => {
+    clearSemanticGroupsCache();
+    getSemanticGroupsMock.mockReset();
+    getSemanticGroupsMock.mockResolvedValue({ data: groups });
+  });
+
+  it("serves a fresh entry without a request", async () => {
+    await loadSemanticGroups("org-c");
+    await loadSemanticGroups("org-c");
+    expect(getSemanticGroupsMock).toHaveBeenCalledTimes(1);
+  });
+
+  // A group save invalidates rather than removes, so a fresh-by-age entry must still be re-read.
+  it("re-reads an invalidated entry however young it is", async () => {
+    await loadSemanticGroups("org-d");
+    await queryClient.invalidateQueries({
+      queryKey: serviceStreamKeys.all("org-d"),
+      refetchType: "none",
+    });
+    await loadSemanticGroups("org-d");
+    expect(getSemanticGroupsMock).toHaveBeenCalledTimes(2);
   });
 });
