@@ -1,9 +1,6 @@
 import { expect } from '@playwright/test';
 
-/**
- * Routes that should not be reachable: internal demo pages, and enterprise-only
- * pages on an opensource build.
- */
+/** Internal pages that must not be reachable in a shipped build. */
 export class RouteGuardPage {
     constructor(page) {
         this.page = page;
