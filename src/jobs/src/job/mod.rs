@@ -1465,6 +1465,13 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("Dashboard id->org cache failed");
 
+    // Import dashboards from a user-configured directory if one is set.
+    let import_dir = config::get_config().common.dashboard_import_dir.clone();
+    if !import_dir.is_empty() {
+        openobserve_core::dashboards::import_dashboards_from_dir(config::DEFAULT_ORG, &import_dir)
+            .await;
+    }
+
     Ok(())
 }
 

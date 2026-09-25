@@ -1889,6 +1889,12 @@ pub struct Common {
     pub data_cache_dir: String,
     #[env_config(name = "ZO_DATA_TMP_DIR", default = "")] // ./data/openobserve/tmp/
     pub data_tmp_dir: String,
+    #[env_config(
+        name = "ZO_DASHBOARD_IMPORT_DIR",
+        default = "",
+        help = "Path to a directory; every *.json file in it is imported as a dashboard on startup. Skipped when empty."
+    )]
+    pub dashboard_import_dir: String,
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
