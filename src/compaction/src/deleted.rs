@@ -113,7 +113,7 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
 }
 
 fn metrics_index_key(file: &FileListDeleted) -> Option<Cow<'_, str>> {
-    if file.mindex_size <= 0 {
+    if !file.mindex_file {
         return None;
     }
     MetricsFileLayout::metrics_index_path(&file.file).map(Cow::Owned)
@@ -126,7 +126,7 @@ mod tests {
     fn deleted_file(file: &str) -> FileListDeleted {
         FileListDeleted {
             file: file.to_string(),
-            mindex_size: 1,
+            mindex_file: true,
             ..Default::default()
         }
     }
@@ -140,7 +140,7 @@ mod tests {
         );
 
         let file_without_index = FileListDeleted {
-            mindex_size: 0,
+            mindex_file: false,
             ..file
         };
         assert!(metrics_index_key(&file_without_index).is_none());

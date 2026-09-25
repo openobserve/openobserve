@@ -188,7 +188,7 @@ impl super::FileList for SqliteFileList {
             let client = CLIENT_RW.clone();
             let mut tx = client.begin().await?;
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_size, flattened, created_at)",
+                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
@@ -199,7 +199,7 @@ impl super::FileList for SqliteFileList {
                     .push_bind(date_key)
                     .push_bind(file_name)
                     .push_bind(item.index_file)
-                    .push_bind(item.mindex_size)
+                    .push_bind(item.mindex_file)
                     .push_bind(item.flattened)
                     .push_bind(created_at);
             });
@@ -712,7 +712,7 @@ SELECT date
         }
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, mindex_size, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#,
+            r#"SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#,
         )
         .bind(org_id)
         .bind(time_max)
@@ -726,7 +726,7 @@ SELECT date
                 account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
-                mindex_size: r.mindex_size,
+                mindex_file: r.mindex_file,
                 flattened: r.flattened,
             })
             .collect())
@@ -735,7 +735,7 @@ SELECT date
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, mindex_size, flattened FROM file_list_deleted;"#,
+            r#"SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -746,7 +746,7 @@ SELECT date
                 account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
-                mindex_size: r.mindex_size,
+                mindex_file: r.mindex_file,
                 flattened: r.flattened,
             })
             .collect())
@@ -1528,8 +1528,8 @@ WHERE org = $1 AND account = $2;"#;
         // store. (Normal per-stream deletion already routes files here; this is the
         // catch-all for rows whose stream schema is already gone.)
         sqlx::query(
-            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_size, flattened, created_at)
-               SELECT account, org, stream, date, file, index_file, mindex_size, flattened, $2
+            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)
+               SELECT account, org, stream, date, file, index_file, mindex_size > 0, flattened, $2
                FROM file_list WHERE org = $1;"#,
         )
         .bind(org_id)
@@ -1812,7 +1812,7 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     date       VARCHAR not null,
     file       VARCHAR not null,
     index_file BOOLEAN default false not null,
-    mindex_size BIGINT DEFAULT 0 NOT NULL,
+    mindex_file BOOLEAN DEFAULT FALSE NOT NULL,
     flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );
@@ -1912,11 +1912,17 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     add_column(&client, "file_list_history", column, data_type).await?;
     add_column(&client, "stream_stats", column, data_type).await?;
     add_column(&client, "file_list_dump_stats", column, data_type).await?;
-    add_column(&client, "file_list_deleted", column, data_type).await?;
 
     let column = "index_file";
     let data_type = "BOOLEAN default false not null";
     add_column(&client, "file_list_deleted", column, data_type).await?;
+    add_column(
+        &client,
+        "file_list_deleted",
+        "mindex_file",
+        "BOOLEAN DEFAULT FALSE NOT NULL",
+    )
+    .await?;
 
     // create column dumped for file_list_jobs for version <=0.14.0
     add_column(
@@ -2977,7 +2983,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_deleted_mindex_size_defaults_to_zero_on_upgrade() {
+    async fn test_deleted_mindex_file_defaults_to_false_on_upgrade() {
         let pool = fresh_in_memory_pool().await;
         sqlx::query(
             "CREATE TABLE file_list_deleted (id INTEGER PRIMARY KEY, account TEXT NOT NULL, stream TEXT NOT NULL, date TEXT NOT NULL, file TEXT NOT NULL, index_file BOOLEAN NOT NULL, flattened BOOLEAN NOT NULL)",
@@ -2994,30 +3000,30 @@ mod tests {
         add_column(
             &pool,
             "file_list_deleted",
-            "mindex_size",
-            "BIGINT DEFAULT 0 NOT NULL",
+            "mindex_file",
+            "BOOLEAN DEFAULT FALSE NOT NULL",
         )
         .await
         .unwrap();
-        for (id, size) in [(2, 0), (3, 42)] {
+        for (id, has_index) in [(2, false), (3, true)] {
             sqlx::query(
-                "INSERT INTO file_list_deleted (id, account, stream, date, file, index_file, mindex_size, flattened) VALUES (?, 'a', 'org/metrics/cpu', '2026/09/22/10', 'indexed-v3-new.parquet', false, ?, false)",
+                "INSERT INTO file_list_deleted (id, account, stream, date, file, index_file, mindex_file, flattened) VALUES (?, 'a', 'org/metrics/cpu', '2026/09/22/10', 'indexed-v3-new.parquet', false, ?, false)",
             )
             .bind(id)
-            .bind(size)
+            .bind(has_index)
             .execute(&pool)
             .await
             .unwrap();
         }
         let rows: Vec<super::super::FileDeletedRecord> = sqlx::query_as(
-            "SELECT id, account, stream, date, file, index_file, mindex_size, flattened FROM file_list_deleted ORDER BY id",
+            "SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted ORDER BY id",
         )
         .fetch_all(&pool)
         .await
         .unwrap();
         assert_eq!(
-            rows.iter().map(|row| row.mindex_size).collect::<Vec<_>>(),
-            [0, 0, 42]
+            rows.iter().map(|row| row.mindex_file).collect::<Vec<_>>(),
+            [false, false, true]
         );
     }
 }
