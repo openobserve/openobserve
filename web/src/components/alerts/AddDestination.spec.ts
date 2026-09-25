@@ -324,7 +324,7 @@ describe("AddDestination - pipeline (!isAlerts) branch", () => {
 
 describe("AddDestination - apiHeaders field array (Rule ①)", () => {
   it("loads saved webhook headers from the full destination record in edit mode", async () => {
-    (destinationService.get_by_name as any).mockResolvedValueOnce({
+    vi.mocked(destinationService.get_by_name).mockResolvedValueOnce({
       data: {
         name: "dest-with-headers",
         type: "http",
