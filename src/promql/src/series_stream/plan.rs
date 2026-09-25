@@ -122,9 +122,10 @@ pub(crate) async fn execute_partitioned(
     let partitions = ctx.state().config().target_partitions();
     if let Some(scan) = ctx.state().config().get_extension::<MetricsBlockScan>()
         && scan.table_name == selector.table_name
+        && blocks::query_window(eval_ctx, selector.offset, lookback).is_some()
     {
         let intervals = hash_partitions(partitions).collect::<Vec<_>>();
-        match blocks::prepare(
+        let prepared = blocks::prepare(
             &scan,
             selector.matchers,
             Arc::clone(&label_cols),
@@ -134,26 +135,19 @@ pub(crate) async fn execute_partitioned(
             eval_ctx,
         )
         .await
-        {
-            Ok(prepared) => {
-                return Ok(Some(
-                    prepared
-                        .into_iter()
-                        .map(|partition| {
-                            Box::pin(async move {
-                                Ok(SeriesSource::Block(blocks::BlockSeriesStream::new(
-                                    partition,
-                                )))
-                            }) as SourceFuture
-                        })
-                        .collect(),
-                ));
-            }
-            Err(error) => log::info!(
-                "[trace_id: {}] [PromQL] metrics blocks fallback before execution: {error}",
-                eval_ctx.trace_id
-            ),
-        }
+        .map_err(|error| DataFusionError::External(error.into()))?;
+        return Ok(Some(
+            prepared
+                .into_iter()
+                .map(|partition| {
+                    Box::pin(async move {
+                        Ok(SeriesSource::Block(blocks::BlockSeriesStream::new(
+                            partition,
+                        )))
+                    }) as SourceFuture
+                })
+                .collect(),
+        ));
     }
     let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
     let Ok(df) = ctx.table(sorted_table.as_str()).await else {

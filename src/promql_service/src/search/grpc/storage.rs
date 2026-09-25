@@ -228,7 +228,7 @@ pub(crate) async fn create_context(
             Ok(None) => {}
             Err(error) => {
                 log::warn!(
-                    "[trace_id {trace_id}] promql->search->storage: metrics-index query failed, falling back to a full scan: {error}"
+                    "[trace_id {trace_id}] promql->search->storage: metrics-index row selection failed; continuing the source scan: {error}"
                 );
             }
         };

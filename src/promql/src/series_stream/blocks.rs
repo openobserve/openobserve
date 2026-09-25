@@ -810,7 +810,7 @@ async fn load_entry(
     .await?)
 }
 
-fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
+pub(super) fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
     let start = eval.start.checked_sub(offset)?;
     let end = eval.end.checked_sub(offset)?;
     if lookback < 0 || end < start {
@@ -1993,7 +1993,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn missing_metadata_falls_back_to_original_stream_before_payload() {
+    async fn missing_metadata_fails_before_source_scan() {
         let rows = [(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))];
         let valid = file(&rows);
         let missing = file(&[(2, 30, 3.0, Some("y"))]);
@@ -2018,13 +2018,33 @@ mod tests {
             matchers: &matchers,
             offset: 100,
         };
-        let sources = execute_partitioned(
+        let error = execute_partitioned(
             &ctx,
             schema().as_ref(),
             &selector,
             LabelColumns::grouped(vec!["group".into()]),
             20,
             &eval(),
+        )
+        .await
+        .err()
+        .unwrap();
+        assert!(!error.to_string().is_empty());
+        assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+
+        let sparse = EvalContext::new(10, 40, 100, "sparse".into());
+        let source_selector = StreamingSelector {
+            table_name: "m",
+            matchers: &matchers,
+            offset: 0,
+        };
+        let sources = execute_partitioned(
+            &ctx,
+            schema().as_ref(),
+            &source_selector,
+            LabelColumns::grouped(vec!["group".into()]),
+            20,
+            &sparse,
         )
         .await
         .unwrap()
@@ -2086,7 +2106,7 @@ mod tests {
                     matchers: &matchers,
                     offset: 0,
                 };
-                let sources = execute_partitioned(
+                let result = execute_partitioned(
                     &ctx,
                     schema().as_ref(),
                     &selector,
@@ -2094,9 +2114,13 @@ mod tests {
                     20,
                     &EvalContext::new(10, 40, 10, "compatibility".into()),
                 )
-                .await
-                .unwrap()
-                .unwrap();
+                .await;
+                if enabled && legacy_count > 0 {
+                    assert!(result.is_err());
+                    assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+                    continue;
+                }
+                let sources = result.unwrap().unwrap();
                 let mut actual = Vec::new();
                 for source in sources {
                     let mut source = source.await.unwrap();
