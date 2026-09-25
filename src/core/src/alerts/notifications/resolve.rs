@@ -178,11 +178,6 @@ fn substitute_raw_row(
 
     let mut out = input.to_string();
 
-    if out.contains("{...row}") {
-        let json = serde_json::to_string(row).unwrap_or_default();
-        out = out.replace("{...row}", &json);
-    }
-
     for (key, value) in row {
         let s = super::custom::stringify_row_value(value);
         scan_and_replace_var(&mut out, key, |len| {
@@ -193,6 +188,12 @@ fn substitute_raw_row(
             }
         });
     }
+
+    if out.contains("{...row}") {
+        let json = serde_json::to_string(row).unwrap_or_default();
+        out = out.replace("{...row}", &json);
+    }
+
     let replaced = replace_unmatched_with_marker(&out, &unk);
     unknown.append(&mut unk);
     replaced
