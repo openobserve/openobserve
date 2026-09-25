@@ -20,13 +20,16 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
+const crypto = require('crypto');
 
 // The tab reads the RUM internal namespace, which is mid-migration from `_oo_` to
 // `_o2_`; `_o2_` is the preferred spelling, so the fixture writes that one.
 const TRACE_ID_FIELD = '_o2_trace_id';
 
-const hex = (bytes) =>
-  Array.from({ length: bytes * 2 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
+// crypto, not Math.random: these become session and trace ids, and CodeQL reads
+// Math.random() in that position as insecure randomness. Same helper the trace
+// generators in utils/service-graph-ingestion.js use.
+const hex = (bytes) => crypto.randomBytes(bytes).toString('hex');
 
 // One failing request among the three, because "which call broke" is the question
 // this tab exists to answer.
