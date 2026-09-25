@@ -472,6 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OPageLayout>
 </template>
 <script lang="ts" setup>
+import destinationService from "@/services/alert_destination";
 import { saveDestinationMutation } from "@/services/alert_destination.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
@@ -857,10 +858,20 @@ watch(
   { deep: true },
 );
 
-const setupDestinationData = () => {
+const setupDestinationData = async () => {
   originalSlackWebhookUrl.value = "";
   if (props.destination) {
     isUpdatingDestination.value = true;
+    let destination = props.destination;
+    try {
+      const response = await destinationService.get_by_name({
+        org_identifier: store.state.selectedOrganization.identifier,
+        destination_name: props.destination.name,
+      });
+      destination = response?.data ?? props.destination;
+    } catch {
+      destination = props.destination;
+    }
     // Resolve the destination_type discriminator FIRST; setDestType only records
     // the choice, which rides into the single form.reset(record) below.
     let destType = "";
@@ -868,17 +879,17 @@ const setupDestinationData = () => {
       destType = v;
     };
 
-    const destHeaders: Record<string, any> = props.destination.headers || {};
+    const destHeaders: Record<string, any> = destination.headers || {};
 
     // Set destination_type for prebuilt destinations in edit mode
     // Parse metadata if it's a string
     let parsedMetadata: any = null;
-    if (props.destination.metadata) {
+    if (destination.metadata) {
       try {
         parsedMetadata =
-          typeof props.destination.metadata === "string"
-            ? JSON.parse(props.destination.metadata)
-            : props.destination.metadata;
+          typeof destination.metadata === "string"
+            ? JSON.parse(destination.metadata)
+            : destination.metadata;
       } catch (e) {
         console.error("Failed to parse destination metadata:", e);
       }
@@ -890,21 +901,17 @@ const setupDestinationData = () => {
     }
     // Priority 2: Check if template starts with 'system-prebuilt-' AND destination structure matches
     // (Must have emails array for email, or specific prebuilt URL patterns for HTTP)
-    else if (props.destination.template?.startsWith("system-prebuilt-")) {
-      const templateType = props.destination.template.replace("system-prebuilt-", "");
+    else if (destination.template?.startsWith("system-prebuilt-")) {
+      const templateType = destination.template.replace("system-prebuilt-", "");
       // Only treat as prebuilt if structure matches the type
-      if (
-        templateType === "email" &&
-        props.destination.type === "email" &&
-        props.destination.emails
-      ) {
+      if (templateType === "email" && destination.type === "email" && destination.emails) {
         setDestType("email");
-      } else if (props.destination.type === "http" && props.destination.url) {
+      } else if (destination.type === "http" && destination.url) {
         // Use URL-only detection here — detectPrebuiltType also checks the template
         // name, which would always match since we're already inside the
         // system-prebuilt-* branch. A custom destination can have any template,
         // so the URL is the only reliable signal at this point.
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
+        const urlType = detectPrebuiltTypeFromUrl(destination.url);
         if (urlType && isPrebuiltType(urlType)) {
           setDestType(urlType);
         } else {
@@ -918,10 +925,10 @@ const setupDestinationData = () => {
     // Priority 3: Check if template starts with 'prebuilt_' (user templates)
     // Also verify the URL matches the prebuilt type to avoid misclassifying custom
     // destinations that happen to use a template with a prebuilt_ prefix.
-    else if (props.destination.template?.startsWith("prebuilt_")) {
-      const extractedType = props.destination.template.replace("prebuilt_", "");
-      if (isPrebuiltType(extractedType) && props.destination.url) {
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
+    else if (destination.template?.startsWith("prebuilt_")) {
+      const extractedType = destination.template.replace("prebuilt_", "");
+      if (isPrebuiltType(extractedType) && destination.url) {
+        const urlType = detectPrebuiltTypeFromUrl(destination.url);
         setDestType(urlType === extractedType ? extractedType : "custom");
       } else {
         setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
@@ -929,19 +936,19 @@ const setupDestinationData = () => {
     }
     // Priority 4: Check if template includes 'prebuilt' (legacy format)
     // Also verify the URL matches the prebuilt type (same guard as Priority 3).
-    else if (props.destination.template?.includes("prebuilt")) {
-      const parts = props.destination.template.split("-");
+    else if (destination.template?.includes("prebuilt")) {
+      const parts = destination.template.split("-");
       const extractedType = parts[parts.length - 1];
-      if (isPrebuiltType(extractedType) && props.destination.url) {
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
+      if (isPrebuiltType(extractedType) && destination.url) {
+        const urlType = detectPrebuiltTypeFromUrl(destination.url);
         setDestType(urlType === extractedType ? extractedType : "custom");
       } else {
         setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
       }
     }
     // Priority 5: Fallback to URL-based detection (for destinations without metadata)
-    else if (props.destination.url) {
-      const detectedType = detectPrebuiltType(props.destination);
+    else if (destination.url) {
+      const detectedType = detectPrebuiltType(destination);
       if (detectedType) {
         setDestType(detectedType);
       } else {
@@ -976,13 +983,13 @@ const setupDestinationData = () => {
     const record: AddDestinationForm = {
       ...addDestinationDefaults(),
       destination_type: destType,
-      name: props.destination.name,
-      url: props.destination.url ?? "",
-      method: props.destination.method ?? "post",
-      skip_tls_verify: props.destination.skip_tls_verify ?? false,
-      template: props.destination.template ?? "",
-      emails: props.destination?.emails ?? [],
-      type: props.destination.type || "http",
+      name: destination.name,
+      url: destination.url ?? "",
+      method: destination.method ?? "post",
+      skip_tls_verify: destination.skip_tls_verify ?? false,
+      template: destination.template ?? "",
+      emails: destination?.emails ?? [],
+      type: destination.type || "http",
       slack_setup_method: hasSavedSlackOAuthMetadata
         ? "oauth"
         : hasSavedSlackManifestMetadata
@@ -1017,12 +1024,12 @@ const setupDestinationData = () => {
     }
 
     // Only override the default when the saved destination carries one.
-    if (props.destination.output_format) {
-      record.output_format = props.destination.output_format;
+    if (destination.output_format) {
+      record.output_format = destination.output_format;
     }
 
     if (destType === "slack") {
-      originalSlackWebhookUrl.value = (props.destination.url ?? "").trim();
+      originalSlackWebhookUrl.value = (destination.url ?? "").trim();
     }
 
     // Template name is stored/displayed as-is (e.g. "prebuilt_slack") — the

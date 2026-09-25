@@ -48,6 +48,7 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), {
     default: {
       create: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+      get_by_name: vi.fn().mockRejectedValue(new Error("not mocked")),
       update: vi.fn().mockResolvedValue({ data: { code: 200 } }),
       test: vi.fn().mockResolvedValue({ data: { code: 200 } }),
     },
@@ -322,6 +323,40 @@ describe("AddDestination - pipeline (!isAlerts) branch", () => {
 });
 
 describe("AddDestination - apiHeaders field array (Rule ①)", () => {
+  it("loads saved webhook headers from the full destination record in edit mode", async () => {
+    (destinationService.get_by_name as any).mockResolvedValueOnce({
+      data: {
+        name: "dest-with-headers",
+        type: "http",
+        url: "https://example.com/webhook",
+        method: "post",
+        template: "tmpl1",
+        headers: { "X-Test": "secret" },
+      },
+    });
+    wrapper = mountComp({
+      isAlerts: true,
+      destination: {
+        name: "dest-with-headers",
+        type: "http",
+        url: "https://example.com/webhook",
+        method: "post",
+        template: "tmpl1",
+        headers: {},
+      },
+    });
+    await flushPromises();
+
+    expect(destinationService.get_by_name).toHaveBeenCalledWith({
+      org_identifier: "default",
+      destination_name: "dest-with-headers",
+    });
+    expect(getForm(wrapper).state.values.apiHeaders).toEqual([{ key: "X-Test", value: "secret" }]);
+    expect(wrapper.find('[data-test="add-destination-header-X-Test-key-input"]').exists()).toBe(
+      true,
+    );
+  });
+
   it("deleting a NON-last row keeps the RENDERED inputs aligned (index :key)", async () => {
     wrapper = mountComp({ isAlerts: true });
     const form = await toCustomHttp(wrapper);
