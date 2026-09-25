@@ -98,13 +98,17 @@ jobs:
           ACTOR: ${{ steps.ctx.outputs.actor }}
           AUTO: ${{ steps.ctx.outputs.auto }}
         run: |
+          # One trace id spans the OSS dispatch → the ENT engine run, so the whole flow is
+          # one OpenObserve trace. The engine mints its own if this is empty.
+          TRACE_ID=$(openssl rand -hex 16)
           gh workflow run docgen.yml --repo openobserve/o2-enterprise \
             -f source_repo=openobserve \
             -f pr_number="$PR" \
             -f dry_run="$DRY" \
             -f actor="$ACTOR" \
-            -f auto="$AUTO"
-          echo "Dispatched DocGen engine for openobserve PR #$PR (dry_run=$DRY, auto=$AUTO, by @$ACTOR)."
+            -f auto="$AUTO" \
+            -f o2_trace_id="$TRACE_ID"
+          echo "Dispatched DocGen engine for openobserve PR #$PR (dry_run=$DRY, auto=$AUTO, by @$ACTOR, trace=$TRACE_ID)."
 
       - name: Acknowledge on the source PR
         # success() => only ack if the dispatch actually succeeded (don't mislead the author if
