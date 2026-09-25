@@ -2765,6 +2765,13 @@
         "desc": "Ausführen, wenn ein Alert ausgelöst wird",
         "intro": "Wenn ein verknüpfter Alert ausgelöst wird, erhält jeder nachgelagerte Schritt diese Payload."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "Incident-Ereignis",
         "tab": "Vorfälle",
@@ -7413,7 +7420,14 @@
         "alertTriggerTimeSeconds": "Auslösezeit in Epoch-Sekunden",
         "alertTriggerTimeStr": "Auslösezeit (menschenlesbar)",
         "rows": "Alle übereinstimmenden Zeilen, formatiert durch die Zeilenvorlage"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "notifyOnRecoveryTemplateHint": "Your template must include {'{'}alert_status{'}'}, or the recovery message will look like a new alert.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds",
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
     },
     "advanced": {
       "addVariable": "Variable hinzufügen",
@@ -7940,7 +7954,8 @@
     "sloKind": "Bedingungstyp",
     "sloLongWindow": "Langes Zeitfenster",
     "sloShortWindow": "Kurzes Zeitfenster",
-    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden."
+    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "Öffnen",

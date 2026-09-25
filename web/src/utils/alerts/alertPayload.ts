@@ -55,6 +55,8 @@ export interface PayloadFormData {
   row_template?: string;
   row_template_type?: string;
   creates_incident?: boolean;
+  notify_on_recovery?: boolean;
+  keep_firing_for?: number;
   /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
   priority?: number | string | null;
   tags?: string[];
@@ -164,6 +166,11 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   payload.trigger_condition.frequency = parseInt(formData.trigger_condition.frequency as any);
 
   payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
+
+  // A `type="number"` input hands back a STRING, and the API takes an i64 — an
+  // uncoerced "60" is rejected by serde before any validation runs, so the user
+  // sees a deserialization error instead of the field's own rule.
+  payload.keep_firing_for = parseInt(formData.keep_firing_for as any, 10) || 0;
 
   // Minutes on the form, seconds on the wire. Forced to 0 for realtime even
   // though the field is unreachable in that template — same belt-and-suspenders

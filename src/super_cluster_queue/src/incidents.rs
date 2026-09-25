@@ -86,6 +86,17 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             )
             .await?;
         }
+        IncidentMessage::ResolveAlert {
+            org_id,
+            incident_id,
+            alert_id,
+            resolved_at,
+        } => {
+            log::debug!(
+                "[SUPER_CLUSTER:incidents] Resolve alert org={org_id} incident={incident_id} alert={alert_id}"
+            );
+            alert_incidents::resolve_alert_firings(&incident_id, &alert_id, resolved_at).await?;
+        }
     }
     Ok(())
 }

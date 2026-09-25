@@ -23,7 +23,7 @@ export const opsgenieTemplate = {
   name: "prebuilt_opsgenie",
   body: JSON.stringify(
     {
-      message: "OpenObserve Alert: {alert_name}",
+      message: "OpenObserve [{alert_status}]: {alert_name}",
       alias: "openobserve-{alert_name}",
       description:
         "Alert Details:\n\nStream: {stream_name}\nType: {stream_type}\nCount: {alert_count}\nThreshold: {alert_operator} {alert_threshold}\nTime: {alert_time}",

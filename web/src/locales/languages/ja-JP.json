@@ -2765,6 +2765,13 @@
         "desc": "アラート発火時に実行",
         "intro": "リンクされたアラートが発火すると、後続の各ステップがこのペイロードを受け取ります。"
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "インシデントイベント",
         "tab": "インシデント",
@@ -7413,7 +7420,14 @@
         "alertTriggerTimeSeconds": "トリガー時刻（エポック秒）",
         "alertTriggerTimeStr": "トリガー時刻（人間が読める形式）",
         "rows": "行テンプレートでフォーマットされたすべての一致行"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "notifyOnRecoveryTemplateHint": "Your template must include {'{'}alert_status{'}'}, or the recovery message will look like a new alert.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds",
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
     },
     "advanced": {
       "addVariable": "[変数を追加]",
@@ -7940,7 +7954,8 @@
     "sloKind": "条件タイプ",
     "sloLongWindow": "長期ウィンドウ",
     "sloShortWindow": "短期ウィンドウ",
-    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。"
+    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "開く",

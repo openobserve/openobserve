@@ -45,6 +45,16 @@ pub struct Model {
     /// `AlertLevel::to_i32` of this group's last *successful* delivery — what
     /// escalation is measured against (§7.1 per group).
     pub last_notified_level: Option<i32>,
+    /// The open firing episode, minted on its first delivered notification and
+    /// cleared by the write that emits the recovery. NULL = nothing was
+    /// delivered, so there is nothing to recover from.
+    pub episode_id: Option<String>,
+    pub episode_opened_at: Option<i64>,
+    /// The incident that owned firing delivery. NULL = the alert path owns it.
+    pub episode_incident_id: Option<String>,
+    /// When the condition first cleared, while `keep_firing_for` holds the
+    /// episode open. NULL = not in the hold.
+    pub recovering_since: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -48,6 +48,11 @@ pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: boo
         // what lets a template branch warning vs critical wording — per-level
         // DESTINATIONS are Phase 4; v1 routing is template-side.
         .replace("{alert_level}", &ctx.alert_level)
+        // `firing` / `resolved` (openobserve#6751). One template, both states.
+        .replace("{alert_status}", &ctx.alert_status)
+        // The key that pairs a resolve with its trigger. Empty when the alert
+        // does not notify on recovery, which is when nothing will resolve.
+        .replace("{episode_id}", ctx.episode_id.as_deref().unwrap_or_default())
         // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
         // incident notifications build custom JSON and workflows carry
         // hard-coded metadata; neither is wired here in v1. Unset priority and
@@ -475,6 +480,8 @@ mod golden {
             alert_count: "3".into(),
             alert_agg_value: "92.5".into(),
             alert_level: "critical".into(),
+            alert_status: "firing".to_string(),
+            episode_id: None,
             alert_priority: "P1".into(),
             alert_tags: "infra, prod".into(),
             alert_threshold_crit: "90".into(),

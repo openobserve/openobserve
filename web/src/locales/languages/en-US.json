@@ -2765,6 +2765,13 @@
         "desc": "Run when an alert fires",
         "intro": "When a linked alert fires, every downstream step receives this payload."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "Incident Event",
         "tab": "Incidents",
@@ -7413,7 +7420,17 @@
         "alertTriggerTimeSeconds": "Trigger time in epoch seconds",
         "alertTriggerTimeStr": "Trigger time, human-readable",
         "rows": "All matching rows, formatted by the row template"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "notifyOnRecoveryTemplateHint": "Chat and email destinations reuse your template, so it must include {'{'}alert_status{'}'} or the recovery message will look like a new alert.",
+      "recoveryResolvesIncident": "resolves the incident",
+      "recoveryClosesAlert": "closes the alert",
+      "recoveryChatMessage": "new \"Resolved\" message",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds",
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -7644,6 +7661,8 @@
       "servicenowPasswordHelp": "ServiceNow password or API token",
       "servicenowAssignmentGroup": "Assignment Group (optional)",
       "servicenowAssignmentGroupHelp": "Group to assign incidents to (e.g., IT Operations)",
+      "servicenowResolutionCode": "Resolution code (optional)",
+      "servicenowResolutionCodeHelp": "Must match a valid resolution code on your ServiceNow instance. Used when OpenObserve resolves the incident. Defaults to Solved (Permanently).",
       "usernameRequired": "Username is required",
       "passwordRequired": "Password is required",
       "emailRecipients": "Recipient Email Addresses",
@@ -7940,7 +7959,8 @@
     "sloKind": "Condition type",
     "sloLongWindow": "Long window",
     "sloShortWindow": "Short window",
-    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -8138,6 +8158,7 @@
     "filterPrebuilt": "Prebuilt",
     "filterCustom": "Custom",
     "variableRowsDescription": "multiple lines of row template",
+    "variableEpisodeIdDescription": "Unique id for this firing. Added automatically to PagerDuty, Opsgenie and ServiceNow payloads so the alert can be resolved.",
     "variableStreamFields": "All of the stream fields are variables.",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} used to limit rows or string length.",
     "variableTimezoneNote": "Timestamp variables ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) render in the server's local timezone.",

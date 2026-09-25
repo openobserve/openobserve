@@ -63,6 +63,10 @@ impl From<alert_states::Model> for AlertState {
             groups_firing_is_lower_bound: m.groups_firing_is_lower_bound,
             silenced_until: m.silenced_until,
             last_notified_level: m.last_notified_level.and_then(AlertLevel::from_i32),
+            episode_id: m.episode_id,
+            episode_opened_at: m.episode_opened_at,
+            episode_incident_id: m.episode_incident_id,
+            recovering_since: m.recovering_since,
         }
     }
 }
@@ -549,6 +553,10 @@ where
         groups_firing_is_lower_bound: Set(state.groups_firing_is_lower_bound),
         silenced_until: Set(state.silenced_until),
         last_notified_level: Set(state.last_notified_level.map(|l| l.to_i32())),
+        episode_id: Set(state.episode_id.clone()),
+        episode_opened_at: Set(state.episode_opened_at),
+        episode_incident_id: Set(state.episode_incident_id.clone()),
+        recovering_since: Set(state.recovering_since),
     };
 
     // Upsert on the composite primary key — rows are created lazily on an
@@ -572,6 +580,13 @@ where
                 alert_states::Column::GroupsFiring,
                 alert_states::Column::GroupsObservedIsLowerBound,
                 alert_states::Column::GroupsFiringIsLowerBound,
+                // The episode columns ARE listed, unlike the two below: the
+                // evaluation owns them, and clearing `episode_id` here is what
+                // makes a recovery emit once rather than once per evaluation.
+                alert_states::Column::EpisodeId,
+                alert_states::Column::EpisodeOpenedAt,
+                alert_states::Column::EpisodeIncidentId,
+                alert_states::Column::RecoveringSince,
                 // `silenced_until` / `last_notified_level` are DELIBERATELY
                 // absent (§5.5 MN-2, one-writer rule). An evaluation carries
                 // stale copies — it read them before it ran — so listing them
@@ -856,6 +871,10 @@ mod tests {
             groups_firing_is_lower_bound: None,
             silenced_until: None,
             last_notified_level: None,
+            episode_id: None,
+            episode_opened_at: None,
+            episode_incident_id: None,
+            recovering_since: None,
         }
     }
 
@@ -1578,5 +1597,72 @@ mod tests {
         assert_eq!(count_states(&db).await, 1);
         assert_eq!(count_transitions(&db).await, 1);
         assert_eq!(count_intervals(&db).await, 1);
+    }
+
+    /// The episode axis has to survive the UPDATE half of the upsert, not only
+    /// the INSERT.
+    ///
+    /// Every alert in a running cluster already has a state row, so evaluation
+    /// always takes the conflict path. Leaving the episode columns out of
+    /// `update_columns` made the whole feature inert there — and on a row that
+    /// did carry an episode, the clearing write was dropped too, so the
+    /// recovery re-emitted on every evaluation for ever. That is the exact bug
+    /// the episode exists to make impossible, so it is pinned here.
+    #[tokio::test]
+    async fn an_episode_survives_the_upsert_and_is_cleared_by_the_recovery() {
+        let db = db().await;
+
+        // First evaluation: the row is created and the episode opens.
+        let mut opened = update_at(ROLLUP_GROUP_KEY, 1_000);
+        if let Some(state) = opened.state.as_mut() {
+            state.episode_id = Some("ep_1".to_string());
+            state.episode_opened_at = Some(1_000);
+            state.episode_incident_id = Some("inc_1".to_string());
+        }
+        persist_with(&db, &opened, None).await.unwrap();
+
+        let stored = get_with(&db, "alert-1", ROLLUP_GROUP_KEY).await.unwrap();
+        assert_eq!(
+            stored.as_ref().and_then(|s| s.episode_id.as_deref()),
+            Some("ep_1"),
+            "the INSERT half stores the episode"
+        );
+
+        // Second evaluation, same row: still firing, and the episode must not
+        // be lost by the conflict path.
+        let mut still_firing = update_at(ROLLUP_GROUP_KEY, 2_000);
+        if let Some(state) = still_firing.state.as_mut() {
+            state.episode_id = Some("ep_1".to_string());
+            state.episode_opened_at = Some(1_000);
+            state.episode_incident_id = Some("inc_1".to_string());
+        }
+        persist_with(&db, &still_firing, None).await.unwrap();
+        let stored = get_with(&db, "alert-1", ROLLUP_GROUP_KEY).await.unwrap();
+        assert_eq!(
+            stored.as_ref().and_then(|s| s.episode_id.as_deref()),
+            Some("ep_1"),
+            "the UPDATE half keeps the episode"
+        );
+
+        // The recovery clears it, on the same conflict path.
+        let mut recovered = update_at(ROLLUP_GROUP_KEY, 3_000);
+        if let Some(state) = recovered.state.as_mut() {
+            state.episode_id = None;
+            state.episode_opened_at = None;
+            state.episode_incident_id = None;
+            state.recovering_since = None;
+        }
+        persist_with(&db, &recovered, None).await.unwrap();
+
+        let stored = get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .expect("the row is still there");
+        assert!(
+            stored.episode_id.is_none(),
+            "a cleared episode must reach the database, or the recovery repeats for ever"
+        );
+        assert!(stored.episode_opened_at.is_none());
+        assert!(stored.episode_incident_id.is_none());
     }
 }

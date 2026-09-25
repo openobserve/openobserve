@@ -32,6 +32,10 @@ pub struct Model {
     /// service_discovery, trace_based, scope_match, workload_match, alert_id
     pub correlation_reason: Option<String>,
     pub created_at: i64,
+    /// When THIS firing recovered. The primary key carries `alert_fired_at`, so
+    /// a row is one firing; the incident resolves once every linked alert's
+    /// latest row has this set. NULL = still firing.
+    pub resolved_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -66,6 +70,7 @@ mod tests {
             alert_kind: "internal".to_string(),
             correlation_reason: Some("service_discovery".to_string()),
             created_at: 1000,
+            resolved_at: None,
         };
         assert_eq!(m.incident_id, "inc-1");
         assert_eq!(m.alert_id, "alert-1");

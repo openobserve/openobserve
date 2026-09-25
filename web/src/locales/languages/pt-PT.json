@@ -2765,6 +2765,13 @@
         "desc": "Executar quando um alerta disparar",
         "intro": "Quando um alerta vinculado dispara, cada passo a jusante recebe este payload."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "Evento de incidente",
         "tab": "Incidentes",
@@ -7413,7 +7420,14 @@
         "alertTriggerTimeSeconds": "Horário de acionamento em epoch segundos",
         "alertTriggerTimeStr": "Horário de acionamento, legível para humanos",
         "rows": "Todas as linhas correspondentes, formatadas pelo modelo de linha"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "notifyOnRecoveryTemplateHint": "Your template must include {'{'}alert_status{'}'}, or the recovery message will look like a new alert.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds",
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
     },
     "advanced": {
       "addVariable": "Adicionar variável",
@@ -7940,7 +7954,8 @@
     "sloKind": "Tipo de condição",
     "sloLongWindow": "Janela longa",
     "sloShortWindow": "Janela curta",
-    "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui."
+    "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",

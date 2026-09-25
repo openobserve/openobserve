@@ -1063,8 +1063,65 @@ pub async fn send_workflow_trigger(
     Ok(())
 }
 
-/// The 4-part positional run-history key. Display, not Debug: a Debug-formatted
-/// variant would put braces and spaces into a key the history API parses.
+/// Run the workflows a user explicitly wired to this alert's recovery.
+///
+/// Selected by association rather than from `alert.workflows`, which is the
+/// firing list. `trigger_type` only labels a run — `handle_workflow_trigger`
+/// never reads it to decide whether to execute — so reusing the firing list
+/// here would run every ticket-opening workflow a second time per episode,
+/// which is the outcome the separate trigger type exists to avoid.
+pub async fn send_alert_resolved(
+    alert: &config::meta::alerts::alert::Alert,
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+) -> Result<(), anyhow::Error> {
+    let associations = infra::table::workflows::get_all_associations_for_trigger_type(
+        &alert.org_id,
+        &WorkflowTriggerType::AlertResolved.to_string(),
+    )
+    .await?;
+    let source_id = alert.id.as_ref().map_or_else(
+        || format!("{}/{}", alert.org_id, alert.name),
+        |v| v.to_string(),
+    );
+    let wired: Vec<String> = associations
+        .into_iter()
+        .filter(|a| a.entity_id == source_id)
+        .map(|a| a.workflow_id)
+        .collect();
+    if wired.is_empty() {
+        return Ok(());
+    }
+
+    let metadata: HashMap<String, Value> = vec![
+        ("org_id", alert.org_id.clone().into()),
+        ("stream_type", alert.stream_type.to_string().into()),
+        ("stream_name", alert.stream_name.clone().into()),
+        ("alert_name", alert.name.clone().into()),
+        ("alert_status", "resolved".into()),
+        ("episode_id", event.episode_id.clone().into()),
+        ("alert_start_time", event.opened_at.into()),
+        ("alert_end_time", event.recovered_at.into()),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect();
+
+    let trace_id = config::ider::generate_trace_id();
+    for workflow_id in wired {
+        send_workflow_trigger(
+            &trace_id,
+            &alert.org_id,
+            source_id.clone(),
+            WorkflowTriggerType::AlertResolved,
+            &workflow_id,
+            metadata.clone(),
+            &[],
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 pub fn workflow_history_key(
     workflow_id: &str,
     trigger_type: WorkflowTriggerType,

@@ -357,6 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :isAggregationEnabled="isAggregationEnabled"
                     :destinations="formData.destinations"
                     :formattedDestinations="getFormattedDestinations"
+                    :destinationObjects="destinations"
                     :workflows="formData.workflows"
                     @update:trigger="updateTriggerCondition"
                     @update:aggregation="updateAggregation"

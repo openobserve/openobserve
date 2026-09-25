@@ -362,6 +362,8 @@ mod tests {
             alert_count: "3".into(),
             alert_agg_value: "92.5".into(),
             alert_level: "critical".into(),
+            alert_status: "firing".to_string(),
+            episode_id: None,
             alert_priority: "P1".into(),
             alert_tags: "infra, prod".into(),
             alert_threshold_crit: "90".into(),
@@ -1520,5 +1522,58 @@ mod tests {
         );
         let (_, sns_message) = sns::render_sns(&c);
         w("sns.txt", &(sns_message + "\n"));
+    }
+
+    /// The resolve half is the dedup key and nothing else: PagerDuty matches it
+    /// against the open alert and drops any resolve it cannot key — with a
+    /// `202 success`, so a missing key fails silently.
+    #[test]
+    fn a_pagerduty_resolve_carries_the_key_and_no_payload() {
+        let mut ctx = fixture_ctx();
+        ctx.alert_status = super::super::STATUS_RESOLVED.to_string();
+        ctx.episode_id = Some("ep_1".into());
+
+        let RenderedMessage::Http { body } =
+            render(ChannelFormat::PagerDuty, &hostile_content(), &ctx).unwrap()
+        else {
+            panic!("PagerDuty renders an HTTP body");
+        };
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["event_action"], "resolve");
+        assert_eq!(v["dedup_key"], "ep_1");
+        assert!(v.get("payload").is_none(), "a resolve carries no payload");
+    }
+
+    /// The trigger must carry the SAME key, or there is nothing for the resolve
+    /// to match. Without one PagerDuty invents a UUID per event, which is why
+    /// every re-firing opens a fresh incident today.
+    #[test]
+    fn a_pagerduty_trigger_carries_the_episode_key_when_recovery_is_on() {
+        let mut ctx = fixture_ctx();
+        ctx.episode_id = Some("ep_1".into());
+
+        let RenderedMessage::Http { body } =
+            render(ChannelFormat::PagerDuty, &hostile_content(), &ctx).unwrap()
+        else {
+            panic!("PagerDuty renders an HTTP body");
+        };
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["event_action"], "trigger");
+        assert_eq!(v["dedup_key"], "ep_1");
+        assert!(v.get("payload").is_some());
+    }
+
+    /// An alert that never opted into recovery keeps today's behaviour exactly:
+    /// no key, so PagerDuty's own dedup rules are untouched.
+    #[test]
+    fn a_pagerduty_trigger_without_an_episode_sends_no_key() {
+        let RenderedMessage::Http { body } =
+            render(ChannelFormat::PagerDuty, &hostile_content(), &fixture_ctx()).unwrap()
+        else {
+            panic!("PagerDuty renders an HTTP body");
+        };
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["event_action"], "trigger");
+        assert!(v.get("dedup_key").is_none());
     }
 }

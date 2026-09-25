@@ -225,7 +225,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="px-1 py-3">
               <div>{{ raw("org_name, stream_type, stream_name") }}</div>
-              <div>{{ raw("alert_name, alert_type") }}</div>
+              <div>{{ raw("alert_name, alert_type, alert_status") }}</div>
+              <div>
+                <b>{{ raw("episode_id") }}</b>
+                {{ t("alert_templates.variableEpisodeIdDescription") }}
+              </div>
               <div>{{ raw("alert_period, alert_operator, alert_threshold") }}</div>
               <div>{{ raw("alert_count, alert_agg_value") }}</div>
               <div>{{ raw("alert_description") }}</div>

@@ -2765,6 +2765,13 @@
         "desc": "알림이 발생하면 실행",
         "intro": "연결된 알림이 발생하면 모든 다운스트림 단계가 이 페이로드를 받습니다."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "인시던트 이벤트",
         "tab": "인시던트",
@@ -7413,7 +7420,14 @@
         "alertTriggerTimeSeconds": "에포크 초 단위의 트리거 시간",
         "alertTriggerTimeStr": "사람이 읽을 수 있는 트리거 시간",
         "rows": "행 템플릿으로 형식화된 모든 일치 행"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "notifyOnRecoveryTemplateHint": "Your template must include {'{'}alert_status{'}'}, or the recovery message will look like a new alert.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds",
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
     },
     "advanced": {
       "addVariable": "변수 추가",
@@ -7940,7 +7954,8 @@
     "sloKind": "조건 유형",
     "sloLongWindow": "긴 기간",
     "sloShortWindow": "짧은 기간",
-    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다."
+    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "열기",

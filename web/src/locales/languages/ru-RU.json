@@ -2765,6 +2765,13 @@
         "desc": "Запускать при срабатывании оповещения",
         "intro": "Когда связанное оповещение срабатывает, каждый последующий шаг получает эту полезную нагрузку."
       },
+      "alertResolved": {
+        "label": "Alert Resolved",
+        "tab": "Resolved",
+        "node": "Alert Resolved Trigger",
+        "desc": "Run when a firing alert recovers",
+        "intro": "When an alert that fired recovers, every downstream step receives this payload."
+      },
       "incidentEvent": {
         "label": "Событие инцидента",
         "tab": "Инциденты",
@@ -7413,7 +7420,14 @@
         "alertTriggerTimeSeconds": "Время срабатывания в секундах эпохи",
         "alertTriggerTimeStr": "Время срабатывания, в читаемом формате",
         "rows": "Все совпадающие строки, отформатированные шаблоном строки"
-      }
+      },
+      "notifyOnRecovery": "Notify on recovery",
+      "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
+      "notifyOnRecoveryTemplateHint": "Your template must include {'{'}alert_status{'}'}, or the recovery message will look like a new alert.",
+      "keepFiringFor": "Keep firing for",
+      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
+      "keepFiringForInvalid": "Enter 0 or more seconds",
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
     },
     "advanced": {
       "addVariable": "Добавить переменную",
@@ -7940,7 +7954,8 @@
     "sloKind": "Тип условия",
     "sloLongWindow": "Длинное окно",
     "sloShortWindow": "Короткое окно",
-    "sloCloneDisabled": "SLO-оповещения создаются на странице SLO, поэтому их нельзя клонировать отсюда."
+    "sloCloneDisabled": "SLO-оповещения создаются на странице SLO, поэтому их нельзя клонировать отсюда.",
+    "seconds": "Seconds"
   },
   "alert_dependencies": {
     "actionOpen": "Открыть",

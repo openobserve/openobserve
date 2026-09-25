@@ -40,6 +40,7 @@ pub mod grouping;
 pub mod incidents;
 pub mod level;
 pub mod priority;
+pub mod recovery;
 pub mod state;
 pub mod state_level;
 pub mod tags;
