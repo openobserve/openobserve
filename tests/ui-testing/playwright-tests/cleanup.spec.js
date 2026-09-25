@@ -90,6 +90,7 @@ test.describe("Pre-Test Cleanup", () => {
     // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
     await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
 
+
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
 
@@ -297,6 +298,9 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupStreams(
       [
         /^e2e_slo_14269_/,             // slo-error-messages.spec.js (#14269) seeded stream
+        /^e2e_13354_/,                 // logs-field-value-rendering.spec.js (#13354)
+        /^e2e_13896_/,                 // logs-result-display.spec.js (#13896)
+        /^e2e_13990_other_/,           // logs-bugs.spec.js (#13990)
         /^e2e_sev_str_/,               // logs-histogram-severity.spec.js (#11353)
         /^e2e_sev_num_/,               // logs-histogram-severity.spec.js (#11441)
         /^e2e_ms7332_/,                // logs-multistream-share-url.spec.js (#7332)
