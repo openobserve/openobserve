@@ -3164,8 +3164,18 @@ fn process_row_template(
     let alert_count = rows.len();
     let mut rows_tpl = Vec::with_capacity(rows.len());
 
-    // For JSON row template type, try to parse the template as JSON
     let is_json_template = row_type == RowTemplateType::Json;
+
+    if tpl.trim() == "{...row}" {
+        for row in rows.iter() {
+            rows_tpl.push(if is_json_template {
+                Value::Object(row.clone())
+            } else {
+                Value::String(serde_json::to_string(row).unwrap_or_default())
+            });
+        }
+        return rows_tpl;
+    }
 
     for row in rows.iter() {
         let mut resp = tpl.to_string();
@@ -3263,6 +3273,10 @@ fn process_row_template(
             for (key, value) in attrs.iter() {
                 process_variable_replace(&mut resp, key, &VarValue::Str(value), false);
             }
+        }
+
+        if resp.contains("{...row}") {
+            resp = resp.replace("{...row}", &serde_json::to_string(row).unwrap_or_default());
         }
 
         // If this is a JSON row template, try to parse it as JSON
@@ -4991,6 +5005,93 @@ mod tests {
         assert_eq!(result.len(), 1);
         // Should fallback to string when JSON parsing fails
         assert!(result[0].is_string());
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_json_type() {
+        let row_template = "{...row}".to_string();
+        let mut row1 = Map::new();
+        row1.insert("host".to_string(), json!("web-1"));
+        row1.insert("cpu".to_string(), json!(92.5));
+        let mut row2 = Map::new();
+        row2.insert("host".to_string(), json!("web-2"));
+        row2.insert("cpu".to_string(), json!(88.1));
+        let rows = vec![row1, row2];
+
+        let mut alert = Alert::default();
+        alert.row_template_type = RowTemplateType::Json;
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::Json,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 2);
+        assert!(result[0].is_object());
+        assert_eq!(
+            result[0].get("host").and_then(|v| v.as_str()),
+            Some("web-1")
+        );
+        assert_eq!(result[0].get("cpu").and_then(|v| v.as_f64()), Some(92.5));
+        assert!(result[1].is_object());
+        assert_eq!(
+            result[1].get("host").and_then(|v| v.as_str()),
+            Some("web-2")
+        );
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_string_type() {
+        let row_template = "{...row}".to_string();
+        let mut row1 = Map::new();
+        row1.insert("host".to_string(), json!("web-1"));
+        row1.insert("cpu".to_string(), json!(92.5));
+        let rows = vec![row1];
+
+        let alert = Alert::default(); // default is String type
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::String,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_string());
+        let s = result[0].as_str().unwrap();
+        let v: Value = serde_json::from_str(s).unwrap();
+        assert_eq!(v.get("host").and_then(|v| v.as_str()), Some("web-1"));
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_with_surrounding_whitespace() {
+        let row_template = "  {...row}  ".to_string();
+        let mut row1 = Map::new();
+        row1.insert("level".to_string(), json!("error"));
+        let rows = vec![row1];
+
+        let mut alert = Alert::default();
+        alert.row_template_type = RowTemplateType::Json;
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::Json,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_object());
+        assert_eq!(
+            result[0].get("level").and_then(|v| v.as_str()),
+            Some("error")
+        );
     }
 
     #[test]
