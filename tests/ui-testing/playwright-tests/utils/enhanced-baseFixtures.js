@@ -6,6 +6,7 @@ const testLogger = require('./test-logger.js');
 const { waitUtils } = require('./wait-helpers.js');
 const { gotoWithRetry } = require('./navigation.js');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
+const { getCloudConfig } = require('./cloud-auth.js');
 
 const istanbulCLIOutput = path.join(process.cwd(), '.nyc_output');
 const authFile = path.join(__dirname, 'auth', 'user.json');
@@ -45,15 +46,21 @@ const test = baseTest.extend({
       }
       
       // A storageState older than a day makes the cloud day-2 Slack invite modal open on every page load.
-      await context.addInitScript(() => {
+      // The connect-data popup is per-session, and opens whenever an org has no streams yet (navigateToBase runs before ingestion).
+      let cloudUserEmail = null;
+      try {
+        cloudUserEmail = isCloudEnvironment() ? getCloudConfig()?.userEmail || null : null;
+      } catch (_) {}
+      await context.addInitScript((email) => {
         try {
           for (const key of Object.keys(localStorage)) {
             if (key.startsWith('slackCommunityInvite:')) {
               localStorage.setItem(key, JSON.stringify({ status: 'resolved', shownAt: null, dismissCount: 0 }));
             }
           }
+          if (email) sessionStorage.setItem(`connectDataSourcePromptShown:${email}`, 'true');
         } catch (_) {}
-      });
+      }, cloudUserEmail);
 
       // Add coverage collection (from original baseFixtures)
       await context.addInitScript(() =>
