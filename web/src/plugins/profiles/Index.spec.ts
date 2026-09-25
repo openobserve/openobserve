@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   meta: vi.fn(),
   series: vi.fn(),
   merge: vi.fn(),
+  tagValues: vi.fn(),
   getConsumableRelativeTime: vi.fn(() => {
     const end = mocks.nowMs;
     return {
@@ -31,6 +32,7 @@ vi.mock("@/services/profiles", () => ({
     meta: mocks.meta,
     series: mocks.series,
     merge: mocks.merge,
+    tagValues: mocks.tagValues,
   },
 }));
 
@@ -49,7 +51,7 @@ const profileMetaResponse = {
     data_sources: ["collector-a"],
     services: ["service-a"],
     profile_types: [{ type: "cpu", unit: "nanoseconds" }],
-    label_names: ["service.name"],
+    label_names: ["k8s_pod_name", "process_name"],
     took: 1,
   },
 };
@@ -68,16 +70,20 @@ const mergeResponse = {
   data: {
     unit: "nanoseconds",
     profile_type: "cpu",
-    total: 10,
-    merged_total: 10,
+    total: 30,
+    merged_total: 30,
     truncated: false,
     root: {
       name: "root",
-      self: 10,
-      total: 10,
+      self: 0,
+      total: 30,
       children: [],
     },
-    top: [{ name: "root", self: 10, total: 10 }],
+    top: [
+      { name: "fn-a", self: 10, total: 20 },
+      { name: "fn-b", self: 5, total: 30 },
+      { name: "fn-c", self: 15, total: 15 },
+    ],
     took: 1,
   },
 };
@@ -94,6 +100,21 @@ describe("Profiles page", () => {
     },
     OContent: {
       template: "<div><slot /></div>",
+    },
+    OIcon: true,
+    OTag: {
+      template: "<div><slot /><slot name='trailing' /></div>",
+    },
+    OTooltip: true,
+    OEmptyState: {
+      template: '<div data-test="profiles-no-results">No Profiles found</div>',
+    },
+    OSpinner: true,
+    OSearchInput: {
+      template:
+        '<input :value="modelValue" :data-test="$attrs[\'data-test\']" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+      props: ["modelValue", "placeholder"],
+      emits: ["update:modelValue"],
     },
     OSelect: {
       template:
@@ -134,6 +155,9 @@ describe("Profiles page", () => {
     mocks.meta.mockResolvedValue(profileMetaResponse);
     mocks.series.mockResolvedValue(seriesResponse);
     mocks.merge.mockResolvedValue(mergeFor("fn-a"));
+    mocks.tagValues.mockResolvedValue({
+      data: { tag: "k8s_pod_name", values: ["pod-a", "pod-b"], took: 1 },
+    });
   });
 
   it("shows an explicit stream selector and loads the first stream by default", async () => {
@@ -253,5 +277,56 @@ describe("Profiles page", () => {
     ).toBe("profiles-a");
     expect(wrapper.text()).toContain("fn-a");
     expect(wrapper.text()).not.toContain("fn-b");
+  });
+
+  it("loads tag values and applies a filter to the next query", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
+    await flushPromises();
+    await nextTick();
+
+    expect(mocks.tagValues).toHaveBeenCalledWith(
+      orgIdentifier,
+      "profiles-a",
+      expect.objectContaining({ tag: "k8s_pod_name" }),
+    );
+
+    await wrapper.find('[data-test="profiles-tag-value-select"] select').setValue("pod-a");
+    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
+    await flushPromises();
+    await nextTick();
+
+    expect(wrapper.find('[data-test="profiles-applied-filters"]').exists()).toBe(true);
+    const lastSeriesPayload = mocks.series.mock.calls[mocks.series.mock.calls.length - 1][2];
+    expect(lastSeriesPayload.filters).toEqual([{ key: "k8s_pod_name", op: "=", value: "pod-a" }]);
+  });
+
+  it("sorts the top table by Self when the column header is clicked", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.find('[data-test="profiles-view-top"]').trigger("click");
+    await nextTick();
+
+    const namesBefore = wrapper
+      .findAll("tbody tr")
+      .map((row) => row.find("td").text())
+      .filter(Boolean);
+    expect(namesBefore[0]).toBe("fn-b");
+
+    await wrapper.find('[data-test="profiles-sort-self"]').trigger("click");
+    await nextTick();
+
+    const namesAfter = wrapper
+      .findAll("tbody tr")
+      .map((row) => row.find("td").text())
+      .filter(Boolean);
+    expect(namesAfter[0]).toBe("fn-c");
   });
 });
