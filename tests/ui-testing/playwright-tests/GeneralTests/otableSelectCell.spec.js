@@ -9,24 +9,17 @@ test.describe("OTable Select Cell Click Selection testcases", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
     let email;
+    let secondEmail;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        const uniqueName = uniqueSaName();
-        email = pm.iamPage.serviceAccountEmailFor(uniqueName);
+        secondEmail = undefined;
 
         await pm.iamPage.gotoIamPage();
         await pm.iamPage.iamPageServiceAccountsTab();
-        await pm.iamPage.iamPageAddServiceAccount();
-        await pm.iamPage.enterNameServiceAccount(uniqueName);
-        await pm.iamPage.clickSaveServiceAccount();
-        await pm.iamPage.verifySuccessMessage('Service account created successfully.');
-        await pm.iamPage.clickServiceAccountPopUpClosed();
-        await pm.iamPage.reloadServiceAccountPage();
-        await pm.iamPage.waitForSelectCell(email);
+        email = await pm.iamPage.createServiceAccount(uniqueSaName());
         testLogger.info('Test setup completed');
     });
 
@@ -37,6 +30,14 @@ test.describe("OTable Select Cell Click Selection testcases", () => {
             await pm.iamPage.requestServiceAccountOk();
         } catch {
             // Row may already be gone — nothing further to clean up.
+        }
+        if (secondEmail) {
+            try {
+                await pm.iamPage.deletedServiceAccount(secondEmail);
+                await pm.iamPage.requestServiceAccountOk();
+            } catch {
+                // Row may already be gone — nothing further to clean up.
+            }
         }
     });
 
@@ -94,6 +95,47 @@ test.describe("OTable Select Cell Click Selection testcases", () => {
         testLogger.info('Click the checkbox square again to deselect the row');
         await pm.iamPage.clickCheckboxByEmail(email);
         await pm.iamPage.expectRowCheckboxUnchecked(email);
+
+        testLogger.info('Test completed');
+    });
+
+    test("header shows indeterminate state when exactly one of several selectable rows is selected", {
+        tag: ['@otable-select-cell', '@selection', '@indeterminate', '@P1', '@all'],
+    }, async () => {
+        testLogger.info('Create a second selectable service account row');
+        const secondName = uniqueSaName();
+        secondEmail = await pm.iamPage.createServiceAccount(secondName);
+        await pm.iamPage.waitForSelectCell(email);
+
+        testLogger.info('Assert the header checkbox is initially unchecked');
+        await pm.iamPage.expectSelectAllCheckboxUnchecked();
+
+        testLogger.info('Select only the first row via its select-cell padding');
+        await pm.iamPage.clickSelectCellPadding(email);
+        await pm.iamPage.expectRowCheckboxChecked(email);
+        await pm.iamPage.expectRowCheckboxUnchecked(secondEmail);
+
+        testLogger.info('Assert the header checkbox is indeterminate, not checked');
+        await pm.iamPage.expectSelectAllCheckboxIndeterminate();
+        await pm.iamPage.expectDeleteSelectedBtnVisible();
+
+        testLogger.info('Test completed');
+    });
+
+    test("system-managed SRE Agent row is non-selectable", {
+        tag: ['@otable-select-cell', '@selection', '@systemRow', '@P1', '@all'],
+    }, async () => {
+        test.skip(!(await pm.iamPage.sreAgentSystemAccountExists()), 'SRE Agent system row not present');
+
+        testLogger.info('Assert the system row checkbox is disabled and unchecked');
+        await pm.iamPage.expectSystemRowCheckboxDisabled();
+
+        testLogger.info('Click the system row select-cell padding (must be ignored)');
+        await pm.iamPage.clickSystemRowSelectCellPadding();
+
+        testLogger.info('Assert the system row checkbox is still disabled and unchecked');
+        await pm.iamPage.expectSystemRowCheckboxDisabled();
+        await pm.iamPage.expectDeleteSelectedBtnHidden();
 
         testLogger.info('Test completed');
     });

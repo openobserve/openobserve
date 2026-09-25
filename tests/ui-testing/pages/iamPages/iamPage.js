@@ -109,6 +109,8 @@ export class IamPage {
         );
         this.systemRowDeleteButton = this.systemAccountRow.locator('[data-test="service-accounts-delete"]');
         this.systemRowUpdateButton = this.systemAccountRow.locator('[data-test="service-accounts-edit"]');
+        this.systemRowSelectCell = this.systemAccountRow.locator('td[data-test="o2-table-select-cell"]');
+        this.systemRowCheckbox = this.systemRowSelectCell.locator('button[role="checkbox"]');
     }
 
     async gotoIamPage() {
@@ -255,6 +257,22 @@ export class IamPage {
         await this.serviceAccountsTab.waitFor({ state: 'visible', timeout: 10000 });
     }
 
+    /**
+     * Full create flow for one service account (no navigation — caller must
+     * already be on the Service Accounts tab). Returns the synthetic email.
+     */
+    async createServiceAccount(name) {
+        const email = this.serviceAccountEmailFor(name);
+        await this.iamPageAddServiceAccount();
+        await this.enterNameServiceAccount(name);
+        await this.clickSaveServiceAccount();
+        await this.verifySuccessMessage('Service account created successfully.');
+        await this.clickServiceAccountPopUpClosed();
+        await this.reloadServiceAccountPage();
+        await this.waitForSelectCell(email);
+        return email;
+    }
+
     async deletedServiceAccount(emailName) {
         // First check if this is a system account that shouldn't be deleted
         const isSystemAccount = emailName.includes('o2-sre-agent');
@@ -377,6 +395,10 @@ export class IamPage {
         await expect(this.selectAllCheckboxBtn).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
     }
 
+    async expectSelectAllCheckboxIndeterminate() {
+        await expect(this.selectAllCheckboxBtn).toHaveAttribute('data-state', 'indeterminate', { timeout: 10000 });
+    }
+
     async expectDeleteSelectedBtnVisible() {
         await expect(this.deleteSelectedBtn).toBeVisible({ timeout: 10000 });
     }
@@ -395,6 +417,21 @@ export class IamPage {
             .locator('tbody button[role="checkbox"][data-state="checked"]')
             .count();
         expect(checkedCount).toBe(selectableRowCount);
+    }
+
+    // System row is never selectable: its checkbox stays unchecked and disabled,
+    // and clicking its select-cell padding is a no-op (isRowSelectable === false).
+    async expectSystemRowCheckboxDisabled() {
+        await expect(this.systemRowCheckbox).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
+        await expect(this.systemRowCheckbox).toBeDisabled();
+    }
+
+    async clickSystemRowSelectCellPadding() {
+        const cell = this.systemRowSelectCell;
+        const box = await cell.boundingBox();
+        await cell.click({
+            position: { x: box ? box.width - 4 : 40, y: box ? box.height / 2 : 15 },
+        });
     }
 
     // ============================================================
