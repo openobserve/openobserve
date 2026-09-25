@@ -69,12 +69,10 @@ vi.mock("vuex", () => ({
 const { default: dbMonitoringService } = await import("@/services/db_monitoring");
 const service = dbMonitoringService as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
-const { useDbmTabCounts, clearDbmTabCounts, fetchDbmTabCounts } =
-  await import("@/composables/dbm/useDbmTabCounts");
-// The scope filters' instance picker reads the org's fleet through its own
-// module-scoped cache, so one test's in-flight read would otherwise be served
-// to the next.
-const { clearDbmFleetInstances } = await import("@/composables/dbm/useDbmFleetInstances");
+const { useDbmTabCounts, fetchDbmTabCounts } = await import("@/composables/dbm/useDbmTabCounts");
+// The scope filters' instance picker reads the org's fleet through the query
+// cache, so one test's read would otherwise be served to the next.
+const { queryClient } = await import("@/composables/query/queryClient");
 const { badgeCount, claimedCount } = await import("@/utils/dbm/format");
 
 /**
@@ -105,8 +103,7 @@ const WINDOW = { startTime: 1_000, endTime: 2_000 };
 describe("a failed fan-out must not blank badges that were already answered", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
-    clearDbmFleetInstances();
+    queryClient.clear();
   });
 
   it("keeps the previous window's numbers when the next fan-out fails", async () => {
@@ -151,8 +148,7 @@ describe("a failed fan-out must not blank badges that were already answered", ()
 describe("the databases fallback counts the same refs the fleet union renders", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
-    clearDbmFleetInstances();
+    queryClient.clear();
   });
 
   it("derives instance refs from the statement lists, not only sessions and blocking", async () => {
@@ -228,8 +224,7 @@ describe("the databases fallback counts the same refs the fleet union renders", 
 describe("one dead slice must not blank a badge the last window answered", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
-    clearDbmFleetInstances();
+    queryClient.clear();
   });
 
   it("carries the previous count for a slice that came back null", async () => {
@@ -282,8 +277,7 @@ describe("one dead slice must not blank a badge the last window answered", () =>
 describe("what one page learns is visible from every tab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
-    clearDbmFleetInstances();
+    queryClient.clear();
   });
 
   it("publishes a page's own refined count into the shared snapshot", async () => {
@@ -320,6 +314,21 @@ describe("what one page learns is visible from every tab", () => {
       badgeCount(counts.value.databaseCount),
       "a stale published count must not survive a window change",
     ).toBe("1");
+  });
+
+  /// The same window reloading — a tab switch past the tier, or Refresh — is
+  /// not a new question, so the page's more exact number stands until that
+  /// page re-measures and republishes.
+  it("keeps a page's published count when the same window reloads", async () => {
+    service.getBadges.mockResolvedValue({ data: envelope() });
+    const { counts, load, publishOwnCount } = useDbmTabCounts();
+
+    await load("acme", RANGE, WINDOW, { system: "postgresql" });
+    publishOwnCount("databaseCount", 6);
+    await load("acme", RANGE, WINDOW, { system: "postgresql" }, { force: true });
+
+    expect(service.getBadges).toHaveBeenCalledTimes(2);
+    expect(badgeCount(counts.value.databaseCount)).toBe("6");
   });
 
   it("treats an empty breakdown beside total:0 as a MEASURED zero, not an unknown", async () => {
@@ -589,8 +598,7 @@ describe("a page withholds its badge until it has actually loaded", () => {
 describe("the badge fan-out is scoped by every filter the reader set", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
-    clearDbmFleetInstances();
+    queryClient.clear();
     service.getBadges.mockResolvedValue({ data: envelope() });
   });
 
@@ -655,8 +663,7 @@ describe("the badge fan-out is scoped by every filter the reader set", () => {
 describe("a capped table-health read is a claim, not a total", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
-    clearDbmFleetInstances();
+    queryClient.clear();
   });
 
   it("renders a truncated count with the + disclosure", async () => {

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { generateTraceContext } from "@/utils/zincutils";
-import { patchNsFieldsInJson } from "@/utils/nsFieldsPatch";
+import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
 import type {
   OrgTraceTimeRangeResponse,
@@ -87,27 +87,21 @@ const search = {
     if (is_multi_stream_search) url += `&is_multi_stream_search=${is_multi_stream_search}`;
     if (validate) url += `&validate=${validate}`;
     // Built once and reused by every post() branch below, so the signal reaches the
-    // multi-stream and aggs paths too — not just the default one.
-    const baseAxiosConfig =
-      page_type === "traces"
-        ? {
-            transformResponse: [
-              (data: string) => {
-                try {
-                  return JSON.parse(patchNsFieldsInJson(data));
-                } catch {
-                  return JSON.parse(data);
-                }
-              },
-            ],
+    // multi-stream and aggs paths too — not just the default one. Always patches
+    // large integers (any field, e.g. a user-defined `userid`, #14376) so
+    // JSON.parse can't silently round them — not just for page_type "traces".
+    const baseAxiosConfig = {
+      transformResponse: [
+        (data: string) => {
+          try {
+            return JSON.parse(patchLargeNumbersInJson(data));
+          } catch {
+            return JSON.parse(data);
           }
-        : undefined;
-    // Only materialise a config object when there is something to put in it, so callers
-    // passing neither a traces transform nor a signal keep the previous `undefined`.
-    const axiosConfig =
-      signal || baseAxiosConfig
-        ? { ...(baseAxiosConfig ?? {}), ...(signal ? { signal } : {}) }
-        : undefined;
+        },
+      ],
+    };
+    const axiosConfig = signal ? { ...baseAxiosConfig, signal } : baseAxiosConfig;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;

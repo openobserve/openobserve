@@ -15032,8 +15032,8 @@
       "serving": "Verified. This domain now serves your status page, as long as its CNAME points at this app's host."
     },
     "preview": {
-      "title": "Live preview",
-      "subtitle": "How your public page looks as you edit",
+      "title": "Preview",
+      "subtitle": "Updates as you edit. Uptime shown is sample data.",
       "sampleBadge": "Sample data",
       "eyebrow": "Service status",
       "untitled": "Your status page",
@@ -19154,6 +19154,8 @@
     "rotationNobody": "Nobody on call",
     "edit": "Edit",
     "timelineLoadFailed": "Could not resolve the schedule for this window",
+    "editorReadFailed": "Could not load the latest copy to edit. Try again.",
+    "refreshFailed": "Could not refresh. What is shown may be out of date.",
     "scheduleDoneEditing": "Back to schedule",
     "coverWhoRequired": "Choose who is covering",
     "timelineCoverAria": "{who} is covering {rotation}, {from} to {to}",

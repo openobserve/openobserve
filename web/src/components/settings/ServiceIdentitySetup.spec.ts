@@ -69,6 +69,8 @@ vi.mock("@/lib/forms/TagInput/OTagInput.vue", () => ({
 
 import ServiceIdentitySetup from "./ServiceIdentitySetup.vue";
 import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 
 // ─── Test setup ──────────────────────────────────────────────────────────────
 
@@ -305,6 +307,44 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       // loading=true: v-else branch (which contains the save btn) is hidden
       expect(wrapper.find('[data-test="service-identity-save-btn"]').exists()).toBe(false);
+    });
+  });
+
+  // The server builds the discovered-services list from this config, so a save expires the whole scope.
+  describe("saving", () => {
+    const scope = { queryKey: serviceStreamKeys.all("test-org") };
+    const oneSet = {
+      data: {
+        sets: [{ id: "k8s", label: "Kubernetes", distinguish_by: ["k8s-namespace"] }],
+        tracked_alias_ids: ["k8s-namespace"],
+      },
+    };
+
+    it("expires the service-correlation cache after a successful save", async () => {
+      vi.mocked(serviceStreamsService.getIdentityConfig).mockResolvedValueOnce(oneSet as any);
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      wrapper = mountComponent();
+      await flushPromises();
+      await (wrapper.vm as any).saveConfig();
+      await flushPromises();
+
+      expect(serviceStreamsService.saveIdentityConfig).toHaveBeenCalled();
+      expect(spy).toHaveBeenCalledWith(scope);
+      spy.mockRestore();
+    });
+
+    it("leaves the cache alone when the save fails", async () => {
+      vi.mocked(serviceStreamsService.getIdentityConfig).mockResolvedValueOnce(oneSet as any);
+      vi.mocked(serviceStreamsService.saveIdentityConfig).mockRejectedValueOnce(new Error("boom"));
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      wrapper = mountComponent();
+      await flushPromises();
+      await (wrapper.vm as any).saveConfig();
+      await flushPromises();
+
+      expect(serviceStreamsService.saveIdentityConfig).toHaveBeenCalled();
+      expect(spy).not.toHaveBeenCalledWith(scope);
+      spy.mockRestore();
     });
   });
 

@@ -4,6 +4,7 @@
 
 import { expect } from "@playwright/test";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
+import testLogger from "../../playwright-tests/utils/test-logger.js";
 import {
   SELECTORS,
   getVariableSelector,
@@ -2691,6 +2692,8 @@ export default class DashboardVariablesScoped {
   async openDashboardRefreshOptions() {
     const trigger = this.page.locator('[data-test="dashboard-refresh-options-btn"]');
     await trigger.waitFor({ state: "visible", timeout: 15000 });
+    // Disabled while any panel is loading.
+    await expect(trigger).toBeEnabled({ timeout: 30000 });
     await trigger.click();
   }
 
@@ -2709,9 +2712,19 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<URL>}
    */
   async clickRefreshWithoutCacheAndWaitForClearCache() {
-    await this.openDashboardRefreshOptions();
     const item = this.getRefreshWithoutCacheMenuItem();
-    await item.waitFor({ state: "visible", timeout: 10000 });
+    const openItem = async () => {
+      await this.openDashboardRefreshOptions();
+      await item.waitFor({ state: "visible", timeout: 10000 });
+    };
+    // Reka UI dropdowns can drop a click that lands mid-animation — retry once.
+    try {
+      await openItem();
+    } catch {
+      await this.page.keyboard.press("Escape");
+      await item.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+      await openItem();
+    }
 
     const [request] = await Promise.all([
       this.page.waitForRequest(
@@ -2756,21 +2769,88 @@ export default class DashboardVariablesScoped {
       await kebab.click();
       await item.waitFor({ state: "visible", timeout: 10000 });
     };
-    try {
-      await openItem();
-    } catch {
-      await this.page.keyboard.press("Escape");
-      await openItem();
-    }
+    const clickAndWaitForClearCache = async (timeout) => {
+      try {
+        await openItem();
+      } catch {
+        await this.page.keyboard.press("Escape");
+        await openItem();
+      }
+      const [request] = await Promise.all([
+        this.page.waitForRequest(
+          (req) => req.url().includes("_search_stream") && req.url().includes("clear_cache=true"),
+          { timeout }
+        ),
+        item.click(),
+      ]);
+      return new URL(request.url());
+    };
 
-    const [request] = await Promise.all([
-      this.page.waitForRequest(
-        (req) => req.url().includes("_search_stream") && req.url().includes("clear_cache=true"),
-        { timeout: 30000 }
-      ),
-      item.click(),
-    ]);
-    return new URL(request.url());
+    try {
+      return await clickAndWaitForClearCache(15000);
+    } catch {
+      // onRefreshPanel() silently ignores the request while the panel is still loading.
+      testLogger.warn(`Panel "${title}" ignored Refresh Cache & Reload, retrying once idle`);
+      await this.page.keyboard.press("Escape");
+      await this.waitForPanelIdle(title);
+      return await clickAndWaitForClearCache(30000);
+    }
+  }
+
+  /**
+   * Locator for a panel container by its title.
+   * @param {string} title - Panel title
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelContainerByTitle(title) {
+    return this.page.locator(`${SELECTORS.PANEL_CONTAINER}[data-test-panel-title="${title}"]`);
+  }
+
+  /**
+   * Wait until the titled panel has no query in flight and stays that way for `stableMs`.
+   * @param {string} title - Panel title
+   * @param {{ timeout?: number, stableMs?: number }} [options]
+   */
+  async waitForPanelIdle(title, { timeout = 30000, stableMs = 2000 } = {}) {
+    const container = this.getPanelContainerByTitle(title);
+    await container.waitFor({ state: "visible", timeout });
+    // The panel's own refresh button is bound to :disabled="isPanelLoading".
+    const btn = container.locator(SELECTORS.PANEL_REFRESH_BTN);
+    const deadline = Date.now() + timeout;
+    let idleSince = null;
+    // A freshly mounted panel reads idle before its first query starts, so idle must hold.
+    while (idleSince === null || Date.now() - idleSince < stableMs) {
+      if (Date.now() > deadline) {
+        throw new Error(`Panel "${title}" did not settle within ${timeout}ms`);
+      }
+      const enabled = await btn.isEnabled().catch(() => false);
+      if (!enabled) idleSince = null;
+      else if (idleSince === null) idleSince = Date.now();
+      await this.page.waitForTimeout(250);
+    }
+  }
+
+  /**
+   * Record the panel_id of every search request fired during `action` plus `settleMs`.
+   * @param {() => Promise<void>} action
+   * @param {number} [settleMs=3000]
+   * @returns {Promise<string[]>} panel ids, one entry per request
+   */
+  async capturePanelQueryIds(action, settleMs = 3000) {
+    const panelIds = [];
+    const onRequest = (req) => {
+      const url = new URL(req.url());
+      const panelId = url.searchParams.get("panel_id");
+      if (url.pathname.includes("_search") && panelId) panelIds.push(panelId);
+    };
+    this.page.on("request", onRequest);
+    try {
+      await action();
+      await this.page.waitForTimeout(settleMs);
+    } finally {
+      this.page.off("request", onRequest);
+    }
+    return panelIds;
   }
 
   /**
@@ -2780,6 +2860,7 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<URL>}
    */
   async clickDashboardRefreshAndWaitForSearch() {
+    await expect(this.page.locator(SELECTORS.REFRESH_BTN)).toBeEnabled({ timeout: 30000 });
     const [request] = await Promise.all([
       this.page.waitForRequest(
         (req) => req.url().includes("_search_stream"),

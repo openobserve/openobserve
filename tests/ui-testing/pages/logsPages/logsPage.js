@@ -506,6 +506,18 @@ export class LogsPage {
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
         this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
+        // useLogsHighlighter marks FTS matches with .log-highlighted inside the result cell.
+        this.highlightedMatch = '[data-test="logs-search-result-logs-table"] .log-highlighted';
+        // The "=" icon is revealed on hover over its sidebar field row.
+        this.fieldListItemPrefix = 'logs-field-list-item-';
+        this.logDetailRowPrefix = 'log-detail-row-';
+        this.fieldValuesList = '[data-test="field-values-panel-values-list"]';
+        this.fieldValueLabelPrefix = (field) => `[data-test^="logs-search-subfield-add-${field}-"]`;
+        this.fieldEqualsButton = (field) => `[data-test="log-search-index-list-filter-${field}-field-btn"]`;
+        this.logDetailRow = (field) => `[data-test="log-detail-row-${field}"]`;
+        this.logDetailFieldMenuTrigger = '[data-test="log-details-include-exclude-field-btn"]';
+        this.logDetailAddFieldItem = '[data-test="log-details-add-field-btn"]';
+        this.tableExpandCell = '[data-test="logs-search-result-logs-table"] tbody tr[data-test="o2-table-row-0"] td[data-test="o2-table-expand-cell"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -2021,6 +2033,130 @@ export class LogsPage {
         }
         // Final attempt — let it throw if it still fails
         await expect(searchResult).toContainText(expectedPattern, { timeout: 15000 });
+    }
+
+    /** Choose a page size without asserting the banner, for tests that assert rows instead. */
+    async selectRecordsPerPage(size) {
+        const dropdown = this.page.locator(this.recordsPerPageDropdown);
+        await dropdown.waitFor({ state: 'visible', timeout: 15000 });
+        await dropdown.click({ force: true });
+        const option = this.page.locator(this.recordsPerPageOption(size)).first();
+        await option.waitFor({ state: 'visible', timeout: 10000 });
+        await option.click({ force: true });
+        await expect(this.page.locator(this.paginationRowCountTitle))
+            .toContainText(`1 to ${size}`, { timeout: 30000 });
+    }
+
+    /**
+     * Wait until the banner reports the expected total.
+     *
+     * Ingest acknowledges before every row is searchable, so a query fired
+     * immediately after seeding sees an arbitrary prefix of the rows -- the same
+     * seed produced 12, then 6, then 3 across consecutive runs. Re-running the
+     * query while polling lets the index catch up.
+     */
+    async waitForResultTotal(expected, attempts = 12) {
+        for (let i = 0; i < attempts; i++) {
+            const title = await this.getResultTitleText();
+            const total = Number((title.match(/out of\s+([\d.]+)/) || [])[1]);
+            if (total === expected) return title;
+            await this.page.waitForTimeout(2000);
+            await this.clickRefreshButton();
+            await this.expectResultsGridSettledWithRows();
+        }
+        throw new Error(
+            `banner never reported ${expected} events; last was "${(await this.getResultTitleText()).replace(/\n/g, ' | ')}"`,
+        );
+    }
+
+    /** The "1 to N out of M events" banner, used to compare the claim against rendered rows. */
+    async getResultTitleText() {
+        return (await this.page.locator(this.paginationRowCountTitle).first().innerText()).trim();
+    }
+
+    /** #9542: match_all matches must render highlighted, not plain. */
+    async expectHighlightedMatchesRendered() {
+        await expect(this.page.locator(this.highlightedMatch).first()).toBeVisible({ timeout: 20000 });
+    }
+
+    async getHighlightedMatchCount() {
+        return await this.page.locator(this.highlightedMatch).count();
+    }
+
+    /**
+     * Rendered text and wrapping of a sidebar field's first value row.
+     *
+     * The wrapping lives on an inner value div carrying `title`, not on the
+     * labelled element itself, so reading the label's own computed style
+     * reports the wrapper's `normal` and misses the fix entirely.
+     */
+    async getFirstFieldValueRendering(field) {
+        const label = this.page.locator(this.fieldValueLabelPrefix(field)).first();
+        await label.waitFor({ state: 'visible', timeout: 20000 });
+        const value = label.locator('div[title]').first();
+        await value.waitFor({ state: 'visible', timeout: 10000 });
+        return await value.evaluate((el) => ({
+            whiteSpace: getComputedStyle(el).whiteSpace,
+            text: el.innerText,
+            newlineCount: (el.innerText.match(/\n/g) || []).length,
+        }));
+    }
+
+    /** Sidebar fields that offer an "=" filter, in render order; the set varies by dataset. */
+    async getFilterableSidebarFields(count = 2) {
+        const fields = await this.page
+            .locator(`[data-test^="${this.fieldListItemPrefix}"]`)
+            .evaluateAll((items, prefix) =>
+                items.map((i) => (i.getAttribute('data-test') || '').replace(prefix, '')),
+            this.fieldListItemPrefix);
+        const usable = fields.filter((f) => f && f !== '_timestamp');
+        if (usable.length < count) {
+            throw new Error(`need ${count} filterable sidebar fields, saw: ${fields.join(', ')}`);
+        }
+        return usable.slice(0, count);
+    }
+
+    /** Click a sidebar field's "=" icon; it only renders while its row is hovered. */
+    async addEqualsFilterForField(field) {
+        await this.page.locator(this.fieldListItem(field)).first().hover();
+        const button = this.page.locator(this.fieldEqualsButton(field)).first();
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        await button.click();
+    }
+
+    async expandFirstResultRow() {
+        await this.page.locator(this.tableExpandCell).click();
+        await expect(this.page.locator(this.logDetailRow('_timestamp'))).toBeVisible({ timeout: 15000 });
+    }
+
+    /** First expanded-row field that offers the add/remove action; timestamp never does. */
+    async getFirstActionableDetailField() {
+        const fields = await this.page
+            .locator(`[data-test^="${this.logDetailRowPrefix}"]`)
+            .evaluateAll((rows, prefix) =>
+                rows.map((r) => (r.getAttribute('data-test') || '').replace(prefix, '')),
+            this.logDetailRowPrefix);
+        const field = fields.find((f) => f && f !== '_timestamp');
+        if (!field) throw new Error(`no actionable field in the expanded row, saw: ${fields.join(', ')}`);
+        return field;
+    }
+
+    /**
+     * Open one expanded-row field's action menu and read its add/remove label.
+     * The menu is scoped to its own log-detail-row: the timestamp column renders no
+     * add item at all, so an unscoped lookup finds nothing.
+     */
+    async getAddOrRemoveFieldLabel(field) {
+        const row = this.page.locator(this.logDetailRow(field));
+        await row.hover();
+        await row.locator(this.logDetailFieldMenuTrigger).first().click();
+        const item = this.page.locator(this.logDetailAddFieldItem).first();
+        await item.waitFor({ state: 'visible', timeout: 10000 });
+        return (await item.innerText()).trim();
+    }
+
+    async clickAddOrRemoveFieldItem() {
+        await this.page.locator(this.logDetailAddFieldItem).first().click();
     }
 
     async pageNotVisible() {

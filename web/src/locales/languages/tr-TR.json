@@ -19154,6 +19154,8 @@
     "rotationNobody": "Nöbette kimse yok",
     "edit": "Düzenle",
     "timelineLoadFailed": "Bu zaman aralığı için çizelge çözümlenemedi",
+    "editorReadFailed": "Düzenlemek için en son kopya yüklenemedi. Tekrar deneyin.",
+    "refreshFailed": "Yenilenemedi. Gösterilen bilgiler güncel olmayabilir.",
     "scheduleDoneEditing": "Çizelgeye Dön",
     "coverWhoRequired": "Yerine bakacak kişiyi seçin",
     "timelineCoverAria": "{who}, {rotation} rotasyonunda {from} ile {to} arasında nöbet tutuyor",

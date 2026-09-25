@@ -129,6 +129,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
+import { setRoutingConfigMutation } from "@/services/oncall.queries";
+import { useMutation } from "@tanstack/vue-query";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
@@ -152,11 +154,13 @@ const {
   config: routingConfig,
   loading: loadingRoutingConfig,
   load: loadRoutingConfig,
-  refresh: refreshRoutingConfig,
 } = useOnCallRoutingConfig();
 const draftDefaultTeam = ref<string | null>(null);
 const savingDefault = ref(false);
 const open = ref(false);
+
+// Getter form, so the write follows an org switch.
+const routingConfigWrite = useMutation(() => setRoutingConfigMutation(orgId.value));
 
 const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? null);
 
@@ -227,13 +231,9 @@ async function saveDefaultTeam() {
 
   savingDefault.value = true;
   try {
-    await oncallService.setRoutingConfig({
-      org_identifier: orgId.value,
-      data: { default_team_id: draftDefaultTeam.value },
-    });
-    // Re-read rather than patching: the value is shared, so a local assignment
-    // would leave the other readers on this screen showing the old catch-all.
-    await refreshRoutingConfig(orgId.value);
+    await routingConfigWrite.mutateAsync(draftDefaultTeam.value);
+    // Shared with the other readers on this screen, which a local patch leaves stale.
+    await loadRoutingConfig(orgId.value);
     draftDefaultTeam.value = routingConfig.value?.default_team_id ?? null;
     open.value = false;
     toast({
