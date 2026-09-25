@@ -112,13 +112,17 @@ def setup_rbac_users(create_session, base_url, org_id):
             # Create authenticated session via login endpoint
             user_session = create_user_session(email, password, url)
             if not user_session:
-                # Skip rather than raise: an unprovisionable role user means the
-                # build cannot support these cases, and raising reports five
-                # setup errors instead of one clear skip.
+                # Fail loudly rather than skip. The module gate already
+                # established that this build supports custom roles, so failing
+                # to provision one here is a real defect -- skipping would hide
+                # it, which is how the 15-character password policy went
+                # unnoticed. The create response is included so the cause is
+                # visible without re-running.
                 logger.error(f"Failed to create session for {email}")
-                pytest.skip(
-                    f"could not provision the {role} user ({email}); "
-                    f"create returned {response.status_code}: {response.text[:200]}"
+                raise AssertionError(
+                    f"could not provision the {role} user ({email}) on a build that "
+                    f"reports custom-role support; create returned "
+                    f"{response.status_code}: {response.text[:200]}"
                 )
 
             # Store user info
