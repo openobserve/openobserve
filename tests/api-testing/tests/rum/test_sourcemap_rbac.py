@@ -32,6 +32,11 @@ pytestmark = [
     pytest.mark.order(2),
 ]
 
+logger = logging.getLogger(__name__)
+
+# Test user credentials (created during test run)
+test_users = {}
+
 
 @pytest.fixture(scope="module", autouse=True)
 def _require_custom_roles(create_session, base_url):
