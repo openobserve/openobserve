@@ -37,33 +37,26 @@ pytestmark = [
 def _require_custom_roles(create_session, base_url):
     """Skip on builds without custom roles, rather than skipping everywhere.
 
-    These cases need viewer/editor/admin accounts. An OSS build answers
-    `400 Custom roles not allowed` to a role-bearing user create, so the users
-    cannot exist and every case errors at login. Enterprise allows them.
+    These cases need viewer/editor/admin accounts. An OSS build has no custom
+    roles, so the users cannot exist and every case errors at login.
 
     This replaces an unconditional `pytest.mark.skip`, which skipped the module
     on EVERY build -- enterprise included -- so these cases had never run
     anywhere. The capability is probed rather than assumed from the edition, in
     the same way `test_anomaly_conditions.py` probes its endpoint.
+
+    The probe is deliberately READ-ONLY. Creating and deleting a probe user
+    would mutate the shared `default` org from an autouse fixture, in parallel
+    (xdist) with the RBAC suite that tests user permissions -- `GET /roles`
+    answers 403 "Not Supported" on OSS and lists roles on enterprise, which is
+    the same signal without touching anything.
     """
-    probe = create_session.post(
-        f"{base_url}api/default/users",
-        json={
-            "email": "rbac_probe@sourcemap-test.local",
-            "password": "Complexpass#123",
-            "role": "viewer",
-            "first_name": "rbac",
-            "last_name": "probe",
-        },
-    )
-    if probe.status_code == 400 and "custom roles" in probe.text.lower():
-        pytest.skip("custom roles are not available on this build (OSS)")
-    create_session.delete(f"{base_url}api/default/users/rbac_probe@sourcemap-test.local")
-
-logger = logging.getLogger(__name__)
-
-# Test user credentials (created during test run)
-test_users = {}
+    probe = create_session.get(f"{base_url}api/default/roles")
+    if probe.status_code != 200:
+        pytest.skip(
+            f"custom roles are not available on this build "
+            f"(GET /roles -> {probe.status_code})"
+        )
 
 
 @pytest.fixture(scope="module", autouse=True)
