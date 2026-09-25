@@ -396,7 +396,9 @@ test.describe("Dashboard Create Alert testcases", () => {
       await pm.dashboardCreate.createDashboard(dashName);
 
       // Add a scatter panel. Scatter needs numeric X and Y axes to render; the
-      // shared e2e_automate stream provides took (X) and FloatValue (Y).
+      // shared e2e_automate stream provides took (X) and FloatValue (Y). The
+      // builder seeds a histogram(_timestamp) X field, which blocks the second
+      // X add (scatter allows one X), so drop it before adding took.
       await pm.dashboardCreate.addPanel();
       await pm.dashboardPanelActions.addPanelName(panelName);
       await pm.chartTypeSelector.selectChartType("scatter");
@@ -408,8 +410,10 @@ test.describe("Dashboard Create Alert testcases", () => {
       ).toHaveAttribute("data-selected", "true");
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.removeField("x_axis_1", "x");
       await pm.chartTypeSelector.searchAndAddField("took", "x");
-      await pm.chartTypeSelector.searchAndAddField("FloatValue", "y");
+      // Field names are lowercased on ingest (FloatValue -> floatvalue).
+      await pm.chartTypeSelector.searchAndAddField("floatvalue", "y");
 
       // Apply query and wait for chart to render
       const streamPromise = waitForStreamComplete(page);
@@ -498,7 +502,10 @@ test.describe("Dashboard Create Alert testcases", () => {
       await pm.chartTypeSelector.selectChartType("pie");
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
-      await pm.chartTypeSelector.searchAndAddField("FloatValue", "y");
+      // Pie allows a single Y field; drop the seeded count(_timestamp) first,
+      // then add the numeric value field (lowercased on ingest).
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
+      await pm.chartTypeSelector.searchAndAddField("floatvalue", "y");
 
       // Apply query and wait for chart to render
       const streamPromise = waitForStreamComplete(page);

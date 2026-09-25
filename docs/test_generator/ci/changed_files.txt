@@ -1,1 +1,0 @@
-web/src/components/dashboards/panels/ChartRenderer.vue
