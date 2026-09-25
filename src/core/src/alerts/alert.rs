@@ -3164,11 +3164,8 @@ fn process_row_template(
     let alert_count = rows.len();
     let mut rows_tpl = Vec::with_capacity(rows.len());
 
-    // For JSON row template type, try to parse the template as JSON
     let is_json_template = row_type == RowTemplateType::Json;
 
-    // {...row} expands to all row fields — JSON type yields the row object
-    // directly; String type serializes the row to a JSON string.
     if tpl.trim() == "{...row}" {
         for row in rows.iter() {
             rows_tpl.push(if is_json_template {

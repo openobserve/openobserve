@@ -171,7 +171,6 @@ fn substitute_raw_row(
     row: &config::utils::json::Map<String, config::utils::json::Value>,
     unknown: &mut Vec<String>,
 ) -> String {
-    // {...row} bypasses the per-key loop — return the full row as JSON.
     if input.trim() == "{...row}" {
         return serde_json::to_string(row).unwrap_or_default();
     }
@@ -183,7 +182,6 @@ fn substitute_raw_row(
 
     let mut out = input.to_string();
 
-    // Replace {...row} embedded inside a larger format string.
     if out.contains("{...row}") {
         let json = serde_json::to_string(row).unwrap_or_default();
         out = out.replace("{...row}", &json);
