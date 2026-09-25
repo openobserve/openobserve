@@ -63,16 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #toolbar-trailing>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="lastUpdatedAt"
           :loading="loading"
           data-test="oncall-teams-refresh"
-          @click="fetchTeams"
-        >
-          <OTooltip side="bottom" :content="t('oncall.refresh')" />
-        </OButton>
+          @click="refreshTeams"
+        />
       </template>
 
       <!-- The routing screen is the only place this fact lived, so a reader
@@ -192,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :description="loadError ? raw(loadError) : undefined"
           :action-label="t('oncall.retry')"
           data-test="oncall-teams-error"
-          @action="fetchTeams"
+          @action="refreshTeams"
         />
       </template>
 
@@ -243,6 +241,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -255,7 +254,16 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
+import { queryClient } from "@/composables/query/queryClient";
 import oncallService from "@/services/oncall";
+import {
+  deleteTeamMutation,
+  oncallTeamsQuery,
+  setRoutingConfigMutation,
+  whoIsOnCallQuery,
+} from "@/services/oncall.queries";
+import { userKeys } from "@/services/users.querykeys";
+import { useMutation } from "@tanstack/vue-query";
 import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
@@ -267,14 +275,11 @@ const route = useRoute();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
 const { confirm } = useConfirmDialog();
-const {
-  config: routingConfig,
-  load: loadRoutingConfig,
-  refresh: refreshRoutingConfig,
-} = useOnCallRoutingConfig();
+const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfig();
 
 const teams = ref<OnCallTeam[]>([]);
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 const loadError = ref<string | null>(null);
 const notAvailable = ref(false);
 const search = ref("");
@@ -290,6 +295,12 @@ const settingDefaultTeamId = ref<string | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? "");
+
+const deleteTeamWrite = useMutation(() => deleteTeamMutation(orgId.value));
+const setRoutingConfigWrite = useMutation(() => setRoutingConfigMutation(orgId.value));
+
+// Named handler: `@click="fetchTeams"` would hand the MouseEvent to `force`.
+const refreshTeams = () => fetchTeams(true);
 
 /// The first rotation, and everything else.
 ///
@@ -401,12 +412,28 @@ const filteredTeams = computed(() => {
   );
 });
 
-async function fetchTeams() {
+async function fetchTeams(force = false) {
   loading.value = true;
   try {
-    const res = await oncallService.listTeams({ org_identifier: orgId.value });
-    teams.value = res.data ?? [];
-    await fetchOnCallNow();
+    const options = oncallTeamsQuery(orgId.value);
+    // A user refresh must reach the server; mount and post-write reads take the cache,
+    // which the write's own invalidation has already expired.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+      // The New team drawer's member picker is this page's too; expired, its next open reads the server.
+      await queryClient.invalidateQueries({
+        queryKey: userKeys.users(orgId.value),
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    teams.value = await queryClient.fetchQuery(options);
+    lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
+    await fetchOnCallNow(force);
     loadError.value = null;
     notAvailable.value = false;
   } catch (err: any) {
@@ -428,15 +455,19 @@ async function fetchTeams() {
 // One request per team, in parallel. A team whose rotation fails to load is
 // left out of the map rather than shown as unstaffed — claiming nobody is on
 // call when we simply do not know would send someone chasing a phantom gap.
-async function fetchOnCallNow() {
+async function fetchOnCallNow(force = false) {
   const results = await Promise.all(
     teams.value.map(async (team) => {
       try {
-        const res = await oncallService.whoIsOnCall({
-          org_identifier: orgId.value,
-          team_id: team.id,
-        });
-        return [team.id, res.data ?? []] as const;
+        const options = whoIsOnCallQuery(orgId.value, team.id);
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        return [team.id, await queryClient.fetchQuery(options)] as const;
       } catch {
         return null;
       }
@@ -450,8 +481,10 @@ async function deleteTeam() {
   teamToDelete.value = null;
   if (!team) return;
   try {
-    await oncallService.deleteTeam({ org_identifier: orgId.value, team_id: team.id });
+    await deleteTeamWrite.mutateAsync(team.id);
     toast({ variant: "success", message: t("oncall.teamDeleted") });
+    // Unforced: the mutation expired the scope, so this read reaches the server
+    // and repaints the rows this page holds in its own ref.
     await fetchTeams();
   } catch (err: any) {
     noteConfigurationDenied(err);
@@ -489,11 +522,9 @@ async function setDefaultTeam(team: OnCallTeam) {
 
   settingDefaultTeamId.value = team.id;
   try {
-    await oncallService.setRoutingConfig({
-      org_identifier: orgId.value,
-      data: { default_team_id: team.id },
-    });
-    await refreshRoutingConfig(orgId.value);
+    await setRoutingConfigWrite.mutateAsync(team.id);
+    // Unforced: the write expired the entry, so this repaints from one server read.
+    await loadRoutingConfig(orgId.value);
     toast({ variant: "success", message: t("oncall.defaultTeamSaved") });
   } catch (err: any) {
     noteConfigurationDenied(err);

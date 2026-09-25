@@ -494,6 +494,8 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -847,6 +849,8 @@ const doResetServices = async () => {
     }
 
     const response = await serviceStreamsService.resetServices(orgId);
+    // The reset deletes the rows the cached services list and analytics are built from.
+    void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(orgId) });
     const { deleted_count } = response.data;
 
     toast({

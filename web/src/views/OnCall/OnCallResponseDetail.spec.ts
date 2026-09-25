@@ -17,8 +17,11 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
 import alertsService from "@/services/alerts";
 import oncallService from "@/services/oncall";
+import { responseProgressQuery } from "@/services/oncall.queries";
+import { oncallKeys } from "@/services/oncall.querykeys";
 import store from "@/test/unit/helpers/store";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import OnCallResponseDetail from "@/views/OnCall/OnCallResponseDetail.vue";
@@ -59,10 +62,18 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 const push = vi.fn();
-vi.mock("vue-router", () => ({
-  useRoute: () => ({ params: { responseId: "resp_1" } }),
-  useRouter: () => ({ push }),
+// Reactive, because the origin and history links change the id on THIS
+// instance; a plain object could never exercise that path.
+const routeState = vi.hoisted(() => ({
+  params: { responseId: "resp_1" } as Record<string, string>,
 }));
+vi.mock("vue-router", async () => {
+  const { reactive } = await import("vue");
+  return {
+    useRoute: () => reactive(routeState),
+    useRouter: () => ({ push }),
+  };
+});
 
 const service = vi.mocked(oncallService);
 const alerts = vi.mocked(alertsService);
@@ -284,10 +295,63 @@ describe("OnCallResponseDetail", () => {
     );
   });
 
+  // `fetchResponse`'s own force reaches the record alone, so Refresh has to expire the rest first.
+  it("re-reads every read on the page on Refresh, and keeps the page on screen", async () => {
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const wrapper = await renderWith();
+    const reads = [
+      service.getResponse,
+      service.getTeam,
+      service.listMembers,
+      service.listTeams,
+      service.priorCauses,
+      service.responseHistory,
+      service.escalationProgress,
+      service.listDeliveries,
+      service.whoIsOnCall,
+      service.getPolicy,
+      service.teamReachability,
+      service.resolvedSchedule,
+      alerts.get_by_alert_id,
+    ];
+    for (const read of reads) expect(read).toHaveBeenCalledTimes(1);
+
+    await wrapper.find('[data-test="oncall-response-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: oncallKeys.all("default"), refetchType: "none" });
+    for (const read of reads) expect(read).toHaveBeenCalledTimes(2);
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).exists()).toBe(true);
+    spy.mockRestore();
+  });
+
   // No decision recorded must leave the row out rather than render an empty one.
   it("omits the routing row when no decision was recorded", async () => {
     const wrapper = await renderWith();
     expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("routingReason")).toBe(null);
+  });
+
+  /// Back to a record already read answers from the cache at once, so the
+  /// slower record for the id just left lands last — and must not be shown
+  /// under the other id's URL, where every action would act on the wrong page.
+  it("ignores a slower record for an id the route has already left", async () => {
+    const { reactive } = await import("vue");
+    const wrapper = await renderWith({ id: "resp_1", title: "First page" });
+    let answerSecond: (value: unknown) => void = () => {};
+    service.getResponse.mockImplementationOnce(
+      () => new Promise((resolve) => (answerSecond = resolve)),
+    );
+
+    reactive(routeState).params.responseId = "resp_2";
+    await flushPromises();
+    reactive(routeState).params.responseId = "resp_1";
+    await flushPromises();
+    answerSecond({
+      data: { response: record({ id: "resp_2", title: "Second page" }), events: [] },
+    });
+    await flushPromises();
+
+    expect((wrapper.vm as any).response?.id).toBe("resp_1");
   });
 
   it("loads the past firings alongside the causes", async () => {
@@ -417,6 +481,9 @@ describe("OnCallResponseDetail", () => {
     expect(banner.exists()).toBe(true);
     expect(banner.text()).toContain("unassigned");
 
+    // A second mount of the same id is served from cache, so the lapsed record
+    // only reaches the page on a fresh load.
+    queryClient.clear();
     const lapsed = await renderWith({ snoozed_until: (Date.now() - 60_000) * 1000 });
     expect(lapsed.find('[data-test="oncall-response-snoozed-banner"]').exists()).toBe(false);
   });
@@ -1073,6 +1140,47 @@ describe("OnCallResponseDetail", () => {
     expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("ackedBy")).toBe(
       "engineer@example.com",
     );
+  });
+
+  /// Both halves of the cache contract in one place: reopening a page inside
+  /// the stale window must cost nothing, and the ladder's countdown — which
+  /// lapses while the entry is still fresh — must still reach the server,
+  /// which only a forced re-read does.
+  it("serves a remount from cache, and still forces the lapsed countdown", async () => {
+    const first = await renderWith();
+    const before = {
+      response: service.getResponse.mock.calls.length,
+      team: service.getTeam.mock.calls.length,
+      members: service.listMembers.mock.calls.length,
+      teams: service.listTeams.mock.calls.length,
+      causes: service.priorCauses.mock.calls.length,
+      deliveries: service.listDeliveries.mock.calls.length,
+      onCall: service.whoIsOnCall.mock.calls.length,
+      progress: service.escalationProgress.mock.calls.length,
+    };
+    expect(before.response).toBe(1);
+    first.unmount();
+
+    await renderWith();
+
+    expect(service.getResponse.mock.calls.length).toBe(before.response);
+    expect(service.getTeam.mock.calls.length).toBe(before.team);
+    expect(service.listMembers.mock.calls.length).toBe(before.members);
+    expect(service.listTeams.mock.calls.length).toBe(before.teams);
+    expect(service.priorCauses.mock.calls.length).toBe(before.causes);
+    expect(service.listDeliveries.mock.calls.length).toBe(before.deliveries);
+    expect(service.whoIsOnCall.mock.calls.length).toBe(before.onCall);
+    expect(service.escalationProgress.mock.calls.length).toBe(before.progress);
+
+    // Seeded, not fetched: the entry is fresh, so an unforced re-read would be
+    // served from it and the countdown would never learn anything new.
+    queryClient.setQueryData(
+      responseProgressQuery(store.state.selectedOrganization.identifier, "resp_1").queryKey,
+      { fired: [], next_targets: [], next_at: Date.now() * 1000 - 1_000_000, exhausted: false },
+    );
+    await renderWith();
+
+    expect(service.escalationProgress.mock.calls.length).toBe(before.progress + 1);
   });
 });
 

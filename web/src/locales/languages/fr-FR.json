@@ -19154,6 +19154,8 @@
     "rotationNobody": "Personne en astreinte",
     "edit": "Modifier",
     "timelineLoadFailed": "Impossible de charger le planning pour cette fenêtre",
+    "editorReadFailed": "Impossible de charger la dernière copie à modifier. Réessayez.",
+    "refreshFailed": "Impossible d'actualiser. Ce qui est affiché peut être obsolète.",
     "scheduleDoneEditing": "Retour au planning",
     "coverWhoRequired": "Choisissez qui est d'astreinte",
     "timelineCoverAria": "{who} couvre {rotation}, de {from} à {to}",

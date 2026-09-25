@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { quantizeRange } from "@/composables/query/queryClient";
 
 export interface ServiceGraphParams {
   streamName?: string;
@@ -101,7 +100,3 @@ export interface TopologyRange {
  * mount. The request still carries the exact range; only the key is rounded.
  */
 export const OVERVIEW_BUCKET_MS = 5 * 60_000;
-
-/** Exposed so callers that build their own query params round the same way. */
-export const overviewRange = (startTime: number, endTime: number) =>
-  quantizeRange(startTime, endTime, OVERVIEW_BUCKET_MS);

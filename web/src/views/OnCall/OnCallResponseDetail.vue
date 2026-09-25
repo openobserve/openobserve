@@ -76,6 +76,13 @@
     </template>
 
     <template #actions>
+      <ORefreshButton
+        v-if="response"
+        :last-run-at="lastFetchedAt"
+        :loading="refreshing"
+        data-test="oncall-response-refresh"
+        @click="refreshPage"
+      />
       <template v-if="response && isOpenState">
         <!-- Exactly one primary, and it moves: claiming the page matters most
              until somebody has, and closing it matters most after. -->
@@ -567,6 +574,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
@@ -604,8 +612,33 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
-import oncallService from "@/services/oncall";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  acknowledgeResponseMutation,
+  addResponseNoteMutation,
+  confirmRecoveryMutation,
+  escalateNowMutation,
+  handoffResponseMutation,
+  oncallTeamQuery,
+  oncallTeamsQuery,
+  promoteResponseMutation,
+  resolveResponseMutation,
+  resolvedScheduleQuery,
+  responseDeliveriesQuery,
+  responseHistoryQuery,
+  responsePriorCausesQuery,
+  responseProgressQuery,
+  responseQuery,
+  snoozeResponseMutation,
+  teamMembersQuery,
+  teamPolicyQuery,
+  teamReachabilityQuery,
+  whoIsOnCallQuery,
+} from "@/services/oncall.queries";
+import { oncallKeys } from "@/services/oncall.querykeys";
 import type {
+  DeliveryLedger,
   DeliveryRecord,
   CauseGroup,
   EscalateResult,
@@ -614,8 +647,12 @@ import type {
   OnCallResponse,
   OnCallResponseEvent,
   OnCallPosition,
+  OnCallTeam,
+  OnCallTeamMember,
   PromoteSeverity,
   ResolutionCause,
+  ResolvedSegment,
+  TeamReachability,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -663,10 +700,9 @@ const isImpacted = computed(
 async function confirmRecovery() {
   confirmingRecovery.value = true;
   try {
-    await oncallService.confirmRecovery({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-      data: recoveryNote.value.trim() ? { note: recoveryNote.value.trim() } : undefined,
+    await recoveryWrite.mutateAsync({
+      responseId: responseId.value,
+      note: recoveryNote.value.trim() || undefined,
     });
     confirmRecoveryOpen.value = false;
     recoveryNote.value = "";
@@ -715,9 +751,8 @@ watch(
 async function promoteRecord() {
   promoting.value = true;
   try {
-    const res = await oncallService.promoteResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
+    const res = await promoteWrite.mutateAsync({
+      responseId: responseId.value,
       data: {
         ...(promoteTitle.value.trim() ? { title: promoteTitle.value.trim() } : {}),
         severity: promoteSeverity.value,
@@ -735,7 +770,8 @@ async function promoteRecord() {
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.promoteFailed"),
     });
-    if (err?.response?.status === 409) await fetchResponse();
+    // A refused write expires nothing, so only a forced read shows whose incident won.
+    if (err?.response?.status === 409) await fetchResponse(true);
   } finally {
     promoting.value = false;
   }
@@ -805,6 +841,16 @@ const snoozeOptions = [
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const responseId = computed(() => String(route.params.responseId ?? ""));
+
+// The id rides in the variables: the origin link swaps it under a reused instance.
+const resolveWrite = useMutation(() => resolveResponseMutation(orgId.value));
+const ackWrite = useMutation(() => acknowledgeResponseMutation(orgId.value));
+const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
+const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
+const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
+const recoveryWrite = useMutation(() => confirmRecoveryMutation(orgId.value));
+const promoteWrite = useMutation(() => promoteResponseMutation(orgId.value));
+const escalateWrite = useMutation(() => escalateNowMutation(orgId.value));
 
 const title = computed(() =>
   response.value
@@ -982,45 +1028,90 @@ const timeToResolve = computed(() => {
   return formatMicrosDuration(r.closed_at - r.opened_at);
 });
 
-async function fetchResponse() {
-  loading.value = true;
-  try {
-    const res = await oncallService.getResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
+/// Cache-first; a force expires the entry first, so it costs one request, not two.
+async function read<T>(
+  options: { queryKey: readonly unknown[]; [k: string]: any },
+  force: boolean,
+): Promise<T> {
+  if (force) {
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
     });
-    response.value = res.data.response;
-    events.value = res.data.events ?? [];
+  }
+  return queryClient.fetchQuery(options as any) as Promise<T>;
+}
+
+// The newest read: a slower record for an id the route has already left must not overwrite the current one.
+let latestResponseRead = 0;
+
+// `force` reaches the record alone — it is the only thing a promote conflict moved.
+async function fetchResponse(force = false) {
+  loading.value = true;
+  const readId = ++latestResponseRead;
+  try {
+    const data = await read<{
+      response: OnCallResponse;
+      events: OnCallResponseEvent[];
+    } | null>(responseQuery(orgId.value, responseId.value), force);
+    if (readId !== latestResponseRead) return;
+    response.value = data?.response ?? null;
+    events.value = data?.events ?? [];
+    lastFetchedAt.value =
+      queryClient.getQueryState(responseQuery(orgId.value, responseId.value).queryKey)
+        ?.dataUpdatedAt ?? null;
     // Flip before the awaits below so the card skeletons instead of reading an empty roster as "nobody on call".
     onCallPositionsLoading.value = true;
-    await fetchTeamName();
-    await fetchSubjectAlert();
-    await fetchHandoffTargets();
-    await fetchPriorCauses();
-    await fetchEscalation();
-    await fetchDeliveries();
-    await fetchTeamContext();
+    for (const step of [
+      fetchTeamName,
+      fetchSubjectAlert,
+      fetchHandoffTargets,
+      fetchPriorCauses,
+      fetchEscalation,
+      fetchDeliveries,
+      fetchTeamContext,
+    ]) {
+      await step();
+      if (readId !== latestResponseRead) return;
+    }
   } catch (err: any) {
+    if (readId !== latestResponseRead) return;
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.loadResponseFailed"),
     });
   } finally {
-    loading.value = false;
+    if (readId === latestResponseRead) loading.value = false;
+  }
+}
+
+const refreshing = ref(false);
+const lastFetchedAt = ref<number | null>(null);
+
+/// Expires every read first, because `fetchResponse`'s own force reaches the record alone.
+async function refreshPage() {
+  refreshing.value = true;
+  try {
+    await queryClient.invalidateQueries({
+      queryKey: oncallKeys.all(orgId.value),
+      refetchType: "none",
+    });
+    await fetchResponse();
+  } finally {
+    refreshing.value = false;
   }
 }
 
 // The record stores a team id; a deleted team still has records pointing at
 // it, so the id is the fallback rather than an error.
 async function fetchTeamName() {
-  if (!response.value) return;
-  teamName.value = response.value.team_id;
+  const r = response.value;
+  if (!r) return;
+  teamName.value = r.team_id;
   try {
-    const res = await oncallService.getTeam({
-      org_identifier: orgId.value,
-      team_id: response.value.team_id,
-    });
-    if (res.data?.name) teamName.value = res.data.name;
+    const team = await read<OnCallTeam | null>(oncallTeamQuery(orgId.value, r.team_id), false);
+    if (team?.name) teamName.value = team.name;
   } catch {
     // Keep the id.
   }
@@ -1030,11 +1121,10 @@ async function resolveRecord() {
   confirmResolve.value = false;
   resolving.value = true;
   try {
-    await oncallService.resolveResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
+    await resolveWrite.mutateAsync({
+      responseId: responseId.value,
       cause: resolveCause.value || undefined,
-      cause_note: resolveNote.value.trim() || undefined,
+      causeNote: resolveNote.value.trim() || undefined,
     });
     toast({ variant: "success", message: t("oncall.resolved") });
     await fetchResponse();
@@ -1051,10 +1141,7 @@ async function resolveRecord() {
 async function acknowledgeRecord() {
   acking.value = true;
   try {
-    await oncallService.acknowledgeResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    });
+    await ackWrite.mutateAsync(responseId.value);
     toast({ variant: "success", message: t("oncall.acknowledged") });
     await fetchResponse();
   } catch (err: any) {
@@ -1070,11 +1157,7 @@ async function acknowledgeRecord() {
 async function snoozeRecord(minutes: number) {
   snoozing.value = true;
   try {
-    await oncallService.snoozeResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-      minutes,
-    });
+    await snoozeWrite.mutateAsync({ responseId: responseId.value, minutes });
     toast({ variant: "success", message: t("oncall.snoozed") });
     await fetchResponse();
   } catch (err: any) {
@@ -1092,11 +1175,7 @@ async function addNote() {
   if (!body) return;
   addingNote.value = true;
   try {
-    await oncallService.addNote({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-      body,
-    });
+    await noteWrite.mutateAsync({ responseId: responseId.value, body });
     noteBody.value = "";
     toast({ variant: "success", message: t("oncall.noteAdded") });
     await fetchResponse();
@@ -1117,11 +1196,10 @@ async function handoffRecord() {
   }
   handingOff.value = true;
   try {
-    await oncallService.handoffResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
+    await handoffWrite.mutateAsync({
+      responseId: responseId.value,
       to: handoffMode.value === "person" ? handoffPerson.value : undefined,
-      to_team_id: handoffMode.value === "team" ? handoffTeam.value : undefined,
+      toTeamId: handoffMode.value === "team" ? handoffTeam.value : undefined,
       note: handoffNote.value.trim() || undefined,
     });
     showHandoff.value = false;
@@ -1143,13 +1221,11 @@ async function handoffRecord() {
 // Handoff targets. Failing to load them leaves the selects empty rather than
 // breaking the page — every other action still works.
 async function fetchHandoffTargets() {
-  if (!response.value) return;
+  const r = response.value;
+  if (!r) return;
   try {
-    const members = await oncallService.listMembers({
-      org_identifier: orgId.value,
-      team_id: response.value.team_id,
-    });
-    memberOptions.value = (members.data ?? []).map((m: { user_email: string }) => ({
+    const members = await read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, r.team_id), false);
+    memberOptions.value = members.map((m) => ({
       label: raw(m.user_email),
       value: m.user_email,
     }));
@@ -1157,10 +1233,10 @@ async function fetchHandoffTargets() {
     memberOptions.value = [];
   }
   try {
-    const teams = await oncallService.listTeams({ org_identifier: orgId.value });
-    teamOptions.value = (teams.data ?? [])
-      .filter((tm: { id: string }) => tm.id !== response.value?.team_id)
-      .map((tm: { id: string; name: string }) => ({ label: raw(tm.name), value: tm.id }));
+    const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), false);
+    teamOptions.value = teams
+      .filter((tm) => tm.id !== r.team_id)
+      .map((tm) => ({ label: raw(tm.name), value: tm.id }));
   } catch {
     teamOptions.value = [];
   }
@@ -1169,6 +1245,7 @@ async function fetchHandoffTargets() {
 /// Only alerts have a rule to fetch, and a page whose alert has since been
 /// deleted must still render — the record is the authority on what happened,
 /// the alert only decorates it.
+// Uncached: the page links to the alert editor, which seeds its form from the cached alert entry.
 async function fetchSubjectAlert() {
   subjectAlert.value = null;
   if (response.value?.subject.subject_type !== "alert") return;
@@ -1187,17 +1264,11 @@ async function fetchPriorCauses() {
   priorCausesLoading.value = true;
   try {
     const [causeRes, historyRes] = await Promise.allSettled([
-      oncallService.priorCauses({
-        org_identifier: orgId.value,
-        response_id: responseId.value,
-      }),
-      oncallService.responseHistory({
-        org_identifier: orgId.value,
-        response_id: responseId.value,
-      }),
+      read<CauseGroup[]>(responsePriorCausesQuery(orgId.value, responseId.value), false),
+      read<OnCallResponse[]>(responseHistoryQuery(orgId.value, responseId.value), false),
     ]);
-    priorCauses.value = causeRes.status === "fulfilled" ? (causeRes.value.data ?? []) : [];
-    firingHistory.value = historyRes.status === "fulfilled" ? (historyRes.value.data ?? []) : [];
+    priorCauses.value = causeRes.status === "fulfilled" ? causeRes.value : [];
+    firingHistory.value = historyRes.status === "fulfilled" ? historyRes.value : [];
   } finally {
     priorCausesLoading.value = false;
   }
@@ -1215,12 +1286,12 @@ const deliveriesLoading = ref(false);
 async function fetchDeliveries() {
   deliveriesLoading.value = true;
   try {
-    const res = await oncallService.listDeliveries({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    });
-    deliveries.value = res.data?.deliveries ?? [];
-    deliveriesTotal.value = res.data?.total ?? 0;
+    const ledger = await read<DeliveryLedger | null>(
+      responseDeliveriesQuery(orgId.value, responseId.value),
+      false,
+    );
+    deliveries.value = ledger?.deliveries ?? [];
+    deliveriesTotal.value = ledger?.total ?? 0;
   } catch {
     deliveries.value = [];
     deliveriesTotal.value = 0;
@@ -1243,22 +1314,18 @@ async function fetchTeamContext() {
   onCallPositionsLoading.value = true;
   try {
     const [slots, policyRes, reach] = await Promise.allSettled([
-      // A closed record is history, and the live rotation is not its history:
-      // hours later the pager has moved on, and the rail named whoever holds it
-      // now as though they had been the one paged. The schedule endpoint answers
-      // as of any instant, so a closed record asks it about its own last moment.
-      oncallService.whoIsOnCall({
-        org_identifier: orgId.value,
-        team_id: r.team_id,
-        at: r.closed_at ?? undefined,
-      }),
-      oncallService.getPolicy({ org_identifier: orgId.value, team_id: r.team_id }),
-      oncallService.teamReachability({ org_identifier: orgId.value, team_id: r.team_id }),
+      // A closed record asks about its own last moment — the live rotation is not its history.
+      read<OnCallPosition[]>(
+        whoIsOnCallQuery(orgId.value, r.team_id, r.closed_at ?? undefined),
+        false,
+      ),
+      read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, r.team_id), false),
+      read<TeamReachability | null>(teamReachabilityQuery(orgId.value, r.team_id), false),
     ]);
-    onCallPositions.value = slots.status === "fulfilled" ? (slots.value.data ?? []) : [];
-    policy.value = policyRes.status === "fulfilled" ? (policyRes.value.data ?? null) : null;
+    onCallPositions.value = slots.status === "fulfilled" ? slots.value : [];
+    policy.value = policyRes.status === "fulfilled" ? policyRes.value : null;
     smtpConfigured.value =
-      reach.status === "fulfilled" ? (reach.value.data?.smtp_configured ?? null) : null;
+      reach.status === "fulfilled" ? (reach.value?.smtp_configured ?? null) : null;
     await fetchHandover();
   } finally {
     onCallPositionsLoading.value = false;
@@ -1280,13 +1347,11 @@ async function fetchHandover() {
   const from = nowMicros.value;
   const to = from + 7 * 24 * 60 * 60 * 1_000_000;
   try {
-    const res = await oncallService.resolvedSchedule({
-      org_identifier: orgId.value,
-      team_id: r.team_id,
-      from,
-      to,
-    });
-    const segments = [...(res.data ?? [])].sort((a, b) => a.from - b.from);
+    const resolved = await read<ResolvedSegment[]>(
+      resolvedScheduleQuery(orgId.value, r.team_id, from, to),
+      false,
+    );
+    const segments = [...resolved].sort((a, b) => a.from - b.from);
     const currentIndex = segments.findIndex((seg) => seg.from <= from && seg.to > from);
     if (currentIndex < 0) return;
     handoverAt.value = segments[currentIndex].to;
@@ -1339,10 +1404,7 @@ function escalateOutcome(result: EscalateResult | undefined): {
 async function escalateNow() {
   escalatingNow.value = true;
   try {
-    const res = await oncallService.escalateNow({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    });
+    const res = await escalateWrite.mutateAsync({ responseId: responseId.value });
     toast(escalateOutcome(res.data));
     await fetchResponse();
   } catch (err: any) {
@@ -1366,13 +1428,12 @@ function openReachability() {
   });
 }
 
-async function fetchEscalation() {
+async function fetchEscalation(force = false) {
   try {
-    const res = await oncallService.escalationProgress({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    });
-    escalation.value = res.data ?? null;
+    escalation.value = await read<EscalationProgress | null>(
+      responseProgressQuery(orgId.value, responseId.value),
+      force,
+    );
   } catch {
     escalation.value = null;
   }
@@ -1386,8 +1447,20 @@ function openResponse(id: string) {
   });
 }
 
+// The ladder's countdown lapses while the entry is still fresh, so this one forces.
+watch(
+  () => {
+    const at = escalation.value?.next_at;
+    return !!at && nowMicros.value >= at;
+  },
+  (lapsed) => {
+    if (lapsed) fetchEscalation(true);
+  },
+);
+
 // The origin-response link stays on this same route with a new responseId
 // param, so Vue Router reuses this instance instead of remounting it — the
 // fetch has to key off responseId directly rather than firing once on mount.
-watch(responseId, fetchResponse, { immediate: true });
+// Wrapped: a watcher hands the callback the new id, which `force` would read as a yes.
+watch(responseId, () => fetchResponse(), { immediate: true });
 </script>

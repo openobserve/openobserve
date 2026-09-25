@@ -16,9 +16,14 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
 import oncallService from "@/services/oncall";
+import { oncallKeys } from "@/services/oncall.querykeys";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { userKeys } from "@/services/users.querykeys";
 import store from "@/test/unit/helpers/store";
 import OnCallTeamDetail from "@/views/OnCall/OnCallTeamDetail.vue";
 
@@ -163,6 +168,27 @@ describe("OnCallTeamDetail", () => {
   /// sit in the header beside a panel reading "no page can be delivered to
   /// anyone" — the chip answering the first question in a voice that sounded
   /// like an answer to both.
+  /// The heaviest read in the module — thirteen requests for one team — and the
+  /// tabs above it send people back and forth all day.
+  it("serves a revisit from the cache, and rechecks against the server", async () => {
+    const first = render();
+    await flushPromises();
+    expect(service.getTeam).toHaveBeenCalledTimes(1);
+    expect(service.teamOverview).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const second = render();
+    await flushPromises();
+    expect(service.getTeam).toHaveBeenCalledTimes(1);
+    expect(service.teamOverview).toHaveBeenCalledTimes(1);
+
+    // "Recheck" is a reader saying the findings may be out of date, so it is
+    // the one path here that must not be answered from what we already hold.
+    second.findComponent({ name: "OnCallTeamAttention" }).vm.$emit("recheck");
+    await flushPromises();
+    expect(service.teamOverview).toHaveBeenCalledTimes(2);
+  });
+
   describe("the coverage chip", () => {
     function onCall(email: string) {
       service.whoIsOnCall.mockResolvedValue({
@@ -545,6 +571,20 @@ describe("OnCallTeamDetail", () => {
     });
   });
 
+  /// The form writes name, timezone and description back together, so it
+  /// starts from the server's team, not the copy this page cached.
+  it("reads the team from the server before the edit form opens", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const before = service.getTeam.mock.calls.length;
+
+    await wrapper.find('[data-test="oncall-team-detail-edit-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(service.getTeam.mock.calls.length).toBe(before + 1);
+    expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("open")).toBe(true);
+  });
+
   it("ignores a tab the URL invented", async () => {
     routeParams.tab = "not-a-tab";
     const wrapper = render();
@@ -594,6 +634,46 @@ describe("OnCallTeamDetail", () => {
       const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
       expect(editor.props("intent")).toEqual({ mode: "edit", id: "Primary" });
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
+    });
+
+    /// The editor's save writes the whole schedule back, so its draft has to
+    /// start from the server's copy: the cached one may be missing a rotation a
+    /// colleague added since, and saving over it deletes that rotation.
+    it("reads the schedule from the server before the editor opens", async () => {
+      const wrapper = await openSchedule();
+      const before = service.getSchedule.mock.calls.length;
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("edit", "Primary");
+      await flushPromises();
+
+      expect(service.getSchedule.mock.calls.length).toBe(before + 1);
+      expect(wrapper.findComponent({ name: "OnCallScheduleEditor" }).props("intent")).toEqual({
+        mode: "edit",
+        id: "Primary",
+      });
+    });
+
+    it("deletes from the schedule the server has now, not the cached copy", async () => {
+      service.setSchedule.mockResolvedValue({ data: {} });
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
+      } as any);
+      const wrapper = await openSchedule();
+      // A colleague added a rotation after this page cached its copy.
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: "UTC",
+          rotations: [rotation("rot_primary", "Primary"), rotation("rot_second", "Secondary")],
+        },
+      } as any);
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
+      await flushPromises();
+      deleteConfirm(wrapper)!.vm.$emit("update:ok");
+      await flushPromises();
+
+      const sent = service.setSchedule.mock.calls[0][0];
+      expect(sent.data.rotations.map((r: any) => r.name)).toEqual(["Secondary"]);
     });
 
     /// Until the lane menu carried it, a rotation could be created and never
@@ -646,11 +726,22 @@ describe("OnCallTeamDetail", () => {
       expect(deleteConfirm(wrapper)!.props("modelValue")).toBe(false);
     });
 
-    /// The point of saving is to see what the engine now says.
+    /// The point of saving is to see what the engine now says. The editor's own
+    /// write expires the team's scope before it emits, which is what makes this
+    /// page's re-read reach the server without asking it to.
     it("refetches the schedule once the editor saves", async () => {
       const wrapper = await openSchedule();
       const before = service.getSchedule.mock.calls.length;
 
+      await queryClient.invalidateQueries({
+        queryKey: [
+          "org",
+          store.state.selectedOrganization.identifier,
+          "oncall",
+          "teams",
+          routeParams.teamId,
+        ],
+      });
       wrapper.findComponent({ name: "OnCallScheduleEditor" }).vm.$emit("saved");
       await flushPromises();
 
@@ -696,6 +787,19 @@ describe("OnCallTeamDetail", () => {
       expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).exists()).toBe(true);
     });
 
+    /// Same rule as the schedule: the save replaces the whole policy, so the
+    /// draft starts from the server's copy rather than the page's cached one.
+    it("reads the policy from the server before the editor opens", async () => {
+      const wrapper = await openEscalation();
+      const before = service.getPolicy.mock.calls.length;
+
+      wrapper.findComponent({ name: "OnCallEscalationLadder" }).vm.$emit("edit");
+      await flushPromises();
+
+      expect(service.getPolicy.mock.calls.length).toBe(before + 1);
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("open")).toBe(true);
+    });
+
     /// The chips are labels ("P3"); the policy's rungs are numbered. Editing
     /// from P3 must open on P3, not send the reader back to find it.
     it("opens the drawer on the priority the ladder is showing", async () => {
@@ -737,6 +841,30 @@ describe("OnCallTeamDetail", () => {
       expect(service.escalationPreview).toHaveBeenLastCalledWith(
         expect.objectContaining({ priority: 3 }),
       );
+    });
+
+    /// Going back to a priority already read answers from the cache at once,
+    /// so the slower dry run for the one just left lands last — and must not
+    /// show its recipients under the other priority's chip.
+    it("ignores a slower dry run for a priority the reader has already left", async () => {
+      service.escalationPreview.mockResolvedValue({ data: { priority: 1 } } as any);
+      const wrapper = await openEscalation();
+      let answerP3: (value: unknown) => void = () => {};
+      service.escalationPreview.mockImplementationOnce(
+        () => new Promise((resolve) => (answerP3 = resolve)),
+      );
+      const ladder = wrapper.findComponent({ name: "OnCallEscalationLadder" });
+
+      ladder.vm.$emit("update:selected", "P3");
+      await flushPromises();
+      ladder.vm.$emit("update:selected", "P1");
+      await flushPromises();
+      answerP3({ data: { priority: 3 } });
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).props("preview")).toEqual({
+        priority: 1,
+      });
     });
   });
 
@@ -845,6 +973,63 @@ describe("OnCallTeamDetail", () => {
     expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(true);
     expect(wrapper.findComponent({ name: "OnCallTeamAttention" }).exists()).toBe(false);
   });
+
+  /// The tabs read only when they mount, so Refresh expires their reads and remounts the open one.
+  describe("Refresh and Retry", () => {
+    const expiries = [
+      { queryKey: oncallKeys.all("default"), exact: false, refetchType: "none" },
+      { queryKey: userKeys.users("default"), exact: true, refetchType: "none" },
+      { queryKey: destinationKeys.list("default", "alert"), exact: true, refetchType: "none" },
+      { queryKey: serviceStreamKeys.all("default"), exact: false, refetchType: "none" },
+    ];
+    const pageReads = () => [
+      service.getTeam,
+      service.listMembers,
+      service.getSchedule,
+      service.getPolicy,
+      service.whoIsOnCall,
+      service.listTeams,
+      service.listOwnershipRules,
+      service.listResponses,
+      service.teamOverview,
+      service.teamReachability,
+      service.teamConfigRisks,
+      service.teamLoad,
+      service.escalationPreview,
+    ];
+
+    it("expires the tabs' reads, forces the page's own, and remounts the open tab", async () => {
+      routeParams.tab = "members";
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      const wrapper = render();
+      await flushPromises();
+      for (const expiry of expiries) expect(spy).not.toHaveBeenCalledWith(expiry);
+      for (const read of pageReads()) expect(read).toHaveBeenCalledTimes(1);
+      const tabBefore = wrapper.findComponent({ name: "OnCallMembers" }).vm;
+
+      await wrapper.find('[data-test="oncall-team-refresh"]').trigger("click");
+      await flushPromises();
+
+      for (const expiry of expiries) expect(spy).toHaveBeenCalledWith(expiry);
+      for (const read of pageReads()) expect(read).toHaveBeenCalledTimes(2);
+      expect(wrapper.findComponent({ name: "OnCallMembers" }).vm).not.toBe(tabBefore);
+      spy.mockRestore();
+    });
+
+    it("runs the same refresh from the error state's Retry", async () => {
+      service.getTeam.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+      const wrapper = render();
+      await flushPromises();
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+
+      wrapper.findComponent('[data-test="oncall-team-detail-error"]').vm.$emit("action");
+      await flushPromises();
+
+      for (const expiry of expiries) expect(spy).toHaveBeenCalledWith(expiry);
+      expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(false);
+      spy.mockRestore();
+    });
+  });
   /// `resolved-schedule` answers for ONE slot and defaults to the default one,
   /// so a two-slot team was only ever asked about primary — and the timeline
   /// drew a secondary lane it could never fill, then said so. The data was
@@ -940,6 +1125,37 @@ describe("OnCallTeamDetail", () => {
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).props("segments")).toEqual(
         [],
       );
+    });
+
+    /// Paging back to a week already read answers from the cache at once, so
+    /// the slower answer for the week just left lands last — and must not be
+    /// drawn on this week's axis.
+    it("ignores a slower answer for a window the calendar has already left", async () => {
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
+      } as any);
+      const thisWeek = { from: 0, to: 1, rotation: "Primary", user_email: "ana@o2.ai" };
+      service.resolvedSchedule.mockResolvedValue({ data: [thisWeek] } as any);
+      const wrapper = render();
+      await flushPromises();
+      await showWeek(wrapper);
+      let answerNext: (value: unknown) => void = () => {};
+      service.resolvedSchedule.mockImplementationOnce(
+        () => new Promise((resolve) => (answerNext = resolve)),
+      );
+      const timeline = wrapper.findComponent({ name: "OnCallScheduleTimeline" });
+
+      timeline.vm.$emit("update:window", { from: 2_000, to: 3_000 });
+      await flushPromises();
+      timeline.vm.$emit("update:window", { from: 1_000, to: 2_000 });
+      await flushPromises();
+      answerNext({ data: [{ ...thisWeek, from: 2_000, to: 3_000 }] });
+      await flushPromises();
+
+      const drawn = wrapper
+        .findComponent({ name: "OnCallScheduleTimeline" })
+        .props("segments") as any[];
+      expect(drawn.map((s) => [s.from, s.to])).toEqual([[0, 1]]);
     });
   });
 });

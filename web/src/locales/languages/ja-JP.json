@@ -19154,6 +19154,8 @@
     "rotationNobody": "オンコール担当者はいません",
     "edit": "編集",
     "timelineLoadFailed": "この期間のスケジュールを解決できませんでした",
+    "editorReadFailed": "最新のコピーを読み込めませんでした。もう一度お試しください。",
+    "refreshFailed": "更新できませんでした。表示されている内容は古い可能性があります。",
     "scheduleDoneEditing": "スケジュールに戻る",
     "coverWhoRequired": "カバーする人を選択してください",
     "timelineCoverAria": "{who} は {rotation} を {from} から {to} までカバーしています",
