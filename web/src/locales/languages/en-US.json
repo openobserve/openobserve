@@ -882,7 +882,8 @@
     "backTo": "Back to {label}",
     "boolTrue": "True",
     "boolFalse": "False",
-    "browserTimeWithZone": "Browser Time ({zone})"
+    "browserTimeWithZone": "Browser Time ({zone})",
+    "import": "Import"
   },
   "flow": {
     "stepPicker": {
@@ -3548,7 +3549,34 @@
     "dataSource": "Data Source",
     "uploadFile": "Upload File",
     "fromUrl": "From URL",
-    "addFunction": "Add Function"
+    "addFunction": "Add Function",
+    "exportDialogTitle": "Export function | Export {count} functions",
+    "exportDialogSubtitle": "Review the definition, then download it as JSON.",
+    "import": {
+      "title": "Import function",
+      "outputMessages": "Output messages",
+      "errorValidations": "Error validations",
+      "results": "Import results",
+      "nameLabel": "Function name",
+      "nameRequired": "Function - {index}: name is required",
+      "nameExists": "Function - {index}: \"{name}\" already exists",
+      "bodyRequired": "Function - {index}: function body is required",
+      "transTypeInvalid": "Function - {index}: type must be 0 for VRL or 1 for JavaScript",
+      "paramsInvalid": "Function - {index}: params must be a string",
+      "conflictActionLabel": "When the name already exists",
+      "useExisting": "Use existing",
+      "override": "Override",
+      "overrideAffects": "Override also changes these pipelines: {pipelines}",
+      "createSuccess": "Function - {index}: \"{name}\" imported",
+      "overridden": "Function - {index}: \"{name}\" overridden",
+      "skipped": "Function - {index}: \"{name}\" skipped, the existing function was kept",
+      "createFailed": "Function - {index}: \"{name}\" failed - {reason}",
+      "jsonStringEmpty": "JSON string is empty",
+      "invalidJsonFormat": "Invalid JSON format",
+      "importSuccess": "Imported {count} function | Imported {count} functions",
+      "allSkipped": "Nothing imported: {count} function already existed | Nothing imported: {count} functions already existed",
+      "nothingToImport": "No functions found to import. Check the file is valid JSON."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Analyzing dimensions...",
@@ -15262,7 +15290,8 @@
       "oncallAck": "Acknowledge",
       "oncallEscalate": "Escalate",
       "oncallSnooze": "Snooze",
-      "oncallResolve": "Resolve"
+      "oncallResolve": "Resolve",
+      "functionsImport": "Import function"
     }
   },
   "components": {
@@ -15871,7 +15900,9 @@
       "enrichmentReloadStarted": "Enrichment table reload started. Processing in background...",
       "enrichmentJobStarted": "Enrichment table job started. Processing in background...",
       "enrichmentCreationFailed": "Enrichment Table creation failed",
-      "functionDeletionAssociatedPipelines": "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines."
+      "functionDeletionAssociatedPipelines": "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
+      "successfullyExportedFunctions": "Successfully exported {count} function | Successfully exported {count} functions",
+      "errorExportingFunctions": "Error exporting functions. Please try again."
     },
     "recommended": {
       "failedToImportDashboard": "Failed to import dashboard: {error}",

@@ -31,6 +31,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #actions>
         <OButton
+          variant="outline"
+          size="sm"
+          icon-left="upload-file"
+          data-test="function-list-import-function-btn"
+          @click="goToImportFunction"
+        >
+          {{ t("common.import") }}
+        </OButton>
+        <OButton
           variant="primary"
           size="sm"
           data-test="function-list-add-function-btn"
@@ -127,14 +136,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="edit"
                 />
                 <OButton
-                  variant="ghost-destructive"
+                  variant="ghost"
                   size="icon-sm"
-                  :title="t('function.delete')"
-                  data-test="function-list-delete-function-btn"
-                  data-row-action="delete"
+                  icon-left="download"
+                  :title="t('common.export')"
+                  data-test="function-list-export-function-btn"
+                  data-row-action="export"
                   class="max-md:hidden"
-                  @click="showDeleteDialogFn({ row })"
-                  icon-left="delete"
+                  @click="exportFunction(row)"
                 />
                 <OButton
                   variant="ghost"
@@ -144,6 +153,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="view"
                   class="max-md:hidden"
                   @click="getAssociatedPipelines({ row })"
+                />
+                <OButton
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  :title="t('function.delete')"
+                  data-test="function-list-delete-function-btn"
+                  data-row-action="delete"
+                  class="max-md:hidden"
+                  @click="showDeleteDialogFn({ row })"
+                  icon-left="delete"
                 />
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
@@ -165,13 +184,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("function.updateTitle") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
+                    icon-left="download"
                     class="md:hidden"
-                    data-test="function-list-delete-function-btn-menu"
-                    @select="showDeleteDialogFn({ row })"
+                    data-test="function-list-export-function-btn-menu"
+                    @select="exportFunction(row)"
                   >
-                    <span>{{ t("function.delete") }}</span>
+                    <span>{{ t("common.export") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
                     icon-left="account-tree"
@@ -180,6 +198,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="getAssociatedPipelines({ row })"
                   >
                     <span>{{ t("function.associatedPipelines") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="function-list-delete-function-btn-menu"
+                    @select="showDeleteDialogFn({ row })"
+                  >
+                    <span>{{ t("function.delete") }}</span>
                   </ODropdownItem>
                 </ODropdown>
               </div>
@@ -190,17 +217,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
                   {{ resultTotal }} {{ t("function.header") }}
                 </div>
-                <OButton
-                  v-if="selectedFunctions.length > 0"
-                  data-test="function-list-delete-functions-btn"
-                  variant="outline-destructive"
-                  size="sm"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                  icon-left="delete"
-                >
-                  {{ t("common.delete") }}
-                </OButton>
+                <div v-if="selectedFunctions.length > 0" class="flex items-center gap-2">
+                  <OButton
+                    data-test="function-list-export-functions-btn"
+                    variant="outline"
+                    size="sm"
+                    @click="exportSelectedFunctions"
+                    icon-left="download"
+                  >
+                    {{ t("common.export") }}
+                  </OButton>
+                  <OButton
+                    data-test="function-list-delete-functions-btn"
+                    variant="outline-destructive"
+                    size="sm"
+                    :loading="bulkDeleteLoading"
+                    @click="openBulkDeleteDialog"
+                    icon-left="delete"
+                  >
+                    {{ t("common.delete") }}
+                  </OButton>
+                </div>
               </div>
             </template>
           </OTable>
@@ -259,6 +296,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </ODialog>
+
+    <ExportResourceDialog
+      v-model:open="showExportDialog"
+      :items="functionsToExport"
+      :terraform="functionsTerraform"
+      :show-terraform="false"
+      :title="
+        t(
+          'function.exportDialogTitle',
+          { count: functionsToExport.length },
+          functionsToExport.length,
+        )
+      "
+      :sub-title="t('function.exportDialogSubtitle')"
+      file-prefix="functions"
+      data-test="function-export-dialog"
+      @download="onExportDownloaded"
+    />
   </div>
 </template>
 
@@ -284,6 +339,8 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
+import type { TerraformExport } from "@/utils/terraform/hcl";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -313,6 +370,7 @@ export default defineComponent({
     ODropdownItem,
     OSearchInput,
     ORefreshButton,
+    ExportResourceDialog,
   },
   emits: [
     "updated:fields",
@@ -357,8 +415,8 @@ export default defineComponent({
         id: "actions",
         header: t("function.actions"),
         isAction: true,
-        size: 150,
-        meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+        size: 190,
+        meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
       },
     ];
 
@@ -687,6 +745,72 @@ export default defineComponent({
       confirmBulkDelete.value = true;
     };
 
+    // ── Export ────────────────────────────────────────────────────────────
+    // The list query already carries every field the file needs, so export reads
+    // from it instead of fetching each definition again.
+    const showExportDialog = ref(false);
+    const functionsToExport = ref<Record<string, unknown>[]>([]);
+    // The provider has no openobserve_function resource yet, so the dialog is
+    // JSON-only; drop in an exporter here once one exists.
+    const functionsTerraform: TerraformExport = { hcl: "", unsupported: [], droppedFields: [] };
+
+    // `streams` is left out: the deprecated stream association names streams that
+    // mean nothing in the org the file is imported into.
+    const exportPayload = (name: string) => {
+      const fn: any = (functions.data.value ?? []).find((item: any) => item.name === name);
+      if (!fn) return null;
+      return {
+        name: fn.name,
+        function: fn.function,
+        params: fn.params,
+        transType: fn.transType,
+        numArgs: fn.numArgs,
+      };
+    };
+
+    const exportFunction = (row: any) => {
+      const payload = exportPayload(row.name);
+      if (!payload) {
+        toast({
+          variant: "error",
+          message: t("toastMessages.functions.errorExportingFunctions"),
+        });
+        return;
+      }
+      functionsToExport.value = [payload];
+      showExportDialog.value = true;
+    };
+
+    const exportSelectedFunctions = () => {
+      const payloads = selectedFunctions.value
+        .map((row: any) => exportPayload(row.name))
+        .filter(Boolean) as Record<string, unknown>[];
+      if (!payloads.length) {
+        toast({
+          variant: "error",
+          message: t("toastMessages.functions.errorExportingFunctions"),
+        });
+        return;
+      }
+      functionsToExport.value = payloads;
+      showExportDialog.value = true;
+    };
+
+    const onExportDownloaded = ({ count }: { format: string; count: number }) => {
+      toast({
+        variant: "success",
+        message: t("toastMessages.functions.successfullyExportedFunctions", { count }, count),
+      });
+      selectedFunctionIds.value = [];
+    };
+
+    const goToImportFunction = () => {
+      router.push({
+        name: "importFunction",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    };
+
     const bulkDelete = useMutation(() => bulkDeleteFunctionsMutation(orgId.value));
 
     const bulkDeleteFunctions = async () => {
@@ -789,6 +913,12 @@ export default defineComponent({
         },
       },
       {
+        id: "functionsImport",
+        handler: () => {
+          if (!isInputFocused()) goToImportFunction();
+        },
+      },
+      {
         id: "functionsRefresh",
         handler: () => {
           if (!isInputFocused()) refreshJSTransforms();
@@ -843,6 +973,13 @@ export default defineComponent({
       visibleRows,
       hasVisibleRows,
       openBulkDeleteDialog,
+      showExportDialog,
+      functionsToExport,
+      functionsTerraform,
+      exportFunction,
+      exportSelectedFunctions,
+      onExportDownloaded,
+      goToImportFunction,
       bulkDeleteFunctions,
       bulkDeleteLoading,
       confirmBulkDelete,
