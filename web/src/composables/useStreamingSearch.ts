@@ -20,6 +20,7 @@ import authService from "@/services/auth";
 import store from "@/stores";
 import { getUUID, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 import { attemptTokenRefresh } from "@/services/http";
+import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 
 // Create and manage stream workers
 let streamWorker: Worker | null = null;
@@ -78,7 +79,7 @@ const useHttpStreaming = () => {
     }
 
     if (typeof response === "string") {
-      response = JSON.parse(response);
+      response = JSON.parse(patchLargeNumbersInJson(response));
     }
 
     const wsResponse = wsMapper[type as StreamResponseType](traceId, response, type);
