@@ -1408,15 +1408,14 @@ function zoneOffsetMs(utcMs: number, timezone: string): number {
 
   const at = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
   // `hour12: false` reports midnight as 24 in some engines.
-  const asIfUtc = Date.UTC(
-    at("year"),
-    at("month") - 1,
-    at("day"),
-    at("hour") % 24,
-    at("minute"),
-    at("second"),
-  );
-  return asIfUtc - utcMs;
+  // Built via setUTCFullYear rather than passed straight into Date.UTC's
+  // (year, month, ...) args — see the comment in fromZonedInputValue for why
+  // that form is unsafe for a year in 0-99 (as this one is while a date
+  // field's year segment is still being typed).
+  const asIfUtcDate = new Date(0);
+  asIfUtcDate.setUTCFullYear(at("year"), at("month") - 1, at("day"));
+  asIfUtcDate.setUTCHours(at("hour") % 24, at("minute"), at("second"), 0);
+  return asIfUtcDate.getTime() - utcMs;
 }
 
 /** An instant as the `YYYY-MM-DDTHH:mm` a `datetime-local` shows, in `timezone`. */
@@ -1447,7 +1446,17 @@ export function fromZonedInputValue(value: string, timezone: string): number | n
   const parsed = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
   if (!parsed) return null;
   const [, y, mo, d, h, mi] = parsed.map(Number);
-  const asIfUtc = Date.UTC(y, mo - 1, d, h, mi);
+  // Built via setUTCFullYear rather than passed straight into Date.UTC's
+  // (year, month, ...) args: that form silently folds a 0-99 year to
+  // 1900-1999 (legacy two-digit-year behavior). A date field mid-edit passes
+  // through exactly that range — @internationalized/date zero-pads a
+  // partially typed year to 4 characters (e.g. "19" -> "0019"), which still
+  // matches the regex above, so Date.UTC(19, ...) would silently commit 1919
+  // instead of leaving the in-progress edit alone.
+  const utcDate = new Date(0);
+  utcDate.setUTCFullYear(y, mo - 1, d);
+  utcDate.setUTCHours(h, mi, 0, 0);
+  const asIfUtc = utcDate.getTime();
   if (Number.isNaN(asIfUtc)) return null;
   try {
     const first = asIfUtc - zoneOffsetMs(asIfUtc, timezone);

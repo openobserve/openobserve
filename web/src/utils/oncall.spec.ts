@@ -1595,6 +1595,19 @@ describe("toZonedInputValue / fromZonedInputValue", () => {
     }
   });
 
+  /// A date field mid-edit (e.g. the year segment re-typed digit by digit)
+  /// round-trips a *zero-padded* partial year through this function —
+  /// `@internationalized/date` pads "19" (two digits typed so far) out to
+  /// "0019". `Date.UTC`'s legacy two-digit-year rule folds any 0-99 year to
+  /// 1900-1999, so a naive implementation reads that as 1919 and commits it,
+  /// stomping whatever the user was typing (issue #14854: rotation "First
+  /// handover" year snapping to 1919 mid-edit). The correct reading is the
+  /// literal year 19.
+  it("does not fold a small zero-padded year into 19xx", () => {
+    const literalYear19 = new Date("0019-09-26T10:00:00.000Z").getTime() * 1000;
+    expect(fromZonedInputValue("0019-09-26T10:00", "UTC")).toBe(literalYear19);
+  });
+
   it("falls back rather than throwing on a zone the runtime cannot resolve", () => {
     expect(toZonedInputValue(KOLKATA_10AM, "Mars/Olympus")).toBe("2026-08-17T04:30");
     expect(fromZonedInputValue("2026-08-17T04:30", "Mars/Olympus")).toBe(KOLKATA_10AM);
