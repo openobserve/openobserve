@@ -159,10 +159,6 @@ pub fn resolve_content(
 /// column set (used by `RowsSpec.format`, which operates on the full row
 /// regardless of the `columns` selection — design §4.2).
 ///
-/// The special token `{...row}` expands to the full row serialized as a
-/// compact JSON object, letting a single format string capture all fields
-/// without enumerating each column name.
-///
 /// Same input-scan discipline as `substitute_raw`: "unmatched" is decided
 /// from the ORIGINAL `input`, not the substituted output, so a row value
 /// that happens to look like `{something}` is never marker-stamped.

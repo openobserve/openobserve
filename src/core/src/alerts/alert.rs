@@ -5026,7 +5026,6 @@ mod tests {
         );
 
         assert_eq!(result.len(), 2);
-        // Each row must be a JSON object with all the original fields.
         assert!(result[0].is_object());
         assert_eq!(
             result[0].get("host").and_then(|v| v.as_str()),
@@ -5059,7 +5058,6 @@ mod tests {
         );
 
         assert_eq!(result.len(), 1);
-        // String type: the row is serialized as a JSON string.
         assert!(result[0].is_string());
         let s = result[0].as_str().unwrap();
         let v: Value = serde_json::from_str(s).unwrap();
@@ -5068,7 +5066,6 @@ mod tests {
 
     #[test]
     fn test_process_row_template_spread_row_with_surrounding_whitespace() {
-        // Trimmed template "  {...row}  " should still be treated as {...row}.
         let row_template = "  {...row}  ".to_string();
         let mut row1 = Map::new();
         row1.insert("level".to_string(), json!("error"));
