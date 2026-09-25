@@ -270,9 +270,18 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OnCallChannelChips from "@/components/oncall/OnCallChannelChips.vue";
+import { queryClient } from "@/composables/query/queryClient";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
-import oncallService from "@/services/oncall";
-import usersService from "@/services/users";
+import {
+  addTeamMembersMutation,
+  createUnavailabilityMutation,
+  deleteUnavailabilityMutation,
+  removeTeamMemberMutation,
+  resolvedScheduleQuery,
+  unavailabilityQuery,
+} from "@/services/oncall.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { orgUsersQuery } from "@/services/users.queries";
 import type {
   MemberReachability,
   OnCallPosition,
@@ -326,6 +335,12 @@ const { noteConfigurationDenied } = useOnCallPermissions();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
+// Getter form: the tab outlives a team switch, and a bound id would write to the one it opened on.
+const addMembersWrite = useMutation(() => addTeamMembersMutation(orgId.value, props.teamId));
+const removeMemberWrite = useMutation(() => removeTeamMemberMutation(orgId.value, props.teamId));
+const createAbsenceWrite = useMutation(() => createUnavailabilityMutation(orgId.value));
+const deleteAbsenceWrite = useMutation(() => deleteUnavailabilityMutation(orgId.value));
+
 /// Which rotation, if any, actually pages this person. Adding somebody to a
 /// team does not put them in the paging order, and that gap is where "why
 /// wasn't I paged" comes from.
@@ -362,12 +377,9 @@ const awaySaving = ref(false);
 async function fetchAbsences() {
   try {
     const now = Date.now() * 1000;
-    const res = await oncallService.listUnavailability({
-      org_identifier: orgId.value,
-      from: now,
-      to: now + ABSENCE_WINDOW_DAYS * MICROS_PER_DAY,
-    });
-    absences.value = res.data ?? [];
+    absences.value = await queryClient.fetchQuery(
+      unavailabilityQuery(orgId.value, undefined, now, now + ABSENCE_WINDOW_DAYS * MICROS_PER_DAY),
+    );
   } catch {
     absences.value = [];
   }
@@ -379,13 +391,14 @@ async function fetchAbsences() {
 async function fetchSegments() {
   try {
     const now = Date.now() * 1000;
-    const res = await oncallService.resolvedSchedule({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      from: now,
-      to: now + SHIFT_HORIZON_DAYS * MICROS_PER_DAY,
-    });
-    segments.value = res.data ?? [];
+    segments.value = await queryClient.fetchQuery(
+      resolvedScheduleQuery(
+        orgId.value,
+        props.teamId,
+        now,
+        now + SHIFT_HORIZON_DAYS * MICROS_PER_DAY,
+      ),
+    );
   } catch {
     segments.value = [];
   }
@@ -422,17 +435,15 @@ function openAway(email: string) {
 async function saveAbsence() {
   awaySaving.value = true;
   try {
-    await oncallService.createUnavailability({
-      org_identifier: orgId.value,
-      data: {
-        user_email: awayEmail.value,
-        start_at: new Date(`${awayFromDate.value}T${awayFromTime.value}`).getTime() * 1000,
-        end_at: new Date(`${awayToDate.value}T${awayToTime.value}`).getTime() * 1000,
-        ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
-      },
+    await createAbsenceWrite.mutateAsync({
+      user_email: awayEmail.value,
+      start_at: new Date(`${awayFromDate.value}T${awayFromTime.value}`).getTime() * 1000,
+      end_at: new Date(`${awayToDate.value}T${awayToTime.value}`).getTime() * 1000,
+      ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
     });
     awayOpen.value = false;
     toast({ variant: "success", message: t("oncall.awaySaved") });
+    // Unforced: the write expired both scopes, so these repaint the refs from one server read.
     await Promise.all([fetchAbsences(), fetchSegments()]);
     // The rota moves the away person's turn, so the schedule tab's answer
     // just changed too.
@@ -453,11 +464,9 @@ async function saveAbsence() {
 
 async function removeAbsence(absence: Unavailability) {
   try {
-    await oncallService.deleteUnavailability({
-      org_identifier: orgId.value,
-      unavailability_id: absence.id,
-    });
+    await deleteAbsenceWrite.mutateAsync(absence.id);
     toast({ variant: "success", message: t("oncall.awayRemoved") });
+    // Unforced: the write expired both scopes, so these repaint the refs from one server read.
     await Promise.all([fetchAbsences(), fetchSegments()]);
     emit("changed");
   } catch (err: any) {
@@ -708,8 +717,7 @@ function nameOf(email: string): string {
 async function fetchOrgUsers() {
   loadingUsers.value = true;
   try {
-    const res = await usersService.orgUsers(orgId.value);
-    orgUsers.value = res.data?.data ?? [];
+    orgUsers.value = await queryClient.fetchQuery(orgUsersQuery(orgId.value));
     userLookupFailed.value = false;
   } catch {
     // Not a toast: the form still works, and an error banner over a
@@ -731,11 +739,7 @@ async function commitMembers(emails: string[]) {
   if (!emails.length) return;
   adding.value = true;
   try {
-    await oncallService.addMembers({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      data: { user_emails: emails },
-    });
+    await addMembersWrite.mutateAsync(emails);
     selected.value = [];
     fallbackEmails.value = "";
     emit("changed");
@@ -756,11 +760,7 @@ async function confirmRemoveMember() {
   memberToRemove.value = null;
   if (!member) return;
   try {
-    await oncallService.removeMember({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      user_email: member.user_email,
-    });
+    await removeMemberWrite.mutateAsync(member.user_email);
     emit("changed");
   } catch (err: any) {
     toast({

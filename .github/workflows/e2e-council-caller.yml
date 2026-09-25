@@ -124,14 +124,18 @@ jobs:
           ACTOR: ${{ steps.ctx.outputs.actor }}
           HINT: ${{ steps.ctx.outputs.hint }}
         run: |
+          # One trace id spans the OSS dispatch → the ENT engine run, so the whole flow is
+          # one OpenObserve trace. The engine mints its own if this is empty.
+          TRACE_ID=$(openssl rand -hex 16)
           gh workflow run e2e-council.yml --repo openobserve/o2-enterprise \
             -f source_repo=openobserve \
             -f pr_number="$PR" \
             -f dry_run="$DRY" \
             -f force_overwrite="$FORCE" \
             -f feature_hint="$HINT" \
-            -f actor="$ACTOR"
-          echo "Dispatched E2E Council engine for openobserve PR #$PR (dry_run=$DRY, force=$FORCE, by @$ACTOR)."
+            -f actor="$ACTOR" \
+            -f o2_trace_id="$TRACE_ID"
+          echo "Dispatched E2E Council engine for openobserve PR #$PR (dry_run=$DRY, force=$FORCE, by @$ACTOR, trace=$TRACE_ID)."
 
       - name: Acknowledge on the source PR
         # success() => only ack if the dispatch actually succeeded (don't mislead the author if the
