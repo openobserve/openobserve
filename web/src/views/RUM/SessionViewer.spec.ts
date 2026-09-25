@@ -762,3 +762,67 @@ describe("SessionViewer.vue — no replay recorded", () => {
     wrapper.unmount();
   });
 });
+
+describe("SessionViewer.vue — repeated view documents", () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const start = 1692884313968;
+  // The SDK re-sends a view on every update: same view_id and date, rising version.
+  const viewDoc = (view_id: string, url: string, version: number, date: number) => ({
+    type: "view",
+    view_id,
+    view_url: url,
+    view_loading_type: "route_change",
+    _o2_document_version: version,
+    view_time_spent: version * 1_000_000_000,
+    date,
+  });
+
+  it("renders one breadcrumb per view, at the navigation time, from its latest document", async () => {
+    vi.clearAllMocks();
+    const search = vi.mocked(searchService.search);
+    const defaultImpl = search.getMockImplementation();
+    search.mockImplementation(async (params: any) => {
+      const sql: string = params?.query?.query?.sql ?? "";
+      if (sql.includes("min(start)")) return defaultImpl!(params, "RUM");
+      if (sql.includes('"_rumdata"')) {
+        return {
+          data: {
+            hits: [
+              viewDoc("v-login", "https://app/#/Login", 2, start + 1000),
+              viewDoc("v-login", "https://app/#/Login", 6, start + 1000),
+              viewDoc("v-login", "https://app/#/Login", 4, start + 1000),
+              { type: "action", action_id: "a1", view_id: "v-login", date: start + 2000 },
+              viewDoc("v-files", "https://app/#/file-manager", 3, start + 5000),
+              viewDoc("v-files", "https://app/#/file-manager", 14, start + 5000),
+            ],
+          },
+        } as any;
+      }
+      return { data: { hits: [] } } as any;
+    });
+
+    try {
+      const router = createTestRouter();
+      await router.push({
+        path: "/rum/sessions/session-abc",
+        query: { start_time: "1692884313968000", end_time: "1692884769270000" },
+      });
+      const wrapper = mountSessionViewer(router);
+      await flush();
+      await flush();
+
+      const events = (wrapper.vm as any).segmentEvents;
+      expect(events.map((e: any) => e.type)).toEqual(["view", "action", "view"]);
+      const views = events.filter((e: any) => e.type === "view");
+      expect(views.map((e: any) => e.name)).toEqual([
+        "route_change : https://app/#/Login",
+        "route_change : https://app/#/file-manager",
+      ]);
+      expect(views.map((e: any) => e.timestamp)).toEqual([start + 1000, start + 5000]);
+      expect((wrapper.vm as any).rawEventsMap.get("v-files")._o2_document_version).toBe(14);
+      wrapper.unmount();
+    } finally {
+      search.mockImplementation(defaultImpl!);
+    }
+  });
+});
