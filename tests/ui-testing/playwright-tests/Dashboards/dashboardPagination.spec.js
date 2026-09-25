@@ -4,6 +4,7 @@ const {
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
 const testLogger = require("../utils/test-logger.js");
+const { getOrgIdentifier } = require("../utils/cloud-auth.js");
 const PageManager = require("../../pages/page-manager.js");
 const { waitForDashboardPage } = require("./utils/dashCreation.js");
 
@@ -117,7 +118,7 @@ test.describe("Folder Switch Pagination Reset testcases", () => {
     { tag: ["@folder-pagination-reset", "@all"] },
     async ({ page }) => {
       testLogger.info("Deep-linking to folder B with a stale page=5");
-      const orgId = process.env["ORGNAME"];
+      const orgId = getOrgIdentifier();
       await page.goto(
         `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${orgId}&folder=${folderB.folderId}&page=5`,
         { waitUntil: "domcontentloaded" },

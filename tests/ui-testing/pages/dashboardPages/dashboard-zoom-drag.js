@@ -109,6 +109,9 @@ export default class DashboardZoomDrag {
   // the chart. Position matters as much as size, and the reflow outlasts a
   // couple of frames — hence the dwell.
   async waitForChartMounted(timeout = 30000) {
+    if (this.chartHostSelector === GRID_CHART_HOST) {
+      await this.waitForPanelsIdle(timeout);
+    }
     await this.page.waitForFunction(
       (selector) => {
         const host = document.querySelector(selector);
@@ -127,6 +130,20 @@ export default class DashboardZoomDrag {
       },
       this.chartHostSelector,
       { timeout, polling: 100 }
+    );
+  }
+
+  // A streamed chunk landing mid-gesture re-renders the chart and drops the in-progress brush.
+  async waitForPanelsIdle(timeout = 30000) {
+    await this.page.waitForFunction(
+      () => {
+        if (document.querySelector('[data-test="dashboard-cancel-btn"]')) return false;
+        const refresh = document.querySelector('[data-test="dashboard-refresh-btn"]');
+        if (!refresh) return false;
+        return !refresh.disabled && refresh.getAttribute("aria-disabled") !== "true";
+      },
+      null,
+      { timeout, polling: 200 }
     );
   }
 
