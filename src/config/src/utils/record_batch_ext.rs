@@ -914,19 +914,46 @@ pub fn convert_json_to_record_batch(
     let records_len = data.len();
     let num_fields = schema.fields().len();
 
-    // Pre-allocate builders for all fields in schema
-    let mut builders: Vec<Box<dyn ArrayBuilder>> = schema
-        .fields()
-        .iter()
-        .map(|f| make_builder(f.data_type(), records_len))
-        .collect();
-
     // Create field name to index mapping (amortize lookup cost)
     let field_indices: HashMap<&str, usize> = schema
         .fields()
         .iter()
         .enumerate()
         .map(|(idx, f)| (f.name().as_str(), idx))
+        .collect();
+
+    // Utf8 builders otherwise start at 1 KiB of values and double as they grow;
+    // the memtable keeps whatever capacity they ended with until the file rotates.
+    let mut value_bytes = vec![0usize; num_fields];
+    for record in data.iter() {
+        if let Some(obj) = record.as_object() {
+            for (key, value) in obj.iter() {
+                if let Some(&idx) = field_indices.get(key.as_str()) {
+                    value_bytes[idx] += match value {
+                        serde_json::Value::String(s) => s.len(),
+                        serde_json::Value::Null => 0,
+                        serde_json::Value::Bool(_) => 5,
+                        serde_json::Value::Number(_) => 20,
+                        _ => 64,
+                    };
+                }
+            }
+        }
+    }
+
+    let mut builders: Vec<Box<dyn ArrayBuilder>> = schema
+        .fields()
+        .iter()
+        .zip(value_bytes.iter())
+        .map(|(f, &bytes)| -> Box<dyn ArrayBuilder> {
+            match f.data_type() {
+                DataType::Utf8 => Box::new(StringBuilder::with_capacity(records_len, bytes)),
+                DataType::LargeUtf8 => {
+                    Box::new(LargeStringBuilder::with_capacity(records_len, bytes))
+                }
+                dt => make_builder(dt, records_len),
+            }
+        })
         .collect();
 
     // Cache data types for faster access
@@ -2249,6 +2276,23 @@ mod test {
         let result = convert_json_to_record_batch(&schema, &[]).unwrap();
         assert_eq!(result.num_rows(), 0);
         assert_eq!(result.schema(), schema);
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_utf8_capacity_matches_data() {
+        let schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
+        let data: Vec<_> = (0..10)
+            .map(|i| Arc::new(serde_json::json!({"s": format!("v{i}")})))
+            .collect();
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(col.value(9), "v9");
+        // 20 bytes of values; the builder used to reserve 1 KiB regardless.
+        assert!(col.values().capacity() < 1024);
     }
 
     #[test]
