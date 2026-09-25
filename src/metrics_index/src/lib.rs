@@ -27,8 +27,9 @@ pub use layout::{
     METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_enabled, metrics_index_stream,
 };
 pub use matcher::{matcher_predicates, matcher_residual_field};
-pub use pruner::search;
+pub use pruner::{matching_blocks, search};
 pub use reader::fetch_parsed_index;
+pub use selection_cache::{cache_blocks, cached_blocks};
 
 #[cfg(test)]
 mod tests {
@@ -237,7 +238,7 @@ mod tests {
             .unwrap();
         let id = config::ider::uuid();
         let account = format!("{id}:default");
-        let path = format!("files/test/midx/m/2026/09/22/00/indexed-v1-{id}.midx");
+        let path = format!("files/test/mindex/m/2026/09/22/00/indexed-v1-{id}.midx");
         let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v1-{id}.vortex");
         let store = object_store::memory::InMemory::new();
         store

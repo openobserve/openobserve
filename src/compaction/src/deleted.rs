@@ -132,7 +132,7 @@ mod tests {
         let file = deleted_file("files/default/metrics/cpu/2026/08/19/07/indexed-v1-456.parquet");
         assert_eq!(
             metrics_index_key(&file).as_deref(),
-            Some("files/default/midx/cpu/2026/08/19/07/indexed-v1-456.midx")
+            Some("files/default/mindex/cpu/2026/08/19/07/indexed-v1-456.midx")
         );
 
         for file in [

@@ -33,7 +33,7 @@ use config::{
             MetricsBlockScan,
             value::{EvalContext, Labels, Sample},
         },
-        stream::{FileKey, FileSelection},
+        stream::FileKey,
     },
     utils::hash::gxhash,
 };
@@ -44,6 +44,7 @@ use metrics_index::{
     block::{BlockDecoder, DecodedBlockRef, Index},
     block_cache::{CacheKey, CachedIndex, INDEX_CACHE, IndexCache, ParentIdentity, cache_limit},
 };
+use promql_parser::label::Matchers;
 use tokio::{
     sync::{OwnedSemaphorePermit, Semaphore},
     task::JoinSet,
@@ -513,6 +514,7 @@ pub async fn load_metrics_block_index(file: &FileKey, labels: &[String]) -> Resu
 
 pub(super) async fn prepare(
     scan: &MetricsBlockScan,
+    matchers: &Matchers,
     columns: Arc<LabelColumns>,
     partitions: &[(u64, u64)],
     offset: i64,
@@ -529,6 +531,15 @@ pub(super) async fn prepare(
         .group
         .iter()
         .chain(&columns.series)
+        .chain(
+            matchers
+                .matchers
+                .iter()
+                .filter(|matcher| {
+                    !["__name__", "_timestamp", "value"].contains(&matcher.name.as_str())
+                })
+                .map(|matcher| &matcher.name),
+        )
         .cloned()
         .collect::<Vec<_>>();
     labels.sort();
@@ -538,10 +549,6 @@ pub(super) async fn prepare(
         ensure!(
             seen.insert((&file.account, &file.key)),
             "duplicate block parent"
-        );
-        ensure!(
-            scan.unfiltered || matches!(file.selection, Some(FileSelection::RowRanges(_))),
-            "exact row-range selection required"
         );
     }
     let metadata_started = Instant::now();
@@ -573,23 +580,32 @@ pub(super) async fn prepare(
         .collect::<Vec<_>>();
     let metadata_ms = metadata_started.elapsed().as_secs_f64() * 1000.0;
     let selection_started = Instant::now();
+    let matchers = Arc::new(matchers.clone());
     let jobs = scan
         .files
         .iter()
         .zip(loaded)
         .map(|(source, file)| {
-            let ranges = match &source.selection {
-                Some(FileSelection::RowRanges(ranges)) => Some(Arc::clone(ranges)),
-                None if scan.unfiltered => None,
-                _ => unreachable!("selection was validated"),
-            };
+            let source = source.clone();
+            let matchers = Arc::clone(&matchers);
             async move {
-                tokio::task::yield_now().await;
-                let ids =
-                    file.index
-                        .select_blocks(ranges.as_deref().map(Vec::as_slice), None, None)?;
+                let ids = if matchers.matchers.is_empty() && matchers.or_matchers.is_empty() {
+                    (0..file.index.blocks.len()).collect()
+                } else if let Some(ids) = metrics_index::cached_blocks(&source, &matchers) {
+                    ids.as_ref().clone()
+                } else {
+                    let index = Arc::clone(&file.index);
+                    let filter = Arc::clone(&matchers);
+                    let ids = tokio::task::spawn_blocking(move || {
+                        metrics_index::matching_blocks(&index, &filter)
+                    })
+                    .await??;
+                    metrics_index::cache_blocks(&source, &matchers, Arc::new(ids.clone()));
+                    ids
+                };
                 ensure!(
-                    ids.windows(2).all(|pair| pair[0] < pair[1]),
+                    ids.iter().all(|id| *id < file.index.blocks.len())
+                        && ids.windows(2).all(|pair| pair[0] < pair[1]),
                     "block selection is not unique and ordered"
                 );
                 Ok(SelectedFile { file, ids })
@@ -987,7 +1003,7 @@ mod tests {
     use config::{
         meta::{
             promql::{HASH_SORTED_TABLE_SUFFIX, value::Label},
-            stream::FileMeta,
+            stream::{FileMeta, FileSelection},
         },
         metrics::promql::IndexBlocksCacheMetrics,
     };
@@ -1172,7 +1188,6 @@ mod tests {
         fn scan(&self, files: impl IntoIterator<Item = FileKey>) -> MetricsBlockScan {
             MetricsBlockScan {
                 table_name: "m".into(),
-                unfiltered: false,
                 files: files
                     .into_iter()
                     .map(|mut file| {
@@ -1276,9 +1291,17 @@ mod tests {
         assert!(exact);
         let reads_after_pruning = fixture.metadata_calls.load(Ordering::SeqCst);
         assert!(reads_after_pruning > 0);
-        let prepared = prepare(&scan, columns(), &intervals(), 100, 20, &eval())
-            .await
-            .unwrap();
+        let prepared = prepare(
+            &scan,
+            &Matchers::empty(),
+            columns(),
+            &intervals(),
+            100,
+            20,
+            &eval(),
+        )
+        .await
+        .unwrap();
         assert!(!prepared.is_empty());
         assert_eq!(
             fixture.metadata_calls.load(Ordering::SeqCst),
@@ -1456,6 +1479,7 @@ mod tests {
         ] {
             let error = prepare(
                 &fixture.scan(files),
+                &Matchers::empty(),
                 columns(),
                 &intervals(),
                 100,
@@ -1497,9 +1521,17 @@ mod tests {
         ]);
         let fixture = Fixture::new(&[first.clone(), second.clone()], false).await;
         let scan = fixture.scan([first.0, second.0]);
-        let prepared = prepare(&scan, columns(), &intervals(), 100, 20, &eval())
-            .await
-            .unwrap();
+        let prepared = prepare(
+            &scan,
+            &Matchers::empty(),
+            columns(),
+            &intervals(),
+            100,
+            20,
+            &eval(),
+        )
+        .await
+        .unwrap();
         assert_eq!(prepared.len(), 28);
         let stats = Arc::clone(&prepared[0].stats);
         assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
@@ -1566,11 +1598,18 @@ mod tests {
         let scan = MetricsBlockScan {
             table_name: "m".into(),
             files: vec![file],
-            unfiltered: false,
         };
-        let prepared = prepare(&scan, columns(), &intervals(), 100, 20, &eval())
-            .await
-            .unwrap();
+        let prepared = prepare(
+            &scan,
+            &Matchers::empty(),
+            columns(),
+            &intervals(),
+            100,
+            20,
+            &eval(),
+        )
+        .await
+        .unwrap();
         let mut result = Vec::new();
         for partition in prepared {
             let mut stream = BlockSeriesStream::new(partition);
@@ -1620,13 +1659,16 @@ mod tests {
         assert_eq!(index.blocks.len(), 3);
         // The gap is read but its unselected payload must never be decoded.
         bytes[index.blocks.block(1).block_offset as usize] ^= 1;
-        key.with_selection(
-            FileSelection::RowRanges(Arc::new(vec![0..2, 4..6])),
-            Some(131072),
-        );
+        key.selection = None;
         let fixture = Fixture::new(&[(key.clone(), bytes)], false).await;
+        let matchers = Matchers::new(vec![Matcher::new(
+            MatchOp::Re("first|last".parse().unwrap()),
+            "group",
+            "first|last",
+        )]);
         let prepared = prepare(
             &fixture.scan([key]),
+            &matchers,
             columns(),
             &intervals(),
             100,
@@ -1665,6 +1707,59 @@ mod tests {
         assert_eq!(stats.read_ranges.load(Ordering::Relaxed), 1);
         assert_eq!(stats.completed_partitions.load(Ordering::Relaxed), 1);
         assert!(stats.read_bytes.load(Ordering::Relaxed) > stats.selected_bytes);
+    }
+
+    #[tokio::test]
+    async fn filtered_block_selection_reuses_one_decode_without_global_cache() {
+        let data = file(&[
+            (1, 10, 1.0, Some("x")),
+            (1, 20, 2.0, Some("x")),
+            (2, 10, 3.0, Some("y")),
+        ]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let file = fixture.scan([data.0]).files.remove(0);
+        let cache = Mutex::new(IndexCache::default());
+        let flights = Arc::new(loads::LoadRegistry::default());
+        let loaded = load_index_cached(
+            &file,
+            &["group".into()],
+            Arc::new(Semaphore::new(2)),
+            &cache,
+            &flights,
+            0,
+        )
+        .await
+        .unwrap();
+        assert!(cache.lock().unwrap().is_empty());
+        let reads = fixture.metadata_calls.load(Ordering::SeqCst);
+        assert!(reads > 0);
+        let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "group", "x")]);
+        assert_eq!(
+            metrics_index::matching_blocks(&loaded.index, &matchers).unwrap(),
+            vec![0]
+        );
+        assert_eq!(fixture.metadata_calls.load(Ordering::SeqCst), reads);
+    }
+
+    #[tokio::test]
+    async fn missing_filter_label_rejects_block_preflight_before_payload_reads() {
+        let data = file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "/api/bar")]);
+        let error = prepare(
+            &fixture.scan([data.0]),
+            &matchers,
+            columns(),
+            &intervals(),
+            100,
+            20,
+            &eval(),
+        )
+        .await
+        .err()
+        .unwrap();
+        assert!(error.to_string().contains("MIDX lacks identity label path"));
+        assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
@@ -1870,7 +1965,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn preflight_rejects_partial_series_duplicates_and_cross_file_ties_without_payload() {
+    async fn preflight_rejects_duplicate_timestamps_and_cross_file_ties_without_payload() {
         let a = file(&[
             (1, 10, 1.0, Some("x")),
             (1, 20, 2.0, Some("x")),
@@ -1879,20 +1974,19 @@ mod tests {
         let b = file(&[(1, 30, 9.0, Some("x")), (1, 40, 10.0, Some("x"))]);
         let duplicate = file(&[(2, 10, 1.0, Some("x")), (2, 10, 2.0, Some("x"))]);
         let fixture = Fixture::new(&[a.clone(), b.clone(), duplicate.clone()], false).await;
-        let mut partial = a.0.clone();
-        partial.with_selection(
-            FileSelection::RowRanges(Arc::new(std::iter::once(0..2).collect())),
-            Some(131072),
-        );
-        for scan in [
-            fixture.scan([partial]),
-            fixture.scan([a.0, b.0]),
-            fixture.scan([duplicate.0]),
-        ] {
+        for scan in [fixture.scan([a.0, b.0]), fixture.scan([duplicate.0])] {
             assert!(
-                prepare(&scan, columns(), &intervals(), 100, 20, &eval())
-                    .await
-                    .is_err()
+                prepare(
+                    &scan,
+                    &Matchers::empty(),
+                    columns(),
+                    &intervals(),
+                    100,
+                    20,
+                    &eval()
+                )
+                .await
+                .is_err()
             );
         }
         assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
@@ -2045,6 +2139,7 @@ mod tests {
         let fixture = Fixture::new(&[absent.clone(), null.clone(), empty.clone()], false).await;
         let prepared = prepare(
             &fixture.scan([absent.0.clone(), null.0]),
+            &Matchers::empty(),
             columns(),
             &intervals(),
             100,
@@ -2062,6 +2157,7 @@ mod tests {
         assert!(
             prepare(
                 &fixture.scan([absent.0, empty.0]),
+                &Matchers::empty(),
                 columns(),
                 &intervals(),
                 100,
@@ -2085,7 +2181,15 @@ mod tests {
         scan.files.extend(fast.scan([malformed.0]).files);
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(5),
-            prepare(&scan, columns(), &intervals(), 100, 20, &eval()),
+            prepare(
+                &scan,
+                &Matchers::empty(),
+                columns(),
+                &intervals(),
+                100,
+                20,
+                &eval(),
+            ),
         )
         .await
         .expect("later metadata error must not wait behind pending reads");
@@ -2114,6 +2218,7 @@ mod tests {
         let fixture = Fixture::new(&[(key.clone(), bytes)], false).await;
         let prepared = prepare(
             &fixture.scan([key]),
+            &Matchers::empty(),
             columns(),
             &intervals(),
             100,
@@ -2139,6 +2244,7 @@ mod tests {
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
         let prepared = prepare(
             &fixture.scan([data.0]),
+            &Matchers::empty(),
             columns(),
             &intervals(),
             100,
@@ -2158,6 +2264,7 @@ mod tests {
         let fixture = Fixture::new(std::slice::from_ref(&data), true).await;
         let prepared = prepare(
             &fixture.scan([data.0]),
+            &Matchers::empty(),
             columns(),
             &intervals(),
             100,

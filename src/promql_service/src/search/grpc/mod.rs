@@ -63,17 +63,20 @@ struct StorageProvider {
     need_wal: bool,
 }
 
-#[async_trait]
-impl TableProvider for StorageProvider {
-    async fn create_context(
+impl StorageProvider {
+    async fn create_context_inner(
         &self,
-        org_id: &str,
-        stream_name: &str,
-        time_range: (i64, i64),
-        matchers: Matchers,
-        label_selector: HashSet<String>,
-        filters: &mut [(String, Vec<String>)],
+        request: ProviderContextRequest<'_>,
     ) -> datafusion::error::Result<Vec<Context>> {
+        let ProviderContextRequest {
+            org_id,
+            stream_name,
+            time_range,
+            matchers,
+            label_selector,
+            filters,
+            prefer_blocks,
+        } = request;
         let mut ctxs = Vec::new();
         // register storage table
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
@@ -84,6 +87,7 @@ impl TableProvider for StorageProvider {
             time_range,
             matchers.clone(),
             filters,
+            prefer_blocks,
         )
         .await?;
         if let Some(ctx) = ctx {
@@ -107,6 +111,61 @@ impl TableProvider for StorageProvider {
             }
         }
         Ok(ctxs)
+    }
+}
+
+struct ProviderContextRequest<'a> {
+    org_id: &'a str,
+    stream_name: &'a str,
+    time_range: (i64, i64),
+    matchers: Matchers,
+    label_selector: HashSet<String>,
+    filters: &'a mut [(String, Vec<String>)],
+    prefer_blocks: bool,
+}
+
+#[async_trait]
+impl TableProvider for StorageProvider {
+    async fn create_context(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        time_range: (i64, i64),
+        matchers: Matchers,
+        label_selector: HashSet<String>,
+        filters: &mut [(String, Vec<String>)],
+    ) -> datafusion::error::Result<Vec<Context>> {
+        self.create_context_inner(ProviderContextRequest {
+            org_id,
+            stream_name,
+            time_range,
+            matchers,
+            label_selector,
+            filters,
+            prefer_blocks: false,
+        })
+        .await
+    }
+
+    async fn create_context_for_streaming(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        time_range: (i64, i64),
+        matchers: Matchers,
+        label_selector: HashSet<String>,
+        filters: &mut [(String, Vec<String>)],
+    ) -> datafusion::error::Result<Vec<Context>> {
+        self.create_context_inner(ProviderContextRequest {
+            org_id,
+            stream_name,
+            time_range,
+            matchers,
+            label_selector,
+            filters,
+            prefer_blocks: true,
+        })
+        .await
     }
 
     #[cfg(feature = "enterprise")]

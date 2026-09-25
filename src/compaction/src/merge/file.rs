@@ -604,7 +604,7 @@ mod tests {
                 .await
                 .unwrap();
                 assert_eq!(storage::get_bytes(&account, &key).await.unwrap(), data);
-                let indexes = storage::list(&account, "files/publish/midx/")
+                let indexes = storage::list(&account, "files/publish/mindex/")
                     .await
                     .unwrap();
                 assert_eq!(indexes.len(), usize::from(kind == "block"));

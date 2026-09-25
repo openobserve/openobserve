@@ -430,7 +430,7 @@ fn generate_local_stream_dirs(
     ];
     if stream_type == StreamType::Metrics {
         dirs.push(PathBuf::from(format!(
-            "{data_stream_dir}files/{org_id}/midx/{stream_name}"
+            "{data_stream_dir}files/{org_id}/mindex/{stream_name}"
         )));
     }
     dirs
@@ -836,7 +836,7 @@ mod tests {
             vec![
                 PathBuf::from("/data/files/org/metrics/cpu"),
                 PathBuf::from("/data/files/org/index/cpu_metrics"),
-                PathBuf::from("/data/files/org/midx/cpu"),
+                PathBuf::from("/data/files/org/mindex/cpu"),
             ]
         );
         assert_eq!(

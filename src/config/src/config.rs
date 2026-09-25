@@ -1716,7 +1716,7 @@ pub struct Search {
     #[env_config(
         name = "ZO_METRICS_INDEX_SELECTION_CACHE_ENABLED",
         default = false,
-        help = "Cache the row ranges a PromQL query selected from each `.midx` metrics index, keyed by file and matchers, so a repeated query skips decoding and evaluating the index."
+        help = "Cache per-file PromQL metric selections: block IDs for MIDX block reads, or source row ranges for Parquet/Vortex reads."
     )]
     pub metrics_index_selection_cache_enabled: bool,
     #[env_config(

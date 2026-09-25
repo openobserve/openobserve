@@ -90,12 +90,11 @@ impl MidxTrailer {
     }
 }
 
-/// Query-authorized immutable files with exact selections or an unfiltered full scan.
+/// Immutable files selected for one PromQL block scan.
 #[derive(Debug, Clone)]
 pub struct MetricsBlockScan {
     pub table_name: String,
     pub files: Vec<FileKey>,
-    pub unfiltered: bool,
 }
 
 pub fn metrics_index_path(path: &str) -> Option<String> {
@@ -109,7 +108,7 @@ pub fn metrics_index_path(path: &str) -> Option<String> {
     if stem.strip_prefix("indexed-v1-").is_none_or(str::is_empty) {
         return None;
     }
-    parts[2] = "midx";
+    parts[2] = "mindex";
     let filename = format!("{stem}.midx");
     *parts.last_mut()? = &filename;
     Some(parts.join("/"))

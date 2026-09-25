@@ -124,7 +124,7 @@ impl MetricsFileLayout {
     /// the Tantivy index — under its own root instead of next to the data —
     /// but in a distinct tree:
     /// `files/{org}/metrics/{stream}/{date}/{hour}/indexed-v1-{id}.vortex`
-    /// -> `files/{org}/midx/{stream}/{date}/{hour}/indexed-v1-{id}.midx`.
+    /// -> `files/{org}/mindex/{stream}/{date}/{hour}/indexed-v1-{id}.midx`.
     pub fn metrics_index_path(path: &str) -> Option<String> {
         if Self::of(path) != Some(Self::Indexed) {
             return None;
@@ -228,13 +228,13 @@ mod metrics_file_layout_tests {
             MetricsFileLayout::metrics_index_path(
                 "files/default/metrics/cpu/2026/08/19/07/indexed-v1-456.parquet"
             ),
-            Some("files/default/midx/cpu/2026/08/19/07/indexed-v1-456.midx".to_string())
+            Some("files/default/mindex/cpu/2026/08/19/07/indexed-v1-456.midx".to_string())
         );
         assert_eq!(
             MetricsFileLayout::metrics_index_path(
                 "files/default/metrics/cpu/2026/08/19/07/indexed-v1-456.vortex"
             ),
-            Some("files/default/midx/cpu/2026/08/19/07/indexed-v1-456.midx".to_string())
+            Some("files/default/mindex/cpu/2026/08/19/07/indexed-v1-456.midx".to_string())
         );
         // other layouts have no metrics index
         assert_eq!(

@@ -66,6 +66,27 @@ pub trait TableProvider: Sync + Send + 'static {
         filters: &mut [(String, Vec<String>)],
     ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>>;
 
+    /// Lets a provider choose a block-first context for streaming selectors.
+    async fn create_context_for_streaming(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        time_range: (i64, i64),
+        matchers: Matchers,
+        label_selector: HashSet<String>,
+        filters: &mut [(String, Vec<String>)],
+    ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+        self.create_context(
+            org_id,
+            stream_name,
+            time_range,
+            matchers,
+            label_selector,
+            filters,
+        )
+        .await
+    }
+
     /// Registers this evaluation with the host's query cancellation service.
     ///
     /// The evaluator deliberately knows nothing about the host service. OSS

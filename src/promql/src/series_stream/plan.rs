@@ -120,14 +120,13 @@ pub(crate) async fn execute_partitioned(
     }
     let label_cols = Arc::new(label_cols);
     let partitions = ctx.state().config().target_partitions();
-    if selector.matchers.matchers.is_empty()
-        && selector.matchers.or_matchers.is_empty()
-        && let Some(scan) = ctx.state().config().get_extension::<MetricsBlockScan>()
+    if let Some(scan) = ctx.state().config().get_extension::<MetricsBlockScan>()
         && scan.table_name == selector.table_name
     {
         let intervals = hash_partitions(partitions).collect::<Vec<_>>();
         match blocks::prepare(
             &scan,
+            selector.matchers,
             Arc::clone(&label_cols),
             &intervals,
             selector.offset,
