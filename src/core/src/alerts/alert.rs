@@ -3275,6 +3275,10 @@ fn process_row_template(
             }
         }
 
+        if resp.contains("{...row}") {
+            resp = resp.replace("{...row}", &serde_json::to_string(row).unwrap_or_default());
+        }
+
         // If this is a JSON row template, try to parse it as JSON
         if is_json_template {
             match serde_json::from_str::<Value>(&resp) {
