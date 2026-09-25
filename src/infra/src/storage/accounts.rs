@@ -15,7 +15,10 @@
 
 use std::{
     ops::Range,
-    sync::{Arc, LazyLock as Lazy},
+    sync::{
+        Arc, LazyLock as Lazy,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use arc_swap::ArcSwap;
@@ -25,7 +28,7 @@ use config::{get_config, is_local_disk_storage, utils::hash::Sum64};
 use futures::{TryStreamExt, stream::BoxStream};
 use hashbrown::{HashMap, HashSet};
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    GetOptions, GetRange, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
     ObjectStoreExt as ObjStoreExt, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
     path::Path,
 };
@@ -46,7 +49,7 @@ static ADD_ACCOUNT_LOCK: Lazy<Arc<Mutex<()>>> = Lazy::new(|| Arc::new(Mutex::new
 //    trait does
 //  not provide Clone, so instead we wrap it up in Arc, so we can clone it
 pub struct StorageClientFactory {
-    accounts: ArcSwap<HashMap<String, Arc<Box<dyn ObjectStore>>>>,
+    accounts: ArcSwap<HashMap<String, Arc<Account>>>,
     stream_strategy: StreamStrategy,
     only_default: bool,
 }
@@ -73,8 +76,7 @@ impl StorageClientFactory {
 
     pub fn new_with_config(config: &config::S3, local_mode: bool) -> Self {
         let (stream_strategy, accounts) = parse_storage_config(config);
-        let mut temp: HashMap<String, Arc<Box<dyn ObjectStore>>> =
-            HashMap::with_capacity(accounts.len());
+        let mut temp: HashMap<String, Arc<Account>> = HashMap::with_capacity(accounts.len());
         let mut only_default = accounts.len() == 1;
 
         if local_mode {
@@ -82,13 +84,14 @@ impl StorageClientFactory {
                 .expect("create stream data dir success");
             temp.insert(
                 DEFAULT_ACCOUNT.to_string(),
-                Arc::new(Box::<super::local::Local>::default()),
+                Arc::new(Account::new(Box::<super::local::Local>::default())),
             );
             // local storage only has one account
             only_default = true;
         } else {
             for (name, config) in accounts {
-                temp.insert(name, Arc::new(Box::new(super::remote::Remote::new(config))));
+                let client = Box::new(super::remote::Remote::new(config));
+                temp.insert(name, Arc::new(Account::new(client)));
             }
         }
 
@@ -118,7 +121,7 @@ impl StorageClientFactory {
         for (k, v) in r.iter() {
             temp.insert(k.clone(), v.clone());
         }
-        temp.insert(key, Arc::new(acc));
+        temp.insert(key, Arc::new(Account::new(acc)));
         self.accounts.swap(Arc::new(temp));
         drop(lock);
     }
@@ -155,7 +158,7 @@ impl StorageClientFactory {
 
     /// Get the client for the given name.
     /// If the name is not found, return the default client.
-    pub fn get_client_by_name(&self, name: &str) -> Arc<Box<dyn ObjectStore>> {
+    fn get_client_by_name(&self, name: &str) -> Arc<Account> {
         if !name.is_empty()
             && let Some(client) = self.accounts.load().get(name).cloned()
         {
@@ -166,6 +169,55 @@ impl StorageClientFactory {
             .get(DEFAULT_ACCOUNT)
             .cloned()
             .expect("default object store account not found")
+    }
+
+    /// Suffix GET that falls back to HEAD + bounded range on stores rejecting suffix ranges.
+    async fn get_suffix_opts(
+        &self,
+        account: &str,
+        location: &Path,
+        options: GetOptions,
+        n: u64,
+    ) -> Result<GetResult> {
+        let acc = self.get_client_by_name(account);
+        if !acc.suffix_unsupported.load(Ordering::Relaxed) {
+            match acc.client.get_opts(location, options.clone()).await {
+                Err(object_store::Error::NotSupported { source }) => {
+                    log::info!(
+                        "[STORAGE] account `{account}` rejects suffix ranges ({source}), \
+                         falling back to HEAD + bounded range"
+                    );
+                    acc.suffix_unsupported.store(true, Ordering::Relaxed);
+                }
+                res => return res,
+            }
+        }
+        let size = acc.client.head(location).await?.size;
+        let range = GetRange::Bounded(size.saturating_sub(n)..size);
+        acc.client
+            .get_opts(
+                location,
+                GetOptions {
+                    range: Some(range),
+                    ..options
+                },
+            )
+            .await
+    }
+}
+
+struct Account {
+    client: Box<dyn ObjectStore>,
+    // Set once the store rejects a suffix range (Azure); later suffix GETs go HEAD + bounded.
+    suffix_unsupported: AtomicBool,
+}
+
+impl Account {
+    fn new(client: Box<dyn ObjectStore>) -> Self {
+        Self {
+            client,
+            suffix_unsupported: AtomicBool::new(false),
+        }
     }
 }
 
@@ -308,6 +360,7 @@ impl ObjectStoreExt for StorageClientFactory {
 
     async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult> {
         self.get_client_by_name(account)
+            .client
             .put(location, payload)
             .await
     }
@@ -320,6 +373,7 @@ impl ObjectStoreExt for StorageClientFactory {
         opts: PutOptions,
     ) -> Result<PutResult> {
         self.get_client_by_name(account)
+            .client
             .put_opts(location, payload, opts)
             .await
     }
@@ -330,6 +384,7 @@ impl ObjectStoreExt for StorageClientFactory {
         location: &Path,
     ) -> Result<Box<dyn MultipartUpload>> {
         self.get_client_by_name(account)
+            .client
             .put_multipart(location)
             .await
     }
@@ -341,12 +396,13 @@ impl ObjectStoreExt for StorageClientFactory {
         opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         self.get_client_by_name(account)
+            .client
             .put_multipart_opts(location, opts)
             .await
     }
 
     async fn get(&self, account: &str, location: &Path) -> Result<GetResult> {
-        self.get_client_by_name(account).get(location).await
+        self.get_client_by_name(account).client.get(location).await
     }
 
     async fn get_opts(
@@ -355,13 +411,18 @@ impl ObjectStoreExt for StorageClientFactory {
         location: &Path,
         options: GetOptions,
     ) -> Result<GetResult> {
+        if let Some(GetRange::Suffix(n)) = options.range {
+            return self.get_suffix_opts(account, location, options, n).await;
+        }
         self.get_client_by_name(account)
+            .client
             .get_opts(location, options)
             .await
     }
 
     async fn get_range(&self, account: &str, location: &Path, range: Range<u64>) -> Result<Bytes> {
         self.get_client_by_name(account)
+            .client
             .get_range(location, range)
             .await
     }
@@ -373,16 +434,20 @@ impl ObjectStoreExt for StorageClientFactory {
         ranges: &[Range<u64>],
     ) -> Result<Vec<Bytes>> {
         self.get_client_by_name(account)
+            .client
             .get_ranges(location, ranges)
             .await
     }
 
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta> {
-        self.get_client_by_name(account).head(location).await
+        self.get_client_by_name(account).client.head(location).await
     }
 
     async fn delete(&self, account: &str, location: &Path) -> Result<()> {
-        self.get_client_by_name(account).delete(location).await
+        self.get_client_by_name(account)
+            .client
+            .delete(location)
+            .await
     }
 
     async fn delete_stream(
@@ -391,13 +456,14 @@ impl ObjectStoreExt for StorageClientFactory {
         locations: BoxStream<'static, Result<Path>>,
     ) -> Result<Vec<Path>> {
         self.get_client_by_name(account)
+            .client
             .delete_stream(locations)
             .try_collect::<Vec<Path>>()
             .await
     }
 
     fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
-        self.get_client_by_name(account).list(prefix)
+        self.get_client_by_name(account).client.list(prefix)
     }
 
     fn list_with_offset(
@@ -407,6 +473,7 @@ impl ObjectStoreExt for StorageClientFactory {
         offset: &Path,
     ) -> BoxStream<'static, Result<ObjectMeta>> {
         self.get_client_by_name(account)
+            .client
             .list_with_offset(prefix, offset)
     }
 
@@ -416,26 +483,32 @@ impl ObjectStoreExt for StorageClientFactory {
         prefix: Option<&Path>,
     ) -> Result<ListResult> {
         self.get_client_by_name(account)
+            .client
             .list_with_delimiter(prefix)
             .await
     }
 
     async fn copy(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
-        self.get_client_by_name(account).copy(from, to).await
+        self.get_client_by_name(account).client.copy(from, to).await
     }
 
     async fn rename(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
-        self.get_client_by_name(account).rename(from, to).await
+        self.get_client_by_name(account)
+            .client
+            .rename(from, to)
+            .await
     }
 
     async fn copy_if_not_exists(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
         self.get_client_by_name(account)
+            .client
             .copy_if_not_exists(from, to)
             .await
     }
 
     async fn rename_if_not_exists(&self, account: &str, from: &Path, to: &Path) -> Result<()> {
         self.get_client_by_name(account)
+            .client
             .rename_if_not_exists(from, to)
             .await
     }
@@ -443,9 +516,98 @@ impl ObjectStoreExt for StorageClientFactory {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::AtomicUsize;
+
     use config::S3;
+    use object_store::{CopyOptions, memory::InMemory};
 
     use super::*;
+
+    #[derive(Debug)]
+    struct RejectSuffixStore {
+        inner: InMemory,
+        suffix_calls: Arc<AtomicUsize>,
+    }
+
+    impl std::fmt::Display for RejectSuffixStore {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("reject-suffix")
+        }
+    }
+
+    #[async_trait]
+    impl ObjectStore for RejectSuffixStore {
+        async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+            if matches!(options.range, Some(GetRange::Suffix(_))) {
+                self.suffix_calls.fetch_add(1, Ordering::Relaxed);
+                return Err(object_store::Error::NotSupported {
+                    source: "suffix range requests".into(),
+                });
+            }
+            self.inner.get_opts(location, options).await
+        }
+
+        async fn put_opts(
+            &self,
+            location: &Path,
+            payload: PutPayload,
+            options: PutOptions,
+        ) -> Result<PutResult> {
+            self.inner.put_opts(location, payload, options).await
+        }
+
+        async fn put_multipart_opts(
+            &self,
+            location: &Path,
+            options: PutMultipartOptions,
+        ) -> Result<Box<dyn MultipartUpload>> {
+            self.inner.put_multipart_opts(location, options).await
+        }
+
+        fn delete_stream(
+            &self,
+            locations: BoxStream<'static, Result<Path>>,
+        ) -> BoxStream<'static, Result<Path>> {
+            self.inner.delete_stream(locations)
+        }
+
+        fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
+            self.inner.list(prefix)
+        }
+
+        async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
+            self.inner.list_with_delimiter(prefix).await
+        }
+
+        async fn copy_opts(&self, from: &Path, to: &Path, options: CopyOptions) -> Result<()> {
+            self.inner.copy_opts(from, to, options).await
+        }
+    }
+
+    async fn reject_suffix_store(location: &Path) -> (Box<dyn ObjectStore>, Arc<AtomicUsize>) {
+        let inner = InMemory::new();
+        inner
+            .put_opts(
+                location,
+                Bytes::from_static(b"0123456789abcdef").into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        let suffix_calls = Arc::new(AtomicUsize::new(0));
+        let store = RejectSuffixStore {
+            inner,
+            suffix_calls: Arc::clone(&suffix_calls),
+        };
+        (Box::new(store), suffix_calls)
+    }
+
+    fn suffix(n: u64) -> GetOptions {
+        GetOptions {
+            range: Some(GetRange::Suffix(n)),
+            ..Default::default()
+        }
+    }
 
     fn base_s3_config() -> S3 {
         S3 {
@@ -618,5 +780,34 @@ mod tests {
         let factory = StorageClientFactory::new_with_config(&config, true);
         assert_eq!(format!("{factory}"), "storage for StorageClientFactory");
         assert_eq!(format!("{factory:?}"), "storage for StorageClientFactory");
+    }
+
+    #[tokio::test]
+    async fn test_suffix_falls_back_to_bounded_range_when_unsupported() {
+        let factory = StorageClientFactory::new_with_config(&base_s3_config(), true);
+        let location = Path::from("files/o/logs/s/f.bin");
+        let (store, suffix_calls) = reject_suffix_store(&location).await;
+        factory.add_account("azure".to_string(), store).await;
+
+        for (n, want) in [(4, &b"cdef"[..]), (100, &b"0123456789abcdef"[..])] {
+            let res = factory
+                .get_opts("azure", &location, suffix(n))
+                .await
+                .unwrap();
+            assert_eq!(res.bytes().await.unwrap(), want);
+        }
+        assert_eq!(suffix_calls.load(Ordering::Relaxed), 1);
+
+        let (store, suffix_calls) = reject_suffix_store(&location).await;
+        factory.add_account("azure".to_string(), store).await;
+        factory
+            .get_opts("azure", &location, suffix(4))
+            .await
+            .unwrap();
+        assert_eq!(
+            suffix_calls.load(Ordering::Relaxed),
+            1,
+            "re-adding an account must retry suffix ranges on the new store"
+        );
     }
 }
