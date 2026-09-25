@@ -16,13 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { saveMonitorMutation } from "@/services/synthetics.queries";
+import { syntheticsKeys } from "@/services/synthetics.querykeys";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { cloneDeep } from "lodash-es";
-import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
+import {
+  useRouter,
+  useRoute,
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  type NavigationGuard,
+} from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
@@ -37,6 +44,7 @@ import type {
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { fetchChildJourney } from "@/utils/synthetics/fetchChildJourney";
 import type { WireStep } from "@/types/synthetics";
 import { buildResolvedGrouped } from "@/components/synthetics/variables/resolved";
 import {
@@ -45,19 +53,41 @@ import {
   sharedPlainValues,
 } from "@/components/synthetics/variables/replayInputs";
 import { useSharedVariables } from "@/components/synthetics/variables/useSharedVariables";
-import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
+import {
+  expandJourney,
+  loadChildren,
+  opensStartingUrl,
+  placeholdersIn,
+  type ChildJourney,
+  type ExpansionMap,
+} from "@/utils/synthetics/expandJourney";
+import {
+  browserMaxSteps,
+  computeRunBudget,
+  formatBudgetDuration,
+  JOB_LEASE_MS,
+} from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
   buildCreateBrowserTestPayload,
   mapResponseToBrowserCheck,
 } from "@/utils/synthetics/buildPayload";
 import {
+  extractEligibility,
+  type ExtractEligibility,
+  type ReferencedByState,
+} from "@/utils/synthetics/extractEligibility";
+import {
+  buildExtractedChildCheck,
+  splitVariablesForChild,
+} from "@/utils/synthetics/buildExtractedChild";
+import {
   makeBrowserCheckGateSchema,
   makeBrowserCheckSaveSchema,
 } from "@/components/synthetics/CreateBrowserTest.schema";
 import { CHROME_UI_LABELS, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
-import { syntheticsListRoute } from "@/utils/synthetics/routes";
+import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -70,6 +100,8 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
+import ExtractSubtestDialog from "@/components/synthetics/journey/ExtractSubtestDialog.vue";
+import type { ExtractForm } from "@/components/synthetics/journey/ExtractSubtestDialog.schema";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import CheckVariablesPanel from "@/components/synthetics/configure/CheckVariablesPanel.vue";
 import useCheckWizardUi, {
@@ -384,9 +416,12 @@ async function loadForEdit(id: string) {
     const mapped = mapResponseToBrowserCheck(res.data as Record<string, unknown>);
     check.value = mapped;
     savedCheck.value = cloneDeep(mapped);
+    // Not on `BrowserCheck`: `buildCreateBrowserTestPayload` spreads it, and the form never sends it.
+    journeyBudgetMs.value = (res.data as any).config?.journey_budget_ms;
     checkName.value = mapped.name;
     startUrl.value = mapped.url;
     journeyStepDone.value = true;
+    void loadReferencedBy(id);
   } catch (err) {
     console.error("[synthetics] failed to load check for edit", err);
     if ((err as any)?.response?.status === 404) {
@@ -507,6 +542,69 @@ const check = ref<BrowserCheck>({
   capture: { screenshot: "on-fail" as const, trace: "on-fail" as const },
   variables: [],
 });
+
+/** The one child-journey cache, shared with `BrowserJourney` so preview and count never drift. */
+const childrenCache = ref<Map<string, ChildJourney>>(new Map());
+
+/** Child ids the prefetch was refused (403) — the journey marks them without a second GET. */
+const refusedChildIds = ref<Set<string>>(new Set());
+
+/** Child ids the prefetch found deleted (404), with the same life cycle as `refusedChildIds`. */
+const missingChildIds = ref<Set<string>>(new Set());
+
+/** The saved check's run-time allowance; undefined in create mode means the server default. */
+const journeyBudgetMs = ref<number | undefined>();
+
+/** Every name a `{{placeholder}}` can resolve to: the server accepts variables and secrets alike. */
+const definedNames = computed(() =>
+  [...(check.value.variables ?? []), ...(check.value.secrets ?? [])].map((v) => v.name.trim()),
+);
+
+/** Composed-child id to reference row for the run on screen, so child results fold back. */
+const expansionMap = ref<ExpansionMap | undefined>(undefined);
+
+/** Steps the journey runs with every reference expanded: the unit of the warning and the cap. */
+const executedStepCount = computed(() => {
+  try {
+    return expandJourney(check.value.journey, childrenCache.value).steps.length;
+  } catch {
+    // `journey.length` is an AUTHORED count and cannot answer a question asked in executed steps.
+    return undefined;
+  }
+});
+
+/** Under Configure's Starting URL, only while the run would not open it (skip rule A1). */
+const targetHint = computed(() =>
+  opensStartingUrl(check.value.journey, childrenCache.value)
+    ? undefined
+    : t("synthetics.checkDetails.startingUrlNotOpened"),
+);
+
+/** Referenced ids as a stable string, so the watcher refetches only when the set changes. */
+const subtestIdsSignature = computed(() =>
+  [
+    ...new Set(
+      check.value.journey.filter((s) => s.action === "subtest").map((s) => s.subtest?.id ?? ""),
+    ),
+  ]
+    .filter(Boolean)
+    .sort()
+    .join(","),
+);
+
+/** Loads children once named: the usage count, warning and preview render before any replay. */
+watch(
+  subtestIdsSignature,
+  async () => {
+    try {
+      const loaded = await loadChildren(check.value.journey, loadChild);
+      for (const [id, child] of loaded) childrenCache.value.set(id, child);
+    } catch (err) {
+      console.error("[synthetics] failed to load referenced check(s)", err);
+    }
+  },
+  { immediate: true },
+);
 
 /**
  * Reconcile the selected folder against the folders this org actually has.
@@ -653,7 +751,8 @@ onBeforeUnmount(() => {
   recorder.cleanup();
 });
 
-onBeforeRouteLeave((to, from, next) => {
+// Registered for updates too: opening a child is a param-only push on this same route record.
+const guardUnsavedChanges: NavigationGuard = (to, from, next) => {
   if (forceLeave) {
     forceLeave = false;
     next();
@@ -667,13 +766,37 @@ onBeforeRouteLeave((to, from, next) => {
   next(false);
   pendingLeavePath = to.fullPath;
   showUnsavedDialog.value = true;
-});
+};
+onBeforeRouteLeave(guardUnsavedChanges);
+// Only an id change leaves this check: a query-only update (the setup `router.replace`) must pass.
+onBeforeRouteUpdate((to, from, next) =>
+  to.params.id === from.params.id ? next() : guardUnsavedChanges(to, from, next),
+);
 
 function beforeUnloadHandler(e: BeforeUnloadEvent) {
   if (!isDirty.value) return;
   // Sync stop the extension before the page goes away
   stopActiveExtension();
   e.preventDefault();
+}
+
+function urlHost(url: string | undefined): string | null {
+  try {
+    return new URL(url ?? "").host || null;
+  } catch {
+    return null;
+  }
+}
+
+/** The hosts the journey's navigates go to, when none of them is the Starting URL's; null otherwise. */
+function startUrlHostMismatch(): { host: string; other: string } | null {
+  const host = urlHost(check.value.url);
+  const navigateHosts = check.value.journey
+    .filter((step) => step.action === "navigate")
+    .map((step) => urlHost(step.value))
+    .filter((h): h is string => !!h);
+  if (!host || navigateHosts.length === 0 || navigateHosts.includes(host)) return null;
+  return { host, other: navigateHosts[0] };
 }
 
 /**
@@ -748,6 +871,15 @@ async function persist(): Promise<boolean> {
     return false;
   }
 
+  // A warning, not a block: the journey may leave the Starting URL on purpose.
+  const mismatch = startUrlHostMismatch();
+  if (mismatch) {
+    toast({
+      variant: "warning",
+      message: t("synthetics.validation.startUrlHostMismatch", mismatch),
+    });
+  }
+
   isSaving.value = true;
   validationErrors.value = {};
   // The parse just succeeded, so any message a previous failed save left on a
@@ -789,6 +921,8 @@ async function persist(): Promise<boolean> {
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return false;
     }
+    if (mapReferencedSaveConflict(err)) return false;
+    if (mapCompositionSaveError(err)) return false;
     toast({
       variant: "error",
       message: err?.response?.data?.message || t("synthetics.newCheck.saveFailed"),
@@ -798,6 +932,66 @@ async function persist(): Promise<boolean> {
   } finally {
     isSaving.value = false;
   }
+}
+
+/** The server's step index points into the expanded journey, so failures map by child name. */
+function mapCompositionSaveError(err: any): boolean {
+  const message: string = err?.response?.data?.message ?? "";
+  if (
+    err?.response?.status !== 400 ||
+    !(
+      message.startsWith("validation: config.steps") ||
+      message.startsWith("validation: expanded journey")
+    )
+  ) {
+    return false;
+  }
+  const matched = check.value.journey.find((step) => {
+    if (step.action !== "subtest") return false;
+    const name = step.subtest?.name || childrenCache.value.get(step.subtest?.id ?? "")?.name;
+    return !!name && message.includes(name);
+  });
+  if (matched) {
+    const idx = check.value.journey.indexOf(matched);
+    journeyFieldIssues.value = [{ path: ["journey", idx], message }];
+    toast({
+      variant: "error",
+      message: t("synthetics.validation.compositionChildFailed", {
+        name: matched.subtest?.name || matched.name || "",
+      }),
+    });
+  } else {
+    toast({
+      variant: "error",
+      message: message ? raw(message) : t("synthetics.newCheck.saveFailed"),
+    });
+  }
+  return true;
+}
+
+// A save-time 409 only occurs in a race: something referenced this check after it was loaded.
+const saveBlockedInfo = ref<{ references: UsedByReference[]; hidden: number } | null>(null);
+const saveBlockedOpen = computed({
+  get: () => saveBlockedInfo.value !== null,
+  set: (open: boolean) => {
+    if (!open) saveBlockedInfo.value = null;
+  },
+});
+
+/** Renders the 409 body's references through the delete flow's used-by presentation. */
+function mapReferencedSaveConflict(err: any): boolean {
+  const data = err?.response?.data;
+  if (
+    err?.response?.status !== 409 ||
+    (data?.code !== "child_referenced" && data?.code !== "referenced_check_cannot_hold_subtest")
+  ) {
+    return false;
+  }
+  saveBlockedInfo.value = {
+    references: (data.references ?? []) as UsedByReference[],
+    hidden: data.hidden_reference_count ?? 0,
+  };
+  return true;
 }
 
 // ── Selection state (synced from BrowserJourney) ───────────────────────────
@@ -811,8 +1005,130 @@ const journeyRef = ref<InstanceType<typeof BrowserJourney>>();
  * assignment in `persist`.
  */
 const journeyFieldIssues = ref<{ path: PropertyKey[]; message: string }[]>([]);
-const journeySelectionState = ref({ count: 0, isRecording: false });
+const journeySelectionState = ref<{ count: number; isRecording: boolean; ids: string[] }>({
+  count: 0,
+  isRecording: false,
+  ids: [],
+});
 const showBulkDeleteDialog = ref(false);
+
+// `=== true` so an unknown flag hides the action, as the journey editor does.
+const isCompositionEnabled = computed(
+  () => store.state.zoConfig?.synthetics_subtests_enabled === true,
+);
+const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
+
+/** Load-time lookup only; the save-time `checkUsageThenSave` asks again on its own. */
+const referencedByState = ref<ReferencedByState>("none");
+/** The passive indicator's number; the tri-state above cannot carry it. */
+const referencedByCount = ref(0);
+const showExtractDialog = ref(false);
+
+async function loadReferencedBy(id: string) {
+  referencedByState.value = "pending";
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.referencedBy(org, id);
+    const count = (res.data?.references?.length ?? 0) + (res.data?.hidden_reference_count ?? 0);
+    referencedByCount.value = count;
+    referencedByState.value = count > 0 ? "some" : "none";
+  } catch (err) {
+    console.error("[synthetics] referencedBy lookup failed", err);
+    referencedByCount.value = 0;
+    referencedByState.value = "unknown";
+  }
+}
+
+function retryReferencedBy() {
+  if (props.editId) void loadReferencedBy(props.editId);
+}
+
+const extractEligibilityResult = computed<ExtractEligibility>(() =>
+  extractEligibility({
+    steps: check.value.journey,
+    selectedIds: new Set(journeySelectionState.value.ids),
+    filterActive: journeyRef.value?.filterActive ?? false,
+    referencedBy: props.editId ? referencedByState.value : "none",
+    definedNames: new Set(definedNames.value),
+  }),
+);
+const extractRange = computed(() =>
+  extractEligibilityResult.value.ok ? extractEligibilityResult.value.range : [],
+);
+const extractAnchor = computed(() =>
+  extractEligibilityResult.value.ok ? extractEligibilityResult.value.anchor : 0,
+);
+const extractVariables = computed(() => splitVariablesForChild(check.value, extractRange.value));
+
+function openExtractDialog() {
+  if (extractEligibilityResult.value.ok) showExtractDialog.value = true;
+}
+
+function extractCreateError(err: unknown, folderId: string): Error {
+  const response = (err as { response?: { status?: number; data?: { message?: string } } })
+    .response;
+  if (response?.status === 403) {
+    const folder = folders.value.find((f) => f.folderId === folderId)?.name ?? folderId;
+    return new Error(t("synthetics.journey.extract.folderForbidden", { folder }));
+  }
+  return new Error(raw(response?.data?.message) || t("synthetics.newCheck.saveFailed"));
+}
+
+/** Rejects so the dialog shows the message and stays open; the parent is only touched after the child exists. */
+async function onExtractSubmit(values: ExtractForm) {
+  const elig = extractEligibilityResult.value;
+  if (!elig.ok) return;
+  const org = store.state.selectedOrganization.identifier;
+  const child = buildExtractedChildCheck({
+    parent: check.value,
+    range: elig.range,
+    name: values.name,
+    folder: values.folder,
+    locations: values.locations ?? check.value.locations,
+    schedule: values.schedule ?? check.value.schedule,
+  });
+  let id: string;
+  try {
+    const res = await saveMonitor.mutateAsync({
+      payload: buildCreateBrowserTestPayload(child),
+      folderId: values.folder,
+    });
+    id = res.data.id;
+  } catch (err) {
+    throw extractCreateError(err, values.folder);
+  }
+  childrenCache.value.set(id, {
+    id,
+    name: child.name,
+    folderId: values.folder,
+    steps: child.journey,
+  });
+  try {
+    journeyRef.value!.replaceRangeWithSubtest(
+      { anchor: elig.anchor, count: elig.range.length },
+      { id, name: child.name },
+    );
+  } catch (err) {
+    // The cache entry must roll back with the child, or it would serve steps for a deleted check.
+    childrenCache.value.delete(id);
+    await syntheticsService.delete(org, id, values.folder).catch(() => {
+      toast({
+        variant: "error",
+        message: t("synthetics.journey.extract.orphan", { name: child.name }),
+      });
+    });
+    // The create's own invalidation already ran, so the list would keep the deleted child.
+    await queryClient.invalidateQueries({ queryKey: syntheticsKeys.monitorsAll(org) });
+    throw err;
+  }
+  // The length watcher misses a one-step range, whose splice keeps the length.
+  isDirty.value = true;
+  toast({
+    variant: "success",
+    message: t("synthetics.journey.extract.created", { name: child.name }),
+  });
+  showExtractDialog.value = false;
+}
 
 function onDeleteSelected() {
   journeyRef.value?.deleteSelectedSteps();
@@ -827,17 +1143,94 @@ function onContinueToConfigure() {
   currentStep.value = 2;
 }
 
+// Saving a referenced check can break its parents, so the author confirms that case first.
+interface UsedByReference {
+  id: string;
+  name: string;
+  folder_id: string;
+  undefined_placeholders?: string[];
+}
+const usedByInfo = ref<{
+  references: UsedByReference[];
+  hidden: number;
+  names: string[];
+} | null>(null);
+const usedByDialogOpen = computed({
+  get: () => usedByInfo.value !== null,
+  set: (open: boolean) => {
+    if (!open) {
+      usedByInfo.value = null;
+      pendingSaveAction = null;
+    }
+  },
+});
+/** Built here, not in the template: a `{{NAME}}` literal inside a mustache breaks the parser. */
+const usedByNames = computed(() =>
+  (usedByInfo.value?.names ?? []).map((name) => "{{" + name + "}}").join(", "),
+);
+let pendingSaveAction: (() => Promise<void>) | null = null;
+
+/** Only the names this edit adds; the full set would re-report parents that were already broken. */
+const addedPlaceholders = computed(() => {
+  const before = new Set(placeholdersIn(savedCheck.value?.journey ?? []));
+  return placeholdersIn(check.value.journey).filter((name) => !before.has(name));
+});
+
+/** A failed `referencedBy` lookup must not block the save; it proceeds as unreferenced. */
+async function checkUsageThenSave(afterPersist: () => Promise<void>) {
+  // Before the usage lookup, so an over-cap save sends no request at all.
+  if (executedStepCount.value !== undefined && executedStepCount.value > maxSteps.value) {
+    currentStep.value = 1;
+    toast({ variant: "error", message: t("synthetics.validation.subtestCap") });
+    nextTick(() => journeyRef.value?.revealCapNotice());
+    return;
+  }
+  const names = addedPlaceholders.value;
+  // An edit that adds no placeholder cannot break a parent, so it asks nothing.
+  if (!check.value.id || names.length === 0) {
+    await afterPersist();
+    return;
+  }
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.referencedBy(org, check.value.id, names);
+    const references = ((res.data?.references ?? []) as UsedByReference[]).filter(
+      (ref) => (ref.undefined_placeholders ?? []).length > 0,
+    );
+    const hidden = res.data?.hidden_reference_count ?? 0;
+    if (references.length > 0) {
+      usedByInfo.value = { references, hidden, names };
+      pendingSaveAction = afterPersist;
+      return;
+    }
+  } catch (err) {
+    console.error("[synthetics] referencedBy check failed", err);
+  }
+  await afterPersist();
+}
+
+async function confirmUsedBySave() {
+  const action = pendingSaveAction;
+  usedByInfo.value = null;
+  pendingSaveAction = null;
+  if (action) await action();
+}
+
 /** Edit mode, Journey step: persist, then move on to Configure. */
 async function onSaveAndContinue() {
-  if (!(await persist())) return;
-  journeyStepDone.value = true;
-  currentStep.value = 2;
+  await checkUsageThenSave(async () => {
+    if (!(await persist())) return;
+    journeyStepDone.value = true;
+    currentStep.value = 2;
+  });
 }
 
 /** Persist, then return to the checks list. */
 async function onSaveAndExit() {
-  if (!(await persist())) return;
-  router.push(backTo.value);
+  await checkUsageThenSave(async () => {
+    if (!(await persist())) return;
+    router.push(backTo.value);
+  });
 }
 
 // ── Replay — uses the composable's phase-based state machine ────────────────
@@ -893,13 +1286,7 @@ function onReplayUpTo(upTo: number) {
   runReplay(check.value.journey.slice(0, Math.max(1, upTo)));
 }
 
-/**
- * Block replay on the same target/first-step rules the Continue button uses.
- *
- * Deliberately the whole journey even for a prefix replay: `validateStepSelectors`
- * reports against the journey the editor is showing, and a partial pass would
- * leave the untouched later steps looking valid.
- */
+/** The whole journey even for a prefix replay, so untouched later steps do not look valid. */
 function validateJourneyBeforeReplay(): boolean {
   return journeyRef.value?.validateStepSelectors?.() ?? true;
 }
@@ -956,8 +1343,20 @@ const knownVariableNames = computed(() => {
   );
 });
 
-function runReplay(journey: BrowserStep[]) {
-  const steps = journeyToWireSteps(journey);
+/** Expanded before shipping, so the runner never sees `subtest`; `expansionMap` folds results back. */
+async function runReplay(journey: BrowserStep[]) {
+  let expanded = journey;
+  expansionMap.value = undefined;
+  try {
+    const children = await loadChildren(journey, loadChild);
+    const result = expandJourney(journey, children);
+    expanded = result.steps;
+    expansionMap.value = result.map;
+  } catch (err) {
+    recorder.error.value = err instanceof Error ? err.message : String(err);
+    return;
+  }
+  const steps = journeyToWireSteps(expanded);
   if (steps.length === 0) return;
   startReplay(steps);
 }
@@ -969,6 +1368,32 @@ function startReplay(steps: WireStep[]) {
     .catch((err) => {
       recorder.error.value = err instanceof Error ? err.message : String(err);
     });
+}
+
+/** The `loadChildren` fetcher: throws on failure, after recording a refusal or a deletion for the rows. */
+async function loadChild(id: string): Promise<ChildJourney> {
+  const result = await fetchChildJourney(orgIdentifier.value, id, childrenCache.value);
+  const failure = result.ok ? undefined : result.failure;
+  // A reference re-added after access was granted, or the child restored, must not keep its mark.
+  refusedChildIds.value = withMember(refusedChildIds.value, id, failure === "refused");
+  missingChildIds.value = withMember(missingChildIds.value, id, failure === "missing");
+  if (!result.ok) throw result.error;
+  return result.child;
+}
+
+/** The same Set when membership already matches, so no dependent re-renders for nothing. */
+function withMember(set: Set<string>, id: string, member: boolean): Set<string> {
+  if (set.has(id) === member) return set;
+  const next = new Set(set);
+  if (member) next.add(id);
+  else next.delete(id);
+  return next;
+}
+
+function onOpenChild(child: ChildJourney) {
+  router.push(
+    syntheticsEditRoute({ orgIdentifier: orgIdentifier.value, folderId: child.folderId }, child.id),
+  );
 }
 
 function onStopReplay() {
@@ -1191,8 +1616,24 @@ function onClearResults() {
                     :blocked-detail="blockedDetail"
                     :field-issues="journeyFieldIssues"
                     :variables-panel-open="variablesPanelOpen"
+                    :own-check-id="check.id"
+                    :own-step-count="executedStepCount"
+                    :journey-budget-ms="journeyBudgetMs"
+                    :defined-names="definedNames"
+                    :variables="check.variables"
+                    :children-cache="childrenCache"
+                    :refused-child-ids="refusedChildIds"
+                    :missing-child-ids="missingChildIds"
+                    :expansion-map="expansionMap"
                     class="h-full!"
+                    @update:start-url="
+                      (url: string) => {
+                        check.url = url;
+                        isDirty = true;
+                      }
+                    "
                     @toggle-variables-panel="variablesPanelOpen = !variablesPanelOpen"
+                    @open-child="onOpenChild"
                     @replay="onReplay"
                     @verify-extension="reverifyExtension"
                     @replay-up-to="onReplayUpTo"
@@ -1214,6 +1655,7 @@ function onClearResults() {
                   :check="check"
                   :check-id="check.id"
                   :saved="savedCheck"
+                  :child-journeys="childrenCache"
                   class="border-border-default border-t"
                   @update:check="onConfigureUpdate"
                   @promoted="onVariablePromoted"
@@ -1240,6 +1682,7 @@ function onClearResults() {
               :folders-loading="foldersLoading"
               :validation-errors="validationErrors"
               :allow-private-locations="privateLocationsEnabled"
+              :target-hint="targetHint"
               class="border-border-default w-full! border-t"
               @refresh:destinations="loadDestinations(true)"
               @update:check="onConfigureUpdate"
@@ -1293,7 +1736,46 @@ function onClearResults() {
                 <template #icon-left><OIcon name="delete" size="sm" /></template>
                 {{ t("synthetics.journey.delete") }}
               </OButton>
+              <template v-if="isCompositionEnabled">
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  :aria-disabled="!extractEligibilityResult.ok"
+                  data-test="synthetics-extract-open-btn"
+                  @click="openExtractDialog"
+                >
+                  <template #icon-left><OIcon name="git-branch" size="sm" /></template>
+                  {{ t("synthetics.journey.extract.action") }}
+                </OButton>
+                <span
+                  v-if="!extractEligibilityResult.ok"
+                  class="text-text-secondary text-xs"
+                  data-test="synthetics-extract-reason"
+                >
+                  {{
+                    t(`synthetics.journey.extract.reason.${extractEligibilityResult.reason}`, {
+                      name: extractEligibilityResult.placeholder,
+                    })
+                  }}
+                  <OButton
+                    v-if="extractEligibilityResult.reason === 'referenced-unknown'"
+                    variant="ghost"
+                    size="sm"
+                    data-test="synthetics-extract-retry-btn"
+                    @click="retryReferencedBy"
+                  >
+                    {{ t("common.retry") }}
+                  </OButton>
+                </span>
+              </template>
             </template>
+            <span
+              v-if="referencedByCount > 0"
+              class="text-text-secondary text-xs"
+              data-test="synthetics-used-by-indicator"
+            >
+              {{ t("synthetics.save.usedByCount", { count: referencedByCount }) }}
+            </span>
             <span class="flex-1" aria-hidden="true" />
 
             <OButton
@@ -1367,6 +1849,25 @@ function onClearResults() {
           </template>
         </div>
 
+        <ExtractSubtestDialog
+          v-if="isCompositionEnabled && extractEligibilityResult.ok"
+          v-model:open="showExtractDialog"
+          :range="extractRange"
+          :anchor="extractAnchor"
+          :authored-count="check.journey.length"
+          :executed-count="executedStepCount"
+          :parent-name="check.name"
+          :parent-starting-url="check.url"
+          :default-folder="check.folder ?? 'default'"
+          :folders="folders"
+          :needs-schedule="check.locations.length === 0"
+          :parent-locations="check.locations"
+          :parent-schedule="check.schedule"
+          :location-options="locations"
+          :variables="extractVariables"
+          :on-submit="onExtractSubmit"
+        />
+
         <!-- Bulk delete confirmation dialog — moved from BrowserJourney -->
         <ODialog
           v-model:open="showBulkDeleteDialog"
@@ -1387,6 +1888,57 @@ function onClearResults() {
         </ODialog>
       </div>
     </template>
+
+    <!-- Only when this save leaves a parent with a placeholder it does not define. -->
+    <ODialog
+      v-model:open="usedByDialogOpen"
+      size="sm"
+      :title="
+        t('synthetics.save.usedByTitle', {
+          name: check.name,
+          count: usedByInfo?.references.length ?? 0,
+        })
+      "
+      :primary-button-label="t('common.save')"
+      :secondary-button-label="t('common.cancel')"
+      data-test="synthetics-create-used-by-dialog"
+      @click:primary="confirmUsedBySave"
+      @click:secondary="usedByDialogOpen = false"
+    >
+      <div class="flex flex-col gap-3 py-1">
+        <ul class="m-0 flex list-none flex-col gap-1 p-0">
+          <li v-for="ref in usedByInfo?.references ?? []" :key="ref.id">
+            <span class="text-sm">{{ ref.name }}</span>
+          </li>
+        </ul>
+        <p v-if="(usedByInfo?.hidden ?? 0) > 0" class="text-text-secondary m-0 text-xs">
+          {{ t("synthetics.delete.hiddenReferences", { count: usedByInfo?.hidden ?? 0 }) }}
+        </p>
+        <p class="m-0">{{ t("synthetics.save.usedByBody", { names: usedByNames }) }}</p>
+      </div>
+    </ODialog>
+
+    <!-- Save-time 409 (§5.3 race): something referenced this check after it was loaded. -->
+    <ODialog
+      v-model:open="saveBlockedOpen"
+      size="sm"
+      :title="t('synthetics.delete.blockedTitle', { name: check.name })"
+      :primary-button-label="t('common.close')"
+      data-test="synthetics-create-save-blocked-dialog"
+      @click:primary="saveBlockedOpen = false"
+    >
+      <div class="flex flex-col gap-3 py-1">
+        <ul class="m-0 flex list-none flex-col gap-1 p-0">
+          <li v-for="ref in saveBlockedInfo?.references ?? []" :key="ref.id">
+            <span class="text-sm">{{ ref.name }}</span>
+          </li>
+        </ul>
+        <p v-if="(saveBlockedInfo?.hidden ?? 0) > 0" class="text-text-secondary m-0 text-xs">
+          {{ t("synthetics.delete.hiddenReferences", { count: saveBlockedInfo?.hidden ?? 0 }) }}
+        </p>
+        <p class="m-0">{{ t("synthetics.save.blockedBody") }}</p>
+      </div>
+    </ODialog>
 
     <!-- Unsaved changes dialog (route leave) — rendered at top level so it's
        available in ALL phases (gate, extension-setup, editor), not just editor. -->

@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { BlockedReason, BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
@@ -27,6 +28,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
@@ -38,18 +40,32 @@ import {
 } from "@/utils/synthetics/journeySuggestions";
 // Chrome UI element names stay in English in every locale — they name the
 // actual Chrome interface the user is looking at.
-import { CHROME_UI_LABELS, DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
+import { CHROME_UI_LABELS, DEFAULT_TEST_ID_ATTR, START_LOAD_STEP_ID } from "@/constants/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
 import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { fetchChildJourney } from "@/utils/synthetics/fetchChildJourney";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
+import { browserMaxSteps } from "@/utils/synthetics/runBudget";
+import {
+  composedStepId,
+  composedStepName,
+  translateStepId,
+  loadChildren,
+  expandJourney,
+  opensStartingUrl,
+  undefinedPlaceholders,
+  type ChildJourney,
+  type ExpansionMap,
+} from "@/utils/synthetics/expandJourney";
 
 const props = defineProps<{
   modelValue: BrowserStep[];
   readonly?: boolean;
-  startUrl?: string; // URL shown in the recording banner
+  /** The check's Starting URL: row 0's value and the page the recorder opens. */
+  startUrl?: string;
   /** Names the check resolves; a step value naming anything else is warned about. */
   knownVariables?: ReadonlySet<string>;
   /**
@@ -106,10 +122,36 @@ const props = defineProps<{
    * has no such panel, and the toolbar toggle is not rendered at all.
    */
   variablesPanelOpen?: boolean;
+  /** This journey's own check id — forwarded to `SubtestPicker` to exclude self-reference. */
+  ownCheckId?: string;
+  /** Executed step count of this journey: the picker's delta, the executed badge and the cap notice. */
+  ownStepCount?: number;
+  /** Configured run-time allowance for this journey, in ms — forwarded to `SubtestPicker`. */
+  journeyBudgetMs?: number;
+  /** Child ids the host's prefetch was refused (403), so the row can say so without a second GET. */
+  refusedChildIds?: Set<string>;
+  /** Child ids the host's prefetch found deleted (404), so the row can say so without a second GET. */
+  missingChildIds?: Set<string>;
+  /** Names this check defines, so a child's undefined placeholder can be named before save. */
+  definedNames?: string[];
+  /** The check's variables, substituted into the Starting URL before the recorder opens it. */
+  variables?: { name: string; value: string }[];
+  /** The host's one child-journey cache, shared so the preview and the executed count never drift. */
+  childrenCache?: Map<string, ChildJourney>;
+  /** Composed-child id to authored row for the parent's replay; undefined falls back to identity. */
+  expansionMap?: ExpansionMap;
 }>();
+
+// A bare mount (tests, a host without subtests) has no cache prop; real hosts always pass one.
+const childrenCache = computed(() => props.childrenCache ?? new Map<string, ChildJourney>());
+
+// Declared before the immediate auto-expand watcher, which reaches `resultFor` during setup.
+const { t } = useI18nTyped();
 
 const emit = defineEmits<{
   "update:modelValue": [value: BrowserStep[]];
+  /** Row 0's URL edit: the host's `check.url` is the one value both views read. */
+  "update:startUrl": [value: string];
   "clear-results": [];
   replay: [];
   /**
@@ -125,13 +167,15 @@ const emit = defineEmits<{
   "replay-up-to": [upTo: number];
   "stop-replay": [];
   "auto-record-consumed": [];
-  "selection-changed": [{ count: number; isRecording: boolean }];
+  "selection-changed": [{ count: number; isRecording: boolean; ids: string[] }];
   /**
    * The setup dialog's incognito ack was just given — the toggle reloads the
    * extension, so the owner of `extensionReady` must invalidate and re-probe.
    */
   "verify-extension": [];
   "toggle-variables-panel": [];
+  /** Open the referenced check's editor; the host owns the router. */
+  "open-child": [child: ChildJourney];
 }>();
 
 // ── Restore-then-record ─────────────────────────────────────────────────────
@@ -144,6 +188,12 @@ const emit = defineEmits<{
  * the same operation with a different anchor — see design §7.4.
  */
 const anchorStepId = ref<string | null>(null);
+
+/** Only a session the recorder opened on the Starting URL starts with a synthetic navigate. */
+const recordingOpensStartUrl = ref(false);
+
+/** This restore's own expansion map: the restore runs in a different recorder than the replay. */
+const restoreExpansionMap = ref<ExpansionMap | undefined>(undefined);
 
 /** How many prefix steps have reported a result, for the restore banner. */
 const restoredCount = computed(() => recorder.stepResults.size);
@@ -159,13 +209,28 @@ const restoreTotal = computed(() => {
 const failedStepNumber = computed(() => {
   const id = prefixFailure.value?.stepId;
   if (!id) return 0;
-  return props.modelValue.findIndex((s) => s.id === id) + 1;
+  const authoredId = restoreExpansionMap.value
+    ? translateStepId(restoreExpansionMap.value, id)
+    : id;
+  return props.modelValue.findIndex((s) => s.id === authoredId) + 1;
 });
 
 // ── Filter / expand / select state ──────────────────────────────────────────
 const filterQuery = ref("");
 const expandedStepIds = ref<string[]>([]);
 const selectedStepIds = ref<string[]>([]);
+const filteredSteps = computed<BrowserStep[]>(() => {
+  const q = filterQuery.value.trim().toLowerCase();
+  if (!q) return props.modelValue;
+  return props.modelValue.filter(
+    (step) =>
+      step.name?.toLowerCase().includes(q) ||
+      step.action.toLowerCase().includes(q) ||
+      step.selector?.toLowerCase().includes(q) ||
+      step.value?.toLowerCase().includes(q),
+  );
+});
+const filterActive = computed(() => filteredSteps.value.length < props.modelValue.length);
 
 // ── "Where did my new step go?" ────────────────────────────────────────────
 // Root element, so the row lookup in revealStep stays inside THIS journey's
@@ -224,10 +289,52 @@ const isReplayTerminal = computed(
 // executing while `stopping`, so letting a step be edited would race the player.
 const isReplayLocked = computed(() => isReplayRunning.value || isReplayStopping.value);
 
+/** A reference row fails on any failed child, passes once all its children pass, else pending. */
+function resultFor(stepId: string): StepReplayResult | undefined {
+  const own = props.stepResults?.get(stepId);
+  if (own || !props.expansionMap) return own;
+  const children = [...props.expansionMap.entries()].filter(([, e]) => e.authoredStepId === stepId);
+  if (children.length === 0) return undefined;
+  const failed = children.map(([id]) => props.stepResults?.get(id)).find((r) => r && !r.passed);
+  if (failed) {
+    const entry = props.expansionMap.get(failed.stepId)!;
+    const authoredIndex = props.modelValue.findIndex((s) => s.id === stepId);
+    const row = props.modelValue[authoredIndex];
+    const childTestName =
+      childrenCache.value.get(row?.subtest?.id ?? "")?.name ?? row?.subtest?.name ?? "";
+    return {
+      ...failed,
+      stepName: t("synthetics.journey.subtest.failedAt", {
+        number: `${authoredIndex + 1}.${entry.childIndex + 1}`,
+        step: composedStepName(row?.name, childTestName, entry.childStepName),
+      }),
+    };
+  }
+  const done = children.filter(([id]) => props.stepResults?.has(id)).length;
+  const total = children[0][1].childCount;
+  if (done < total) return undefined;
+  const durationMs = children.reduce(
+    (sum, [id]) => sum + (props.stepResults?.get(id)?.durationMs ?? 0),
+    0,
+  );
+  return { stepId, stepName: "", passed: true, durationMs };
+}
+
+/** Child progress `{done, total}` for a reference row, or null off a reference row. */
+function childProgress(stepId: string): { done: number; total: number } | null {
+  if (!props.expansionMap) return null;
+  const children = [...props.expansionMap.entries()].filter(([, e]) => e.authoredStepId === stepId);
+  if (children.length === 0) return null;
+  return {
+    done: children.filter(([id]) => props.stepResults?.has(id)).length,
+    total: children[0][1].childCount,
+  };
+}
+
 /** Index of the first failing step in journey order, or -1 when none failed. */
 const firstFailedIndex = computed(() =>
   props.modelValue.findIndex((s) => {
-    const r = props.stepResults?.get(s.id);
+    const r = resultFor(s.id);
     return r && !r.passed;
   }),
 );
@@ -236,7 +343,7 @@ const firstFailedIndex = computed(() =>
 const failedStepResult = computed<StepReplayResult | undefined>(() => {
   if (firstFailedIndex.value < 0) return undefined;
   const step = props.modelValue[firstFailedIndex.value];
-  return props.stepResults?.get(step.id);
+  return resultFor(step.id);
 });
 
 /**
@@ -247,7 +354,7 @@ const failedStepResult = computed<StepReplayResult | undefined>(() => {
  */
 function failedResultFor(row: BrowserStep): StepReplayResult | undefined {
   if (!isReplayActive.value) return undefined;
-  const r = props.stepResults?.get(row.id);
+  const r = resultFor(row.id);
   return r && !r.passed ? r : undefined;
 }
 
@@ -275,15 +382,16 @@ watch(
 /** Derive the status dot state for a step based on replay results. */
 function stepDotState(stepId: string): StepDotState | undefined {
   if (!isReplayActive.value || !props.replayPhase) return undefined;
-  const result = props.stepResults?.get(stepId);
+  const result = resultFor(stepId);
   if (result) {
     return result.passed ? "pass" : "fail";
   }
-  // Currently executing step. Gated on `running` deliberately: a stopped replay leaves
-  // the step it was interrupted on with no result, and rendering that as "active" is what
-  // left the journey showing a step spinning forever. Outside `running` it falls through
-  // to "pending" — an empty circle, which is the truth: that step never completed.
-  if (isReplayRunning.value && props.activeStepId === stepId) return "active";
+  // Only while running (a stopped step must not spin); a child's id maps to its reference row.
+  const activeStepId =
+    props.activeStepId && props.expansionMap
+      ? translateStepId(props.expansionMap, props.activeStepId)
+      : props.activeStepId;
+  if (isReplayRunning.value && activeStepId === stepId) return "active";
   const stepIndex = props.modelValue.findIndex((s) => s.id === stepId);
   if (firstFailedIndex.value >= 0 && stepIndex > firstFailedIndex.value) return "skip";
   if (props.replayPhase === "running") return "pending";
@@ -310,6 +418,25 @@ function deleteSelectedSteps() {
     props.modelValue.filter((s) => !ids.has(s.id)),
   );
   selectedStepIds.value = [];
+}
+
+/** Returns the reference step's id; clears the selection itself because a one-step range keeps the length. */
+function replaceRangeWithSubtest(
+  range: { anchor: number; count: number },
+  child: { id: string; name: string },
+): string {
+  const step: BrowserStep = {
+    id: getUUIDv7(true),
+    action: "subtest",
+    name: child.name,
+    subtest: { id: child.id, name: child.name },
+  };
+  const next = [...props.modelValue];
+  next.splice(range.anchor, range.count, step);
+  emit("update:modelValue", next);
+  selectedStepIds.value = [];
+  revealStep(step.id);
+  return step.id;
 }
 
 // Clear selection when the step list changes, filter changes, or replay starts.
@@ -353,7 +480,8 @@ const multiSelectEnabled = computed(
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
 // reflects its reactive state and merges the result into the journey on stop.
-const { t } = useI18nTyped();
+const store = useStore();
+const org = computed(() => store.state.selectedOrganization.identifier as string);
 
 const recorder = useSyntheticsRecorder(t);
 const isRecording = recorder.isRecording;
@@ -433,14 +561,27 @@ watch(
   },
 );
 
-// Emit selection state changes for the parent's sticky footer
-watch([selectedCount, isRecording], ([count, recording]) => {
-  emit("selection-changed", { count, isRecording: recording });
+// Selected ids in model order; the host judges extract eligibility on these.
+const selectedIdsInModelOrder = computed(() => {
+  const set = new Set(selectedStepIds.value);
+  return props.modelValue.filter((s) => set.has(s.id)).map((s) => s.id);
 });
+
+// Keyed on the joined ids too, so a same-size id swap re-emits; immediate, so a remount resyncs the host.
+watch(
+  [selectedCount, () => selectedIdsInModelOrder.value.join(","), isRecording],
+  ([count, , recording]) => {
+    emit("selection-changed", {
+      count,
+      isRecording: recording,
+      ids: selectedIdsInModelOrder.value,
+    });
+  },
+  { immediate: true },
+);
 
 // ── Step validation (Continue button + save) ──────────────────────────────
 const selectorErrors = ref<Set<string>>(new Set());
-const firstStepError = ref(false);
 
 /**
  * Field errors for the expanded editor, keyed by step id then field name.
@@ -451,19 +592,7 @@ const firstStepError = ref(false);
  */
 const stepFieldErrors = ref<Map<string, Record<string, string>>>(new Map());
 
-/**
- * Steps carrying at least one schema-level field error.
- *
- * `validateJourneySteps` enforces two rules of its own, but they are not the only
- * ones that block a save: `stepNameRequired`, `retiredAction`, the navigate URL,
- * `typeTextRequired` and `expectedRequired` all live in the zod schema and reach
- * this component through `setStepFieldErrors` alone. Row highlighting and
- * auto-expand read this so those rules behave like the two local ones instead of
- * being announced by a toast and then shown nowhere.
- *
- * `clearFieldError` can leave a step with an empty record, so emptiness is
- * checked rather than mere presence of the key.
- */
+/** Steps with a schema error: those rules reach the journey only as field errors. */
 const fieldErrorStepIds = computed(
   () =>
     new Set(
@@ -516,9 +645,7 @@ function applyStepFieldErrors(issues: readonly { path: PropertyKey[]; message: s
     next.set(step.id, { ...(next.get(step.id) ?? {}), [field]: issue.message });
   }
   stepFieldErrors.value = next;
-  // This is the schema's only channel into the journey, so it owns the expansion
-  // the way validateJourneySteps owns it for its own two rules. Without this the
-  // save's toast named fields that sat inside a collapsed row.
+  // The schema's only channel into the journey, so it owns revealing the errored rows.
   revealErroredSteps(next.keys());
 }
 
@@ -546,12 +673,7 @@ function clearFieldError(stepId: string, field: string) {
 }
 
 function validateJourneySteps(): boolean {
-  // 1. First step must be "navigate"
-  const first = props.modelValue[0];
-  firstStepError.value = first ? first.action !== "navigate" : false;
-
-  // 2. Element-acting steps must name their element — by a v1 `selector` or a
-  //    v2 locator bundle. See stepIsMissingTarget.
+  // Element-acting steps must name their element, by v1 selector or v2 locator.
   const selErrs = new Set<string>();
   for (const step of props.modelValue) {
     if (stepIsMissingTarget(step)) selErrs.add(step.id);
@@ -560,10 +682,9 @@ function validateJourneySteps(): boolean {
 
   // Auto-expand errored steps so the inline error is visible
   const erroredIds = [...selErrs];
-  if (firstStepError.value && first) erroredIds.push(first.id);
   revealErroredSteps(erroredIds);
 
-  const valid = !firstStepError.value && selErrs.size === 0;
+  const valid = selErrs.size === 0;
   if (!valid) {
     // Surface the first error as a toast so the user knows why
     // navigation was blocked, then expand the step to see inline details.
@@ -572,14 +693,10 @@ function validateJourneySteps(): boolean {
     const stepLabel =
       props.modelValue[stepIdx]?.name ||
       t("synthetics.results.steps.step", { step: (stepIdx ?? 0) + 1 });
-    if (firstStepError.value && (!first || first.id === firstErrId)) {
-      toast({ variant: "error", message: t("synthetics.validation.firstStepMustNavigate") });
-    } else {
-      toast({
-        variant: "error",
-        message: t("synthetics.validation.selectorRequired", { step: stepLabel }),
-      });
-    }
+    toast({
+      variant: "error",
+      message: t("synthetics.validation.selectorRequired", { step: stepLabel }),
+    });
   }
 
   return valid;
@@ -591,21 +708,20 @@ function clearSelectorError(stepId: string) {
   selectorErrors.value = next;
 }
 
-function clearFirstStepError() {
-  firstStepError.value = false;
-}
-
 // Expose selection state + validation for the parent's sticky footer
 defineExpose({
   selectedCount,
   isRecording,
+  filterActive,
   deleteSelectedSteps,
+  replaceRangeWithSubtest,
   stopActiveRecording,
   stopActiveReplay,
   // Still imperative: both callers (Continue-to-Configure, the replay gate) run
   // while the Journey step IS the active one, so the ref is live. Save-time zod
   // issues cannot use this channel — see the `fieldIssues` prop.
   validateStepSelectors: validateJourneySteps,
+  revealCapNotice,
 });
 
 /**
@@ -616,24 +732,45 @@ defineExpose({
  * that cannot restore — takes the original path, because there is either nothing to
  * replay or no way to replay it.
  */
-function startRecording() {
+async function startRecording() {
   const insertAt = currentInsertAt();
   const prefix = props.modelValue.slice(0, insertAt);
 
   if (prefix.length === 0 || !props.canRecordFrom) {
-    // Nothing was restored, so the capture starts on a browser that knows nothing about
-    // the prefix — steps from it cannot be filed at the anchor.
-    anchorStepId.value = null;
-    recorder.startRecording(props.startUrl ?? "", props.testIdAttr).catch((err) => {
-      recorder.error.value = err instanceof Error ? err.message : String(err);
-    });
+    // An empty prefix keeps the anchor: the browser sits on the Starting URL, which is what precedes row 1.
+    if (prefix.length > 0) anchorStepId.value = null;
+    restoreExpansionMap.value = undefined;
+    recordingOpensStartUrl.value = true;
+    recorder
+      .startRecording(props.startUrl ?? "", props.testIdAttr, props.variables)
+      .catch((err) => {
+        recorder.error.value = err instanceof Error ? err.message : String(err);
+      })
+      .finally(() => {
+        // A refused start leaves no session for the kept anchor's marker to describe.
+        if (!recorder.isRecording.value) anchorStepId.value = null;
+      });
+    return;
+  }
+  recordingOpensStartUrl.value = false;
+
+  // The restore runs the child's real steps, so a reference in the prefix is expanded first.
+  let expandedPrefix = prefix;
+  try {
+    const children = await loadChildren(prefix, fetchChildJourneyForRestore);
+    const result = expandJourney(prefix, children);
+    expandedPrefix = result.steps;
+    restoreExpansionMap.value = result.map;
+  } catch (err) {
+    recorder.error.value = err instanceof Error ? err.message : String(err);
     return;
   }
 
   recorder
-    .startRecordingFrom(journeyToWireSteps(prefix), {
+    .startRecordingFrom(journeyToWireSteps(expandedPrefix), {
       targetUrl: props.startUrl,
       testIdAttr: props.testIdAttr,
+      variables: props.variables,
     })
     .catch((err) => {
       recorder.error.value = err instanceof Error ? err.message : String(err);
@@ -651,7 +788,10 @@ function startRecording() {
 function onRecordFromFailure() {
   const failed = restoreStepFailure.value;
   if (!failed) return;
-  anchorStepId.value = failed.stepId;
+  anchorStepId.value = restoreExpansionMap.value
+    ? translateStepId(restoreExpansionMap.value, failed.stepId)
+    : failed.stepId;
+  recordingOpensStartUrl.value = false;
   recorder.recordFromHere().catch((err) => {
     recorder.error.value = err instanceof Error ? err.message : String(err);
   });
@@ -748,12 +888,18 @@ function announceRecordedSteps(insertAt: number, count: number) {
  * invalidation rule cannot drift apart between them. The toast lives here for that
  * same reason: hung off the Stop button it would have missed the other two.
  */
-function commitRecordedSteps(steps: BrowserStep[]) {
+function commitRecordedSteps(recorded: BrowserStep[]) {
+  const insertAt = currentInsertAt();
+  // A plain recording session opened the Starting URL, so its leading navigate is that page, not a Step.
+  const steps =
+    insertAt === 0 && recordingOpensStartUrl.value && recorded[0]?.action === "navigate"
+      ? recorded.slice(1)
+      : recorded;
+  recordingOpensStartUrl.value = false;
   if (steps.length === 0) {
     anchorStepId.value = null;
     return;
   }
-  const insertAt = currentInsertAt();
   const next = [...props.modelValue];
   next.splice(insertAt, 0, ...steps);
   emit("update:modelValue", next);
@@ -793,9 +939,18 @@ function onRecordButtonClick() {
   }
 }
 
+/** How many authored rows the current replay covers; null is the whole journey. */
+const replayedUpTo = ref<number | null>(null);
+
+function requestReplay(upTo?: number) {
+  replayedUpTo.value = upTo ?? null;
+  if (upTo === undefined) emit("replay");
+  else emit("replay-up-to", upTo);
+}
+
 function onReplayButtonClick() {
   if (props.extensionReady) {
-    emit("replay");
+    requestReplay();
   } else {
     extensionSetup.value = { open: true, action: "replay" };
   }
@@ -803,7 +958,7 @@ function onReplayButtonClick() {
 
 function onExtensionSetupContinue() {
   if (extensionSetup.value.action === "record") startRecording();
-  else emit("replay");
+  else requestReplay();
 }
 
 const extensionSetupDialog = ref<InstanceType<typeof ExtensionSetupDialog> | null>(null);
@@ -827,7 +982,7 @@ watch([() => props.blockedReason, recordingBlockedIncognito], ([reason, recordBl
 
 function onIncognitoRetry() {
   if (recordingBlockedIncognito.value) startRecording();
-  else emit("replay");
+  else requestReplay();
 }
 
 function onIncognitoDismiss() {
@@ -886,19 +1041,6 @@ onBeforeUnmount(() => {
   window.clearTimeout(flashTimer);
 });
 
-// ── Step list (single flat list — one journey, one start URL) ───────────────
-const filteredSteps = computed<BrowserStep[]>(() => {
-  const q = filterQuery.value.trim().toLowerCase();
-  if (!q) return props.modelValue;
-  return props.modelValue.filter(
-    (step) =>
-      step.name?.toLowerCase().includes(q) ||
-      step.action.toLowerCase().includes(q) ||
-      step.selector?.toLowerCase().includes(q) ||
-      step.value?.toLowerCase().includes(q),
-  );
-});
-
 // ── Journey suggestions ────────────────────────────────────────────────────
 // What the recording is worth telling its author, collapsed into one toolbar
 // chip. Derived, never stored: a suggestion leaves when the author resolves the
@@ -924,7 +1066,150 @@ function handleToggleExpand(row: BrowserStep) {
     expandedStepIds.value = expandedStepIds.value.filter((id) => id !== row.id);
   } else {
     expandedStepIds.value = [...expandedStepIds.value, row.id];
+    if (row.action === "subtest") ensureChildLoaded(row);
   }
+}
+
+// Fetch status only; the journeys themselves live in the host's one `childrenCache`.
+const loadingChildIds = ref<Set<string>>(new Set());
+const localRefusedChildIds = ref<Set<string>>(new Set());
+const localMissingChildIds = ref<Set<string>>(new Set());
+/** A 5xx or network failure: unlike a refusal or a deletion, a retry can succeed. */
+const erroredChildIds = ref<Set<string>>(new Set());
+
+function isChildLoading(row: BrowserStep): boolean {
+  return !!row.subtest?.id && loadingChildIds.value.has(row.subtest.id);
+}
+
+function isChildRefused(row: BrowserStep): boolean {
+  const id = row.subtest?.id;
+  return !!id && (localRefusedChildIds.value.has(id) || !!props.refusedChildIds?.has(id));
+}
+
+function isChildMissing(row: BrowserStep): boolean {
+  const id = row.subtest?.id;
+  return !!id && (localMissingChildIds.value.has(id) || !!props.missingChildIds?.has(id));
+}
+
+function isChildErrored(row: BrowserStep): boolean {
+  return !!row.subtest?.id && erroredChildIds.value.has(row.subtest.id);
+}
+
+function childFor(row: BrowserStep) {
+  return row.subtest?.id ? childrenCache.value.get(row.subtest.id) : undefined;
+}
+
+/** Keyed by composed id: child ids can collide with authored ones in the nested table. */
+function childRowsFor(row: BrowserStep) {
+  const child = childFor(row);
+  if (!child) return [];
+  return child.steps.map((s) => ({
+    id: composedStepId(row.id, s.id),
+    action: s.action,
+    name: s.name,
+    detail: s.value ?? s.selector ?? s.locator?.candidates[0]?.value ?? "",
+  }));
+}
+
+function missingVariablesFor(row: BrowserStep): string[] {
+  const child = childFor(row);
+  return child ? undefinedPlaceholders(child, props.definedNames ?? []) : [];
+}
+
+function stepBadgeForRow(row: BrowserStep): { label: string; variant: "default" | "error" } | null {
+  if (row.action !== "subtest") return null;
+  if (isChildRefused(row)) {
+    return { label: t("synthetics.journey.subtest.noAccessBadge"), variant: "error" };
+  }
+  const child = childFor(row);
+  if (!child) return null;
+  return {
+    label: t(
+      "synthetics.journey.subtest.stepsBadge",
+      { count: child.steps.length },
+      child.steps.length,
+    ),
+    variant: "default",
+  };
+}
+
+/** The restore's `loadChildren` fetcher; a failure aborts the restore with its error. */
+async function fetchChildJourneyForRestore(id: string): Promise<ChildJourney> {
+  const result = await fetchChildJourney(org.value, id, childrenCache.value);
+  if (!result.ok) throw result.error;
+  return result.child;
+}
+
+async function ensureChildLoaded(row: BrowserStep) {
+  const id = row.subtest?.id;
+  if (!id) return;
+  if (
+    childrenCache.value.has(id) ||
+    loadingChildIds.value.has(id) ||
+    isChildRefused(row) ||
+    isChildMissing(row) ||
+    erroredChildIds.value.has(id)
+  ) {
+    return;
+  }
+  loadingChildIds.value = new Set([...loadingChildIds.value, id]);
+  const result = await fetchChildJourney(org.value, id, childrenCache.value);
+  const next = new Set(loadingChildIds.value);
+  next.delete(id);
+  loadingChildIds.value = next;
+  if (result.ok) return;
+  if (result.failure === "refused") {
+    localRefusedChildIds.value = new Set([...localRefusedChildIds.value, id]);
+    toast({ variant: "error", message: t("synthetics.journey.subtest.noAccessToast") });
+  } else if (result.failure === "missing") {
+    localMissingChildIds.value = new Set([...localMissingChildIds.value, id]);
+  } else {
+    console.error("[synthetics] failed to load subtest reference", result.error);
+    erroredChildIds.value = new Set([...erroredChildIds.value, id]);
+  }
+}
+
+function retryChildLoad(row: BrowserStep) {
+  const id = row.subtest?.id;
+  if (!id) return;
+  const next = new Set(erroredChildIds.value);
+  next.delete(id);
+  erroredChildIds.value = next;
+  void ensureChildLoaded(row);
+}
+
+const variablesToggleLabel = computed(() =>
+  props.variablesPanelOpen
+    ? t("synthetics.variablesPanel.collapsePanel")
+    : t("synthetics.variablesPanel.openPanel"),
+);
+
+// `=== true` so an unknown flag hides the button, as the step editor does.
+const isCompositionEnabled = computed(
+  () => store.state.zoConfig?.synthetics_subtests_enabled === true,
+);
+
+// An unknown `ownStepCount` shows no notice; the server backstop applies.
+const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
+const overCap = computed(
+  () => props.ownStepCount !== undefined && props.ownStepCount > maxSteps.value,
+);
+const ownStepTotal = computed(() => props.modelValue.filter((s) => s.action !== "subtest").length);
+const hasReference = computed(() => props.modelValue.some((s) => s.action === "subtest"));
+/** One entry per reference row in journey order — the same child twice runs twice. */
+const capChildren = computed(() =>
+  props.modelValue
+    .filter((s) => s.action === "subtest")
+    .map((row) => ({
+      name: childFor(row)?.name ?? row.subtest?.name ?? row.name,
+      count: childFor(row)?.steps.length ?? 0,
+    })),
+);
+
+function revealCapNotice() {
+  journeyRootRef.value
+    ?.querySelector('[data-test="synthetics-journey-cap-notice"]')
+    ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 // ── Step CRUD — find by id and mutate ──────────────────────────────────────
@@ -986,13 +1271,19 @@ function handleUpdateExpanded(ids: string[]) {
   expandedStepIds.value = ids;
 }
 function addStep() {
-  const step: BrowserStep = {
+  appendStep({
     id: getUUIDv7(true),
     action: "click",
     name: "",
     // See handleInsertBelow — a new step is version 2.
     locator: { candidates: [] },
-  };
+  });
+}
+// No locator, matching what the editor writes when an action becomes subtest.
+function addSubtestStep() {
+  appendStep({ id: getUUIDv7(true), action: "subtest", name: "", subtest: undefined });
+}
+function appendStep(step: BrowserStep) {
   emit("update:modelValue", [...props.modelValue, step]);
   revealStep(step.id);
 }
@@ -1047,16 +1338,45 @@ function dotStateForRow(row: BrowserStep): StepDotState | undefined {
   return stepDotState(row.id);
 }
 
+/** Only while the run is live; afterwards the row's steps badge says how heavy it is. */
+function stepProgressForRow(row: BrowserStep): { done: number; total: number } | null {
+  return isReplayLocked.value ? childProgress(row.id) : null;
+}
+
+/** Dot state for a preview row, keyed by its composed id; `skip` is a child the run never reached. */
+function childDotState(composedId: string): StepDotState | undefined {
+  if (!isReplayActive.value) return undefined;
+  const result = props.stepResults?.get(composedId);
+  if (result) return result.passed ? "pass" : "fail";
+  if (isReplayRunning.value && props.activeStepId === composedId) return "active";
+  return isReplayLocked.value ? "pending" : "skip";
+}
+
+/** What actually runs: the map holds every child step of the replayed rows in place of their reference rows. */
+const executedTotal = computed(() => {
+  const rows =
+    replayedUpTo.value === null
+      ? props.modelValue
+      : props.modelValue.slice(0, Math.max(1, replayedUpTo.value));
+  if (!props.expansionMap) return rows.length;
+  const replayed = new Set(rows.map((s) => s.id));
+  const children = [...props.expansionMap.values()].filter((e) => replayed.has(e.authoredStepId));
+  return rows.filter((s) => s.action !== "subtest").length + children.length;
+});
+
+/** Row 0 — the Starting URL as a navigate-shaped row — exactly when the run opens it (skip rule A1). */
+const startRow = computed<BrowserStep | null>(() =>
+  opensStartingUrl(props.modelValue, childrenCache.value)
+    ? { id: START_LOAD_STEP_ID, action: "navigate", value: props.startUrl ?? "" }
+    : null,
+);
+
 // ── Row status color: red left border for rows with validation errors ──────
 function getRowStatusColor(row: BrowserStep): string | undefined {
-  const first = props.modelValue[0];
-  const hasFirstStepErr = firstStepError.value && first?.id === row.id;
   const hasSelectorErr = selectorErrors.value.has(row.id);
-  // Schema-level errors count too, or "fix the highlighted fields" would name a
-  // row that carries no highlight — every rule except these two local ones
-  // reaches the journey only as a field error.
+  // Schema errors count too, or the toast would name a row with no highlight.
   const hasFieldErr = fieldErrorStepIds.value.has(row.id);
-  if (hasFirstStepErr || hasSelectorErr || hasFieldErr) return "var(--color-status-error-text)";
+  if (hasSelectorErr || hasFieldErr) return "var(--color-status-error-text)";
   // Transient "this is the one you just added". It clears itself a moment later; the
   // list says nothing lasting about a row's age, only about whether it is broken.
   if (flashStepId.value === row.id) return "var(--color-status-info-text)";
@@ -1090,8 +1410,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
 
 <template>
   <div ref="journeyRootRef" class="flex min-h-0 w-full flex-col py-4">
-    <!-- Toolbar — ps-4 mirrors the expand column (w-4) so the select-all checkbox
-         aligns with the row checkboxes in the OTable below. -->
     <div class="ms-6.5 mb-3 flex items-center gap-4 px-3">
       <!-- Select-all — visibility:hidden during replay to preserve layout -->
       <OCheckbox
@@ -1106,11 +1424,17 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           {{ t("synthetics.journey.steps") }}
         </h3>
         <OBadge variant="default" size="sm" class="ms-1">{{ modelValue.length }}</OBadge>
+        <OBadge
+          v-if="hasReference && ownStepCount !== undefined"
+          :variant="overCap ? 'error' : 'default'"
+          size="sm"
+          class="ms-1"
+          data-test="synthetics-journey-executed-badge"
+        >
+          {{ t("synthetics.journey.subtest.executedBadge", { count: ownStepCount }) }}
+        </OBadge>
       </div>
 
-      <!-- Advisory notices used to be two permanently-expanded cards below this
-           toolbar. The filter is `flex-1` and the action area is a fixed width,
-           so the chip's width comes out of the filter and the buttons stay put. -->
       <JourneySuggestions
         v-if="!readonly"
         :suggestions="suggestions"
@@ -1123,8 +1447,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         class="flex-1"
         data-test="synthetics-journey-filter-input"
       />
-      <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
-      <div class="flex w-110 items-center justify-end gap-2">
+      <div class="flex shrink-0 items-center justify-end gap-2">
         <OButton
           v-if="!isRecording && !isReplayLocked"
           variant="outline"
@@ -1136,6 +1459,24 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         >
           {{ t("synthetics.journey.addStep") }}
         </OButton>
+        <!-- The wrapper carries the tooltip: a disabled button receives no pointer events. -->
+        <span v-if="!isRecording && !isReplayLocked" class="inline-flex">
+          <OButton
+            variant="outline"
+            size="sm"
+            :disabled="!isCompositionEnabled || readonly || isRecording || isRestoring"
+            data-test="synthetics-journey-add-subtest-btn"
+            @click="addSubtestStep"
+            icon-left="account-tree"
+          >
+            {{ t("synthetics.journey.addSubtest") }}
+          </OButton>
+          <OTooltip
+            v-if="!isCompositionEnabled"
+            :content="t('synthetics.journey.subtest.disabledTooltip')"
+            side="bottom"
+          />
+        </span>
 
         <!-- Run replay / Stop / Re-run — positionally stable, same slot -->
         <template v-if="!isRecording">
@@ -1195,6 +1536,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           size="sm"
           data-test="synthetics-journey-cancel-btn"
           @click="cancelRecording"
+          icon-left="close"
         >
           {{ t("synthetics.journey.cancel") }}
         </OButton>
@@ -1206,7 +1548,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           data-test="synthetics-journey-stop-btn"
           @click="stopRecording"
           icon-left="stop"
-          class="w-24!"
         >
           {{ t("synthetics.journey.stop") }}
         </OButton>
@@ -1218,7 +1559,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           data-test="synthetics-journey-record-btn"
           @click="onRecordButtonClick"
           icon-left="smart-display"
-          class="w-24!"
         >
           {{ t("synthetics.journey.record") }}
         </OButton>
@@ -1226,27 +1566,19 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <!-- Variables panel toggle — only when the host provides that panel -->
         <OButton
           v-if="variablesPanelOpen !== undefined"
-          variant="outline"
-          size="sm"
-          class="shrink-0"
+          variant="panel-collapse"
+          size="icon-toolbar"
+          :aria-label="variablesToggleLabel"
           data-test="synthetics-journey-toggle-variables-btn"
           @click="emit('toggle-variables-panel')"
         >
-          {{ t("synthetics.variablesPanel.title") }}
           <OIcon
             :name="
               variablesPanelOpen ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
             "
             size="sm"
           />
-          <OTooltip
-            :content="
-              variablesPanelOpen
-                ? t('synthetics.variablesPanel.collapsePanel')
-                : t('synthetics.variablesPanel.openPanel')
-            "
-            side="bottom"
-          />
+          <OTooltip :content="variablesToggleLabel" side="bottom" />
         </OButton>
       </div>
     </div>
@@ -1309,11 +1641,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         data-test="synthetics-journey-prefix-failed-detail"
         >{{ restoreStepFailure.error }}</pre>
       <div class="flex items-center gap-2">
-        <!-- Recording before step 1 would leave the journey starting with something
-             that is not a navigate, which validateJourneySteps rejects — the same
-             guardrail the row button carries. -->
         <OButton
-          v-if="canRecordFromFailure && failedStepNumber > 1"
+          v-if="canRecordFromFailure"
           variant="primary"
           size="sm"
           data-test="synthetics-journey-prefix-failed-record-btn"
@@ -1437,7 +1766,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           variant="primary"
           size="sm"
           data-test="synthetics-journey-preflight-retry-btn"
-          @click="emit('replay')"
+          @click="requestReplay()"
         >
           {{ t("synthetics.journey.retry") }}
         </OButton>
@@ -1467,7 +1796,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         {{
           t("synthetics.journey.replayProgress", {
             current: stepResults?.size ?? 0,
-            total: modelValue.length,
+            total: executedTotal,
           })
         }}
       </span>
@@ -1495,7 +1824,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
     >
       <OIcon name="check-circle" size="sm" class="text-timeline-dot-success" aria-hidden="true" />
       <span class="text-badge-success-ol-text font-semi-bold text-sm">{{
-        t("synthetics.journey.replayPassed", { count: modelValue.length })
+        t("synthetics.journey.replayPassed", { count: executedTotal })
       }}</span>
       <span class="flex-1" />
       <OButton
@@ -1558,7 +1887,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         variant="outline"
         size="xs"
         data-test="synthetics-journey-stopped-retry-btn"
-        @click="emit('replay')"
+        @click="requestReplay()"
       >
         {{ t("synthetics.journey.reRun") }}
       </OButton>
@@ -1570,6 +1899,30 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       >
         <OIcon name="close" size="sm" />
       </OButton>
+    </div>
+
+    <!-- Over the executed-step cap. Derived, so it leaves the moment the count drops. -->
+    <div
+      v-if="overCap"
+      role="alert"
+      class="rounded-default border-badge-error-ol-border/30 bg-badge-error-soft-bg mx-2 mb-3 flex items-start gap-2 border px-3 py-2"
+      data-test="synthetics-journey-cap-notice"
+    >
+      <OIcon name="error" size="sm" class="text-badge-error-ol-text mt-0.5" aria-hidden="true" />
+      <div class="text-badge-error-ol-text flex min-w-0 flex-1 flex-col gap-0.5 text-xs">
+        <span class="font-semibold">{{
+          t("synthetics.journey.subtest.capTitle", { total: ownStepCount, limit: maxSteps })
+        }}</span>
+        <span data-test="synthetics-journey-cap-breakdown"
+          >{{
+            [
+              t("synthetics.journey.subtest.capOwn", { count: ownStepTotal }),
+              ...capChildren.map((c) => t("synthetics.journey.subtest.capChild", c)),
+            ].join(" · ")
+          }}.</span
+        >
+        <span>{{ t("synthetics.journey.subtest.capRemedy") }}</span>
+      </div>
     </div>
 
     <!-- Recorder error (extension missing / failed to start). The incognito
@@ -1679,6 +2032,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       name-key="name"
       detail-key="selector"
       :dot-state-fn="dotStateForRow"
+      :step-progress-fn="stepProgressForRow"
+      :step-badge-fn="stepBadgeForRow"
       :locked="isReplayLocked || isRestoring"
       :readonly="readonly"
       :enable-reorder="showDragColumn"
@@ -1688,6 +2043,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       :selected-ids="selectedStepIds"
       :expanded-ids="expandedStepIds"
       :get-row-status-color="getRowStatusColor"
+      :start-row="startRow"
+      @update:start-url="(url: string) => emit('update:startUrl', url)"
       @update:data="handleRowReorder"
       @update:selected-ids="handleUpdateSelected"
       @update:expanded-ids="handleUpdateExpanded"
@@ -1698,7 +2055,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       :can-record-from="canOfferRecordBefore"
       @record-before="onRecordBefore"
       @insert-below="handleInsertBelow"
-      @retry-replay="emit('replay')"
+      @retry-replay="requestReplay()"
     >
       <!-- Inline editor (expanded content) — the same component the recording
            panel renders, so an author sees the same fields either way -->
@@ -1719,7 +2076,13 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           class="mx-8 mt-3"
           :result="failedResultFor(row)!"
           :step-number="stepNumberOf(row)"
-          @retry-replay="emit('replay-up-to', stepNumberOf(row))"
+          :child-name="
+            (row as BrowserStep).action === 'subtest'
+              ? childFor(row as BrowserStep)?.name
+              : undefined
+          "
+          @retry-replay="requestReplay(stepNumberOf(row))"
+          @open-child="emit('open-child', childFor(row as BrowserStep)!)"
         />
         <!-- `selector-error-message` is field-scoped, not step-scoped: it renders
              inside the step it describes, so naming that step again only crowds
@@ -1728,11 +2091,11 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <BrowserJourneyStepEditor
           class="px-8 pt-3 pb-3"
           :step="row"
-          :action-error-message="
-            (firstStepError && props.modelValue[0]?.id === row.id
-              ? t('synthetics.validation.firstStepMustNavigate')
-              : raw('')) || fieldError(row.id, 'action')
-          "
+          :own-check-id="ownCheckId"
+          :own-step-count="ownStepCount"
+          :journey-budget-ms="journeyBudgetMs"
+          :child-name="childFor(row as BrowserStep)?.name"
+          :action-error-message="fieldError(row.id, 'action')"
           :name-error-message="fieldError(row.id, 'name')"
           :selector-error-message="
             (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : raw('')) ||
@@ -1742,15 +2105,130 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           :expected-error-message="fieldError(row.id, 'assertion.expected')"
           :known-variables="knownVariables"
           @update:step="(next: BrowserStep) => handleStepReplace(row, next)"
-          @action-edited="
-            clearFirstStepError();
-            clearFieldError(row.id, 'action');
-          "
+          @action-edited="clearFieldError(row.id, 'action')"
           @selector-edited="
             clearSelectorError(row.id);
             clearFieldError(row.id, 'selector');
           "
         />
+        <!-- The third impact line: a name the child reads and this check lacks fails at resolve. -->
+        <p
+          v-if="(row as BrowserStep).action === 'subtest' && missingVariablesFor(row).length"
+          class="text-status-warning-text mx-8 mt-0 mb-2 text-xs"
+          data-test="synthetics-journey-subtest-undefined-variable"
+        >
+          {{
+            t("synthetics.journey.subtest.undefinedVariable", {
+              name: childFor(row as BrowserStep)!.name,
+              variable: missingVariablesFor(row).join(", "),
+            })
+          }}
+          <OButton
+            v-if="variablesPanelOpen !== undefined"
+            variant="ghost-primary"
+            size="xs"
+            data-test="synthetics-journey-subtest-add-variable"
+            @click="emit('toggle-variables-panel')"
+          >
+            {{ t("synthetics.journey.subtest.undefinedVariableAction") }}
+          </OButton>
+        </p>
+        <!-- Loading and refused render apart, so a refused author is not left watching a spinner. -->
+        <div
+          v-if="(row as BrowserStep).action === 'subtest'"
+          class="mx-8 flex flex-col gap-2 pb-3"
+          data-test="synthetics-journey-subtest-preview"
+        >
+          <p
+            class="text-text-secondary m-0 text-xs"
+            data-test="synthetics-journey-subtest-ignored-env"
+          >
+            {{ t("synthetics.journey.subtest.ignoredEnv") }}
+          </p>
+          <OSkeleton
+            v-if="isChildLoading(row as BrowserStep)"
+            :rows="3"
+            data-test="synthetics-journey-subtest-loading"
+          />
+          <div
+            v-else-if="isChildRefused(row as BrowserStep)"
+            class="rounded-default bg-status-error-bg text-status-error-text flex flex-col gap-1 px-3 py-2 text-sm"
+            role="alert"
+            data-test="synthetics-journey-subtest-refused"
+          >
+            <span class="flex items-center gap-2">
+              <OIcon name="lock" size="sm" aria-hidden="true" />
+              <span>{{
+                t("synthetics.journey.subtest.noAccess", {
+                  name: (row as BrowserStep).subtest?.name || (row as BrowserStep).name || "",
+                })
+              }}</span>
+            </span>
+            <span class="text-xs" data-test="synthetics-journey-subtest-refused-remedy">{{
+              t("synthetics.journey.subtest.noAccessRemedy")
+            }}</span>
+          </div>
+          <div
+            v-else-if="isChildMissing(row as BrowserStep)"
+            class="rounded-default bg-status-error-bg text-status-error-text flex items-center gap-2 px-3 py-2 text-sm"
+            role="alert"
+            data-test="synthetics-journey-subtest-missing"
+          >
+            <OIcon name="link-off" size="sm" aria-hidden="true" />
+            <span>{{ t("synthetics.journey.subtest.missing") }}</span>
+          </div>
+          <div
+            v-else-if="isChildErrored(row as BrowserStep)"
+            class="rounded-default bg-status-warning-bg text-status-warning-text flex items-center gap-2 px-3 py-2 text-sm"
+            role="alert"
+            data-test="synthetics-journey-subtest-load-error"
+          >
+            <OIcon name="error-outline" size="sm" aria-hidden="true" />
+            <span class="flex-1">{{ t("synthetics.journey.subtest.loadFailed") }}</span>
+            <OButton
+              variant="ghost"
+              size="xs"
+              data-test="synthetics-journey-subtest-retry"
+              @click="retryChildLoad(row as BrowserStep)"
+            >
+              {{ t("common.retry") }}
+            </OButton>
+          </div>
+          <template v-else-if="childFor(row as BrowserStep)">
+            <div class="flex items-center gap-2">
+              <span class="text-text-heading text-xs font-semibold">
+                {{ t("synthetics.journey.subtest.previewLabel") }}
+              </span>
+              <OBadge variant="default" size="sm" data-test="synthetics-journey-subtest-count">
+                {{ childFor(row as BrowserStep)!.steps.length }}
+              </OBadge>
+              <span class="flex-1" />
+              <OButton
+                variant="ghost"
+                size="xs"
+                icon-right="open-in-new"
+                data-test="synthetics-journey-subtest-open-child"
+                @click="emit('open-child', childFor(row as BrowserStep)!)"
+              >
+                {{
+                  t("synthetics.journey.subtest.openChild", {
+                    name: childFor(row as BrowserStep)!.name,
+                  })
+                }}
+              </OButton>
+            </div>
+            <JourneySteps
+              :data="childRowsFor(row as BrowserStep)"
+              mode="preview"
+              :number-prefix="String(stepNumberOf(row))"
+              :dot-state-fn="(r) => childDotState(r.id)"
+              action-key="action"
+              name-key="name"
+              detail-key="detail"
+              readonly
+            />
+          </template>
+        </div>
       </template>
     </JourneySteps>
 

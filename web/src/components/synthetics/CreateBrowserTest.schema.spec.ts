@@ -18,10 +18,7 @@ import { makeBrowserCheckGateSchema, makeBrowserCheckSaveSchema } from "./Create
 
 const t = (key: string) => key;
 
-// Most journey fixtures below exercise the target and first-step rules, not names,
-// so a name is supplied by default — step name is required (D10) and every fixture
-// would otherwise trip that rule for reasons unrelated to what it is testing. A
-// case that IS about names passes an explicit `name`, which wins over the default.
+// A default name keeps fixtures clear of the required-name rule; name cases pass their own.
 function form(journey: unknown[]) {
   return {
     name: "check",
@@ -267,11 +264,54 @@ describe("makeBrowserCheckSaveSchema journey validation", () => {
     expect(issuePaths(result)).toContain("journey.1.selector");
   });
 
-  it("should still require the first step to navigate", () => {
-    const result = schema.safeParse(form([{ id: "1", action: "click", selector: "#login" }]));
+  // The Starting URL opens the run, so a journey need not open its own page.
+  it("lets a click open the journey", () => {
+    const result = schema.safeParse(
+      form([
+        {
+          id: "1",
+          action: "click",
+          locator: { candidates: [{ kind: "css", value: "#login" }] },
+        },
+      ]),
+    );
+
+    expect(issuePaths(result)).toEqual([]);
+    expect(result.success).toBe(true);
+  });
+});
+
+// `_start` is row 0's id on every result record, so an authored step cannot carry it.
+describe("makeBrowserCheckSaveSchema reserved step ids", () => {
+  const schema = makeBrowserCheckSaveSchema(t);
+
+  it("rejects the start load's reserved id on an authored step", () => {
+    const result = schema.safeParse(
+      form([{ id: "_start", action: "navigate", value: "https://app.test" }]),
+    );
 
     expect(result.success).toBe(false);
-    expect(issuePaths(result)).toContain("journey.0.action");
+    expect(issuePaths(result)).toContain("journey.0.id");
+  });
+
+  it("rejects the reserved id wherever it sits in the journey", () => {
+    const result = schema.safeParse(
+      form([
+        { id: "1", action: "navigate", value: "https://app.test" },
+        { id: "_start", action: "navigate", value: "https://app.test/next" },
+      ]),
+    );
+
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.id");
+  });
+
+  it("accepts an id that merely contains the reserved word", () => {
+    const result = schema.safeParse(
+      form([{ id: "_start_page", action: "navigate", value: "https://app.test" }]),
+    );
+
+    expect(result.success).toBe(true);
   });
 });
 
@@ -672,4 +712,59 @@ describe("makeBrowserCheckSaveSchema retired actions", () => {
       expect(issuePaths(result)).toContain("journey.1.action");
     },
   );
+});
+
+describe("makeBrowserCheckSaveSchema subtest steps", () => {
+  const schema = makeBrowserCheckSaveSchema(t);
+  const valid = { name: "Checkout flow", url: "https://app.test", locations: ["us-east"] };
+  const nav = { id: "s1", action: "navigate", name: "Open", value: "https://app.test" };
+
+  it("keeps the subtest field through parsing", () => {
+    const parsed = schema.parse({
+      ...valid,
+      journey: [nav, { id: "s2", action: "subtest", name: "Login", subtest: { id: "login-test" } }],
+    });
+    expect(parsed.journey[1].subtest).toEqual({ id: "login-test" });
+  });
+
+  it("requires a referenced check", () => {
+    const result = schema.safeParse({
+      ...valid,
+      journey: [nav, { id: "s2", action: "subtest", name: "Login" }],
+    });
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.subtest");
+  });
+
+  it("rejects optional and always-run on a subtest", () => {
+    const result = schema.safeParse({
+      ...valid,
+      journey: [
+        nav,
+        { id: "s2", action: "subtest", name: "Login", subtest: { id: "x" }, optional: true },
+      ],
+    });
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.optional");
+  });
+
+  it("rejects always-run on a subtest", () => {
+    const result = schema.safeParse({
+      ...valid,
+      journey: [
+        nav,
+        { id: "s2", action: "subtest", name: "Login", subtest: { id: "x" }, alwaysRun: true },
+      ],
+    });
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.alwaysRun");
+  });
+
+  it("lets a subtest open the journey", () => {
+    const result = schema.safeParse({
+      ...valid,
+      journey: [{ id: "s1", action: "subtest", name: "Login", subtest: { id: "x" } }],
+    });
+    expect(result.success).toBe(true);
+  });
 });

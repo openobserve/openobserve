@@ -13862,7 +13862,8 @@
       "tags": "태그",
       "title": "검사 세부정보",
       "urlTarget": "URL",
-      "urlTargetPlaceholder": "https://api.example.com/health"
+      "urlTargetPlaceholder": "https://api.example.com/health",
+      "startingUrlNotOpened": "열리지 않음 — 첫 단계가 이동을 수행합니다."
     },
     "createBrowserTest": {
       "buildManually": "수동으로 빌드",
@@ -13963,7 +13964,8 @@
         "scroll": "스크롤",
         "wait": "대기",
         "assert": "검증",
-        "screenshot": "스크린샷"
+        "screenshot": "스크린샷",
+        "subtest": "서브테스트"
       },
       "clickTypeLabel": "클릭 유형",
       "clickTypeHelp": "오른쪽 클릭은 상황 메뉴를 열고, 더블 클릭은 두 번의 클릭을 보냅니다.",
@@ -14151,7 +14153,81 @@
       "valueFallback": "값",
       "showSetupSteps": "설정 단계 표시",
       "waitingForActions": "브라우저에서 작업을 기다리는 중…",
-      "unboundVariables": "{names}은(는) 이 검사, 해당 환경 또는 전역에 정의되지 않아 작성된 그대로 입력됩니다. | {names}은(는) 이 검사, 해당 환경 또는 전역에 정의되지 않아 작성된 그대로 입력됩니다."
+      "unboundVariables": "{names}은(는) 이 검사, 해당 환경 또는 전역에 정의되지 않아 작성된 그대로 입력됩니다. | {names}은(는) 이 검사, 해당 환경 또는 전역에 정의되지 않아 작성된 그대로 입력됩니다.",
+      "addSubtest": "서브테스트 추가",
+      "extract": {
+        "action": "서브테스트로 추출",
+        "confirm": "추출",
+        "created": "\"{name}\"을(를) 만들었습니다. 참조를 유지하려면 이 테스트를 저장하세요.",
+        "every": "{n}{unit}마다",
+        "folderForbidden": "\"{folder}\"에는 테스트를 만들 수 없습니다. 다른 폴더를 선택하세요.",
+        "folderLabel": "폴더",
+        "historyNotice": "단계 기록이 다시 시작됩니다. 이 단계들은 새 테스트에서 새 ID를 받으므로 단계별 차트가 오늘부터 나뉩니다.",
+        "labelThisTest": "이 테스트",
+        "nameLabel": "테스트 이름",
+        "nameTooLong": "이름은 256바이트 미만으로 유지하세요",
+        "orphan": "\"{name}\"을(를) 만들었지만 이 여정을 업데이트하지 못했습니다. 새 테스트를 열거나 삭제하세요.",
+        "reason": {
+          "contains-subtest": "서브테스트는 다른 서브테스트를 포함할 수 없습니다",
+          "not-contiguous": "서로 붙어 있는 단계를 선택하세요",
+          "not-contiguous-filtered": "서로 붙어 있는 단계를 선택하세요 — 전체 목록을 보려면 필터를 해제하세요",
+          "referenced": "이 테스트는 다른 테스트에서 서브테스트로 사용 중이라 서브테스트를 가질 수 없습니다",
+          "referenced-pending": "이 테스트가 사용되는 위치를 확인하는 중…",
+          "referenced-unknown": "이 테스트가 사용되는 위치를 확인할 수 없습니다",
+          "undefined-placeholder": "추출하기 전에 변수에서 {name}을(를) 정의하세요"
+        },
+        "schedule": "{locations} · {frequency} (이 테스트와 동일)",
+        "status": "일시 중지 상태로 생성됩니다. 활성화할 때까지 이 테스트의 일부로만 실행됩니다.",
+        "steps": "단계 {first} · {path}에서 시작 | 단계 {first} – {last} · {path}에서 시작",
+        "subtitle": "단계들이 지금 생성되는 새 브라우저 테스트로 이동합니다. 이 여정은 그 자리에 서브테스트 참조를 유지합니다 — 유지하려면 이 테스트를 저장하세요.",
+        "thisTest": "추출 후 {authored}개 단계 · 동일한 {executed}개 단계 실행",
+        "thisTestAuthored": "추출 후 {authored}개 단계",
+        "title": "{count}개 단계를 새 테스트로 추출",
+        "unit": {
+          "hours": "시간",
+          "minutes": "분"
+        },
+        "variablesCopied": "새 테스트로 복사됨: {names}.",
+        "variablesToDefine": "단독으로 실행하기 전에 새 테스트에서 정의하세요: {names}."
+      },
+      "startRowLabel": "열기",
+      "subtest": {
+        "capChild": "\"{name}\"에서 {count}개",
+        "capOwn": "자체 {count}개",
+        "capRemedy": "서브테스트를 제거하거나 이 테스트의 자체 단계를 줄이세요.",
+        "capTitle": "이 테스트는 {total}개 단계를 실행합니다 — 한도는 {limit}입니다.",
+        "delta": "\"{name}\"을(를) 추가하면 이 테스트의 실행 단계가 {before} → {after}가 됩니다. 한도는 {limit}입니다.",
+        "deltaUnknown": "단계 영향 알 수 없음 — 참조된 테스트를 불러오지 못했습니다.",
+        "failedAt": "{number} — {step}",
+        "ignoredEnv": "해당 테스트의 시작 URL, 변수, 인증, 쿠키는 여기서 무시됩니다 — 상위 테스트의 설정이 적용됩니다.",
+        "lastRun": "마지막 실행은 허용된 {budget}초 중 {seconds}초가 걸렸습니다.",
+        "lastRunUnknown": "시간 영향 알 수 없음 — 이 테스트는 아직 실행을 완료하지 않았습니다.",
+        "noAccess": "\"{name}\"에 대한 접근 권한이 없어 해당 단계를 여기에 표시할 수 없습니다.",
+        "noAccessBadge": "접근 불가",
+        "noAccessRemedy": "해당 폴더의 읽기 권한을 요청하거나 참조를 제거하세요.",
+        "disabledTooltip": "이 배포에서는 하위 테스트가 활성화되어 있지 않습니다.",
+        "loadFailed": "이 하위 테스트를 불러오지 못해 단계와 단계 수를 알 수 없습니다.",
+        "missing": "이 하위 테스트는 더 이상 존재하지 않습니다. 참조를 제거하거나 다른 테스트를 선택하세요.",
+        "noAccessToast": "이 테스트가 참조하는 테스트 중 하나에 대한 접근 권한이 없습니다.",
+        "notRun": "실행되지 않음",
+        "openChild": "\"{name}\" 열기",
+        "pickEmpty": "이 조직에는 아직 다른 브라우저 테스트가 없습니다.",
+        "pickLabel": "여기서 실행할 테스트",
+        "pickLastRun": "{status} {ago}",
+        "pickLoadFailed": "브라우저 테스트 목록을 불러오지 못했습니다. 다시 시도하세요.",
+        "pickNested": "이미 서브테스트를 포함하고 있습니다 — 중첩은 한 단계로 제한됩니다",
+        "pickGroupUsable": "여기에서 사용 가능",
+        "pickGroupBlocked": "여기에서 사용할 수 없음",
+        "pickSteps": "{count}개 단계",
+        "pickUsedBy": "{count}개 테스트에서 사용 중",
+        "previewLabel": "여기서 실행되는 단계",
+        "progressAria": "하위 단계 {total}개 중 {done}개 완료",
+        "raiseBudget": "실행이 중단되기 시작하면 이 테스트의 실행 시간 허용치를 늘리세요.",
+        "stepsBadge": "{count}개 단계",
+        "executedBadge": "{count}개 실행",
+        "undefinedVariable": "\"{name}\"이(가) 이 테스트에 정의되지 않은 {variable}을(를) 사용합니다.",
+        "undefinedVariableAction": "변수에 추가"
+      }
     },
     "labels": {
       "copyOf": "{name}의 복사본",
@@ -14530,7 +14606,9 @@
       "pageActivity": "페이지 활동",
       "pageActivityEvents": "{count} 이벤트 | {count} 이벤트",
       "pageActivityViewAllShort": "증거에서 모두 보기",
-      "expandScreenshot": "펼치기"
+      "expandScreenshot": "펼치기",
+      "failedAtStartLoad": "시작 URL을 여는 데 실패했습니다",
+      "startLoadLabel": "{url} 열기"
     },
     "runRowExpansion": {
       "browserHeader": "브라우저",
@@ -14702,13 +14780,17 @@
       "statusUp": "✓ 정상",
       "steps": "단계",
       "stepsCount": "{count}단계",
+      "subtestMissing": "하위 테스트 없음",
+      "subtestNested": "하위 테스트에 하위 테스트가 있음",
       "testName": "테스트 이름",
       "timeout": "시간 초과",
       "trigger": "트리거",
       "triggering": "트리거 중...",
       "type": "유형",
       "uptime": "가동 시간 7일",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "사용 위치",
+      "usedByCount": "{count}개 테스트"
     },
     "tabs": {
       "all": "전체",
@@ -14755,7 +14837,6 @@
       "updateFailed": "체크 업데이트에 실패했습니다."
     },
     "validation": {
-      "firstStepMustNavigate": "첫 번째 단계는 \"탐색\"이어야 합니다.",
       "locationsRequired": "위치를 하나 이상 선택하세요",
       "nameRequired": "이름은 필수입니다.",
       "locatorRequired": "이 단계가 작동할 요소를 알 수 있도록 로케이터를 하나 이상 추가하세요.",
@@ -14770,7 +14851,13 @@
       "retiredAction": "\"{action}\"은(는) 더 이상 지원되지 않습니다 — \"{step}\"을(를) 제거하거나 교체하세요.",
       "runBudgetExceeded": "이 검사는 실행당 최대 {worstCase}이(가) 소요될 수 있으며, {limit} 한도를 초과합니다. 브라우저/기기 조합을 제거하거나 재시도를 줄이세요. ({combos} 콤보 × {attempts} 시도 × 각 {perAttempt})",
       "runBudgetRetriesHint": "재시도를 줄이면 이 검사가 {limit} 실행 한도 내로 돌아옵니다.",
-      "folderUnavailable": "폴더 \"{folder}\"이(가) 이 조직에서 사용할 수 없습니다 — 기본 폴더에 저장합니다."
+      "folderUnavailable": "폴더 \"{folder}\"이(가) 이 조직에서 사용할 수 없습니다 — 기본 폴더에 저장합니다.",
+      "compositionChildFailed": "\"{name}\"이(가) 저장 시 검증에 실패했습니다 — 열어서 수정할 단계를 확인하세요.",
+      "startUrlHostMismatch": "이 테스트는 {host}을(를) 열지만 단계들은 {other}(으)로 이동합니다.",
+      "stepIdReserved": "이 단계 ID는 실행의 시작 URL용으로 예약되어 있습니다",
+      "subtestCap": "실행 단계가 너무 많습니다 — 단계 위의 알림을 확인하세요.",
+      "subtestFlags": "서브테스트는 선택 실행이나 항상 실행일 수 없습니다 — 실패하면 이 테스트도 항상 실패합니다",
+      "subtestRequired": "여기서 실행할 테스트를 선택하세요"
     },
     "privateLocations": {
       "searchPlaceholder": "위치 검색...",
@@ -14860,7 +14947,19 @@
     "secondsAgo": "{count}초 전",
     "stepsQueryFailed": "단계 쿼리가 실패했습니다.",
     "queryFailed": "쿼리가 실패했습니다.",
-    "relationNotContaining": "포함하지 않음"
+    "relationNotContaining": "포함하지 않음",
+    "delete": {
+      "blockedBody": "먼저 해당 참조를 제거하거나 테스트를 함께 삭제하세요.",
+      "blockedBulkTitle": "선택한 {count}개의 테스트가 이 선택 밖의 테스트에서 사용되고 있습니다",
+      "blockedTitle": "\"{name}\"은(는) 다른 테스트에서 사용 중입니다",
+      "hiddenReferences": "접근 권한이 없는 테스트 {count}개"
+    },
+    "save": {
+      "blockedBody": "저장이 완료되지 않았습니다. 먼저 해당 참조를 제거한 후 다시 저장하세요.",
+      "usedByBody": "이 변경은 {names}을(를) 추가합니다. 위 테스트들은 이를 정의하지 않으므로 다음 실행에서 해결되지 않은 채 남습니다.",
+      "usedByTitle": "\"{name}\"을(를) 사용하는 {count}개 테스트가 실패하기 시작합니다",
+      "usedByCount": "{count}개 테스트에서 사용 중"
+    }
   },
   "statusPages": {
     "tabTitle": "상태 페이지",

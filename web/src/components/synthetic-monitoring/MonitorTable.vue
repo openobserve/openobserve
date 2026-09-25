@@ -96,10 +96,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBadge>
     </template>
 
-    <!-- Steps count (Browser mode) -->
+    <!-- Null means the journey could not be read, which is not zero steps. -->
     <template #cell-steps="{ row }">
-      <span class="truncate">{{
-        (row as any).steps ? t("synthetics.table.stepsCount", { count: (row as any).steps }) : "—"
+      <span class="flex min-w-0 items-center gap-2">
+        <span class="truncate" :data-test="`${dataTest}-cell-steps`">{{
+          (row as any).steps != null
+            ? t("synthetics.table.stepsCount", { count: (row as any).steps })
+            : "—"
+        }}</span>
+        <OBadge
+          v-if="brokenReferenceLabel((row as any).referenceState)"
+          variant="warning-soft"
+          size="sm"
+          :data-test="`${dataTest}-reference-state`"
+        >
+          {{ brokenReferenceLabel((row as any).referenceState) }}
+        </OBadge>
+      </span>
+    </template>
+
+    <!-- Zero reads as a dash: most checks are referenced by nothing. -->
+    <template #cell-referencedBy="{ row }">
+      <span class="truncate" :data-test="`${dataTest}-cell-referencedBy`">{{
+        (row as any).referencedBy
+          ? t(
+              "synthetics.table.usedByCount",
+              { count: (row as any).referencedBy },
+              (row as any).referencedBy,
+            )
+          : "—"
       }}</span>
     </template>
 
@@ -786,6 +811,16 @@ const STEPS_COL: OTableColumnDef = {
   sortable: false,
   hideable: true,
 };
+// Wider than STEPS_COL (72): "3 tests" clips at that width.
+const USED_BY_COL: OTableColumnDef = {
+  id: "referencedBy",
+  header: t("synthetics.table.usedBy"),
+  accessorKey: "referencedBy",
+  size: 90,
+  minSize: 80,
+  sortable: false,
+  hideable: true,
+};
 const ACTIONS_COL: OTableColumnDef = {
   id: "actions",
   header: raw(""),
@@ -812,6 +847,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       TEST_NAME_COL,
       URL_COL,
       STEPS_COL,
+      USED_BY_COL,
       HISTORY_COL,
       PAGE_LOAD_COL,
       UPTIME_COL,
@@ -841,6 +877,13 @@ const columns = computed<OTableColumnDef[]>(() => {
 
 function formatLocationsList(locations: string[]): string {
   return locations.map((l) => locationLabel(l)).join("\n");
+}
+
+/** `ok` and an absent state (no reference) render nothing; see `SyntheticListItem.reference_state`. */
+function brokenReferenceLabel(state: string | undefined): I18nText | undefined {
+  if (state === "missing") return t("synthetics.table.subtestMissing");
+  if (state === "nested") return t("synthetics.table.subtestNested");
+  return undefined;
 }
 
 // ── Spark tooltip ─────────────────────────────────────────────────────

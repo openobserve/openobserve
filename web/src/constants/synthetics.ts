@@ -32,6 +32,7 @@ export const ACTION_LABEL_KEYS: Record<StepAction, I18nKey> = {
   wait: "synthetics.journey.actionLabels.wait",
   assert: "synthetics.journey.actionLabels.assert",
   screenshot: "synthetics.journey.actionLabels.screenshot",
+  subtest: "synthetics.journey.actionLabels.subtest",
 };
 
 // ── Action icons ─────────────────────────────────────────────────────────
@@ -49,6 +50,7 @@ export const ACTION_ICONS: Record<StepAction, IconName> = {
   wait: "hourglass-empty",
   assert: "fact-check",
   screenshot: "photo-camera",
+  subtest: "account-tree",
 };
 
 // ── Action groups ────────────────────────────────────────────────────────
@@ -123,6 +125,16 @@ export const RETIRED_ACTIONS: readonly StepAction[] = ["scroll", "wait", "screen
 export function isRetiredAction(action: StepAction): boolean {
   return RETIRED_ACTIONS.includes(action);
 }
+
+/** Actions expanded server-side before a browser sees them; mirrors `V2_COMPOSITION_ACTIONS`. */
+export const COMPOSITION_ACTIONS: readonly StepAction[] = ["subtest"];
+
+export function isCompositionAction(action: StepAction): boolean {
+  return COMPOSITION_ACTIONS.includes(action);
+}
+
+/** Row 0's id on every result record, so no authored step may carry it; mirrors `STEP_ID_RESERVED`. */
+export const START_LOAD_STEP_ID = "_start";
 
 /**
  * Oldest recorder extension this build of the web app knows how to talk to.

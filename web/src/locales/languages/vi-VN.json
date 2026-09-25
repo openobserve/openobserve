@@ -13862,7 +13862,8 @@
       "tags": "Thẻ",
       "title": "Chi tiết kiểm tra",
       "urlTarget": "URL",
-      "urlTargetPlaceholder": "https://api.example.com/health"
+      "urlTargetPlaceholder": "https://api.example.com/health",
+      "startingUrlNotOpened": "Không được mở — bước đầu tiên thực hiện điều hướng."
     },
     "createBrowserTest": {
       "buildManually": "Xây dựng thủ công",
@@ -13963,7 +13964,8 @@
         "scroll": "Cuộn",
         "wait": "Chờ",
         "assert": "Khẳng định",
-        "screenshot": "Chụp màn hình"
+        "screenshot": "Chụp màn hình",
+        "subtest": "Bài test con"
       },
       "clickTypeLabel": "Loại nhấp chuột",
       "clickTypeHelp": "Nhấp chuột phải mở menu ngữ cảnh; nhấp đúp sẽ gửi hai cú nhấp.",
@@ -14151,7 +14153,81 @@
       "valueFallback": "Giá trị",
       "showSetupSteps": "Hiển thị các bước thiết lập",
       "waitingForActions": "Đang chờ hành động trong trình duyệt…",
-      "unboundVariables": "{names} không được định nghĩa trong kiểm tra này, các môi trường của nó hoặc toàn cục, nên nó được nhập nguyên văn. | {names} không được định nghĩa trong kiểm tra này, các môi trường của nó hoặc toàn cục, nên chúng được nhập nguyên văn."
+      "unboundVariables": "{names} không được định nghĩa trong kiểm tra này, các môi trường của nó hoặc toàn cục, nên nó được nhập nguyên văn. | {names} không được định nghĩa trong kiểm tra này, các môi trường của nó hoặc toàn cục, nên chúng được nhập nguyên văn.",
+      "addSubtest": "Thêm bài test con",
+      "extract": {
+        "action": "Tách thành bài test con",
+        "confirm": "Tách",
+        "created": "Đã tạo \"{name}\". Lưu bài test này để giữ tham chiếu.",
+        "every": "mỗi {n} {unit}",
+        "folderForbidden": "Bạn không thể tạo bài test trong \"{folder}\". Hãy chọn thư mục khác.",
+        "folderLabel": "Thư mục",
+        "historyNotice": "Lịch sử các bước bắt đầu lại. Các bước này nhận id mới trong bài test mới, nên biểu đồ theo bước sẽ tách ra từ hôm nay.",
+        "labelThisTest": "Bài test này",
+        "nameLabel": "Tên bài test",
+        "nameTooLong": "Giữ tên dưới 256 byte",
+        "orphan": "Đã tạo \"{name}\" nhưng không thể cập nhật hành trình này. Hãy mở bài test mới hoặc xóa nó.",
+        "reason": {
+          "contains-subtest": "Một bài test con không thể chứa bài test con khác",
+          "not-contiguous": "Hãy chọn các bước liền kề nhau",
+          "not-contiguous-filtered": "Hãy chọn các bước liền kề nhau — xóa bộ lọc để xem danh sách đầy đủ",
+          "referenced": "Bài test này đang được dùng làm bài test con bởi các bài test khác nên không thể chứa bài test con",
+          "referenced-pending": "Đang kiểm tra nơi bài test này được sử dụng…",
+          "referenced-unknown": "Không thể kiểm tra nơi bài test này được sử dụng",
+          "undefined-placeholder": "Hãy định nghĩa {name} trong mục Biến trước khi tách"
+        },
+        "schedule": "{locations} · {frequency} (giống bài test này)",
+        "status": "Được tạo ở trạng thái tạm dừng. Chỉ chạy như một phần của bài test này cho đến khi bạn bật nó.",
+        "steps": "Bước {first} · bắt đầu tại {path} | Các bước {first} – {last} · bắt đầu tại {path}",
+        "subtitle": "Các bước sẽ chuyển sang một bài test trình duyệt mới, được tạo ngay bây giờ. Hành trình này giữ một tham chiếu bài test con tại vị trí của chúng — lưu bài test này để giữ nó.",
+        "thisTest": "{authored} bước sau khi tách · chạy cùng {executed} bước",
+        "thisTestAuthored": "{authored} bước sau khi tách",
+        "title": "Tách {count} bước sang bài test mới",
+        "unit": {
+          "hours": "giờ",
+          "minutes": "phút"
+        },
+        "variablesCopied": "Đã sao chép sang bài test mới: {names}.",
+        "variablesToDefine": "Cần định nghĩa trên bài test mới trước khi chạy riêng: {names}."
+      },
+      "startRowLabel": "Mở",
+      "subtest": {
+        "capChild": "{count} từ \"{name}\"",
+        "capOwn": "{count} của riêng nó",
+        "capRemedy": "Hãy bỏ một bài test con, hoặc rút ngắn các bước riêng của bài test này.",
+        "capTitle": "Bài test này chạy {total} bước — giới hạn là {limit}.",
+        "delta": "Thêm \"{name}\" đưa bài test này từ {before} → {after} bước được chạy. Giới hạn là {limit}.",
+        "deltaUnknown": "Chưa rõ ảnh hưởng về bước — không tải được một bài test được tham chiếu.",
+        "failedAt": "{number} — {step}",
+        "ignoredEnv": "URL bắt đầu, biến, xác thực và cookie của nó bị bỏ qua ở đây — áp dụng của bài test cha.",
+        "lastRun": "Lần chạy gần nhất mất {seconds}s trong {budget}s cho phép.",
+        "lastRunUnknown": "Chưa rõ ảnh hưởng về thời gian — bài test này chưa hoàn thành lần chạy nào.",
+        "noAccess": "Bạn không có quyền truy cập \"{name}\" nên không thể hiển thị các bước của nó ở đây.",
+        "noAccessBadge": "không có quyền",
+        "noAccessRemedy": "Hãy xin quyền đọc thư mục của nó, hoặc bỏ tham chiếu.",
+        "disabledTooltip": "Bài test con chưa được bật trên bản triển khai này.",
+        "loadFailed": "Không thể tải bài test con này, nên chưa biết các bước và số bước của nó.",
+        "missing": "Bài test con này không còn tồn tại. Hãy xóa tham chiếu hoặc chọn bài test khác.",
+        "noAccessToast": "Bạn không có quyền truy cập một trong các bài test mà bài test này tham chiếu.",
+        "notRun": "Chưa chạy",
+        "openChild": "Mở \"{name}\"",
+        "pickEmpty": "Chưa có bài test trình duyệt nào khác trong tổ chức này.",
+        "pickLabel": "Bài test chạy tại đây",
+        "pickLastRun": "{status} {ago}",
+        "pickLoadFailed": "Không tải được danh sách bài test trình duyệt. Hãy thử lại.",
+        "pickNested": "Đã chứa một bài test con — lồng nhau chỉ giới hạn một cấp",
+        "pickGroupUsable": "Có thể dùng ở đây",
+        "pickGroupBlocked": "Không thể dùng ở đây",
+        "pickSteps": "{count} bước",
+        "pickUsedBy": "Được {count} bài test sử dụng",
+        "previewLabel": "Các bước chạy tại đây",
+        "progressAria": "Hoàn thành {done} trong {total} bước con",
+        "raiseBudget": "Hãy tăng thời gian chạy cho phép của bài test này nếu nó bắt đầu bị cắt ngắn.",
+        "stepsBadge": "{count} bước",
+        "executedBadge": "{count} được thực thi",
+        "undefinedVariable": "\"{name}\" dùng {variable}, mà bài test này không định nghĩa.",
+        "undefinedVariableAction": "Thêm nó trong mục Biến"
+      }
     },
     "labels": {
       "copyOf": "Bản sao của {name}",
@@ -14530,7 +14606,9 @@
       "pageActivity": "Hoạt động trang",
       "pageActivityEvents": "{count} sự kiện | {count} sự kiện",
       "pageActivityViewAllShort": "Xem tất cả trong Bằng chứng",
-      "expandScreenshot": "Mở rộng"
+      "expandScreenshot": "Mở rộng",
+      "failedAtStartLoad": "Không mở được URL bắt đầu",
+      "startLoadLabel": "Mở {url}"
     },
     "runRowExpansion": {
       "browserHeader": "Trình duyệt",
@@ -14702,13 +14780,17 @@
       "statusUp": "✓ Hoạt động",
       "steps": "Các bước",
       "stepsCount": "{count} bước",
+      "subtestMissing": "Thiếu bài test con",
+      "subtestNested": "Bài test con chứa bài test con",
       "testName": "Tên kiểm tra",
       "timeout": "Thời gian chờ",
       "trigger": "Kích hoạt",
       "triggering": "Đang kích hoạt…",
       "type": "Loại",
       "uptime": "Uptime 7 ngày",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "Được dùng bởi",
+      "usedByCount": "{count} bài test"
     },
     "tabs": {
       "all": "Tất cả",
@@ -14755,7 +14837,6 @@
       "updateFailed": "Không thể cập nhật kiểm tra."
     },
     "validation": {
-      "firstStepMustNavigate": "Bước đầu tiên phải là \"Điều hướng\"",
       "locationsRequired": "Chọn ít nhất một vị trí",
       "nameRequired": "Tên là bắt buộc",
       "locatorRequired": "Thêm ít nhất một bộ định vị để bước này biết phần tử nào cần thao tác",
@@ -14770,7 +14851,13 @@
       "retiredAction": "\"{action}\" không còn được hỗ trợ — hãy xóa hoặc thay thế \"{step}\"",
       "runBudgetExceeded": "Kiểm tra này có thể mất tới {worstCase} mỗi lần chạy, vượt quá giới hạn {limit}. Hãy xóa một tổ hợp trình duyệt/thiết bị, hoặc giảm số lần thử lại. ({combos} tổ hợp × {attempts} lần thử × {perAttempt} mỗi lần.)",
       "runBudgetRetriesHint": "Giảm số lần thử lại sẽ đưa kiểm tra này trở lại trong giới hạn chạy {limit}.",
-      "folderUnavailable": "Thư mục \"{folder}\" không có sẵn trong tổ chức này — đang lưu vào thư mục mặc định."
+      "folderUnavailable": "Thư mục \"{folder}\" không có sẵn trong tổ chức này — đang lưu vào thư mục mặc định.",
+      "compositionChildFailed": "\"{name}\" không qua được bước kiểm tra khi lưu — hãy mở nó để xem bước nào cần sửa.",
+      "startUrlHostMismatch": "Bài test này mở {host}, nhưng các bước của nó điều hướng đến {other}.",
+      "stepIdReserved": "Id bước này được dành riêng cho URL bắt đầu của lần chạy",
+      "subtestCap": "Quá nhiều bước được chạy — xem thông báo phía trên các bước.",
+      "subtestFlags": "Bài test con không thể là tùy chọn hoặc luôn chạy — thất bại của nó luôn làm bài test này thất bại",
+      "subtestRequired": "Hãy chọn bài test chạy tại đây"
     },
     "privateLocations": {
       "searchPlaceholder": "Tìm kiếm vị trí...",
@@ -14860,7 +14947,19 @@
     "secondsAgo": "{count} giây trước",
     "stepsQueryFailed": "Truy vấn bước thất bại",
     "queryFailed": "Truy vấn thất bại",
-    "relationNotContaining": "không chứa"
+    "relationNotContaining": "không chứa",
+    "delete": {
+      "blockedBody": "Hãy xóa các tham chiếu đó trước, hoặc xóa các bài test cùng nhau.",
+      "blockedBulkTitle": "{count} bài test được chọn đang được các bài test ngoài lựa chọn này sử dụng",
+      "blockedTitle": "\"{name}\" đang được các bài test khác sử dụng",
+      "hiddenReferences": "{count} bài test bạn không có quyền truy cập"
+    },
+    "save": {
+      "blockedBody": "Lưu không thành công. Hãy xóa các tham chiếu đó trước, rồi lưu lại.",
+      "usedByBody": "Thay đổi này thêm {names}. Các bài test ở trên không định nghĩa nó, nên nó sẽ chưa được giải quyết ở lần chạy tiếp theo.",
+      "usedByTitle": "{count} bài test dùng \"{name}\" sẽ bắt đầu thất bại",
+      "usedByCount": "Được {count} bài test sử dụng"
+    }
   },
   "statusPages": {
     "tabTitle": "Trang trạng thái",

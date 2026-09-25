@@ -1489,4 +1489,126 @@ describe("useSyntheticsRecorder", () => {
       expect(r.isReplaying.value).toBe(false);
     });
   });
+
+  // The extension opens `targetUrl` first, so a `{{baseUrl}}` left in it opens nothing.
+  describe("Starting URL variable substitution", () => {
+    const vars = [{ name: "baseUrl", value: "example.com" }];
+    const click: WireStep[] = [{ id: "s1", action: "click", selector: "#go" } as WireStep];
+
+    it("resolves the Starting URL before startRecording", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.startRecording("https://{{baseUrl}}/x", undefined, vars);
+
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      expect(getLastCommand()).toMatchObject({
+        action: "startRecording",
+        targetUrl: "https://example.com/x",
+      });
+    });
+
+    it("resolves the Starting URL before startRecordingFrom", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.startRecordingFrom(click, {
+        targetUrl: "https://{{baseUrl}}/x",
+        variables: vars,
+      });
+
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      expect(getLastCommand()).toMatchObject({
+        action: "startRecordingFrom",
+        targetUrl: "https://example.com/x",
+      });
+    });
+
+    it("resolves the Starting URL before replay", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.replay(click, "https://{{baseUrl}}/x", vars);
+
+      await settleProbeDelay();
+      respondToLastCommand({ success: true, passed: true });
+      await promise;
+
+      expect(getLastCommand()).toMatchObject({
+        action: "replay",
+        targetUrl: "https://example.com/x",
+      });
+    });
+
+    // Substituted like a Step url: a missing variable stops the command rather than opening a guess.
+    it("rejects an unresolved placeholder in the Starting URL like one in a step", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.startRecordingFrom(click, {
+        targetUrl: "https://{{missing}}/x",
+        variables: vars,
+      });
+      const outcome = expect(promise).rejects.toThrow("unresolved variable {{missing}}");
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true });
+      await outcome;
+
+      expect(getLastCommand()?.action).not.toBe("startRecordingFrom");
+    });
+
+    // The refusal must happen before any state flips, or the editor stays locked on a replay that never ran.
+    it("leaves no phantom running replay behind an unresolved Starting URL", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.replay(click, "https://{{missing}}/x", vars);
+      const outcome = expect(promise).rejects.toThrow("unresolved variable {{missing}}");
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true, passed: true });
+      await outcome;
+
+      expect(r.isReplaying.value).toBe(false);
+      expect(r.replayPhase.value).toBe("idle");
+      expect(getLastCommand()?.action).not.toBe("replay");
+    });
+
+    it("stops a replay with a step placeholder and no variables before any state change", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const typed = [{ id: "s2_c1", action: "type", selector: "#q", value: "{{X}}" } as WireStep];
+      const promise = r.replay(typed, "https://app.test/x");
+      const outcome = expect(promise).rejects.toThrow("unresolved variable {{X}}");
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true, passed: true });
+      await outcome;
+
+      expect(r.isReplaying.value).toBe(false);
+      expect(r.replayPhase.value).toBe("idle");
+      expect(getLastCommand()?.action).not.toBe("replay");
+    });
+
+    it("stops a restore with a prefix placeholder and no variables before any state change", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const typed = [{ id: "s2_c1", action: "type", selector: "#q", value: "{{X}}" } as WireStep];
+      const promise = r.startRecordingFrom(typed, { targetUrl: "https://app.test/x" });
+      const outcome = expect(promise).rejects.toThrow("unresolved variable {{X}}");
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true });
+      await outcome;
+
+      expect(r.replayPhase.value).toBe("idle");
+      expect(getLastCommand()?.action).not.toBe("startRecordingFrom");
+    });
+
+    it("sends a Starting URL with no placeholders unchanged when no variables are given", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.startRecording("https://app.test/x");
+
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      expect(getLastCommand()?.targetUrl).toBe("https://app.test/x");
+    });
+  });
 });

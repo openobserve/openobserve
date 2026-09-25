@@ -371,15 +371,8 @@ pub(crate) mod billing {
         // e. Clamp + zero fallback.
         let steps = resolve_billable(flags, &i);
 
-        // f. The job never ran: `"queue"` means it waited behind other jobs past
-        // its own `valid_until` — our scheduling lag, not their work.
-        //
-        // Step e's two `warn`s are logged BELOW this guard, not inside
-        // `resolve_billable`. The arithmetic order is still e then f; only the
-        // logging is deferred, because a queue-errored ack always carries
-        // `steps_executed = 0` and would otherwise fire the zero-fallback warning
-        // — "an un-upgraded probe is in the fleet", which A3 pages on.
-        if i.error_source == "queue" {
+        // Queue and config errors never ran: nothing billed, and no zero-fallback warning.
+        if i.error_source == "queue" || i.error_source == crate::alerting::ERROR_SOURCE_CONFIG {
             return Vec::new();
         }
 
@@ -479,7 +472,7 @@ pub(crate) mod billing {
     }
 }
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::meta::{
     self_reporting::usage::UsageData,
@@ -1058,6 +1051,39 @@ pub enum AlertDecision {
     Degraded,
 }
 
+pub const REASON_CONFIG_STEPS_EXCEEDED: &str = "config_steps_exceeded";
+pub const REASON_CONFIG_REFERENCE_MISSING: &str = "config_reference_missing";
+/// A super-cluster parent references a child that has not replicated to this region yet.
+pub const REASON_CONFIG_REFERENCE_PENDING: &str = "config_reference_pending";
+pub const REASON_CONFIG_REFERENCE_INVALID: &str = "config_reference_invalid";
+pub const REASON_CONFIG_VARIABLE_UNDEFINED: &str = "config_variable_undefined";
+/// A shared secret row the check references exists but holds no value; retrying cannot fix it.
+pub const REASON_CONFIG_SECRET_UNSET: &str = "config_secret_unset";
+pub const REASON_CONFIG_VARIABLE_LIMIT: &str = "config_variable_limit";
+
+/// Expansion could not produce a runnable journey; `guard_failure` means a guard of ours failed.
+#[derive(Debug, Clone)]
+pub struct ConfigError {
+    pub status_reason: &'static str,
+    pub message: String,
+    pub guard_failure: bool,
+}
+
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.status_reason, self.message)
+    }
+}
+
+impl std::error::Error for ConfigError {}
+
+/// What the deferred child-placeholder guard needs after `env_inject` is complete.
+#[derive(Debug)]
+struct ComposedJourney {
+    parent_steps: Vec<serde_json::Value>,
+    children: HashMap<String, config::meta::synthetics_composition::ChildJourney>,
+}
+
 // ── Service functions (called by OSS handlers) ────────────────────────────────
 
 /// Returns full synthetic config for a pending check so the probe knows what to execute.
@@ -1098,17 +1124,22 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
     let env_id = check.env.clone();
     let has_shared_variables = crate::service::org_has_shared_variables(&check.org_id).await;
     let mut env_inject = HashMap::new();
+    let dek = if needs_dek(&synthetic, has_encrypted_config, has_shared_variables) {
+        Some(crate::service::synthetics_dek(&check.org_id).await?)
+    } else {
+        None
+    };
 
-    if needs_dek(&synthetic, has_encrypted_config, has_shared_variables) {
-        let dek = crate::service::synthetics_dek(&check.org_id).await?;
+    // Before the shared tier: a `{{NAME}}` in a header only exists once its slot is restored.
+    if has_encrypted_config && let Some(dek) = dek.as_deref() {
+        crate::service::rehydrate_config_secrets(&mut synthetic, dek)?;
+    }
+    // Before the shared tier too: a child's `{{NAME}}` is invisible until its steps are spliced in.
+    let composed = expand_for_resolve(conn, &mut synthetic).await?;
 
-        // Before the shared tier: a `{{NAME}}` in a header only exists once its slot is restored.
-        if has_encrypted_config {
-            crate::service::rehydrate_config_secrets(&mut synthetic, &dek)?;
-        }
-
+    if let Some(dek) = dek.as_deref() {
         if let Some(ref auth) = synthetic.auth {
-            env_inject.extend(build_env_map(auth, &dek)?);
+            env_inject.extend(build_env_map(auth, dek)?);
         }
 
         let shared = if has_shared_variables {
@@ -1116,7 +1147,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
                 &check.org_id,
                 env_id.as_deref(),
                 &synthetic,
-                &dek,
+                dek,
             )
             .await?
         } else {
@@ -1125,7 +1156,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         env_inject.extend(merge_variable_tiers(
             shared,
             &synthetic.variables,
-            &dek,
+            dek,
             &check.synthetics_id,
         )?);
 
@@ -1140,7 +1171,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
                     let value = if c.value.is_empty() {
                         Ok(String::new())
                     } else {
-                        crate::service::decrypt_secret(&dek, &c.value)
+                        crate::service::decrypt_secret(dek, &c.value)
                     }?;
                     Ok(serde_json::json!({
                         "name":     c.name,
@@ -1160,10 +1191,17 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         }
     }
 
+    inject_journey_secrets(&synthetic, &mut env_inject);
     synthetic.target = resolved_target(
         &synthetic.check_type,
         &substitute_placeholders(&synthetic.target, &env_inject),
     )?;
+    // Deferred to here: env_inject is the whole set of names the probe can substitute.
+    if let Some(composed) = composed {
+        let defined: HashSet<String> = env_inject.keys().cloned().collect();
+        validate_child_placeholders(&composed.parent_steps, &composed.children, &defined)
+            .map_err(anyhow::Error::new)?;
+    }
 
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);
@@ -1201,12 +1239,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         })
         .collect();
 
-    let trigger_type = synthetics_runs::get_run(conn, &check.run_id)
-        .await
-        .ok()
-        .flatten()
-        .map(|r| r.trigger_type)
-        .unwrap_or_else(|| "schedule".to_string());
+    let trigger_type = run_trigger_type(conn, &check.run_id).await;
 
     let mut metadata: serde_json::Value =
         serde_json::from_str(&check.metadata).unwrap_or(serde_json::json!({}));
@@ -1215,8 +1248,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
             serde_json::json!(environment_display_name(&check.org_id, env_id).await);
     }
 
-    // SSRF policy from the location registry: private locations run relaxed
-    // (probing the customer's own network is the point), everything else strict.
+    // Private locations run relaxed SSRF: probing the customer's own network is the point.
     let location_record = synthetics_locations::get(&check.location)
         .await
         .ok()
@@ -1289,11 +1321,16 @@ fn merge_variable_tiers(
         };
         merged.insert(var.name.clone(), value);
     }
+    // A plain error here would 500, and a 500 makes the probe retry a job that can never resolve.
     if merged.len() > MAX_VARIABLES {
-        anyhow::bail!(
-            "check {synthetics_id} resolves {} variables, more than the {MAX_VARIABLES} allowed",
-            merged.len()
-        );
+        return Err(anyhow::Error::new(ConfigError {
+            status_reason: REASON_CONFIG_VARIABLE_LIMIT,
+            message: format!(
+                "check {synthetics_id} resolves {} variables, more than the {MAX_VARIABLES} allowed",
+                merged.len()
+            ),
+            guard_failure: false,
+        }));
     }
     Ok(merged)
 }
@@ -1350,6 +1387,224 @@ fn redact_auth(auth: SyntheticAuth) -> SyntheticAuth {
     }
 }
 
+// The probe fills {{NAME}} only from env_inject, so a journey with or without subtests needs its
+// secrets there.
+fn inject_journey_secrets(
+    synthetic: &config::meta::synthetics::Synthetic,
+    env_inject: &mut HashMap<String, String>,
+) {
+    if synthetic.check_type == SyntheticType::Browser {
+        inject_browser_secrets(&synthetic.config, env_inject);
+    }
+}
+
+// Browser secrets substitute {{NAME}} like variables, so their decrypted values join env_inject.
+fn inject_browser_secrets(config: &serde_json::Value, env_inject: &mut HashMap<String, String>) {
+    let Some(secrets) = config.get("secrets").and_then(|s| s.as_array()) else {
+        return;
+    };
+    for secret in secrets {
+        if let (Some(name), Some(value)) = (
+            secret.get("name").and_then(|v| v.as_str()),
+            secret.get("value").and_then(|v| v.as_str()),
+        ) {
+            env_inject.insert(name.to_string(), value.to_string());
+        }
+    }
+}
+
+fn expand_journey(
+    parent_steps: &[serde_json::Value],
+    children: &HashMap<String, config::meta::synthetics_composition::ChildJourney>,
+    parent_updated_at: i64,
+    super_cluster: bool,
+) -> Result<Vec<serde_json::Value>, ConfigError> {
+    use config::meta::{
+        synthetics::is_composition_action,
+        synthetics_composition::{ExpansionError, expand_steps},
+    };
+    // Keyed on the action: a `subtest` step with no id yields no ref and would reach the probe.
+    let mut has_reference = false;
+    for step in parent_steps {
+        if !step
+            .get("action")
+            .and_then(|a| a.as_str())
+            .is_some_and(is_composition_action)
+        {
+            continue;
+        }
+        has_reference = true;
+        let names_a_child = step
+            .pointer("/subtest/id")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|id| !id.trim().is_empty());
+        if !names_a_child {
+            return Err(ConfigError {
+                status_reason: REASON_CONFIG_REFERENCE_INVALID,
+                message: format!(
+                    "step '{}' is a subtest reference that names no check",
+                    step.get("id")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default()
+                ),
+                guard_failure: true,
+            });
+        }
+    }
+    if !has_reference {
+        return Ok(parent_steps.to_vec());
+    }
+    let expanded = expand_steps(parent_steps, children).map_err(|e| match e {
+        ExpansionError::MissingChild(_)
+            if super_cluster && within_replication_grace(parent_updated_at) =>
+        {
+            ConfigError {
+                status_reason: REASON_CONFIG_REFERENCE_PENDING,
+                message: e.to_string(),
+                guard_failure: false,
+            }
+        }
+        ExpansionError::MissingChild(_) => ConfigError {
+            status_reason: REASON_CONFIG_REFERENCE_MISSING,
+            message: e.to_string(),
+            guard_failure: true,
+        },
+        _ => ConfigError {
+            status_reason: REASON_CONFIG_REFERENCE_INVALID,
+            message: e.to_string(),
+            guard_failure: true,
+        },
+    })?;
+    let max_steps = config::get_config().synthetics.browser_max_steps;
+    if expanded.len() > max_steps {
+        return Err(ConfigError {
+            status_reason: REASON_CONFIG_STEPS_EXCEEDED,
+            message: format!(
+                "this test now needs {} steps after expanding its subtests; the limit is {max_steps}",
+                expanded.len(),
+            ),
+            guard_failure: false,
+        });
+    }
+    Ok(expanded)
+}
+
+/// Saving a child never re-validates its parents, so the parent-save guard is not enough.
+fn validate_child_placeholders(
+    parent_steps: &[serde_json::Value],
+    children: &HashMap<String, config::meta::synthetics_composition::ChildJourney>,
+    defined: &HashSet<String>,
+) -> Result<(), ConfigError> {
+    use config::meta::synthetics_composition::{placeholders_in, subtest_refs};
+    // Keyed on the child map, not the expanded array: the message needs the child's identity, and
+    // the parent's own steps are never validated here.
+    for child_id in subtest_refs(parent_steps) {
+        let Some(child) = children.get(&child_id) else {
+            continue;
+        };
+        if let Some(var) =
+            crate::service::composition::undefined_among(&placeholders_in(&child.steps), defined)
+                .first()
+        {
+            return Err(ConfigError {
+                status_reason: REASON_CONFIG_VARIABLE_UNDEFINED,
+                message: format!(
+                    "'{}' uses {{{{{var}}}}}, which this test does not define",
+                    child.name
+                ),
+                guard_failure: false,
+            });
+        }
+    }
+    Ok(())
+}
+
+fn within_replication_grace(parent_updated_at: i64) -> bool {
+    let grace_secs = config::get_config()
+        .synthetics
+        .subtests_replication_grace_secs;
+    let grace_us = i64::try_from(grace_secs)
+        .unwrap_or(i64::MAX)
+        .saturating_mul(1_000_000);
+    config::utils::time::now_micros().saturating_sub(parent_updated_at) < grace_us
+}
+
+/// Splices every referenced child's stored steps into the parent's config, or says why it cannot.
+async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    synthetic: &mut config::meta::synthetics::Synthetic,
+) -> anyhow::Result<Option<ComposedJourney>> {
+    use config::meta::{
+        synthetics::{BrowserConfig, is_composition_action},
+        synthetics_composition::{ChildJourney, subtest_refs},
+    };
+    if synthetic.check_type != SyntheticType::Browser {
+        return Ok(None);
+    }
+    let steps = synthetic
+        .config
+        .get("steps")
+        .and_then(|s| s.as_array())
+        .cloned()
+        .unwrap_or_default();
+    // Keyed on the action so that a reference naming no child still reaches the boundary check.
+    if !steps.iter().any(|s| {
+        s.get("action")
+            .and_then(|a| a.as_str())
+            .is_some_and(is_composition_action)
+    }) {
+        return Ok(None);
+    }
+    let refs = subtest_refs(&steps);
+    let mut children = HashMap::new();
+    for child_id in refs.iter().collect::<std::collections::HashSet<_>>() {
+        if let Some(child) = synthetics_checks::get_cached(conn, &synthetic.org_id, child_id)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?
+            && child.check_type == SyntheticType::Browser
+        {
+            // Not `unwrap_or_default`: a 0-step child would silently drop the reference.
+            let cfg: BrowserConfig = serde_json::from_value(child.config).map_err(|e| {
+                config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
+                anyhow::Error::new(ConfigError {
+                    status_reason: REASON_CONFIG_REFERENCE_INVALID,
+                    message: format!(
+                        "referenced check '{}' has an unreadable journey: {e}",
+                        child.id
+                    ),
+                    guard_failure: true,
+                })
+            })?;
+            children.insert(
+                child.id.clone(),
+                ChildJourney {
+                    id: child.id,
+                    name: child.name,
+                    steps: cfg.steps,
+                },
+            );
+        }
+    }
+    #[cfg(feature = "enterprise")]
+    let super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let super_cluster = false;
+    let expanded =
+        expand_journey(&steps, &children, synthetic.updated_at, super_cluster).map_err(|e| {
+            if e.guard_failure {
+                config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
+            }
+            anyhow::Error::new(e)
+        })?;
+    synthetic.config["steps"] = serde_json::Value::Array(expanded);
+    Ok(Some(ComposedJourney {
+        parent_steps: steps,
+        children,
+    }))
+}
+
 /// The 200 an ack that did not apply gets: a duplicate, or a late one from a
 /// holder the reaper already evicted. Nothing here may touch run accounting a
 /// second time, and nothing here may bill. `usage_events` stays empty, and that
@@ -1383,6 +1638,15 @@ fn stale_lease_response(
         failing_environments: Vec::new(),
         usage_events: Vec::new(),
     }
+}
+
+async fn run_trigger_type<C: sea_orm::ConnectionTrait>(conn: &C, run_id: &str) -> String {
+    synthetics_runs::get_run(conn, run_id)
+        .await
+        .ok()
+        .flatten()
+        .map(|r| r.trigger_type)
+        .unwrap_or_else(|| "schedule".to_string())
 }
 
 /// Acknowledges completion of a job.
@@ -1664,6 +1928,67 @@ async fn environment_names(org_id: &str, run_id: &str) -> Vec<String> {
         .collect()
 }
 
+/// Writes the result row for a config error; the ack path completes the run separately.
+pub async fn report_config_error_result(
+    org_id: &str,
+    job_id: &str,
+    err: &ConfigError,
+) -> anyhow::Result<()> {
+    let conn = get_orm_client_ro().await;
+    let job = synthetics_jobs::get_by_id(conn, job_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .ok_or_else(|| anyhow::anyhow!("job not found: {job_id}"))?;
+    let Some(token) = org_ingestion_tokens::find_default_enabled(org_id)
+        .await?
+        .map(|t| t.token)
+    else {
+        tracing::warn!(
+            org_id,
+            job_id,
+            "[synthetics] no enabled ingest token — config-error result not recorded"
+        );
+        return Ok(());
+    };
+    let now_us = config::utils::time::now_micros();
+    let row = serde_json::json!([{
+        "_timestamp": now_us,
+        "job_id": job_id,
+        "run_id": job.run_id,
+        "execution_id": "",
+        "synthetics_id": job.synthetics_id,
+        "synthetics_name": job.synthetics_name,
+        "org_id": org_id,
+        "location": job.location,
+        "scheduled_ts": job.scheduled_ts,
+        "status": "error",
+        "error_source": crate::alerting::ERROR_SOURCE_CONFIG,
+        "status_reason": err.status_reason,
+        "error": err.message,
+        "response_time_ms": 0,
+        "dispatch_attempt": job.dispatch_attempts
+    }]);
+    let api_endpoint = config::meta::synthetics::api_endpoint();
+    crate::scheduler::post_json(
+        &reqwest::Client::new(),
+        &format!("{api_endpoint}/api/{org_id}/synthetics_results/_json"),
+        &token,
+        &row,
+        &job.synthetics_id,
+    )
+    .await;
+    Ok(())
+}
+
+/// The trigger type that `resolve` would have sent for this job, so a config-error ack matches it.
+pub async fn job_trigger_type(job_id: &str) -> String {
+    let conn = get_orm_client_ro().await;
+    match synthetics_jobs::get_by_id(conn, job_id).await {
+        Ok(Some(job)) => run_trigger_type(conn, &job.run_id).await,
+        _ => "schedule".to_string(),
+    }
+}
+
 /// Resolves the alert decision for a completed run and persists the new state.
 ///
 /// A failure to read or write the state is never allowed to fail the ack: the
@@ -1918,6 +2243,7 @@ mod tests {
             AckRequest, AlertDecision,
             billing::{
                 BillingFlags, BillingInputs, Venue, events_for_ack, frozen_combos, inputs_from,
+                resolve_billable,
             },
             stale_lease_response,
         };
@@ -2291,6 +2617,13 @@ mod tests {
         }
 
         #[test]
+        fn a_config_errored_ack_bills_nothing_and_does_not_take_the_zero_fallback() {
+            let mut i = browser(16, 1, 0, 0);
+            i.error_source = crate::alerting::ERROR_SOURCE_CONFIG;
+            assert!(events_for_ack(LIVE, i).is_empty());
+        }
+
+        #[test]
         fn t17_a_private_venue_emits_nothing() {
             let events = events_for_ack(
                 LIVE,
@@ -2655,6 +2988,49 @@ mod tests {
             );
         }
 
+        /// The ack carries only counters, so a run that opened row 0 acks like one that did not.
+        #[test]
+        fn a_run_with_a_start_load_acks_the_same_counters_and_bills_the_same() {
+            fn inputs<'a>(row: &'a LeasedRow, req: &'a AckRequest) -> BillingInputs<'a> {
+                inputs_from(row, req, 0, Venue::Public, NOW_US, None)
+            }
+            // A `[click, assert]` journey: row 0 opened first, its load time on the clock.
+            let mut opened = probe_ack(2, 2);
+            opened.browser_ms = 9_150;
+            // The same journey with a navigate first step: no row 0, so less wall time.
+            let mut plain = probe_ack(2, 2);
+            plain.browser_ms = 8_400;
+
+            let row = LeasedRow {
+                steps_configured: 2,
+                browser_devices: Some(one_combo()),
+                ..leased_row()
+            };
+            let with_row0 = resolve_billable(LIVE, &inputs(&row, &opened));
+            assert_eq!(with_row0, resolve_billable(LIVE, &inputs(&row, &plain)));
+            assert_eq!(
+                with_row0.billable, 2,
+                "the start load is never a billed step"
+            );
+            assert!(!with_row0.clamped);
+
+            let opened_events = events_for_ack(LIVE, inputs(&row, &opened));
+            let plain_events = events_for_ack(LIVE, inputs(&row, &plain));
+            assert_eq!(billed(&opened_events), Some(2.0));
+            assert_eq!(billed(&plain_events), Some(2.0));
+            assert_eq!(defined(&opened_events), Some(2.0));
+            assert_eq!(defined(&plain_events), Some(2.0));
+            // The wall clock is the one thing a start load changes; it passes through untouched.
+            assert_eq!(
+                size_for(&opened_events, UsageEvent::_SyntheticsBrowserMs),
+                Some(9_150.0)
+            );
+            assert_eq!(
+                size_for(&plain_events, UsageEvent::_SyntheticsBrowserMs),
+                Some(8_400.0)
+            );
+        }
+
         /// A zero definition is a zero clamp ceiling, which bills real work as nothing.
         #[test]
         fn the_frozen_definition_is_never_zero() {
@@ -2828,9 +3204,14 @@ mod tests {
             .collect();
         assert!(merge_variable_tiers(shared.clone(), &[], &dek(), "check-1").is_ok());
         // One inline variable that does not collide pushes the merged set over.
-        assert!(
-            merge_variable_tiers(shared, &[variable("EXTRA", "1")], &dek(), "check-1").is_err()
-        );
+        let err =
+            merge_variable_tiers(shared, &[variable("EXTRA", "1")], &dek(), "check-1").unwrap_err();
+        // A plain error would 500, and the probe would retry a job that can never resolve.
+        let cfg = err
+            .downcast_ref::<ConfigError>()
+            .expect("the cap must settle the job, not 500");
+        assert_eq!(cfg.status_reason, REASON_CONFIG_VARIABLE_LIMIT);
+        assert!(!cfg.guard_failure);
     }
 
     #[test]
@@ -2906,5 +3287,305 @@ mod tests {
 
         assert!(referenced(&synthetic).contains("API_TOKEN"));
         assert!(synthetic.config_secrets.is_empty());
+    }
+
+    mod expansion {
+        use std::collections::{HashMap, HashSet};
+
+        use config::meta::synthetics_composition::ChildJourney;
+        use serde_json::json;
+
+        use super::super::*;
+
+        fn nav(id: &str) -> serde_json::Value {
+            json!({ "id": id, "action": "navigate", "url": "https://x" })
+        }
+
+        fn child(id: &str, steps: usize) -> ChildJourney {
+            ChildJourney {
+                id: id.into(),
+                name: id.into(),
+                steps: (0..steps).map(|i| nav(&format!("c{i}"))).collect(),
+            }
+        }
+
+        fn parent(refs: &[&str], own: usize) -> Vec<serde_json::Value> {
+            let mut v: Vec<_> = (0..own).map(|i| nav(&format!("s{i}"))).collect();
+            for (i, r) in refs.iter().enumerate() {
+                v.push(
+                    json!({ "id": format!("r{i}"), "action": "subtest", "subtest": { "id": r } }),
+                );
+            }
+            v
+        }
+
+        #[test]
+        fn a_plain_journey_passes_through_untouched() {
+            let steps = parent(&[], 3);
+            assert_eq!(
+                expand_journey(&steps, &HashMap::new(), 0, false).unwrap(),
+                steps
+            );
+        }
+
+        #[test]
+        fn over_the_cap_is_a_customer_fixable_config_error() {
+            let children = HashMap::from([("big".to_string(), child("big", 40))]);
+            // `own` excludes the appended reference: 11 + 40 = 51 executed, one over the cap.
+            let err = expand_journey(&parent(&["big"], 11), &children, 0, false).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_STEPS_EXCEEDED);
+            assert!(!err.guard_failure);
+            assert!(err.message.contains("51"), "{}", err.message);
+        }
+
+        #[test]
+        fn a_malformed_reference_never_reaches_a_browser() {
+            // No `subtest.id`, so it yields no ref — the early return must still catch it.
+            let steps = vec![nav("s0"), json!({ "id": "r0", "action": "subtest" })];
+            let err = expand_journey(&steps, &HashMap::new(), 0, false).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
+            assert!(err.guard_failure);
+        }
+
+        #[test]
+        fn a_missing_child_is_our_guard_failure() {
+            let err = expand_journey(&parent(&["gone"], 1), &HashMap::new(), 0, false).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
+            assert!(err.guard_failure);
+        }
+
+        #[test]
+        fn a_fresh_super_cluster_parent_waits_for_its_child_to_replicate() {
+            let now = config::utils::time::now_micros();
+            let err =
+                expand_journey(&parent(&["gone"], 1), &HashMap::new(), now, true).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_PENDING);
+            assert!(!err.guard_failure);
+        }
+
+        #[test]
+        fn a_super_cluster_parent_past_the_grace_period_reports_the_child_missing() {
+            let grace_us = i64::try_from(
+                config::get_config()
+                    .synthetics
+                    .subtests_replication_grace_secs,
+            )
+            .unwrap()
+                * 1_000_000;
+            let stale = config::utils::time::now_micros() - grace_us - 1_000_000;
+            let err =
+                expand_journey(&parent(&["gone"], 1), &HashMap::new(), stale, true).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
+            assert!(err.guard_failure);
+        }
+
+        #[test]
+        fn a_fresh_parent_without_super_cluster_reports_the_child_missing() {
+            let now = config::utils::time::now_micros();
+            let err =
+                expand_journey(&parent(&["gone"], 1), &HashMap::new(), now, false).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
+        }
+
+        fn defined(name: &str) -> HashSet<String> {
+            HashSet::from([name.to_string()])
+        }
+
+        #[test]
+        fn a_variable_is_matched_by_name_never_by_value() {
+            // A name/value swap in what feeds `defined` compiles and fails every composed check.
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+            let steps = parent(&["login"], 1);
+            validate_child_placeholders(&steps, &children, &defined("TOKEN")).unwrap();
+            assert!(validate_child_placeholders(&steps, &children, &defined("sekret")).is_err());
+        }
+
+        // A {{NAME}} defined only as a browser secret passes the guard and reaches env_inject.
+        #[test]
+        fn a_parent_secret_defines_a_child_placeholder_and_feeds_env_inject() {
+            let synthetic = config::meta::synthetics::Synthetic {
+                config: json!({
+                    "steps": [ { "id": "r0", "action": "subtest", "subtest": { "id": "login" } } ],
+                    "secrets": [ { "name": "PASSWORD", "value": "hunter2" } ]
+                }),
+                ..Default::default()
+            };
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{PASSWORD}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+
+            let mut env_inject = HashMap::new();
+            inject_browser_secrets(&synthetic.config, &mut env_inject);
+            assert_eq!(
+                env_inject.get("PASSWORD").map(String::as_str),
+                Some("hunter2")
+            );
+            let steps = parent(&["login"], 1);
+            let names: HashSet<String> = env_inject.keys().cloned().collect();
+            validate_child_placeholders(&steps, &children, &names).unwrap();
+
+            let mut expanded_config = synthetic.config.clone();
+            expanded_config["steps"] = json!(expand_journey(&steps, &children, 0, false).unwrap());
+            let mut env_inject = HashMap::new();
+            inject_browser_secrets(&expanded_config, &mut env_inject);
+            assert_eq!(
+                env_inject.get("PASSWORD").map(String::as_str),
+                Some("hunter2")
+            );
+        }
+
+        /// The shared tier reads placeholders off `config`, so expansion must already have run.
+        #[test]
+        fn an_expanded_journey_exposes_a_child_placeholder_to_the_shared_tier() {
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{REGION}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+            let steps = parent(&["login"], 1);
+            let mut synthetic = config::meta::synthetics::Synthetic {
+                check_type: SyntheticType::Browser,
+                config: json!({ "steps": steps }),
+                ..Default::default()
+            };
+            assert!(!crate::service::check_placeholder_text(&synthetic).contains("REGION"));
+            synthetic.config["steps"] = json!(expand_journey(&steps, &children, 0, false).unwrap());
+            assert!(crate::service::check_placeholder_text(&synthetic).contains("REGION"));
+        }
+
+        /// A shared row resolves into env_inject, which is the whole of what the guard accepts.
+        #[test]
+        fn a_shared_variable_in_env_inject_defines_a_child_placeholder() {
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{REGION}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+            let env_inject = HashMap::from([("REGION".to_string(), "eu-west".to_string())]);
+            let names: HashSet<String> = env_inject.keys().cloned().collect();
+            validate_child_placeholders(&parent(&["login"], 1), &children, &names).unwrap();
+        }
+
+        #[test]
+        fn the_first_referenced_child_is_the_one_named() {
+            let mut a = child("a", 1);
+            a.steps[0]["url"] = json!("https://x/{{AAA}}");
+            let mut b = child("b", 1);
+            b.steps[0]["url"] = json!("https://x/{{BBB}}");
+            let children = HashMap::from([("a".to_string(), a), ("b".to_string(), b)]);
+            let err =
+                validate_child_placeholders(&parent(&["a", "b"], 1), &children, &HashSet::new())
+                    .unwrap_err();
+            assert!(err.message.contains("AAA"), "{}", err.message);
+        }
+
+        #[test]
+        fn a_child_placeholder_the_parent_does_not_define_is_a_config_error() {
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+            let err =
+                validate_child_placeholders(&parent(&["login"], 1), &children, &HashSet::new())
+                    .unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_VARIABLE_UNDEFINED);
+            // Customer-fixable, so it must not be counted as one of our guards failing.
+            assert!(!err.guard_failure);
+            assert!(err.message.contains("TOKEN"), "{}", err.message);
+        }
+
+        #[test]
+        fn a_child_placeholder_the_parent_defines_expands_normally() {
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+            let steps = parent(&["login"], 1);
+            validate_child_placeholders(&steps, &children, &defined("TOKEN")).unwrap();
+            let out = expand_journey(&steps, &children, 0, false).unwrap();
+            assert_eq!(out.len(), 2);
+        }
+
+        fn holding(id: &str, child: &str) -> ChildJourney {
+            ChildJourney {
+                id: id.into(),
+                name: id.into(),
+                steps: parent(&[child], 1),
+            }
+        }
+
+        #[test]
+        fn a_two_node_cycle_ends_as_an_invalid_reference() {
+            let children = HashMap::from([
+                ("a".to_string(), holding("a", "b")),
+                ("b".to_string(), holding("b", "a")),
+            ]);
+            let err = expand_journey(&parent(&["b"], 1), &children, 0, false).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
+        }
+
+        #[test]
+        fn a_self_cycle_ends_as_an_invalid_reference() {
+            let children = HashMap::from([("a".to_string(), holding("a", "a"))]);
+            let err = expand_journey(&parent(&["a"], 1), &children, 0, false).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
+        }
+
+        #[test]
+        fn a_child_holding_a_reference_is_our_guard_failure() {
+            let mut nested = child("nested", 2);
+            nested
+                .steps
+                .push(json!({ "id": "z", "action": "subtest", "subtest": { "id": "other" } }));
+            let children = HashMap::from([("nested".to_string(), nested)]);
+            let err = expand_journey(&parent(&["nested"], 1), &children, 0, false).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
+            assert!(err.guard_failure);
+        }
+
+        async fn empty_db() -> sea_orm::DatabaseConnection {
+            sea_orm::Database::connect("sqlite::memory:").await.unwrap()
+        }
+
+        fn browser_synthetic(steps: serde_json::Value) -> config::meta::synthetics::Synthetic {
+            config::meta::synthetics::Synthetic {
+                check_type: SyntheticType::Browser,
+                config: json!({
+                    "steps": steps,
+                    "secrets": [ { "name": "PASSWORD", "value": "hunter2" } ]
+                }),
+                ..Default::default()
+            }
+        }
+
+        #[tokio::test]
+        async fn a_plain_journey_resolves_unchanged() {
+            let mut synthetic = browser_synthetic(json!(parent(&[], 2)));
+            let before = synthetic.config.clone();
+            expand_for_resolve(&empty_db().await, &mut synthetic)
+                .await
+                .unwrap();
+            assert_eq!(synthetic.config, before);
+        }
+
+        #[test]
+        fn a_plain_journey_gets_its_secrets_in_env_inject() {
+            let mut synthetic = browser_synthetic(json!(parent(&[], 2)));
+            synthetic.config["secrets"] = json!([{ "name": "PASSWORD", "value": "s3cret" }]);
+            let mut env_inject = HashMap::new();
+            inject_journey_secrets(&synthetic, &mut env_inject);
+            assert_eq!(
+                env_inject.get("PASSWORD").map(String::as_str),
+                Some("s3cret")
+            );
+        }
+
+        #[tokio::test]
+        async fn a_reference_naming_no_child_reaches_the_boundary_check() {
+            let mut synthetic =
+                browser_synthetic(json!([nav("s0"), { "id": "r0", "action": "subtest" }]));
+            let err = expand_for_resolve(&empty_db().await, &mut synthetic)
+                .await
+                .unwrap_err();
+            let err = err.downcast_ref::<ConfigError>().expect("a ConfigError");
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
+            assert!(err.message.contains("names no check"), "{}", err.message);
+        }
     }
 }

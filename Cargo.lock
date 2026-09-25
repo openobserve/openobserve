@@ -8514,6 +8514,7 @@ dependencies = [
  "serde",
  "serde_json",
  "svix-ksuid",
+ "thiserror 2.0.19",
  "tokio",
  "tracing",
  "urlencoding",

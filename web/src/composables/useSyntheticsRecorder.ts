@@ -15,6 +15,7 @@
 
 import { reactive, ref } from "vue";
 import type { TranslateFn } from "@/types/i18n";
+import { placeholderNames } from "@/components/synthetics/variables/placeholders";
 import { mapWireSteps, substituteVariables } from "@/utils/synthetics/mapRecordedStep";
 import type {
   BrowserStep,
@@ -32,7 +33,11 @@ import type {
   WireStep,
 } from "@/types/synthetics";
 import { classifyRestoreFailure } from "@/utils/synthetics/replayFailure";
-import { DEFAULT_TEST_ID_ATTR, MIN_EXTENSION_VERSION } from "@/constants/synthetics";
+import {
+  DEFAULT_TEST_ID_ATTR,
+  MIN_EXTENSION_VERSION,
+  START_LOAD_STEP_ID,
+} from "@/constants/synthetics";
 
 /**
  * Encapsulates all communication with the OpenObserve Extension (playwright-crx)
@@ -59,6 +64,33 @@ export function isExtensionOutdated(version: string | undefined): boolean {
     if (a !== m) return a < m;
   }
   return false;
+}
+
+// substitutePlaceholders leaves an unbound name verbatim, which the browser would type as text.
+function assertResolved(texts: (string | undefined)[], vars: Record<string, string>): void {
+  for (const text of texts) {
+    const name = text
+      ? placeholderNames(text).find((n) => !Object.prototype.hasOwnProperty.call(vars, n))
+      : undefined;
+    if (name) throw new Error(`unresolved variable {{${name}}}`);
+  }
+}
+
+function substitutedTexts(step: WireStep): (string | undefined)[] {
+  return [step.url, step.value, step.text, step.key, step.selector, step.name];
+}
+
+/** The extension opens `targetUrl` first, so it takes the same substitution (and the same refusal) a step url does. */
+function resolveTargetUrl(
+  targetUrl: string | undefined,
+  variables: { name: string; value: string }[] | undefined,
+): string | undefined {
+  if (targetUrl === undefined) return undefined;
+  const vars = Object.fromEntries((variables ?? []).map((v) => [v.name, v.value]));
+  assertResolved([targetUrl], vars);
+  if (Object.keys(vars).length === 0) return targetUrl;
+  return substituteVariables({ id: START_LOAD_STEP_ID, action: "navigate", url: targetUrl }, vars)
+    .url;
 }
 
 const useSyntheticsRecorder = (t: TranslateFn) => {
@@ -428,16 +460,16 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
     pendingCommands.clear();
   }
 
-  /**
-   * Open the live port and ask the extension to start recording. The extension
-   * opens its own top-level tab; steps stream back over the port via setActions.
-   * `targetUrl` is kept only for the local recording banner — the extension
-   * command itself takes no URL.
-   */
-  async function startRecording(targetUrl: string, testIdAttr?: string): Promise<void> {
+  /** The extension opens `targetUrl` in its own tab, so it is sent with variables resolved. */
+  async function startRecording(
+    targetUrl: string,
+    testIdAttr?: string,
+    variables?: { name: string; value: string }[],
+  ): Promise<void> {
+    const resolvedUrl = resolveTargetUrl(targetUrl, variables) ?? "";
     error.value = "";
     liveSteps.value = [];
-    currentUrl.value = targetUrl;
+    currentUrl.value = resolvedUrl;
     mode.value = "recording";
 
     // Ensure bridge is alive — the port may have died since detectExtension()
@@ -462,7 +494,7 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
     // `data-qa` or `data-cy` got none at all, silently.
     const res = await sendCommand<RecorderStartResponse>({
       action: "startRecording",
-      targetUrl,
+      targetUrl: resolvedUrl,
       testIdAttr: testIdAttr || DEFAULT_TEST_ID_ATTR,
     });
     if (!res?.success) {
@@ -493,6 +525,11 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
       cookies?: { name: string; value: string; domain: string }[];
     } = {},
   ): Promise<void> {
+    const targetUrl = resolveTargetUrl(opts.targetUrl, opts.variables);
+    // Also with an empty map, before any state flips: a child's `{{X}}` must stop the restore.
+    const vars = Object.fromEntries((opts.variables ?? []).map((v) => [v.name, v.value]));
+    prefixSteps.forEach((s) => assertResolved(substitutedTexts(s), vars));
+    const resolved = prefixSteps.map((s) => substituteVariables(s, vars));
     error.value = "";
     liveSteps.value = [];
     baselineStepCount.value = null;
@@ -501,7 +538,7 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
     prefixFailure.value = null;
     stepResults.clear();
     activeStepId.value = null;
-    currentUrl.value = opts.targetUrl ?? "";
+    currentUrl.value = targetUrl ?? "";
     mode.value = "recording";
     replayPhase.value = "restoring";
     const generation = ++restoreGeneration;
@@ -517,15 +554,6 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
       isRecording.value = false;
     };
 
-    // The prefix replays against a real browser, so the same variable substitution
-    // the replay path does has to happen here — otherwise the restore runs with
-    // `{{ VAR }}` typed literally into the page.
-    const vars = Object.fromEntries((opts.variables ?? []).map((v) => [v.name, v.value]));
-    const resolved =
-      Object.keys(vars).length > 0
-        ? prefixSteps.map((s) => substituteVariables(s, vars))
-        : prefixSteps;
-
     // Unwrap Vue reactive proxies before structured clone — see `replay`.
     const plainSteps = JSON.parse(JSON.stringify(resolved)) as WireStep[];
 
@@ -533,7 +561,7 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
       {
         action: "startRecordingFrom",
         prefixSteps: plainSteps,
-        targetUrl: opts.targetUrl,
+        targetUrl,
         testIdAttr: opts.testIdAttr || DEFAULT_TEST_ID_ATTR,
         auth: opts.auth,
         headers: opts.headers,
@@ -706,17 +734,18 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
       return null;
     }
     error.value = "";
+    // Resolved before any state flips: an unresolved placeholder must not leave a phantom running replay.
+    const vars = Object.fromEntries((variables ?? []).map((v) => [v.name, v.value]));
+    // Also with an empty map: a child's `{{X}}` would otherwise be typed into the page literally.
+    steps.forEach((s) => assertResolved(substitutedTexts(s), vars));
+    const resolvedSteps = steps.map((s) => substituteVariables(s, vars));
+    const resolvedTargetUrl = resolveTargetUrl(targetUrl, variables);
     replayResult.value = null;
     stepResults.clear();
     activeStepId.value = null;
     replayPhase.value = "running";
     isReplaying.value = true;
     const generation = ++replayGeneration;
-
-    // // Substitute {{ VAR_NAME }} placeholders in wire step fields with actual variable values.
-    const vars = Object.fromEntries((variables ?? []).map((v) => [v.name, v.value]));
-    const resolvedSteps =
-      vars && Object.keys(vars).length > 0 ? steps.map((s) => substituteVariables(s, vars)) : steps;
 
     // Wake the content script bridge if it went idle. The port may have
     // died between stopRecording and replay (bfcache, SW suspend, etc.).
@@ -761,7 +790,7 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
       {
         action: "replay",
         steps: plainSteps,
-        targetUrl,
+        targetUrl: resolvedTargetUrl,
       },
       REPLAY_TIMEOUT_MS,
     );

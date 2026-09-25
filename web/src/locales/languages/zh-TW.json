@@ -13857,7 +13857,8 @@
       "tags": "標籤",
       "title": "檢查詳細資訊",
       "urlTarget": "網址",
-      "urlTargetPlaceholder": "https://api.example.com/health"
+      "urlTargetPlaceholder": "https://api.example.com/health",
+      "startingUrlNotOpened": "未開啟 — 第一步執行導覽。"
     },
     "createBrowserTest": {
       "buildManually": "手動建立",
@@ -13958,7 +13959,8 @@
         "scroll": "捲動",
         "wait": "等待",
         "assert": "斷言",
-        "screenshot": "螢幕截圖"
+        "screenshot": "螢幕截圖",
+        "subtest": "子測試"
       },
       "clickTypeLabel": "點擊類型",
       "clickTypeHelp": "右鍵點擊會開啟上下文選單；雙擊會傳送兩次點擊。",
@@ -14146,7 +14148,81 @@
       "valueFallback": "值",
       "showSetupSteps": "顯示設定步驟",
       "waitingForActions": "正在等待瀏覽器中的操作…",
-      "unboundVariables": "{names} 未在此檢查、其環境或全域中定義，因此會依輸入時的文字呈現。 | {names} 未在此檢查、其環境或全域中定義，因此會依輸入時的文字呈現。"
+      "unboundVariables": "{names} 未在此檢查、其環境或全域中定義，因此會依輸入時的文字呈現。 | {names} 未在此檢查、其環境或全域中定義，因此會依輸入時的文字呈現。",
+      "addSubtest": "新增子測試",
+      "extract": {
+        "action": "擷取為子測試",
+        "confirm": "擷取",
+        "created": "已建立「{name}」。儲存此測試以保留參照。",
+        "every": "每 {n} {unit}",
+        "folderForbidden": "您無法在「{folder}」中建立測試。請選擇其他資料夾。",
+        "folderLabel": "資料夾",
+        "historyNotice": "步驟歷史將重新開始。這些步驟在新測試中會取得新的 ID，因此各步驟的圖表會從今天起分開。",
+        "labelThisTest": "此測試",
+        "nameLabel": "測試名稱",
+        "nameTooLong": "名稱請保持在 256 位元組以內",
+        "orphan": "已建立「{name}」，但無法更新此流程。請開啟新測試或將其刪除。",
+        "reason": {
+          "contains-subtest": "子測試不能包含另一個子測試",
+          "not-contiguous": "請選取相鄰的步驟",
+          "not-contiguous-filtered": "請選取相鄰的步驟 — 清除篩選以檢視完整清單",
+          "referenced": "此測試正被其他測試作為子測試使用，因此不能包含子測試",
+          "referenced-pending": "正在檢查此測試的使用位置…",
+          "referenced-unknown": "無法檢查此測試的使用位置",
+          "undefined-placeholder": "擷取前請在「變數」中定義 {name}"
+        },
+        "schedule": "{locations} · {frequency}（與此測試相同）",
+        "status": "以暫停狀態建立。在您啟用之前，僅作為此測試的一部分執行。",
+        "steps": "步驟 {first} · 從 {path} 開始 | 步驟 {first} – {last} · 從 {path} 開始",
+        "subtitle": "這些步驟會移入現在建立的新瀏覽器測試。此流程會在原位置保留一個子測試參照 — 儲存此測試以保留它。",
+        "thisTest": "擷取後 {authored} 個步驟 · 執行相同的 {executed} 個步驟",
+        "thisTestAuthored": "擷取後 {authored} 個步驟",
+        "title": "將 {count} 個步驟擷取到新測試",
+        "unit": {
+          "hours": "小時",
+          "minutes": "分鐘"
+        },
+        "variablesCopied": "已複製到新測試：{names}。",
+        "variablesToDefine": "在單獨執行之前，請在新測試中定義：{names}。"
+      },
+      "startRowLabel": "開啟",
+      "subtest": {
+        "capChild": "來自「{name}」的 {count} 個",
+        "capOwn": "自身 {count} 個",
+        "capRemedy": "移除一個子測試，或縮減此測試自身的步驟。",
+        "capTitle": "此測試執行 {total} 個步驟 — 上限為 {limit}。",
+        "delta": "加入「{name}」後，此測試的執行步驟從 {before} → {after}。上限為 {limit}。",
+        "deltaUnknown": "步驟影響未知 — 無法載入被參照的測試。",
+        "failedAt": "{number} — {step}",
+        "ignoredEnv": "其起始 URL、變數、驗證與 Cookie 在此會被忽略 — 採用父測試的設定。",
+        "lastRun": "其上次執行耗時 {seconds} 秒，允許上限為 {budget} 秒。",
+        "lastRunUnknown": "時間影響未知 — 此測試尚未完成任何執行。",
+        "noAccess": "您無權存取「{name}」，因此無法在此顯示其步驟。",
+        "noAccessBadge": "無權存取",
+        "noAccessRemedy": "請申請其資料夾的讀取權限，或移除該參照。",
+        "disabledTooltip": "此部署未啟用子測試。",
+        "loadFailed": "無法載入此子測試，因此其步驟和步驟數未知。",
+        "missing": "此子測試已不存在。請移除參照，或選擇其他測試。",
+        "noAccessToast": "您無權存取此測試參照的某個測試。",
+        "notRun": "未執行",
+        "openChild": "開啟「{name}」",
+        "pickEmpty": "此組織中還沒有其他瀏覽器測試。",
+        "pickLabel": "在此執行的測試",
+        "pickLastRun": "{status} {ago}",
+        "pickLoadFailed": "無法載入瀏覽器測試清單。請再試一次。",
+        "pickNested": "已包含子測試 — 巢狀僅限一層",
+        "pickGroupUsable": "可在此處使用",
+        "pickGroupBlocked": "無法在此處使用",
+        "pickSteps": "{count} 個步驟",
+        "pickUsedBy": "被 {count} 個測試使用",
+        "previewLabel": "在此執行的步驟",
+        "progressAria": "{total} 個子步驟中已完成 {done} 個",
+        "raiseBudget": "如果此測試開始被中斷，請提高其執行時間上限。",
+        "stepsBadge": "{count} 個步驟",
+        "executedBadge": "執行 {count} 個",
+        "undefinedVariable": "「{name}」使用了此測試未定義的 {variable}。",
+        "undefinedVariableAction": "在「變數」中新增"
+      }
     },
     "labels": {
       "copyOf": "{name} 的副本",
@@ -14525,7 +14601,9 @@
       "pageActivity": "頁面活動",
       "pageActivityEvents": "{count} 個事件 | {count} 個事件",
       "pageActivityViewAllShort": "在「證據」中檢視全部",
-      "expandScreenshot": "展開"
+      "expandScreenshot": "展開",
+      "failedAtStartLoad": "開啟起始 URL 失敗",
+      "startLoadLabel": "開啟 {url}"
     },
     "runRowExpansion": {
       "browserHeader": "瀏覽器",
@@ -14697,13 +14775,17 @@
       "statusUp": "✓ 正常",
       "steps": "步驟",
       "stepsCount": "{count} 個步驟",
+      "subtestMissing": "子測試遺失",
+      "subtestNested": "子測試包含子測試",
       "testName": "測試名稱",
       "timeout": "逾時",
       "trigger": "觸發",
       "triggering": "正在觸發…",
       "type": "類型",
       "uptime": "正常運行時間 7 天",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "使用者",
+      "usedByCount": "{count} 個測試"
     },
     "tabs": {
       "all": "全部",
@@ -14750,7 +14832,6 @@
       "updateFailed": "更新檢查失敗。"
     },
     "validation": {
-      "firstStepMustNavigate": "第一步必須是「導航」",
       "locationsRequired": "至少選擇一個位置",
       "nameRequired": "名稱為必填",
       "locatorRequired": "至少新增一個定位器，讓此步驟知道要對哪個元素操作",
@@ -14765,7 +14846,13 @@
       "retiredAction": "「{action}」已不再支援 — 請移除或取代「{step}」",
       "runBudgetExceeded": "此檢查每次執行可能花費最多 {worstCase}，超過 {limit} 的上限。請移除瀏覽器/裝置組合，或降低重試次數。（{combos} 個組合 × {attempts} 次嘗試 × 每次 {perAttempt}。）",
       "runBudgetRetriesHint": "降低重試次數可讓此檢查回到 {limit} 執行上限內。",
-      "folderUnavailable": "資料夾「{folder}」在此組織中不可用 — 將儲存到預設資料夾。"
+      "folderUnavailable": "資料夾「{folder}」在此組織中不可用 — 將儲存到預設資料夾。",
+      "compositionChildFailed": "「{name}」在儲存時未通過驗證 — 請開啟它以查看需要修正的步驟。",
+      "startUrlHostMismatch": "此測試開啟 {host}，但其步驟導覽至 {other}。",
+      "stepIdReserved": "此步驟 ID 已保留給本次執行的起始 URL",
+      "subtestCap": "執行的步驟過多 — 請查看步驟上方的提示。",
+      "subtestFlags": "子測試不能設為選用或一律執行 — 它的失敗總會導致此測試失敗",
+      "subtestRequired": "請選擇在此執行的測試"
     },
     "privateLocations": {
       "searchPlaceholder": "搜尋位置...",
@@ -14855,7 +14942,19 @@
     "secondsAgo": "{count} 秒前",
     "stepsQueryFailed": "步驟查詢失敗",
     "queryFailed": "查詢失敗",
-    "relationNotContaining": "不包含"
+    "relationNotContaining": "不包含",
+    "delete": {
+      "blockedBody": "請先移除這些參照，或將這些測試一併刪除。",
+      "blockedBulkTitle": "所選的 {count} 個測試正被此選取範圍以外的測試使用",
+      "blockedTitle": "「{name}」正被其他測試使用",
+      "hiddenReferences": "{count} 個您無權存取的測試"
+    },
+    "save": {
+      "blockedBody": "儲存未成功。請先移除這些參照，然後重新儲存。",
+      "usedByBody": "此變更新增了 {names}。上面列出的測試沒有定義它，因此在它們下次執行時仍無法解析。",
+      "usedByTitle": "使用「{name}」的 {count} 個測試將開始失敗",
+      "usedByCount": "被 {count} 個測試使用"
+    }
   },
   "statusPages": {
     "tabTitle": "狀態頁面",

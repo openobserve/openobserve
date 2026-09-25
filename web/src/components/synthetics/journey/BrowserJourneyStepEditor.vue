@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserStep, SettleResponse, StepAssertion, StepLocator } from "@/types/synthetics";
 import {
@@ -45,6 +46,7 @@ import { unboundPlaceholders } from "@/components/synthetics/variables/placehold
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import BrowserJourneyLocator from "./BrowserJourneyLocator.vue";
 import BrowserJourneyAssertion from "./BrowserJourneyAssertion.vue";
+import SubtestPicker from "./SubtestPicker.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 
@@ -71,6 +73,14 @@ const props = defineProps<{
   expectedErrorMessage?: string;
   /** Names the check resolves; absent where the host cannot tell. */
   knownVariables?: ReadonlySet<string>;
+  /** This journey's own check id, so `SubtestPicker` can exclude self-reference. */
+  ownCheckId?: string;
+  /** Executed step count of this journey as it stands — see `SubtestPicker`. */
+  ownStepCount?: number;
+  /** Configured run-time allowance for this journey, in ms; undefined uses the default. */
+  journeyBudgetMs?: number;
+  /** The loaded child's name: a stored reference is `{ id }` only, so it carries no name of its own. */
+  childName?: string;
 }>();
 
 const emit = defineEmits<{
@@ -81,6 +91,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
 
 /**
  * Apply an edit and keep the recorded wire step in sync.
@@ -138,9 +149,16 @@ const showTarget = computed(() => stepNeedsTarget(props.step));
  */
 const effectiveLocator = computed<StepLocator>(() => props.step.locator ?? { candidates: [] });
 
-// Built inside a computed so the option wording follows the active locale
-// rather than freezing at whatever was loaded when the module first evaluated.
-const actionSelectOptions = computed(() => actionOptions(t));
+// A computed so the wording follows the locale; `=== true` hides subtest on an unknown flag.
+const actionSelectOptions = computed(() =>
+  actionOptions(t).filter(
+    (o) =>
+      o.value !== "subtest" ||
+      // A row that already holds a reference keeps it: the server lets it save unchanged.
+      props.step.action === "subtest" ||
+      store?.state?.zoConfig?.synthetics_subtests_enabled === true,
+  ),
+);
 
 const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
 const unboundNames = computed(() =>
@@ -170,10 +188,31 @@ const actionComputed = computed({
   get: () => props.step.action,
   set: (v: BrowserStep["action"]) => {
     if (v !== props.step.action && props.step.wire) actionChangedFromRecorded.value = true;
-    // The click fields describe a click and nothing else, so they go the same way
-    // as the wire when the action changes — otherwise a right click renamed to a
-    // hover would still store `button: right` on a step that cannot use it.
-    update(v === "click" ? { action: v } : { action: v, button: undefined, clickCount: undefined });
+    if (v === "subtest") {
+      // A subtest runs no action of its own, so the old action's execution fields would misdescribe it.
+      update({
+        action: v,
+        locator: undefined,
+        selector: undefined,
+        value: undefined,
+        assertion: undefined,
+        settle: undefined,
+        optional: undefined,
+        alwaysRun: undefined,
+        button: undefined,
+        clickCount: undefined,
+        subtest: undefined,
+      });
+    } else {
+      // The click fields describe a click and nothing else, so they go the same way
+      // as the wire when the action changes — otherwise a right click renamed to a
+      // hover would still store `button: right` on a step that cannot use it.
+      update(
+        v === "click"
+          ? { action: v, subtest: undefined }
+          : { action: v, button: undefined, clickCount: undefined, subtest: undefined },
+      );
+    }
     emit("action-edited");
   },
 });
@@ -233,6 +272,14 @@ const timeoutBelowDefault = computed(() => {
 // element the v1 way flipped the whole journey to steps_version 1, because
 // isV2Journey reads `locator`, not `selector` (SE-18). No v1 journeys exist, so
 // the fork served no case and is gone. See `showTarget` for the render condition.
+
+/** A name the author never changed still names the old child, so a re-pick replaces it. */
+function onSubtestPicked(picked: { id: string; name: string } | undefined) {
+  const current = props.step.name;
+  const earlier = props.step.subtest?.name ?? props.childName;
+  const keepName = !!current && current !== earlier;
+  update({ subtest: picked, name: keepName ? current : picked?.name });
+}
 
 function updateLocator(locator: StepLocator) {
   update({ locator });
@@ -428,6 +475,18 @@ const hasAdvancedChanges = computed(
         />
       </div>
 
+      <!-- A subtest runs another check's steps, so no execution field below applies. -->
+      <SubtestPicker
+        v-if="props.step.action === 'subtest'"
+        :model-value="props.step.subtest"
+        :fallback-name="props.step.name"
+        :own-check-id="ownCheckId"
+        :own-step-count="ownStepCount"
+        :journey-budget-ms="journeyBudgetMs"
+        data-test="synthetics-journey-step-subtest-picker"
+        @update:model-value="onSubtestPicked"
+      />
+
       <!-- The discard is right; doing it silently was not (D9). -->
       <p
         v-if="actionChangedFromRecorded"
@@ -518,6 +577,7 @@ const hasAdvancedChanges = computed(
          Opens itself when the step carries a non-default, so nothing an author set
          is hidden from them. -->
     <OCollapsible
+      v-if="props.step.action !== 'subtest'"
       :default-open="hasAdvancedChanges"
       variant="sidebar"
       class="rounded-default bg-surface-panel mt-2 w-full max-w-200 border"

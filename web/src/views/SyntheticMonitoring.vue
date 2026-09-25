@@ -338,6 +338,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
     </ODialog>
 
+    <!-- Delete blocked: other checks reference this one (or, in bulk, one outside the selection). -->
+    <ODialog
+      v-model:open="blockedDeleteOpen"
+      size="sm"
+      :title="blockedDelete?.title ?? raw('')"
+      :primary-button-label="t('common.ok')"
+      data-test="synthetic-monitoring-blocked-delete-dialog"
+      @click:primary="blockedDelete = null"
+    >
+      <div class="flex flex-col gap-3 py-1">
+        <p class="m-0">{{ t("synthetics.delete.blockedBody") }}</p>
+        <ul class="m-0 flex list-none flex-col gap-1 p-0">
+          <li v-for="ref in blockedDelete?.references ?? []" :key="ref.id">
+            <router-link
+              :to="
+                syntheticsEditRoute(
+                  { orgIdentifier: orgIdentifier, folderId: ref.folder_id },
+                  ref.id,
+                )
+              "
+              class="text-text-link text-sm"
+              :data-test="`synthetic-monitoring-blocked-delete-ref-${ref.id}`"
+            >
+              {{ ref.name }}
+            </router-link>
+          </li>
+        </ul>
+        <p v-if="(blockedDelete?.hidden ?? 0) > 0" class="text-text-secondary m-0 text-xs">
+          {{ t("synthetics.delete.hiddenReferences", { count: blockedDelete?.hidden ?? 0 }) }}
+        </p>
+      </div>
+    </ODialog>
+
     <!-- Agent setup drawer — private locations only, so enterprise only -->
     <AgentSetupDrawer
       v-if="privateLocationsEnabled"
@@ -543,6 +576,12 @@ interface ApiMonitor {
   last_triggered_at: number;
   last_check_at: number | null;
   last_response_ms: number | null;
+  /** Expanded step count (browser); null means unreadable, which is not zero steps. */
+  steps: number | null;
+  /** How many other checks reference this one as a subtest. */
+  referenced_by: number;
+  /** Absent for a check with no subtest reference. */
+  reference_state?: "ok" | "missing" | "nested";
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -593,6 +632,9 @@ function mapMonitor(m: ApiMonitor) {
     history: [] as unknown[],
     folderId: m.folder_id,
     lastTriggeredAt: m.last_triggered_at,
+    steps: m.steps,
+    referencedBy: m.referenced_by,
+    referenceState: m.reference_state,
   };
 }
 
@@ -792,6 +834,24 @@ const showMoveDialog = ref(false);
 const showBulkDeleteConfirm = ref(false);
 const monitorsToMove = ref<string[]>([]);
 
+// Both delete handlers' 409s render here, with distinct titles for a named parent vs outside ones.
+interface BlockedReference {
+  id: string;
+  name: string;
+  folder_id: string;
+}
+const blockedDelete = ref<{
+  title: I18nText;
+  references: BlockedReference[];
+  hidden: number;
+} | null>(null);
+const blockedDeleteOpen = computed({
+  get: () => blockedDelete.value !== null,
+  set: (open: boolean) => {
+    if (!open) blockedDelete.value = null;
+  },
+});
+
 const showDuplicateDialog = ref(false);
 const duplicateTarget = ref<any>(null);
 const duplicateName = ref("");
@@ -827,14 +887,23 @@ const bulkDeleteMonitors = async () => {
     await loadMonitors(undefined, true);
   } catch (err: any) {
     dismiss();
-    toast({
-      variant: "error",
-      message:
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        t("synthetics.toast.bulkDeleteFailed"),
-    });
-    console.error("[synthetics] bulk delete failed", err);
+    // §5.3 ignores blockers inside the delete set, so a 409 here has no single check to name.
+    if (err?.response?.status === 409 && err.response.data?.code === "child_referenced") {
+      blockedDelete.value = {
+        title: t("synthetics.delete.blockedBulkTitle", { count: selectedMonitorIds.value.length }),
+        references: err.response.data.references ?? [],
+        hidden: err.response.data.hidden_reference_count ?? 0,
+      };
+    } else {
+      toast({
+        variant: "error",
+        message:
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          t("synthetics.toast.bulkDeleteFailed"),
+      });
+      console.error("[synthetics] bulk delete failed", err);
+    }
   } finally {
     showBulkDeleteConfirm.value = false;
     bulkActionLoading.value = false;
@@ -1598,6 +1667,14 @@ async function deleteMonitor(m: any) {
     toast({ variant: "success", message: t("synthetics.toast.deleteSuccessSingle") });
   } catch (err: any) {
     dismiss();
+    if (err?.response?.status === 409 && err.response.data?.code === "child_referenced") {
+      blockedDelete.value = {
+        title: t("synthetics.delete.blockedTitle", { name: m.name }),
+        references: err.response.data.references ?? [],
+        hidden: err.response.data.hidden_reference_count ?? 0,
+      };
+      return;
+    }
     toast({
       variant: "error",
       message:

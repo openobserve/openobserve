@@ -13862,7 +13862,8 @@
       "tags": "Tags",
       "title": "Controledetails",
       "urlTarget": "URL",
-      "urlTargetPlaceholder": "https://api.example.com/health"
+      "urlTargetPlaceholder": "https://api.example.com/health",
+      "startingUrlNotOpened": "Niet geopend — de eerste stap navigeert."
     },
     "createBrowserTest": {
       "buildManually": "Handmatig opbouwen",
@@ -13963,7 +13964,8 @@
         "scroll": "Scrollen",
         "wait": "Wachten",
         "assert": "Verifiëren",
-        "screenshot": "Screenshot"
+        "screenshot": "Screenshot",
+        "subtest": "Subtest"
       },
       "clickTypeLabel": "Kliktype",
       "clickTypeHelp": "Rechtsklik opent een contextmenu; dubbelklik verzendt twee klikken.",
@@ -14151,7 +14153,81 @@
       "valueFallback": "Waarde",
       "showSetupSteps": "Toon instellingsstappen",
       "waitingForActions": "Wachten op acties in de browser…",
-      "unboundVariables": "{names} is niet gedefinieerd in deze check, de bijbehorende omgevingen of globaal, dus wordt het getypt zoals geschreven. | {names} zijn niet gedefinieerd in deze check, de bijbehorende omgevingen of globaal, dus worden ze getypt zoals geschreven."
+      "unboundVariables": "{names} is niet gedefinieerd in deze check, de bijbehorende omgevingen of globaal, dus wordt het getypt zoals geschreven. | {names} zijn niet gedefinieerd in deze check, de bijbehorende omgevingen of globaal, dus worden ze getypt zoals geschreven.",
+      "addSubtest": "Subtest toevoegen",
+      "extract": {
+        "action": "Extraheren naar subtest",
+        "confirm": "Extraheren",
+        "created": "\"{name}\" is aangemaakt. Sla deze test op om de verwijzing te behouden.",
+        "every": "elke {n} {unit}",
+        "folderForbidden": "U kunt geen tests aanmaken in \"{folder}\". Kies een andere map.",
+        "folderLabel": "Map",
+        "historyNotice": "De stapgeschiedenis begint opnieuw. Deze stappen krijgen nieuwe ids in de nieuwe test, dus grafieken per stap splitsen vanaf vandaag.",
+        "labelThisTest": "Deze test",
+        "nameLabel": "Testnaam",
+        "nameTooLong": "Houd de naam onder 256 bytes",
+        "orphan": "\"{name}\" is aangemaakt maar deze journey kon niet worden bijgewerkt. Open de nieuwe test of verwijder hem.",
+        "reason": {
+          "contains-subtest": "Een subtest kan geen andere subtest bevatten",
+          "not-contiguous": "Selecteer stappen die naast elkaar staan",
+          "not-contiguous-filtered": "Selecteer stappen die naast elkaar staan — wis het filter om de volledige lijst te zien",
+          "referenced": "Deze test wordt als subtest gebruikt door andere tests en kan er zelf geen bevatten",
+          "referenced-pending": "Controleren waar deze test wordt gebruikt…",
+          "referenced-unknown": "Kon niet controleren waar deze test wordt gebruikt",
+          "undefined-placeholder": "Definieer {name} onder Variabelen voordat u extraheert"
+        },
+        "schedule": "{locations} · {frequency} (zoals deze test)",
+        "status": "Gepauzeerd aangemaakt. Draait alleen als onderdeel van deze test totdat u hem inschakelt.",
+        "steps": "Stap {first} · begint bij {path} | Stappen {first} – {last} · begint bij {path}",
+        "subtitle": "De stappen verhuizen naar een nieuwe browsertest, die nu wordt aangemaakt. Deze journey houdt op hun plaats een subtest-verwijzing — sla deze test op om die te behouden.",
+        "thisTest": "{authored} stappen na extractie · voert dezelfde {executed} stappen uit",
+        "thisTestAuthored": "{authored} stappen na extractie",
+        "title": "{count} stap naar een nieuwe test extraheren | {count} stappen naar een nieuwe test extraheren",
+        "unit": {
+          "hours": "uur | uur",
+          "minutes": "minuut | minuten"
+        },
+        "variablesCopied": "Gekopieerd naar de nieuwe test: {names}.",
+        "variablesToDefine": "Definieer op de nieuwe test voordat u hem los uitvoert: {names}."
+      },
+      "startRowLabel": "Opent",
+      "subtest": {
+        "capChild": "{count} uit \"{name}\"",
+        "capOwn": "{count} eigen",
+        "capRemedy": "Verwijder een subtest, of kort de eigen stappen van deze test in.",
+        "capTitle": "Deze test voert {total} stappen uit — de limiet is {limit}.",
+        "delta": "Met \"{name}\" gaat deze test van {before} → {after} uitgevoerde stappen. De limiet is {limit}.",
+        "deltaUnknown": "Stapimpact onbekend — een gerefereerde test kon niet worden geladen.",
+        "failedAt": "{number} — {step}",
+        "ignoredEnv": "Zijn start-URL, variabelen, authenticatie en cookies worden hier genegeerd — die van de bovenliggende test gelden.",
+        "lastRun": "Zijn laatste run duurde {seconds}s van de toegestane {budget}s.",
+        "lastRunUnknown": "Tijdimpact onbekend — deze test heeft nog geen run voltooid.",
+        "noAccess": "U hebt geen toegang tot \"{name}\", dus de stappen kunnen hier niet worden getoond.",
+        "noAccessBadge": "geen toegang",
+        "noAccessRemedy": "Vraag leestoegang tot de map, of verwijder de verwijzing.",
+        "disabledTooltip": "Subtests zijn niet ingeschakeld in deze implementatie.",
+        "loadFailed": "Deze subtest kon niet worden geladen, dus de stappen en het aantal stappen zijn onbekend.",
+        "missing": "Deze subtest bestaat niet meer. Verwijder de verwijzing of kies een andere test.",
+        "noAccessToast": "U hebt geen toegang tot een van de tests waarnaar deze test verwijst.",
+        "notRun": "Niet uitgevoerd",
+        "openChild": "\"{name}\" openen",
+        "pickEmpty": "Nog geen andere browsertests in deze organisatie.",
+        "pickLabel": "Test die hier draait",
+        "pickLastRun": "{status} {ago}",
+        "pickLoadFailed": "Kon de lijst met browsertests niet laden. Probeer het opnieuw.",
+        "pickNested": "Bevat al een subtest — nesten is beperkt tot één niveau",
+        "pickGroupUsable": "Kan hier worden gebruikt",
+        "pickGroupBlocked": "Kan hier niet worden gebruikt",
+        "pickSteps": "{count} stap | {count} stappen",
+        "pickUsedBy": "Gebruikt door {count} test | Gebruikt door {count} tests",
+        "previewLabel": "Stappen die hier draaien",
+        "progressAria": "{done} van {total} substappen voltooid",
+        "raiseBudget": "Verhoog de toegestane looptijd van deze test als hij wordt afgebroken.",
+        "stepsBadge": "{count} stap | {count} stappen",
+        "executedBadge": "{count} uitgevoerd",
+        "undefinedVariable": "\"{name}\" gebruikt {variable}, die deze test niet definieert.",
+        "undefinedVariableAction": "Toevoegen onder Variabelen"
+      }
     },
     "labels": {
       "copyOf": "Kopie van {name}",
@@ -14530,7 +14606,9 @@
       "pageActivity": "Pagina-activiteit",
       "pageActivityEvents": "{count} gebeurtenis | {count} gebeurtenissen",
       "pageActivityViewAllShort": "Alles in Evidence weergeven",
-      "expandScreenshot": "Uitvouwen"
+      "expandScreenshot": "Uitvouwen",
+      "failedAtStartLoad": "Openen van start-URL mislukt",
+      "startLoadLabel": "{url} openen"
     },
     "runRowExpansion": {
       "browserHeader": "Browser",
@@ -14702,13 +14780,17 @@
       "statusUp": "✓ Online",
       "steps": "Stappen",
       "stepsCount": "{count} stappen",
+      "subtestMissing": "Subtest ontbreekt",
+      "subtestNested": "Subtest bevat een subtest",
       "testName": "Testnaam",
       "timeout": "Time-out",
       "trigger": "Trigger",
       "triggering": "Bezig met triggeren…",
       "type": "Type",
       "uptime": "Uptime 7d",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "Gebruikt door",
+      "usedByCount": "{count} test | {count} tests"
     },
     "tabs": {
       "all": "Alle",
@@ -14755,7 +14837,6 @@
       "updateFailed": "Bijwerken van controle mislukt."
     },
     "validation": {
-      "firstStepMustNavigate": "Eerste stap moet \"Navigeren\" zijn",
       "locationsRequired": "Selecteer minstens één locatie",
       "nameRequired": "Naam is verplicht",
       "locatorRequired": "Voeg ten minste één locator toe zodat deze stap weet op welk element te handelen",
@@ -14770,7 +14851,13 @@
       "retiredAction": "\"{action}\" wordt niet meer ondersteund — verwijder of vervang \"{step}\"",
       "runBudgetExceeded": "Deze check kan tot {worstCase} per run duren, boven de {limit}-limiet. Verwijder een browser-/apparaatcombinatie of verlaag het aantal retries. ({combos} combinatie(s) × {attempts} poging(en) × {perAttempt} elk.)",
       "runBudgetRetriesHint": "Het verlagen van het aantal retries brengt deze check terug binnen de {limit}-runlimiet.",
-      "folderUnavailable": "Map \"{folder}\" is niet beschikbaar in deze organisatie — er wordt opgeslagen naar de standaardmap."
+      "folderUnavailable": "Map \"{folder}\" is niet beschikbaar in deze organisatie — er wordt opgeslagen naar de standaardmap.",
+      "compositionChildFailed": "\"{name}\" faalde de validatie bij het opslaan — open hem om te zien welke stap moet worden hersteld.",
+      "startUrlHostMismatch": "Deze test opent {host}, maar de stappen navigeren naar {other}.",
+      "stepIdReserved": "Deze stap-id is gereserveerd voor de start-URL van de run",
+      "subtestCap": "Te veel uitgevoerde stappen — zie de melding boven de stappen.",
+      "subtestFlags": "Een subtest kan niet optioneel of always-run zijn — zijn falen laat deze test altijd falen",
+      "subtestRequired": "Kies de test die hier draait"
     },
     "privateLocations": {
       "searchPlaceholder": "Locaties doorzoeken...",
@@ -14860,7 +14947,19 @@
     "secondsAgo": "{count} sec geleden",
     "stepsQueryFailed": "Steps-query mislukt",
     "queryFailed": "Query mislukt",
-    "relationNotContaining": "bevat niet"
+    "relationNotContaining": "bevat niet",
+    "delete": {
+      "blockedBody": "Verwijder eerst die verwijzingen, of verwijder de tests samen.",
+      "blockedBulkTitle": "{count} geselecteerde tests worden gebruikt door tests buiten deze selectie",
+      "blockedTitle": "\"{name}\" wordt gebruikt door andere tests",
+      "hiddenReferences": "{count} tests waartoe u geen toegang hebt"
+    },
+    "save": {
+      "blockedBody": "Het opslaan is niet gelukt. Verwijder eerst die verwijzingen en sla opnieuw op.",
+      "usedByBody": "Deze wijziging voegt {names} toe. De hierboven genoemde tests definiëren het niet, dus blijft het onopgelost bij hun volgende run.",
+      "usedByTitle": "{count} test die \"{name}\" gebruikt gaat falen | {count} tests die \"{name}\" gebruiken gaan falen",
+      "usedByCount": "Gebruikt door {count} test | Gebruikt door {count} tests"
+    }
   },
   "statusPages": {
     "tabTitle": "Statuspagina's",

@@ -13862,7 +13862,8 @@
       "tags": "Etiketler",
       "title": "Kontrol Detayları",
       "urlTarget": "URL",
-      "urlTargetPlaceholder": "https://api.example.com/health"
+      "urlTargetPlaceholder": "https://api.example.com/health",
+      "startingUrlNotOpened": "Açılmadı — ilk adım gezinme yapıyor."
     },
     "createBrowserTest": {
       "buildManually": "Manuel olarak oluştur",
@@ -13963,7 +13964,8 @@
         "scroll": "Kaydır",
         "wait": "Bekle",
         "assert": "Doğrula",
-        "screenshot": "Ekran görüntüsü"
+        "screenshot": "Ekran görüntüsü",
+        "subtest": "Alt test"
       },
       "clickTypeLabel": "Tıklama türü",
       "clickTypeHelp": "Sağ tıklama bir bağlam menüsü açar; çift tıklama iki tıklama gönderir.",
@@ -14151,7 +14153,81 @@
       "valueFallback": "Değer",
       "showSetupSteps": "Kurulum adımlarını göster",
       "waitingForActions": "Tarayıcıda eylemler bekleniyor…",
-      "unboundVariables": "{names}, bu kontrolde, ortamlarında veya genel değerlerde tanımlı değil, bu nedenle yazıldığı gibi düz metin olarak işlenir. | {names}, bu kontrolde, ortamlarında veya genel değerlerde tanımlı değil, bu nedenle yazıldıkları gibi düz metin olarak işlenir."
+      "unboundVariables": "{names}, bu kontrolde, ortamlarında veya genel değerlerde tanımlı değil, bu nedenle yazıldığı gibi düz metin olarak işlenir. | {names}, bu kontrolde, ortamlarında veya genel değerlerde tanımlı değil, bu nedenle yazıldıkları gibi düz metin olarak işlenir.",
+      "addSubtest": "Alt test ekle",
+      "extract": {
+        "action": "Alt teste çıkar",
+        "confirm": "Çıkar",
+        "created": "\"{name}\" oluşturuldu. Referansı korumak için bu testi kaydedin.",
+        "every": "her {n} {unit}",
+        "folderForbidden": "\"{folder}\" içinde test oluşturamazsınız. Başka bir klasör seçin.",
+        "folderLabel": "Klasör",
+        "historyNotice": "Adım geçmişi yeniden başlar. Bu adımlar yeni testte yeni id'ler alır; bu yüzden adım bazlı grafikler bugünden itibaren ayrılır.",
+        "labelThisTest": "Bu test",
+        "nameLabel": "Test adı",
+        "nameTooLong": "Adı 256 baytın altında tutun",
+        "orphan": "\"{name}\" oluşturuldu ama bu akış güncellenemedi. Yeni testi açın veya silin.",
+        "reason": {
+          "contains-subtest": "Bir alt test başka bir alt test içeremez",
+          "not-contiguous": "Yan yana olan adımları seçin",
+          "not-contiguous-filtered": "Yan yana olan adımları seçin — tam listeyi görmek için filtreyi temizleyin",
+          "referenced": "Bu test başka testler tarafından alt test olarak kullanılıyor ve kendisi bir tane içeremez",
+          "referenced-pending": "Bu testin nerede kullanıldığı denetleniyor…",
+          "referenced-unknown": "Bu testin nerede kullanıldığı denetlenemedi",
+          "undefined-placeholder": "Çıkarmadan önce {name} değişkenini Değişkenler altında tanımlayın"
+        },
+        "schedule": "{locations} · {frequency} (bu testle aynı)",
+        "status": "Duraklatılmış oluşturuldu. Siz etkinleştirene kadar yalnızca bu testin parçası olarak çalışır.",
+        "steps": "Adım {first} · {path} ile başlar | Adımlar {first} – {last} · {path} ile başlar",
+        "subtitle": "Adımlar şimdi oluşturulan yeni bir tarayıcı testine taşınır. Bu akış onların yerinde bir alt test referansı tutar — korumak için bu testi kaydedin.",
+        "thisTest": "Çıkarmadan sonra {authored} adım · aynı {executed} adımı çalıştırır",
+        "thisTestAuthored": "Çıkarmadan sonra {authored} adım",
+        "title": "{count} adımı yeni bir teste çıkar | {count} adımı yeni bir teste çıkar",
+        "unit": {
+          "hours": "saat | saat",
+          "minutes": "dakika | dakika"
+        },
+        "variablesCopied": "Yeni teste kopyalandı: {names}.",
+        "variablesToDefine": "Tek başına çalıştırmadan önce yeni testte tanımlayın: {names}."
+      },
+      "startRowLabel": "Açar",
+      "subtest": {
+        "capChild": "\"{name}\" testinden {count}",
+        "capOwn": "{count} kendi adımı",
+        "capRemedy": "Bir alt testi kaldırın veya bu testin kendi adımlarını kısaltın.",
+        "capTitle": "Bu test {total} adım çalıştırıyor — sınır {limit}.",
+        "delta": "\"{name}\" eklemek bu testi {before} → {after} çalıştırılan adıma taşır. Sınır {limit}.",
+        "deltaUnknown": "Adım etkisi bilinmiyor — başvurulan bir test yüklenemedi.",
+        "failedAt": "{number} — {step}",
+        "ignoredEnv": "Başlangıç URL'si, değişkenleri, kimlik doğrulaması ve çerezleri burada yok sayılır — üst testinkiler geçerlidir.",
+        "lastRun": "Son çalıştırması, izin verilen {budget}s'nin {seconds}s'sini aldı.",
+        "lastRunUnknown": "Zaman etkisi bilinmiyor — bu test henüz bir çalıştırma tamamlamadı.",
+        "noAccess": "\"{name}\" testine erişiminiz yok, bu yüzden adımları burada gösterilemiyor.",
+        "noAccessBadge": "erişim yok",
+        "noAccessRemedy": "Klasörüne okuma erişimi isteyin veya referansı kaldırın.",
+        "disabledTooltip": "Bu dağıtımda alt testler etkin değil.",
+        "loadFailed": "Bu alt test yüklenemedi, bu nedenle adımları ve adım sayısı bilinmiyor.",
+        "missing": "Bu alt test artık mevcut değil. Referansı kaldırın veya başka bir test seçin.",
+        "noAccessToast": "Bu testin başvurduğu testlerden birine erişiminiz yok.",
+        "notRun": "Çalıştırılmadı",
+        "openChild": "\"{name}\" testini aç",
+        "pickEmpty": "Bu organizasyonda henüz başka tarayıcı testi yok.",
+        "pickLabel": "Burada çalıştırılacak test",
+        "pickLastRun": "{status} {ago}",
+        "pickLoadFailed": "Tarayıcı testleri listesi yüklenemedi. Yeniden deneyin.",
+        "pickNested": "Zaten bir alt test içeriyor — iç içe yerleştirme bir seviyeyle sınırlıdır",
+        "pickGroupUsable": "Burada kullanılabilir",
+        "pickGroupBlocked": "Burada kullanılamaz",
+        "pickSteps": "{count} adım",
+        "pickUsedBy": "{count} test tarafından kullanılıyor | {count} test tarafından kullanılıyor",
+        "previewLabel": "Burada çalıştırdığı adımlar",
+        "progressAria": "{total} alt adımdan {done} tanesi tamamlandı",
+        "raiseBudget": "Kesilmeye başlarsa bu testin çalışma süresi sınırını artırın.",
+        "stepsBadge": "{count} adım",
+        "executedBadge": "{count} yürütülen",
+        "undefinedVariable": "\"{name}\", bu testin tanımlamadığı {variable} değişkenini kullanıyor.",
+        "undefinedVariableAction": "Değişkenler altında ekleyin"
+      }
     },
     "labels": {
       "copyOf": "{name} kopyası",
@@ -14530,7 +14606,9 @@
       "pageActivity": "Sayfa etkinliği",
       "pageActivityEvents": "{count} olay | {count} olay",
       "pageActivityViewAllShort": "Kanıtlarda tümünü görüntüle",
-      "expandScreenshot": "Genişlet"
+      "expandScreenshot": "Genişlet",
+      "failedAtStartLoad": "Başlangıç URL'si açılamadı",
+      "startLoadLabel": "{url} adresini aç"
     },
     "runRowExpansion": {
       "browserHeader": "Tarayıcı",
@@ -14702,13 +14780,17 @@
       "statusUp": "✓ Açık",
       "steps": "Adımlar",
       "stepsCount": "{count} adım",
+      "subtestMissing": "Alt test eksik",
+      "subtestNested": "Alt test bir alt test içeriyor",
       "testName": "Test adı",
       "timeout": "Zaman Aşımı",
       "trigger": "Tetikle",
       "triggering": "Tetikleniyor…",
       "type": "Tür",
       "uptime": "7 Günlük Çalışma Süresi",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "Kullanan",
+      "usedByCount": "{count} test | {count} test"
     },
     "tabs": {
       "all": "Tümü",
@@ -14755,7 +14837,6 @@
       "updateFailed": "Kontrol güncellenemedi."
     },
     "validation": {
-      "firstStepMustNavigate": "İlk adım \"Navigate\" olmalıdır.",
       "locationsRequired": "En az bir konum seçin",
       "nameRequired": "Ad gereklidir",
       "locatorRequired": "Bu adımın hangi öğeye etki edeceğini bilmesi için en az bir konumlandırıcı ekleyin",
@@ -14770,7 +14851,13 @@
       "retiredAction": "\"{action}\" artık desteklenmiyor — \"{step}\" adımını kaldırın veya değiştirin",
       "runBudgetExceeded": "Bu kontrol çalıştırma başına {worstCase} kadar sürebilir, {limit} sınırının üzerinde. Bir tarayıcı/cihaz kombinasyonunu kaldırın veya yeniden denemeleri azaltın. ({combos} kombinasyon × {attempts} deneme × {perAttempt} her biri.)",
       "runBudgetRetriesHint": "Yeniden denemeleri azaltmak, bu kontrolü {limit} çalıştırma sınırının içine geri getirir.",
-      "folderUnavailable": "\"{folder}\" klasörü bu kuruluşta mevcut değil — varsayılan klasöre kaydediliyor."
+      "folderUnavailable": "\"{folder}\" klasörü bu kuruluşta mevcut değil — varsayılan klasöre kaydediliyor.",
+      "compositionChildFailed": "\"{name}\" kaydetme sırasında doğrulamadan geçemedi — hangi adımın düzeltilmesi gerektiğini görmek için açın.",
+      "startUrlHostMismatch": "Bu test {host} adresini açıyor ama adımları {other} adresine gidiyor.",
+      "stepIdReserved": "Bu adım id'si çalıştırmanın Başlangıç URL'si için ayrılmıştır",
+      "subtestCap": "Çok fazla çalıştırılan adım — adımların üzerindeki uyarıya bakın.",
+      "subtestFlags": "Bir alt test isteğe bağlı veya her zaman çalıştırılan olamaz — başarısızlığı bu testi her zaman başarısız kılar",
+      "subtestRequired": "Burada çalıştırılacak testi seçin"
     },
     "privateLocations": {
       "searchPlaceholder": "Konum ara...",
@@ -14860,7 +14947,19 @@
     "secondsAgo": "{count} sn önce",
     "stepsQueryFailed": "Adımlar sorgusu başarısız oldu",
     "queryFailed": "Sorgu başarısız oldu",
-    "relationNotContaining": "içermeyen"
+    "relationNotContaining": "içermeyen",
+    "delete": {
+      "blockedBody": "Önce bu referansları kaldırın veya testleri birlikte silin.",
+      "blockedBulkTitle": "Seçilen {count} test, bu seçimin dışındaki testler tarafından kullanılıyor",
+      "blockedTitle": "\"{name}\" başka testler tarafından kullanılıyor",
+      "hiddenReferences": "Erişiminiz olmayan {count} test"
+    },
+    "save": {
+      "blockedBody": "Kaydetme gerçekleşmedi. Önce bu referansları kaldırın, sonra tekrar kaydedin.",
+      "usedByBody": "Bu değişiklik {names} ekliyor. Yukarıdaki testler bunu tanımlamıyor, bu yüzden bir sonraki çalıştırmalarında çözümlenmeden kalacak.",
+      "usedByTitle": "\"{name}\" kullanan {count} test başarısız olmaya başlayacak",
+      "usedByCount": "{count} test tarafından kullanılıyor"
+    }
   },
   "statusPages": {
     "tabTitle": "Durum Sayfaları",

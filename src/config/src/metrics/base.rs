@@ -372,6 +372,20 @@ pub static SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::n
     .expect("Metric created")
 });
 
+/// Unlabelled on purpose: it should sit at zero, and a per-org label adds customer ids.
+pub static SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_composition_guard_failures_total",
+            "Subtest expansions at resolve that failed one of our own guards.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
 /// Service graph v4 edge resolutions by confidence tier; org only, never a stream label.
 pub static O2_SERVICE_GRAPH_RESOLVED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -2617,6 +2631,11 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(O2_SERVICE_GRAPH_DROPPED_REQUESTS_TOTAL.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(
+            SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.clone(),
+        ))
+        .expect("Metric registered");
+    registry
         .register(Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()))
         .expect("Metric registered");
     registry
@@ -3146,6 +3165,7 @@ mod tests {
         let _ = SYNTHETICS_BROWSER_MS_TOTAL.clone();
         let _ = SYNTHETICS_STEP_CLAMP_TOTAL.clone();
         let _ = SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.clone();
+        let _ = SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.clone();
         let _ = USAGE_ENQUEUE_FAILURES_TOTAL.clone();
         let _ = TRIAL_QUOTA_FLUSH_DROPS_TOTAL.clone();
         let _ = METERING_OFFSET_AGE_SECONDS.clone();

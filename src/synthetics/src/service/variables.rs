@@ -1124,7 +1124,13 @@ async fn resolve_shared_variables_in<C: sea_orm::ConnectionTrait>(
             .ok()
             .flatten()
             .map_or_else(|| unset.env.clone(), |e| e.name);
-        anyhow::bail!("secret {} in environment {env} is not set", unset.name);
+        // A plain error here would 500, and a 500 makes the probe retry a job that can never
+        // resolve.
+        return Err(anyhow::Error::new(crate::job_api::ConfigError {
+            status_reason: crate::job_api::REASON_CONFIG_SECRET_UNSET,
+            message: format!("secret {} in environment {env} is not set", unset.name),
+            guard_failure: false,
+        }));
     }
     let mut out = Vec::new();
     for row in applicable.iter() {
@@ -2922,6 +2928,8 @@ mod tests {
         for table in [
             schema.create_table_from_entity(infra::table::entity::synthetics_environments::Entity),
             schema.create_table_from_entity(infra::table::entity::synthetics_variables::Entity),
+            // Saving a check also rewrites its subtest references.
+            schema.create_table_from_entity(infra::table::entity::synthetics_refs::Entity),
         ] {
             db.execute(backend.build(&table)).await.unwrap();
         }
@@ -3016,9 +3024,21 @@ mod tests {
         let check = synthetic("Login", "{{URL}}?p={{PASSWORD}}", &[&staging.id], &[]);
         let err = resolve_shared_variables_in(&db, org, Some(&staging.id), &check, &[7u8; 64])
             .await
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("PASSWORD") && err.contains("staging"), "{err}");
+            .unwrap_err();
+        // A plain error would 500, and the probe would retry a job that can never resolve.
+        let cfg = err
+            .downcast_ref::<crate::job_api::ConfigError>()
+            .expect("an unset secret must settle the job, not 500");
+        assert_eq!(
+            cfg.status_reason,
+            crate::job_api::REASON_CONFIG_SECRET_UNSET
+        );
+        assert!(!cfg.guard_failure);
+        assert!(
+            cfg.message.contains("PASSWORD") && cfg.message.contains("staging"),
+            "{}",
+            cfg.message
+        );
     }
 
     #[tokio::test]

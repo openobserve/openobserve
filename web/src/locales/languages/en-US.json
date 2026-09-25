@@ -13857,6 +13857,7 @@
       "namePlaceholder": "My browser check",
       "removeTag": "Remove tag {tag}",
       "startingUrl": "Starting URL",
+      "startingUrlNotOpened": "Not opened — the first Step navigates.",
       "startingUrlPlaceholder": "https://example.com",
       "tagPlaceholder": "Add a tag and press Enter",
       "tags": "Tags",
@@ -13920,6 +13921,12 @@
       "deleteSingleTitle": "Delete Check",
       "duplicateTitle": "Duplicate Check"
     },
+    "delete": {
+      "blockedTitle": "\"{name}\" is used by other tests",
+      "blockedBulkTitle": "{count} selected tests are used by tests outside this selection",
+      "blockedBody": "Remove those references first, or delete the tests together.",
+      "hiddenReferences": "{count} tests you don't have access to"
+    },
     "empty": {
       "browserTests": "No browser tests found.",
       "checks": "No checks found. Adjust filters or create your first check."
@@ -13950,6 +13957,41 @@
       "checks": "Checks"
     },
     "journey": {
+      "extract": {
+        "action": "Extract to subtest",
+        "title": "Extract {count} step to a new test | Extract {count} steps to a new test",
+        "subtitle": "The steps move to a new browser test, created now. This journey keeps a subtest reference in their place — save this test to keep it.",
+        "confirm": "Extract",
+        "nameLabel": "Test name",
+        "folderLabel": "Folder",
+        "labelThisTest": "This test",
+        "nameTooLong": "Keep the name under 256 bytes",
+        "steps": "Step {first} · starts at {path} | Steps {first} – {last} · starts at {path}",
+        "thisTest": "{authored} steps after extraction · runs the same {executed} steps",
+        "thisTestAuthored": "{authored} steps after extraction",
+        "schedule": "{locations} · {frequency} (same as this test)",
+        "status": "Created paused. Runs only as part of this test until you enable it.",
+        "variablesCopied": "Copied to the new test: {names}.",
+        "variablesToDefine": "Define on the new test before running it alone: {names}.",
+        "every": "every {n} {unit}",
+        "unit": {
+          "minutes": "minute | minutes",
+          "hours": "hour | hours"
+        },
+        "historyNotice": "Step history restarts. These steps get new ids in the new test, so per-step charts split at today.",
+        "created": "Created \"{name}\". Save this test to keep the reference.",
+        "orphan": "Created \"{name}\" but could not update this journey. Open the new test or delete it.",
+        "folderForbidden": "You can't create tests in \"{folder}\". Choose another folder.",
+        "reason": {
+          "not-contiguous": "Select steps that are next to each other",
+          "not-contiguous-filtered": "Select steps that are next to each other — clear the filter to see the full list",
+          "contains-subtest": "A subtest cannot contain another subtest",
+          "referenced": "This test is used as a subtest by other tests and cannot hold one",
+          "referenced-pending": "Checking where this test is used…",
+          "referenced-unknown": "Could not check where this test is used",
+          "undefined-placeholder": "Define {name} under Variables before extracting"
+        }
+      },
       "actionLabels": {
         "navigate": "Navigate",
         "click": "Click",
@@ -13963,7 +14005,8 @@
         "scroll": "Scroll",
         "wait": "Wait",
         "assert": "Assert",
-        "screenshot": "Screenshot"
+        "screenshot": "Screenshot",
+        "subtest": "Subtest"
       },
       "clickTypeLabel": "Click type",
       "clickTypeHelp": "Right click opens a context menu; double click sends two clicks.",
@@ -14085,6 +14128,7 @@
       "advancedTimeoutHeading": "While it acts — give up after",
       "advancedFailureHeading": "If it fails",
       "addStep": "Add Step",
+      "addSubtest": "Add Subtest",
       "addStepManually": "Add a step manually",
       "bulkDeleteStepsBody": "Delete {count} step? This cannot be undone. | Delete {count} steps? This cannot be undone.",
       "bulkDeleteStepsTitle": "Delete steps",
@@ -14108,6 +14152,7 @@
       "recordBeforeFailedStep": "Record before step {step}",
       "newStepsLandHere": "New steps land here",
       "recordBeforeStep": "Record before this step",
+      "startRowLabel": "Opens",
       "recordBeforeStepHint": "Replay the journey up to this point, then record new steps before it.",
       "recordBeforeNeedsNewerExtension": "Update the recorder extension to record from a specific step.",
       "insertStepBelow": "Insert step below",
@@ -14151,7 +14196,44 @@
       "valueFallback": "Value",
       "showSetupSteps": "Show setup steps",
       "waitingForActions": "Waiting for actions in the browser…",
-      "unboundVariables": "{names} is not defined in this check, its environments or global, so it is typed as written. | {names} are not defined in this check, its environments or global, so they are typed as written."
+      "unboundVariables": "{names} is not defined in this check, its environments or global, so it is typed as written. | {names} are not defined in this check, its environments or global, so they are typed as written.",
+      "subtest": {
+        "pickLabel": "Test to run here",
+        "delta": "Adding \"{name}\" takes this test from {before} → {after} executed steps. The limit is {limit}.",
+        "lastRun": "Its last run took {seconds}s of the {budget}s allowance.",
+        "deltaUnknown": "Step impact unknown — a referenced test could not be loaded.",
+        "lastRunUnknown": "Time impact unknown — this test has not completed a run yet.",
+        "raiseBudget": "Raise this test's run-time allowance if it starts being cut short.",
+        "stepsBadge": "{count} step | {count} steps",
+        "executedBadge": "{count} executed",
+        "ignoredEnv": "Its Starting URL, variables, auth and cookies are ignored here — the parent's apply.",
+        "noAccess": "You don't have access to \"{name}\", so its steps can't be shown here.",
+        "noAccessToast": "You don't have access to one of the tests this test references.",
+        "progressAria": "{done} of {total} sub-steps complete",
+        "previewLabel": "Steps it runs here",
+        "openChild": "Open \"{name}\"",
+        "noAccessRemedy": "Ask for read access to its folder, or remove the reference.",
+        "disabledTooltip": "Subtests are not enabled on this deployment.",
+        "loadFailed": "Couldn't load this subtest, so its steps and step count are unknown.",
+        "missing": "This subtest no longer exists. Remove the reference, or pick another test.",
+        "noAccessBadge": "no access",
+        "pickNested": "Already contains a subtest — nesting is limited to one level",
+        "pickGroupUsable": "Can be used here",
+        "pickGroupBlocked": "Can't be used here",
+        "pickUsedBy": "Used by {count} test | Used by {count} tests",
+        "pickSteps": "{count} step | {count} steps",
+        "pickLastRun": "{status} {ago}",
+        "pickEmpty": "No other browser tests in this organization yet.",
+        "pickLoadFailed": "Couldn't load the list of browser tests. Try again.",
+        "undefinedVariable": "\"{name}\" uses {variable}, which this test doesn't define.",
+        "undefinedVariableAction": "Add it under Variables",
+        "failedAt": "{number} — {step}",
+        "notRun": "Not run",
+        "capTitle": "This test executes {total} steps — the limit is {limit}.",
+        "capOwn": "{count} of its own",
+        "capChild": "{count} from \"{name}\"",
+        "capRemedy": "Remove a subtest, or shorten this test's own steps."
+      }
     },
     "labels": {
       "copyOf": "Copy of {name}",
@@ -14485,9 +14567,11 @@
       "detailSelector": "Selector",
       "downloadTrace": "Download {filename}",
       "errorFullscreenTitle": "Step {id}: {action} - Error",
+      "failedAtStartLoad": "Failed opening Starting URL",
       "failedAtStep": "Failed at Step {step}",
       "failedCount": "{count} failed",
       "failureScreenshot": "Failure screenshot",
+      "startLoadLabel": "Open {url}",
       "lightboxTitle": "Step {id}: {action}",
       "loadFailed": "Failed to load run data",
       "locations": "Locations",
@@ -14585,6 +14669,12 @@
       "windowMinutes": "Last {minutes} minutes",
       "filteringByErrorLabel": "Filtering by error:",
       "errorPatternsWindowDesc": "Normalized across {window} · click a row to filter runs"
+    },
+    "save": {
+      "usedByTitle": "{count} test that uses \"{name}\" will start failing | {count} tests that use \"{name}\" will start failing",
+      "usedByBody": "This change adds {names}. The tests listed above don't define it, so it stays unresolved on their next run.",
+      "blockedBody": "The save didn't go through. Remove those references first, then save again.",
+      "usedByCount": "Used by {count} test | Used by {count} tests"
     },
     "scheduleAlert": {
       "addNewDestination": "Add New Destination",
@@ -14702,13 +14792,17 @@
       "statusUp": "✓ Up",
       "steps": "Steps",
       "stepsCount": "{count} steps",
+      "subtestMissing": "Subtest missing",
+      "subtestNested": "Subtest holds a subtest",
       "testName": "Test name",
       "timeout": "Timeout",
       "trigger": "Trigger",
       "triggering": "Triggering…",
       "type": "Type",
       "uptime": "Uptime 7d",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "Used by",
+      "usedByCount": "{count} test | {count} tests"
     },
     "tabs": {
       "all": "All",
@@ -14755,9 +14849,10 @@
       "updateFailed": "Failed to update check."
     },
     "validation": {
-      "firstStepMustNavigate": "First step must be \"Navigate\"",
       "locationsRequired": "Select at least one location",
       "nameRequired": "Name is required",
+      "startUrlHostMismatch": "This test opens {host}, but its steps navigate to {other}.",
+      "stepIdReserved": "This step id is reserved for the run's Starting URL",
       "locatorRequired": "Add at least one locator so this step knows which element to act on",
       "selectorRequired": "\"{step}\" does not say which element to act on",
       "stepNameRequired": "Give this step a name — it is what run results show",
@@ -14768,9 +14863,13 @@
       "urlRequired": "Starting URL is required",
       "fixHighlightedFields": "Fix the highlighted fields before saving",
       "retiredAction": "\"{action}\" is no longer supported — remove or replace \"{step}\"",
+      "subtestRequired": "Choose the test to run here",
+      "subtestFlags": "A subtest cannot be optional or always-run — its failure always fails this test",
       "runBudgetExceeded": "This check could take up to {worstCase} per run, over the {limit} limit. Remove a browser/device combo, or lower retries. ({combos} combo(s) × {attempts} attempt(s) × {perAttempt} each.)",
       "runBudgetRetriesHint": "Lowering retries brings this check back inside the {limit} run limit.",
-      "folderUnavailable": "Folder \"{folder}\" is not available in this organization — saving to the default folder."
+      "folderUnavailable": "Folder \"{folder}\" is not available in this organization — saving to the default folder.",
+      "compositionChildFailed": "\"{name}\" failed validation on save — open it to see which step needs fixing.",
+      "subtestCap": "Too many executed steps — see the notice above the steps."
     },
     "privateLocations": {
       "searchPlaceholder": "Search locations...",

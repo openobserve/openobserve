@@ -13862,7 +13862,8 @@
       "tags": "Tag",
       "title": "Dettagli controllo",
       "urlTarget": "URL",
-      "urlTargetPlaceholder": "https://api.example.com/health"
+      "urlTargetPlaceholder": "https://api.example.com/health",
+      "startingUrlNotOpened": "Non aperto — il primo passo naviga."
     },
     "createBrowserTest": {
       "buildManually": "Costruisci manualmente",
@@ -13963,7 +13964,8 @@
         "scroll": "Scorri",
         "wait": "Attendi",
         "assert": "Verifica",
-        "screenshot": "Screenshot"
+        "screenshot": "Screenshot",
+        "subtest": "Subtest"
       },
       "clickTypeLabel": "Tipo di clic",
       "clickTypeHelp": "Il clic destro apre un menu contestuale; il doppio clic invia due clic.",
@@ -14151,7 +14153,81 @@
       "valueFallback": "Valore",
       "showSetupSteps": "Mostra i passaggi di configurazione",
       "waitingForActions": "In attesa di azioni nel browser…",
-      "unboundVariables": "{names} non è definita in questo controllo, nei suoi ambienti o a livello globale, quindi viene digitata così com'è. | {names} non sono definite in questo controllo, nei suoi ambienti o a livello globale, quindi vengono digitate così come sono."
+      "unboundVariables": "{names} non è definita in questo controllo, nei suoi ambienti o a livello globale, quindi viene digitata così com'è. | {names} non sono definite in questo controllo, nei suoi ambienti o a livello globale, quindi vengono digitate così come sono.",
+      "addSubtest": "Aggiungi subtest",
+      "extract": {
+        "action": "Estrai in subtest",
+        "confirm": "Estrai",
+        "created": "\"{name}\" è stato creato. Salva questo test per mantenere il riferimento.",
+        "every": "ogni {n} {unit}",
+        "folderForbidden": "Non puoi creare test in \"{folder}\". Scegli un'altra cartella.",
+        "folderLabel": "Cartella",
+        "historyNotice": "La cronologia dei passi riparte. Questi passi ricevono nuovi id nel nuovo test, quindi i grafici per passo si dividono da oggi.",
+        "labelThisTest": "Questo test",
+        "nameLabel": "Nome del test",
+        "nameTooLong": "Mantieni il nome sotto i 256 byte",
+        "orphan": "\"{name}\" è stato creato ma non è stato possibile aggiornare questo percorso. Apri il nuovo test o eliminalo.",
+        "reason": {
+          "contains-subtest": "Un subtest non può contenere un altro subtest",
+          "not-contiguous": "Seleziona passi adiacenti",
+          "not-contiguous-filtered": "Seleziona passi adiacenti — rimuovi il filtro per vedere l'elenco completo",
+          "referenced": "Questo test è usato come subtest da altri test e non può contenerne uno",
+          "referenced-pending": "Verifica di dove è usato questo test…",
+          "referenced-unknown": "Impossibile verificare dove è usato questo test",
+          "undefined-placeholder": "Definisci {name} in Variabili prima di estrarre"
+        },
+        "schedule": "{locations} · {frequency} (come questo test)",
+        "status": "Creato in pausa. Viene eseguito solo come parte di questo test finché non lo abiliti.",
+        "steps": "Passo {first} · inizia da {path} | Passi {first} – {last} · inizia da {path}",
+        "subtitle": "I passi passano a un nuovo test browser, creato ora. Questo percorso mantiene al loro posto un riferimento di subtest — salva questo test per conservarlo.",
+        "thisTest": "{authored} passi dopo l'estrazione · esegue gli stessi {executed} passi",
+        "thisTestAuthored": "{authored} passi dopo l'estrazione",
+        "title": "Estrai {count} passo in un nuovo test | Estrai {count} passi in un nuovo test",
+        "unit": {
+          "hours": "ora | ore",
+          "minutes": "minuto | minuti"
+        },
+        "variablesCopied": "Copiate nel nuovo test: {names}.",
+        "variablesToDefine": "Da definire sul nuovo test prima di eseguirlo da solo: {names}."
+      },
+      "startRowLabel": "Apre",
+      "subtest": {
+        "capChild": "{count} da \"{name}\"",
+        "capOwn": "{count} propri",
+        "capRemedy": "Rimuovi un subtest, o accorcia i passi propri di questo test.",
+        "capTitle": "Questo test esegue {total} passi — il limite è {limit}.",
+        "delta": "Aggiungendo \"{name}\" questo test passa da {before} → {after} passi eseguiti. Il limite è {limit}.",
+        "deltaUnknown": "Impatto sui passi sconosciuto — non è stato possibile caricare un test referenziato.",
+        "failedAt": "{number} — {step}",
+        "ignoredEnv": "Il suo URL iniziale, le variabili, l'autenticazione e i cookie sono ignorati qui — valgono quelli del test padre.",
+        "lastRun": "La sua ultima esecuzione ha richiesto {seconds}s dei {budget}s consentiti.",
+        "lastRunUnknown": "Impatto sul tempo sconosciuto — questo test non ha ancora completato un'esecuzione.",
+        "noAccess": "Non hai accesso a \"{name}\", quindi i suoi passi non possono essere mostrati qui.",
+        "noAccessBadge": "nessun accesso",
+        "noAccessRemedy": "Chiedi l'accesso in lettura alla sua cartella, o rimuovi il riferimento.",
+        "disabledTooltip": "I subtest non sono abilitati in questa installazione.",
+        "loadFailed": "Impossibile caricare questo subtest, quindi i suoi passi e il loro numero sono sconosciuti.",
+        "missing": "Questo subtest non esiste più. Rimuovi il riferimento o scegli un altro test.",
+        "noAccessToast": "Non hai accesso a uno dei test a cui questo test fa riferimento.",
+        "notRun": "Non eseguito",
+        "openChild": "Apri \"{name}\"",
+        "pickEmpty": "Nessun altro test browser in questa organizzazione per ora.",
+        "pickLabel": "Test da eseguire qui",
+        "pickLastRun": "{status} {ago}",
+        "pickLoadFailed": "Impossibile caricare l'elenco dei test browser. Riprova.",
+        "pickNested": "Contiene già un subtest — l'annidamento è limitato a un livello",
+        "pickGroupUsable": "Utilizzabile qui",
+        "pickGroupBlocked": "Non utilizzabile qui",
+        "pickSteps": "{count} passo | {count} passi",
+        "pickUsedBy": "Usato da {count} test | Usato da {count} test",
+        "previewLabel": "Passi eseguiti qui",
+        "progressAria": "{done} di {total} sotto-passi completati",
+        "raiseBudget": "Aumenta il tempo di esecuzione consentito a questo test se inizia a essere interrotto.",
+        "stepsBadge": "{count} passo | {count} passi",
+        "executedBadge": "{count} eseguiti",
+        "undefinedVariable": "\"{name}\" usa {variable}, che questo test non definisce.",
+        "undefinedVariableAction": "Aggiungila in Variabili"
+      }
     },
     "labels": {
       "copyOf": "Copia di {name}",
@@ -14530,7 +14606,9 @@
       "pageActivity": "Attività della pagina",
       "pageActivityEvents": "{count} evento | {count} eventi",
       "pageActivityViewAllShort": "Visualizza tutto in Prova",
-      "expandScreenshot": "Espandi"
+      "expandScreenshot": "Espandi",
+      "failedAtStartLoad": "Apertura dell'URL iniziale non riuscita",
+      "startLoadLabel": "Apri {url}"
     },
     "runRowExpansion": {
       "browserHeader": "Browser",
@@ -14702,13 +14780,17 @@
       "statusUp": "✓ Su",
       "steps": "Passaggi",
       "stepsCount": "{count} passaggi",
+      "subtestMissing": "Subtest mancante",
+      "subtestNested": "Il subtest contiene un subtest",
       "testName": "Nome test",
       "timeout": "Timeout",
       "trigger": "Attiva",
       "triggering": "Attivazione in corso…",
       "type": "Tipo",
       "uptime": "Uptime 7gg",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "Usato da",
+      "usedByCount": "{count} test | {count} test"
     },
     "tabs": {
       "all": "Tutti",
@@ -14755,7 +14837,6 @@
       "updateFailed": "Impossibile aggiornare il controllo."
     },
     "validation": {
-      "firstStepMustNavigate": "Il primo passaggio deve essere \"Navigazione\"",
       "locationsRequired": "Seleziona almeno una posizione",
       "nameRequired": "Il nome è obbligatorio",
       "locatorRequired": "Aggiungi almeno un localizzatore affinché questo passo sappia su quale elemento agire",
@@ -14770,7 +14851,13 @@
       "retiredAction": "\"{action}\" non è più supportato — rimuovi o sostituisci \"{step}\"",
       "runBudgetExceeded": "Questo controllo potrebbe richiedere fino a {worstCase} per esecuzione, superando il limite di {limit}. Rimuovi una combinazione browser/dispositivo o riduci i tentativi. ({combos} combo × {attempts} tentativo(i) × {perAttempt} ciascuno.)",
       "runBudgetRetriesHint": "Ridurre i tentativi riporta questo controllo entro il limite di esecuzione di {limit}.",
-      "folderUnavailable": "La cartella \"{folder}\" non è disponibile in questa organizzazione — si salverà nella cartella predefinita."
+      "folderUnavailable": "La cartella \"{folder}\" non è disponibile in questa organizzazione — si salverà nella cartella predefinita.",
+      "compositionChildFailed": "\"{name}\" non ha superato la validazione al salvataggio — aprilo per vedere quale passo va corretto.",
+      "startUrlHostMismatch": "Questo test apre {host}, ma i suoi passi navigano verso {other}.",
+      "stepIdReserved": "Questo id di passo è riservato all'URL iniziale dell'esecuzione",
+      "subtestCap": "Troppi passi eseguiti — vedi l'avviso sopra i passi.",
+      "subtestFlags": "Un subtest non può essere opzionale né a esecuzione forzata — il suo fallimento fa sempre fallire questo test",
+      "subtestRequired": "Scegli il test da eseguire qui"
     },
     "privateLocations": {
       "searchPlaceholder": "Cerca posizioni...",
@@ -14860,7 +14947,19 @@
     "secondsAgo": "{count} secondi fa",
     "stepsQueryFailed": "Query dei passaggi non riuscita",
     "queryFailed": "Query non riuscita",
-    "relationNotContaining": "non contiene"
+    "relationNotContaining": "non contiene",
+    "delete": {
+      "blockedBody": "Rimuovi prima quei riferimenti, o elimina i test insieme.",
+      "blockedBulkTitle": "{count} test selezionati sono usati da test fuori da questa selezione",
+      "blockedTitle": "\"{name}\" è usato da altri test",
+      "hiddenReferences": "{count} test a cui non hai accesso"
+    },
+    "save": {
+      "blockedBody": "Il salvataggio non è andato a buon fine. Rimuovi prima quei riferimenti, poi salva di nuovo.",
+      "usedByBody": "Questa modifica aggiunge {names}. I test elencati sopra non lo definiscono, quindi resterà non risolto alla loro prossima esecuzione.",
+      "usedByTitle": "{count} test che usa \"{name}\" inizierà a fallire | {count} test che usano \"{name}\" inizieranno a fallire",
+      "usedByCount": "Usato da {count} test | Usato da {count} test"
+    }
   },
   "statusPages": {
     "tabTitle": "Pagine di stato",

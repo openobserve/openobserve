@@ -13,12 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import type { BrowserStep } from "@/types/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import SubtestPicker from "./SubtestPicker.vue";
+import store from "@/test/unit/helpers/store";
 import en from "@/locales/languages/en-US.json";
+
+// SubtestPicker fetches its options on mount; resolve empty, since no test here reads them.
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    listByFolderId: vi.fn().mockResolvedValue({ data: { checks: [] } }),
+    get: vi.fn(),
+    getRuns: vi.fn(),
+  },
+}));
 
 const i18n = createI18n({
   legacy: false,
@@ -37,7 +49,7 @@ function render(step: Partial<BrowserStep> = {}, props: Record<string, unknown> 
   };
   return mount(BrowserJourneyStepEditor, {
     props: { step: full, ...props },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, store] },
   });
 }
 
@@ -143,7 +155,7 @@ describe("BrowserJourneyStepEditor inline field errors", () => {
     };
     return mount(BrowserJourneyStepEditor, {
       props: { step: full, ...errors },
-      global: { plugins: [i18n] },
+      global: { plugins: [i18n, store] },
     });
   }
 
@@ -587,5 +599,118 @@ describe("BrowserJourneyStepEditor unbound variables", () => {
   it("stays quiet when the host cannot tell what resolves", () => {
     const wrapper = render({ action: "type", value: "{{USER}}" });
     expect(wrapper.find(warning).exists()).toBe(false);
+  });
+});
+
+// A reference runs no action, so its execution fields go; turning back drops the reference.
+describe("BrowserJourneyStepEditor subtest action", () => {
+  it("clears the execution fields when a step becomes a subtest, and the reference when it stops being one", async () => {
+    const click: BrowserStep = {
+      id: "s2",
+      action: "click",
+      name: "Sign in",
+      value: "x",
+      optional: true,
+      locator: { candidates: [{ kind: "css", value: "#a" }] },
+    };
+    const w = mount(BrowserJourneyStepEditor, {
+      props: { step: click },
+      global: { plugins: [i18n, store] },
+    });
+    await w.findComponent(OSelect).vm.$emit("update:modelValue", "subtest");
+    const toSubtest = w.emitted("update:step")!.at(-1)![0] as BrowserStep;
+    expect(toSubtest.action).toBe("subtest");
+    expect(toSubtest.locator).toBeUndefined();
+    expect(toSubtest.value).toBeUndefined();
+    expect(toSubtest.optional).toBeUndefined();
+    expect(toSubtest.subtest).toBeUndefined(); // the picker fills this, not the action change
+
+    const ref: BrowserStep = {
+      id: "s2",
+      action: "subtest",
+      name: "Login",
+      subtest: { id: "login-test" },
+    };
+    const w2 = mount(BrowserJourneyStepEditor, {
+      props: { step: ref },
+      global: { plugins: [i18n, store] },
+    });
+    await w2.findComponent(OSelect).vm.$emit("update:modelValue", "click");
+    expect((w2.emitted("update:step")!.at(-1)![0] as BrowserStep).subtest).toBeUndefined();
+  });
+
+  // Both halves: without the ON case, the OFF assertion would pass against pre-gate code too.
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    "offers the subtest action only when composition is enabled (flag=%s)",
+    async (flag, expected) => {
+      store.state.zoConfig.synthetics_subtests_enabled = flag;
+      const w = render({ action: "click" });
+      const values = w
+        .findComponent(OSelect)
+        .props("options")
+        .map((o: { value: string }) => o.value);
+      expect(values.includes("subtest")).toBe(expected);
+      store.state.zoConfig.synthetics_subtests_enabled = true;
+    },
+  );
+
+  it("keeps the subtest action for a row that already holds a reference while composition is off", () => {
+    store.state.zoConfig.synthetics_subtests_enabled = false;
+    try {
+      const w = render({ action: "subtest", subtest: { id: "login-test" } });
+      const values = w
+        .findComponent(OSelect)
+        .props("options")
+        .map((o: { value: string }) => o.value);
+      expect(values).toContain("subtest");
+    } finally {
+      store.state.zoConfig.synthetics_subtests_enabled = true;
+    }
+  });
+
+  const pick = async (w: ReturnType<typeof render>, picked: { id: string; name: string }) => {
+    await w.findComponent(SubtestPicker).vm.$emit("update:modelValue", picked);
+    return w.emitted("update:step")!.at(-1)![0] as BrowserStep;
+  };
+
+  it("replaces a name that still names the earlier child on a re-pick", async () => {
+    const w = render({ action: "subtest", name: "Login", subtest: { id: "a", name: "Login" } });
+    const next = await pick(w, { id: "b", name: "Checkout" });
+    expect(next.name).toBe("Checkout");
+    expect(next.subtest).toEqual({ id: "b", name: "Checkout" });
+
+    // A stored `{ id }` reference names its child through the host's cache.
+    const stored = render(
+      { action: "subtest", name: "Login", subtest: { id: "a" } },
+      { childName: "Login" },
+    );
+    expect((await pick(stored, { id: "b", name: "Checkout" })).name).toBe("Checkout");
+  });
+
+  it("keeps a name the author wrote on a re-pick, and fills an empty one", async () => {
+    const w = render({
+      action: "subtest",
+      name: "Sign in first",
+      subtest: { id: "a", name: "Login" },
+    });
+    expect((await pick(w, { id: "b", name: "Checkout" })).name).toBe("Sign in first");
+
+    const empty = render({ action: "subtest", name: "", subtest: undefined });
+    expect((await pick(empty, { id: "b", name: "Checkout" })).name).toBe("Checkout");
+  });
+
+  it("renders the subtest picker only for a subtest step, in place of the target/value/advanced blocks", () => {
+    const w = render({ action: "subtest", subtest: { id: "login-test" } });
+    expect(w.find(test("synthetics-journey-step-subtest-picker")).exists()).toBe(true);
+    // A saved reference is `{ id }` only, so the step name is what the picker can display.
+    expect(w.findComponent(SubtestPicker).props("fallbackName")).toBe("Sign in");
+    expect(w.find(test("synthetics-journey-step-locator")).exists()).toBe(false);
+    expect(w.find(test("synthetics-journey-step-group-advanced")).exists()).toBe(false);
+
+    const other = render({ action: "click" });
+    expect(other.find(test("synthetics-journey-step-subtest-picker")).exists()).toBe(false);
   });
 });

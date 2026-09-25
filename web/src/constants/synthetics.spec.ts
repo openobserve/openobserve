@@ -66,6 +66,7 @@ describe("synthetics action vocabulary", () => {
         "navigate",
         "press",
         "select",
+        "subtest",
         "type",
         "uncheck",
         "upload",

@@ -96,6 +96,7 @@ pub mod synthetics_environments;
 pub mod synthetics_jobs;
 pub mod synthetics_locations;
 pub mod synthetics_probe_tokens;
+pub mod synthetics_refs;
 pub mod synthetics_runs;
 pub mod synthetics_variables;
 pub mod system_prompts;

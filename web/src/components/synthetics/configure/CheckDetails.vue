@@ -34,6 +34,8 @@ const props = defineProps<{
   /** Override the target field label/placeholder (protocol checks take a host, not a URL). */
   targetLabel?: I18nText;
   targetPlaceholder?: I18nText;
+  /** Under the URL field; the host says whether the run opens the Starting URL at all. */
+  targetHint?: I18nText;
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
@@ -154,6 +156,7 @@ function handleTagKeydown(event: KeyboardEvent) {
         :error="!!props.validationErrors?.url"
         :error-message="raw(props.validationErrors?.url)"
         :placeholder="targetPlaceholder ?? t('synthetics.checkDetails.startingUrlPlaceholder')"
+        :help-text="targetHint"
         data-test="synthetics-check-details-url-input"
       />
 
