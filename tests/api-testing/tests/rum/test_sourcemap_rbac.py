@@ -28,11 +28,37 @@ import pytest
 import logging
 import requests
 
-# Mark all tests in this module to run serially and skip in OSS (enterprise-only feature)
 pytestmark = [
     pytest.mark.order(2),
-    pytest.mark.skip(reason="Sourcemaps is an enterprise feature and cannot be tested in CI with non-enterprise build")
 ]
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _require_custom_roles(create_session, base_url):
+    """Skip on builds without custom roles, rather than skipping everywhere.
+
+    These cases need viewer/editor/admin accounts. An OSS build answers
+    `400 Custom roles not allowed` to a role-bearing user create, so the users
+    cannot exist and every case errors at login. Enterprise allows them.
+
+    This replaces an unconditional `pytest.mark.skip`, which skipped the module
+    on EVERY build -- enterprise included -- so these cases had never run
+    anywhere. The capability is probed rather than assumed from the edition, in
+    the same way `test_anomaly_conditions.py` probes its endpoint.
+    """
+    probe = create_session.post(
+        f"{base_url}api/default/users",
+        json={
+            "email": "rbac_probe@sourcemap-test.local",
+            "password": "Complexpass#123",
+            "role": "viewer",
+            "first_name": "rbac",
+            "last_name": "probe",
+        },
+    )
+    if probe.status_code == 400 and "custom roles" in probe.text.lower():
+        pytest.skip("custom roles are not available on this build (OSS)")
+    create_session.delete(f"{base_url}api/default/users/rbac_probe@sourcemap-test.local")
 
 logger = logging.getLogger(__name__)
 
