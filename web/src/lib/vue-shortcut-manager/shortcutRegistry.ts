@@ -213,6 +213,13 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         descriptionKey: "shortcuts.actions.aiChatToggle",
         visible: aiChat,
       },
+      {
+        id: "commandPalette",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        allowInInput: true,
+        descriptionKey: "shortcuts.actions.commandPalette",
+      },
     ],
   },
 

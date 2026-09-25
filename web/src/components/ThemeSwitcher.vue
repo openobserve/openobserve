@@ -40,7 +40,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { switchThemeMode } from "@/utils/theme";
+import { applyThemeMode } from "@/composables/useThemeMode";
 
 export default defineComponent({
   components: { OButton, OIcon, OTooltip },
@@ -90,23 +90,8 @@ export default defineComponent({
       },
     );
 
-    const setTheme = (theme: any) => {
-      try {
-        localStorage.setItem("theme", theme);
-      } catch (error) {
-        // Handle localStorage not available
-        console.warn("localStorage not available for theme storage:", error);
-      }
-      // Toggle .dark on <html> for the O2 component library (Tailwind dark variant).
-      // Wrapped in switchThemeMode so the mode flip animates as one frame
-      // (soft curtain sweep, defined in styles/tailwind.css).
-      // `darkMode` is the component's source of truth and is always set to
-      // match `theme` before setTheme runs, so the html-class toggle reads it
-      // directly rather than re-deriving the boolean from the string arg.
-      switchThemeMode(theme, () => {
-        document.documentElement.classList.toggle("dark", darkMode.value);
-        store.dispatch("appTheme", theme);
-      });
+    const setTheme = (theme: "light" | "dark") => {
+      applyThemeMode(theme, store);
     };
 
     const toggleDarkMode = () => {

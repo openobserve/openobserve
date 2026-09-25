@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
+  <div class="bg-surface-chrome-deeper relative flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo -->
     <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
       <OButton
@@ -139,8 +139,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
-    <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
+    <!-- CENTER: command palette trigger; the wrapper owns the absolute centering because OButton's own position would override it -->
     <div class="min-w-0 flex-1" />
+    <div
+      class="absolute top-1/2 left-1/2 hidden w-[min(24rem,calc(100vw-66rem))] -translate-x-1/2 -translate-y-1/2 xl:block"
+    >
+      <OButton
+        variant="outline"
+        size="search-pill"
+        content-align="between"
+        icon-left="search"
+        class="bg-surface-base text-text-secondary hover:border-accent w-full shadow-xs"
+        data-test="header-command-palette-trigger"
+        :aria-label="t('palette.title')"
+        @click="openPalette('header')"
+      >
+        <span class="min-w-0 flex-1 truncate text-start">{{ t("palette.trigger") }}</span>
+        <OShortcut id="commandPalette" />
+      </OButton>
+    </div>
 
     <!-- RIGHT SIDE: Controls -->
     <div class="flex shrink-0 items-center justify-end gap-1 pe-3">
@@ -296,6 +313,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Documentation link -->
               <ODropdownItem data-test="menu-link-docs-item" @select="navigateToDocs()">
                 {{ t(`menu.docs`) }}
+              </ODropdownItem>
+              <ODropdownSeparator />
+
+              <!-- Command palette -->
+              <ODropdownItem
+                data-test="menu-link-palette-item"
+                shortcut-id="commandPalette"
+                @select="openPalette('help')"
+              >
+                {{ t("palette.menuEntry") }}
               </ODropdownItem>
               <ODropdownSeparator />
 
@@ -457,6 +484,7 @@ import OrganizationSelector from "./OrganizationSelector.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -474,6 +502,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
+    OShortcut,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -559,6 +588,7 @@ export default defineComponent({
     "changeLanguage",
     "openPredefinedThemes",
     "openShortcuts",
+    "openPalette",
     "toggle-mobile-nav",
     "signout",
   ],
@@ -650,6 +680,10 @@ export default defineComponent({
       emit("openShortcuts");
     };
 
+    const openPalette = (source: "header" | "help" = "header") => {
+      emit("openPalette", source);
+    };
+
     const signout = () => {
       emit("signout");
     };
@@ -695,6 +729,7 @@ export default defineComponent({
       changeLanguage,
       openPredefinedThemes,
       openShortcuts,
+      openPalette,
       signout,
       handleMouseEnter,
       handleMouseLeave,
