@@ -1619,6 +1619,48 @@ pub static NODE_MEMORY_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static PROCESS_MEMORY_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "process_memory_bytes",
+            "Resident memory split by kind (anon, file, shmem, swap) from /proc/self/status",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["kind"],
+    )
+    .expect("Metric created")
+});
+pub static PROCESS_THREADS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("process_threads", "OS threads grouped by thread name")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["group"],
+    )
+    .expect("Metric created")
+});
+pub static ALLOCATOR_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("allocator_bytes", "Global allocator statistics")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["allocator", "stat"],
+    )
+    .expect("Metric created")
+});
+pub static DATAFUSION_MEMORY_RESERVED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "datafusion_memory_reserved_bytes",
+            "Bytes reserved across all live DataFusion memory pools",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
 pub static NODE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("node_memory_usage", "Memory usage")
@@ -2916,6 +2958,18 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PROCESS_MEMORY_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PROCESS_THREADS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALLOCATOR_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(DATAFUSION_MEMORY_RESERVED_BYTES.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_DISK_TOTAL.clone()))
