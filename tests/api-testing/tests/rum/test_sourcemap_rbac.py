@@ -19,7 +19,8 @@ Prerequisites:
 - OpenFGA enabled for RBAC enforcement
 
 Note:
-- Tests marked with @pytest.mark.skip for OSS CI (enterprise-only feature)
+- Skipped at runtime by `_require_custom_roles` when the build has no custom
+  roles (GET /roles answers 403 on OSS); they run on enterprise
 - Tests must run serially due to shared module-scoped fixture
 - Uses session-based authentication (matches enterprise RBAC test pattern)
 """

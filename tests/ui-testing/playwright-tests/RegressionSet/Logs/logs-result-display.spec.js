@@ -80,7 +80,10 @@ test.describe("Logs Result Display Regression", () => {
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.expectResultsGridSettledWithRows();
 
-    const title = await pm.logsPage.getResultTitleText();
+    // Ingest acks before every row is searchable, so settle on the full count
+    // first -- otherwise the banner reports whatever prefix happens to be
+    // indexed and the comparison below is against the wrong number.
+    const title = await pm.logsPage.waitForResultTotal(DENSE_ROWS);
     const rendered = await pm.logsPage.getLogRowCount();
     testLogger.info(`Banner: ${title.replace(/\n/g, ' | ')} | rendered rows: ${rendered}`);
 
@@ -89,8 +92,12 @@ test.describe("Logs Result Display Regression", () => {
 
     // The defect overstated the total by an order of magnitude, counting the whole
     // histogram bucket while the log query correctly filtered to the range.
-    expect(claimedTotal, 'the banner total must not exceed the rows in the range')
-      .toBeLessThanOrEqual(DENSE_ROWS);
+    // Asserted as EQUAL, not <=: a `<=` here also passes when the window is wrong
+    // and only part of the seeded second is matched, which is a weaker test than
+    // it looks. from/to are milliseconds (see logsUtils), while ingest takes
+    // microseconds -- both denote the same instant.
+    expect(claimedTotal, 'the banner total must equal the rows seeded in the range')
+      .toBe(DENSE_ROWS);
     expect(rendered, 'all rows in the one-second window must render').toBe(claimedTotal);
   });
 });

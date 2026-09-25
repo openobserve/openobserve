@@ -7,7 +7,7 @@ it.
 #13892 (mixed-case `__name__` selectors) is deliberately NOT covered here: it
 only reproduces with `ZO_FORMAT_STREAM_NAME_TO_LOWERCASE=false`, which is not the
 default, so on a stock server the name is lowercased at ingest and the selector
-legitimately finds nothing. `tests/regression/test_promql_mixed_case_metric_name.py`
+legitimately finds nothing. `tests/api-testing/tests/regression/test_promql_mixed_case_metric_name.py`
 already covers the related #13926 -- though note that folder is excluded from the
 integration run, so it never executes.
 """

@@ -11,7 +11,7 @@ Test Coverage:
 - Delete sourcemaps
 
 Prerequisites:
-- OpenObserve ENTERPRISE build running on ZO_BASE_URL
+- OpenObserve running on ZO_BASE_URL (either edition; the sourcemaps routes are not enterprise-gated)
 - RUM enabled (ZO_RUM_ENABLED=true)
 - Static sourcemap fixtures at tests/api-testing/fixtures/sourcemaps/
 
