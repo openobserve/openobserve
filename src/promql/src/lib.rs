@@ -66,8 +66,8 @@ pub trait TableProvider: Sync + Send + 'static {
         filters: &mut [(String, Vec<String>)],
     ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>>;
 
-    /// Lets a provider choose a block-first context for streaming selectors.
-    async fn create_context_for_streaming(
+    /// Allows a provider to consider MIDX blocks before registering a source scan.
+    async fn create_context_prefer_blocks(
         &self,
         org_id: &str,
         stream_name: &str,

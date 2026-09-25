@@ -81,7 +81,7 @@ impl Engine {
         if prefer_blocks {
             self.ctx
                 .table_provider
-                .create_context_for_streaming(
+                .create_context_prefer_blocks(
                     org_id,
                     name,
                     time_range,

@@ -147,7 +147,7 @@ impl TableProvider for StorageProvider {
         .await
     }
 
-    async fn create_context_for_streaming(
+    async fn create_context_prefer_blocks(
         &self,
         org_id: &str,
         stream_name: &str,
