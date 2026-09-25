@@ -17531,6 +17531,11 @@
       "explore": "메트릭 탐색기에서 열기",
       "railLabel": "메트릭 섹션",
       "noAccess": "{stream}을(를) 읽을 권한이 없습니다. 관리자에게 이 스트림에 대한 읽기 액세스 권한을 요청하세요.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "쿼리별",
         "database": "데이터베이스별",

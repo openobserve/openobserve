@@ -17531,6 +17531,11 @@
       "explore": "Открыть в обозревателе метрик",
       "railLabel": "Разделы метрик",
       "noAccess": "У вас нет разрешения на чтение {stream}. Запросите у администратора доступ на чтение этого потока.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "по запросу",
         "database": "по базе данных",
