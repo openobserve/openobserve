@@ -133,6 +133,16 @@ limitations under the License.
           tabindex="0"
         />
       </div>
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.resolutionCode"
+          data-test="servicenow-resolution-code-input"
+          :label="t('alerts.prebuiltDestinations.servicenowResolutionCode')"
+          :placeholder="raw('Solved (Permanently)')"
+          :helpText="t('alerts.prebuiltDestinations.servicenowResolutionCodeHelp')"
+          tabindex="0"
+        />
+      </div>
     </template>
 
     <!-- Email Fields -->

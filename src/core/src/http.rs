@@ -92,7 +92,8 @@ impl From<AlertError> for Response {
             | AlertError::PendingPeriodOnRealtimeAlert
             | AlertError::NegativePendingPeriod
             | AlertError::KeepFiringForOutOfRange
-            | AlertError::RecoveryTemplateCannotSayResolved { .. }
+            | AlertError::RecoveryNeedsJsonPayload { .. }
+            | AlertError::RecoveryNeedsRoutingKey { .. }
             | AlertError::MultiAlertGroupingError(_) => MetaHttpResponse::bad_request(value),
             // S-16 PR 4. A conflict, not a bad request: the alert being sent is
             // fine on its own terms — it is the SLOs that already exist and

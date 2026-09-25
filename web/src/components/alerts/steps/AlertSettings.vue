@@ -315,13 +315,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex flex-col gap-1">
             <OFormSwitch name="notify_on_recovery" data-test="alert-notify-on-recovery-toggle" />
-            <div
-              v-if="formData?.notify_on_recovery"
-              class="text-text-secondary text-xs"
-              data-test="alert-notify-on-recovery-hint"
-            >
-              {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
-            </div>
+            <template v-if="formData?.notify_on_recovery">
+              <div
+                v-for="row in recoveryPlan"
+                :key="row.name"
+                class="text-text-secondary text-xs"
+                :data-test="`alert-notify-on-recovery-plan-${row.name}`"
+              >
+                {{ row.name }} — {{ row.action }}
+              </div>
+              <div
+                v-if="hasChatRecovery"
+                class="text-text-secondary text-xs"
+                data-test="alert-notify-on-recovery-hint"
+              >
+                {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
+              </div>
+            </template>
           </div>
         </div>
 
@@ -357,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, inject, ref, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
@@ -366,6 +376,7 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { convertMinutesToCron, getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
@@ -410,6 +421,13 @@ export default defineComponent({
       default: () => [],
     },
     formattedDestinations: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
+    // The org's destination OBJECTS (`destinations` above holds only the
+    // selected names). Read-only here — the recovery list needs each selected
+    // destination's platform, which lives on the object.
+    destinationObjects: {
       type: Array as PropType<any[]>,
       default: () => [],
     },
@@ -599,7 +617,41 @@ export default defineComponent({
       emit("update:trigger", nextTrigger);
     };
 
+    // ── Recovery ────────────────────────────────────────────────────────────
+    // Platform destinations are resolved by the server itself (it closes the
+    // incident/alert it opened); everything else gets an ordinary rendered
+    // message, so only those still depend on the user's template.
+    const { detectPrebuiltType } = usePrebuiltDestinations();
+    const platformRecoveryKeys: Record<string, I18nKey> = {
+      pagerduty: "alerts.alertSettings.recoveryResolvesIncident",
+      opsgenie: "alerts.alertSettings.recoveryClosesAlert",
+      servicenow: "alerts.alertSettings.recoveryResolvesIncident",
+    };
+
+    // `destination_type_name` first, because that is the field the server reads
+    // (`derive_channel_format`) when it decides to send a protocol resolve. A
+    // destination pointed at PagerDuty without going through the prebuilt
+    // wizard has no `prebuilt_type`, and saying "new Resolved message" for one
+    // would promise something the server does not do.
+    const platformOf = (destination: any): string =>
+      destination?.destination_type_name || detectPrebuiltType(destination) || "";
+
+    const recoveryPlan = computed(() =>
+      props.destinations.map((name: any) => {
+        const destination = props.destinationObjects.find((d: any) => d?.name === name);
+        const platformKey = destination ? platformRecoveryKeys[platformOf(destination)] : undefined;
+        return {
+          name: String(name),
+          isPlatform: !!platformKey,
+          action: t(platformKey ?? "alerts.alertSettings.recoveryChatMessage"),
+        };
+      }),
+    );
+    const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.isPlatform));
+
     return {
+      recoveryPlan,
+      hasChatRecovery,
       t,
       store,
       handlePeriodChange,

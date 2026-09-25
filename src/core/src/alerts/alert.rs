@@ -80,6 +80,7 @@ use crate::{
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
+            platform::{self, platform_of},
             render,
             render::slack as slack_render,
             resolve_content,
@@ -305,9 +306,17 @@ pub enum AlertError {
     #[error("Alert keep_firing_for must be between 0 and {KEEP_FIRING_FOR_MAX_SECS} seconds")]
     KeepFiringForOutOfRange,
     #[error(
-        "template '{template}' has no {{alert_status}}, so its recovery message would read exactly like a new firing — add {{alert_status}} to it, or turn off notify_on_recovery"
+        "destination '{destination}' is {platform}, which is resolved by updating the alert the firing opened. That needs the firing payload to be a JSON object, and template '{template}' does not render one"
     )]
-    RecoveryTemplateCannotSayResolved { template: String },
+    RecoveryNeedsJsonPayload {
+        destination: String,
+        platform: String,
+        template: String,
+    },
+    #[error(
+        "destination '{destination}' has no PagerDuty integration key, and a resolve sent without one is discarded — add it to the destination, or turn off notify_on_recovery"
+    )]
+    RecoveryNeedsRoutingKey { destination: String },
     #[error("Error in multi alert grouping: {0}")]
     MultiAlertGroupingError(String),
 }
@@ -378,13 +387,13 @@ pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder,
 // Sync (unlike its async AlertError-returning neighbours, whose futures hide
 // the size from this lint); boxing the error is not worth the churn here.
 #[allow(clippy::result_large_err)]
-/// Refuse a recovery notification that could not say it was one.
+/// Refuse a recovery that could not be delivered as one.
 ///
-/// A CONTENT template is safe whatever the author wrote: the renderer labels a
-/// recovered level "RECOVERED" in green on its own. A CUSTOM template is the
-/// author's raw body and nothing can be injected into it safely, so without
-/// `{alert_status}` its recovery renders byte-identical to a firing — which
-/// reads as a re-page, at the exact moment somebody is hoping to stand down.
+/// Only platform destinations are checked. PagerDuty, Opsgenie and ServiceNow
+/// are resolved by updating the record the firing opened, which means the
+/// firing payload has to be a JSON object with room for the correlation key.
+/// Everything else — chat, email, generic webhooks — gets an ordinary rendered
+/// message and cannot fail this way.
 ///
 /// Refused at save rather than stored, for the same reason a malformed runbook
 /// link is: the moment it is read is the one moment nobody can debug it.
@@ -393,23 +402,55 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
         return Ok(());
     }
 
-    let mut checked: Vec<Template> = Vec::new();
-    if let Some(name) = alert.template.as_ref().filter(|n| !n.is_empty())
-        && let Ok(t) = db::alerts::templates::get(org_id, name).await
-    {
-        checked.push(t);
-    } else {
-        for dest_name in alert.destinations.iter() {
-            if let Ok((_, Some(t))) = destinations::get_with_template(org_id, dest_name).await {
-                checked.push(t);
-            }
-        }
-    }
+    let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
+        Some(name) => db::alerts::templates::get(org_id, name).await.ok(),
+        None => None,
+    };
 
-    for template in checked {
-        if template.kind == TemplateKind::Custom && !template.body.contains("{alert_status}") {
-            return Err(AlertError::RecoveryTemplateCannotSayResolved {
-                template: template.name,
+    for dest_name in alert.destinations.iter() {
+        let Ok((destination, dest_template)) =
+            destinations::get_with_template(org_id, dest_name).await
+        else {
+            continue;
+        };
+        let Module::Alert {
+            destination_type, ..
+        } = &destination.module
+        else {
+            continue;
+        };
+        let Some(platform) = platform_of(destination_type) else {
+            continue;
+        };
+        // The resolve is sent by us, so it reads the key off the destination
+        // rather than out of the template. A firing that hardcoded its own key
+        // would still page, and then never resolve — silently, because
+        // PagerDuty answers 202 to a resolve it discards.
+        if platform == platform::Platform::PagerDuty
+            && let DestinationType::Http(endpoint) = destination_type
+            && !endpoint
+                .metadata
+                .get("routing_key")
+                .is_some_and(|key| !key.is_empty())
+        {
+            return Err(AlertError::RecoveryNeedsRoutingKey {
+                destination: dest_name.clone(),
+            });
+        }
+        let Some(template) = choose_template(alert_template.as_ref(), dest_template.as_ref())
+        else {
+            continue;
+        };
+        // A CONTENT template always renders a JSON object; only a raw body can
+        // be something else. It cannot be parsed here — the `{var}` tokens are
+        // unresolved until send time — so this is the structural half of the
+        // question, which is the half that catches a plain-text or array body.
+        // A body that is shaped right but malformed still fails loudly at send.
+        if template.kind == TemplateKind::Custom && !template.body.trim_start().starts_with('{') {
+            return Err(AlertError::RecoveryNeedsJsonPayload {
+                destination: dest_name.clone(),
+                platform: format!("{platform:?}"),
+                template: template.name.clone(),
             });
         }
     }
@@ -2768,6 +2809,24 @@ pub async fn send_recovery_notification(
                     continue;
                 }
             };
+        // A platform resolve is protocol, not a message: it carries no
+        // author-written content, so the template is not rendered at all and
+        // whatever shape it has cannot break the resolve.
+        if let (Some(platform), DestinationType::Http(endpoint)) =
+            (platform_of(&destination_type), &destination_type)
+        {
+            match platform::send_resolve(platform, endpoint, &event.episode_id).await {
+                Ok(resp) => log::info!(
+                    "[RECOVERY] {}/{} episode {} destination {dest_name} closed on {platform:?} {resp}",
+                    alert.org_id,
+                    alert.name,
+                    event.episode_id
+                ),
+                Err(e) => failures = format!("{failures} destination {dest_name}: {e};"),
+            }
+            continue;
+        }
+
         let explicit = choose_template(
             match alert.template.as_ref() {
                 Some(name) => db::alerts::templates::get(&alert.org_id, name).await.ok(),
@@ -2845,6 +2904,39 @@ async fn build_chart_asset(
     Some((url, payload))
 }
 
+/// Carry the episode id into a platform's own correlation field, so the resolve
+/// this module sends later can find what the firing opened.
+///
+/// A body we cannot parse is left alone and logged: saving the alert already
+/// refused this combination, so reaching here means the template changed after
+/// the fact, and dropping the firing would be the worse failure.
+fn stamp_platform_key(
+    dest_type: &DestinationType,
+    ctx: &NotificationContext,
+    msg: String,
+) -> String {
+    let (Some(platform), Some(episode_id)) = (platform_of(dest_type), ctx.episode_id.as_deref())
+    else {
+        return msg;
+    };
+    let empty = hashbrown::HashMap::new();
+    let metadata = match dest_type {
+        DestinationType::Http(endpoint) => &endpoint.metadata,
+        _ => &empty,
+    };
+    match platform::stamp_key(platform, &msg, episode_id, metadata) {
+        Ok(stamped) => stamped,
+        Err(e) => {
+            log::warn!(
+                "[ALERT] {} payload has no place for {}: {e} — it will not be resolvable",
+                ctx.alert_name,
+                platform.key_field()
+            );
+            msg
+        }
+    }
+}
+
 /// `ctx` is the notification-wide context; this function swaps in the
 /// destination's metadata before rendering (§5.1).
 async fn send_to_destination(
@@ -2868,6 +2960,7 @@ async fn send_to_destination(
         TemplateKind::Custom => {
             // Unchanged legacy path — byte-identical output.
             let msg = apply_custom_template(&template.body, ctx, is_email);
+            let msg = stamp_platform_key(dest_type, ctx, msg);
             let email_subject = if let TemplateType::Email { title } = &template.template_type {
                 apply_custom_template(title, ctx, is_email)
             } else {
@@ -2903,6 +2996,7 @@ async fn send_to_destination(
                     {
                         send_discord_with_attachment(endpoint, body, png).await
                     } else {
+                        let body = stamp_platform_key(dest_type, ctx, body);
                         send_http_notification(endpoint, body).await
                     }
                 }
@@ -4512,26 +4606,34 @@ mod send_path_tests {
 #[cfg(test)]
 mod tests {
 
-    /// A recovery that cannot say it is one is worse than no recovery at all.
+    /// A platform is resolved by updating the record its firing opened, so the
+    /// firing payload has to have somewhere to carry the correlation key.
     ///
-    /// CUSTOM templates are the author's raw body — nothing can be injected
-    /// into arbitrary JSON safely — so without `{alert_status}` the resolve
-    /// renders byte-identical to the firing and reads as a re-page. CONTENT
-    /// templates need no such rule: the renderer labels a recovered level
-    /// "RECOVERED" in green whatever the author wrote.
+    /// This is the only shape a platform destination can refuse. What the body
+    /// *says* no longer matters — the resolve is protocol we send ourselves and
+    /// never renders the template at all.
     #[test]
-    fn a_custom_template_without_alert_status_cannot_announce_a_recovery() {
-        let says_nothing = "{\"text\": \"Alert: {alert_name}\"}";
-        let says_status = "{\"text\": \"[{alert_status}] {alert_name}\"}";
+    fn a_platform_firing_payload_must_be_a_json_object() {
+        let accepted = [
+            r#"{"payload": {"summary": "{alert_name}"}}"#,
+            "\n  {\"message\": \"{alert_name}\"}",
+            // No `{alert_status}` anywhere, and still fine: the resolve does
+            // not come from this body.
+            r#"{"short_description": "{alert_name}"}"#,
+        ];
+        for body in accepted {
+            assert!(
+                body.trim_start().starts_with('{'),
+                "{body} is a JSON object and must be accepted"
+            );
+        }
 
-        assert!(
-            !says_nothing.contains("{alert_status}"),
-            "this is the shape we refuse"
-        );
-        assert!(
-            says_status.contains("{alert_status}"),
-            "and the shape we accept"
-        );
+        for body in ["Alert: {alert_name}", r#"[{"message": "x"}]"#] {
+            assert!(
+                !body.trim_start().starts_with('{'),
+                "{body} has nowhere to put a correlation key"
+            );
+        }
     }
 
     /// The ceiling exists for a units mistake, not a policy one.

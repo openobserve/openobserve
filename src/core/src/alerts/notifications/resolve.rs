@@ -403,6 +403,7 @@ pub(crate) fn scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str, &str)
         ("alert_agg_value", ctx.alert_agg_value.as_str()),
         ("alert_level", ctx.alert_level.as_str()),
         ("alert_status", ctx.alert_status.as_str()),
+        ("episode_id", ctx.episode_id.as_deref().unwrap_or_default()),
         ("alert_priority", ctx.alert_priority.as_str()),
         ("alert_tags", ctx.alert_tags.as_str()),
         ("alert_threshold_crit", ctx.alert_threshold_crit.as_str()),

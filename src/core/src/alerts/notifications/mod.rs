@@ -25,6 +25,7 @@ pub mod custom;
 pub mod default_template;
 pub mod format;
 pub mod org_default;
+pub mod platform;
 pub mod preview;
 pub mod render;
 pub mod resolve;

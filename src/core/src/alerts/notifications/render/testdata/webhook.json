@@ -8,7 +8,6 @@
     "alert_end_time": "2026-08-01T10:10:00",
     "alert_level": "critical",
     "alert_status": "firing",
-    "alert_status": "firing",
     "alert_name": "CPU \"high\"",
     "alert_operator": ">=",
     "alert_period": "10",
@@ -28,6 +27,7 @@
       "92.5"
     ],
     "env": "prod",
+    "episode_id": null,
     "group.pod": "web-1",
     "host": [
       "web-1"

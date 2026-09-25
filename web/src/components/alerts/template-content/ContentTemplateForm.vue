@@ -659,6 +659,7 @@ const allVariables = [
   "alert_period",
   "alert_type",
   "alert_status",
+  "episode_id",
 ];
 const mostUsedVariables = allVariables.slice(0, 5);
 const showAllVariables = ref(false);
