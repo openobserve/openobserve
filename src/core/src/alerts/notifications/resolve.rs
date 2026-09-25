@@ -173,7 +173,7 @@ fn substitute_raw_row(
 
     let mut unk: Vec<String> = scan_unmatched(input)
         .into_iter()
-        .filter(|name| !row.contains_key(name))
+        .filter(|name| name.as_str() != "...row" && !row.contains_key(name))
         .collect();
 
     let mut out = input.to_string();
