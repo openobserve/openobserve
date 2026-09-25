@@ -566,39 +566,44 @@ pub async fn merge(
         None,
         Box::new(move |value| {
             match value {
-                None => Ok(Some((
-                    None,
-                    Some((
-                        key,
-                        json::to_vec(&vec![{
-                            // there is no schema, just set the new schema
-                            let schema_metadata = inferred_schema.metadata();
-                            let inferred_schema = if schema_metadata.contains_key("created_at")
-                                && schema_metadata.contains_key("start_dt")
-                            {
+                None => {
+                    let create_start_dt = resolve_create_start_dt(&inferred_schema, start_dt);
+                    Ok(Some((
+                        None,
+                        Some((
+                            key,
+                            json::to_vec(&vec![{
+                                // there is no schema, just set the new schema
+                                let schema_metadata = inferred_schema.metadata();
+                                let inferred_schema = if schema_metadata.contains_key("created_at")
+                                    && schema_metadata.contains_key("start_dt")
+                                {
+                                    inferred_schema
+                                } else {
+                                    let mut schema_metadata = inferred_schema.metadata().clone();
+                                    if !schema_metadata.contains_key("created_at") {
+                                        schema_metadata.insert(
+                                            "created_at".to_string(),
+                                            create_start_dt.to_string(),
+                                        );
+                                    }
+                                    if !schema_metadata.contains_key("start_dt") {
+                                        schema_metadata.insert(
+                                            "start_dt".to_string(),
+                                            create_start_dt.to_string(),
+                                        );
+                                    }
+                                    inferred_schema.with_metadata(schema_metadata)
+                                };
+                                tx.send(Some((inferred_schema.clone(), vec![]))).unwrap();
                                 inferred_schema
-                            } else {
-                                let start_dt =
-                                    start_dt.unwrap_or_else(|| Utc::now().timestamp_micros());
-                                let mut schema_metadata = inferred_schema.metadata().clone();
-                                if !schema_metadata.contains_key("created_at") {
-                                    schema_metadata
-                                        .insert("created_at".to_string(), start_dt.to_string());
-                                }
-                                if !schema_metadata.contains_key("start_dt") {
-                                    schema_metadata
-                                        .insert("start_dt".to_string(), start_dt.to_string());
-                                }
-                                inferred_schema.with_metadata(schema_metadata)
-                            };
-                            tx.send(Some((inferred_schema.clone(), vec![]))).unwrap();
-                            inferred_schema
-                        }])
-                        .unwrap()
-                        .into(),
-                        start_dt,
-                    )),
-                ))),
+                            }])
+                            .unwrap()
+                            .into(),
+                            Some(create_start_dt),
+                        )),
+                    )))
+                }
                 Some(value) => {
                     // there is schema, merge the schema
                     // parse latest schema
@@ -631,7 +636,9 @@ pub async fn merge(
                         .collect::<Vec<_>>();
                     let need_new_version = !schema_version_changes.is_empty();
 
-                    if need_new_version && let Some(start_dt) = start_dt {
+                    if need_new_version
+                        && let Some(start_dt) = start_dt.filter(|start_dt| *start_dt > 0)
+                    {
                         // update old version end_dt
                         let mut metadata = latest_schema.metadata().clone();
                         metadata.insert("end_dt".to_string(), start_dt.to_string());
@@ -697,10 +704,11 @@ pub async fn update_setting(
             for (k, v) in metadata.iter() {
                 schema_metadata.insert(k.clone(), v.clone());
             }
-            let start_dt = match schema_metadata.get("created_at") {
-                Some(v) => v.parse().unwrap(),
-                None => Utc::now().timestamp_micros(),
-            };
+            let start_dt = schema_metadata
+                .get("created_at")
+                .and_then(|created_at| created_at.parse::<i64>().ok())
+                .filter(|created_at| *created_at > 0)
+                .unwrap_or_else(|| Utc::now().timestamp_micros());
             if !schema_metadata.contains_key("created_at") {
                 schema_metadata.insert("created_at".to_string(), start_dt.to_string());
             }
@@ -1020,6 +1028,14 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         _ => vec![DataType::Utf8],
     };
     allowed_type.contains(to)
+}
+
+/// A schema row's start_dt must equal the value's, and `build_key` drops a zero.
+fn resolve_create_start_dt(schema: &Schema, min_ts: Option<i64>) -> i64 {
+    unwrap_stream_start_dt(schema)
+        .filter(|start_dt| *start_dt > 0)
+        .or_else(|| min_ts.filter(|min_ts| *min_ts > 0))
+        .unwrap_or_else(|| Utc::now().timestamp_micros())
 }
 
 #[cfg(test)]
@@ -1676,5 +1692,59 @@ mod tests {
         let schema = Schema::new(vec![Field::new("f1", DataType::Int32, false)]);
         let cache = SchemaCache::new(schema);
         assert_eq!(cache.schema().fields().len(), 1);
+    }
+
+    fn schema_with_start_dt(start_dt: &str) -> Schema {
+        Schema::empty().with_metadata(HashMap::from([(
+            "start_dt".to_string(),
+            start_dt.to_string(),
+        )]))
+    }
+
+    #[test]
+    fn test_resolve_create_start_dt_falls_back_to_now() {
+        let before = Utc::now().timestamp_micros();
+        for min_ts in [None, Some(0)] {
+            let resolved = resolve_create_start_dt(&Schema::empty(), min_ts);
+            assert!(
+                resolved >= before,
+                "expected a fresh timestamp, got {resolved}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_resolve_create_start_dt_uses_min_ts() {
+        assert_eq!(
+            resolve_create_start_dt(&Schema::empty(), Some(1_700_000_000_000_000)),
+            1_700_000_000_000_000
+        );
+    }
+
+    #[test]
+    fn test_resolve_create_start_dt_prefers_the_schema_metadata() {
+        let schema = schema_with_start_dt("1790056698540533");
+        assert_eq!(
+            resolve_create_start_dt(&schema, None),
+            1790056698540533,
+            "a replayed schema keeps the version it arrived with"
+        );
+        assert_eq!(resolve_create_start_dt(&schema, Some(5)), 1790056698540533);
+    }
+
+    #[test]
+    fn test_resolve_create_start_dt_ignores_unusable_metadata() {
+        for value in ["0", "not-a-number"] {
+            assert_eq!(
+                resolve_create_start_dt(&schema_with_start_dt(value), Some(5)),
+                5
+            );
+        }
+        // created_at alone does not stamp the row; only start_dt does
+        let schema = Schema::empty().with_metadata(HashMap::from([(
+            "created_at".to_string(),
+            "42".to_string(),
+        )]));
+        assert_eq!(resolve_create_start_dt(&schema, Some(5)), 5);
     }
 }
