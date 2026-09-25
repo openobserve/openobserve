@@ -524,6 +524,14 @@ test.describe("Dashboard Create Alert testcases", () => {
       await dashboardStreamPromise;
       await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
 
+      // Positive render guard: a persistent no-data overlay would swallow the
+      // right-click and let the "menu hidden" assertion pass vacuously.
+      await pm.dashboardPanelActions.expectCustomChartRendered(expect);
+      await pm.dashboardPanelActions
+        .getNoDataLocator()
+        .first()
+        .waitFor({ state: "hidden", timeout: 20000 });
+
       // Right-click the chart center. A pie series type is not in the
       // context-menu whitelist, so no menu may appear.
       await pm.dashboardPanelEdit.rightClickChart();
