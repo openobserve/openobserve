@@ -511,6 +511,8 @@ export class LogsPage {
         // The "=" icon is revealed on hover over its sidebar field row.
         this.fieldListItemPrefix = 'logs-field-list-item-';
         this.logDetailRowPrefix = 'log-detail-row-';
+        this.fieldValuesList = '[data-test="field-values-panel-values-list"]';
+        this.fieldValueLabelPrefix = (field) => `[data-test^="logs-search-subfield-add-${field}-"]`;
         this.fieldEqualsButton = (field) => `[data-test="log-search-index-list-filter-${field}-field-btn"]`;
         this.logDetailRow = (field) => `[data-test="log-detail-row-${field}"]`;
         this.logDetailFieldMenuTrigger = '[data-test="log-details-include-exclude-field-btn"]';
@@ -2057,6 +2059,25 @@ export class LogsPage {
 
     async getHighlightedMatchCount() {
         return await this.page.locator(this.highlightedMatch).count();
+    }
+
+    /**
+     * Rendered text and wrapping of a sidebar field's first value row.
+     *
+     * The wrapping lives on an inner value div carrying `title`, not on the
+     * labelled element itself, so reading the label's own computed style
+     * reports the wrapper's `normal` and misses the fix entirely.
+     */
+    async getFirstFieldValueRendering(field) {
+        const label = this.page.locator(this.fieldValueLabelPrefix(field)).first();
+        await label.waitFor({ state: 'visible', timeout: 20000 });
+        const value = label.locator('div[title]').first();
+        await value.waitFor({ state: 'visible', timeout: 10000 });
+        return await value.evaluate((el) => ({
+            whiteSpace: getComputedStyle(el).whiteSpace,
+            text: el.innerText,
+            newlineCount: (el.innerText.match(/\n/g) || []).length,
+        }));
     }
 
     /** Sidebar fields that offer an "=" filter, in render order; the set varies by dataset. */
