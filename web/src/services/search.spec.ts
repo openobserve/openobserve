@@ -81,7 +81,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true",
         params.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -111,7 +111,9 @@ describe("Search Service", () => {
         "&tab_id=tab-1" +
         "&tab_name=Test%20Tab";
 
-      expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query, undefined);
+      expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query, {
+        transformResponse: [expect.any(Function)],
+      });
     });
 
     it("should add is_ui_histogram parameter when provided", async () => {
@@ -127,7 +129,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true&is_ui_histogram=true",
         params.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -143,7 +145,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true&is_multi_stream_search=true",
         params.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -161,7 +163,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search_multi?type=logs&search_type=ui&use_cache=true",
         params.query.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -180,7 +182,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search_multi?type=logs&search_type=ui&use_cache=true",
         { ...params.query.query, aggs: params.query.aggs },
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -213,7 +215,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=false",
         params.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -232,7 +234,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true",
         params.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -275,7 +277,7 @@ describe("Search Service", () => {
       expect(result._start_time_ns).toBe("1700000000123456789");
     });
 
-    it("should not pass transformResponse config when page_type is not traces", async () => {
+    it("should also pass transformResponse config when page_type is logs", async () => {
       const params = {
         org_identifier: "org",
         query: { query: { sql: "SELECT 1" } },
@@ -285,8 +287,25 @@ describe("Search Service", () => {
       await search.search(params);
 
       const postCall = mockHttp.post.mock.calls[0];
-      // axiosConfig is undefined for non-traces page types
-      expect(postCall[2]).toBeUndefined();
+      expect(Array.isArray(postCall[2]?.transformResponse)).toBe(true);
+    });
+
+    it("should quote an unsafe-integer field (e.g. userid, #14376) regardless of page_type", async () => {
+      const params = {
+        org_identifier: "org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "logs",
+      };
+
+      await search.search(params);
+
+      const postCall = mockHttp.post.mock.calls[0];
+      const transformFn = postCall[2].transformResponse[0];
+
+      const rawJson = '{"hits":[{"userid":646586703926004764}]}';
+      const parsed = transformFn(rawJson);
+
+      expect(parsed.hits[0].userid).toBe("646586703926004764");
     });
 
     it("should not throw when transformResponse receives invalid JSON", async () => {
