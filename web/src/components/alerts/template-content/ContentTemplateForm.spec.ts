@@ -168,7 +168,7 @@ describe("ContentTemplateForm", () => {
     );
   });
 
-  it("does NOT show the lint hint when format is the {..row} spread token", async () => {
+  it("does NOT show the lint hint when format is the {...row} spread token", async () => {
     const spec = emptyContentSpec();
     spec.rows.enabled = true;
     spec.rows.columns = ["timestamp", "message"];

@@ -3167,7 +3167,7 @@ fn process_row_template(
     // For JSON row template type, try to parse the template as JSON
     let is_json_template = row_type == RowTemplateType::Json;
 
-    // {..row} expands to all row fields — JSON type yields the row object
+    // {...row} expands to all row fields — JSON type yields the row object
     // directly; String type serializes the row to a JSON string.
     if tpl.trim() == "{...row}" {
         for row in rows.iter() {
@@ -5071,7 +5071,7 @@ mod tests {
 
     #[test]
     fn test_process_row_template_spread_row_with_surrounding_whitespace() {
-        // Trimmed template "  {..row}  " should still be treated as {..row}.
+        // Trimmed template "  {...row}  " should still be treated as {...row}.
         let row_template = "  {...row}  ".to_string();
         let mut row1 = Map::new();
         row1.insert("level".to_string(), json!("error"));
