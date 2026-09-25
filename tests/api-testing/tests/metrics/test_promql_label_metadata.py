@@ -56,7 +56,8 @@ def labelled_metric(create_session, base_url, org_id):
 
     wait_until(visible, timeout=90, interval=1,
                msg=f"metric {metric} never appeared in /label/__name__/values")
-    return metric, now_sec
+    yield metric, now_sec
+    session.delete(f"{base_url}api/{org_id}/streams/{metric}?type=metrics")
 
 
 def test_labels_honours_a_time_range(create_session, base_url, org_id, labelled_metric):

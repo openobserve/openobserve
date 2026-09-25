@@ -60,7 +60,10 @@ def histogram_names(create_session, base_url, org_id):
 
     wait_until(lambda: f"{full}_sum" in names(), timeout=120, interval=2,
                msg="the control histogram's _sum never appeared")
-    return bare, full, names()
+    yield bare, full, names()
+    for base in (bare, full):
+        for suffix in ("", "_count", "_sum", "_min", "_max", "_bucket"):
+            session.delete(f"{base_url}api/{org_id}/streams/{base}{suffix}?type=metrics")
 
 
 def test_absent_optional_stats_emit_no_record(create_session, base_url, org_id, histogram_names):

@@ -22,6 +22,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
+
+def _drop(session, base_url, stream, stream_type="logs"):
+    """Follows the suite convention: the test that seeds a stream drops it."""
+    session.delete(f"{base_url}api/{ORG_ID}/streams/{stream}?type={stream_type}")
+
 ROW_COUNT = 60
 TERMS = ["error", "Error", "exception", "Exception",
          "Traceback", "FATAL", "panic", "CRITICAL"]
@@ -64,35 +69,38 @@ def _server_is_alive(session, base_url) -> bool:
 def test_ored_match_all_terms_do_not_abort_the_server(create_session, base_url):
     session = create_session
     stream = f"e2e_matchall_or_{uuid.uuid4().hex[:8]}"
-    now = _seed(session, base_url, stream)
+    try:
+        now = _seed(session, base_url, stream)
 
-    assert _server_is_alive(session, base_url), "server was already unhealthy before the query"
+        assert _server_is_alive(session, base_url), "server was already unhealthy before the query"
 
-    disjunction = " OR ".join(f"match_all('{t}')" for t in TERMS)
-    sql = (
-        f'SELECT project AS proj, container_name, count(*) AS n FROM "{stream}" '
-        f"WHERE ({disjunction}) GROUP BY proj, container_name ORDER BY n DESC"
-    )
+        disjunction = " OR ".join(f"match_all('{t}')" for t in TERMS)
+        sql = (
+            f'SELECT project AS proj, container_name, count(*) AS n FROM "{stream}" '
+            f"WHERE ({disjunction}) GROUP BY proj, container_name ORDER BY n DESC"
+        )
 
-    resp = session.post(
-        f"{base_url}api/{ORG_ID}/_search?type=logs",
-        json={"query": {
-            "sql": sql,
-            "start_time": now - 3_600_000_000, "end_time": now + 60_000_000,
-            "from": 0, "size": 100,
-        }},
-    )
-    logger.info("disjunction query answered %s", resp.status_code)
+        resp = session.post(
+            f"{base_url}api/{ORG_ID}/_search?type=logs",
+            json={"query": {
+                "sql": sql,
+                "start_time": now - 3_600_000_000, "end_time": now + 60_000_000,
+                "from": 0, "size": 100,
+            }},
+        )
+        logger.info("disjunction query answered %s", resp.status_code)
 
-    # A graceful error is acceptable; a dead connection is not.
-    assert resp.status_code < 500 or resp.text, \
-        f"query returned {resp.status_code} with no body, which suggests the node died"
+        # A graceful error is acceptable; a dead connection is not.
+        assert resp.status_code < 500 or resp.text, \
+            f"query returned {resp.status_code} with no body, which suggests the node died"
 
-    # The real contract: the process is still serving.
-    assert _server_is_alive(session, base_url), \
-        "server stopped answering after the OR-ed match_all query, i.e. the query aborted it"
+        # The real contract: the process is still serving.
+        assert _server_is_alive(session, base_url), \
+            "server stopped answering after the OR-ed match_all query, i.e. the query aborted it"
 
-    if resp.status_code == 200:
-        hits = resp.json().get("hits", [])
-        assert isinstance(hits, list), f"unexpected result shape: {resp.text[:300]}"
-        logger.info("query succeeded with %d grouped rows", len(hits))
+        if resp.status_code == 200:
+            hits = resp.json().get("hits", [])
+            assert isinstance(hits, list), f"unexpected result shape: {resp.text[:300]}"
+            logger.info("query succeeded with %d grouped rows", len(hits))
+    finally:
+        _drop(session, base_url, stream)

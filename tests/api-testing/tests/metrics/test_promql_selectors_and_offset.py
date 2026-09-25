@@ -53,7 +53,8 @@ def seeded_metric(create_session, base_url, org_id):
 
     wait_until(visible, timeout=120, interval=2,
                msg=f"metric {metric} never became queryable by __name__ selector")
-    return metric, t0
+    yield metric, t0
+    session.delete(f"{base_url}api/{org_id}/streams/{metric}?type=metrics")
 
 
 def _instant(session, base_url, org_id, query, at):

@@ -28,10 +28,19 @@ def _zip(entries: dict[str, str]) -> bytes:
     return buf.getvalue()
 
 
-def _upload(session, base_url, data: bytes, filename: str):
+def _upload(session, base_url, data: bytes, filename: str, service: str):
+    """Upload under an explicit service so the group can be deleted afterwards."""
     return session.post(
         f"{base_url}api/{ORG_ID}/sourcemaps",
         files={"file": (filename, data, "application/zip")},
+        data={"service": service, "env": "pytest", "version": "1.0.0"},
+    )
+
+
+def _delete_group(session, base_url, service: str):
+    return session.delete(
+        f"{base_url}api/{ORG_ID}/sourcemaps",
+        params={"service": service, "env": "pytest", "version": "1.0.0"},
     )
 
 
@@ -47,8 +56,9 @@ def _listed_count(session, base_url) -> int:
 def test_zip_without_any_sourcemap_is_rejected(create_session, base_url):
     session = create_session
     data = _zip({"README.txt": "no maps here", "notes/other.md": "# nothing"})
+    service = f"pytest_nomaps_{uuid.uuid4().hex[:6]}"
     before = _listed_count(session, base_url)
-    resp = _upload(session, base_url, data, f"nomaps_{uuid.uuid4().hex[:6]}.zip")
+    resp = _upload(session, base_url, data, "nomaps.zip", service)
     logger.info("no-sourcemap ZIP answered %s: %s", resp.status_code, resp.text[:160])
 
     # Reporting success for a ZIP with nothing usable inside was the defect.
@@ -71,14 +81,19 @@ def test_zip_with_a_valid_sourcemap_is_accepted(create_session, base_url):
         '"names":[],"mappings":"AAAA","sourcesContent":["console.log(1)"]}'
     )
     data = _zip({"app.min.js.map": smap, "app.min.js": "console.log(1)\n"})
+    service = f"pytest_withmap_{uuid.uuid4().hex[:6]}"
     before = _listed_count(session, base_url)
-    resp = _upload(session, base_url, data, f"withmap_{uuid.uuid4().hex[:6]}.zip")
-    logger.info("valid ZIP answered %s: %s", resp.status_code, resp.text[:160])
+    try:
+        resp = _upload(session, base_url, data, "withmap.zip", service)
+        logger.info("valid ZIP answered %s: %s", resp.status_code, resp.text[:160])
 
-    assert resp.status_code < 400, \
-        f"a ZIP containing a real sourcemap must be accepted, got {resp.status_code}: {resp.text[:300]}"
+        assert resp.status_code < 400, \
+            f"a ZIP containing a real sourcemap must be accepted, got {resp.status_code}: {resp.text[:300]}"
 
-    # Accepting and then storing nothing would be the same failure wearing a 2xx.
-    after = _listed_count(session, base_url)
-    assert after > before, \
-        f"an accepted upload must store the map: sourcemap count went {before} -> {after}"
+        # Accepting and then storing nothing would be the same failure wearing a 2xx.
+        after = _listed_count(session, base_url)
+        assert after > before, \
+            f"an accepted upload must store the map: sourcemap count went {before} -> {after}"
+    finally:
+        # This test is the only one here that stores anything, so it reaps its own group.
+        _delete_group(session, base_url, service)

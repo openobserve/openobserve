@@ -49,7 +49,8 @@ def flagged_metric(create_session, base_url, org_id):
         return q.status_code == 200 and bool(q.json().get("data", {}).get("result"))
 
     wait_until(visible, timeout=120, interval=2, msg=f"{metric} never became queryable")
-    return metric, at
+    yield metric, at
+    session.delete(f"{base_url}api/{org_id}/streams/{metric}?type=metrics")
 
 
 @pytest.fixture(scope="module")
@@ -84,7 +85,9 @@ def exp_histogram(create_session, base_url, org_id):
         return q.status_code == 200 and bool(q.json().get("data", {}).get("result"))
 
     wait_until(visible, timeout=120, interval=2, msg=f"{metric}_bucket never appeared")
-    return metric, at, zero_count, 10
+    yield metric, at, zero_count, 10
+    for suffix in ("", "_count", "_sum", "_bucket"):
+        session.delete(f"{base_url}api/{org_id}/streams/{metric}{suffix}?type=metrics")
 
 
 def _buckets(session, base_url, org_id, metric, at):

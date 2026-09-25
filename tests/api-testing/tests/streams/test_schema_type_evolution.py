@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 
+def _drop(session, base_url, stream, stream_type="logs"):
+    """Follows the suite convention: the test that seeds a stream drops it."""
+    session.delete(f"{base_url}api/{ORG_ID}/streams/{stream}?type={stream_type}")
+
+
 
 def _window():
     now = int(time.time() * 1_000_000)
@@ -38,30 +43,33 @@ def _search(session, base_url, sql):
 def test_boolean_field_widens_to_numeric(create_session, base_url):
     session = create_session
     stream = f"e2e_evolve_{uuid.uuid4().hex[:8]}"
-    now = int(time.time() * 1_000_000)
+    try:
+        now = int(time.time() * 1_000_000)
 
-    bool_rows = [{"_timestamp": now - 5_000_000 + i, "job": "pytest_evolve",
-                  "flag": True, "tag": "boolgen"} for i in range(3)]
-    r1 = session.post(f"{base_url}api/{ORG_ID}/{stream}/_json", json=bool_rows)
-    assert r1.status_code == 200, f"boolean ingest failed: {r1.status_code} {r1.text[:300]}"
+        bool_rows = [{"_timestamp": now - 5_000_000 + i, "job": "pytest_evolve",
+                      "flag": True, "tag": "boolgen"} for i in range(3)]
+        r1 = session.post(f"{base_url}api/{ORG_ID}/{stream}/_json", json=bool_rows)
+        assert r1.status_code == 200, f"boolean ingest failed: {r1.status_code} {r1.text[:300]}"
 
-    num_rows = [{"_timestamp": now + i, "job": "pytest_evolve",
-                 "flag": 7, "tag": "numgen"} for i in range(3)]
-    r2 = session.post(f"{base_url}api/{ORG_ID}/{stream}/_json", json=num_rows)
-    assert r2.status_code == 200, f"numeric ingest failed: {r2.status_code} {r2.text[:300]}"
-    body = r2.json()
-    failed = sum(s.get("failed", 0) for s in body.get("status", []))
-    logger.info("numeric generation ingest status: %s", body.get("status"))
-    assert failed == 0, f"numeric records were rejected after a boolean field: {body}"
+        num_rows = [{"_timestamp": now + i, "job": "pytest_evolve",
+                     "flag": 7, "tag": "numgen"} for i in range(3)]
+        r2 = session.post(f"{base_url}api/{ORG_ID}/{stream}/_json", json=num_rows)
+        assert r2.status_code == 200, f"numeric ingest failed: {r2.status_code} {r2.text[:300]}"
+        body = r2.json()
+        failed = sum(s.get("failed", 0) for s in body.get("status", []))
+        logger.info("numeric generation ingest status: %s", body.get("status"))
+        assert failed == 0, f"numeric records were rejected after a boolean field: {body}"
 
-    for _ in range(30):
-        resp = _search(session, base_url, f'SELECT tag, flag FROM "{stream}"')
-        if resp.status_code == 200 and len(resp.json().get("hits", [])) >= 6:
-            break
-        time.sleep(1)
-    assert resp.status_code == 200, f"search failed: {resp.status_code} {resp.text[:300]}"
+        for _ in range(30):
+            resp = _search(session, base_url, f'SELECT tag, flag FROM "{stream}"')
+            if resp.status_code == 200 and len(resp.json().get("hits", [])) >= 6:
+                break
+            time.sleep(1)
+        assert resp.status_code == 200, f"search failed: {resp.status_code} {resp.text[:300]}"
 
-    tags = [h.get("tag") for h in resp.json()["hits"]]
-    logger.info("rows visible after evolution: %s", sorted(tags))
-    assert tags.count("boolgen") == 3, f"boolean-generation rows lost: {tags}"
-    assert tags.count("numgen") == 3, f"numeric-generation rows lost: {tags}"
+        tags = [h.get("tag") for h in resp.json()["hits"]]
+        logger.info("rows visible after evolution: %s", sorted(tags))
+        assert tags.count("boolgen") == 3, f"boolean-generation rows lost: {tags}"
+        assert tags.count("numgen") == 3, f"numeric-generation rows lost: {tags}"
+    finally:
+        _drop(session, base_url, stream)

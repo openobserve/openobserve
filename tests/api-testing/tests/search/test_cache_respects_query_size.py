@@ -17,6 +17,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
+
+def _drop(session, base_url, stream, stream_type="logs"):
+    """Follows the suite convention: the test that seeds a stream drops it."""
+    session.delete(f"{base_url}api/{ORG_ID}/streams/{stream}?type={stream_type}")
+
 ROW_COUNT = 40
 SMALL, LARGE = 5, 25
 
@@ -42,23 +47,26 @@ def _seed(session, base_url, stream):
 def test_cached_result_is_not_replayed_for_a_different_size(create_session, base_url):
     session = create_session
     stream = f"e2e_cachesize_{uuid.uuid4().hex[:8]}"
-    start, end = _seed(session, base_url, stream)
-    sql = f'SELECT * FROM "{stream}" ORDER BY _timestamp DESC'
+    try:
+        start, end = _seed(session, base_url, stream)
+        sql = f'SELECT * FROM "{stream}" ORDER BY _timestamp DESC'
 
-    def run(size):
-        r = session.post(
-            f"{base_url}api/{ORG_ID}/_search?type=logs&use_cache=true",
-            json={"query": {"sql": sql, "start_time": start, "end_time": end,
-                            "from": 0, "size": size}},
-        )
-        assert r.status_code == 200, f"search failed: {r.status_code} {r.text[:300]}"
-        return len(r.json().get("hits", []))
+        def run(size):
+            r = session.post(
+                f"{base_url}api/{ORG_ID}/_search?type=logs&use_cache=true",
+                json={"query": {"sql": sql, "start_time": start, "end_time": end,
+                                "from": 0, "size": size}},
+            )
+            assert r.status_code == 200, f"search failed: {r.status_code} {r.text[:300]}"
+            return len(r.json().get("hits", []))
 
-    small = run(SMALL)
-    large = run(LARGE)
-    logger.info("size %s -> %s rows; size %s -> %s rows", SMALL, small, LARGE, large)
+        small = run(SMALL)
+        large = run(LARGE)
+        logger.info("size %s -> %s rows; size %s -> %s rows", SMALL, small, LARGE, large)
 
-    assert small == SMALL, f"first query must return {SMALL} rows, got {small}"
-    # A size-blind cache replays the first result here, returning SMALL again.
-    assert large == LARGE, \
-        f"second query must return {LARGE} rows, got {large} (cache ignored query size)"
+        assert small == SMALL, f"first query must return {SMALL} rows, got {small}"
+        # A size-blind cache replays the first result here, returning SMALL again.
+        assert large == LARGE, \
+            f"second query must return {LARGE} rows, got {large} (cache ignored query size)"
+    finally:
+        _drop(session, base_url, stream)

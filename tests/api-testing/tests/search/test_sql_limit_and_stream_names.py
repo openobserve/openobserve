@@ -19,6 +19,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
+
+def _drop(session, base_url, stream, stream_type="logs"):
+    """Follows the suite convention: the test that seeds a stream drops it."""
+    session.delete(f"{base_url}api/{ORG_ID}/streams/{stream}?type={stream_type}")
+
 ROW_COUNT = 30
 SQL_LIMIT = 7
 REQUEST_SIZE = 100
@@ -56,58 +61,65 @@ def test_explicit_sql_limit_wins_over_request_size(create_session, base_url):
     """`LIMIT 7` with `size: 100` must return 7 rows, not 100."""
     session = create_session
     stream = f"e2e_sqllimit_{uuid.uuid4().hex[:8]}"
-    _seed(session, base_url, stream)
-    start, end = _window()
+    try:
+        _seed(session, base_url, stream)
+        start, end = _window()
 
-    resp = session.post(
-        f"{base_url}api/{ORG_ID}/_search?type=logs",
-        json={"query": {
-            "sql": f'SELECT * FROM "{stream}" ORDER BY _timestamp DESC LIMIT {SQL_LIMIT}',
-            "start_time": start, "end_time": end, "from": 0, "size": REQUEST_SIZE,
-        }},
-    )
-    assert resp.status_code == 200, f"search failed: {resp.status_code} {resp.text[:400]}"
-    hits = resp.json().get("hits", [])
-    logger.info("LIMIT %s with size %s returned %s rows", SQL_LIMIT, REQUEST_SIZE, len(hits))
+        resp = session.post(
+            f"{base_url}api/{ORG_ID}/_search?type=logs",
+            json={"query": {
+                "sql": f'SELECT * FROM "{stream}" ORDER BY _timestamp DESC LIMIT {SQL_LIMIT}',
+                "start_time": start, "end_time": end, "from": 0, "size": REQUEST_SIZE,
+            }},
+        )
+        assert resp.status_code == 200, f"search failed: {resp.status_code} {resp.text[:400]}"
+        hits = resp.json().get("hits", [])
+        logger.info("LIMIT %s with size %s returned %s rows", SQL_LIMIT, REQUEST_SIZE, len(hits))
 
-    # There are more rows than the LIMIT, so a build that ignores it returns more.
-    assert len(hits) == SQL_LIMIT, \
-        f"explicit SQL LIMIT {SQL_LIMIT} must decide the row count, got {len(hits)}"
-
+        # There are more rows than the LIMIT, so a build that ignores it returns more.
+        assert len(hits) == SQL_LIMIT, \
+            f"explicit SQL LIMIT {SQL_LIMIT} must decide the row count, got {len(hits)}"
+    finally:
+        _drop(session, base_url, stream)
 
 def test_request_size_still_applies_without_an_explicit_limit(create_session, base_url):
     """A negative control: with no SQL LIMIT, `size` is what caps the result."""
     session = create_session
     stream = f"e2e_sqllimit_{uuid.uuid4().hex[:8]}"
-    _seed(session, base_url, stream)
-    start, end = _window()
+    try:
+        _seed(session, base_url, stream)
+        start, end = _window()
 
-    size = 5
-    resp = session.post(
-        f"{base_url}api/{ORG_ID}/_search?type=logs",
-        json={"query": {"sql": f'SELECT * FROM "{stream}"',
-                        "start_time": start, "end_time": end, "from": 0, "size": size}},
-    )
-    assert resp.status_code == 200, f"search failed: {resp.status_code} {resp.text[:400]}"
-    hits = resp.json().get("hits", [])
-    logger.info("no SQL LIMIT, size %s returned %s rows", size, len(hits))
-    assert len(hits) == size, f"size must cap the result when the SQL has no LIMIT, got {len(hits)}"
-
+        size = 5
+        resp = session.post(
+            f"{base_url}api/{ORG_ID}/_search?type=logs",
+            json={"query": {"sql": f'SELECT * FROM "{stream}"',
+                            "start_time": start, "end_time": end, "from": 0, "size": size}},
+        )
+        assert resp.status_code == 200, f"search failed: {resp.status_code} {resp.text[:400]}"
+        hits = resp.json().get("hits", [])
+        logger.info("no SQL LIMIT, size %s returned %s rows", size, len(hits))
+        assert len(hits) == size, f"size must cap the result when the SQL has no LIMIT, got {len(hits)}"
+    finally:
+        _drop(session, base_url, stream)
 
 def test_stream_name_containing_a_colon_is_queryable(create_session, base_url):
     """A `:` in the stream name must be quoted into the SQL, not raise a ParserError."""
     session = create_session
     stream = f"e2e:colon:{uuid.uuid4().hex[:6]}"
-    _seed(session, base_url, stream, rows=5)
-    start, end = _window()
+    try:
+        _seed(session, base_url, stream, rows=5)
+        start, end = _window()
 
-    resp = session.post(
-        f"{base_url}api/{ORG_ID}/_search?type=logs",
-        json={"query": {"sql": f'SELECT * FROM "{stream}"',
-                        "start_time": start, "end_time": end, "from": 0, "size": 10}},
-    )
-    logger.info("colon-named stream answered %s", resp.status_code)
-    assert resp.status_code == 200, \
-        f"a colon in the stream name must not break parsing: {resp.status_code} {resp.text[:400]}"
-    assert "ParserError" not in resp.text, f"ParserError surfaced: {resp.text[:300]}"
-    assert len(resp.json().get("hits", [])) == 5, "all seeded rows must come back"
+        resp = session.post(
+            f"{base_url}api/{ORG_ID}/_search?type=logs",
+            json={"query": {"sql": f'SELECT * FROM "{stream}"',
+                            "start_time": start, "end_time": end, "from": 0, "size": 10}},
+        )
+        logger.info("colon-named stream answered %s", resp.status_code)
+        assert resp.status_code == 200, \
+            f"a colon in the stream name must not break parsing: {resp.status_code} {resp.text[:400]}"
+        assert "ParserError" not in resp.text, f"ParserError surfaced: {resp.text[:300]}"
+        assert len(resp.json().get("hits", [])) == 5, "all seeded rows must come back"
+    finally:
+        _drop(session, base_url, stream)
