@@ -468,7 +468,8 @@
       "tracesAnalyzeDimensions.spec.js",
       "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
-      "tracesCharts.spec.js"
+      "tracesCharts.spec.js",
+      "traceSessionReplay.spec.js"
     ],
     "disabled": []
   },
