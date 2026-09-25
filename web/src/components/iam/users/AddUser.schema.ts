@@ -11,16 +11,9 @@
 
 import { z } from "zod";
 
-// Password policy (mirrors src/config/src/utils/password.rs): length 8-128 AND
-// lower AND upper AND digit AND special.
-export const isStrongPassword = (val: string): boolean => {
-  if (!val || val.length < 8 || val.length > 128) return false;
-  const hasLower = /[a-z]/.test(val);
-  const hasUpper = /[A-Z]/.test(val);
-  const hasDigit = /[0-9]/.test(val);
-  const hasSpecial = /[^A-Za-z0-9]/.test(val);
-  return hasLower && hasUpper && hasDigit && hasSpecial;
-};
+import type { PasswordComplexity } from "@/services/passwordPolicy";
+import type { TranslateFn } from "@/types/i18n";
+import { validateAgainstComplexity } from "@/utils/passwordComplexity";
 
 export const userEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // other_organization must START WITH A LETTER, then alphanumeric / _ / - .
@@ -35,6 +28,8 @@ export interface AddUserSchemaContext {
   loggedInUserEmail: string;
   modelEmail: string;
   organization: string;
+  /** The instance policy the server will hold this password to. */
+  complexity: PasswordComplexity;
 }
 
 // Base fields are optional; the real, mode-dependent requireds are enforced in
@@ -54,10 +49,7 @@ export const addUserBaseSchema = z.object({
 
 export type AddUserForm = z.infer<typeof addUserBaseSchema>;
 
-export const makeAddUserSchema = (
-  getCtx: () => AddUserSchemaContext,
-  t: (_key: string) => string,
-) =>
+export const makeAddUserSchema = (getCtx: () => AddUserSchemaContext, t: TranslateFn) =>
   addUserBaseSchema.superRefine((val, zctx) => {
     // Read the live context on every run so a single stable schema instance
     // follows mode flips (e.g. the 422 add-existing → create-new switch) without
@@ -90,12 +82,15 @@ export const makeAddUserSchema = (
           path: ["password"],
           message: t("user.passwordRequired"),
         });
-      } else if (!isStrongPassword(val.password)) {
-        zctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["password"],
-          message: t("user.passwordPolicyHint"),
-        });
+      } else {
+        const failure = validateAgainstComplexity(val.password, ctx.complexity, t);
+        if (failure) {
+          zctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["password"],
+            message: failure,
+          });
+        }
       }
     }
 
@@ -117,12 +112,15 @@ export const makeAddUserSchema = (
           path: ["new_password"],
           message: t("user.newPasswordRequired"),
         });
-      } else if (!isStrongPassword(val.new_password)) {
-        zctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["new_password"],
-          message: t("user.passwordPolicyHint"),
-        });
+      } else {
+        const failure = validateAgainstComplexity(val.new_password, ctx.complexity, t);
+        if (failure) {
+          zctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["new_password"],
+            message: failure,
+          });
+        }
       }
     }
 

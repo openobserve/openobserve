@@ -51,6 +51,23 @@ const createOrgUser = (email) => req('POST', '/users', {
 });
 const deleteOrgUser = (email) => req('DELETE', `/users/${encodeURIComponent(email)}`);
 const getTemplate = (name) => req('GET', `/alerts/templates/${name}`);
+const listOrgUsers = () => req('GET', '/users');
+const listServiceAccounts = () => req('GET', '/service_accounts');
+
+/**
+ * Every address the recipients picker may offer — the org's users plus its
+ * service accounts, lowercased. It is the picker's own option source, so a case
+ * can prove an offered value really is an account of this org (and that an
+ * outsider is not one) instead of taking the list on trust.
+ */
+async function orgAccounts() {
+  const responses = await Promise.all([listOrgUsers(), listServiceAccounts()]);
+  const emails = responses.flatMap((r) =>
+    (Array.isArray(r.body?.data) ? r.body.data : [])
+      .map((account) => String(account?.email ?? '').toLowerCase()),
+  );
+  return [...new Set(emails.filter(Boolean))];
+}
 
 /** Stored recipients for a destination, or null when it does not exist. */
 async function storedRecipients(name) {
@@ -62,5 +79,5 @@ async function storedRecipients(name) {
 module.exports = {
   BASE, ORG, req, getDestination, listDestinations, createDestination,
   deleteDestination, testDestination, listTemplates, getTemplate, storedRecipients,
-  createOrgUser, deleteOrgUser,
+  createOrgUser, deleteOrgUser, listOrgUsers, listServiceAccounts, orgAccounts,
 };

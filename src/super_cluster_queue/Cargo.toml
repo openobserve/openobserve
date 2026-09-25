@@ -14,7 +14,11 @@ enterprise = [
     "openobserve-core/enterprise",
     "stream/enterprise",
 ]
-vectorscan = ["o2_enterprise/vectorscan", "stream/vectorscan"]
+vectorscan = [
+    "enrichment-data/vectorscan",
+    "o2_enterprise/vectorscan",
+    "stream/vectorscan",
+]
 
 [dependencies]
 anyhow.workspace = true

@@ -113,9 +113,13 @@ export const emailConfig: PrebuiltConfig = {
     {
       key: "recipients",
       labelKey: "alerts.prebuiltDestinations.emailRecipients",
-      type: "email",
+      type: "email-multi",
       required: true,
       hintKey: "alerts.prebuiltDestinations.emailRecipientsHelp",
+      // Recipients are picked from the org's users / service accounts, so the
+      // normal path has no free text to mistype. The validator stays as a guard
+      // for legacy string values (edit-prefill of an older destination): an
+      // array's `toString()` is the comma-joined form this already parses.
       validator: (emails: string) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const emailList = emails.split(",").map((e) => e.trim());

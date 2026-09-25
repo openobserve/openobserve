@@ -56,7 +56,13 @@ export class AlertDestinationsPage {
         this.importJsonFileTab = '[data-test="tab-import_json_file"]';
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
-        this.destinationInUseMessage = 'Destination is currently used by alert:';
+        // Backend message shape: "'name' is used by 2 synthetic checks (a, b), 1 escalation
+        // policy (t) and 1 alert (my-alert)" — the delete path names only the FIRST blocking
+        // kind it finds (it short-circuits), but the parser below handles every kind anyway.
+        this.destinationInUseMessage = 'is used by';
+        // OToast error message (preferred over getByText('is used by') to dodge strict-mode
+        // collisions and text appearing elsewhere on the page).
+        this.errorToastMessage = '[data-test-variant="error"] [data-test="o-toast-message"]';
         this.nextPageButton = '[data-test="alert-destinations-list-next-btn"]';
         // Search input is an OInput wrapper; inner native input uses `-field` suffix for fill/click
         this.destinationListSearchInputField = '[data-test="destination-list-search-input-field"]';
@@ -74,8 +80,13 @@ export class AlertDestinationsPage {
         // Webhook OInput wrapper (any prebuilt type) — used for visibility checks; inner native input uses `-field`
         this.webhookInputAny = '[data-test$="-webhook-url-input"]';
         this.webhookInputAnyField = '[data-test$="-webhook-url-input-field"]';
-        this.recipientsInput = '[data-test="email-recipients-input"]';
-        this.recipientsInputField = '[data-test="email-recipients-input-field"]';
+        // The prebuilt Email recipients are an OSelect multi-picker over the org's
+        // users and service accounts — there is no free-text field to fill.
+        this.recipientsSelect = '[data-test="email-recipients-select"]';
+        this.recipientsSelectTrigger = '[data-test="email-recipients-select-trigger"]';
+        this.recipientsSelectPopover = '[data-test="email-recipients-select-popover"]';
+        this.recipientsSelectSearch = '[data-test="email-recipients-select-search"]';
+        this.recipientsSelectOption = '[data-test="email-recipients-select-option"]';
         this.integrationKeyInput = '[data-test="pagerduty-integration-key-input"]';
         this.integrationKeyInputField = '[data-test="pagerduty-integration-key-input-field"]';
         this.opsgenieApiKeyInput = '[data-test="opsgenie-api-key-input"]';
@@ -154,9 +165,20 @@ export class AlertDestinationsPage {
         await expect(this.page.locator(this.addDestinationTitle)).toBeVisible();
     }
 
-    /** Current value of the prebuilt recipients field (edit-mode prefill checks). */
+    /**
+     * Addresses currently selected in the prebuilt email picker, in selection
+     * order. Read from the trigger's `data-test-selected-value` (OSelect mirrors
+     * the model there), never from a rendered chip — a chip's text is decoration.
+     */
+    async getEmailRecipients() {
+        const raw = await this.page.locator(this.recipientsSelectTrigger).first()
+            .getAttribute('data-test-selected-value').catch(() => '');
+        return (raw || '').split(',').map((v) => v.trim()).filter(Boolean);
+    }
+
+    /** Current value of the prebuilt recipients picker (edit-mode prefill checks). */
     async getEmailRecipientsValue() {
-        return await this.page.locator(this.recipientsInputField).first().inputValue().catch(() => '');
+        return (await this.getEmailRecipients()).join(', ');
     }
 
     /** Open an existing destination for editing, by name. */
@@ -164,7 +186,7 @@ export class AlertDestinationsPage {
         const btn = this.page.locator(this.updateDestinationButton.replace('{destinationName}', destinationName));
         await btn.waitFor({ state: 'visible', timeout: 15000 });
         await btn.click();
-        await this.page.locator(this.recipientsInputField).first().waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.locator(this.recipientsSelectTrigger).first().waitFor({ state: 'visible', timeout: 15000 });
     }
 
     /** Text of every visible field-level validation error. */
@@ -204,7 +226,81 @@ export class AlertDestinationsPage {
     }
 
     async isPrebuiltRecipientsFieldPresent() {
-        return (await this.page.locator(this.recipientsInputField).count()) > 0;
+        return (await this.page.locator(this.recipientsSelect).count()) > 0;
+    }
+
+    /**
+     * Open the prebuilt recipients picker and return its popover. The multi-select
+     * OSelect keeps the popover OPEN on every option click, so picking several
+     * addresses costs one open — hence the idempotent guard rather than a click
+     * that would toggle an already-open popover closed.
+     */
+    async openEmailRecipientsPicker() {
+        const trigger = this.page.locator(this.recipientsSelectTrigger).first();
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        const popover = this.page.locator(this.recipientsSelectPopover).first();
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (await popover.isVisible().catch(() => false)) return popover;
+            await trigger.click({ timeout: 10000 }).catch((e) => {
+                testLogger.debug('Recipients picker trigger click failed', { attempt, error: e.message });
+            });
+            if (await popover.isVisible({ timeout: 5000 }).catch(() => false)) return popover;
+        }
+        await popover.waitFor({ state: 'visible', timeout: 10000 });
+        return popover;
+    }
+
+    /**
+     * Values the prebuilt recipients picker is offering, optionally filtered by a
+     * search term. Only the org's users and service accounts can appear here —
+     * this picker is what keeps a non-member out of a destination.
+     */
+    async getEmailRecipientOptions(searchTerm = null) {
+        const popover = await this.openEmailRecipientsPicker();
+        if (searchTerm === null) {
+            // The account list is fetched when the popover opens, so an immediate
+            // read returns [] and cannot be told apart from "no accounts offered".
+            await popover.locator(this.recipientsSelectOption).first()
+                .waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        } else {
+            await this.searchEmailRecipientOptions(searchTerm);
+        }
+        return await popover.locator(this.recipientsSelectOption)
+            .evaluateAll((els) => els.map((el) => el.getAttribute('data-test-value')))
+            .catch(() => []);
+    }
+
+    /** Type a search term into the open recipients picker and let the filter settle. */
+    async searchEmailRecipientOptions(term) {
+        const search = this.page.locator(this.recipientsSelectSearch).first();
+        if (await search.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await search.fill(term);
+            // No DOM signal for "the client-side filter finished re-rendering" — the
+            // search value lands synchronously, the filtered list is what is under test.
+            await this.page.waitForTimeout(600);
+        }
+    }
+
+    /**
+     * Toggle one org account in the prebuilt recipients picker. `email` must be the
+     * address the picker's own option carries — a padded or mixed-case variant
+     * matches no option, which is the point of the control.
+     */
+    async setEmailRecipientSelected(email, selected) {
+        if ((await this.getEmailRecipients()).includes(email) === selected) return;
+        const popover = await this.openEmailRecipientsPicker();
+        await this.searchEmailRecipientOptions(email);
+        const option = popover.locator(`${this.recipientsSelectOption}[data-test-value="${email}"]`).first();
+        await option.waitFor({ state: 'visible', timeout: 10000 });
+        await option.click();
+        await expect.poll(async () => (await this.getEmailRecipients()).includes(email),
+            { timeout: 10000, intervals: [500, 1000] }).toBe(selected);
+        testLogger.debug('Toggled email recipient', { email, selected });
+    }
+
+    /** Remove one org account from the prebuilt recipients picker. */
+    async unselectEmailRecipient(email) {
+        await this.setEmailRecipientSelected(email, false);
     }
 
     /**
@@ -268,7 +364,7 @@ export class AlertDestinationsPage {
     /** Tab from the name field until focus lands on recipients. Returns true if reached. */
     async tabToRecipientsField(maxTabs = 12) {
         await this.page.locator(this.destinationNameInputField).first().focus();
-        const field = this.page.locator(this.recipientsInputField).first();
+        const field = this.page.locator(this.recipientsSelectTrigger).first();
         for (let i = 0; i < maxTabs; i++) {
             await this.page.keyboard.press('Tab');
             if (await field.evaluate((el) => el === document.activeElement).catch(() => false)) return true;
@@ -276,10 +372,10 @@ export class AlertDestinationsPage {
         return false;
     }
 
-    /** Computed focus styling of the recipients field's wrapper — for focus-visible checks. */
+    /** Computed focus styling of the recipients picker's trigger — for focus-visible checks. */
     async getRecipientsFocusStyle() {
-        return await this.page.locator(this.recipientsInputField).first().evaluate((el) => {
-            const s = getComputedStyle(el.parentElement || el);
+        return await this.page.locator(this.recipientsSelectTrigger).first().evaluate((el) => {
+            const s = getComputedStyle(el);
             return { shadow: s.boxShadow, border: s.borderColor };
         });
     }
@@ -379,6 +475,50 @@ export class AlertDestinationsPage {
     /** Wait for the destinations list page to be ready (Add Destination button visible). */
     async waitForDestinationListReady() {
         await this.page.locator(this.addDestinationButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    /**
+     * Deep-link straight to the destinations list with a given `page` query param,
+     * exercising AlertsDestinationList's URL-restored `currentPage` on a cold mount.
+     * @param {number} page
+     */
+    async gotoDestinationsWithPageParam(page) {
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const orgIdentifier = process.env.ORGNAME || 'default';
+        await this.page.goto(
+            `${baseUrl}/web/alert-destinations?org_identifier=${orgIdentifier}&page=${page}`,
+            { waitUntil: 'domcontentloaded' }
+        );
+        await this.waitForDestinationListReady();
+    }
+
+    // ==================== LIST PAGINATION (OTable pagination bar) ====================
+
+    async clickNextPage() {
+        const nextPageBtn = this.page.locator('[data-test="o2-table-next-page-btn"]');
+        await nextPageBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await nextPageBtn.click();
+    }
+
+    async getPaginationInfoText() {
+        const text = await this.page.locator('[data-test="o2-table-pagination-info"]').textContent().catch(() => null);
+        return (text || '').replace(/\s+/g, ' ').trim();
+    }
+
+    async expectPaginationInfoToMatch(pattern) {
+        await expect
+            .poll(async () => await this.getPaginationInfoText(), { timeout: 20000 })
+            .toMatch(pattern);
+    }
+
+    async expectUrlHasPageParam(pageValue) {
+        await expect.poll(() => this.page.url(), { timeout: 15000 }).toContain(`page=${pageValue}`);
+    }
+
+    async expectAtLeastOneListRow() {
+        await expect(
+            this.page.locator('[data-test^="o2-table-row-"]').first(),
+        ).toBeVisible({ timeout: 20000 });
     }
 
     /** @param {string} destinationName @param {string} url @param {string} templateName */
@@ -745,42 +885,62 @@ export class AlertDestinationsPage {
         await deleteButton.click();
         await this.page.locator(this.confirmButton).click();
 
-        // Check if "Destination is currently used by alert" message appears
-        try {
-            const inUseMessage = await this.page.getByText(this.destinationInUseMessage).textContent({ timeout: 3000 });
+        // Check if the "'name' is used by ..." error toast appears; a real timeout here (element
+        // never shows) means the delete went through, which is the only case this should swallow.
+        const errorToast = this.page.locator(this.errorToastMessage).filter({ hasText: this.destinationInUseMessage });
+        const isBlocked = await errorToast.first().isVisible({ timeout: 3000 }).catch(() => false);
 
-            // Extract alert name from message: "Destination is currently used by alert: Automation_Alert_3Igfv"
-            const match = inUseMessage.match(/alert:\s*(.+)$/);
-            if (match && match[1]) {
-                const alertName = match[1].trim();
-                testLogger.warn('Destination in use by alert, deleting alert first', { destinationName, alertName });
+        if (isBlocked) {
+            const inUseMessage = await errorToast.first().textContent();
 
-                // Close the error dialog
-                const closeBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
-                if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-                    await closeBtn.click();
-                } else {
-                    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-                }
-                await this.page.waitForTimeout(500);
+            // Every "N kind (name1, name2, ...)" segment in the message. Splitting names on ", "
+            // breaks if a name itself contains a comma or a closing paren — an accepted limit of
+            // this parser, not a claim about the backend's contract.
+            const blockerPattern = /(\d+)\s+([a-z][a-z ]*?)s?\s*\(([^)]*)\)/gi;
+            const blockers = [...inUseMessage.matchAll(blockerPattern)].map((m) => ({
+                kind: m[2].trim().toLowerCase(),
+                names: m[3].split(',').map((s) => s.trim()).filter(Boolean),
+            }));
 
-                // Navigate to alerts and delete the alert
-                await this.alertsPage.searchAndDeleteAlert(alertName);
-
-                // Navigate back to destinations
-                await this.navigateToDestinations();
-                await this.page.waitForTimeout(1000);
-
-                // Search for the destination again
-                await this.searchDestinations(destinationName);
-
-                // Retry deleting the destination
-                await deleteButton.waitFor({ state: 'visible', timeout: 5000 });
-                await deleteButton.click();
-                await this.page.locator(this.confirmButton).click();
+            // Close the error toast/dialog before doing anything else, clearable or not.
+            const closeBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+            if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await closeBtn.click();
+            } else {
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
             }
-        } catch (e) {
-            // No "in use" message, deletion was successful
+            await this.page.waitForTimeout(500);
+
+            // This helper only knows how to clear alerts; any other blocker kind (synthetic
+            // check, pipeline, escalation policy, team channel, composite alert, workflow,
+            // anomaly detection config) — or a message it could not parse at all — fails loudly
+            // instead of silently reporting success.
+            const unclearable = blockers.filter((b) => !b.kind.startsWith('alert'));
+            if (blockers.length === 0 || unclearable.length > 0) {
+                throw new Error(
+                    `Destination "${destinationName}" is still in use and this helper cannot clear it: ${inUseMessage}`
+                );
+            }
+
+            const alertNames = blockers.flatMap((b) => b.names);
+            testLogger.warn('Destination in use by alert(s), deleting them first', { destinationName, alertNames });
+
+            // Navigate to alerts and delete every blocking alert
+            for (const alertName of alertNames) {
+                await this.alertsPage.searchAndDeleteAlert(alertName);
+            }
+
+            // Navigate back to destinations
+            await this.navigateToDestinations();
+            await this.page.waitForTimeout(1000);
+
+            // Search for the destination again
+            await this.searchDestinations(destinationName);
+
+            // Retry deleting the destination
+            await deleteButton.waitFor({ state: 'visible', timeout: 5000 });
+            await deleteButton.click();
+            await this.page.locator(this.confirmButton).click();
         }
 
         await this.page.waitForTimeout(1000);
@@ -1244,7 +1404,7 @@ export class AlertDestinationsPage {
             pagerduty: '[data-test="pagerduty-integration-key-input-field"]',
             opsgenie: '[data-test="opsgenie-api-key-input-field"]',
             servicenow: '[data-test="servicenow-instance-url-input-field"]',
-            email: this.recipientsInputField,
+            email: this.recipientsSelectTrigger,
             custom: this.urlInput,
         }[type] || this.destinationNameInput;
         const confirmField = this.page.locator(typeConfirmSelector).first();
@@ -1338,14 +1498,17 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Fill email recipients (for Email type)
-     * @param {string} recipients - Comma-separated email addresses
+     * Select email recipients in the prebuilt picker (for Email type).
+     * @param {string|string[]} recipients - Account addresses, comma-separated or as an array.
+     *   Each must be an address the picker offers; a repeated address collapses to one
+     *   selection, since a picker cannot hold the same account twice.
      */
     async fillEmailRecipients(recipients) {
-        const input = this.page.locator(this.recipientsInputField).first();
-        await input.waitFor({ state: 'visible', timeout: 15000 });
-        await input.fill(recipients);
-        testLogger.debug('Filled email recipients', { recipients });
+        const addresses = (Array.isArray(recipients) ? recipients : String(recipients).split(','))
+            .map((r) => String(r).trim())
+            .filter(Boolean);
+        for (const email of addresses) await this.setEmailRecipientSelected(email, true);
+        testLogger.debug('Selected email recipients', { recipients: addresses });
     }
 
     /**
@@ -2137,43 +2300,21 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Verify email recipients field contains a value (edit mode)
+     * Verify the email recipients picker is populated (edit mode)
      * @param {string} expectedRecipients - Expected recipients (optional)
      */
     async expectEmailRecipientsPopulated(expectedRecipients = null) {
         await this.page.waitForTimeout(1500);
-
-        // Try multiple possible recipients input selectors
-        const recipientsSelectors = [
-            'input[data-test="email-recipients-input"]',
-            'input[data-test*="recipients"]',
-            'input[placeholder*="email"]',
-            'input[name*="recipients"]'
-        ];
-
-        let found = false;
-        for (const selector of recipientsSelectors) {
-            try {
-                const input = this.page.locator(selector).first();
-                if (await input.isVisible().catch(() => false)) {
-                    const value = await input.inputValue().catch(() => '');
-                    if (value && value.length > 0) {
-                        if (expectedRecipients) {
-                            await expect(input).toHaveValue(expectedRecipients, { timeout: 5000 });
-                        }
-                        testLogger.debug('Email recipients populated in edit mode', { selector });
-                        found = true;
-                        return;
-                    }
-                }
-            } catch (error) {
-                continue;
-            }
+        const selected = await this.getEmailRecipients();
+        if (!selected.length) {
+            testLogger.debug('Email recipients picker is empty in edit mode');
+            return;
         }
-
-        if (!found) {
-            testLogger.debug('Email recipients field not found or empty');
+        if (expectedRecipients) {
+            await expect.poll(async () => (await this.getEmailRecipients()).join(', '), { timeout: 5000 })
+                .toBe(expectedRecipients);
         }
+        testLogger.debug('Email recipients populated in edit mode', { selected });
     }
 
     /**
@@ -2226,20 +2367,19 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Update email recipients (for edit mode)
-     * @param {string} newRecipients - New email recipients
+     * Update email recipients (for edit mode). The picker has no free text, so an
+     * update is a selection: anything not listed is deselected.
+     * @param {string|string[]} newRecipients - Account addresses, comma-separated or as an array
      */
     async updateEmailRecipients(newRecipients) {
-        const input = this.page.locator(this.recipientsInputField).first();
-        if (!(await input.isVisible({ timeout: 10000 }).catch(() => false))) {
-            throw new Error('Email recipients input not found for update');
+        const wanted = (Array.isArray(newRecipients) ? newRecipients : String(newRecipients).split(','))
+            .map((r) => String(r).trim())
+            .filter(Boolean);
+        for (const current of await this.getEmailRecipients()) {
+            if (!wanted.includes(current)) await this.unselectEmailRecipient(current);
         }
-        await input.click();
-        await this.page.keyboard.press('Control+a');
-        await this.page.keyboard.press('Meta+a');
-        await input.fill(newRecipients);
-        await expect(input).toHaveValue(newRecipients, { timeout: 5000 });
-        testLogger.debug('Updated email recipients', { newRecipients });
+        await this.fillEmailRecipients(wanted);
+        testLogger.debug('Updated email recipients', { newRecipients: wanted });
     }
 
     /**

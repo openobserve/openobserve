@@ -1495,7 +1495,7 @@ import incidentsService, {
   IncidentCorrelatedStreams,
   ArchivedRcaReport,
 } from "@/services/incidents";
-import oncallService from "@/services/oncall";
+import { oncallTeamsQuery, responsesForIncidentQuery } from "@/services/oncall.queries";
 import type { OnCallResponse } from "@/ts/interfaces/oncall";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
@@ -1608,11 +1608,7 @@ export default defineComponent({
     /// claiming nobody was paged.
     async function loadOnCallResponse(org: string, incidentId: string) {
       try {
-        const res = await oncallService.listResponsesForIncident({
-          org_identifier: org,
-          incident_id: incidentId,
-        });
-        const records = res.data ?? [];
+        const records = await queryClient.fetchQuery(responsesForIncidentQuery(org, incidentId));
         oncallResponses.value = records;
         // The owner fixes the thing; a liaison contains the blast radius. The
         // owner's record is the one the panel is about.
@@ -1630,10 +1626,8 @@ export default defineComponent({
     async function loadOnCallTeamNames(org: string, records: OnCallResponse[]) {
       if (!records.some((record) => record.team_id)) return;
       try {
-        const res = await oncallService.listTeams({ org_identifier: org });
-        oncallTeamNames.value = Object.fromEntries(
-          (res.data ?? []).map((team) => [team.id, team.name]),
-        );
+        const teams = await queryClient.fetchQuery(oncallTeamsQuery(org));
+        oncallTeamNames.value = Object.fromEntries(teams.map((team) => [team.id, team.name]));
       } catch {
         // The ids still render; a failed lookup must not blank the panel.
         oncallTeamNames.value = {};

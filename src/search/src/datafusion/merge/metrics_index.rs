@@ -20,7 +20,7 @@ use arrow::array::RecordBatch;
 use arrow_schema::Schema;
 use config::{get_config, meta::stream::FileMeta};
 use datafusion::error::{DataFusionError, Result};
-use metrics_block::{BlockWriter, ParentMetadata};
+use metrics_index::block::{BlockWriter, ParentMetadata};
 use parquet::file::metadata::ParquetMetaData;
 use tokio::task::JoinHandle;
 use vortex::{arrow::ArrowSessionExt, file::OpenOptionsSessionExt, session::VortexSession};
@@ -56,8 +56,11 @@ pub(super) enum Blocks {
 impl Blocks {
     pub fn try_new(schema: &Arc<Schema>) -> anyhow::Result<Self> {
         let (file, path) = new_file()?;
-        let writer =
-            BlockWriter::new_pending(file, Arc::clone(schema), metrics_block::MAX_BLOCK_ROWS)?;
+        let writer = BlockWriter::new_pending(
+            file,
+            Arc::clone(schema),
+            metrics_index::block::MAX_BLOCK_ROWS,
+        )?;
 
         Ok(Self::Active(Box::new(BlockFile { writer, path })))
     }

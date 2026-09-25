@@ -84,7 +84,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 85: create llm_experiment_slot_retries.
 // 86: create synthetics shared variables tables; add env to synthetics_jobs.
 // 87: add input_preview to llm_annotation_queue_items.
-pub const DB_SCHEMA_VERSION: u64 = 87;
+// 88: add iam password policy tables.
+// 89: add level_half_width_seconds to anomaly_detection_config.
+pub const DB_SCHEMA_VERSION: u64 = 89;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2258,6 +2260,18 @@ pub struct Common {
     )]
     pub regex_patterns_source_url: String,
     #[env_config(
+        name = "ZO_SDR_DETECT_POLICY_ENABLED",
+        default = false,
+        help = "Allow AUTHORING the Detect (count-only) redaction policy on this node. It gates writes made here only; it does NOT stop a Detect association authored elsewhere from replicating to this node, which honours it as count-only either way. On a build that predates Detect the association stops redacting instead of being applied as Redact, so the field is left unredacted until that build is upgraded."
+    )]
+    pub sdr_detect_policy_enabled: bool,
+    #[env_config(
+        name = "ZO_SDR_EVIDENCE_HEARTBEAT_INTERVAL",
+        default = 300,
+        help = "Seconds between redaction-evidence heartbeat rows per (org, stream). A heartbeat records that scanning was active even when nothing matched."
+    )]
+    pub sdr_evidence_heartbeat_interval: u64,
+    #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
         default = true,
         help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
@@ -4026,6 +4040,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.usage_publish_interval < 1 {
         cfg.common.usage_publish_interval = 60;
+    }
+
+    // A zero interval makes every batch overdue, so heartbeats overflow their own queue.
+    if cfg.common.sdr_evidence_heartbeat_interval == 0 {
+        cfg.common.sdr_evidence_heartbeat_interval = 300;
     }
 
     cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();

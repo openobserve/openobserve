@@ -26,6 +26,8 @@ use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{LabelModifier, token};
 use rayon::prelude::*;
 
+use crate::scalar_param::ScalarParam;
+
 mod avg;
 mod count;
 mod count_values;
@@ -180,10 +182,10 @@ pub trait Accumulate: Send + Sync + Sized {
 /// through [`AggOp::eval_aggregate`] and the streaming path through `streaming_eval::aggregate`,
 /// each matching once into the monomorphized fold for the chosen [`AggFunc`]. Operators that
 /// are not listed here (`quantile`, `count_values`) are evaluated by their own functions.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum AggOp {
     Avg,
-    Bottomk(usize),
+    Bottomk(ScalarParam),
     Count,
     Group,
     Max,
@@ -191,18 +193,15 @@ pub(crate) enum AggOp {
     Stddev,
     Stdvar,
     Sum,
-    Topk(usize),
+    Topk(ScalarParam),
 }
 
 impl AggOp {
     /// The operator of a token with its evaluated parameter; the error of an unsupported
     /// operator or of a k that is not a number.
-    pub(crate) fn new(op: &token::TokenType, param: Option<Value>) -> Result<Self> {
-        let k = |name: &str| match param {
-            Some(Value::Float(value)) => Ok(value as usize),
-            _ => Err(DataFusionError::Plan(format!(
-                "[{name}] param must be a number"
-            ))),
+    pub(crate) fn new(op: &token::TokenType, param: Option<ScalarParam>) -> Result<Self> {
+        let k = |name: &str| {
+            param.ok_or_else(|| DataFusionError::Plan(format!("[{name}] param must be a number")))
         };
         Ok(match op.id() {
             token::T_AVG => Self::Avg,
@@ -585,7 +584,7 @@ mod tests {
         // The buffering accumulators merge by appending, so only the chunking may vary.
         assert_chunkings_match(Stddev, 4, &points);
         assert_chunkings_match(Stdvar, 4, &points);
-        assert_chunkings_match(quantile::Quantile::new(0.5), 4, &points);
+        assert_chunkings_match(quantile::Quantile::new(ScalarParam::Const(0.5)), 4, &points);
         assert!(samples_of(Sum.build(0), &[]).is_empty());
     }
 
@@ -617,7 +616,10 @@ mod tests {
         check(Group, &[(10, 1.0), (30, 1.0)]);
         check(Stdvar, &[(10, 1.0), (30, 1.0)]);
         check(Stddev, &[(10, 1.0), (30, 1.0)]);
-        check(quantile::Quantile::new(1.0), &[(10, 3.0), (30, 4.0)]);
+        check(
+            quantile::Quantile::new(ScalarParam::Const(1.0)),
+            &[(10, 3.0), (30, 4.0)],
+        );
     }
 
     #[test]
@@ -701,34 +703,28 @@ mod tests {
             AggOp::new(&op(token::T_AVG), None),
             Ok(AggOp::Avg)
         ));
-        assert!(matches!(
-            AggOp::new(&op(token::T_TOPK), Some(Value::Float(3.7))),
-            Ok(AggOp::Topk(3))
-        ));
-        assert!(matches!(
-            AggOp::new(&op(token::T_BOTTOMK), Some(Value::Float(1.0))),
-            Ok(AggOp::Bottomk(1))
-        ));
-        assert!(matches!(
-            AggOp::new(&op(token::T_TOPK), Some(Value::Float(-1.0))),
-            Ok(AggOp::Topk(0))
-        ));
+        assert_eq!(
+            AggOp::new(&op(token::T_TOPK), Some(ScalarParam::Const(3.7))).unwrap(),
+            AggOp::Topk(ScalarParam::Const(3.7))
+        );
+        assert_eq!(
+            AggOp::new(&op(token::T_BOTTOMK), Some(ScalarParam::Const(1.0))).unwrap(),
+            AggOp::Bottomk(ScalarParam::Const(1.0))
+        );
         for (id, message) in [
             (token::T_TOPK, "[topk] param must be a number"),
             (token::T_BOTTOMK, "[bottomk] param must be a number"),
         ] {
-            for param in [None, Some(Value::None), Some(Value::String("k".into()))] {
-                let result = AggOp::new(&op(id), param);
-                assert!(
-                    matches!(&result, Err(DataFusionError::Plan(m)) if m == message),
-                    "{result:?}"
-                );
-            }
+            let result = AggOp::new(&op(id), None);
+            assert!(
+                matches!(&result, Err(DataFusionError::Plan(m)) if m == message),
+                "{result:?}"
+            );
         }
         for id in [token::T_QUANTILE, token::T_COUNT_VALUES, token::T_ADD] {
             let unsupported = op(id);
             assert!(matches!(
-                AggOp::new(&unsupported, Some(Value::Float(0.5))),
+                AggOp::new(&unsupported, Some(ScalarParam::Const(0.5))),
                 Err(DataFusionError::NotImplemented(m)) if m == format!("Unsupported Aggregate: {unsupported:?}")
             ));
         }
@@ -736,7 +732,10 @@ mod tests {
 
     #[test]
     fn test_agg_op_series_labels() {
-        for op in [AggOp::Topk(1), AggOp::Bottomk(1)] {
+        for op in [
+            AggOp::Topk(ScalarParam::Const(1.0)),
+            AggOp::Bottomk(ScalarParam::Const(1.0)),
+        ] {
             assert!(op.needs_series_labels());
         }
         for op in [
@@ -763,7 +762,11 @@ mod tests {
             [Sample::new(1000, 1.0)],
         )];
         assert!(matches!(
-            AggOp::Topk(0).eval_aggregate(&None, Value::Matrix(matrix.clone()), &eval_ctx),
+            AggOp::Topk(ScalarParam::Const(0.0)).eval_aggregate(
+                &None,
+                Value::Matrix(matrix.clone()),
+                &eval_ctx
+            ),
             Ok(Value::None)
         ));
         let off_grid = vec![RangeValue::new(
@@ -771,14 +774,22 @@ mod tests {
             [Sample::new(1500, 1.0)],
         )];
         assert!(matches!(
-            AggOp::Topk(2).eval_aggregate(&None, Value::Matrix(off_grid), &eval_ctx),
+            AggOp::Topk(ScalarParam::Const(2.0)).eval_aggregate(
+                &None,
+                Value::Matrix(off_grid),
+                &eval_ctx
+            ),
             Ok(Value::None)
         ));
         assert!(matches!(
-            AggOp::Topk(2).eval_aggregate(&None, Value::Matrix(vec![]), &eval_ctx),
+            AggOp::Topk(ScalarParam::Const(2.0)).eval_aggregate(
+                &None,
+                Value::Matrix(vec![]),
+                &eval_ctx
+            ),
             Ok(Value::None)
         ));
-        let Value::Matrix(result) = AggOp::Topk(2)
+        let Value::Matrix(result) = AggOp::Topk(ScalarParam::Const(2.0))
             .eval_aggregate(&None, Value::Matrix(matrix), &eval_ctx)
             .unwrap()
         else {

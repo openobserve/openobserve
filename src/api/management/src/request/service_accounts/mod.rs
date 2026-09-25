@@ -287,6 +287,7 @@ pub async fn update(
         new_password: None,
         role: None,
         token: None,
+        remove_lockout: false,
     };
     let initiator_id = &user_email.user_id;
 

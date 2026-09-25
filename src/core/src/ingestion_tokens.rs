@@ -67,7 +67,7 @@ pub async fn list_tokens(org_id: &str) -> Result<Vec<OrgIngestionToken>, anyhow:
     Ok(tokens)
 }
 
-/// Create a new named ingestion token. Returns the full token (only time it's shown unmasked).
+/// Create a named ingestion token; returns the full, unmasked value.
 pub async fn create_token(
     org_id: &str,
     name: &str,
@@ -143,7 +143,7 @@ pub async fn create_token(
     })
 }
 
-/// Rotate a token's value. Returns the new full token (only time it's shown unmasked).
+/// Rotate a token's value; returns the new full, unmasked value.
 pub async fn rotate_token(org_id: &str, name: &str) -> Result<OrgIngestionToken, anyhow::Error> {
     let existing = db::org_ingestion_tokens::get_by_name(org_id, name)
         .await?

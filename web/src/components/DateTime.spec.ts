@@ -537,6 +537,71 @@ describe("DateTime Component", () => {
       expect(wrapper.emitted("on:date-change")).toBeTruthy();
     });
 
+    it("should cap a huge custom value at the per-unit maximum", async () => {
+      wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
+      store.state.savedViewFlag = false;
+      wrapper.vm.selectedType = "relative";
+      wrapper.vm.relativePeriod = "m";
+      wrapper.vm.relativeValue = 40000000000000000000;
+
+      wrapper.vm.onCustomPeriodSelect();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.relativeValue).toBe(5_256_000);
+    });
+
+    it("should re-cap the custom value when the unit changes", async () => {
+      wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
+      store.state.savedViewFlag = false;
+      wrapper.vm.selectedType = "relative";
+      wrapper.vm.relativeValue = 5000;
+      wrapper.vm.relativePeriod = "M";
+
+      wrapper.vm.onCustomPeriodSelect();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.relativeValue).toBe(120);
+    });
+
+    it.each([0, -5, 2.7])(
+      "should clamp custom value %s to a whole number of at least 1",
+      async (typed) => {
+        wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
+        store.state.savedViewFlag = false;
+        wrapper.vm.selectedType = "relative";
+        wrapper.vm.relativePeriod = "m";
+        wrapper.vm.relativeValue = typed;
+
+        wrapper.vm.onCustomPeriodSelect();
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.relativeValue).toBe(Math.max(1, Math.trunc(typed)));
+      },
+    );
+
+    it("should not apply an emptied custom value and restore the last applied one on blur", async () => {
+      wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
+      store.state.savedViewFlag = false;
+      wrapper.vm.selectedType = "relative";
+      wrapper.vm.relativePeriod = "m";
+      wrapper.vm.relativeValue = 30;
+      wrapper.vm.onCustomValueFocus();
+      wrapper.vm.relativeValue = 45;
+      wrapper.vm.onCustomPeriodSelect();
+      const emittedBefore = wrapper.emitted("on:date-change")?.length ?? 0;
+
+      wrapper.vm.relativeValue = "";
+      wrapper.vm.onCustomPeriodSelect();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.emitted("on:date-change")?.length ?? 0).toBe(emittedBefore);
+      expect(wrapper.vm.getDisplayValue).toContain("45");
+      expect(wrapper.vm.getDisplayValue).not.toContain("NaN");
+
+      wrapper.vm.onCustomValueBlur();
+      expect(wrapper.vm.relativeValue).toBe(45);
+    });
+
     it("should test setRelativeDate with autoApply", async () => {
       wrapper = createWrapper({ autoApply: true });
       store.state.savedViewFlag = false;
