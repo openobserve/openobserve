@@ -878,6 +878,7 @@ pub struct FileDeletedRecord {
     pub date: String,
     pub file: String,
     pub index_file: bool,
+    pub mindex_size: i64,
     pub flattened: bool,
 }
 

@@ -113,6 +113,9 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
 }
 
 fn metrics_index_key(file: &FileListDeleted) -> Option<Cow<'_, str>> {
+    if file.mindex_size <= 0 {
+        return None;
+    }
     MetricsFileLayout::metrics_index_path(&file.file).map(Cow::Owned)
 }
 
@@ -123,6 +126,7 @@ mod tests {
     fn deleted_file(file: &str) -> FileListDeleted {
         FileListDeleted {
             file: file.to_string(),
+            mindex_size: 1,
             ..Default::default()
         }
     }
@@ -134,6 +138,12 @@ mod tests {
             metrics_index_key(&file).as_deref(),
             Some("files/default/mindex/cpu/2026/08/19/07/indexed-v1-456.midx")
         );
+
+        let file_without_index = FileListDeleted {
+            mindex_size: 0,
+            ..file
+        };
+        assert!(metrics_index_key(&file_without_index).is_none());
 
         for file in [
             "files/default/logs/app/2026/08/19/07/indexed-v1-456.parquet",

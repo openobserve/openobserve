@@ -320,6 +320,7 @@ async fn cleanup_orphan_blooms(
                     account,
                     file: path,
                     index_file: false, // a `.bf` has no companion `.ttv`
+                    mindex_size: 0,
                     flattened: false,
                 });
             }

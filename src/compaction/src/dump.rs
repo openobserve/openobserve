@@ -451,6 +451,7 @@ pub async fn delete_by_time_range(
             account: f.account.to_string(),
             file: format!("files/{}/{}/{}", f.stream, f.date, f.file),
             index_file: false,
+            mindex_size: f.mindex_size,
             flattened: false,
         })
         .collect();
@@ -461,6 +462,7 @@ pub async fn delete_by_time_range(
         account: f.account.to_string(),
         file: f.key.clone(),
         index_file: false,
+        mindex_size: f.meta.mindex_size,
         flattened: false,
     }));
 

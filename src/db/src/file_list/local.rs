@@ -32,6 +32,7 @@ pub async fn add_pending_delete(org_id: &str, account: &str, file: &str) -> Resu
                 account: account.to_string(),
                 file: file.to_string(),
                 index_file: false,
+                mindex_size: 0,
                 flattened: false,
             }],
         )
