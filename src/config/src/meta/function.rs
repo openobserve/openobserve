@@ -473,4 +473,18 @@ mod tests {
         assert!(obj.contains_key("streams"));
         assert_eq!(obj["streams"].as_array().unwrap().len(), 1);
     }
+
+    #[test]
+    fn an_explicit_null_trans_type_is_not_covered_by_the_field_default() {
+        // The serde default only fills an absent field, so a present null still yields None
+        // and callers cannot assume the option is populated.
+        let absent: Transform = serde_json::from_str(r#"{"function":"."}"#).unwrap();
+        assert_eq!(absent.trans_type, Some(0));
+
+        let null: Transform = serde_json::from_str(r#"{"function":".","transType":null}"#).unwrap();
+        assert_eq!(null.trans_type, None);
+
+        let set: Transform = serde_json::from_str(r#"{"function":".","transType":1}"#).unwrap();
+        assert_eq!(set.trans_type, Some(1));
+    }
 }
