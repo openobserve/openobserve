@@ -16,7 +16,8 @@
 mod loads;
 
 use std::{
-    collections::VecDeque,
+    cmp::Reverse,
+    collections::{BinaryHeap, VecDeque},
     hash::Hasher,
     sync::{
         Arc, LazyLock, Mutex,
@@ -309,6 +310,7 @@ impl FileCursor {
 
 pub(crate) struct BlockSeriesStream {
     files: Vec<FileCursor>,
+    heads: BinaryHeap<Reverse<(u64, usize)>>,
     columns: Arc<LabelColumns>,
     interners: Vec<LabelInterner>,
     window: (i64, i64),
@@ -324,6 +326,12 @@ pub(crate) struct BlockSeriesStream {
 
 impl BlockSeriesStream {
     pub(super) fn new(partition: PreparedPartition) -> Self {
+        let heads = partition
+            .files
+            .iter()
+            .enumerate()
+            .filter_map(|(id, file)| file.hash().map(|hash| Reverse((hash, id))))
+            .collect();
         let interners = partition
             .columns
             .series
@@ -332,6 +340,7 @@ impl BlockSeriesStream {
             .collect();
         Self {
             files: partition.files,
+            heads,
             columns: partition.columns,
             interners,
             window: partition.window,
@@ -372,7 +381,7 @@ impl SeriesStream for BlockSeriesStream {
             ));
         }
         loop {
-            let Some(hash) = self.files.iter().filter_map(FileCursor::hash).min() else {
+            let Some(Reverse((hash, first_file))) = self.heads.pop() else {
                 self.head = None;
                 if !self.ended {
                     self.stats
@@ -382,18 +391,16 @@ impl SeriesStream for BlockSeriesStream {
                 }
                 return Ok(None);
             };
-            let first = self
-                .files
-                .iter()
-                .find(|file| file.hash() == Some(hash))
-                .unwrap();
+            let first = &self.files[first_file];
             let head = (Arc::clone(&first.file.index), first.head().unwrap());
             self.samples.clear();
             if self.decoder.is_none() {
                 self.decoder = Some(BlockDecoder::new().map_err(external)?);
             }
             let decoder = self.decoder.as_mut().expect("decoder initialized");
-            for cursor in &mut self.files {
+            let mut file_id = first_file;
+            loop {
+                let cursor = &mut self.files[file_id];
                 while cursor.hash() == Some(hash) {
                     let block = cursor
                         .decode_next(decoder, &mut self.local_stats)
@@ -417,6 +424,16 @@ impl SeriesStream for BlockSeriesStream {
                         }
                     }
                 }
+                if let Some(next_hash) = cursor.hash() {
+                    self.heads.push(Reverse((next_hash, file_id)));
+                }
+                let Some(Reverse((next_hash, _))) = self.heads.peek() else {
+                    break;
+                };
+                if *next_hash != hash {
+                    break;
+                }
+                file_id = self.heads.pop().unwrap().0.1;
             }
             if self.samples.is_empty() {
                 continue;
@@ -1571,6 +1588,58 @@ mod tests {
         assert_eq!(
             stats.decoded_blocks.load(Ordering::Relaxed),
             stats.selected_blocks as u64
+        );
+    }
+
+    #[tokio::test]
+    async fn merge_orders_shared_hashes_and_exhausted_files() {
+        let first = file(&[(1, 10, 1.0, Some("a")), (4, 10, 4.0, Some("d"))]);
+        let second = file(&[(1, 20, 2.0, Some("a")), (2, 10, 3.0, Some("b"))]);
+        let third = file(&[(3, 10, 5.0, Some("c"))]);
+        let fixture = Fixture::new(&[first.clone(), second.clone(), third.clone()], false).await;
+        let scan = fixture.scan([first.0, second.0, third.0]);
+        let prepared = prepare(
+            &scan,
+            &Matchers::empty(),
+            columns(),
+            &intervals(),
+            100,
+            20,
+            &eval(),
+        )
+        .await
+        .unwrap();
+        let mut stream = BlockSeriesStream::new(prepared.into_iter().next().unwrap());
+        let mut actual = Vec::new();
+        while stream.advance().await.unwrap().is_some() {
+            let labels = stream.labels();
+            let mut samples = Vec::new();
+            stream.consume(&mut samples).await.unwrap();
+            actual.push((
+                labels,
+                samples.into_iter().map(|s| s.value.to_bits()).collect(),
+            ));
+        }
+        assert_eq!(
+            actual,
+            [
+                (
+                    vec![Arc::new(Label::new("group", "a"))],
+                    vec![1.0f64.to_bits(), 2.0f64.to_bits()]
+                ),
+                (
+                    vec![Arc::new(Label::new("group", "b"))],
+                    vec![3.0f64.to_bits()]
+                ),
+                (
+                    vec![Arc::new(Label::new("group", "c"))],
+                    vec![5.0f64.to_bits()]
+                ),
+                (
+                    vec![Arc::new(Label::new("group", "d"))],
+                    vec![4.0f64.to_bits()]
+                ),
+            ]
         );
     }
 
