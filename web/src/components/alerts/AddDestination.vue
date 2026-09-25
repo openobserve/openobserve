@@ -862,12 +862,14 @@ const setupDestinationData = async () => {
   originalSlackWebhookUrl.value = "";
   if (props.destination) {
     isUpdatingDestination.value = true;
+    const requestedName = props.destination.name;
     let destination = props.destination;
     try {
       const response = await destinationService.get_by_name({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: props.destination.name,
+        org_identifier: orgId.value,
+        destination_name: requestedName,
       });
+      if (props.destination?.name !== requestedName) return;
       destination = response?.data ?? props.destination;
     } catch {
       destination = props.destination;
