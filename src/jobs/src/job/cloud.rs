@@ -684,7 +684,8 @@ async fn send_budget_warning_emails(
     let allowed_configs: Vec<_> = config
         .into_iter()
         .filter(|v| {
-            let allowed = v.org_id == org_id || member_orgs.contains(&v.org_id);
+            let allowed =
+                v.org_id == org_id || member_orgs.contains(&v.org_id) || v.org_id == "total";
             if !allowed {
                 log::warn!(
                     "skipping org {} for org {}, as not a member nor the same org",
@@ -696,10 +697,13 @@ async fn send_budget_warning_emails(
         })
         .collect();
 
-    let own_config = allowed_configs.iter().filter(|v| v.org_id == org_id).next();
+    let total_config = allowed_configs
+        .iter()
+        .filter(|v| v.org_id == "total")
+        .next();
     let child_configs: Vec<_> = allowed_configs
         .iter()
-        .filter(|v| v.org_id != org_id)
+        .filter(|v| v.org_id != "total")
         .collect();
 
     let start_str = chrono::DateTime::from_timestamp_micros(upcoming_invoice.cycle_start)
@@ -711,18 +715,19 @@ async fn send_budget_warning_emails(
         .to_utc()
         .to_rfc2822();
 
-    if let Some(own) = own_config
-        && !own.paused
+    if let Some(total) = total_config
+        && !total.paused
     {
-        if own.warn_at_amount <= upcoming_invoice.total_cost {
+        if total.warn_at_amount <= upcoming_invoice.total_cost {
             send_warning_email(
                 org_id,
                 None,
                 &start_str,
                 &end_str,
-                own.total_budget_amount,
-                own.warn_at_amount,
+                total.total_budget_amount,
+                total.warn_at_amount,
                 upcoming_invoice.total_cost,
+                true,
             )
             .await?;
         }
@@ -785,6 +790,7 @@ async fn send_budget_warning_emails(
                 child_config.total_budget_amount,
                 child_config.warn_at_amount,
                 total_cost,
+                false,
             )
             .await?;
         }
@@ -835,6 +841,7 @@ async fn send_warning_email(
     total: f64,
     warn: f64,
     actual: f64,
+    is_total_config: bool,
 ) -> Result<(), anyhow::Error> {
     let admins = list_users_by_org(org_id)
         .await?
@@ -849,9 +856,21 @@ async fn send_warning_email(
         "Openobserve Cloud: Budget Warning notification for {} org",
         child_org.unwrap_or(org_id)
     );
+
+    let info_line = if is_total_config {
+        format!(
+            "This is a notification email based on configured total cost budget for org id <b>{org_id}</b>"
+        )
+    } else {
+        format!(
+            "This is a notification email based on configured cost budget for org id <b>{}</b>.",
+            child_org.unwrap_or(org_id)
+        )
+    };
+
     let body = format!(
         r#"Hello,
-    This is a notification email based on configured cost budget for org id <b>{}</b>.
+    {info_line}
     You have configured a total budget of <b>${}</b>, with warning starting at </b>${}</b> or <b>{:.2}%<b>.
     The org has reached estimated cost of <b>${}</b> or <b>{:.2}%</b> of the total budget, exceeding the warning level.
     These amounts are for current billing cycle ranging from <b>{}</b> (UTC) to <b>{}</b> (UTC).
@@ -859,7 +878,6 @@ async fn send_warning_email(
     These notifications will now continue till end of the cycle, and you can pause them from the Budget tab of the Usage section in Openobserve Cloud.
 
     Regards,"#,
-        child_org.unwrap_or(org_id),
         total,
         warn,
         (warn / total) * 100.0,

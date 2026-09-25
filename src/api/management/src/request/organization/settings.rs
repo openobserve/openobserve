@@ -247,6 +247,7 @@ pub async fn create(
             let mut allowed_orgs: HashSet<_> =
                 child_orgs.into_iter().map(|v| v.member_org_id).collect();
             allowed_orgs.insert(org_id.clone());
+            allowed_orgs.insert("total".to_string()); // special indicator for total of super org
 
             for config in &configs {
                 if !allowed_orgs.contains(&config.org_id) {
