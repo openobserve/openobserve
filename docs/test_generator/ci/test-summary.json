@@ -1,0 +1,12 @@
+[
+  {
+    "title": "should show alert context menu on right-clicking a scatter chart and navigate to alert creation via above threshold",
+    "action": "append",
+    "verifies": "a scatter series opens the alert context menu and the above-threshold item routes to the alert form with prefill=panel"
+  },
+  {
+    "title": "should not show alert context menu on right-clicking a pie chart (non-cartesian series)",
+    "action": "append",
+    "verifies": "a non-cartesian pie series right-click produces no alert context menu (whitelist no-op)"
+  }
+]

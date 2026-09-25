@@ -252,6 +252,30 @@ export default class DashboardPanel {
     await chartCanvas.click({ button: "right", position });
   }
 
+  // Right-click the chart center without asserting the alert context menu.
+  // Used for series types that must NOT open the menu (pie/donut), where
+  // rightClickChartForAlert() would waste retries waiting for a menu that
+  // never appears. Mirrors its no-data-overlay + center-right-click logic.
+  async rightClickChart() {
+    const chartCanvas = this.chartRendererCanvas.first();
+    await chartCanvas.waitFor({ state: "visible", timeout: 15000 });
+
+    // Same guard as rightClickChartForAlert(): savePanel() re-runs the query
+    // while chart-renderer stays "visible", but a same-sized no-data overlay
+    // covers it and intercepts the click until the re-query resolves.
+    await this.noDataElement
+      .first()
+      .waitFor({ state: "hidden", timeout: 20000 })
+      .catch(() => {});
+
+    const box = await chartCanvas.boundingBox();
+    const position = box
+      ? { x: Math.floor(box.width / 2), y: Math.floor(box.height / 2) }
+      : { x: 200, y: 100 };
+
+    await chartCanvas.click({ button: "right", position });
+  }
+
   // Verify alert context menu is visible
   async expectAlertContextMenuVisible() {
     await expect(this.alertContextMenu).toBeVisible({ timeout: 10000 });

@@ -375,6 +375,166 @@ test.describe("Dashboard Create Alert testcases", () => {
     }
   );
 
+  test(
+    "should show alert context menu on right-clicking a scatter chart and navigate to alert creation via above threshold",
+    { tag: ["@dashboard-chart-context-menu", "@all", "@functional", "@P0"] },
+    async ({ page }) => {
+      testLogger.info(
+        "Testing alert context menu on scatter chart right-click (above threshold)"
+      );
+
+      const pm = new PageManager(page);
+      const dashName =
+        "Dashboard_Alert_Scatter_" + Math.random().toString(36).slice(2, 11);
+      const panelName =
+        pm.dashboardPanelActions.generateUniquePanelName("alert-scatter");
+
+      // Navigate to dashboards and create a new dashboard with a scatter panel
+      await pm.dashboardList.menuItem("dashboards-item");
+      await waitForDashboardPage(page);
+
+      await pm.dashboardCreate.createDashboard(dashName);
+
+      // Add a scatter panel. Scatter needs numeric X and Y axes to render; the
+      // shared e2e_automate stream provides took (X) and FloatValue (Y).
+      await pm.dashboardCreate.addPanel();
+      await pm.dashboardPanelActions.addPanelName(panelName);
+      await pm.chartTypeSelector.selectChartType("scatter");
+      // Guard: confirm scatter actually activated — a silent click failure
+      // leaves the panel as bar/line, which also opens the menu, so the
+      // downstream right-click assertion would pass without exercising scatter.
+      await expect(
+        pm.chartTypeSelector.getSelectedChartItem("scatter")
+      ).toHaveAttribute("data-selected", "true");
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.searchAndAddField("took", "x");
+      await pm.chartTypeSelector.searchAndAddField("FloatValue", "y");
+
+      // Apply query and wait for chart to render
+      const streamPromise = waitForStreamComplete(page);
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await streamPromise;
+      await pm.dashboardPanelActions.waitForChartToRender();
+
+      // Save the panel and wait for dashboard to reload chart data.
+      // _search_stream is SSE/chunked (progress events, then a final
+      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
+      // the first response event (headers), which fires as soon as the
+      // stream opens, not when it actually finishes. waitForStreamComplete
+      // reads the body and waits for the real [[DONE]] marker instead.
+      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
+      await pm.dashboardPanelActions.savePanel();
+      await dashboardStreamPromise;
+      await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
+
+      // Right-click on the chart renderer to trigger alert context menu
+      await pm.dashboardPanelEdit.rightClickChartForAlert();
+
+      // Verify the alert context menu appears
+      await pm.dashboardPanelEdit.expectAlertContextMenuVisible();
+      testLogger.info("Alert context menu is visible after scatter right-click");
+
+      // Verify menu items contain threshold text
+      const aboveOption = pm.dashboardPanelEdit.getAlertContextMenuAbove();
+      await expect(aboveOption).toBeVisible({ timeout: 5000 });
+      await expect(aboveOption).toContainText("Create Alert with threshold above");
+
+      const belowOption = pm.dashboardPanelEdit.getAlertContextMenuBelow();
+      await expect(belowOption).toBeVisible({ timeout: 5000 });
+      await expect(belowOption).toContainText("Create Alert with threshold below");
+
+      // Click "above threshold" option and wait for navigation simultaneously
+      await Promise.all([
+        page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
+          timeout: 15000,
+        }),
+        pm.dashboardPanelEdit.selectAlertAboveThreshold(),
+      ]);
+
+      const currentUrl = page.url();
+      expect(currentUrl).toContain("prefill=panel");
+      // The panel payload rides sessionStorage now, not the URL — a query string
+      // long enough to be truncated by a browser or proxy was the reason.
+      expect(currentUrl).not.toContain("panelData=");
+
+      testLogger.info(
+        "Navigated to alert creation page from scatter context menu (above threshold)"
+      );
+
+      // Navigate back and clean up
+      await returnToDashboardFolder(page, pm);
+      await deleteDashboard(page, dashName);
+
+      testLogger.info(
+        "Test completed: Scatter alert context menu above threshold"
+      );
+    }
+  );
+
+  test(
+    "should not show alert context menu on right-clicking a pie chart (non-cartesian series)",
+    { tag: ["@dashboard-chart-context-menu", "@all", "@functional", "@P1"] },
+    async ({ page }) => {
+      testLogger.info(
+        "Testing no alert context menu on pie chart right-click (whitelist no-op)"
+      );
+
+      const pm = new PageManager(page);
+      const dashName =
+        "Dashboard_Alert_Pie_" + Math.random().toString(36).slice(2, 11);
+      const panelName =
+        pm.dashboardPanelActions.generateUniquePanelName("alert-pie");
+
+      // Navigate to dashboards and create a new dashboard with a pie panel
+      await pm.dashboardList.menuItem("dashboards-item");
+      await waitForDashboardPage(page);
+
+      await pm.dashboardCreate.createDashboard(dashName);
+
+      // Add a pie panel (non-cartesian). Pie needs a single numeric value.
+      await pm.dashboardCreate.addPanel();
+      await pm.dashboardPanelActions.addPanelName(panelName);
+      await pm.chartTypeSelector.selectChartType("pie");
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.searchAndAddField("FloatValue", "y");
+
+      // Apply query and wait for chart to render
+      const streamPromise = waitForStreamComplete(page);
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await streamPromise;
+      await pm.dashboardPanelActions.waitForChartToRender();
+
+      // Save the panel and wait for dashboard to reload chart data.
+      // _search_stream is SSE/chunked (progress events, then a final
+      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
+      // the first response event (headers), which fires as soon as the
+      // stream opens, not when it actually finishes. waitForStreamComplete
+      // reads the body and waits for the real [[DONE]] marker instead.
+      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
+      await pm.dashboardPanelActions.savePanel();
+      await dashboardStreamPromise;
+      await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
+
+      // Right-click the chart center. A pie series type is not in the
+      // context-menu whitelist, so no menu may appear.
+      await pm.dashboardPanelEdit.rightClickChart();
+
+      // Verify the alert context menu does not appear
+      await pm.dashboardPanelEdit.expectAlertContextMenuHidden();
+      testLogger.info("No alert context menu after pie right-click (as expected)");
+
+      // Clean up
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashName);
+
+      testLogger.info(
+        "Test completed: No alert context menu for pie chart"
+      );
+    }
+  );
+
   // ===== P0: END-TO-END ALERT CREATION =====
   // this is skipped for now as we are working on alert v3 
 
@@ -517,7 +677,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       testLogger.info("Alert found in alerts list", { alertName });
 
       // Cleanup: Delete the alert via kebab menu on the first row
-      const kebabButton = firstRow.locator('[data-test*="-more-options"]').first();
+      const kebabButton = pm.alertsPage.getAlertRowMoreOptions(firstRow);
       await kebabButton.waitFor({ state: "visible", timeout: 5000 });
       await kebabButton.click();
       await pm.alertsPage.getDeleteMenuOption().waitFor({ state: "visible", timeout: 5000 });

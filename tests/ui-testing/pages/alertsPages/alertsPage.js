@@ -4879,6 +4879,11 @@ export class AlertsPage {
         return this.page.locator("table tbody tr");
     }
 
+    /** More-options kebab button inside a specific alert list row */
+    getAlertRowMoreOptions(rowLocator) {
+        return rowLocator.locator('[data-test*="-more-options"]').first();
+    }
+
     /** Context/kebab menu "Delete" option by exact text */
     getDeleteMenuOption() {
         return this.page.getByText("Delete", { exact: true });
