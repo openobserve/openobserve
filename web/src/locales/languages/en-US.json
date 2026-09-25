@@ -15032,8 +15032,8 @@
       "serving": "Verified. This domain now serves your status page, as long as its CNAME points at this app's host."
     },
     "preview": {
-      "title": "Live preview",
-      "subtitle": "How your public page looks as you edit",
+      "title": "Preview",
+      "subtitle": "Updates as you edit. Uptime shown is sample data.",
       "sampleBadge": "Sample data",
       "eyebrow": "Service status",
       "untitled": "Your status page",
