@@ -145,6 +145,9 @@ echarts.use([
   SVGRenderer,
 ]);
 
+// Right-click reads a y-axis value, so only cartesian series types can answer it
+const CONTEXT_MENU_SERIES_TYPES = ["bar", "line", "scatter"];
+
 export default defineComponent({
   name: "ChartRenderer",
   emits: [
@@ -318,8 +321,7 @@ export default defineComponent({
       // Get chart type from the first series
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
-      // Only handle contextmenu for bar and line charts
-      if (!chartType || !["bar", "line"].includes(chartType)) {
+      if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
         return;
       }
 
@@ -382,8 +384,7 @@ export default defineComponent({
       await nextTick();
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
-      // Only handle contextmenu for bar and line charts
-      if (!chartType || !["bar", "line"].includes(chartType)) {
+      if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
         return;
       }
 
