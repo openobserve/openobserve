@@ -27,8 +27,6 @@ use std::{
 
 use anyhow::{Context, Result, ensure};
 use bytes::Bytes;
-#[cfg(test)]
-use config::metrics::promql::IndexBlocksCacheMetrics;
 use config::{
     meta::{
         promql::{
@@ -42,12 +40,6 @@ use config::{
 use datafusion::error::DataFusionError;
 use futures::{StreamExt, stream};
 use hashbrown::{HashMap, HashSet};
-#[cfg(test)]
-use metrics_index::block::ParentMetadata;
-#[cfg(test)]
-use metrics_index::block_cache::CacheWeight;
-#[cfg(test)]
-use metrics_index::block_cache::SidecarBinding;
 use metrics_index::{
     block::{BlockDecoder, DecodedBlockRef, Index},
     block_cache::{CacheKey, CachedIndex, INDEX_CACHE, IndexCache, ParentIdentity, cache_limit},
@@ -992,9 +984,12 @@ mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize};
 
     use async_trait::async_trait;
-    use config::meta::{
-        promql::{HASH_SORTED_TABLE_SUFFIX, value::Label},
-        stream::FileMeta,
+    use config::{
+        meta::{
+            promql::{HASH_SORTED_TABLE_SUFFIX, value::Label},
+            stream::FileMeta,
+        },
+        metrics::promql::IndexBlocksCacheMetrics,
     };
     use datafusion::{
         arrow::{
@@ -1005,7 +1000,10 @@ mod tests {
         prelude::{SessionConfig, SessionContext, col},
     };
     use futures::stream::BoxStream;
-    use metrics_index::block::BlockWriter;
+    use metrics_index::{
+        block::{BlockWriter, ParentMetadata},
+        block_cache::{CacheWeight, SidecarBinding},
+    };
     use object_store::{
         CopyOptions, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
         PutMultipartOptions, PutOptions, PutPayload, PutResult, path::Path,
