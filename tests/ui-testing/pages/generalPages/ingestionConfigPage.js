@@ -42,6 +42,11 @@ export class IngestionConfigPage {
         // Recommended Kubernetes tab marker (default tab on Recommended page)
         this.recommendedKubernetesTab = page.locator('[data-test="ingestion-recommended-tab-ingestFromKubernetes"]');
 
+        // Recommended → GPU (DCGM Exporter) setup card
+        this.recommendedGpuTab = page.locator('[data-test="ingestion-recommended-tab-ingestFromGpu"]');
+        this.gpuExporterSwitch = page.locator('[data-test="gpu-setup-exporter-group"]');
+        this.gpuExporterDcgm = page.locator('[data-test="gpu-setup-exporter-dcgm"]');
+
         // Count of integration route tabs in Recommended view (scoped to its container)
         this.recommendedRouteTabs = page.locator('[data-test="data-sources-recommended-tabs"] [data-test^="ingestion-recommended-tab-"]');
     }
@@ -63,6 +68,29 @@ export class IngestionConfigPage {
     async navigateToIntegration(integrationPath, orgId) {
         await this.page.goto(`${process.env.ZO_BASE_URL}/web${integrationPath}?org_identifier=${orgId}`);
         await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+    }
+
+    // ==================== GPU (DCGM Exporter) ====================
+
+    async openGpuFromRecommended(orgId) {
+        await this.navigateToRecommended(orgId);
+        await expect(this.recommendedGpuTab).toBeVisible({ timeout: 10000 });
+        await this.recommendedGpuTab.click();
+        await this.page.waitForURL(/\/ingestion\/recommended\/gpu/, { timeout: 10000 });
+    }
+
+    async expectDcgmExporterSelected() {
+        await expect(this.gpuExporterSwitch).toBeVisible({ timeout: 10000 });
+        await expect(this.gpuExporterDcgm).toHaveAttribute('data-state', 'on');
+    }
+
+    /** Picks a platform on a card step's variant toggle (steps in one group follow it). */
+    async selectStepVariant(stepId, variantId) {
+        await this.page.locator(`[data-test="ai-step-${stepId}"] [data-test="ai-variant-${variantId}"]`).click();
+    }
+
+    async getStepCode(stepId) {
+        return await this.page.locator(`[data-test="ai-step-${stepId}"] [data-test="ai-code"]`).first().textContent();
     }
 
     // ==================== Tab Interactions ====================
