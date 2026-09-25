@@ -8239,6 +8239,7 @@ dependencies = [
  "tower",
  "tracing",
  "transform",
+ "urlencoding",
  "usage_reporting",
  "utoipa",
 ]

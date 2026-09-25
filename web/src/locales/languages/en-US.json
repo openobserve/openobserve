@@ -348,6 +348,10 @@
       "title": "No traces found",
       "description": "No traces match the selected service and time range. Try a wider time range or a different service."
     },
+    "noProfiles": {
+      "title": "No Profiles found",
+      "description": "Your time window doesn't contain any profile data from this stream. Try a wider time range or a different service."
+    },
     "noServiceGraph": {
       "title": "No service graph data",
       "description": "Try querying a longer time range, or ensure your services are emitting span metrics."
@@ -414,6 +418,7 @@
       "alerts": "alerts",
       "incidents": "incidents",
       "traces": "traces",
+      "profiles": "profiles",
       "discoveryItems": "unhealthy items",
       "datasetItems": "items",
       "searches": "searches",
@@ -1299,6 +1304,8 @@
     "tagKey": "Tag key",
     "tagValue": "Tag value",
     "addFilter": "Add filter",
+    "removeFilter": "Remove filter {key}={value}",
+    "searchFrames": "Search frames",
     "runQuery": "Run query",
     "timeSeriesTitle": "Profile values over time",
     "resultTitle": "Profile result",
@@ -1307,14 +1314,28 @@
     "viewTree": "Stack tree",
     "self": "Self",
     "total": "Total",
+    "share": "Share",
     "cpuDuration": "CPU duration",
     "percent": "%",
+    "sortBySelf": "Sort by Self",
+    "sortByTotal": "Sort by Total",
     "noStreams": "No profile streams available",
-    "noSeries": "No time-series data in this range",
-    "noResults": "No profile result in this range",
+    "noSeries": "No Data",
+    "noResults": "No Profiles found",
+    "noProfilesFound": "No Profiles found",
+    "noProfilesFoundDesc": "Your time window doesn't contain any profile data from this stream. Try a wider time range or a different service.",
+    "loading": "Loading profiles…",
     "filters": "Filters",
     "expand": "Expand",
     "collapse": "Collapse",
+    "resetFocus": "Reset focus",
+    "labelAlign": "Label alignment",
+    "alignLeft": "Align left",
+    "alignRight": "Align right",
+    "inverted": "Inverted",
+    "copyFunctionName": "Copy function name",
+    "focusBlock": "Focus block",
+    "focusOfTotal": "{percent}% of total",
     "errors": {
       "loadFailed": "Failed to load profile data"
     }
