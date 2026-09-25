@@ -55,10 +55,10 @@ export const msteamsTemplate = {
       "@type": "MessageCard",
       "@context": "http://schema.org/extensions",
       themeColor: "D63638",
-      summary: "Alert: {alert_name}",
+      summary: "[{alert_status}] {alert_name}",
       sections: [
         {
-          activityTitle: "🚨 Alert: {alert_name}",
+          activityTitle: "[{alert_status}] {alert_name}",
           activitySubtitle: "OpenObserve Alert Notification",
           activityImage: "https://openobserve.ai/favicon.ico",
           facts: [
@@ -72,7 +72,7 @@ export const msteamsTemplate = {
             },
             {
               name: "Status",
-              value: "🔴 Firing",
+              value: "{alert_status}",
             },
             {
               name: "Count",

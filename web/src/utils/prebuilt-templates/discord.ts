@@ -25,7 +25,7 @@ export const discordTemplate = {
     {
       username: "OpenObserve Alerts",
       avatar_url: "https://openobserve.ai/favicon.ico",
-      content: "🚨 **Alert: {alert_name}**",
+      content: "[{alert_status}] **{alert_name}**",
       embeds: [
         {
           title: "{alert_name}",
@@ -44,7 +44,7 @@ export const discordTemplate = {
             },
             {
               name: "Status",
-              value: "🔴 Firing",
+              value: "{alert_status}",
               inline: true,
             },
             {

@@ -52,7 +52,7 @@ export const emailTemplate = {
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚨 Alert Notification</h1>
+            <h1>[{alert_status}] {alert_name}</h1>
         </div>
         <div class="content">
             <div class="alert-info">
@@ -71,7 +71,7 @@ export const emailTemplate = {
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Status:</span>
-                    <span class="detail-value">🔴 Firing</span>
+                    <span class="detail-value">{alert_status}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Count:</span>
