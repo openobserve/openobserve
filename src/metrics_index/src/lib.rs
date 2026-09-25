@@ -59,7 +59,7 @@ mod tests {
         let schema = Schema::new(vec![Field::new("path", DataType::Utf8, true)]);
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "/api/bar")]);
         let file = FileKey::from_file_name(
-            "files/default/metrics/cpu/2026/09/23/00/indexed-v1-no-index.parquet",
+            "files/default/metrics/cpu/2026/09/23/00/indexed-v3-no-index.parquet",
         );
         let mut files = vec![file];
         assert!(
@@ -238,8 +238,8 @@ mod tests {
             .unwrap();
         let id = config::ider::uuid();
         let account = format!("{id}:default");
-        let path = format!("files/test/mindex/m/2026/09/22/00/indexed-v1-{id}.midx");
-        let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v1-{id}.vortex");
+        let path = format!("files/test/mindex/m/2026/09/22/00/indexed-v3-{id}.midx");
+        let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v3-{id}.vortex");
         let store = object_store::memory::InMemory::new();
         store
             .put_opts(

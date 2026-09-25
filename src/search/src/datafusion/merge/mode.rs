@@ -57,7 +57,7 @@ pub enum MergeMode {
     /// hour-end merge takes them once more.
     MetricsHashMerged,
     /// Metrics index stream, closed hour: the whole hour merges into
-    /// size-split `indexed-v1-*` files in the same order.
+    /// size-split `indexed-v3-*` files in the same order.
     MetricsIndexed,
     /// Metrics downsampling (enterprise): aggregate every series by the rule's
     /// step, size-split output files. Only for a closed hour, which is merged
@@ -319,7 +319,7 @@ mod tests {
         let legacy = FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/1.parquet");
         let sorted =
             FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/hash-sorted-v1-2.parquet");
-        let major = FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/indexed-v1-3.parquet");
+        let major = FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/indexed-v3-3.parquet");
         // all inputs hash ordered: the hash modes merge them pre-sorted
         for mode in [MergeMode::MetricsHashSorted, MergeMode::MetricsIndexed] {
             assert_eq!(

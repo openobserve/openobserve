@@ -467,7 +467,7 @@ mod tests {
             0,
             format!("{id}:default"),
             format!(
-                "files/test/metrics/m/2026/09/20/00/indexed-v1-{id}{}",
+                "files/test/metrics/m/2026/09/20/00/indexed-v3-{id}{}",
                 format.extension()
             ),
             FileMeta {

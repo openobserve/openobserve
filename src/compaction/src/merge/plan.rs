@@ -296,9 +296,9 @@ mod tests {
     #[test]
     fn test_plan_batches_all_indexed_hour_is_skipped() {
         let files = vec![
-            metrics_file("indexed-v1-1.parquet", 300),
-            metrics_file("indexed-v1-2.parquet", 300),
-            metrics_file("indexed-v1-3.parquet", 300),
+            metrics_file("indexed-v3-1.parquet", 300),
+            metrics_file("indexed-v3-2.parquet", 300),
+            metrics_file("indexed-v3-3.parquet", 300),
             metrics_file("7.parquet", 300),
             metrics_file("8.parquet", 300),
         ];
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn test_plan_batches_indexed_file_is_not_rewritten() {
         let files = vec![
-            metrics_file("indexed-v1-1.parquet", 300),
+            metrics_file("indexed-v3-1.parquet", 300),
             metrics_file("hash-sorted-v1-2.parquet", 300),
         ];
         let batches = plan_batches(

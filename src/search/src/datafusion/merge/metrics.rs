@@ -1030,7 +1030,7 @@ mod tests {
                 .unwrap()
                 .remove(0);
             assert!(matches!(file, MergedFile::MetricsIndexedNoIndex { .. }));
-            assert!(file.file_name("example", format).starts_with("indexed-v1-"));
+            assert!(file.file_name("example", format).starts_with("indexed-v3-"));
             let (data, meta, path) = file.into_upload_parts().await.unwrap();
             assert!(path.is_none());
             assert_eq!(
@@ -1400,7 +1400,7 @@ mod tests {
                 && meta.original_size < max_file_size as i64
         }));
         assert!(files.iter().all(|file| file.file_name("1", file_format)
-            == format!("indexed-v1-1{}", file_format.extension())));
+            == format!("indexed-v3-1{}", file_format.extension())));
 
         let mut file_hashes = Vec::new();
         for file in files {

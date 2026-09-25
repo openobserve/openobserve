@@ -425,7 +425,7 @@ mod tests {
         FileKey::new(
             1,
             String::new(),
-            "files/org/metrics/m/2026/09/23/00/indexed-v1-id.parquet".into(),
+            "files/org/metrics/m/2026/09/23/00/indexed-v3-id.parquet".into(),
             FileMeta {
                 records,
                 compressed_size: 100,

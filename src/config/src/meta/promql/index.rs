@@ -105,7 +105,7 @@ pub fn metrics_index_path(path: &str) -> Option<String> {
     let name = *parts.last()?;
     let format = FileFormat::from_extension(name)?;
     let stem = name.strip_suffix(format.extension())?;
-    if stem.strip_prefix("indexed-v1-").is_none_or(str::is_empty) {
+    if stem.strip_prefix("indexed-v3-").is_none_or(str::is_empty) {
         return None;
     }
     parts[2] = "mindex";
