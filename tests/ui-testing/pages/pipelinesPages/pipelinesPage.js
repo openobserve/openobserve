@@ -1176,6 +1176,22 @@ export class PipelinesPage {
         await this.page.locator(this.enrichmentTableTab).click();
     }
 
+    /**
+     * Open Settings -> Pipeline Destinations and wait for the named row.
+     *
+     * Pipeline destinations live on their own tab — `destinationsQuery(org, "pipeline")` —
+     * so the alert destinations page never lists them and cannot reach this row. That
+     * list also has no search box, so the row is awaited directly rather than filtered.
+     */
+    async openPipelineDestinationsAt(name) {
+        await this.settingsMenu.click();
+        await this.pipelineDestinationsTab.click();
+        await expect(this.destinationListAddBtn).toBeVisible({ timeout: 30000 });
+        await this.page
+            .locator(`[data-test="alert-destination-list-${name}-delete-destination"]`)
+            .waitFor({ state: 'visible', timeout: 30000 });
+    }
+
     async deleteDestination(randomNodeName) {
         await this.settingsMenu.click();
         await this.pipelineDestinationsTab.click();

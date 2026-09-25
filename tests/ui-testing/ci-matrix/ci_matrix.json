@@ -26,7 +26,8 @@
       "alerts-chart-error-state.spec.js",
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
-      "alertDestinationsPagination.spec.js"
+      "alertDestinationsPagination.spec.js",
+      "alerts-destinations-usage.spec.js"
     ],
     "disabled": [
       {

@@ -37,7 +37,8 @@
       "alerts-14308-composite-trigger-timestamps.spec.js",
       "alerts-measure-column-default.spec.js",
       "alerts-from-dashboard-panel.spec.js",
-      "alerts-query-editor-search-endpoint.spec.js"
+      "alerts-query-editor-search-endpoint.spec.js",
+      "alerts-14796-destination-usage.spec.js"
     ],
     "disabled": []
   },
