@@ -7531,6 +7531,9 @@
       "lastError": "Lỗi cuối cùng",
       "lastTrained": "Lần huấn luyện cuối",
       "lookBackWindow": "Cửa sổ nhìn lại",
+      "lookBackWindowFloor": "Look Back Window must be at least {min} — Check Every plus one Detection Resolution. A shorter window cannot hold a complete bucket by the time a run fires, so buckets would be skipped.",
+      "lookBackWindowLegacy": "This saved window is below the {min} minimum (Check Every plus one Detection Resolution). It will save unchanged, but runs can skip buckets until the window is raised.",
+      "lookBackWindowMinimum": "Minimum {min}. Recommended {recommended} or more — twice (Check Every + Detection Resolution) — plus 10 minutes where absence detection is enabled.",
       "lookBackWindowTooltip": "Khoảng thời gian tối đa mà mỗi lần chạy phát hiện truy vấn. Giới hạn cửa sổ ngay cả sau khi tạm dừng lâu. Mặc định là khoảng thời gian Kiểm tra mỗi lần.",
       "metricChart": "Chỉ số và bất thường",
       "metricChartHint": "Một điểm cho mỗi khoảng phát hiện",
@@ -7539,6 +7542,15 @@
       "nDays": "{days} ngày | {days} ngày",
       "noDestinationsFound": "Không tìm thấy đích nào",
       "noFieldsFound": "Không tìm thấy trường nào",
+      "noticeHybridFallback": "Fallback detection",
+      "noticeHybridFallbackTooltip": "The hybrid threshold was unavailable on recent runs, so detection fell back to the frozen threshold. Scoring continues on the frozen threshold until the model is retrained.",
+      "noticeRetrain": "Auto-retraining",
+      "noticeRetrainTooltip": "The saved model could not be read after an upgrade, so it was discarded and the config was queued for retraining automatically. No action is required; detection resumes once training completes.",
+      "noticeSkipAbsence": "Absence grading fell behind the Look Back Window; the span that could no longer be fetched was skipped and recorded.",
+      "noticeSkipScored": "Detection runs arrived further apart than the Look Back Window covers, so closed buckets left the window before a run could judge them.",
+      "noticeWindowFloor": "Window too narrow",
+      "noticeWindowFloorTooltip": "The Look Back Window is below Check Every plus one Detection Resolution, so runs cannot judge any bucket. Raise the window to restore detection.",
+      "noticeWindowSkip": "Buckets skipped",
       "notifications": "Thông báo",
       "notificationsTooltip": "Khi được bật, một thông báo sẽ được gửi đến đích đã chọn mỗi khi phát hiện bất thường.",
       "percentile": "Mức",
@@ -15343,6 +15355,9 @@
       "noOptionsFound": "Không tìm thấy tùy chọn",
       "multiSelect": "Chọn nhiều",
       "singleSelect": "Chọn một"
+    },
+    "templateInput": {
+      "suggestions": "Gợi ý biến"
     },
     "time": {
       "openTimePicker": "Mở bộ chọn thời gian",

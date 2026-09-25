@@ -18,6 +18,8 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import type { BrowserStep } from "@/types/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
+import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
+import type { VariableSuggestion } from "@/components/synthetics/variables/suggestions";
 import en from "@/locales/languages/en-US.json";
 
 const i18n = createI18n({
@@ -587,5 +589,34 @@ describe("BrowserJourneyStepEditor unbound variables", () => {
   it("stays quiet when the host cannot tell what resolves", () => {
     const wrapper = render({ action: "type", value: "{{USER}}" });
     expect(wrapper.find(warning).exists()).toBe(false);
+  });
+});
+
+describe("BrowserJourneyStepEditor variable suggestions", () => {
+  const suggestions: VariableSuggestion[] = [
+    { name: "BASE_URL", envs: ["prod"], global: false, secret: false, gap: [] },
+  ];
+  const valueField = (wrapper: ReturnType<typeof render>) => wrapper.findComponent(OTemplateInput);
+
+  it("offers the rows on a value the probe substitutes", () => {
+    const wrapper = render({ action: "type", value: "" }, { variableSuggestions: suggestions });
+    expect(valueField(wrapper).props("suggestions")).toEqual(suggestions);
+  });
+
+  it("keeps the value plain for an action whose value is never substituted", () => {
+    const wrapper = render({ action: "upload", value: "" }, { variableSuggestions: suggestions });
+    expect(valueField(wrapper).props("suggestions")).toBeUndefined();
+  });
+
+  it("writes an accepted token into the step and its wire", async () => {
+    const wrapper = render(
+      { action: "type", value: "", wire: { id: "w1", action: "type" } as never },
+      { variableSuggestions: suggestions },
+    );
+    await valueField(wrapper).vm.$emit("update:modelValue", "{{BASE_URL}}");
+    const emitted = wrapper.emitted("update:step");
+    const step = emitted?.[emitted.length - 1]?.[0] as BrowserStep;
+    expect(step.value).toBe("{{BASE_URL}}");
+    expect(step.wire).toMatchObject({ value: "{{BASE_URL}}" });
   });
 });

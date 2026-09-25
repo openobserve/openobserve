@@ -15356,6 +15356,9 @@
       "multiSelect": "多选",
       "singleSelect": "单选"
     },
+    "templateInput": {
+      "suggestions": "变量建议"
+    },
     "time": {
       "openTimePicker": "打开时间选择器",
       "clear": "清除",

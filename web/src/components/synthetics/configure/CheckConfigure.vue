@@ -29,6 +29,7 @@ import useCheckWizardUi, {
   VARIABLES_SPLITTER_LIMITS,
 } from "@/composables/synthetics/useCheckWizardUi";
 import CheckDetails from "./CheckDetails.vue";
+import type { VariableSuggestion } from "../variables/suggestions";
 import CheckAuthNetwork from "./CheckAuthNetwork.vue";
 import CheckVariablesPanel from "./CheckVariablesPanel.vue";
 import CheckSchedule from "./CheckSchedule.vue";
@@ -53,6 +54,8 @@ const props = defineProps<{
   allowPrivateLocations?: boolean;
   /** When true, CheckLocations shows skeleton rows instead of the list. */
   loadingLocations?: boolean;
+  /** Rows offered on `{{` in the target field; the protocol view passes nothing. */
+  variableSuggestions?: VariableSuggestion[];
 }>();
 
 const { t } = useI18nTyped();
@@ -117,6 +120,7 @@ function handleUpdate(value: BrowserCheck) {
               :validation-errors="props.validationErrors ?? {}"
               :target-label="targetLabel"
               :target-placeholder="targetPlaceholder"
+              :variable-suggestions="variableSuggestions"
               data-test="synthetics-check-configure-details"
               @update:check="handleUpdate"
             />

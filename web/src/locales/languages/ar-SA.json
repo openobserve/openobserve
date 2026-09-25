@@ -7531,6 +7531,9 @@
       "lastError": "آخر خطأ",
       "lastTrained": "آخر تدريب",
       "lookBackWindow": "نافذة النظر إلى الوراء",
+      "lookBackWindowFloor": "Look Back Window must be at least {min} — Check Every plus one Detection Resolution. A shorter window cannot hold a complete bucket by the time a run fires, so buckets would be skipped.",
+      "lookBackWindowLegacy": "This saved window is below the {min} minimum (Check Every plus one Detection Resolution). It will save unchanged, but runs can skip buckets until the window is raised.",
+      "lookBackWindowMinimum": "Minimum {min}. Recommended {recommended} or more — twice (Check Every + Detection Resolution) — plus 10 minutes where absence detection is enabled.",
       "lookBackWindowTooltip": "إلى أي مدى تراجع كل استعلامات كشف تشغيلية. يحدد النافذة حتى بعد توقف طويل. يحدد الافتراضي فحص كل فترة.",
       "metricChart": "المقياس والشذوذات",
       "metricChartHint": "نقطة واحدة لكل مجموعة كشف",
@@ -7539,6 +7542,15 @@
       "nDays": "{days} يوم | {days} أيام",
       "noDestinationsFound": "لم يتم العثور على وجهات",
       "noFieldsFound": "لم يتم العثور على حقول",
+      "noticeHybridFallback": "Fallback detection",
+      "noticeHybridFallbackTooltip": "The hybrid threshold was unavailable on recent runs, so detection fell back to the frozen threshold. Scoring continues on the frozen threshold until the model is retrained.",
+      "noticeRetrain": "Auto-retraining",
+      "noticeRetrainTooltip": "The saved model could not be read after an upgrade, so it was discarded and the config was queued for retraining automatically. No action is required; detection resumes once training completes.",
+      "noticeSkipAbsence": "Absence grading fell behind the Look Back Window; the span that could no longer be fetched was skipped and recorded.",
+      "noticeSkipScored": "Detection runs arrived further apart than the Look Back Window covers, so closed buckets left the window before a run could judge them.",
+      "noticeWindowFloor": "Window too narrow",
+      "noticeWindowFloorTooltip": "The Look Back Window is below Check Every plus one Detection Resolution, so runs cannot judge any bucket. Raise the window to restore detection.",
+      "noticeWindowSkip": "Buckets skipped",
       "notifications": "الإشعارات",
       "notificationsTooltip": "عند تفعيلها، سيتم إرسال إشعار إلى الوجهة المحددة كلما تم اكتشاف شذوذ.",
       "percentile": "المستوى",
@@ -15343,6 +15355,9 @@
       "noOptionsFound": "لم يتم العثور على خيارات",
       "multiSelect": "الاختيار المتعدد",
       "singleSelect": "اختيار فردي"
+    },
+    "templateInput": {
+      "suggestions": "اقتراحات المتغيرات"
     },
     "time": {
       "openTimePicker": "أداة اختيار الوقت المفتوح",

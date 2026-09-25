@@ -15356,6 +15356,9 @@
       "multiSelect": "Multi select",
       "singleSelect": "Single select"
     },
+    "templateInput": {
+      "suggestions": "Variable suggestions"
+    },
     "time": {
       "openTimePicker": "Open time picker",
       "clear": "Clear",

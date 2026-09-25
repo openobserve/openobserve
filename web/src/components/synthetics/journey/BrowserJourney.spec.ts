@@ -45,6 +45,12 @@ const OInputStub = {
   template:
     '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
 };
+const OTemplateInputStub = {
+  props: ["modelValue", "suggestions"],
+  emits: ["update:modelValue", "blur"],
+  template:
+    '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" @blur="$emit(\'blur\', $event)" />',
+};
 const OSelectStub = {
   props: ["modelValue", "options", "label", "error", "errorMessage"],
   template: '<select v-bind="$attrs" />',
@@ -109,6 +115,7 @@ const STUBS = {
   OIcon: OIconStub,
   OBadge: OBadgeStub,
   OInput: OInputStub,
+  OTemplateInput: OTemplateInputStub,
   OSelect: OSelectStub,
   OCheckbox: OCheckboxStub,
   OTooltip: OTooltipStub,
@@ -374,6 +381,22 @@ describe("BrowserJourney recording", () => {
     const next = emitted[emitted.length - 1][0] as any[];
     expect(next[0].value).toBe("https://new.test");
     expect(next[0].wire.url).toBe("https://new.test");
+  });
+
+  it("should hand the variable rows to the value input of a substituted step", () => {
+    const variableSuggestions = [
+      { name: "BASE_URL", envs: ["prod"], global: false, secret: false, gap: [] },
+    ];
+    wrapper = mount(BrowserJourney, {
+      props: {
+        modelValue: [{ id: "s1", action: "navigate", name: "Open page", value: "" }],
+        variableSuggestions,
+      },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion } },
+    });
+
+    const valueInput = wrapper.findComponent('[data-test="synthetics-journey-step-value-input"]');
+    expect(valueInput.props("suggestions")).toEqual(variableSuggestions);
   });
 
   it("should emit clear-results when modelValue becomes empty", async () => {

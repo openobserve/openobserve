@@ -96,6 +96,13 @@ export const VALUE_ACTIONS: readonly StepAction[] = [
   "wait",
 ];
 
+const NOT_SUBSTITUTED_ACTIONS: readonly StepAction[] = ["upload", "scroll", "wait"];
+
+// Only these values reach url/key/value, the three step fields the probe substitutes.
+export const SUBSTITUTED_VALUE_ACTIONS: readonly StepAction[] = VALUE_ACTIONS.filter(
+  (action) => !NOT_SUBSTITUTED_ACTIONS.includes(action),
+);
+
 /**
  * Actions retired from the authoring vocabulary (spec X-9).
  *

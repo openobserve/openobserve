@@ -15356,6 +15356,9 @@
       "multiSelect": "複数選択",
       "singleSelect": "単一選択"
     },
+    "templateInput": {
+      "suggestions": "変数の候補"
+    },
     "time": {
       "openTimePicker": "時刻ピッカーを開く",
       "clear": "クリア",
