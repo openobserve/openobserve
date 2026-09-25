@@ -326,7 +326,8 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js"
+      "timezoneDisplay.spec.js",
+      "searchPatternsMultiStream.spec.js"
     ],
     "disabled": [
       {
