@@ -66,4 +66,40 @@ test.describe('RUM Onboarding Snippets', () => {
     // Two copy buttons: npm command + init config.
     await pm.rumIngestionPage.expectCopyControlsPresent(2);
   });
+
+  test('CDN variant shows O2 globals and pinned 0.4.3 bundle URLs', {
+    tag: ['@rum', '@rumOnboarding', '@P0'],
+  }, async () => {
+    await pm.rumIngestionPage.switchToCdnVariant();
+    await pm.rumIngestionPage.expectInstallSnippetContains('O2_RUM');
+    await pm.rumIngestionPage.expectInstallSnippetContains('O2_LOGS');
+    await pm.rumIngestionPage.expectInstallSnippetContains(
+      'https://browsersdk.openobserve.ai/0.4.3/openobserve-rum.js',
+    );
+    await pm.rumIngestionPage.expectInstallSnippetContains(
+      'https://browsersdk.openobserve.ai/0.4.3/openobserve-logs.js',
+    );
+    await pm.rumIngestionPage.expectInitSnippetContains('O2_RUM.onReady');
+    await pm.rumIngestionPage.expectInitSnippetContains('O2_LOGS.onReady');
+  });
+
+  test('CDN variant contains no OO_RUM / OO_LOGS / 0.3.4 anywhere', {
+    tag: ['@rum', '@rumOnboarding', '@P1'],
+  }, async () => {
+    await pm.rumIngestionPage.switchToCdnVariant();
+    await pm.rumIngestionPage.expectCardDoesNotContain('OO_RUM');
+    await pm.rumIngestionPage.expectCardDoesNotContain('OO_LOGS');
+    await pm.rumIngestionPage.expectCardDoesNotContain('0.3.4');
+  });
+
+  test('switching back to NPM restores the default install command', {
+    tag: ['@rum', '@rumOnboarding', '@P2'],
+  }, async () => {
+    await pm.rumIngestionPage.switchToCdnVariant();
+    await pm.rumIngestionPage.switchToNpmVariant();
+    await pm.rumIngestionPage.expectInstallSnippetContains(
+      'npm i @openobserve/browser-rum @openobserve/browser-logs',
+    );
+    await pm.rumIngestionPage.expectInitSnippetContains('openobserveRum.init');
+  });
 });
