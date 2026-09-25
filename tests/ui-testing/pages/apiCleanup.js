@@ -33,9 +33,13 @@ class APICleanup {
     async _fetch(url, options = {}) {
         if (this._page && isCloudEnvironment()) {
             // Ensure page is on the same origin so session cookies are sent with fetch
-            if (!this._pageNavigated) {
+            // Re-navigating an already-open app page would reset the test's UI state and org context.
+            const onAppOrigin = (() => {
+                try { return new URL(this._page.url()).origin === new URL(this.baseUrl).origin; } catch { return false; }
+            })();
+            if (!this._pageNavigated && !onAppOrigin) {
                 try {
-                    await this._page.goto(`${this.baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+                    await this._page.goto(`${this.baseUrl}/web/?org_identifier=${this.org}`, { waitUntil: 'domcontentloaded' });
                     this._pageNavigated = true;
                 } catch (e) {
                     testLogger.warn('Failed to navigate page to baseUrl for cookie auth', { error: e.message });
