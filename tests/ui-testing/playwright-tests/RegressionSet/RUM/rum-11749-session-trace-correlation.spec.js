@@ -26,9 +26,9 @@ const crypto = require('crypto');
 // `_o2_`; `_o2_` is the preferred spelling, so the fixture writes that one.
 const TRACE_ID_FIELD = '_o2_trace_id';
 
-// crypto, not Math.random: these become session and trace ids, and CodeQL reads
-// Math.random() in that position as insecure randomness. Same helper the trace
-// generators in utils/service-graph-ingestion.js use.
+// These become session and trace ids, so they are generated with crypto rather
+// than a pseudo-random source, which CodeQL reads as insecure randomness in that
+// position. Same helper the trace generators in utils/service-graph-ingestion.js use.
 const hex = (bytes) => crypto.randomBytes(bytes).toString('hex');
 
 // One failing request among the three, because "which call broke" is the question
