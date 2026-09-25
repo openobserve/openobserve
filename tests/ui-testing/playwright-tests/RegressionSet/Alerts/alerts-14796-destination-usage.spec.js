@@ -46,6 +46,7 @@ test.describe('Alert destination delete guard across consumers testcases', {
   let createdAlerts = [];
   let createdDestinations = [];
   let createdTemplates = [];
+  let createdPipelines = [];
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -53,16 +54,20 @@ test.describe('Alert destination delete guard across consumers testcases', {
     createdAlerts = [];
     createdDestinations = [];
     createdTemplates = [];
+    createdPipelines = [];
     await seedAlertFixtures(page);
     await navigateToBase(page);
   });
 
   test.afterEach(async ({ page }) => {
     const { v1 } = urls();
-    // Alerts first — while one still names a destination, the guard under test
+    // Consumers first — while one still names a destination, the guard under test
     // refuses that destination's delete and the fixture would leak.
     for (const id of [...createdAlerts].reverse()) {
       await deleteAlertInFolder(page, id, 'default');
+    }
+    for (const id of createdPipelines) {
+      await api(page, 'delete', `${v1}/pipelines/${id}`).catch(() => {});
     }
     for (const name of createdDestinations) {
       await api(page, 'delete', `${v1}/alerts/destinations/${name}`).catch(() => {});
@@ -116,6 +121,42 @@ test.describe('Alert destination delete guard across consumers testcases', {
     expect(id, 'seeded composite must exist').toBeTruthy();
     createdAlerts.push(id);
     return { id, name };
+  }
+
+  /**
+   * A pipeline-module destination (`?module=pipeline`) plus a realtime pipeline whose
+   * `remote_stream` node names it. Pipeline destinations carry no template and never
+   * appear on the alert destinations list, so this is the only way to reach that arm.
+   */
+  async function seedPipelineOnDestination(page, prefix) {
+    const { v1, org } = urls();
+    const destinationName = uniq(`${prefix}_dest`);
+    const destRes = await api(page, 'post', `${v1}/alerts/destinations?module=pipeline`, {
+      name: destinationName, url: 'http://127.0.0.1:1/never-called', method: 'post', type: 'http',
+    });
+    expect(destRes.status(), await destRes.text()).toBe(200);
+    createdDestinations.push(destinationName);
+
+    const pipelineName = uniq(`${prefix}_pipeline`);
+    const stream = 'alerts_p0_stream';
+    const pipeRes = await api(page, 'post', `${v1}/pipelines`, {
+      name: pipelineName, description: '', org, enabled: true,
+      source: { source_type: 'realtime', org_id: org, stream_name: stream, stream_type: 'logs' },
+      nodes: [
+        {
+          id: 'n1', type: 'input', io_type: 'input', position: { x: 0, y: 0 },
+          data: { node_type: 'stream', org_id: org, stream_name: stream, stream_type: 'logs' },
+        },
+        {
+          id: 'n2', type: 'output', io_type: 'output', position: { x: 200, y: 200 },
+          data: { node_type: 'remote_stream', org_id: org, destination_name: destinationName },
+        },
+      ],
+      edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
+    });
+    expect(pipeRes.status(), await pipeRes.text()).toBe(200);
+    createdPipelines.push((await pipeRes.json()).id);
+    return { destinationName, pipelineName };
   }
 
   async function openDestinationsScopedTo(name) {
@@ -176,6 +217,22 @@ test.describe('Alert destination delete guard across consumers testcases', {
     await pm.alertDestinationsPage.expectInUseErrorToastContaining([
       plain.name, 'composite alert', composite.name,
     ]);
+    await pm.alertDestinationsPage.expectDestinationRowStillVisible(destinationName);
+    testLogger.info('Test completed');
+  });
+
+  test('should refuse deleting a pipeline destination a pipeline still routes to', {
+    tag: ['@alert-destination-pipeline-consumer', '@all', '@alerts', '@P0'],
+  }, async ({ page }) => {
+    testLogger.info('Seeding a pipeline destination and a pipeline that routes to it');
+    const { destinationName, pipelineName } = await seedPipelineOnDestination(page, 'e2e_14796_pipe');
+
+    // Pipeline destinations live on their own Settings tab, not the alerts list.
+    await pm.pipelinesPage.openPipelineDestinationsAt(destinationName);
+
+    testLogger.info('Asserting the delete is refused and names the pipeline');
+    await pm.alertDestinationsPage.attemptDeleteDestination(destinationName);
+    await pm.alertDestinationsPage.expectInUseErrorToastContaining(['pipeline', pipelineName]);
     await pm.alertDestinationsPage.expectDestinationRowStillVisible(destinationName);
     testLogger.info('Test completed');
   });
