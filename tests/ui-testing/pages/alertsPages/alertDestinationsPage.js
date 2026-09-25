@@ -2949,6 +2949,24 @@ export class AlertDestinationsPage {
         await expect(toast.first()).toBeVisible({ timeout: 15000 });
     }
 
+    /**
+     * Assert the blocked-delete toast names every fragment in `fragments`.
+     *
+     * The guard reports every blocking consumer in ONE message; asserting only
+     * "is used by" would still pass against the pre-#14796 behaviour of naming the
+     * first blocker and returning, which is the defect this guards.
+     */
+    async expectInUseErrorToastContaining(fragments) {
+        const toast = this.page
+            .locator(this.errorToastMessage)
+            .filter({ hasText: this.destinationInUseMessage })
+            .first();
+        await expect(toast).toBeVisible({ timeout: 15000 });
+        for (const fragment of fragments) {
+            await expect(toast).toContainText(fragment, { timeout: 15000 });
+        }
+    }
+
     /** The in-use destination row must still be present after a blocked delete. */
     async expectDestinationRowStillVisible(name) {
         await expect(this.getDeleteDestinationBtn(name)).toBeVisible({ timeout: 10000 });
