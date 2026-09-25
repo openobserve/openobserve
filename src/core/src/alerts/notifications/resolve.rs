@@ -159,6 +159,10 @@ pub fn resolve_content(
 /// column set (used by `RowsSpec.format`, which operates on the full row
 /// regardless of the `columns` selection — design §4.2).
 ///
+/// The special token `{...row}` expands to the full row serialized as a
+/// compact JSON object, letting a single format string capture all fields
+/// without enumerating each column name.
+///
 /// Same input-scan discipline as `substitute_raw`: "unmatched" is decided
 /// from the ORIGINAL `input`, not the substituted output, so a row value
 /// that happens to look like `{something}` is never marker-stamped.
@@ -167,12 +171,24 @@ fn substitute_raw_row(
     row: &config::utils::json::Map<String, config::utils::json::Value>,
     unknown: &mut Vec<String>,
 ) -> String {
+    // {..row} bypasses the per-key loop — return the full row as JSON.
+    if input.trim() == "{...row}" {
+        return serde_json::to_string(row).unwrap_or_default();
+    }
+
     let mut unk: Vec<String> = scan_unmatched(input)
         .into_iter()
         .filter(|name| !row.contains_key(name))
         .collect();
 
     let mut out = input.to_string();
+
+    // Replace {..row} embedded inside a larger format string.
+    if out.contains("{...row}") {
+        let json = serde_json::to_string(row).unwrap_or_default();
+        out = out.replace("{...row}", &json);
+    }
+
     for (key, value) in row {
         let s = super::custom::stringify_row_value(value);
         scan_and_replace_var(&mut out, key, |len| {
@@ -797,5 +813,52 @@ mod tests {
             crate::alerts::notifications::render::markdown::markdown_to_plaintext(&r.body_markdown),
             r#"CPU "high" fired at 92.5"#
         );
+    }
+
+    #[test]
+    fn spread_row_token_as_sole_format_serializes_full_row() {
+        use config::meta::alerts::content_spec::{ContentSpec, RowsSpec};
+
+        let spec = ContentSpec {
+            rows: RowsSpec {
+                enabled: true,
+                max: 5,
+                columns: None,
+                format: Some("{...row}".into()),
+            },
+            ..Default::default()
+        };
+        let r = resolve_content(&spec, &fixture_ctx(), "webhook");
+        let lines = r.row_lines.as_ref().unwrap();
+        assert_eq!(lines.len(), 2);
+        // First line must be valid JSON with both row fields.
+        let v: serde_json::Value = serde_json::from_str(&lines[0]).unwrap();
+        assert_eq!(v.get("host").and_then(|v| v.as_str()), Some("web-1"));
+        assert_eq!(v.get("cpu").and_then(|v| v.as_f64()), Some(92.5));
+        // Second row.
+        let v2: serde_json::Value = serde_json::from_str(&lines[1]).unwrap();
+        assert_eq!(v2.get("host").and_then(|v| v.as_str()), Some("web-2"));
+    }
+
+    #[test]
+    fn spread_row_token_embedded_in_larger_format() {
+        use config::meta::alerts::content_spec::{ContentSpec, RowsSpec};
+
+        let spec = ContentSpec {
+            rows: RowsSpec {
+                enabled: true,
+                max: 5,
+                columns: None,
+                format: Some("row={...row}".into()),
+            },
+            ..Default::default()
+        };
+        let r = resolve_content(&spec, &fixture_ctx(), "webhook");
+        let lines = r.row_lines.as_ref().unwrap();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].starts_with("row="), "{}", lines[0]);
+        let json_part = lines[0].strip_prefix("row=").unwrap();
+        let v: serde_json::Value = serde_json::from_str(json_part).unwrap();
+        assert!(v.get("host").is_some());
     }
 }
