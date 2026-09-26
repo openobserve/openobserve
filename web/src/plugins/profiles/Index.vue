@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-card-glass-bg flex h-full min-h-0 flex-col">
     <div
-      class="border-border-default flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b p-1.5"
+      class="border-border-default flex shrink-0 flex-nowrap items-center gap-1.5 border-b p-1.5"
     >
-      <div class="w-60 shrink-0">
+      <div class="max-w-36 min-w-0 flex-1">
         <OSelect
           v-model="selectedStream"
           :label="t('profiles.stream')"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-stream-select"
         />
       </div>
-      <div class="w-60 shrink-0">
+      <div class="max-w-36 min-w-0 flex-1">
         <OSelect
           v-model="selectedService"
           :label="t('profiles.service')"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-service-select"
         />
       </div>
-      <div class="w-72 shrink-0">
+      <div class="max-w-44 min-w-0 flex-1">
         <OSelect
           v-model="selectedProfileType"
           :label="t('profiles.profileType')"
@@ -50,6 +50,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-type-select"
         />
       </div>
+      <div class="max-w-36 min-w-0 flex-1">
+        <OSelect
+          v-model="draftTagKey"
+          :label="t('profiles.tagKey')"
+          label-position="inside"
+          :options="tagKeyOptions"
+          :disabled="!tagKeyOptions.length"
+          clearable
+          class="w-full"
+          data-test="profiles-tag-key-select"
+        />
+      </div>
+      <div class="max-w-36 min-w-0 flex-1">
+        <OSelect
+          v-model="draftTagValue"
+          :label="t('profiles.tagValue')"
+          label-position="inside"
+          :options="tagValueOptions"
+          :disabled="!draftTagKey || tagValuesLoading"
+          :loading="tagValuesLoading"
+          clearable
+          class="w-full"
+          data-test="profiles-tag-value-select"
+        />
+      </div>
+      <OButton
+        class="shrink-0"
+        variant="outline"
+        size="sm-toolbar"
+        icon-left="add"
+        :disabled="!canAddFilter"
+        data-test="profiles-add-filter"
+        @click="addFilter"
+      >
+        {{ t("profiles.addFilter") }}
+      </OButton>
 
       <div class="ms-auto flex shrink-0 items-center gap-2">
         <DateTimePickerDashboard v-model="dateState" />
@@ -67,24 +103,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-y-auto">
-      <OContent class="flex flex-col gap-2.5 py-2.5">
-        <div
-          v-if="errorMessage"
-          class="bg-surface-panel border-border-default text-status-error-text rounded-default border p-3 text-sm"
-          data-test="profiles-error"
-        >
-          {{ errorMessage }}
-        </div>
+    <div
+      v-if="appliedFilters.length"
+      class="border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b px-1.5 py-1.5"
+      data-test="profiles-applied-filters"
+    >
+      <OTag
+        v-for="filter in appliedFilters"
+        :key="`${filter.key}=${filter.value}`"
+        type="fieldTag"
+        value="primarysm"
+        class="max-w-62.5"
+        :data-test="`profiles-filter-chip-${filter.key}`"
+      >
+        <span class="truncate font-mono text-xs">{{ filter.key }} = {{ filter.value }}</span>
+        <template #trailing>
+          <button
+            type="button"
+            class="ms-1 inline-flex cursor-pointer items-center"
+            :aria-label="t('profiles.removeFilter', { key: filter.key, value: filter.value })"
+            :data-test="`profiles-filter-remove-${filter.key}`"
+            @click.stop="removeFilter(filter)"
+          >
+            <OIcon name="close" size="xs" />
+          </button>
+        </template>
+      </OTag>
+    </div>
 
-        <div
-          v-if="!streamOptions.length"
-          class="bg-surface-panel border-border-default rounded-default border p-6 text-center"
-          data-test="profiles-no-stream"
-        >
-          {{ t("profiles.noStreams") }}
-        </div>
+    <div
+      class="min-h-0 flex-1 overflow-y-auto"
+      :class="!hasProfileData && streamOptions.length ? 'flex flex-col' : ''"
+    >
+      <div
+        v-if="errorMessage"
+        class="bg-surface-panel border-border-default text-status-error-text rounded-default m-2.5 border p-3 text-sm"
+        data-test="profiles-error"
+      >
+        {{ errorMessage }}
+      </div>
 
+      <div
+        v-if="!streamOptions.length"
+        class="bg-surface-panel border-border-default rounded-default m-2.5 border p-6 text-center"
+        data-test="profiles-no-stream"
+      >
+        {{ t("profiles.noStreams") }}
+      </div>
+
+      <div
+        v-else-if="queryLoading && !hasProfileData"
+        class="text-text-secondary flex flex-1 flex-col items-center justify-center gap-2.5 opacity-80"
+        data-test="profiles-loading"
+      >
+        <OSpinner size="lg" />
+        <span>{{ t("profiles.loading") }}</span>
+      </div>
+
+      <div
+        v-else-if="!hasProfileData"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
+        data-test="profiles-no-results"
+      >
+        <OEmptyState preset="no-profiles" size="block" :hide-action="true" />
+      </div>
+
+      <OContent v-else class="flex flex-col gap-2.5 py-2.5">
         <section class="bg-surface-panel border-border-default rounded-default border">
           <header class="border-border-default border-b px-3 py-2 text-sm font-semibold">
             {{ t("profiles.timeSeriesTitle") }}
@@ -110,61 +194,104 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-border-default flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2"
           >
             <div class="text-sm font-semibold">{{ t("profiles.resultTitle") }}</div>
-            <div class="flex items-center gap-1">
-              <OButton
-                :variant="activeView === 'top' ? 'primary' : 'ghost'"
-                size="sm"
-                data-test="profiles-view-top"
-                @click="activeView = 'top'"
-              >
-                {{ t("profiles.viewTop") }}
-              </OButton>
-              <OButton
-                :variant="activeView === 'flame' ? 'primary' : 'ghost'"
-                size="sm"
-                data-test="profiles-view-flame"
-                @click="activeView = 'flame'"
-              >
-                {{ t("profiles.viewFlame") }}
-              </OButton>
-              <OButton
-                :variant="activeView === 'tree' ? 'primary' : 'ghost'"
-                size="sm"
-                data-test="profiles-view-tree"
-                @click="activeView = 'tree'"
-              >
-                {{ t("profiles.viewTree") }}
-              </OButton>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="w-56">
+                <OSearchInput
+                  v-model="searchQuery"
+                  :placeholder="t('profiles.searchFrames')"
+                  data-test="profiles-search-frames"
+                />
+              </div>
+              <div class="flex items-center gap-1">
+                <OButton
+                  :variant="activeView === 'top' ? 'primary' : 'ghost'"
+                  size="sm"
+                  data-test="profiles-view-top"
+                  @click="activeView = 'top'"
+                >
+                  {{ t("profiles.viewTop") }}
+                </OButton>
+                <OButton
+                  :variant="activeView === 'flame' ? 'primary' : 'ghost'"
+                  size="sm"
+                  data-test="profiles-view-flame"
+                  @click="activeView = 'flame'"
+                >
+                  {{ t("profiles.viewFlame") }}
+                </OButton>
+                <OButton
+                  :variant="activeView === 'tree' ? 'primary' : 'ghost'"
+                  size="sm"
+                  data-test="profiles-view-tree"
+                  @click="activeView = 'tree'"
+                >
+                  {{ t("profiles.viewTree") }}
+                </OButton>
+              </div>
             </div>
           </header>
           <div class="p-3">
-            <div
-              v-if="!mergeResult || mergeResult.total <= 0"
-              class="text-text-secondary flex h-40 items-center justify-center text-sm"
-              data-test="profiles-no-results"
-            >
-              {{ t("profiles.noResults") }}
-            </div>
-
-            <div v-else-if="activeView === 'top'" class="overflow-auto">
-              <table class="w-full min-w-120 text-sm">
+            <div v-if="activeView === 'top'" class="overflow-auto">
+              <table class="w-full table-fixed text-sm">
                 <thead class="bg-surface-page text-left">
                   <tr>
-                    <th class="px-2 py-1">{{ t("function.header") }}</th>
-                    <th class="px-2 py-1 text-right">{{ valueColumnLabel(t("profiles.self")) }}</th>
-                    <th class="px-2 py-1 text-right">
-                      {{ valueColumnLabel(t("profiles.total")) }}
+                    <th class="min-w-0 px-2 py-1">{{ t("function.header") }}</th>
+                    <th class="w-40 px-2 py-1 text-right">
+                      <button
+                        type="button"
+                        class="hover:text-text-body inline-flex cursor-pointer items-center gap-1"
+                        :aria-label="t('profiles.sortBySelf')"
+                        data-test="profiles-sort-self"
+                        @click="toggleTopSort('self')"
+                      >
+                        {{ valueColumnLabel(t("profiles.self")) }}
+                        <span v-if="topSortKey === 'self'" class="text-text-secondary">{{
+                          topSortAsc ? "↑" : "↓"
+                        }}</span>
+                      </button>
                     </th>
-                    <th class="px-2 py-1 text-right">{{ t("profiles.percent") }}</th>
+                    <th class="w-40 px-2 py-1 text-right">
+                      <button
+                        type="button"
+                        class="hover:text-text-body inline-flex cursor-pointer items-center gap-1"
+                        :aria-label="t('profiles.sortByTotal')"
+                        data-test="profiles-sort-total"
+                        @click="toggleTopSort('total')"
+                      >
+                        {{ valueColumnLabel(t("profiles.total")) }}
+                        <span v-if="topSortKey === 'total'" class="text-text-secondary">{{
+                          topSortAsc ? "↑" : "↓"
+                        }}</span>
+                      </button>
+                    </th>
+                    <th class="w-16 px-2 py-1 text-right">{{ t("profiles.percent") }}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="row in topRows" :key="row.name" class="border-border-default border-t">
-                    <td class="px-2 py-1 font-mono text-xs">{{ row.name }}</td>
-                    <td class="px-2 py-1 text-right">{{ formatTableValue(row.self) }}</td>
-                    <td class="px-2 py-1 text-right">{{ formatTableValue(row.total) }}</td>
-                    <td class="px-2 py-1 text-right">
-                      {{ formatPercent(row.total, mergeResult.total) }}
+                  <tr
+                    v-for="row in topRows"
+                    :key="row.name"
+                    class="border-border-default hover:bg-table-row-hover-bg border-t"
+                  >
+                    <td class="max-w-0 px-2 py-1 font-mono text-xs">
+                      <span class="block truncate" v-html="highlightName(row.name)" />
+                      <OTooltip
+                        :content="raw(row.name)"
+                        side="top"
+                        align="start"
+                        hoverable
+                        max-width="40rem"
+                        content-class="font-mono text-xs break-all"
+                      />
+                    </td>
+                    <td class="px-2 py-1 text-right whitespace-nowrap">
+                      {{ formatTableValue(row.self) }}
+                    </td>
+                    <td class="px-2 py-1 text-right whitespace-nowrap">
+                      {{ formatTableValue(row.total) }}
+                    </td>
+                    <td class="px-2 py-1 text-right whitespace-nowrap">
+                      {{ formatPercent(row.total, mergeResult?.total ?? 0) }}
                     </td>
                   </tr>
                 </tbody>
@@ -177,55 +304,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :summary-label="t('profiles.total')"
                 :summary-value="formatTableValue(mergeResult?.total ?? 0)"
                 :unit-label="tableUnitLabel"
-                :empty-label="t('profiles.noResults')"
+                :empty-label="t('profiles.noProfilesFound')"
                 :value-formatter="formatTableValue"
+                :search-query="searchQuery"
               />
             </div>
 
             <div v-else class="overflow-auto">
-              <table class="w-full min-w-120 text-sm">
+              <table class="w-full table-fixed text-sm">
                 <thead class="bg-surface-page text-left">
                   <tr>
-                    <th class="px-2 py-1">{{ t("function.header") }}</th>
-                    <th class="px-2 py-1 text-right">{{ valueColumnLabel(t("profiles.self")) }}</th>
-                    <th class="px-2 py-1 text-right">
+                    <th class="min-w-0 px-2 py-1">{{ t("function.header") }}</th>
+                    <th class="w-40 px-2 py-1 text-right">
+                      {{ valueColumnLabel(t("profiles.self")) }}
+                    </th>
+                    <th class="w-40 px-2 py-1 text-right">
                       {{ valueColumnLabel(t("profiles.total")) }}
                     </th>
-                    <th class="px-2 py-1 text-right">{{ t("profiles.percent") }}</th>
+                    <th class="w-16 px-2 py-1 text-right">{{ t("profiles.percent") }}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr
                     v-for="row in visibleStackRows"
                     :key="row.id"
-                    class="border-border-default border-t"
+                    class="border-border-default hover:bg-table-row-hover-bg border-t"
                     :data-test="`profiles-stack-row-${row.id}`"
                   >
-                    <td class="px-2 py-1 font-mono text-xs">
-                      <span
-                        class="inline-flex items-center gap-1"
+                    <td class="max-w-0 px-2 py-1 font-mono text-xs">
+                      <button
+                        type="button"
+                        class="inline-flex max-w-full min-w-0 items-center gap-1 text-start"
+                        :class="row.hasChildren ? 'cursor-pointer' : 'cursor-default'"
                         :style="{ paddingInlineStart: `${row.depth}rem` }"
+                        :aria-expanded="
+                          row.hasChildren ? expandedStackNodeIds.has(row.id) : undefined
+                        "
+                        @click="row.hasChildren && toggleStackNode(row.id)"
                       >
-                        <button
-                          v-if="row.hasChildren"
-                          class="text-text-secondary hover:text-text-body h-4 w-4 cursor-pointer text-xs"
-                          :title="
-                            expandedStackNodeIds.has(row.id)
-                              ? t('profiles.collapse')
-                              : t('profiles.expand')
-                          "
-                          @click="toggleStackNode(row.id)"
+                        <span
+                          class="text-text-secondary inline-flex h-4 w-4 shrink-0 items-center justify-center text-xs"
+                          aria-hidden="true"
                         >
-                          {{ expandedStackNodeIds.has(row.id) ? "▾" : "▸" }}
-                        </button>
-                        <span v-else class="inline-block h-4 w-4"></span>
-                        {{ row.name }}
-                      </span>
+                          <template v-if="row.hasChildren">
+                            {{ expandedStackNodeIds.has(row.id) ? "▾" : "▸" }}
+                          </template>
+                        </span>
+                        <span class="min-w-0 truncate" v-html="highlightName(row.name)" />
+                      </button>
+                      <OTooltip
+                        :content="raw(row.name)"
+                        side="top"
+                        align="start"
+                        hoverable
+                        max-width="40rem"
+                        content-class="font-mono text-xs break-all"
+                      />
                     </td>
-                    <td class="px-2 py-1 text-right">{{ formatTableValue(row.self) }}</td>
-                    <td class="px-2 py-1 text-right">{{ formatTableValue(row.total) }}</td>
-                    <td class="px-2 py-1 text-right">
-                      {{ formatPercent(row.total, mergeResult.total) }}
+                    <td class="px-2 py-1 text-right whitespace-nowrap">
+                      {{ formatTableValue(row.self) }}
+                    </td>
+                    <td class="px-2 py-1 text-right whitespace-nowrap">
+                      {{ formatTableValue(row.total) }}
+                    </td>
+                    <td class="px-2 py-1 text-right whitespace-nowrap">
+                      {{ formatPercent(row.total, mergeResult?.total ?? 0) }}
                     </td>
                   </tr>
                 </tbody>
@@ -244,16 +387,24 @@ import { useStore } from "vuex";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import CommonFlameGraph from "@/components/common/FlameGraphView.vue";
 import streamService from "@/services/stream";
 import profilesService, {
+  type ProfileFilter,
   type ProfilesMergeResponse,
   type ProfilesQueryBody,
   type ProfilesSeriesResponse,
   type ProfilesTreeNode,
 } from "@/services/profiles";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { escapeHtml } from "@/utils/html";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const ChartRenderer = defineAsyncComponent(
@@ -262,6 +413,7 @@ const ChartRenderer = defineAsyncComponent(
 
 type SelectOption = { label: I18nText; value: string };
 type ProfileView = "top" | "flame" | "tree";
+type TopSortKey = "self" | "total";
 type StackRow = {
   id: string;
   depth: number;
@@ -284,6 +436,14 @@ const streamOptions = ref<SelectOption[]>([]);
 const selectedStream = ref<string | null>(null);
 const selectedService = ref<string | null>(null);
 const selectedProfileType = ref<string | null>(null);
+const draftTagKey = ref<string | null>(null);
+const draftTagValue = ref<string | null>(null);
+const tagValueOptions = ref<SelectOption[]>([]);
+const tagValuesLoading = ref(false);
+const appliedFilters = ref<ProfileFilter[]>([]);
+const searchQuery = ref("");
+const topSortKey = ref<TopSortKey>("total");
+const topSortAsc = ref(false);
 const activeView = ref<ProfileView>("top");
 const expandedStackNodeIds = ref<Set<string>>(new Set());
 
@@ -299,6 +459,7 @@ const queryLoading = ref(false);
 const errorMessage = ref("");
 let metaRequestSeq = 0;
 let queryRequestSeq = 0;
+let tagValuesRequestSeq = 0;
 
 const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier as string | undefined,
@@ -313,6 +474,9 @@ const profileTypeOptions = computed<SelectOption[]>(() =>
     value: `${item.type}\u0000${item.unit}`,
   })),
 );
+const tagKeyOptions = computed<SelectOption[]>(() =>
+  (metaResponse.value?.label_names ?? []).map((value) => ({ label: raw(value), value })),
+);
 const currentProfileType = computed(() => {
   const selected = selectedProfileType.value;
   if (!selected) return null;
@@ -322,6 +486,10 @@ const currentProfileType = computed(() => {
 });
 const canQuery = computed(
   () => !!orgIdentifier.value && !!selectedStream.value && !!currentProfileType.value,
+);
+const hasProfileData = computed(() => (mergeResult.value?.total ?? 0) > 0);
+const canAddFilter = computed(
+  () => !!draftTagKey.value && !!draftTagValue.value && !queryLoading.value,
 );
 const seriesPoints = computed(() => seriesResponse.value?.series ?? []);
 const seriesStepSecs = computed(() => Math.max(1, seriesResponse.value?.step_secs ?? 1));
@@ -367,7 +535,20 @@ const seriesChartData = computed(() => {
     },
   };
 });
-const topRows = computed(() => (mergeResult.value?.top ?? []).slice(0, 200));
+const topRows = computed(() => {
+  const needle = searchQuery.value.trim().toLowerCase();
+  const rows = [...(mergeResult.value?.top ?? [])].filter((row) =>
+    needle ? row.name.toLowerCase().includes(needle) : true,
+  );
+  const key = topSortKey.value;
+  const direction = topSortAsc.value ? 1 : -1;
+  rows.sort((a, b) => {
+    const delta = a[key] - b[key];
+    if (delta !== 0) return delta * direction;
+    return a.name.localeCompare(b.name);
+  });
+  return rows.slice(0, 200);
+});
 const stackRows = computed<StackRow[]>(() => {
   const root = mergeResult.value?.root;
   if (!root) return [];
@@ -488,6 +669,37 @@ const formatSeriesValue = (value: number) => {
 const formatPercent = (value: number, total: number) =>
   total > 0 ? `${((value / total) * 100).toFixed(2)}%` : "0.00%";
 
+const highlightName = (name: string) => {
+  const query = searchQuery.value.trim();
+  if (!query) return escapeHtml(name);
+  const lowerName = name.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  let html = "";
+  let cursor = 0;
+  while (cursor < name.length) {
+    const matchAt = lowerName.indexOf(lowerQuery, cursor);
+    if (matchAt === -1) {
+      html += escapeHtml(name.slice(cursor));
+      break;
+    }
+    html += escapeHtml(name.slice(cursor, matchAt));
+    html += `<mark class="bg-status-warning-bg text-text-body rounded-default px-0.5">${escapeHtml(
+      name.slice(matchAt, matchAt + query.length),
+    )}</mark>`;
+    cursor = matchAt + query.length;
+  }
+  return html;
+};
+
+const toggleTopSort = (key: TopSortKey) => {
+  if (topSortKey.value === key) {
+    topSortAsc.value = !topSortAsc.value;
+    return;
+  }
+  topSortKey.value = key;
+  topSortAsc.value = false;
+};
+
 const toggleStackNode = (nodeId: string) => {
   if (!nodeId) return;
   const next = new Set(expandedStackNodeIds.value);
@@ -526,7 +738,7 @@ const queryPayload = (range = resolveTimeRange()): ProfilesQueryBody | null => {
     service_name: selectedService.value || undefined,
     profile_type: profileType.type,
     profile_unit: profileType.unit,
-    filters: [],
+    filters: appliedFilters.value.map((filter) => ({ ...filter })),
   };
 };
 
@@ -543,14 +755,90 @@ const buildErrorMessage = (error: unknown): string => {
   );
 };
 
+const clearDraftTag = () => {
+  draftTagKey.value = null;
+  draftTagValue.value = null;
+  tagValueOptions.value = [];
+};
+
 const resetProfilesState = () => {
   selectedService.value = null;
   selectedProfileType.value = null;
+  appliedFilters.value = [];
+  searchQuery.value = "";
+  topSortKey.value = "total";
+  topSortAsc.value = false;
+  clearDraftTag();
   seriesResponse.value = null;
   mergeResult.value = null;
   expandedStackNodeIds.value = new Set();
   activeView.value = "top";
   errorMessage.value = "";
+};
+
+const addFilter = async () => {
+  const key = draftTagKey.value;
+  const value = draftTagValue.value;
+  if (!key || !value) return;
+  const exists = appliedFilters.value.some(
+    (filter) => filter.key === key && filter.value === value,
+  );
+  if (!exists) {
+    appliedFilters.value = [...appliedFilters.value, { key, op: "=", value }];
+  }
+  draftTagValue.value = null;
+  await runQuery();
+};
+
+const removeFilter = async (filter: ProfileFilter) => {
+  appliedFilters.value = appliedFilters.value.filter(
+    (item) => !(item.key === filter.key && item.value === filter.value),
+  );
+  await runQuery();
+};
+
+const loadTagValues = async () => {
+  const org = orgIdentifier.value;
+  const stream = selectedStream.value;
+  const tag = draftTagKey.value;
+  const range = resolveTimeRange();
+  const profileType = currentProfileType.value;
+  if (!org || !stream || !tag || !range) {
+    tagValueOptions.value = [];
+    return;
+  }
+  const requestSeq = ++tagValuesRequestSeq;
+  tagValuesLoading.value = true;
+  try {
+    const response = await profilesService.tagValues(org, stream, {
+      start_time: range.startTime,
+      end_time: range.endTime,
+      service_name: selectedService.value || undefined,
+      profile_type: profileType?.type,
+      profile_unit: profileType?.unit,
+      filters: appliedFilters.value.map((filter) => ({ ...filter })),
+      tag,
+    });
+    if (requestSeq !== tagValuesRequestSeq) return;
+    tagValueOptions.value = (response.data.values ?? []).map((value) => ({
+      label: raw(value),
+      value,
+    }));
+    if (
+      draftTagValue.value &&
+      !tagValueOptions.value.some((option) => option.value === draftTagValue.value)
+    ) {
+      draftTagValue.value = null;
+    }
+  } catch (error) {
+    if (requestSeq !== tagValuesRequestSeq) return;
+    tagValueOptions.value = [];
+    errorMessage.value = buildErrorMessage(error);
+  } finally {
+    if (requestSeq === tagValuesRequestSeq) {
+      tagValuesLoading.value = false;
+    }
+  }
 };
 
 const loadStreams = async () => {
@@ -602,6 +890,12 @@ const loadMeta = async () => {
     ) {
       selectedProfileType.value = firstProfileType;
     }
+    if (
+      draftTagKey.value &&
+      !tagKeyOptions.value.some((item) => item.value === draftTagKey.value)
+    ) {
+      clearDraftTag();
+    }
   } catch (error) {
     if (requestSeq !== metaRequestSeq) return;
     errorMessage.value = buildErrorMessage(error);
@@ -644,15 +938,28 @@ const initPage = async () => {
   await runQuery();
 };
 
+watch(draftTagKey, async (key, previousKey) => {
+  if (key === previousKey) return;
+  draftTagValue.value = null;
+  tagValueOptions.value = [];
+  if (!key) return;
+  await loadTagValues();
+});
+
 watch(selectedStream, async (stream, previousStream) => {
   if (!stream || stream === previousStream) return;
   selectedService.value = null;
+  appliedFilters.value = [];
+  clearDraftTag();
   await loadMeta();
   await runQuery();
 });
 
 watch(dateState, async () => {
   await loadMeta();
+  if (draftTagKey.value) {
+    await loadTagValues();
+  }
 });
 
 watch(
