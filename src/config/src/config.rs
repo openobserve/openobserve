@@ -2254,6 +2254,12 @@ pub struct Common {
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
     #[env_config(
+        name = "ZO_MCP_ENABLED",
+        default = true,
+        help = "Enable the MCP server. When false the tool registry is not built at boot (it derives ~200 tools with their JSON schemas from the OpenAPI spec) and the MCP endpoints report it as disabled."
+    )]
+    pub mcp_enabled: bool,
+    #[env_config(
         name = "ZO_REGEX_PATTERNS_SOURCE_URL",
         default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/regex.json",
         help = "URL for built-in regex patterns JSON source. Can be customized to use different pattern libraries."

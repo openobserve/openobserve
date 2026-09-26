@@ -197,11 +197,18 @@ async fn run() -> Result<(), anyhow::Error> {
             }
 
             // Initialize MCP tools from the OpenAPI spec for all editions.
-            let api = openapi::ApiDoc::openapi();
-            if let Err(e) = openobserve_mcp::tools::init_mcp_tools(&api) {
-                log::error!("Failed to initialize MCP tools: {e}");
+            // Deriving the registry materialises the whole OpenAPI spec plus a
+            // tool (with its JSON schema) per operation, all retained for the
+            // process lifetime, so a node that serves no MCP client can skip it.
+            if get_config().common.mcp_enabled {
+                let api = openapi::ApiDoc::openapi();
+                if let Err(e) = openobserve_mcp::tools::init_mcp_tools(&api) {
+                    log::error!("Failed to initialize MCP tools: {e}");
+                } else {
+                    log::info!("Initialized MCP tools");
+                }
             } else {
-                log::info!("Initialized MCP tools");
+                log::info!("MCP is disabled, skipping MCP tool registry");
             }
 
             // init enterprise
