@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "已存在同名变量",
     "pivotTotal": "总计",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "显示示例（追踪样本）",
+      "hide": "隐藏示例 · 已显示 {count} 个",
+      "empty": "此时间范围内没有示例",
+      "emptyShort": "0 个示例",
+      "loadFailed": "无法加载示例",
+      "loadFailedHint": "图表不受影响。重试仅重新获取示例。",
+      "retry": "重试",
+      "cardTitle": "示例",
+      "query": "查询 {name}",
+      "returnedBy": "由 {count} 个查询返回 | 由 {count} 个查询返回",
+      "series": "序列",
+      "aboveRange": "超出图表范围；绘制在顶部边缘",
+      "belowRange": "低于图表范围；绘制在底部边缘",
+      "checkingTrace": "正在检查追踪…",
+      "openTrace": "打开追踪",
+      "openTraceHint": "或点击标记。返回后回到此处。",
+      "traceNotAvailable": "追踪不可用 — 已被采样丢弃或超出保留期",
+      "openTraceUnverified": "打开追踪（未验证）",
+      "unverifiedTimeout": "追踪查找超时，因此该追踪可能不存在。",
+      "unverifiedForbidden": "无法确认该追踪 — 您可能没有追踪的访问权限。",
+      "unverifiedPartial": "仅搜索了部分保留期窗口。",
+      "unverifiedError": "无法检查该追踪。",
+      "noTraceId": "该示例上没有 {label}，因此没有可打开的追踪。",
+      "markersAria": "示例标记",
+      "markerAria": "示例 {value}，时间 {time}"
+    },
+    "showExemplarsLabel": "显示示例",
+    "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "复制{name}刷新失败的详情",
         "stalePreamble": "刷新失败——显示上次成功的结果。",
         "staleClickToCopy": "点击复制详情。",
-        "lastRefreshedPrefix": "上次刷新时间："
+        "lastRefreshedPrefix": "上次刷新时间：",
+        "exemplarsShowHeatmap": "显示示例（追踪样本）。开启时将此卡片切换为百分位数。",
+        "exemplarsHideHeatmap": "隐藏示例 · 已显示 {count} 个。将此卡片恢复为热力图。"
       },
       "fn": {
         "subtitle": "选择此指标的聚合方式",

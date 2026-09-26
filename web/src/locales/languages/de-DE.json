@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Variable mit demselben Namen existiert bereits",
     "pivotTotal": "Gesamt",
     "pivotOthers": "Andere",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Exemplare anzeigen (Trace-Stichproben)",
+      "hide": "Exemplare ausblenden · {count} angezeigt",
+      "empty": "Keine Exemplare in diesem Zeitraum",
+      "emptyShort": "0 Exemplare",
+      "loadFailed": "Exemplare konnten nicht geladen werden",
+      "loadFailedHint": "Das Diagramm ist nicht betroffen. Erneut versuchen lädt nur die Exemplare.",
+      "retry": "Erneut versuchen",
+      "cardTitle": "Exemplar",
+      "query": "Abfrage {name}",
+      "returnedBy": "Von {count} Abfrage zurückgegeben | Von {count} Abfragen zurückgegeben",
+      "series": "Reihe",
+      "aboveRange": "Überhalb des Diagrammbereichs; an der oberen Kante gezeichnet",
+      "belowRange": "Unterhalb des Diagrammbereichs; an der unteren Kante gezeichnet",
+      "checkingTrace": "Trace wird geprüft…",
+      "openTrace": "Trace öffnen",
+      "openTraceHint": "Oder klicken Sie auf die Markierung. Zurück führt hierher.",
+      "traceNotAvailable": "Trace nicht verfügbar – herausgesampelt oder außerhalb der Aufbewahrungsfrist",
+      "openTraceUnverified": "Trace öffnen (unbestätigt)",
+      "unverifiedTimeout": "Die Trace-Suche hat das Zeitlimit überschritten, daher fehlt dieser Trace möglicherweise.",
+      "unverifiedForbidden": "Dieser Trace konnte nicht bestätigt werden – möglicherweise haben Sie keinen Zugriff auf Traces.",
+      "unverifiedPartial": "Es wurde nur ein Teil des Aufbewahrungszeitraums durchsucht.",
+      "unverifiedError": "Dieser Trace konnte nicht geprüft werden.",
+      "noTraceId": "Kein {label} bei diesem Exemplar, daher gibt es keinen Trace zum Öffnen.",
+      "markersAria": "Exemplar-Markierungen",
+      "markerAria": "Exemplar {value} um {time}"
+    },
+    "showExemplarsLabel": "Exemplare anzeigen",
+    "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "Details der fehlgeschlagenen Aktualisierung für {name} kopieren",
         "stalePreamble": "Aktualisierung fehlgeschlagen — zeige das letzte erfolgreiche Ergebnis.",
         "staleClickToCopy": "Klicken Sie, um die Details zu kopieren.",
-        "lastRefreshedPrefix": "Zuletzt aktualisiert um: "
+        "lastRefreshedPrefix": "Zuletzt aktualisiert um: ",
+        "exemplarsShowHeatmap": "Exemplare anzeigen (Trace-Stichproben). Schaltet diese Karte währenddessen auf Perzentile um.",
+        "exemplarsHideHeatmap": "Exemplare ausblenden · {count} angezeigt. Setzt diese Karte auf die Heatmap zurück."
       },
       "fn": {
         "subtitle": "Wählen Sie, wie diese Metrik aggregiert wird",

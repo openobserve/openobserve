@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Une variable portant le même nom existe déjà",
     "pivotTotal": "Total",
     "pivotOthers": "Autres",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Afficher les exemplaires (échantillons de traces)",
+      "hide": "Masquer les exemplaires · {count} affichés",
+      "empty": "Aucun exemplaire dans cette plage temporelle",
+      "emptyShort": "0 exemplaire",
+      "loadFailed": "Impossible de charger les exemplaires",
+      "loadFailedHint": "Le graphique n'est pas affecté. Réessayer ne récupère que les exemplaires.",
+      "retry": "Réessayer",
+      "cardTitle": "Exemplaire",
+      "query": "Requête {name}",
+      "returnedBy": "Retourné par {count} requête | Retourné par {count} requêtes",
+      "series": "Série",
+      "aboveRange": "Au-dessus de la plage du graphique ; dessiné sur le bord supérieur",
+      "belowRange": "En dessous de la plage du graphique ; dessiné sur le bord inférieur",
+      "checkingTrace": "Vérification de la trace…",
+      "openTrace": "Ouvrir la trace",
+      "openTraceHint": "Ou cliquez sur le marqueur. Retour vous ramène ici.",
+      "traceNotAvailable": "Trace indisponible — exclue par l'échantillonnage ou au-delà de la rétention",
+      "openTraceUnverified": "Ouvrir la trace (non vérifiée)",
+      "unverifiedTimeout": "La recherche de la trace a expiré ; cette trace est peut-être absente.",
+      "unverifiedForbidden": "Impossible de confirmer cette trace — vous n'avez peut-être pas accès aux traces.",
+      "unverifiedPartial": "Seule une partie de la fenêtre de rétention a été recherchée.",
+      "unverifiedError": "Impossible de vérifier cette trace.",
+      "noTraceId": "Aucun {label} sur cet exemplaire, il n'y a donc aucune trace à ouvrir.",
+      "markersAria": "Marqueurs d'exemplaires",
+      "markerAria": "Exemplaire {value} à {time}"
+    },
+    "showExemplarsLabel": "Afficher les exemplaires",
+    "showExemplarsHelp": "Dessine les échantillons de traces sur ce graphique pour toute personne qui ouvre le tableau de bord. Les spectateurs peuvent toujours les masquer depuis l'en-tête du panneau."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "Copier les détails de l'échec d'actualisation pour {name}",
         "stalePreamble": "Échec de l'actualisation — affichage du dernier résultat réussi.",
         "staleClickToCopy": "Cliquez pour copier les détails.",
-        "lastRefreshedPrefix": "Dernière actualisation à : "
+        "lastRefreshedPrefix": "Dernière actualisation à : ",
+        "exemplarsShowHeatmap": "Afficher les exemplaires (échantillons de traces). Bascule cette carte en percentiles tant que l'option est active.",
+        "exemplarsHideHeatmap": "Masquer les exemplaires · {count} affichés. Rétablit cette carte en carte de chaleur."
       },
       "fn": {
         "subtitle": "Choisissez comment cette métrique est agrégée",

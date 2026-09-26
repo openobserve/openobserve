@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Er bestaat al een variabele met dezelfde naam",
     "pivotTotal": "Totaal",
     "pivotOthers": "Overige",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Exemplaren tonen (trace-voorbeelden)",
+      "hide": "Exemplaren verbergen · {count} weergegeven",
+      "empty": "Geen exemplaren in dit tijdsbereik",
+      "emptyShort": "0 exemplaren",
+      "loadFailed": "Exemplaren konden niet worden geladen",
+      "loadFailedHint": "De grafiek blijft ongewijzigd. Opnieuw proberen haalt alleen exemplaren op.",
+      "retry": "Opnieuw proberen",
+      "cardTitle": "Exemplaar",
+      "query": "Query {name}",
+      "returnedBy": "Geretourneerd door {count} query | Geretourneerd door {count} query's",
+      "series": "Reeks",
+      "aboveRange": "Boven het grafiekbereik; getekend aan de bovenrand",
+      "belowRange": "Onder het grafiekbereik; getekend aan de onderrand",
+      "checkingTrace": "Trace controleren…",
+      "openTrace": "Trace openen",
+      "openTraceHint": "Of klik op de markering. Terug brengt je hier terug.",
+      "traceNotAvailable": "Trace niet beschikbaar — weggevallen uit de steekproef of voorbij de bewaartermijn",
+      "openTraceUnverified": "Trace openen (niet geverifieerd)",
+      "unverifiedTimeout": "Het opzoeken van de trace is verlopen, dus deze trace ontbreekt mogelijk.",
+      "unverifiedForbidden": "Deze trace kon niet worden bevestigd — mogelijk hebt u geen toegang tot traces.",
+      "unverifiedPartial": "Slechts een deel van het bewaarvenster is doorzocht.",
+      "unverifiedError": "Deze trace kon niet worden gecontroleerd.",
+      "noTraceId": "Geen {label} op dit exemplaar, dus er is geen trace om te openen.",
+      "markersAria": "Exemplaarmarkeringen",
+      "markerAria": "Exemplaar {value} op {time}"
+    },
+    "showExemplarsLabel": "Exemplaren tonen",
+    "showExemplarsHelp": "Tekent trace-voorbeelden op deze grafiek voor iedereen die het dashboard opent. Kijkers kunnen ze nog steeds verbergen via de paneelheader."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "Kopieer de mislukte-vernieuwingsdetails voor {name}",
         "stalePreamble": "Vernieuwing mislukt — toon het laatste succesvolle resultaat.",
         "staleClickToCopy": "Klik om de details te kopiëren.",
-        "lastRefreshedPrefix": "Laatst vernieuwd om: "
+        "lastRefreshedPrefix": "Laatst vernieuwd om: ",
+        "exemplarsShowHeatmap": "Exemplaren tonen (trace-voorbeelden). Schakelt deze kaart naar percentielen zolang dit aan staat.",
+        "exemplarsHideHeatmap": "Exemplaren verbergen · {count} weergegeven. Zet deze kaart terug naar heatmap."
       },
       "fn": {
         "subtitle": "Kies hoe deze metriek wordt geaggregeerd",

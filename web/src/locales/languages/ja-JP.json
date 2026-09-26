@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "同じ名前の変数が既に存在します。",
     "pivotTotal": "合計",
     "pivotOthers": "その他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "エグザンプラー（トレースサンプル）を表示",
+      "hide": "エグザンプラーを非表示 · {count} 件表示",
+      "empty": "この期間にエグザンプラーはありません",
+      "emptyShort": "エグザンプラー 0 件",
+      "loadFailed": "エグザンプラーを読み込めませんでした",
+      "loadFailedHint": "グラフは影響を受けません。再試行ではエグザンプラーのみを取得します。",
+      "retry": "再試行",
+      "cardTitle": "エグザンプラー",
+      "query": "クエリ {name}",
+      "returnedBy": "{count} 件のクエリから返されました | {count} 件のクエリから返されました",
+      "series": "シリーズ",
+      "aboveRange": "グラフの範囲より上。上端に描画されます",
+      "belowRange": "グラフの範囲より下。下端に描画されます",
+      "checkingTrace": "トレースを確認中…",
+      "openTrace": "トレースを開く",
+      "openTraceHint": "またはマーカーをクリックします。戻るとここに戻ります。",
+      "traceNotAvailable": "トレースを利用できません — サンプリング対象外、または保持期間を過ぎています",
+      "openTraceUnverified": "トレースを開く（未確認）",
+      "unverifiedTimeout": "トレースの検索がタイムアウトしたため、このトレースは存在しない可能性があります。",
+      "unverifiedForbidden": "このトレースを確認できませんでした — トレースへのアクセス権がない可能性があります。",
+      "unverifiedPartial": "保持期間の一部のみが検索されました。",
+      "unverifiedError": "このトレースを確認できませんでした。",
+      "noTraceId": "このエグザンプラーに {label} がないため、開くトレースがありません。",
+      "markersAria": "エグザンプラーマーカー",
+      "markerAria": "{time} のエグザンプラー {value}"
+    },
+    "showExemplarsLabel": "エグザンプラーを表示",
+    "showExemplarsHelp": "このダッシュボードを開くすべてのユーザーに対して、このグラフにトレースサンプルを描画します。閲覧者はパネルヘッダーから非表示にできます。"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "{name} の更新失敗詳細をコピー",
         "stalePreamble": "更新に失敗しました — 最後に成功した結果を表示しています。",
         "staleClickToCopy": "クリックして詳細をコピーします。",
-        "lastRefreshedPrefix": "最終更新日時: "
+        "lastRefreshedPrefix": "最終更新日時: ",
+        "exemplarsShowHeatmap": "エグザンプラー（トレースサンプル）を表示します。オンの間、このカードはパーセンタイルに切り替わります。",
+        "exemplarsHideHeatmap": "エグザンプラーを非表示 · {count} 件表示。このカードをヒートマップに戻します。"
       },
       "fn": {
         "subtitle": "このメトリクスの集計方法を選択",

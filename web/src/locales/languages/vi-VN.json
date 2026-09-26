@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Biến có cùng tên đã tồn tại",
     "pivotTotal": "Tổng",
     "pivotOthers": "Khác",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Hiển thị exemplar (mẫu trace)",
+      "hide": "Ẩn exemplar · hiển thị {count}",
+      "empty": "Không có exemplar trong khoảng thời gian này",
+      "emptyShort": "0 exemplar",
+      "loadFailed": "Không thể tải exemplar",
+      "loadFailedHint": "Biểu đồ không bị ảnh hưởng. Thao tác thử lại chỉ tải exemplar.",
+      "retry": "Thử lại",
+      "cardTitle": "Exemplar",
+      "query": "Truy vấn {name}",
+      "returnedBy": "Được trả về bởi {count} truy vấn | Được trả về bởi {count} truy vấn",
+      "series": "Chuỗi",
+      "aboveRange": "Nằm trên phạm vi biểu đồ; được vẽ ở cạnh trên",
+      "belowRange": "Nằm dưới phạm vi biểu đồ; được vẽ ở cạnh dưới",
+      "checkingTrace": "Đang kiểm tra trace…",
+      "openTrace": "Mở trace",
+      "openTraceHint": "Hoặc nhấp vào điểm đánh dấu. Nút Quay lại sẽ đưa bạn về đây.",
+      "traceNotAvailable": "Trace không khả dụng — bị loại do lấy mẫu hoặc ngoài thời gian lưu trữ",
+      "openTraceUnverified": "Mở trace (chưa xác minh)",
+      "unverifiedTimeout": "Tra cứu trace đã hết thời gian chờ, nên trace này có thể không tồn tại.",
+      "unverifiedForbidden": "Không thể xác nhận trace này — bạn có thể không có quyền truy cập trace.",
+      "unverifiedPartial": "Chỉ một phần của khoảng thời gian lưu trữ được tìm kiếm.",
+      "unverifiedError": "Không thể kiểm tra trace này.",
+      "noTraceId": "Exemplar này không có {label}, nên không có trace để mở.",
+      "markersAria": "Điểm đánh dấu exemplar",
+      "markerAria": "Exemplar {value} lúc {time}"
+    },
+    "showExemplarsLabel": "Hiển thị exemplar",
+    "showExemplarsHelp": "Vẽ mẫu trace trên biểu đồ này cho tất cả những ai mở bảng điều khiển. Người xem vẫn có thể ẩn chúng từ tiêu đề panel."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "Sao chép chi tiết làm mới thất bại cho {name}",
         "stalePreamble": "Làm mới thất bại — hiển thị kết quả thành công gần nhất.",
         "staleClickToCopy": "Nhấp để sao chép chi tiết.",
-        "lastRefreshedPrefix": "Lần làm mới cuối cùng lúc: "
+        "lastRefreshedPrefix": "Lần làm mới cuối cùng lúc: ",
+        "exemplarsShowHeatmap": "Hiển thị exemplar (mẫu trace). Chuyển thẻ này sang percentile khi bật.",
+        "exemplarsHideHeatmap": "Ẩn exemplar · hiển thị {count}. Đưa thẻ này trở lại heatmap."
       },
       "fn": {
         "subtitle": "Chọn cách tổng hợp số liệu này",
