@@ -43,7 +43,10 @@ use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, otlp::otlp_export_response},
+    common::meta::{
+        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
+        otlp::{otlp_error_response, otlp_export_response},
+    },
     db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
@@ -133,6 +136,27 @@ fn build_otlp_log_record(
     }
     rec[TIMESTAMP_COL_NAME] = timestamp.into();
     Some(rec)
+}
+
+/// OTLP/HTTP clients only log a rejection reason they can decode as a `google.rpc.Status`.
+fn write_error_response(
+    req_type: OtlpRequestType,
+    status: StatusCode,
+    message: String,
+) -> Response {
+    // the gRPC handler reads the reason back out of the JSON body
+    if req_type == OtlpRequestType::Grpc {
+        return MetaHttpResponse::error_with_header(status, message);
+    }
+    let rpc_code = match status {
+        StatusCode::BAD_REQUEST => 3,          // INVALID_ARGUMENT
+        StatusCode::SERVICE_UNAVAILABLE => 14, // UNAVAILABLE
+        _ => 13,                               // INTERNAL
+    };
+    let header = error_header_value(&message);
+    let mut resp = otlp_error_response(req_type, status, rpc_code, message);
+    resp.headers_mut().insert(ERROR_HEADER, header);
+    resp
 }
 
 pub async fn handle_request(
@@ -807,7 +831,8 @@ pub async fn handle_request(
 
     if let Err(e) = write_result {
         log::error!("Error while writing logs: {e}");
-        return Ok(MetaHttpResponse::error_with_header(
+        return Ok(write_error_response(
+            req_type,
             status,
             format!("error while writing log data: {e}"),
         ));
@@ -834,11 +859,23 @@ mod tests {
     };
     use prost::Message;
 
-    use super::{normalized_resource_map, otlp_export_response, otlp_log_record};
+    use super::{
+        normalized_resource_map, otlp_export_response, otlp_log_record, write_error_response,
+    };
     use crate::common::meta::{
-        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        http::{
+            CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, ERROR_HEADER, HttpResponse as MetaHttpResponse,
+        },
         otlp::export_response_to_proto_json,
     };
+
+    #[derive(Clone, PartialEq, Message)]
+    struct RpcStatus {
+        #[prost(int32, tag = "1")]
+        code: i32,
+        #[prost(string, tag = "2")]
+        message: String,
+    }
 
     fn partial_response(rejected: i64, error: &str) -> ExportLogsServiceResponse {
         ExportLogsServiceResponse {
@@ -1869,5 +1906,122 @@ mod tests {
             .as_ref()
             .unwrap();
         assert_eq!(scope.name, "b");
+    }
+
+    fn columns_limit_write_error(req_type: OtlpRequestType) -> axum::response::Response {
+        let e = infra::errors::Error::OtherError(schema::get_request_columns_limit_error(
+            "default", 244,
+        ));
+        let status = crate::ingestion::write_error_status(&e);
+        write_error_response(
+            req_type,
+            status,
+            format!("error while writing log data: {e}"),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_write_error_protobuf_is_rpc_status() {
+        let resp = columns_limit_write_error(OtlpRequestType::HttpProtobuf);
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            resp.headers()[axum::http::header::CONTENT_TYPE],
+            CONTENT_TYPE_PROTO
+        );
+        assert!(resp.headers().contains_key(ERROR_HEADER));
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let status = RpcStatus::decode(body).unwrap();
+        assert_eq!(status.code, 3);
+        assert!(status.message.starts_with(
+            "error while writing log data: Error# Got 244 columns for stream default"
+        ));
+        assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
+    }
+
+    #[tokio::test]
+    async fn test_write_error_json_is_proto_json_status() {
+        let resp = columns_limit_write_error(OtlpRequestType::HttpJson);
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            resp.headers()[axum::http::header::CONTENT_TYPE],
+            CONTENT_TYPE_JSON
+        );
+        assert!(resp.headers().contains_key(ERROR_HEADER));
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: json::Value = json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], 3);
+        assert!(
+            body["message"]
+                .as_str()
+                .unwrap()
+                .contains("Got 244 columns for stream default")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_write_error_grpc_keeps_json_message() {
+        let resp = columns_limit_write_error(OtlpRequestType::Grpc);
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: MetaHttpResponse = json::from_slice(&body).unwrap();
+        assert!(body.message.contains("Got 244 columns for stream default"));
+    }
+
+    #[tokio::test]
+    async fn test_handle_request_columns_limit_is_rpc_status() {
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let log_rec = LogRecord {
+            time_unix_nano: chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64,
+            attributes: (0..=limit)
+                .map(|i| kv(&format!("attr_{i}"), IntValue(i as i64)))
+                .collect(),
+            ..Default::default()
+        };
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs {
+                    log_records: vec![log_rec],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = super::handle_request(
+            0,
+            "test_org_id",
+            request,
+            Some("test_columns_limit"),
+            "a@a.com",
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await
+        .unwrap();
+        let status_code = resp.status();
+        let headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(status_code, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            headers[axum::http::header::CONTENT_TYPE],
+            CONTENT_TYPE_PROTO
+        );
+        let status = RpcStatus::decode(body).unwrap();
+        assert_eq!(status.code, 3);
+        assert!(
+            status
+                .message
+                .starts_with("error while writing log data: Error# Got ")
+        );
+        assert!(status.message.contains(&format!(
+            "columns for stream test_org_id/logs/test_columns_limit, only {limit} columns accept"
+        )));
+        assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
     }
 }
