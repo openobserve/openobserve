@@ -289,6 +289,48 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Show exemplars switch", () => {
+    const promqlPanel = (type: string, queryType = "range", showExemplars?: boolean) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        queryType: "promql",
+        queries: [{ query: "rate(x_bucket[5m])", config: { query_type: queryType } }],
+        config: { ...mockDashboardPanelData.data.config, show_exemplars: showExemplars },
+      },
+    });
+
+    it("appears off by default for an eligible PromQL panel and binds config.show_exemplars", async () => {
+      const panel = promqlPanel("line");
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+      const toggle = wrapper.findComponent('[data-test="dashboard-config-show-exemplars"]');
+      expect(toggle.exists()).toBe(true);
+      expect(toggle.props("modelValue")).toBeFalsy();
+      await toggle.vm.$emit("update:modelValue", true);
+      expect(panel.data.config.show_exemplars).toBe(true);
+    });
+
+    it.each([
+      ["h-bar", "range"],
+      ["stacked", "range"],
+      ["table", "range"],
+      ["heatmap", "range"],
+      ["line", "instant"],
+    ])("is absent for %s (%s)", (type, queryType) => {
+      wrapper = createWrapper(
+        { dashboardPanelData: promqlPanel(type, queryType) },
+        { promqlMode: true },
+      );
+      expect(wrapper.find('[data-test="dashboard-config-show-exemplars"]').exists()).toBe(false);
+    });
+
+    it("is absent outside PromQL mode", () => {
+      wrapper = createWrapper({ dashboardPanelData: promqlPanel("line") }, { promqlMode: false });
+      expect(wrapper.find('[data-test="dashboard-config-show-exemplars"]').exists()).toBe(false);
+    });
+  });
+
   describe("PromQL Mode Configuration", () => {
     it("should show step value input in PromQL mode", async () => {
       wrapper = createWrapper({}, { promqlMode: true });

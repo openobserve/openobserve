@@ -2,6 +2,7 @@
   <div
     v-if="
       error ||
+      exemplarError ||
       maxQueryRangeWarning ||
       limitNumberOfSeriesWarningMessage ||
       sparklineWarning ||
@@ -24,6 +25,37 @@
         <template #content
           ><div class="whitespace-pre-wrap">{{ error }}</div></template
         >
+      </OTooltip>
+    </OButton>
+    <OButton
+      v-if="exemplarError"
+      variant="ghost-warning"
+      size="icon"
+      icon-left="warning"
+      :aria-label="t('dashboard.exemplars.loadFailed')"
+      data-test="dashboard-panel-exemplars-error"
+    >
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+        <template #content>
+          <div class="flex flex-col gap-1.5">
+            <div class="font-medium">{{ t("dashboard.exemplars.loadFailed") }}</div>
+            <div class="whitespace-pre-wrap" data-test="dashboard-panel-exemplars-error-message">
+              {{ exemplarError }}
+            </div>
+            <div class="text-2xs">{{ t("dashboard.exemplars.loadFailedHint") }}</div>
+            <div>
+              <OButton
+                variant="outline"
+                size="xs"
+                icon-left="replay"
+                data-test="dashboard-panel-exemplars-retry"
+                @click="$emit('retry-exemplars')"
+              >
+                {{ t("dashboard.exemplars.retry") }}
+              </OButton>
+            </div>
+          </div>
+        </template>
       </OTooltip>
     </OButton>
     <OButton
@@ -189,7 +221,12 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    exemplarError: {
+      type: String,
+      default: "",
+    },
   },
+  emits: ["retry-exemplars"],
   setup() {
     const { t } = useI18nTyped();
     return {

@@ -49,7 +49,9 @@ use hashbrown::{HashMap, HashSet, hash_map::Entry};
 use promql_parser::parser::VectorSelector;
 
 use self::labels::load_series_labels;
-use super::utils::{apply_label_selector, apply_matchers, apply_time_window, batch_run_len};
+use super::utils::{
+    apply_label_selector, apply_matchers, apply_time_window, batch_run_len, exemplar_load_step,
+};
 
 const MAX_SERIES_FRAGMENT_HINT: usize = 24;
 const MAX_INITIAL_SERIES_CAPACITY: usize = 2048;
@@ -101,8 +103,9 @@ pub(super) async fn selector_load_data_from_datafusion(
     let start_time = std::time::Instant::now();
     let table_name = selector.name.as_ref().unwrap();
 
+    let window_step = exemplar_load_step(&query_ctx, step);
     let mut df_group = match ctx.table(table_name).await {
-        Ok(v) => apply_time_window(v, start, end, step, lookback)?,
+        Ok(v) => apply_time_window(v, start, end, window_step, lookback)?,
         Err(_) => {
             return Ok(LoadedMetrics::Partitioned(Vec::new()));
         }

@@ -149,6 +149,14 @@ pub fn apply_label_selector(
     Some(df)
 }
 
+/// Zeroes the step of local exemplar loads only; older peers divide by the forwarded step.
+pub(crate) fn exemplar_load_step(
+    query_ctx: &config::meta::promql::value::QueryContext,
+    step: i64,
+) -> i64 {
+    if query_ctx.query_exemplars { 0 } else { step }
+}
+
 /// Restricts `df` to the rows the evaluation can observe: per-step lookback
 /// windows when the steps are sparse enough, the contiguous
 /// `[start - lookback, end]` range otherwise.
@@ -229,6 +237,26 @@ mod tests {
     use promql_parser::label::Matchers;
 
     use super::*;
+
+    #[test]
+    fn test_exemplar_load_step_is_zero_only_for_exemplars() {
+        let ctx = |query_exemplars| config::meta::promql::value::QueryContext {
+            trace_id: "t".to_string(),
+            org_id: "o".to_string(),
+            query_exemplars,
+            query_data: false,
+            need_wal: false,
+            use_cache: false,
+            timeout: 1,
+            search_event_type: None,
+            search_event_context: None,
+            regions: vec![],
+            clusters: vec![],
+            is_super_cluster: true,
+        };
+        assert_eq!(exemplar_load_step(&ctx(true), 300_000_000), 0);
+        assert_eq!(exemplar_load_step(&ctx(false), 300_000_000), 300_000_000);
+    }
 
     #[test]
     fn test_batch_run_len() {

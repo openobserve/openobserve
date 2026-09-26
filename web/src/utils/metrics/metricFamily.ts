@@ -113,7 +113,7 @@ export interface MetricCard {
 }
 
 /** Non-schema fields OpenObserve adds to every record; never user labels. */
-const INTERNAL_FIELDS = new Set([
+export const INTERNAL_FIELDS = new Set([
   "_timestamp",
   "value",
   "__hash__",

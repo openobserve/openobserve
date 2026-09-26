@@ -31,6 +31,7 @@ import {
   SQL_PARSE_MAX_DEPTH,
   stripWherePredicate,
 } from "@/utils/query/sqlComplexity";
+import { EXEMPLAR_SERIES_ID } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -55,6 +56,7 @@ export function usePanelDrilldown({
   isCursorOverPanel,
   showErrorNotification,
   t,
+  onExemplarClick,
 }: {
   panelSchema: any;
   variablesData: any;
@@ -79,6 +81,7 @@ export function usePanelDrilldown({
   isCursorOverPanel: any;
   showErrorNotification: any;
   t: TranslateFn;
+  onExemplarClick?: (params: any) => void | Promise<void>;
 }) {
   // Cross-linking: store cross-links from result_schema response
   const crossLinksData: any = ref({ stream_links: [], org_links: [] });
@@ -512,6 +515,11 @@ export function usePanelDrilldown({
   };
 
   const onChartClick = async (params: any, ...args: any) => {
+    // An exemplar marker opens its trace, never the drilldown menu or an annotation.
+    if (params?.seriesId === EXEMPLAR_SERIES_ID) {
+      await onExemplarClick?.(params);
+      return;
+    }
     // Check if we have both drilldown and annotation at the same point
     const hasAnnotation =
       params?.componentType === "markLine" || params?.componentType === "markArea";

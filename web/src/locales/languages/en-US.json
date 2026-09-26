@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Variable with same name already exists",
     "pivotTotal": "Total",
     "pivotOthers": "Others",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Show exemplars (trace samples)",
+      "hide": "Hide exemplars · {count} shown",
+      "empty": "No exemplars in this time range",
+      "emptyShort": "0 exemplars",
+      "loadFailed": "Couldn't load exemplars",
+      "loadFailedHint": "The chart is unaffected. Retry fetches exemplars only.",
+      "retry": "Retry",
+      "cardTitle": "Exemplar",
+      "query": "Query {name}",
+      "returnedBy": "Returned by {count} query | Returned by {count} queries",
+      "series": "Series",
+      "aboveRange": "Above the chart range; drawn at the top edge",
+      "belowRange": "Below the chart range; drawn at the bottom edge",
+      "checkingTrace": "Checking trace…",
+      "openTrace": "Open trace",
+      "openTraceHint": "Or click the marker. Back returns here.",
+      "traceNotAvailable": "Trace not available — sampled out or past retention",
+      "openTraceUnverified": "Open trace (unverified)",
+      "unverifiedTimeout": "The trace lookup timed out, so this trace may be missing.",
+      "unverifiedForbidden": "Couldn't confirm this trace — you may not have access to traces.",
+      "unverifiedPartial": "Only part of the retention window was searched.",
+      "unverifiedError": "Couldn't check this trace.",
+      "noTraceId": "No {label} on this exemplar, so there is no trace to open.",
+      "markersAria": "Exemplar markers",
+      "markerAria": "Exemplar {value} at {time}"
+    },
+    "showExemplarsLabel": "Show exemplars",
+    "showExemplarsHelp": "Draws trace samples on this chart for everyone who opens the dashboard. Viewers can still hide them from the panel header."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "Copy the failed-refresh details for {name}",
         "stalePreamble": "Refresh failed — showing the last successful result.",
         "staleClickToCopy": "Click to copy the details.",
-        "lastRefreshedPrefix": "Last Refreshed At: "
+        "lastRefreshedPrefix": "Last Refreshed At: ",
+        "exemplarsShowHeatmap": "Show exemplars (trace samples). Switches this card to percentiles while on.",
+        "exemplarsHideHeatmap": "Hide exemplars · {count} shown. Returns this card to heatmap."
       },
       "fn": {
         "subtitle": "Choose how this metric is aggregated",
