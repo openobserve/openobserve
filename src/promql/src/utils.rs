@@ -13,23 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::ops::Not;
-
 use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
 };
 use datafusion::{
-    arrow::datatypes::{DataType, Field, Schema},
-    common::ScalarValue,
+    arrow::datatypes::Schema,
     error::Result,
-    functions::regex::regexp_like,
     logical_expr::utils::disjunction,
     prelude::{DataFrame, Expr, col, lit},
 };
 use hashbrown::HashSet;
+pub use metrics_index::{matcher_predicates, matcher_residual_field};
 use promql_parser::{
-    label::{MatchOp, Matcher, Matchers},
+    label::{MatchOp, Matchers},
     parser::{Offset, VectorSelector},
 };
 
@@ -51,59 +48,6 @@ pub fn metric_name(selector: &VectorSelector) -> Option<String> {
         .into_iter()
         .find(|mat| matches!(mat.op, MatchOp::Equal))
         .map(|mat| mat.value)
-}
-
-/// The schema field a residual matcher filters on; `None` when
-/// `matcher_predicates` skips the matcher entirely.
-pub fn matcher_residual_field<'a>(schema: &'a Schema, matcher: &Matcher) -> Option<&'a Field> {
-    // `__name__` is consumed by stream selection; the stored column may hold the
-    // pre-`format_stream_name` metric name (e.g. mixed case), so filtering on it
-    // would drop every row of a stream that was already selected by name.
-    if matcher.name == TIMESTAMP_COL_NAME
-        || matcher.name == VALUE_LABEL
-        || matcher.name == NAME_LABEL
-    {
-        return None;
-    }
-    schema.field_with_name(&matcher.name).ok()
-}
-
-/// Build the DataFusion predicates used for PromQL label matchers.
-///
-/// Keeping predicate construction separate lets storage-side secondary
-/// indexes evaluate exactly the same matcher semantics as the final scan.
-pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
-    let mut predicates = Vec::new();
-    for mat in matchers.matchers.iter() {
-        let Some(field) = matcher_residual_field(schema, mat) else {
-            continue;
-        };
-        let field_type = field.data_type();
-        let column = col(mat.name.as_str());
-        let literal = |value: String| -> Expr {
-            match field_type {
-                // the metrics_index pruner plans this without type coercion: literal must match
-                DataType::Utf8View => lit(ScalarValue::Utf8View(Some(value))),
-                DataType::LargeUtf8 => lit(ScalarValue::LargeUtf8(Some(value))),
-                _ => lit(value),
-            }
-        };
-        let predicate = match &mat.op {
-            MatchOp::Equal => column.eq(literal(mat.value.clone())),
-            MatchOp::NotEqual => column.not_eq(literal(mat.value.clone())),
-            MatchOp::Re(regex) | MatchOp::NotRe(regex) => {
-                let regex = format!("^{}$", regex.as_str());
-                let predicate = regexp_like().call(vec![column, lit(regex)]);
-                if matches!(mat.op, MatchOp::NotRe(_)) {
-                    predicate.not()
-                } else {
-                    predicate
-                }
-            }
-        };
-        predicates.push(predicate);
-    }
-    predicates
 }
 
 pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {

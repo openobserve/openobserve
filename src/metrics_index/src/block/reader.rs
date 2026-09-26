@@ -168,9 +168,70 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
         )?);
     }
     let blocks = decode_directory(&arrays, &header.parent, header.blocks_end)?;
+    let labels = decode_labels(header, &columns[1..], &projection, &mut decoder)?;
+    for i in 1..rows {
+        if blocks.block(i).hash == blocks.block(i - 1).hash {
+            for column in labels.columns() {
+                ensure!(
+                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
+                    "label metadata changes within one series"
+                );
+            }
+        }
+    }
+    Ok(Index {
+        base: Arc::new(IndexBase {
+            row_group_size: header.row_group_size,
+            parent: header.parent.clone(),
+            source_schema: Arc::clone(&header.source_schema),
+            blocks,
+            header: header.clone(),
+        }),
+        labels,
+        missing,
+    })
+}
+
+pub fn decode_additional_labels(
+    prior: &Index,
+    columns: &[Bytes],
+    names: &[String],
+) -> Result<Index> {
+    let header = &prior.base.header;
+    let (projection, missing) = header.projection(names)?;
+    ensure!(
+        columns.len() == projection.len(),
+        "MIDX label count mismatch"
+    );
+    let mut decoder = super::compact::frame_decoder()?;
+    let labels = decode_labels(header, columns, &projection, &mut decoder)?;
+    for i in 1..header.blocks {
+        if prior.blocks.block(i).hash == prior.blocks.block(i - 1).hash {
+            for column in labels.columns() {
+                ensure!(
+                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
+                    "label metadata changes within one series"
+                );
+            }
+        }
+    }
+    Ok(Index {
+        base: Arc::clone(&prior.base),
+        labels,
+        missing,
+    })
+}
+
+fn decode_labels(
+    header: &Header,
+    columns: &[Bytes],
+    projection: &[usize],
+    decoder: &mut zstd::bulk::Decompressor<'static>,
+) -> Result<RecordBatch> {
+    let rows = header.blocks;
     let mut fields = Vec::with_capacity(projection.len());
     let mut label_columns: Vec<ArrayRef> = Vec::with_capacity(projection.len());
-    for (bytes, index) in columns[1..].iter().zip(&projection) {
+    for (bytes, index) in columns.iter().zip(projection) {
         let label = &header.labels[*index];
         ensure!(
             bytes.len() as u64 == label.column.range.end - label.column.range.start,
@@ -178,7 +239,7 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
         );
         let field = header.source_schema.field_with_name(&label.name)?;
         let column = super::compact::decode_frame(
-            &mut decoder,
+            decoder,
             bytes,
             label.column.raw,
             field.data_type(),
@@ -193,29 +254,11 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
         ));
         label_columns.push(column);
     }
-    let labels = RecordBatch::try_new_with_options(
+    Ok(RecordBatch::try_new_with_options(
         Arc::new(Schema::new(fields)),
         label_columns,
         &RecordBatchOptions::new().with_row_count(Some(rows)),
-    )?;
-    for i in 1..rows {
-        if blocks.block(i).hash == blocks.block(i - 1).hash {
-            for column in labels.columns() {
-                ensure!(
-                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
-                    "label metadata changes within one series"
-                );
-            }
-        }
-    }
-    Ok(Index {
-        row_group_size: header.row_group_size,
-        parent: header.parent.clone(),
-        source_schema: Arc::clone(&header.source_schema),
-        blocks,
-        labels,
-        missing,
-    })
+    )?)
 }
 
 /// Decodes an index from the complete bytes of one MIDX file.

@@ -69,6 +69,32 @@ impl BlockDirectory {
         })
     }
 
+    pub fn row_boundary(&self, row: u64) -> Result<usize, usize> {
+        self.entries
+            .binary_search_by_key(&row, |entry| entry.row_start)
+    }
+
+    pub fn hash_partition_point(&self, mut predicate: impl FnMut(u64) -> bool) -> usize {
+        self.entries.partition_point(|entry| predicate(entry.hash))
+    }
+
+    pub fn allocated_bytes(&self) -> usize {
+        std::mem::size_of_val(self.entries.as_ref()).saturating_add(self.strict.len())
+    }
+
+    pub(crate) fn row_start(&self, index: usize) -> u64 {
+        self.entries[index].row_start
+    }
+
+    pub(crate) fn hash(&self, index: usize) -> u64 {
+        self.entries[index].hash
+    }
+
+    pub(crate) fn overlaps_time(&self, index: usize, lo: i64, hi: i64) -> bool {
+        let entry = self.entries[index];
+        lo <= hi && entry.min_timestamp <= hi && entry.max_timestamp >= lo
+    }
+
     pub fn iter(&self) -> BlockIter<'_> {
         self.range(0..self.len())
     }

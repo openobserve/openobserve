@@ -59,16 +59,14 @@ pub enum MetricsFileLayout {
     /// Size-bounded file ordered by `(__hash__ ASC, _timestamp ASC)`;
     /// `mindex_size` indicates whether its `.midx` exists.
     /// written by the compactor's hour-end merge
-    /// (`indexed-v1-{id}.parquet` or `.vortex`).
+    /// (`indexed-v3-{id}.parquet` or `.vortex`).
     Indexed,
 }
 
 impl MetricsFileLayout {
     const HASH_SORTED_PREFIX: &'static str = "hash-sorted-v1-";
     const HASH_MERGED_PREFIX: &'static str = "hash-merged-v1-";
-    const INDEXED_PREFIX: &'static str = "indexed-v1-";
-    const METRICS_INDEX_DIR: &'static str = "midx";
-    const METRICS_INDEX_EXT: &'static str = ".midx";
+    const INDEXED_PREFIX: &'static str = "indexed-v3-";
 
     /// Layout of the file at `path` (a full object key or a bare file name).
     pub fn of(path: &str) -> Option<Self> {
@@ -125,24 +123,13 @@ impl MetricsFileLayout {
     /// The possible `.midx` path of an indexed metrics data file. Stored like
     /// the Tantivy index — under its own root instead of next to the data —
     /// but in a distinct tree:
-    /// `files/{org}/metrics/{stream}/{date}/{hour}/indexed-v1-{id}.vortex`
-    /// -> `files/{org}/midx/{stream}/{date}/{hour}/indexed-v1-{id}.midx`.
+    /// `files/{org}/metrics/{stream}/{date}/{hour}/indexed-v3-{id}.vortex`
+    /// -> `files/{org}/mindex/{stream}/{date}/{hour}/indexed-v3-{id}.midx`.
     pub fn metrics_index_path(path: &str) -> Option<String> {
         if Self::of(path) != Some(Self::Indexed) {
             return None;
         }
-        let mut parts: Vec<&str> = path.split('/').collect();
-        // files/{org}/metrics/{stream}/.../{file}
-        if parts.len() < 5 || parts[2] != StreamType::Metrics.as_str() {
-            return None;
-        }
-        parts[2] = Self::METRICS_INDEX_DIR;
-        let file_name_pos = parts.len() - 1;
-        let file_format = FileFormat::from_extension(parts[file_name_pos])?;
-        let file_name = parts[file_name_pos].strip_suffix(file_format.extension())?;
-        let file_name = format!("{file_name}{}", Self::METRICS_INDEX_EXT);
-        parts[file_name_pos] = &file_name;
-        Some(parts.join("/"))
+        config::meta::promql::index::metrics_index_path(path)
     }
 }
 
@@ -167,7 +154,7 @@ mod metrics_file_layout_tests {
         );
         assert_eq!(
             MetricsFileLayout::of(
-                "files/default/metrics/test/2026/08/13/10/indexed-v1-456.parquet"
+                "files/default/metrics/test/2026/08/13/10/indexed-v3-456.parquet"
             ),
             Some(MetricsFileLayout::Indexed)
         );
@@ -189,12 +176,13 @@ mod metrics_file_layout_tests {
             None
         );
         assert_eq!(
-            MetricsFileLayout::of("indexed-v1-456.vortex"),
+            MetricsFileLayout::of("indexed-v3-456.vortex"),
             Some(MetricsFileLayout::Indexed)
         );
         // empty id, other versions, marker in a directory name
         for name in [
-            "indexed-v1-.parquet",
+            "indexed-v3-.parquet",
+            "indexed-v1-456.parquet",
             "hash-sorted-v1-.parquet",
             "metrics-indexed-v2-x.parquet",
             "final-unindexed-v1-77.parquet",
@@ -209,7 +197,7 @@ mod metrics_file_layout_tests {
     fn builds_and_marks_file_names() {
         assert_eq!(
             MetricsFileLayout::Indexed.file_name("456", FileFormat::Parquet),
-            "indexed-v1-456.parquet"
+            "indexed-v3-456.parquet"
         );
         assert_eq!(
             MetricsFileLayout::HashSorted.file_name("456", FileFormat::Parquet),
@@ -217,7 +205,7 @@ mod metrics_file_layout_tests {
         );
         assert_eq!(
             MetricsFileLayout::Indexed.file_name("456", FileFormat::Vortex),
-            "indexed-v1-456.vortex"
+            "indexed-v3-456.vortex"
         );
         let key = "files/default/metrics/cpu/2026/08/18/10/7099.parquet";
         let marked = MetricsFileLayout::HashSorted.mark_file_key(key);
@@ -239,20 +227,26 @@ mod metrics_file_layout_tests {
     fn metrics_index_path_only_for_indexed_metrics_keys() {
         assert_eq!(
             MetricsFileLayout::metrics_index_path(
-                "files/default/metrics/cpu/2026/08/19/07/indexed-v1-456.parquet"
+                "files/default/metrics/cpu/2026/08/19/07/indexed-v3-456.parquet"
             ),
-            Some("files/default/midx/cpu/2026/08/19/07/indexed-v1-456.midx".to_string())
+            Some("files/default/mindex/cpu/2026/08/19/07/indexed-v3-456.midx".to_string())
         );
         assert_eq!(
             MetricsFileLayout::metrics_index_path(
-                "files/default/metrics/cpu/2026/08/19/07/indexed-v1-456.vortex"
+                "files/default/metrics/cpu/2026/08/19/07/indexed-v3-456.vortex"
             ),
-            Some("files/default/midx/cpu/2026/08/19/07/indexed-v1-456.midx".to_string())
+            Some("files/default/mindex/cpu/2026/08/19/07/indexed-v3-456.midx".to_string())
         );
         // other layouts have no metrics index
         assert_eq!(
             MetricsFileLayout::metrics_index_path(
                 "files/default/metrics/cpu/2026/08/19/07/hash-sorted-v1-456.parquet"
+            ),
+            None
+        );
+        assert_eq!(
+            MetricsFileLayout::metrics_index_path(
+                "files/default/metrics/cpu/2026/08/19/07/indexed-v1-456.parquet"
             ),
             None
         );
@@ -270,12 +264,12 @@ mod metrics_file_layout_tests {
         );
         // not a full metrics object key
         assert_eq!(
-            MetricsFileLayout::metrics_index_path("files/default/indexed-v1-456.parquet"),
+            MetricsFileLayout::metrics_index_path("files/default/indexed-v3-456.parquet"),
             None
         );
         assert_eq!(
             MetricsFileLayout::metrics_index_path(
-                "files/default/logs/app/2026/08/19/07/indexed-v1-456.parquet"
+                "files/default/logs/app/2026/08/19/07/indexed-v3-456.parquet"
             ),
             None
         );

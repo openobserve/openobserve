@@ -384,6 +384,7 @@ pub struct FileListDeleted {
     pub account: String,
     pub file: String,
     pub index_file: bool,
+    pub mindex_file: bool,
     pub flattened: bool,
 }
 

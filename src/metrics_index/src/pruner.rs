@@ -18,11 +18,14 @@ use std::{
     sync::Arc,
 };
 
-use arrow::datatypes::Schema;
+use arrow::{
+    array::{Array, BooleanArray},
+    datatypes::Schema,
+};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::is_metrics_hash_excluded_label,
+        promql::{NAME_LABEL, VALUE_LABEL, is_metrics_hash_excluded_label},
         stream::{FileKey, FileSelection},
     },
     metrics,
@@ -38,10 +41,48 @@ use futures::{StreamExt, stream};
 use promql_parser::label::{MatchOp, Matchers};
 
 use crate::{
-    cache::METRICS_INDEX_SELECTION_CACHE,
+    block::Index,
     layout::MetricsFileLayout,
     reader::{IndexLabels, evaluate_metrics_index, load_metrics_index_file},
+    selection_cache::METRICS_INDEX_SELECTION_CACHE,
 };
+
+pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>> {
+    if !matchers.or_matchers.is_empty() {
+        return Err(DataFusionError::Execution(
+            "OR matchers require the source reader".into(),
+        ));
+    }
+    for matcher in &matchers.matchers {
+        if [NAME_LABEL, VALUE_LABEL, TIMESTAMP_COL_NAME].contains(&matcher.name.as_str()) {
+            continue;
+        }
+        if index
+            .labels
+            .schema()
+            .field_with_name(&matcher.name)
+            .is_err()
+        {
+            return Err(DataFusionError::Execution(format!(
+                "MIDX lacks identity label {}",
+                matcher.name
+            )));
+        }
+    }
+    let Some(filter) = create_physical_filter(index.labels.schema().as_ref(), matchers)? else {
+        return Ok((0..index.blocks.len()).collect());
+    };
+    let mask = filter
+        .evaluate(&index.labels)?
+        .into_array(index.blocks.len())?;
+    let mask = mask
+        .as_any()
+        .downcast_ref::<BooleanArray>()
+        .ok_or_else(|| DataFusionError::Execution("MIDX matcher was not boolean".into()))?;
+    Ok((0..mask.len())
+        .filter(|&id| !mask.is_null(id) && mask.value(id))
+        .collect())
+}
 
 /// Apply the `.midx` metrics indexes of indexed metrics files in `files` before
 /// registering the metrics table.
@@ -60,6 +101,9 @@ pub async fn search(
     matchers: &Matchers,
     target_partitions: usize,
 ) -> Result<Option<(usize, bool)>> {
+    if !matchers.or_matchers.is_empty() {
+        return Ok(None);
+    }
     let Some(matcher_labels) = metrics_index_labels(table_schema, matchers) else {
         return Ok(None);
     };
@@ -71,7 +115,7 @@ pub async fn search(
     // Keep the complete matcher set in the key. A short hash collision could
     // otherwise reuse physical row ranges selected by a different query.
     let filter_key = format!("{matchers:?}");
-    let selection_cache_enabled = get_config().search.metrics_index_selection_cache_enabled;
+    let selection_cache_enabled = get_config().search.metrics_selection_cache_enabled;
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
         // Zero size means this finalized file was published without a sidecar.
@@ -203,12 +247,17 @@ pub async fn search(
                 let result = async {
                     let data = load_metrics_index_file(
                         &account,
+                        &data_path,
                         &sidecar_path,
                         config::FileFormat::from_extension(&data_path).ok_or_else(|| {
                             DataFusionError::Execution("Unsupported metrics source format".into())
                         })?,
-                        expected_rows,
-                        compressed_size,
+                        crate::block::ParentMetadata {
+                            rows: u64::try_from(expected_rows)
+                                .map_err(|error| DataFusionError::External(error.into()))?,
+                            compressed_size: u64::try_from(compressed_size)
+                                .map_err(|error| DataFusionError::External(error.into()))?,
+                        },
                         mindex_size,
                         IndexLabels {
                             requested: Arc::clone(&labels),
@@ -270,7 +319,8 @@ pub async fn search(
     let indexed_file_count = evaluated.len() + failed_files;
     // An empty selection drops its file, so an incomplete matcher set cannot
     // have over-selected anything there.
-    let exact = other_files == 0
+    let exact = matchers.or_matchers.is_empty()
+        && other_files == 0
         && failed_files == 0
         && residual_matchers_covered(table_schema, &matchers, &matcher_labels)
         && evaluated
@@ -329,7 +379,7 @@ pub(super) fn residual_matchers_covered(
     matcher_labels: &[String],
 ) -> bool {
     matchers.matchers.iter().all(|matcher| {
-        promql::utils::matcher_residual_field(table_schema, matcher).is_none()
+        crate::matcher_residual_field(table_schema, matcher).is_none()
             || matcher_labels.contains(&matcher.name)
     })
 }
@@ -361,7 +411,7 @@ pub(super) fn create_physical_filter(
     sidecar_schema: &Schema,
     matchers: &Matchers,
 ) -> Result<Option<Arc<dyn PhysicalExpr>>> {
-    let Some(filter) = promql::utils::matcher_predicates(sidecar_schema, matchers)
+    let Some(filter) = crate::matcher_predicates(sidecar_schema, matchers)
         .into_iter()
         .reduce(Expr::and)
     else {

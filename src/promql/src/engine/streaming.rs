@@ -297,7 +297,7 @@ impl Engine {
         let (start, end, offset) = self.selector_time_range(&selector, Some(range));
         let label_selector = self.selector_labels();
         let ctxs = self
-            .create_selector_contexts(&selector, (start, end), &label_selector)
+            .create_selector_contexts(&selector, (start, end), &label_selector, true)
             .await?;
         let scan_matchers = match ctxs.as_slice() {
             [(_, _, _, false)] => Matchers::empty(),

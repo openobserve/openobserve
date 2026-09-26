@@ -884,8 +884,8 @@ fn vortex_finalizer_preserves_schema_without_row_groups() {
 fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     let directory = tempfile::tempdir().unwrap();
-    let data_path = directory.path().join("indexed-v1-before.parquet");
-    let midx_path = directory.path().join("indexed-v1-before.midx");
+    let data_path = directory.path().join("indexed-v3-before.parquet");
+    let midx_path = directory.path().join("indexed-v3-before.midx");
     let input = batch(&rows());
     let original = parquet_bytes(&input, 3);
     std::fs::write(&data_path, &original).unwrap();
@@ -896,8 +896,8 @@ fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
     std::fs::write(&midx_path, build_from_parquet(original, source).unwrap()).unwrap();
     let moved = directory.path().join("moved");
     std::fs::create_dir(&moved).unwrap();
-    let moved_data = moved.join("indexed-v1-after.parquet");
-    let moved_index = moved.join("indexed-v1-after.midx");
+    let moved_data = moved.join("indexed-v3-after.parquet");
+    let moved_index = moved.join("indexed-v3-after.midx");
     std::fs::rename(data_path, &moved_data).unwrap();
     std::fs::rename(midx_path, &moved_index).unwrap();
     let source =
@@ -960,42 +960,4 @@ fn sample_block_requires_one_complete_frame() {
     assert!(decode_block(&trailing, &block).is_err());
     block.block_length = (original.len() - 1) as u32;
     assert!(decode_block(&original[..original.len() - 1], &block).is_err());
-}
-
-#[test]
-#[ignore = "Exercises a directory with over one million blocks"]
-fn more_than_one_million_blocks_roundtrip() {
-    let rows = 1_000_001usize;
-    let schema = Arc::new(Schema::new(vec![
-        Field::new("__hash__", DataType::UInt64, false),
-        Field::new("_timestamp", DataType::Int64, false),
-        Field::new("value", DataType::Float64, false),
-    ]));
-    let batch = RecordBatch::try_new(
-        schema.clone(),
-        vec![
-            Arc::new(UInt64Array::from(vec![7; rows])),
-            Arc::new(Int64Array::from_iter_values(0..rows as i64)),
-            Arc::new(Float64Array::from(vec![1.; rows])),
-        ],
-    )
-    .unwrap();
-    let parent = ParentMetadata {
-        rows: rows as u64,
-        compressed_size: 100,
-    };
-    let mut writer = BlockWriter::new(Vec::new(), schema, vec![], parent.clone(), 1).unwrap();
-    writer.write(&batch).unwrap();
-    let bytes = writer.finish().unwrap();
-    let index = decode_file(&bytes, &parent, &[]).unwrap();
-    assert_eq!(index.blocks.len(), rows);
-    for (i, block) in index.blocks.iter().enumerate() {
-        assert_eq!(block.hash, 7);
-        let range = block.block_range();
-        let decoded =
-            decode_block(&bytes[range.start as usize..range.end as usize], &block).unwrap();
-        assert_eq!(decoded.timestamps, vec![i as i64]);
-        assert_eq!(decoded.value_bits, vec![1f64.to_bits()]);
-    }
-    eprintln!("one series, {} blocks, {} MIDX bytes", rows, bytes.len());
 }

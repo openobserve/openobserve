@@ -520,7 +520,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_access_plan_attaches_vortex_metrics_ranges() {
         let trace_id = "test_vortex_metrics_ranges";
-        let file_key = "files/org/metrics/cpu/2026/01/01/00/indexed-v1-1.vortex";
+        let file_key = "files/org/metrics/cpu/2026/01/01/00/indexed-v3-1.vortex";
         let mut file = FileKey::from_file_name(file_key);
         file.with_selection(FileSelection::RowRanges(Arc::new(vec![1..3, 5..8])), None);
         storage::file_list::set(trace_id, "schema", "vortex", vec![file]).await;

@@ -430,7 +430,7 @@ fn generate_local_stream_dirs(
     ];
     if stream_type == StreamType::Metrics {
         dirs.push(PathBuf::from(format!(
-            "{data_stream_dir}files/{org_id}/midx/{stream_name}"
+            "{data_stream_dir}files/{org_id}/mindex/{stream_name}"
         )));
     }
     dirs
@@ -656,6 +656,7 @@ async fn write_file_list(
                         account: v.account.clone(),
                         file: v.key.clone(),
                         index_file: v.meta.index_size > 0,
+                        mindex_file: v.meta.mindex_size > 0,
                         flattened: v.meta.flattened,
                     })
                     .collect::<Vec<_>>();
@@ -836,7 +837,7 @@ mod tests {
             vec![
                 PathBuf::from("/data/files/org/metrics/cpu"),
                 PathBuf::from("/data/files/org/index/cpu_metrics"),
-                PathBuf::from("/data/files/org/midx/cpu"),
+                PathBuf::from("/data/files/org/mindex/cpu"),
             ]
         );
         assert_eq!(

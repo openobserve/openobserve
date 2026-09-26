@@ -236,7 +236,7 @@ impl super::FileList for PostgresFileList {
             // we don't care the id here, because the id is from file_list table not for this table
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)",
+                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
@@ -247,6 +247,7 @@ impl super::FileList for PostgresFileList {
                     .push_bind(date_key)
                     .push_bind(file_name)
                     .push_bind(item.index_file)
+                    .push_bind(item.mindex_file)
                     .push_bind(item.flattened)
                     .push_bind(created_at);
             });
@@ -898,7 +899,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
         let items: Vec<FileListDeleted> = match sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#
+            r#"SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#
         )
         .bind(org_id)
         .bind(time_max)
@@ -912,6 +913,7 @@ SELECT date
                     account: r.account.to_string(),
                     file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     index_file: r.index_file,
+                    mindex_file: r.mindex_file,
                     flattened: r.flattened,
                 })
                 .collect(),
@@ -975,7 +977,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+            r#"SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -986,6 +988,7 @@ SELECT date
                 account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
+                mindex_file: r.mindex_file,
                 flattened: r.flattened,
             })
             .collect())
@@ -1935,8 +1938,8 @@ WHERE org = $1 AND account = $2;"#;
             .with_label_values(&["insert", "file_list_deleted"])
             .inc();
         sqlx::query(
-            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)
-               SELECT account, org, stream, date, file, index_file, flattened, $2
+            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)
+               SELECT account, org, stream, date, file, index_file, mindex_size > 0, flattened, $2
                FROM file_list WHERE org = $1;"#,
         )
         .bind(org_id)
@@ -3054,6 +3057,7 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     date       VARCHAR(16)  not null,
     file       VARCHAR(1024) not null,
     index_file BOOLEAN default false not null,
+    mindex_file BOOLEAN DEFAULT FALSE NOT NULL,
     flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );
@@ -3114,6 +3118,12 @@ CREATE TABLE IF NOT EXISTS stream_stats
         "file_list_deleted",
         "index_file",
         "BOOLEAN default false not null",
+    )
+    .await?;
+    add_column(
+        "file_list_deleted",
+        "mindex_file",
+        "BOOLEAN DEFAULT FALSE NOT NULL",
     )
     .await?;
     add_column(
@@ -3652,6 +3662,7 @@ mod tests {
                 date VARCHAR(16) not null,
                 file VARCHAR(1024) not null,
                 index_file BOOLEAN default false not null,
+                mindex_file BOOLEAN DEFAULT FALSE NOT NULL,
                 flattened BOOLEAN default false not null,
                 created_at BIGINT not null
             )
@@ -3954,6 +3965,7 @@ mod tests {
                 file: "org1/stream1/logs/2021/01/01/pg_deleted1.parquet".to_string(),
                 flattened: false,
                 index_file: false,
+                mindex_file: false,
             },
             FileListDeleted {
                 id: 0,
@@ -3961,6 +3973,7 @@ mod tests {
                 file: "org1/stream1/logs/2021/01/01/pg_deleted2.parquet".to_string(),
                 flattened: true,
                 index_file: true,
+                mindex_file: false,
             },
         ];
 

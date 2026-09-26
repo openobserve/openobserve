@@ -24,7 +24,7 @@ use std::{
 
 use bytes::Bytes;
 use config::{
-    meta::promql::midx::{MIDX_TRAILER_LEN, MidxTrailer},
+    meta::promql::index::{MIDX_TRAILER_LEN, MidxTrailer},
     utils::time::{HourFormat, get_ymdh_from_micros},
 };
 use hashbrown::HashSet;

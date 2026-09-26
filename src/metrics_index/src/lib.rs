@@ -16,15 +16,20 @@
 //! Metrics index layout, label pruning, and row-selection caching.
 
 pub mod block;
-mod cache;
+pub mod block_cache;
 pub mod layout;
+mod matcher;
 mod pruner;
 mod reader;
+mod selection_cache;
 
 pub use layout::{
     METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_enabled, metrics_index_stream,
 };
-pub use pruner::search;
+pub use matcher::{matcher_predicates, matcher_residual_field};
+pub use pruner::{matching_blocks, search};
+pub use reader::fetch_parsed_index;
+pub use selection_cache::{cache_blocks, cached_blocks};
 
 #[cfg(test)]
 mod tests {
@@ -54,7 +59,7 @@ mod tests {
         let schema = Schema::new(vec![Field::new("path", DataType::Utf8, true)]);
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "/api/bar")]);
         let file = FileKey::from_file_name(
-            "files/default/metrics/cpu/2026/09/23/00/indexed-v1-no-index.parquet",
+            "files/default/metrics/cpu/2026/09/23/00/indexed-v3-no-index.parquet",
         );
         let mut files = vec![file];
         assert!(
@@ -233,7 +238,8 @@ mod tests {
             .unwrap();
         let id = config::ider::uuid();
         let account = format!("{id}:default");
-        let path = format!("files/test/midx/m/2026/09/22/00/indexed-v1-{id}.midx");
+        let path = format!("files/test/mindex/m/2026/09/22/00/indexed-v3-{id}.midx");
+        let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v3-{id}.vortex");
         let store = object_store::memory::InMemory::new();
         store
             .put_opts(
@@ -246,10 +252,13 @@ mod tests {
         infra::storage::add_account(&id, Box::new(store)).await;
         load_metrics_index_file(
             &account,
+            &data_path,
             &path,
             config::FileFormat::Vortex,
-            rows,
-            123,
+            crate::block::ParentMetadata {
+                rows: rows as u64,
+                compressed_size: 123,
+            },
             0,
             crate::reader::IndexLabels {
                 requested: Arc::new(requested.to_vec()),

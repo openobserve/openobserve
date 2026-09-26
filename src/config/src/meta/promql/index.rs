@@ -13,9 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! 32-byte MIDX trailer: label_len u64, directory_len u64, header_len u32, version u32, magic.
+//! MIDX framing, sidecar paths, and block-scan context shared across crates.
 
 use anyhow::{Context, Result, ensure};
+
+use crate::{
+    FileFormat,
+    meta::stream::{FileKey, StreamType},
+};
 
 pub const MIDX_VERSION: u32 = 3;
 pub const MIDX_MAGIC: &[u8; 8] = b"O2MIDX03";
@@ -83,6 +88,30 @@ impl MidxTrailer {
     pub fn header_start(&self, file_size: u64) -> u64 {
         file_size.saturating_sub(MIDX_TRAILER_LEN as u64 + u64::from(self.header_len))
     }
+}
+
+/// Immutable files selected for one PromQL block scan.
+#[derive(Debug, Clone)]
+pub struct MetricsBlockScan {
+    pub table_name: String,
+    pub files: Vec<FileKey>,
+}
+
+pub fn metrics_index_path(path: &str) -> Option<String> {
+    let mut parts: Vec<&str> = path.split('/').collect();
+    if parts.len() < 5 || parts[0] != "files" || parts[2] != StreamType::Metrics.as_str() {
+        return None;
+    }
+    let name = *parts.last()?;
+    let format = FileFormat::from_extension(name)?;
+    let stem = name.strip_suffix(format.extension())?;
+    if stem.strip_prefix("indexed-v3-").is_none_or(str::is_empty) {
+        return None;
+    }
+    parts[2] = "mindex";
+    let filename = format!("{stem}.midx");
+    *parts.last_mut()? = &filename;
+    Some(parts.join("/"))
 }
 
 #[cfg(test)]

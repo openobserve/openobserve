@@ -16,8 +16,9 @@
 use std::sync::Arc;
 
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
+        promql::{MetricsBlockScan, NAME_LABEL, VALUE_LABEL, is_metrics_hash_excluded_label},
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
@@ -33,8 +34,8 @@ use itertools::Itertools;
 use metrics_index::MetricsFileLayout;
 use promql_parser::label::Matchers;
 use search::{
-    datafusion::{exec::register_metrics_table, sort_order::FileSortOrder},
-    file_cache::{cache_files, calc_target_partitions},
+    datafusion::{exec::register_metrics_table_with_blocks, sort_order::FileSortOrder},
+    file_cache::{cache_files, calc_target_partitions, inspect_file_cache},
 };
 use search_service::match_source;
 use tracing::Instrument;
@@ -49,6 +50,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     filters: &mut [(String, Vec<String>)],
+    prefer_blocks: bool,
 ) -> Result<Option<Context>> {
     let enter_span = tracing::span::Span::current();
 
@@ -127,25 +129,33 @@ pub(crate) async fn create_context(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let (cache_type, cache_hits, cache_misses) = cache_files(
-        trace_id,
-        &files
-            .iter()
-            .map(|f| {
-                (
-                    f.id,
-                    &f.account,
-                    &f.key,
-                    f.meta.compressed_size,
-                    f.meta.max_ts,
-                )
-            })
-            .collect_vec(),
-        &mut scan_stats,
-        "parquet",
-    )
-    .instrument(enter_span.clone())
-    .await;
+    let block_eligible = prefer_blocks
+        && get_config().compact.metrics_index_enabled
+        && get_config().search.feature_metrics_streaming_agg_enabled
+        && files.iter().all(block_parent_eligible)
+        && block_matchers_supported(&schema, &matchers);
+    let cache_inputs = files
+        .iter()
+        .map(|f| {
+            (
+                f.id,
+                &f.account,
+                &f.key,
+                f.meta.compressed_size,
+                f.meta.max_ts,
+            )
+        })
+        .collect_vec();
+    let (cache_type, cache_hits, cache_misses) = if block_eligible {
+        let (_, hits, misses) = inspect_file_cache(trace_id, &cache_inputs, &mut scan_stats)
+            .instrument(enter_span.clone())
+            .await;
+        (file_data::CacheType::None, hits, misses)
+    } else {
+        cache_files(trace_id, &cache_inputs, &mut scan_stats, "parquet")
+            .instrument(enter_span.clone())
+            .await
+    };
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
@@ -190,34 +200,39 @@ pub(crate) async fn create_context(
 
     let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
 
-    cache_metrics_index_files(trace_id, org_id, &files).await;
+    if block_eligible {
+        log::info!(
+            "[trace_id {trace_id}] promql->search->storage: MIDX block candidate across {} files; row selection deferred to block preflight",
+            files.len()
+        );
+    }
+    if !block_eligible {
+        cache_metrics_index_files(trace_id, org_id, &files).await;
+    }
 
-    // Prune indexed metrics files through their `.midx` metrics indexes: matching
-    // physical rows are attached to each FileKey before the metrics table is
-    // built. Files of any other layout (legacy or not yet finalized hours) are
-    // scanned in full; the PromQL matchers are always applied by the query.
     let mut keep_filters = true;
-    match metrics_index::search(
-        trace_id,
-        &mut files,
-        schema.as_ref(),
-        &matchers,
-        target_partitions,
-    )
-    .await
-    {
-        Ok(Some((took_ms, exact))) => {
-            scan_stats.idx_took = took_ms as i64;
-            // exact selections already hold only the matching series' rows
-            keep_filters = !exact;
-        }
-        Ok(None) => {}
-        Err(error) => {
-            log::warn!(
-                "[trace_id {trace_id}] promql->search->storage: metrics-index query failed, falling back to a full scan: {error}"
-            );
-        }
-    };
+    if !block_eligible {
+        match metrics_index::search(
+            trace_id,
+            &mut files,
+            schema.as_ref(),
+            &matchers,
+            target_partitions,
+        )
+        .await
+        {
+            Ok(Some((took_ms, exact))) => {
+                scan_stats.idx_took = took_ms as i64;
+                keep_filters = !exact;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                log::warn!(
+                    "[trace_id {trace_id}] promql->search->storage: metrics-index row selection failed; continuing the source scan: {error}"
+                );
+            }
+        };
+    }
 
     // every indexed file was pruned away: nothing in storage can match the selector
     if files.is_empty() {
@@ -229,7 +244,7 @@ pub(crate) async fn create_context(
     }
 
     log::info!(
-        "[trace_id {trace_id}] promql->search->storage: after metrics-index pruning, files {}, scan_size {}, compressed_size {}, index took: {} ms",
+        "[trace_id {trace_id}] promql->search->storage: after metrics-index path selection, files {}, scan_size {}, compressed_size {}, index took: {} ms",
         scan_stats.files,
         scan_stats.original_size,
         scan_stats.compressed_size,
@@ -251,11 +266,65 @@ pub(crate) async fn create_context(
         FileSortOrder::None
     };
 
-    let ctx =
-        register_metrics_table(&session, schema.clone(), stream_name, files, sort_order).await?;
+    let block_scan = block_scan_candidate(stream_name, &files, sort_order, block_eligible);
+    let ctx = register_metrics_table_with_blocks(
+        &session,
+        schema.clone(),
+        stream_name,
+        files,
+        sort_order,
+        block_scan,
+    )
+    .await?;
 
     // keep_filters=false only when the pruner proved its selections exact
     Ok(Some((ctx, schema, scan_stats, keep_filters)))
+}
+
+fn block_parent_eligible(file: &FileKey) -> bool {
+    !file.deleted
+        && config::FileFormat::from_extension(&file.key).is_some()
+        && MetricsFileLayout::of(&file.key) == Some(MetricsFileLayout::Indexed)
+        && file.meta.records > 0
+        && file.meta.compressed_size > 0
+        && file.meta.mindex_size > 0
+}
+
+fn block_matchers_supported(schema: &arrow::datatypes::Schema, matchers: &Matchers) -> bool {
+    matchers.or_matchers.is_empty()
+        && matchers.matchers.iter().all(|matcher| {
+            if [NAME_LABEL, VALUE_LABEL, TIMESTAMP_COL_NAME].contains(&matcher.name.as_str()) {
+                return true;
+            }
+            let Ok(field) = schema.field_with_name(&matcher.name) else {
+                return false;
+            };
+            !is_metrics_hash_excluded_label(&matcher.name)
+                && matches!(
+                    field.data_type(),
+                    arrow::datatypes::DataType::Utf8
+                        | arrow::datatypes::DataType::LargeUtf8
+                        | arrow::datatypes::DataType::Utf8View
+                )
+        })
+}
+
+fn block_scan_candidate(
+    table_name: &str,
+    files: &[FileKey],
+    sort_order: FileSortOrder,
+    enabled: bool,
+) -> Option<Arc<MetricsBlockScan>> {
+    (enabled
+        && sort_order == FileSortOrder::HashTimestampAsc
+        && !files.is_empty()
+        && files.iter().all(block_parent_eligible))
+    .then(|| {
+        Arc::new(MetricsBlockScan {
+            table_name: table_name.to_owned(),
+            files: files.to_vec(),
+        })
+    })
 }
 
 /// Prefetch the `.midx` sidecars like the Tantivy path prefetches `.ttv` files:
@@ -342,4 +411,63 @@ async fn get_file_list(
         }
     }
     Ok(files)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::FileMeta;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use promql_parser::label::{MatchOp, Matcher};
+
+    use super::*;
+
+    fn file(records: i64) -> FileKey {
+        FileKey::new(
+            1,
+            String::new(),
+            "files/org/metrics/m/2026/09/23/00/indexed-v3-id.parquet".into(),
+            FileMeta {
+                records,
+                compressed_size: 100,
+                mindex_size: 50,
+                ..Default::default()
+            },
+            false,
+        )
+    }
+
+    #[test]
+    fn unfiltered_scan_uses_all_rows_without_source_selection() {
+        let files = vec![file(100)];
+        let scan =
+            block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, true).unwrap();
+        assert_eq!(scan.files.len(), 1);
+        assert!(files[0].selection.is_none());
+    }
+
+    #[test]
+    fn filtered_scan_is_chosen_before_row_selection() {
+        let files = vec![file(100)];
+        assert!(block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, true).is_some());
+        assert!(
+            block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, false).is_none()
+        );
+        let mut missing = files;
+        missing[0].meta.mindex_size = 0;
+        assert!(
+            block_scan_candidate("m", &missing, FileSortOrder::HashTimestampAsc, true).is_none()
+        );
+    }
+
+    #[test]
+    fn block_matchers_require_identity_labels() {
+        let schema = Schema::new(vec![
+            Field::new("path", DataType::Utf8, true),
+            Field::new("start_time", DataType::Utf8, true),
+        ]);
+        let path = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "/api/bar")]);
+        let point = Matchers::new(vec![Matcher::new(MatchOp::Equal, "start_time", "x")]);
+        assert!(block_matchers_supported(&schema, &path));
+        assert!(!block_matchers_supported(&schema, &point));
+    }
 }

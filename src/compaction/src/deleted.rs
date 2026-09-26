@@ -113,6 +113,9 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
 }
 
 fn metrics_index_key(file: &FileListDeleted) -> Option<Cow<'_, str>> {
+    if !file.mindex_file {
+        return None;
+    }
     MetricsFileLayout::metrics_index_path(&file.file).map(Cow::Owned)
 }
 
@@ -123,20 +126,28 @@ mod tests {
     fn deleted_file(file: &str) -> FileListDeleted {
         FileListDeleted {
             file: file.to_string(),
+            mindex_file: true,
             ..Default::default()
         }
     }
 
     #[test]
     fn metrics_index_key_only_for_indexed_metrics_files() {
-        let file = deleted_file("files/default/metrics/cpu/2026/08/19/07/indexed-v1-456.parquet");
+        let file = deleted_file("files/default/metrics/cpu/2026/08/19/07/indexed-v3-456.parquet");
         assert_eq!(
             metrics_index_key(&file).as_deref(),
-            Some("files/default/midx/cpu/2026/08/19/07/indexed-v1-456.midx")
+            Some("files/default/mindex/cpu/2026/08/19/07/indexed-v3-456.midx")
         );
 
+        let file_without_index = FileListDeleted {
+            mindex_file: false,
+            ..file
+        };
+        assert!(metrics_index_key(&file_without_index).is_none());
+
         for file in [
-            "files/default/logs/app/2026/08/19/07/indexed-v1-456.parquet",
+            "files/default/logs/app/2026/08/19/07/indexed-v3-456.parquet",
+            "files/default/metrics/cpu/2026/08/19/07/indexed-v1-456.parquet",
             "files/default/metrics/cpu/2026/08/19/07/hash-sorted-v1-456.parquet",
             "files/default/metrics/cpu/2026/08/19/07/456.parquet",
         ] {
