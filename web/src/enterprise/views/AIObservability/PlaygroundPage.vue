@@ -317,6 +317,7 @@ import llmDatasetsService, {
   type LlmDatasetItem,
 } from "@/services/llm-datasets.service";
 import {
+  chatProviders,
   PlaygroundRunError,
   runPlayground,
   scorePlayground,
@@ -516,7 +517,7 @@ onBeforeUnmount(() => {
 async function loadProviders() {
   loadingProviders.value = true;
   try {
-    providers.value = await onlineEvalsService.providers.list(orgId.value);
+    providers.value = chatProviders(await onlineEvalsService.providers.list(orgId.value));
     seedDefaultProvider();
   } catch {
     toast({ variant: "error", message: t("aiObservability.playground.providerLoadError") });

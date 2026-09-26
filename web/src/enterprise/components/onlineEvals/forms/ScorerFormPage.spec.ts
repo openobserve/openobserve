@@ -33,7 +33,10 @@ const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "test-org" } },
 });
 
-const providers = [{ id: "p1", name: "Provider 1", providerType: "openai" }];
+const providers = [
+  { id: "p1", name: "Provider 1", providerType: "openai" },
+  { id: "p2", name: "Decisions", providerType: "systemone" },
+];
 const scoreConfigs = [{ id: "sc1", name: "faithfulness", dataType: "numeric" }];
 
 function createWrapper(props: Record<string, any> = {}) {
@@ -152,6 +155,39 @@ describe("ScorerFormPage", () => {
     const [, payload] = (onlineEvalsService.scorers.create as any).mock.calls[0];
     expect(payload.scorer.producesScoreConfigId).toBeNull();
     expect(wrapper.emitted("saved")).toBeTruthy();
+  });
+
+  // A decision model fills no extra fields; its reasoning is the answer summary, so it stays.
+  it("drops extra fields but keeps reasoning for a decision-model provider", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "my-scorer");
+    setField(wrapper, "extraMetadataFields", [{ name: "why", type: "string", description: "" }]);
+    setField(wrapper, "providerId", "p2");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="scorer-form-decision-provider-note"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="scorer-form-include-reasoning"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="scorer-form-extra-field-add"]').exists()).toBe(false);
+
+    await submit(wrapper);
+    const [, payload] = (onlineEvalsService.scorers.create as any).mock.calls[0];
+    expect(payload.scorer.params.include_reasoning).toBe(true);
+    expect(payload.scorer.params.extra_metadata_fields).toBeUndefined();
+  });
+
+  it("drops hidden duplicate rows so a decision-model scorer can still save", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "my-scorer");
+    setField(wrapper, "providerId", "p1");
+    setField(wrapper, "extraMetadataFields", [
+      { name: "dup", type: "string", description: "" },
+      { name: "dup", type: "number", description: "" },
+    ]);
+    setField(wrapper, "providerId", "p2");
+    await submit(wrapper);
+
+    expect(oform(wrapper).form.state.isValid).toBe(true);
+    expect(onlineEvalsService.scorers.create).toHaveBeenCalledTimes(1);
   });
 
   it("rejects duplicate extra-metadata field names", async () => {

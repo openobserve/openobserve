@@ -12816,6 +12816,7 @@
       "promptLabel": "Judge prompt",
       "includeReasoningLabel": "Include Reasoning",
       "includeReasoningHint": "The judge explains why it gave that score, saved with each result.",
+      "decisionProviderNote": "Decision models return a score and reasoning only, so extra fields are not available.",
       "extraFieldsLabel": "Extra Metadata Fields (Optional)",
       "extraFieldsHint": "Ask the judge to return extra values with each score — a category or a confidence, for example.",
       "extraFields": {
