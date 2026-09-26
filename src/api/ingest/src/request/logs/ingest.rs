@@ -471,10 +471,13 @@ pub async fn handle_gcp_request(
     description = "Ingests log data using OpenTelemetry Protocol (OTLP) format. Supports both Protocol Buffers and JSON \
                    content types for OTLP log ingestion. This is the standard endpoint for OpenTelemetry SDK and \
                    collector integrations to send structured log data with trace correlation.",
-    request_body(content = String, description = "ExportLogsServiceRequest", content_type = "application/x-protobuf"),
+    request_body(description = "ExportLogsServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
-        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+        (status = 200, description = "ExportLogsServiceResponse, encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 400, description = "google.rpc.Status: invalid body, unsupported Content-Type, ingestion refused (e.g. stream being deleted), or write rejected (e.g. columns limit)", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 429, description = "google.rpc.Status: trial period expired", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 500, description = "google.rpc.Status: internal write error", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 503, description = "google.rpc.Status: ingester overloaded or unavailable, or ingestion not allowed (cloud)", content(("application/x-protobuf"), (Object = "application/json"))),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -498,13 +501,14 @@ pub async fn otlp_logs_write(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return otlp_error_response(
-            otlp_request_type_from_content_type(content_type)
-                .unwrap_or(OtlpRequestType::HttpProtobuf),
-            StatusCode::TOO_MANY_REQUESTS,
-            8, // RESOURCE_EXHAUSTED
-            e.to_string(),
-        );
+        let req_type = otlp_request_type_from_content_type(content_type)
+            .unwrap_or(OtlpRequestType::HttpProtobuf);
+        let (status, rpc_code) = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            (StatusCode::TOO_MANY_REQUESTS, 8) // RESOURCE_EXHAUSTED
+        } else {
+            (StatusCode::SERVICE_UNAVAILABLE, 14) // UNAVAILABLE
+        };
+        return otlp_error_response(req_type, status, rpc_code, e.to_string());
     }
 
     let (request, request_type) = match otlp_request_type_from_content_type(content_type) {
@@ -584,10 +588,14 @@ pub async fn otlp_logs_write(
                     "Error processing otlp {content_type} logs write request {org_id}/{in_stream_name:?}: {e:?}"
                 );
             }
-            let (status, rpc_code) = if matches!(e, infra::errors::Error::ResourceError(_)) {
-                (StatusCode::SERVICE_UNAVAILABLE, 14) // UNAVAILABLE
-            } else {
-                (StatusCode::BAD_REQUEST, 3) // INVALID_ARGUMENT
+            let (status, rpc_code) = match e {
+                infra::errors::Error::ResourceError(_) => {
+                    (StatusCode::SERVICE_UNAVAILABLE, 14) // UNAVAILABLE
+                }
+                infra::errors::Error::TrialPeriodExpired => {
+                    (StatusCode::TOO_MANY_REQUESTS, 8) // RESOURCE_EXHAUSTED
+                }
+                _ => (StatusCode::BAD_REQUEST, 3), // INVALID_ARGUMENT
             };
             otlp_error_response(request_type, status, rpc_code, e.to_string())
         }
