@@ -26,6 +26,7 @@ import DateTimeHelper from "./dashboardPages/dashboard-time";
 import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
 import DashboardZoomDrag from "./dashboardPages/dashboard-zoom-drag";
 import LogsVisualise from "./dashboardPages/visualise";
+import DashboardExemplars from "./dashboardPages/dashboard-exemplars";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDrawer.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
@@ -168,6 +169,7 @@ class PageManager {
     this.dashboardPanelTime = new DashboardPanelTime(page);
     this.dashboardZoomDrag = new DashboardZoomDrag(page);
     this.logsVisualise = new LogsVisualise(page);
+    this.dashboardExemplars = new DashboardExemplars(page);
     this.dashboardPage = new DashboardPage(page);
     this.scheduledReportsDrawer = new ScheduledReportsDrawerPage(page);
 

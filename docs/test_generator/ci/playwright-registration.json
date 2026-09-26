@@ -1,0 +1,6 @@
+{
+  "group": "Dashboards-Charts",
+  "spec_filename": "dashboard-exemplars.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

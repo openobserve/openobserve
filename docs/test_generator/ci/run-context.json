@@ -1,0 +1,25 @@
+{
+  "feature_slug": "prometheus-exemplars",
+  "feature_title": "Prometheus Exemplars",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "dashboard-exemplars.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-exemplars.spec.js",
+  "playwright_group": "Dashboards-Charts",
+  "source_files": [
+    "web/src/components/dashboards/exemplars/ExemplarCard.vue",
+    "web/src/components/dashboards/exemplars/ExemplarToggle.vue",
+    "web/src/components/dashboards/exemplars/ExemplarMarkerList.vue",
+    "web/src/components/dashboards/panels/ChartRenderer.vue",
+    "web/src/composables/dashboard/usePanelExemplars.ts",
+    "web/src/composables/dashboard/usePanelExemplarInteraction.ts",
+    "web/src/composables/metrics/useMetricsExplorerExemplars.ts",
+    "web/src/plugins/metrics/explorer/MetricCard.vue",
+    "web/src/services/search.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

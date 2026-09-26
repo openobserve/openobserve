@@ -16,6 +16,8 @@ function newRun() {
     HIST: `${PREFIX}_latency_seconds`,
     COUNTER: `${PREFIX}_requests_total`,
     SPARSE: `${PREFIX}_empty_seconds`,
+    NOTRACE: `${PREFIX}_notrace_seconds`,
+    SPIKE: `${PREFIX}_spike_seconds`,
   };
 }
 const SERVICE = 'e2e-exemplar-svc';
@@ -59,6 +61,20 @@ function histogramPayload(run, ids, nowNs) {
     exemplars: [{ timeUnixNano: p.exemplars[0].timeUnixNano, asDouble: 1, filteredAttributes: [{ key: 'pod', value: { stringValue: 'api-0' } }] }],
   }));
   const plainPoints = dataPoints.map((p) => ({ ...p, exemplars: [] }));
+  // No trace_id/span_id: the exemplar has a label but no trace reference, so the card resolves to `none`.
+  const notracePoints = dataPoints.map((p) => ({
+    ...p,
+    exemplars: [{
+      timeUnixNano: p.exemplars[0].timeUnixNano,
+      asDouble: p.exemplars[0].asDouble,
+      filteredAttributes: [{ key: 'route', value: { stringValue: '/pay' } }],
+    }],
+  }));
+  // Value far above the p99 line, so the marker clamps to the top of the drawn axis.
+  const spikePoints = dataPoints.map((p) => ({
+    ...p,
+    exemplars: p.exemplars.map((e) => ({ ...e, asDouble: 1e6 })),
+  }));
   return {
     resourceMetrics: [{
       resource: { attributes: [{ key: 'service.name', value: { stringValue: SERVICE } }] },
@@ -68,6 +84,8 @@ function histogramPayload(run, ids, nowNs) {
           { name: run.HIST, unit: 's', histogram: { aggregationTemporality: 2, dataPoints } },
           { name: run.COUNTER, sum: { aggregationTemporality: 2, isMonotonic: true, dataPoints: counterPoints } },
           { name: run.SPARSE, unit: 's', histogram: { aggregationTemporality: 2, dataPoints: plainPoints } },
+          { name: run.NOTRACE, unit: 's', histogram: { aggregationTemporality: 2, dataPoints: notracePoints } },
+          { name: run.SPIKE, unit: 's', histogram: { aggregationTemporality: 2, dataPoints: spikePoints } },
         ],
       }],
     }],

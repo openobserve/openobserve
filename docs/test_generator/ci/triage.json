@@ -1,0 +1,33 @@
+{
+  "feature_slug": "prometheus-exemplars",
+  "feature_title": "Prometheus Exemplars",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "dashboard-exemplars.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-exemplars.spec.js",
+  "playwright_group": "Dashboards-Charts",
+  "source_files": [
+    "web/src/components/dashboards/exemplars/ExemplarCard.vue",
+    "web/src/components/dashboards/exemplars/ExemplarToggle.vue",
+    "web/src/components/dashboards/exemplars/ExemplarMarkerList.vue",
+    "web/src/components/dashboards/panels/ChartRenderer.vue",
+    "web/src/composables/dashboard/usePanelExemplars.ts",
+    "web/src/composables/dashboard/usePanelExemplarInteraction.ts",
+    "web/src/composables/metrics/useMetricsExplorerExemplars.ts",
+    "web/src/plugins/metrics/explorer/MetricCard.vue",
+    "web/src/services/search.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path is open-source: src/promql/*, src/promql_service/*, src/config/*, web/src/** and tests/ui-testing/** (plus a translations state file). None live under enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/), and there are no enterprise keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management) in the paths, so this is an OSS change.",
+    "skip": "Not skipped. The trigger comment and feature hint are empty (no tests-added label or skip request), and the change is user-facing: it adds exemplar markers, toggles, hover cards and click-to-trace interactions to dashboard panels and the metrics explorer, not docs/CI/comment-only edits.",
+    "e2e": "E2E is warranted because the change adds real UI behavior a user exercises: drawing one exemplar marker per in-window exemplar on panel charts, a header toggle that overrides without saving, a hover card, marker click opening a span, and a metrics-explorer card toggle that shows/hides exemplars on a heatmap. These flows need browser verification.",
+    "area": "The bulk of new UI lives under web/src/components/dashboards/ (ExemplarCard, ExemplarToggle, ExemplarMarkerList, ChartRenderer) and web/src/composables/dashboard/use*Exemplar*, with sibling specs in tests/ui-testing/playwright-tests/Dashboards/. The metrics-explorer side (web/src/composables/metrics/useMetricsExplorerExemplars.ts, MetricCard.vue) is a secondary surface and has its own sibling spec under Metrics/.",
+    "group": "The primary spec (dashboard-exemplars.spec.js) is chart-rendering/interaction work, matching the Dashboards-Charts shard whose run_files already carry chart specs (custom-charts, geoMap, maps, multi-y-axis). The secondary metrics-explorer-exemplars.spec.js belongs to the Metrics shard and should be handled there.",
+    "existing_tests": "Yes — the diff already adds two Playwright E2E specs: tests/ui-testing/playwright-tests/Dashboards/dashboard-exemplars.spec.js and tests/ui-testing/playwright-tests/Metrics/metrics-explorer-exemplars.spec.js, plus a tests/ui-testing/playwright-tests/utils/exemplar-fixtures.js helper. These cover the new exemplar feature directly, so the Architect should enhance/extend them (route = enhance). The many changed web/src/**/*.spec.ts files are Vitest unit tests, which are not E2E coverage and do not count toward this flag."
+  }
+}

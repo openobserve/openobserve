@@ -1,0 +1,17 @@
+[
+  {
+    "title": "exemplar with no trace_id shows 'No trace_id on this exemplar'",
+    "action": "append",
+    "verifies": "an exemplar with no trace_id resolves to the 'none' state, shows the no-trace message, sends zero trace lookups, and offers no open-trace button"
+  },
+  {
+    "title": "trace lookup failure shows the unverified button with its reason",
+    "action": "append",
+    "verifies": "a 403 trace lookup shows the unverified open-trace button with data-reason forbidden, and a delayed lookup past the 8s cap shows data-reason timeout"
+  },
+  {
+    "title": "value above the y-extent clamps the marker to the top and shows the clamped note",
+    "action": "append",
+    "verifies": "an exemplar value above the series y-max clamps the marker to the top (data-clamped=top) and shows the above-range note"
+  }
+]
