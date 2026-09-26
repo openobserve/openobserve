@@ -20,6 +20,8 @@
 
 use axum::response::Response as HttpResponse;
 use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
+use config::utils::sql::{quote_identifier, quote_sql_string};
 use serde::Deserialize;
 
 /// Query parameters for service graph API
@@ -141,10 +143,10 @@ async fn topology_v1(
     // byte-identical to the pre-B4 query (backward compatible). The
     // `_o2_service_graph` stream has NO `agent_version` column, so we never
     // reference version here.
-    let agent_pred: Option<String> = query.agent_env.as_deref().map(|env| {
-        let escaped = env.replace('\'', "''");
-        format!("agent_env = '{escaped}'")
-    });
+    let agent_pred: Option<String> = query
+        .agent_env
+        .as_deref()
+        .map(|env| format!("agent_env = {}", quote_sql_string(env)));
 
     // 1. Query current window
     let edges = match query_edges_from_stream_internal(
@@ -312,22 +314,23 @@ fn build_edges_sql(
     let agent_clause = agent_pred
         .map(|p| format!("\n             AND {p}"))
         .unwrap_or_default();
+    let table = quote_identifier(stream_name);
+    let org = quote_sql_string(org_id);
     if let Some(stream) = stream_filter {
+        let stream = quote_sql_string(stream);
         format!(
-            "SELECT * FROM \"{}\"
-             WHERE _timestamp >= {} AND _timestamp < {}
-             AND org_id = '{}'
-             AND trace_stream_name = '{}'{}
-             LIMIT 10000",
-            stream_name, start_time, end_time, org_id, stream, agent_clause
+            "SELECT * FROM {table}
+             WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+             AND org_id = {org}
+             AND trace_stream_name = {stream}{agent_clause}
+             LIMIT 10000"
         )
     } else {
         format!(
-            "SELECT * FROM \"{}\"
-             WHERE _timestamp >= {} AND _timestamp < {}
-             AND org_id = '{}'{}
-             LIMIT 10000",
-            stream_name, start_time, end_time, org_id, agent_clause
+            "SELECT * FROM {table}
+             WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+             AND org_id = {org}{agent_clause}
+             LIMIT 10000"
         )
     }
 }
@@ -490,24 +493,36 @@ pub async fn get_edge_history(
         };
 
     let mut filters = format!(
-        "_timestamp >= {} AND _timestamp < {} AND org_id = '{}'",
-        start_time, end_time, org_id
+        "_timestamp >= {} AND _timestamp < {} AND org_id = {}",
+        start_time,
+        end_time,
+        quote_sql_string(&org_id)
     );
     if let Some(ref client) = query.client_service {
-        filters.push_str(&format!(" AND client_service = '{}'", client));
+        filters.push_str(&format!(
+            " AND client_service = {}",
+            quote_sql_string(client)
+        ));
     }
     if let Some(ref server) = query.server_service {
-        filters.push_str(&format!(" AND server_service = '{}'", server));
+        filters.push_str(&format!(
+            " AND server_service = {}",
+            quote_sql_string(server)
+        ));
     }
     if let Some(ref stream) = query.stream_name {
-        filters.push_str(&format!(" AND trace_stream_name = '{}'", stream));
+        filters.push_str(&format!(
+            " AND trace_stream_name = {}",
+            quote_sql_string(stream)
+        ));
     }
 
     let sql = format!(
         "SELECT _timestamp, p50_latency_ns, p95_latency_ns, p99_latency_ns, \
          total_requests, failed_requests \
-         FROM \"{}\" WHERE {} ORDER BY _timestamp ASC LIMIT 10000",
-        stream_name, filters
+         FROM {} WHERE {} ORDER BY _timestamp ASC LIMIT 10000",
+        quote_identifier(stream_name),
+        filters
     );
 
     let req = config::meta::search::Request {
@@ -767,6 +782,18 @@ mod tests {
         assert!(sql.contains("agent_env = 'prod'"));
         assert!(sql.contains("AND trace_stream_name = 'my_stream'"));
         assert!(sql.contains("AND agent_env = 'prod'"));
+    }
+
+    #[test]
+    fn test_build_edges_sql_escapes_org_and_stream_filter() {
+        let sql = build_edges_sql("_o2_service_graph", Some("a'b"), 1, 2, "o'rg", None);
+        assert!(sql.contains("org_id = 'o''rg'"));
+        assert!(sql.contains("trace_stream_name = 'a''b'"));
+        assert!(!sql.contains("'o'rg'"));
+        // org_id is interpolated in the unfiltered branch too; a partial fix would miss it.
+        let sql = build_edges_sql("_o2_service_graph", None, 1, 2, "o'rg", None);
+        assert!(sql.contains("org_id = 'o''rg'"));
+        assert_eq!(sql.matches('\'').count() % 2, 0);
     }
 
     #[test]
