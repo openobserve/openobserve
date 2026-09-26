@@ -336,7 +336,7 @@ async fn buffer_stream_rows(
         rows,
         &schema,
         &schema_key,
-        ingest::stream_partition_time_level(org_id, stream_name).await,
+        ingest::stream_partition_time_levels(org_id, stream_name).await,
         partition_keys,
         alerts,
         partitions,

@@ -24,15 +24,12 @@ use arrow::{
 };
 use arrow_schema::{DataType, Schema};
 use config::{
-    meta::stream::{PartitionTimeLevel, StreamType},
+    meta::stream::{PartitionTimeLevel, PartitionTimeLevels, StreamType},
     utils::{json, schema_ext::SchemaExt},
 };
-use infra::{
-    errors::{Error, Result},
-    schema::get_partition_time_level,
-};
+use infra::errors::{Error, Result};
 
-use super::{get_write_partition_key, partition_bucket_micros};
+use super::get_write_partition_key;
 
 const BUILDER_START_ROWS: usize = 16;
 
@@ -40,8 +37,8 @@ const BUILDER_START_ROWS: usize = 16;
 pub struct ColumnarBuckets {
     schema: Arc<Schema>,
     schema_key: String,
-    time_level: PartitionTimeLevel,
-    bucket_micros: i64,
+    /// The stream's level by data timestamp; buckets never straddle a level change.
+    time_levels: PartitionTimeLevels,
     /// A backfill can span any number of partitions, and foldhash keeps an i64 lookup cheap.
     buckets: hashbrown::HashMap<i64, ColumnarBucket>,
 }
@@ -49,7 +46,7 @@ pub struct ColumnarBuckets {
 impl ColumnarBuckets {
     pub fn new(stream_type: StreamType, schema: &Schema) -> Self {
         // read the per-stream level before the metadata carrying the settings is dropped
-        let time_level = infra::schema::get_stream_partition_time_level(
+        let time_levels = infra::schema::get_stream_partition_time_levels(
             stream_type,
             infra::schema::unwrap_stream_settings(schema).as_ref(),
         );
@@ -57,8 +54,7 @@ impl ColumnarBuckets {
         Self {
             schema_key: schema.hash_key(),
             schema,
-            time_level,
-            bucket_micros: partition_bucket_micros(time_level),
+            time_levels,
             buckets: hashbrown::HashMap::with_capacity(1),
         }
     }
@@ -81,13 +77,15 @@ impl ColumnarBuckets {
         let Self {
             schema,
             schema_key,
-            time_level,
-            bucket_micros,
+            time_levels,
             buckets,
         } = self;
+        // keyed by the partition's start, so an hour bucket and a day bucket never collide
         buckets
-            .entry(timestamp.div_euclid(*bucket_micros))
-            .or_insert_with(|| ColumnarBucket::new(timestamp, *time_level, schema_key, schema))
+            .entry(time_levels.bucket_start(timestamp))
+            .or_insert_with(|| {
+                ColumnarBucket::new(timestamp, time_levels.at(timestamp), schema_key, schema)
+            })
     }
 
     /// Schema columns any row holds a value in, in schema order.
@@ -340,6 +338,7 @@ fn shrunk<A: Array + 'static>(mut array: A) -> ArrayRef {
 mod tests {
     use arrow::array::{AsArray, types::Int64Type};
     use arrow_schema::Field;
+    use infra::schema::get_partition_time_level;
 
     use super::*;
 

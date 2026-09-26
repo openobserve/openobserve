@@ -91,6 +91,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     });
 
+    // cheap when there is nothing to do: runs at most once per
+    // ZO_METRICS_DAILY_PARTITION_AUTO_INTERVAL_HOURS across the cluster
+    spawn_pausable_job!("metrics_partition_classifier", 3600, {
+        log::debug!("[COMPACTOR::JOB] Running metrics partition classifier");
+        if let Err(e) = compaction::partition_classifier::run().await {
+            log::error!("[COMPACTOR::JOB] run metrics partition classifier error: {e}");
+        }
+    });
+
     spawn_pausable_job!(
         "run_generate_retention_job",
         get_config().compact.data_retention_interval + 3,

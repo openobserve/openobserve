@@ -76,7 +76,10 @@ pub(crate) async fn create_context(
 
     // get partition time level
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    let partition_time_level = get_stream_partition_time_level(stream_type, Some(&stream_settings));
+    // files are selected by min_ts/max_ts, so a range spanning a level change still
+    // finds both layouts; the level is only passed along as a hint
+    let partition_time_level =
+        get_stream_partition_time_level(stream_type, Some(&stream_settings), time_range.1);
 
     // rewrite partition filters
     let partition_keys: HashMap<&String, &StreamPartition> = stream_settings

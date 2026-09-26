@@ -547,7 +547,7 @@ pub async fn remote_write(
                 .map(|(record, timestamp, _)| (record, timestamp)),
             &schema,
             &schema_key,
-            ingest::stream_partition_time_level(org_id, &stream_name).await,
+            ingest::stream_partition_time_levels(org_id, &stream_name).await,
             partition_keys,
             alerts,
             metric_data_map.entry(stream_name.clone()).or_default(),

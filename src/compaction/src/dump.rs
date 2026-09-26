@@ -99,6 +99,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
         let partition_time_level = infra::schema::get_stream_partition_time_level(
             stream_type,
             Some(stream_settings.as_ref()),
+            *offset,
         );
         if stream_type == StreamType::Metrics && partition_time_level == PartitionTimeLevel::Daily {
             // Daily metrics streams are not dumped. A dump deletes the dumped rows from

@@ -293,7 +293,11 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
     let job_end_ts = job_range_end(
         offset,
-        infra::schema::get_stream_partition_time_level(stream_type, stream_settings.as_deref()),
+        infra::schema::get_stream_partition_time_level(
+            stream_type,
+            stream_settings.as_deref(),
+            offset,
+        ),
     );
     if offset >= time_now_day
         || time_now.timestamp_micros() - offset

@@ -197,6 +197,13 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>>;
+    /// The organization's `stream_stats` rows unmerged, as `(stream, is_recent,
+    /// stats)`: the recent row covers files dated from yesterday 00:00 (as of the
+    /// last stats run) on, the other row everything before.
+    async fn get_stream_stats_by_recency(
+        &self,
+        org_id: &str,
+    ) -> Result<Vec<(String, bool, StreamStats)>>;
     async fn del_stream_stats(
         &self,
         org_id: &str,
@@ -577,6 +584,11 @@ pub async fn get_stream_stats(
 }
 
 #[inline]
+pub async fn get_stream_stats_by_recency(org_id: &str) -> Result<Vec<(String, bool, StreamStats)>> {
+    CLIENT.get_stream_stats_by_recency(org_id).await
+}
+
+#[inline]
 pub async fn del_stream_stats(
     org_id: &str,
     stream_type: StreamType,
@@ -844,6 +856,13 @@ pub struct StatsRecord {
     pub compressed_size: i64,
     pub index_size: i64,
     pub mindex_size: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct StatsRecencyRecord {
+    #[sqlx(flatten)]
+    pub stats: StatsRecord,
+    pub is_recent: bool,
 }
 
 impl From<&StatsRecord> for StreamStats {

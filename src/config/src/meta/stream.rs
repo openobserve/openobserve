@@ -761,6 +761,104 @@ impl std::fmt::Display for PartitionTimeLevel {
     }
 }
 
+const PARTITION_HOUR_MICROS: i64 = 3_600_000_000;
+const PARTITION_DAY_MICROS: i64 = 24 * PARTITION_HOUR_MICROS;
+
+/// Most level changes a stream keeps. Beyond this the oldest is folded into
+/// the first entry, so data older than the second-oldest kept change is
+/// resolved with the level that change replaced.
+pub const MAX_PARTITION_TIME_LEVEL_CHANGES: usize = 32;
+
+/// One entry of a stream's partition time level history: data whose timestamp
+/// is at or after `since` (microseconds, always a UTC day start, or 0 for the
+/// first entry) is partitioned at `level` (`Unset` = the stream type default).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct PartitionTimeLevelChange {
+    pub since: i64,
+    pub level: PartitionTimeLevel,
+}
+
+/// A stream's partition time level as a function of the data timestamp.
+///
+/// Level changes only ever take effect at a UTC day boundary, so every hour
+/// bucket and every day bucket lies entirely on one side of a change. Every
+/// component that maps timestamps to partitions (ingest, compaction, dump,
+/// data delete) resolves the level of the data it handles with [`Self::at`],
+/// not the stream's current level, so a switch can never leave a day half in
+/// one layout and half in the other.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PartitionTimeLevels {
+    /// `(since, level)` ascending by `since`; the first entry has `since == i64::MIN`.
+    ranges: Vec<(i64, PartitionTimeLevel)>,
+}
+
+impl PartitionTimeLevels {
+    pub fn uniform(level: PartitionTimeLevel) -> Self {
+        Self {
+            ranges: vec![(i64::MIN, level)],
+        }
+    }
+
+    /// Build from resolved `(since, level)` pairs; the first `since` is treated as
+    /// the beginning of time. Adjacent equal levels are merged.
+    pub fn from_changes(changes: impl IntoIterator<Item = (i64, PartitionTimeLevel)>) -> Self {
+        let mut ranges: Vec<(i64, PartitionTimeLevel)> = Vec::new();
+        for (since, level) in changes {
+            match ranges.last() {
+                None => ranges.push((i64::MIN, level)),
+                Some((_, last)) if *last == level => {}
+                Some(_) => ranges.push((since, level)),
+            }
+        }
+        if ranges.is_empty() {
+            ranges.push((i64::MIN, PartitionTimeLevel::Hourly));
+        }
+        Self { ranges }
+    }
+
+    /// The level of data with timestamp `ts` (microseconds).
+    pub fn at(&self, ts: i64) -> PartitionTimeLevel {
+        if self.ranges.len() == 1 {
+            return self.ranges[0].1;
+        }
+        let idx = self.ranges.partition_point(|(since, _)| *since <= ts);
+        self.ranges[idx.saturating_sub(1)].1
+    }
+
+    /// Whether the level is the same for all timestamps.
+    pub fn is_uniform(&self) -> bool {
+        self.ranges.len() == 1
+    }
+
+    /// Whether any timestamp in `[start, end]` is partitioned at `level`.
+    pub fn any_in(&self, start: i64, end: i64, level: PartitionTimeLevel) -> bool {
+        self.ranges.iter().enumerate().any(|(i, (since, l))| {
+            let until = self.ranges.get(i + 1).map(|(s, _)| *s).unwrap_or(i64::MAX);
+            *l == level && *since <= end && until > start
+        })
+    }
+
+    /// Start (microseconds) of the partition bucket holding `ts`: its day for a
+    /// daily level, otherwise its hour.
+    pub fn bucket_start(&self, ts: i64) -> i64 {
+        let size = match self.at(ts) {
+            PartitionTimeLevel::Daily => PARTITION_DAY_MICROS,
+            PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => PARTITION_HOUR_MICROS,
+        };
+        ts - ts.rem_euclid(size)
+    }
+}
+
+/// First UTC day start at which a partition time level change requested at
+/// `now` can take effect: after the furthest-future timestamp ingest may
+/// already have accepted (`allowed_in_future`) plus `propagation`, the time
+/// every node needs to see the new settings. Data before this day keeps the
+/// old level, so nothing already written ever changes layout.
+pub fn next_partition_level_switch(now: i64, allowed_in_future: i64, propagation: i64) -> i64 {
+    let earliest = now + allowed_in_future.max(0) + propagation.max(0);
+    earliest - earliest.rem_euclid(PARTITION_DAY_MICROS) + PARTITION_DAY_MICROS
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateSettingsWrapper<D> {
     #[serde(default)]
@@ -1020,6 +1118,114 @@ pub struct StreamSettings {
     /// set; see `infra::schema::get_stream_partition_time_level`.
     #[serde(default)]
     pub partition_time_level: Option<PartitionTimeLevel>,
+    /// History of partition time level changes, oldest first; empty while the
+    /// level has never been changed through
+    /// [`StreamSettings::schedule_partition_time_level`], in which case
+    /// `partition_time_level` applies to all data.
+    #[serde(default)]
+    pub partition_time_level_changes: Vec<PartitionTimeLevelChange>,
+    /// Whether the latest partition time level change was made by the automatic
+    /// classifier. A level set through the settings API is a pin the classifier
+    /// never overrides; `unset` through the API hands the stream back to it.
+    #[serde(default)]
+    pub partition_time_level_auto: bool,
+}
+
+impl StreamSettings {
+    /// The requested (not yet flag-checked) level of data at `ts`; `Unset` means
+    /// the stream type default.
+    pub fn requested_partition_time_level_at(&self, ts: i64) -> PartitionTimeLevel {
+        if self.partition_time_level_changes.is_empty() {
+            return self.partition_time_level.unwrap_or_default();
+        }
+        let idx = self
+            .partition_time_level_changes
+            .partition_point(|c| c.since <= ts);
+        self.partition_time_level_changes[idx.saturating_sub(1)].level
+    }
+
+    /// The requested level history as `(since, level)` pairs, oldest first.
+    pub fn requested_partition_time_levels(&self) -> Vec<(i64, PartitionTimeLevel)> {
+        if self.partition_time_level_changes.is_empty() {
+            vec![(0, self.partition_time_level.unwrap_or_default())]
+        } else {
+            self.partition_time_level_changes
+                .iter()
+                .map(|c| (c.since, c.level))
+                .collect()
+        }
+    }
+
+    /// Start of the latest change that has taken effect by `now`, or `None`
+    /// when a change is still pending or the level was never changed.
+    pub fn partition_time_level_changed_since(&self, now: i64) -> Option<i64> {
+        let last = self.partition_time_level_changes.last()?;
+        if last.since > now || last.since == 0 {
+            return None;
+        }
+        Some(last.since)
+    }
+
+    /// Whether a change is scheduled but not in effect yet at `now`.
+    pub fn partition_time_level_change_pending(&self, now: i64) -> bool {
+        self.partition_time_level_changes
+            .last()
+            .is_some_and(|c| c.since > now)
+    }
+
+    /// Request `level` (`Unset` = the stream type default) for data from the UTC
+    /// day starting at `since` on (see [`next_partition_level_switch`]); data
+    /// before it keeps whatever level it was written with. A change still
+    /// pending at `now` is replaced. Returns whether the settings changed.
+    pub fn schedule_partition_time_level(
+        &mut self,
+        level: PartitionTimeLevel,
+        auto: bool,
+        since: i64,
+        now: i64,
+    ) -> bool {
+        let before = (
+            self.partition_time_level,
+            self.partition_time_level_changes.clone(),
+            self.partition_time_level_auto,
+        );
+        let mut changes = if self.partition_time_level_changes.is_empty() {
+            vec![PartitionTimeLevelChange {
+                since: 0,
+                level: self.partition_time_level.unwrap_or_default(),
+            }]
+        } else {
+            std::mem::take(&mut self.partition_time_level_changes)
+        };
+        // a pending change never took effect: drop it, keeping the first entry
+        changes.retain(|c| c.since == 0 || c.since <= now);
+        if changes.last().map(|c| c.level) != Some(level) {
+            // a change at the same day start as the last one replaces it
+            if changes.len() > 1 && changes.last().is_some_and(|c| c.since == since) {
+                changes.pop();
+            }
+            if changes.last().map(|c| c.level) != Some(level) {
+                changes.push(PartitionTimeLevelChange { since, level });
+            }
+        }
+        while changes.len() > MAX_PARTITION_TIME_LEVEL_CHANGES {
+            changes.remove(0);
+            changes[0].since = 0;
+        }
+        if changes.len() == 1 {
+            // uniform again: back to the plain setting
+            changes.clear();
+        }
+        self.partition_time_level_changes = changes;
+        self.partition_time_level = (level != PartitionTimeLevel::Unset).then_some(level);
+        self.partition_time_level_auto = auto;
+        before
+            != (
+                self.partition_time_level,
+                self.partition_time_level_changes.clone(),
+                self.partition_time_level_auto,
+            )
+    }
 }
 
 impl Default for StreamSettings {
@@ -1047,6 +1253,8 @@ impl Default for StreamSettings {
             cross_links: Vec::new(),
             storage_type: StorageType::Normal,
             partition_time_level: None,
+            partition_time_level_changes: Vec::new(),
+            partition_time_level_auto: false,
         }
     }
 }
@@ -1137,6 +1345,19 @@ impl Serialize for StreamSettings {
             _ => {
                 state.skip_field("partition_time_level")?;
             }
+        }
+        if !self.partition_time_level_changes.is_empty() {
+            state.serialize_field(
+                "partition_time_level_changes",
+                &self.partition_time_level_changes,
+            )?;
+        } else {
+            state.skip_field("partition_time_level_changes")?;
+        }
+        if self.partition_time_level_auto {
+            state.serialize_field("partition_time_level_auto", &true)?;
+        } else {
+            state.skip_field("partition_time_level_auto")?;
         }
         state.end()
     }
@@ -1312,6 +1533,15 @@ impl From<&str> for StreamSettings {
             .and_then(Value::as_str)
             .map(PartitionTimeLevel::from)
             .filter(|level| *level != PartitionTimeLevel::Unset);
+        let mut partition_time_level_changes: Vec<PartitionTimeLevelChange> = settings
+            .get("partition_time_level_changes")
+            .and_then(|v| json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+        partition_time_level_changes.sort_by_key(|c| c.since);
+        let partition_time_level_auto = settings
+            .get("partition_time_level_auto")
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         Self {
             partition_keys,
             full_text_search_keys,
@@ -1335,6 +1565,8 @@ impl From<&str> for StreamSettings {
             cross_links,
             storage_type,
             partition_time_level,
+            partition_time_level_changes,
+            partition_time_level_auto,
         }
     }
 }
@@ -1349,6 +1581,8 @@ impl MemorySize for StreamSettings {
             + self.defined_schema_fields.mem_size()
             + self.distinct_value_fields.mem_size()
             + self.extended_retention_days.mem_size()
+            + self.partition_time_level_changes.len()
+                * std::mem::size_of::<PartitionTimeLevelChange>()
             + self
                 .index_fields_updated_at
                 .iter()
@@ -1509,11 +1743,141 @@ mod tests {
     }
 
     #[test]
+    fn test_partition_time_levels_resolve_by_timestamp() {
+        use PartitionTimeLevel::*;
+        const DAY: i64 = 86_400_000_000;
+        const HOUR: i64 = 3_600_000_000;
+        let d10 = 10 * DAY;
+        let d20 = 20 * DAY;
+        let levels = PartitionTimeLevels::from_changes([(0, Hourly), (d10, Daily), (d20, Hourly)]);
+        assert!(!levels.is_uniform());
+        assert_eq!(levels.at(i64::MIN), Hourly);
+        assert_eq!(levels.at(d10 - 1), Hourly);
+        assert_eq!(levels.at(d10), Daily);
+        assert_eq!(levels.at(d20 - 1), Daily);
+        assert_eq!(levels.at(d20), Hourly);
+        // buckets never straddle a change
+        assert_eq!(levels.bucket_start(d10 - 1), d10 - HOUR);
+        assert_eq!(levels.bucket_start(d10 + 5 * HOUR + 7), d10);
+        assert_eq!(levels.bucket_start(d20 + 5 * HOUR + 7), d20 + 5 * HOUR);
+        assert_eq!(levels.bucket_start(-1), -HOUR);
+        // ranges
+        assert!(levels.any_in(d10 - HOUR, d10, Daily));
+        assert!(!levels.any_in(0, d10 - 1, Daily));
+        assert!(!levels.any_in(d10, d20 - 1, Hourly));
+        // adjacent equal levels merge; empty input is hourly
+        assert!(PartitionTimeLevels::from_changes([(0, Daily), (d10, Daily)]).is_uniform());
+        assert_eq!(PartitionTimeLevels::from_changes([]).at(0), Hourly);
+        assert_eq!(
+            PartitionTimeLevels::uniform(Daily).bucket_start(d10 + HOUR),
+            d10
+        );
+    }
+
+    #[test]
+    fn test_next_partition_level_switch() {
+        const DAY: i64 = 86_400_000_000;
+        const HOUR: i64 = 3_600_000_000;
+        let today = 100 * DAY;
+        // 10:00 with 24h future ingestion and 1h propagation -> the day after tomorrow
+        assert_eq!(
+            next_partition_level_switch(today + 10 * HOUR, 24 * HOUR, HOUR),
+            today + 2 * DAY
+        );
+        // no future ingestion -> tomorrow
+        assert_eq!(
+            next_partition_level_switch(today + 10 * HOUR, 0, HOUR),
+            today + DAY
+        );
+        // 23:30 with 1h propagation -> the day after tomorrow
+        assert_eq!(
+            next_partition_level_switch(today + 23 * HOUR + HOUR / 2, 0, HOUR),
+            today + 2 * DAY
+        );
+        // always a day start strictly in the future
+        for h in 0..48 {
+            let now = today + h * HOUR / 2;
+            let at = next_partition_level_switch(now, 5 * HOUR, HOUR);
+            assert_eq!(at % DAY, 0);
+            assert!(at > now + 6 * HOUR);
+        }
+    }
+
+    #[test]
+    fn test_schedule_partition_time_level() {
+        use PartitionTimeLevel::*;
+        const DAY: i64 = 86_400_000_000;
+        let mut s = StreamSettings::default();
+        let now = 100 * DAY + 1;
+
+        // first change: history starts with the old level
+        assert!(s.schedule_partition_time_level(Daily, true, 102 * DAY, now));
+        assert_eq!(s.partition_time_level, Some(Daily));
+        assert!(s.partition_time_level_auto);
+        assert!(s.partition_time_level_change_pending(now));
+        assert_eq!(s.requested_partition_time_level_at(now), Unset);
+        assert_eq!(s.requested_partition_time_level_at(102 * DAY), Daily);
+        assert_eq!(s.partition_time_level_changed_since(now), None);
+        assert_eq!(
+            s.partition_time_level_changed_since(103 * DAY),
+            Some(102 * DAY)
+        );
+
+        // replacing a pending change before it takes effect: back to uniform
+        assert!(s.schedule_partition_time_level(Unset, true, 103 * DAY, now));
+        assert!(s.partition_time_level_changes.is_empty());
+        assert_eq!(s.partition_time_level, None);
+
+        // same level again is not a change
+        assert!(!s.schedule_partition_time_level(Unset, true, 103 * DAY, now));
+
+        // two changes in effect keep the full history
+        s.schedule_partition_time_level(Daily, true, 102 * DAY, now);
+        let later = 110 * DAY;
+        assert!(s.schedule_partition_time_level(Hourly, false, 112 * DAY, later));
+        assert_eq!(s.requested_partition_time_level_at(101 * DAY), Unset);
+        assert_eq!(s.requested_partition_time_level_at(105 * DAY), Daily);
+        assert_eq!(s.requested_partition_time_level_at(112 * DAY), Hourly);
+        assert_eq!(s.partition_time_level, Some(Hourly));
+        assert!(!s.partition_time_level_auto);
+
+        // re-requesting the level in effect drops the pending change
+        assert!(s.schedule_partition_time_level(Daily, false, 112 * DAY, later));
+        assert_eq!(s.partition_time_level_changes.len(), 2);
+        assert_eq!(s.partition_time_level, Some(Daily));
+
+        // survives the schema metadata round trip
+        let parsed = StreamSettings::from(json::to_string(&s).unwrap().as_str());
+        assert_eq!(
+            parsed.partition_time_level_changes,
+            s.partition_time_level_changes
+        );
+        assert_eq!(parsed.partition_time_level, s.partition_time_level);
+        assert!(!parsed.partition_time_level_auto);
+
+        // history is capped, the oldest folded into the first entry
+        let mut s = StreamSettings::default();
+        for i in 0..(MAX_PARTITION_TIME_LEVEL_CHANGES as i64 + 5) {
+            let level = if i % 2 == 0 { Daily } else { Hourly };
+            s.schedule_partition_time_level(level, true, (i + 1) * DAY, i * DAY + 1);
+        }
+        assert_eq!(
+            s.partition_time_level_changes.len(),
+            MAX_PARTITION_TIME_LEVEL_CHANGES
+        );
+        assert_eq!(s.partition_time_level_changes[0].since, 0);
+    }
+
+    #[test]
     fn test_stream_settings_partition_time_level_roundtrip() {
         // absent: no override, and nothing is written back
         let settings = StreamSettings::from("{}");
         assert_eq!(settings.partition_time_level, None);
-        assert!(!json::to_string(&settings).unwrap().contains("partition_time_level"));
+        assert!(
+            !json::to_string(&settings)
+                .unwrap()
+                .contains("partition_time_level")
+        );
 
         // daily survives serialize -> parse, the path settings take through schema metadata
         let settings = StreamSettings {

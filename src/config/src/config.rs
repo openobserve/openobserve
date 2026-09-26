@@ -2543,6 +2543,32 @@ pub struct Limit {
     /// file-list max_ts bound can never exclude a daily file.
     #[env_config(name = "ZO_METRICS_DAILY_PARTITION_ENABLED", default = false)]
     pub metrics_daily_partition_enabled: bool,
+    /// Let a compactor job pick the partition time level of metrics streams from
+    /// their volume (needs ZO_METRICS_DAILY_PARTITION_ENABLED). Streams whose level
+    /// was set through the settings API are left alone.
+    #[env_config(name = "ZO_METRICS_DAILY_PARTITION_AUTO", default = false)]
+    pub metrics_daily_partition_auto: bool,
+    /// Hours between two classifier runs across the cluster.
+    #[env_config(name = "ZO_METRICS_DAILY_PARTITION_AUTO_INTERVAL_HOURS", default = 24)]
+    pub metrics_daily_partition_auto_interval_hours: i64,
+    /// A stream moves to daily partitions when its compressed volume stays below
+    /// this many KB per hour, both over the last 1-2 days and over its history.
+    #[env_config(name = "ZO_METRICS_DAILY_PARTITION_LOW_KB_PER_HOUR", default = 1024)]
+    pub metrics_daily_partition_low_kb_per_hour: i64,
+    /// A daily stream moves back to hourly partitions when its compressed volume
+    /// over the last 1-2 days exceeds this many KB per hour. Must be above the
+    /// low mark; the gap between the two is the hysteresis band.
+    #[env_config(name = "ZO_METRICS_DAILY_PARTITION_HIGH_KB_PER_HOUR", default = 4096)]
+    pub metrics_daily_partition_high_kb_per_hour: i64,
+    /// Days a level must have been in effect before the classifier changes it again.
+    #[env_config(name = "ZO_METRICS_DAILY_PARTITION_MIN_DWELL_DAYS", default = 7)]
+    pub metrics_daily_partition_min_dwell_days: i64,
+    /// Days of data a stream needs before the classifier considers it.
+    #[env_config(name = "ZO_METRICS_DAILY_PARTITION_MIN_AGE_DAYS", default = 3)]
+    pub metrics_daily_partition_min_age_days: i64,
+    /// Most level changes one classifier run schedules; the rest wait for the next run.
+    #[env_config(name = "ZO_METRICS_DAILY_PARTITION_MAX_CHANGES_PER_RUN", default = 500)]
+    pub metrics_daily_partition_max_changes_per_run: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
@@ -3823,6 +3849,25 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         );
         cfg.limit.metrics_query_retention = "daily".to_string();
     }
+    if cfg.limit.metrics_daily_partition_auto_interval_hours < 1 {
+        cfg.limit.metrics_daily_partition_auto_interval_hours = 24;
+    }
+    if cfg.limit.metrics_daily_partition_low_kb_per_hour < 1 {
+        cfg.limit.metrics_daily_partition_low_kb_per_hour = 1024;
+    }
+    if cfg.limit.metrics_daily_partition_high_kb_per_hour
+        <= cfg.limit.metrics_daily_partition_low_kb_per_hour
+    {
+        let high = cfg.limit.metrics_daily_partition_low_kb_per_hour * 4;
+        log::warn!(
+            "ZO_METRICS_DAILY_PARTITION_HIGH_KB_PER_HOUR must be above ZO_METRICS_DAILY_PARTITION_LOW_KB_PER_HOUR, using {high}"
+        );
+        cfg.limit.metrics_daily_partition_high_kb_per_hour = high;
+    }
+    cfg.limit.metrics_daily_partition_min_dwell_days =
+        cfg.limit.metrics_daily_partition_min_dwell_days.max(1);
+    cfg.limit.metrics_daily_partition_min_age_days =
+        cfg.limit.metrics_daily_partition_min_age_days.max(2);
     // file retention is always hourly now
     cfg.limit.logs_file_retention = "hourly".to_string();
     cfg.limit.traces_file_retention = "hourly".to_string();

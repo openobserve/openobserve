@@ -37,6 +37,7 @@ pub mod dump;
 pub mod flatten;
 pub mod incremental;
 pub mod merge;
+pub mod partition_classifier;
 pub mod retention;
 pub mod stats;
 pub mod worker;
@@ -299,6 +300,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
         let partition_time_level = infra::schema::get_stream_partition_time_level(
             stream_type,
             Some(stream_settings.as_ref()),
+            job.offsets,
         );
         // to avoid compacting conflict with retention, need check the data retention time
         let stream_data_retention_end = if stream_settings.data_retention > 0 {

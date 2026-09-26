@@ -121,8 +121,13 @@ async fn search_parquet_files(
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
             .await
             .unwrap_or_default();
-    let partition_time_level =
-        get_stream_partition_time_level(query.stream_type, Some(stream_settings.as_ref()));
+    // metrics windows cover both layouts while daily partitions are enabled (see
+    // wal_dir_time_window); for everything else the level is uniform
+    let partition_time_level = get_stream_partition_time_level(
+        query.stream_type,
+        Some(stream_settings.as_ref()),
+        query.time_range.1,
+    );
     let (files, mut locks) = get_file_list(
         query.clone(),
         &stream_settings.partition_keys,

@@ -77,9 +77,12 @@ pub async fn merge_by_stream(
     // groups and carry the remainder, so each file is merged into a sealed output exactly
     // once. The scheduled hour-end pass seals whatever is left.
     let offset = offset - offset % hour_micros(1);
+    // the level of the data at this offset, not the stream's current level: a
+    // level change takes effect at a day boundary, so the whole day is one layout
     let partition_time_level = infra::schema::get_stream_partition_time_level(
         stream_type,
         infra::schema::unwrap_stream_settings(&schema).as_ref(),
+        offset,
     );
     // For a daily-partitioned stream the range is the whole day: every hourly job
     // before the day settles is an incremental round over the day, and the job
