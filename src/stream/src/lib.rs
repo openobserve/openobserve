@@ -49,8 +49,7 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST,
-        get_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
-        unwrap_stream_settings,
+        unwrap_stream_created_at, unwrap_stream_is_derived, unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -489,6 +488,10 @@ pub async fn update_stream_settings(
     }
     if let Some(v) = new_settings.is_llm_stream {
         settings.is_llm_stream = v;
+    }
+    if let Some(v) = new_settings.partition_time_level {
+        // Unset clears the override and falls back to the stream type default
+        settings.partition_time_level = (v != PartitionTimeLevel::Unset).then_some(v);
     }
 
     // partition_keys: remove-then-add, dedup (by `field`) deferred to normalize.
@@ -932,7 +935,9 @@ pub async fn delete_stream_data_by_time_range(
 
     // Convert the time range to RFC3339 format
     // we need check the date is hour or day, user can't delete data with minute and second
-    let partition_time_level = get_partition_time_level(stream_type);
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let partition_time_level =
+        infra::schema::get_stream_partition_time_level(stream_type, stream_settings.as_deref());
     let start_time = Utc.timestamp_nanos(time_range.start * 1000);
     let end_time = Utc.timestamp_nanos(time_range.end * 1000);
     let (start_time, end_time) = if partition_time_level == PartitionTimeLevel::Daily {

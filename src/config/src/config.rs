@@ -2536,6 +2536,13 @@ pub struct Limit {
     pub traces_query_retention: String,
     #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
     pub metrics_query_retention: String,
+    /// Allow metrics streams to opt into daily partitions via the stream
+    /// setting `partition_time_level: "daily"`. Low-volume metrics streams
+    /// otherwise produce one tiny parquet file per hour. When enabled,
+    /// ZO_METRICS_QUERY_RETENTION is raised to at least "daily" so the
+    /// file-list max_ts bound can never exclude a daily file.
+    #[env_config(name = "ZO_METRICS_DAILY_PARTITION_ENABLED", default = false)]
+    pub metrics_daily_partition_enabled: bool,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
@@ -3807,6 +3814,14 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.metrics_file_retention != "hourly" && cfg.limit.metrics_query_retention == "hourly"
     {
         cfg.limit.metrics_query_retention = cfg.limit.metrics_file_retention.clone();
+    }
+    // daily-partitioned metrics files can have max_ts up to 24h past the query end;
+    // the file-list upper bound on max_ts must cover that or those files are missed
+    if cfg.limit.metrics_daily_partition_enabled && cfg.limit.metrics_query_retention == "hourly" {
+        log::warn!(
+            "ZO_METRICS_DAILY_PARTITION_ENABLED requires ZO_METRICS_QUERY_RETENTION >= daily, overriding \"hourly\" to \"daily\""
+        );
+        cfg.limit.metrics_query_retention = "daily".to_string();
     }
     // file retention is always hourly now
     cfg.limit.logs_file_retention = "hourly".to_string();

@@ -27,7 +27,7 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 use infra::{
     cache::file_data,
-    schema::{get_partition_time_level, unwrap_stream_settings},
+    schema::{get_stream_partition_time_level, unwrap_stream_settings},
 };
 use itertools::Itertools;
 use metrics_index::MetricsFileLayout;
@@ -76,7 +76,7 @@ pub(crate) async fn create_context(
 
     // get partition time level
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    let partition_time_level = get_partition_time_level(stream_type);
+    let partition_time_level = get_stream_partition_time_level(stream_type, Some(&stream_settings));
 
     // rewrite partition filters
     let partition_keys: HashMap<&String, &StreamPartition> = stream_settings

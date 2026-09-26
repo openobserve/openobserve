@@ -27,7 +27,7 @@ use config::{
         alerts::alert,
         pipeline::PipelineKind,
         self_reporting::usage::UsageType,
-        stream::{StreamPartition, StreamType},
+        stream::{PartitionTimeLevel, StreamPartition, StreamType},
     },
     metrics,
     utils::{
@@ -166,6 +166,16 @@ pub(super) async fn run_pipelines<T: Clone>(
     (outputs, failures)
 }
 
+/// Partition time level of one metrics stream, read from the cached stream
+/// settings (see `infra::schema::get_stream_partition_time_level`).
+pub(super) async fn stream_partition_time_level(
+    org_id: &str,
+    stream_name: &str,
+) -> PartitionTimeLevel {
+    let settings = infra::schema::get_settings(org_id, stream_name, StreamType::Metrics).await;
+    infra::schema::get_stream_partition_time_level(StreamType::Metrics, settings.as_deref())
+}
+
 /// The stream's schema once `records` are in it, as the write path keys and partitions by it.
 pub(super) async fn resolve_batch_schema(
     org_id: &str,
@@ -282,12 +292,12 @@ pub(super) async fn buffer_stream_records(
     records: impl IntoIterator<Item = (json::Map<String, json::Value>, i64)>,
     schema: &Arc<Schema>,
     schema_key: &str,
+    partition_time_level: PartitionTimeLevel,
     partition_keys: Option<&Vec<StreamPartition>>,
     alerts: Option<&Vec<alert::Alert>>,
     partitions: &mut HashMap<String, SchemaRecords>,
 ) -> Option<TriggerAlertData> {
     let partition_keys = partition_keys.unwrap_or(&NO_PARTITION_KEYS);
-    let partition_time_level = infra::schema::get_partition_time_level(StreamType::Metrics);
     let mut partition_memo = PartitionMemo::new(partition_keys, partition_time_level);
     let alert_keys: Vec<String> = alerts
         .map(|alerts| {
@@ -668,7 +678,17 @@ mod tests {
             (record, *ts)
         });
         let mut partitions = HashMap::new();
-        buffer_stream_records("org", records, &schema, "key", None, None, &mut partitions).await;
+        buffer_stream_records(
+            "org",
+            records,
+            &schema,
+            "key",
+            infra::schema::get_partition_time_level(StreamType::Metrics),
+            None,
+            None,
+            &mut partitions,
+        )
+        .await;
 
         let level = infra::schema::get_partition_time_level(StreamType::Metrics);
         for ts in timestamps {
