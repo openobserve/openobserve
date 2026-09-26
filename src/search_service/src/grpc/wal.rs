@@ -24,7 +24,7 @@ use config::{
     get_config,
     meta::{
         search::{ScanStats, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition},
+        stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
     utils::{
         async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
@@ -46,7 +46,7 @@ use futures::StreamExt;
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::get_partition_time_level,
+    schema::get_stream_partition_time_level,
 };
 use ingester::WAL_PARQUET_METADATA;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -121,7 +121,8 @@ async fn search_parquet_files(
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
             .await
             .unwrap_or_default();
-    let partition_time_level = get_partition_time_level(query.stream_type);
+    let partition_time_level =
+        get_stream_partition_time_level(query.stream_type, Some(stream_settings.as_ref()));
     let (files, mut locks) = get_file_list(
         query.clone(),
         &stream_settings.partition_keys,
@@ -620,6 +621,33 @@ async fn create_tables_from_batch_groups(
     Ok(tables)
 }
 
+/// Inclusive `[start, end]` window of WAL partition directories (`YYYY/MM/DD/HH`)
+/// that can hold data for a query range.
+///
+/// A metrics stream can switch between hourly and daily partitions (stream
+/// setting `partition_time_level`), so while ZO_METRICS_DAILY_PARTITION_ENABLED
+/// is on, one day of its WAL can hold both `DD/HH` and `DD/00` directories.
+/// Widening the start to the day and keeping the end at the hour covers both
+/// layouts, whichever level this node currently resolves. WAL files move to
+/// object storage within minutes, so the wider start costs little.
+fn wal_dir_time_window(
+    start_ts: i64,
+    end_ts: i64,
+    stream_type: StreamType,
+    partition_time_level: PartitionTimeLevel,
+    metrics_daily_enabled: bool,
+) -> (i64, i64) {
+    let floor_day = |ts: i64| ts - ts % DAY_MICRO_SECS;
+    let floor_hour = |ts: i64| ts - ts % HOUR_MICRO_SECS;
+    if stream_type == StreamType::Metrics && metrics_daily_enabled {
+        (floor_day(start_ts), floor_hour(end_ts))
+    } else if partition_time_level == PartitionTimeLevel::Daily {
+        (floor_day(start_ts), floor_day(end_ts))
+    } else {
+        (floor_hour(start_ts), floor_hour(end_ts))
+    }
+}
+
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
 async fn get_file_list(
     query: Arc<super::QueryParams>,
@@ -652,17 +680,13 @@ async fn get_file_list(
         let (start_ts, end_ts) = query.time_range;
 
         // normalize timestamps to partition boundaries
-        let normalized = if partition_time_level == PartitionTimeLevel::Daily {
-            (
-                start_ts - start_ts % DAY_MICRO_SECS,
-                end_ts - end_ts % DAY_MICRO_SECS,
-            )
-        } else {
-            (
-                start_ts - start_ts % HOUR_MICRO_SECS,
-                end_ts - end_ts % HOUR_MICRO_SECS,
-            )
-        };
+        let normalized = wal_dir_time_window(
+            start_ts,
+            end_ts,
+            query.stream_type,
+            partition_time_level,
+            get_config().limit.metrics_daily_partition_enabled,
+        );
 
         if let Some((start_time, end_time)) = DateTime::from_timestamp_micros(normalized.0)
             .zip(DateTime::from_timestamp_micros(normalized.1))
@@ -815,6 +839,45 @@ mod tests {
     use arrow_schema::Field;
 
     use super::*;
+
+    #[test]
+    fn test_wal_dir_time_window() {
+        use chrono::{TimeZone, Utc};
+        let ts = |d, h, m| {
+            Utc.with_ymd_and_hms(2026, 9, d, h, m, 0)
+                .unwrap()
+                .timestamp_micros()
+        };
+        let (start, end) = (ts(25, 10, 15), ts(25, 11, 30));
+        // hourly streams and the feature off: unchanged hour window
+        for st in [StreamType::Logs, StreamType::Metrics] {
+            assert_eq!(
+                wal_dir_time_window(start, end, st, PartitionTimeLevel::Hourly, false),
+                (ts(25, 10, 0), ts(25, 11, 0))
+            );
+        }
+        // daily non-metrics streams (file list): unchanged day window
+        assert_eq!(
+            wal_dir_time_window(
+                start,
+                end,
+                StreamType::Filelist,
+                PartitionTimeLevel::Daily,
+                true
+            ),
+            (ts(25, 0, 0), ts(25, 0, 0))
+        );
+        // metrics with the feature on: the DD/00 daily directory and every hourly
+        // directory up to the query end are in the window, for either resolved level
+        for level in [PartitionTimeLevel::Hourly, PartitionTimeLevel::Daily] {
+            let (s, e) = wal_dir_time_window(start, end, StreamType::Metrics, level, true);
+            assert_eq!((s, e), (ts(25, 0, 0), ts(25, 11, 0)));
+            let daily_dir = ts(25, 0, 0);
+            let hourly_dirs = [ts(25, 10, 0), ts(25, 11, 0)];
+            assert!(s <= daily_dir && daily_dir <= e);
+            assert!(hourly_dirs.iter().all(|d| s <= *d && *d <= e));
+        }
+    }
 
     #[test]
     fn test_adapt_batch_exact_match() {

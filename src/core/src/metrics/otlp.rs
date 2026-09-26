@@ -624,6 +624,7 @@ pub async fn handle_otlp_request(
             rows,
             &schema,
             &schema_key,
+            ingest::stream_partition_time_level(org_id, &local_metric_name).await,
             partition_keys,
             alerts,
             metric_data_map
