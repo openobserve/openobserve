@@ -97,11 +97,7 @@ pub async fn bulk(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     // log start processing time
@@ -179,11 +175,7 @@ pub async fn multi(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     // log start processing time
@@ -267,11 +259,7 @@ pub async fn json(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     // log start processing time
@@ -352,11 +340,7 @@ pub async fn handle_kinesis_request(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     let request_time = post_data
@@ -419,11 +403,7 @@ pub async fn handle_gcp_request(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     match logs::ingest::ingest(
@@ -638,11 +618,7 @@ pub async fn hec(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     // log start processing time

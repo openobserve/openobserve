@@ -653,7 +653,7 @@ pub async fn handle_otlp_request(
 }
 
 /// Only the write path yields infra errors, so any other error means the request itself was bad.
-fn write_failure_response(req_type: OtlpRequestType, e: &anyhow::Error) -> HttpResponse {
+pub fn write_failure_response(req_type: OtlpRequestType, e: &anyhow::Error) -> HttpResponse {
     let status = e.downcast_ref::<infra::errors::Error>().map_or(
         http::StatusCode::BAD_REQUEST,
         crate::ingestion::write_error_status,
@@ -3997,7 +3997,7 @@ mod tests {
             http::StatusCode::BAD_REQUEST
         );
         assert_eq!(
-            status(infra::errors::Error::WatcherExists("wal".to_string()).into()),
+            status(infra::errors::Error::IngestionError("wal write failed".to_string()).into()),
             http::StatusCode::INTERNAL_SERVER_ERROR
         );
         assert_eq!(

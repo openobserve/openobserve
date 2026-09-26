@@ -79,7 +79,7 @@ pub async fn json(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
-        return MetaHttpResponse::too_many_requests(e);
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     let mut resp = match metrics::json::ingest(&org_id, None, body, user).await {
