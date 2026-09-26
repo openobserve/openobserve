@@ -17531,6 +17531,11 @@
       "explore": "Metrics Explorer'da aç",
       "railLabel": "Metrik bölümleri",
       "noAccess": "{stream} akışını okuma izniniz yok. Bu akışa okuma erişimi için bir yöneticiye başvurun.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "sorguya göre",
         "database": "veritabanına göre",

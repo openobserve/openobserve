@@ -17531,6 +17531,11 @@
       "explore": "Mở trong Metrics Explorer",
       "railLabel": "Các mục chỉ số",
       "noAccess": "Bạn không có quyền đọc {stream}. Hãy yêu cầu quản trị viên cấp quyền đọc Stream này.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "theo truy vấn",
         "database": "theo cơ sở dữ liệu",

@@ -17526,6 +17526,11 @@
       "explore": "在指標總管中開啟",
       "railLabel": "指標區段",
       "noAccess": "你沒有讀取 {stream} 的權限。請聯絡管理員以取得此串流的讀取權限。",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "依查詢",
         "database": "依資料庫",

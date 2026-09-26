@@ -17531,6 +17531,11 @@
       "explore": "Ouvrir dans l'explorateur de métriques",
       "railLabel": "Sections de métriques",
       "noAccess": "Vous n'avez pas la permission de lire {stream}. Demandez à un administrateur l'accès en lecture à ce flux.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "par requête",
         "database": "par base de données",

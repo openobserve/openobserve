@@ -17531,6 +17531,11 @@
       "explore": "在指标浏览器中打开",
       "railLabel": "指标分区",
       "noAccess": "你没有权限读取 {stream}。请联系管理员获取此数据流的读取权限。",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "按查询",
         "database": "按数据库",
