@@ -324,8 +324,7 @@ pub async fn search(
                 Some(query_params.time_range),
                 req.search_info.histogram_interval,
                 &trace_id,
-            )
-            .await;
+            );
         }
 
         let storage_search_start = std::time::Instant::now();
