@@ -40,7 +40,7 @@ use prost::Message;
 use crate::{
     common::meta::{
         http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
-        otlp::otlp_error_response,
+        otlp::{otlp_error_response, otlp_rejection_response},
     },
     request::logs::otlp_utf8::sanitize_invalid_utf8,
     service::{
@@ -483,12 +483,12 @@ pub async fn otlp_logs_write(
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
         let req_type = otlp_request_type_from_content_type(content_type)
             .unwrap_or(OtlpRequestType::HttpProtobuf);
-        let (status, rpc_code) = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
-            (StatusCode::TOO_MANY_REQUESTS, 8) // RESOURCE_EXHAUSTED
+        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            StatusCode::TOO_MANY_REQUESTS
         } else {
-            (StatusCode::SERVICE_UNAVAILABLE, 14) // UNAVAILABLE
+            StatusCode::SERVICE_UNAVAILABLE
         };
-        return otlp_error_response(req_type, status, rpc_code, e.to_string());
+        return otlp_rejection_response(req_type, status, e.to_string());
     }
 
     let (request, request_type) = match otlp_request_type_from_content_type(content_type) {
@@ -568,16 +568,12 @@ pub async fn otlp_logs_write(
                     "Error processing otlp {content_type} logs write request {org_id}/{in_stream_name:?}: {e:?}"
                 );
             }
-            let (status, rpc_code) = match e {
-                infra::errors::Error::ResourceError(_) => {
-                    (StatusCode::SERVICE_UNAVAILABLE, 14) // UNAVAILABLE
-                }
-                infra::errors::Error::TrialPeriodExpired => {
-                    (StatusCode::TOO_MANY_REQUESTS, 8) // RESOURCE_EXHAUSTED
-                }
-                _ => (StatusCode::BAD_REQUEST, 3), // INVALID_ARGUMENT
+            let status = match e {
+                infra::errors::Error::ResourceError(_) => StatusCode::SERVICE_UNAVAILABLE,
+                infra::errors::Error::TrialPeriodExpired => StatusCode::TOO_MANY_REQUESTS,
+                _ => StatusCode::BAD_REQUEST,
             };
-            otlp_error_response(request_type, status, rpc_code, e.to_string())
+            otlp_rejection_response(request_type, status, e.to_string())
         }
     }
 }
