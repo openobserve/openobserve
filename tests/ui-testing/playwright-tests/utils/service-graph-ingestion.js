@@ -429,6 +429,134 @@ function generateDatabaseTrace({
 }
 
 /**
+ * o2-enterprise#1849: an UNINSTRUMENTED dependency — a database, queue or
+ * external API that never emits a SERVER span of its own. Only the caller's
+ * CLIENT/PRODUCER span exists, carrying the peer attributes the backend infers
+ * the dependency's identity from (`infer_service_name`/`_type`/`_system`).
+ *
+ * This is deliberately NOT what `generateDatabaseTrace` produces: that one emits
+ * a SERVER span for the database too, so the database is instrumented and the
+ * ordinary parent/child join already finds it. Only a client-only span exercises
+ * the inference path.
+ *
+ * `peerService` is optional on purpose. Setting `peer.service` makes the peer an
+ * EXPLICIT one, which the topology resolver admits immediately; leaving it unset
+ * is the ordinary OTel database convention (`db.system` + `db.name` +
+ * `server.address`) and takes the slower staged path. Both must end up as nodes.
+ */
+function generateUninstrumentedDependencyTrace({
+  clientService = 'checkout-service',
+  operationName = 'POST /checkout',
+  dependencies = [
+    { name: 'cart', system: 'redis', host: 'redis.internal', kind: 'database' },
+    { name: 'orders', system: 'mysql', host: 'mysql.internal', kind: 'database' },
+    { name: 'checkout.events', system: 'kafka', kind: 'queue' },
+  ],
+  peerService = false,
+  latencyMs = 15,
+} = {}) {
+  const traceId = generateTraceId();
+  const rootSpanId = generateSpanId();
+  const startNs = Date.now() * 1_000_000;
+
+  const rootSpan = buildSpan({
+    traceId,
+    spanId: rootSpanId,
+    name: operationName,
+    kind: SpanKind.SERVER,
+    startTimeNs: startNs,
+    endTimeNs: startNs + msToNs(latencyMs * dependencies.length + 20),
+    attributes: [attr('http.method', 'POST'), ...k8sAttrs(clientService)],
+    status: { code: StatusCode.OK },
+  });
+
+  const dependencySpans = dependencies.map((dep, index) => {
+    const isQueue = dep.kind === 'queue';
+    const attributes = isQueue
+      ? [attr('messaging.system', dep.system), attr('messaging.destination.name', dep.name)]
+      : [
+          attr('db.system', dep.system),
+          attr('db.name', dep.name),
+          ...(dep.host ? [attr('server.address', dep.host)] : []),
+        ];
+    if (peerService) {
+      attributes.push(attr('peer.service', dep.name));
+    }
+    const spanStartNs = startNs + msToNs(5 + index * latencyMs);
+    return buildSpan({
+      traceId,
+      spanId: generateSpanId(),
+      parentSpanId: rootSpanId,
+      name: `${dep.name} ${isQueue ? 'send' : 'query'}`,
+      kind: isQueue ? SpanKind.PRODUCER : SpanKind.CLIENT,
+      startTimeNs: spanStartNs,
+      endTimeNs: spanStartNs + msToNs(latencyMs),
+      attributes,
+      status: { code: StatusCode.OK },
+    });
+  });
+
+  return {
+    // Every span belongs to the CALLER — the dependency emits nothing at all,
+    // which is the whole point of the fixture.
+    payload: buildTracePayload([buildResourceSpans(clientService, [rootSpan, ...dependencySpans])]),
+    metadata: {
+      traceId,
+      clientService,
+      dependencies: dependencies.map((d) => d.name),
+      type: 'uninstrumented_dependency',
+    },
+  };
+}
+
+/**
+ * openobserve#6591 item 8: span names whose numeric suffixes overlap, so a
+ * substring search can be told apart from a broken one. Searching "querier-1"
+ * must match querier-1 and querier-13 and NOT querier-3 or querier-31 — a trace
+ * of ordinary operation names cannot distinguish those two behaviours.
+ */
+function generateQuerierFanoutTrace({
+  coordinatorService = 'search-coordinator',
+  spanNames = ['querier-1', 'querier-3', 'querier-13', 'querier-31', 'ingester-1'],
+  latencyMs = 60,
+} = {}) {
+  const traceId = generateTraceId();
+  const rootSpanId = generateSpanId();
+  const startNs = Date.now() * 1_000_000;
+
+  const rootSpan = buildSpan({
+    traceId,
+    spanId: rootSpanId,
+    name: 'search dispatch',
+    kind: SpanKind.SERVER,
+    startTimeNs: startNs,
+    endTimeNs: startNs + msToNs(latencyMs * spanNames.length + 40),
+    attributes: k8sAttrs(coordinatorService),
+    status: { code: StatusCode.OK },
+  });
+
+  const childSpans = spanNames.map((name, index) => {
+    const childStartNs = startNs + msToNs(10 + index * latencyMs);
+    return buildSpan({
+      traceId,
+      spanId: generateSpanId(),
+      parentSpanId: rootSpanId,
+      name,
+      kind: SpanKind.SERVER,
+      startTimeNs: childStartNs,
+      endTimeNs: childStartNs + msToNs(latencyMs),
+      attributes: k8sAttrs(coordinatorService),
+      status: { code: StatusCode.OK },
+    });
+  });
+
+  return {
+    payload: buildTracePayload([buildResourceSpans(coordinatorService, [rootSpan, ...childSpans])]),
+    metadata: { traceId, coordinatorService, spanNames, type: 'querier_fanout' },
+  };
+}
+
+/**
  * TC-006, TC-015: Messaging trace with PRODUCER/CONSUMER spans
  * PRODUCER span (kind=4) + CONSUMER span (kind=5) with messaging.system
  */
@@ -2172,6 +2300,8 @@ module.exports = {
   generateBasicTrace,
   generateErrorTrace,
   generateDatabaseTrace,
+  generateUninstrumentedDependencyTrace,
+  generateQuerierFanoutTrace,
   generateMessagingTrace,
   generateGrpcTrace,
   generateOrphanClientTrace,

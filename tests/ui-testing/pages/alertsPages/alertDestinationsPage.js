@@ -1371,28 +1371,6 @@ export class AlertDestinationsPage {
      * Select a prebuilt destination type
      * @param {string} type - Type ID (slack, discord, msteams, email, pagerduty, opsgenie, servicenow, custom)
      */
-    /**
-     * Wait until `locator` has been CONTINUOUSLY visible for `stableMs`, resetting the moment
-     * it detaches. Returns false if it never settles within `timeout`. This is the tool for a
-     * field that renders, gets UNMOUNTED by a re-render, then re-renders — a plain waitFor
-     * would accept the first (doomed) render; this only accepts the field once it has settled.
-     */
-    async _waitForFieldStable(locator, { stableMs = 1500, timeout = 20000 } = {}) {
-        const start = Date.now();
-        let stableSince = null;
-        while (Date.now() - start < timeout) {
-            const visible = await locator.isVisible().catch(() => false);
-            if (visible) {
-                if (stableSince === null) stableSince = Date.now();
-                if (Date.now() - stableSince >= stableMs) return true;
-            } else {
-                stableSince = null;
-            }
-            await this.page.waitForTimeout(250);
-        }
-        return false;
-    }
-
     async selectDestinationType(type) {
         // Wait for the TYPE-SPECIFIC credential field (proof the type's form rendered) plus the
         // common destination-name field the caller fills next. Each credential field is behind
@@ -1410,77 +1388,32 @@ export class AlertDestinationsPage {
         const confirmField = this.page.locator(typeConfirmSelector).first();
         const nameField = this.page.locator(this.destinationNameInputField).first();
 
-        // On a REUSED destination form (2nd+ destination in a run), selecting a type sometimes
-        // triggers a re-render (template auto-load) that UNMOUNTS the credential/name fields and
-        // they stay gone — verified by watching count→0 for 25s+. A wait can't recover an
-        // unmounted element, so when the fields don't settle we re-open the form (fresh mount,
-        // like the always-stable first destination) and re-select. Deterministic — not a retry.
-        for (let openAttempt = 1; openAttempt <= 4; openAttempt++) {
-            await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-            const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
-            await card.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 });
+        const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
+        await card.waitFor({ state: 'visible', timeout: 10000 });
 
-            // Click the card once if not already selected. selectType() re-emits on every click,
-            // so re-clicking a selected card re-renders the form — only click when needed.
-            const cardSelected = () => card.evaluate((el) => el.classList.contains('selected')).catch(() => false);
-            if (!(await cardSelected())) {
-                await card.click({ timeout: 10000 }).catch((e) => {
-                    testLogger.debug('selectDestinationType card click failed', { type, openAttempt, error: e.message });
-                });
-            }
-            await expect.poll(cardSelected, { timeout: 8000, intervals: [400, 800, 1200] }).toBe(true).catch(() => {});
+        // selectType() re-emits on every click and a re-emit re-renders the form,
+        // so click only when the card is not already the selected one.
+        const cardSelected = () => card.evaluate((el) => el.classList.contains('selected')).catch(() => false);
+        if (!(await cardSelected())) {
+            await card.click({ timeout: 10000 });
+        }
+        await expect.poll(cardSelected, { timeout: 8000, intervals: [400, 800, 1200] }).toBe(true);
 
-            // Slack opens on the guided flow — OAuth on Cloud, the manifest stepper on
-            // enterprise — neither of which renders a webhook field. These specs cover the
-            // webhook path, so pick that method explicitly rather than depending on which
-            // deployment's default happens to be showing.
-            if (type === 'slack') {
-                const webhookMethod = this.page.locator('[data-test="slack-setup-method-webhook"]').first();
-                if (await webhookMethod.isVisible({ timeout: 5000 }).catch(() => false)) {
-                    await webhookMethod.click({ timeout: 10000 }).catch((e) => {
-                        testLogger.debug('slack webhook method click failed', { openAttempt, error: e.message });
-                    });
-                }
-            }
-
-            // Let the prebuilt TEMPLATE auto-load settle BEFORE judging field stability. Picking a
-            // type fires a template fetch whose completion re-renders the form and (on a reused
-            // form) unmounts the fields. That fetch can land AFTER a short stability window — so
-            // without this the fields looked "stable" here, then unmounted during the caller's
-            // fills (fillWebhookUrl → fillDestinationName). Waiting for the network to go idle ties
-            // us to the actual fetch, so the unmount happens inside the stability check below (and
-            // triggers a remount) instead of leaking into the fills.
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-            // Wait for BOTH fields to be STABLE (settled past any re-render), not just present.
-            // A healthy field settles in ~1-2s so this returns fast; the caps only bound how long
-            // we tolerate the UNMOUNTED case before remounting. The name field settles a touch
-            // later than the credential field, so it gets a longer budget.
-            const credStable = await this._waitForFieldStable(confirmField, { stableMs: 1500, timeout: 12000 });
-            const nameStable = credStable && await this._waitForFieldStable(nameField, { stableMs: 1000, timeout: 12000 });
-            if (credStable && nameStable) {
-                testLogger.debug('Selected destination type and form loaded', { type, openAttempt });
-                return;
-            }
-
-            // Fields unmounted and stuck — remount to force a fresh render, then retry. A light
-            // remount (cancel + re-open) first; if the stale parent state persists, escalate to a
-            // full page reload + fresh navigate — a guaranteed clean mount, like the always-stable
-            // first destination — which recovers the cases cancel+reopen can't.
-            testLogger.warn('Destination fields did not stabilise after type-select; remounting', { type, openAttempt, credStable, nameStable });
-            if (openAttempt === 1) {
-                await this.page.locator(this.cancelButton).first().click({ force: true, timeout: 10000 }).catch(() => {});
-                await this.page.locator(this.addDestinationTitle).first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-                await this.clickNewDestination();
-            } else {
-                await this.navigateToDestinations();
-                await this.clickNewDestination();
+        // Slack opens on the guided flow — OAuth on Cloud, the manifest stepper on
+        // enterprise — neither of which renders a webhook field. These specs cover the
+        // webhook path, so pick that method explicitly rather than depending on which
+        // deployment's default happens to be showing.
+        if (type === 'slack') {
+            const webhookMethod = this.page.locator('[data-test="slack-setup-method-webhook"]').first();
+            if (await webhookMethod.isVisible({ timeout: 5000 }).catch(() => false)) {
+                await webhookMethod.click({ timeout: 10000 });
             }
         }
-        // Surface a clear failure if remounts didn't recover it.
+
         await confirmField.waitFor({ state: 'visible', timeout: 15000 });
         await nameField.waitFor({ state: 'visible', timeout: 15000 });
-        testLogger.debug('Selected destination type and form loaded (after remounts)', { type });
+        testLogger.debug('Selected destination type and form loaded', { type });
     }
 
     /**
