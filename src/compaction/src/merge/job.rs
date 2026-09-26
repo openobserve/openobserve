@@ -21,9 +21,8 @@ use config::{
     utils::time::{day_micros, hour_micros},
 };
 use infra::{
-    cluster::get_node_by_uuid,
-    dist_lock, file_list as infra_file_list,
-    schema::{get_partition_time_level, unwrap_stream_created_at},
+    cluster::get_node_by_uuid, dist_lock, file_list as infra_file_list,
+    schema::unwrap_stream_created_at,
 };
 
 /// Last microsecond of the range a merge job at `offset` covers: the hour of
@@ -291,7 +290,15 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // against the end of that hour (see merge_by_stream), so only enqueue it
     // once the whole hour is older than the rule's offset; otherwise the job
     // would run as a plain merge and the advanced offset would skip the hour.
-    let job_end_ts = job_range_end(offset, get_partition_time_level(stream_type));
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let job_end_ts = job_range_end(
+        offset,
+        infra::schema::get_stream_partition_time_level(
+            stream_type,
+            stream_settings.as_deref(),
+            offset,
+        ),
+    );
     if offset >= time_now_day
         || time_now.timestamp_micros() - offset
             <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
@@ -336,6 +343,45 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_past_range_end_matches_is_past_hour_for_hourly() {
+        use config::utils::time::now_micros;
+        let now = now_micros();
+        let hour = hour_micros(1);
+        // walk back from the current hour: the hourly range check must agree with
+        // is_past_hour for every offset, so hourly streams keep today's behaviour
+        for h in 0..6 {
+            let offset = now - now % hour - h * hour;
+            assert_eq!(
+                crate::is_past_range_end(job_range_end(offset, PartitionTimeLevel::Hourly)),
+                crate::is_past_hour(offset),
+                "offset {h}h back"
+            );
+        }
+    }
+
+    #[test]
+    fn test_daily_range_seals_only_after_the_day() {
+        use config::utils::time::now_micros;
+        let now = now_micros();
+        let day = day_micros(1);
+        let today_start = now - now % day;
+        // an hour of today that is past: settled as an hour, but not as a day
+        let offset = today_start;
+        if crate::is_past_hour(offset) {
+            assert!(!crate::is_past_range_end(job_range_end(
+                offset,
+                PartitionTimeLevel::Daily
+            )));
+        }
+        // any hour of the day before yesterday is sealed for a daily stream
+        let old = today_start - 2 * day + 5 * hour_micros(1);
+        assert!(crate::is_past_range_end(job_range_end(
+            old,
+            PartitionTimeLevel::Daily
+        )));
+    }
 
     #[test]
     fn test_job_range_end_hourly_and_daily() {

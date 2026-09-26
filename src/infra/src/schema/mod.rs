@@ -25,7 +25,7 @@ use config::{
     RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS,
     TIMESTAMP_COL_NAME, get_config,
     ider::SnowflakeIdGenerator,
-    meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
+    meta::stream::{PartitionTimeLevel, PartitionTimeLevels, StreamSettings, StreamType},
     stats::MemorySize,
     utils::{
         json,
@@ -386,6 +386,120 @@ pub fn get_partition_time_level(stream_type: StreamType) -> PartitionTimeLevel {
         // for file list dump streams, we want to compact by daily
         StreamType::Filelist => PartitionTimeLevel::Daily,
         _ => PartitionTimeLevel::default(),
+    }
+}
+
+/// Partition time levels of one stream as a function of the data timestamp:
+/// the stream-type default from [`get_partition_time_level`], except that data
+/// of a metrics stream whose settings request `daily` for its time range is
+/// partitioned daily when ZO_METRICS_DAILY_PARTITION_ENABLED is on.
+///
+/// Every component that maps timestamps to partition directories for a
+/// stream (ingest write keys, compaction ranges, dump, WAL search, data
+/// delete) must use this, with settings read from the shared schema cache, and
+/// resolve the level of the data it handles (see `PartitionTimeLevels::at`),
+/// so ingesters, compactors and queriers always agree on the layout, including
+/// across a level change.
+pub fn get_stream_partition_time_levels(
+    stream_type: StreamType,
+    settings: Option<&StreamSettings>,
+) -> PartitionTimeLevels {
+    resolve_stream_partition_time_levels(
+        stream_type,
+        settings,
+        get_config().limit.metrics_daily_partition_enabled,
+    )
+}
+
+fn resolve_stream_partition_time_levels(
+    stream_type: StreamType,
+    settings: Option<&StreamSettings>,
+    enabled: bool,
+) -> PartitionTimeLevels {
+    match settings {
+        None => PartitionTimeLevels::uniform(resolve_stream_partition_time_level(
+            stream_type,
+            None,
+            enabled,
+        )),
+        Some(settings) => PartitionTimeLevels::from_changes(
+            settings
+                .requested_partition_time_levels()
+                .into_iter()
+                .map(|(since, level)| {
+                    (
+                        since,
+                        resolve_stream_partition_time_level(stream_type, Some(level), enabled),
+                    )
+                }),
+        ),
+    }
+}
+
+/// Partition time level of the stream's data at `ts` (microseconds); see
+/// [`get_stream_partition_time_levels`].
+pub fn get_stream_partition_time_level(
+    stream_type: StreamType,
+    settings: Option<&StreamSettings>,
+    ts: i64,
+) -> PartitionTimeLevel {
+    get_stream_partition_time_levels(stream_type, settings).at(ts)
+}
+
+/// How long every node needs to see a settings change before it takes effect.
+const PARTITION_LEVEL_PROPAGATION_MICROS: i64 = 3_600_000_000;
+
+/// First UTC day start at which a partition time level change made now can
+/// take effect (see `config::meta::stream::next_partition_level_switch`).
+pub fn next_partition_level_switch(now: i64) -> i64 {
+    config::meta::stream::next_partition_level_switch(
+        now,
+        get_config().limit.ingest_allowed_in_future_micro,
+        PARTITION_LEVEL_PROPAGATION_MICROS,
+    )
+}
+
+/// Request `level` for a stream's data from the next possible UTC day on
+/// ([`next_partition_level_switch`]), recording who made the change. Returns
+/// whether the settings changed; the caller persists them.
+pub fn schedule_partition_time_level(
+    org_id: &str,
+    stream_type: StreamType,
+    settings: &mut StreamSettings,
+    level: PartitionTimeLevel,
+    auto: bool,
+    now: i64,
+) -> bool {
+    let from = settings.partition_time_level.unwrap_or_default();
+    let changed =
+        settings.schedule_partition_time_level(level, auto, next_partition_level_switch(now), now);
+    if changed && from != level {
+        config::metrics::METRICS_PARTITION_LEVEL_CHANGES
+            .with_label_values(&[
+                org_id,
+                stream_type.as_str(),
+                &from.to_string(),
+                &level.to_string(),
+                if auto { "auto" } else { "manual" },
+            ])
+            .inc();
+    }
+    changed
+}
+
+fn resolve_stream_partition_time_level(
+    stream_type: StreamType,
+    requested: Option<PartitionTimeLevel>,
+    metrics_daily_enabled: bool,
+) -> PartitionTimeLevel {
+    let default = get_partition_time_level(stream_type);
+    if stream_type == StreamType::Metrics
+        && metrics_daily_enabled
+        && requested == Some(PartitionTimeLevel::Daily)
+    {
+        PartitionTimeLevel::Daily
+    } else {
+        default
     }
 }
 
@@ -1193,6 +1307,92 @@ mod tests {
         // Test Filelist stream type
         let level = get_partition_time_level(StreamType::Filelist);
         assert_eq!(level, PartitionTimeLevel::Daily);
+    }
+
+    #[test]
+    fn test_resolve_stream_partition_time_levels_across_changes() {
+        use PartitionTimeLevel::*;
+        const DAY: i64 = 86_400_000_000;
+        let mut settings = StreamSettings::default();
+        settings.schedule_partition_time_level(Daily, true, 10 * DAY, 9 * DAY);
+        settings.schedule_partition_time_level(Unset, true, 20 * DAY, 19 * DAY);
+
+        let on = resolve_stream_partition_time_levels(StreamType::Metrics, Some(&settings), true);
+        assert_eq!(on.at(10 * DAY - 1), Hourly);
+        assert_eq!(on.at(10 * DAY), Daily);
+        assert_eq!(on.at(20 * DAY - 1), Daily);
+        assert_eq!(on.at(20 * DAY), Hourly);
+
+        // with the flag off every range resolves to the default, so nothing changes
+        let off = resolve_stream_partition_time_levels(StreamType::Metrics, Some(&settings), false);
+        assert!(off.is_uniform());
+        assert_eq!(off.at(15 * DAY), Hourly);
+
+        // other stream types ignore it
+        let logs = resolve_stream_partition_time_levels(StreamType::Logs, Some(&settings), true);
+        assert!(logs.is_uniform());
+        assert_eq!(logs.at(15 * DAY), Hourly);
+        assert_eq!(
+            resolve_stream_partition_time_levels(StreamType::Filelist, None, true).at(0),
+            Daily
+        );
+    }
+
+    #[test]
+    fn test_resolve_stream_partition_time_level() {
+        use PartitionTimeLevel::*;
+        // no override: stream type default
+        assert_eq!(
+            resolve_stream_partition_time_level(StreamType::Metrics, None, true),
+            Hourly
+        );
+        // daily metrics only when the feature is enabled
+        assert_eq!(
+            resolve_stream_partition_time_level(StreamType::Metrics, Some(Daily), true),
+            Daily
+        );
+        assert_eq!(
+            resolve_stream_partition_time_level(StreamType::Metrics, Some(Daily), false),
+            Hourly
+        );
+        assert_eq!(
+            resolve_stream_partition_time_level(StreamType::Metrics, Some(Hourly), true),
+            Hourly
+        );
+        assert_eq!(
+            resolve_stream_partition_time_level(StreamType::Metrics, Some(Unset), true),
+            Hourly
+        );
+        // other stream types ignore the override
+        assert_eq!(
+            resolve_stream_partition_time_level(StreamType::Logs, Some(Daily), true),
+            Hourly
+        );
+        assert_eq!(
+            resolve_stream_partition_time_level(StreamType::Traces, Some(Daily), true),
+            Hourly
+        );
+        assert_eq!(
+            resolve_stream_partition_time_level(StreamType::Filelist, None, true),
+            Daily
+        );
+        // the public wrapper reads the config flag (off by default)
+        let settings = StreamSettings {
+            partition_time_level: Some(Daily),
+            ..Default::default()
+        };
+        assert_eq!(
+            get_stream_partition_time_level(StreamType::Metrics, Some(&settings), 0),
+            if get_config().limit.metrics_daily_partition_enabled {
+                Daily
+            } else {
+                Hourly
+            }
+        );
+        assert_eq!(
+            get_stream_partition_time_level(StreamType::Metrics, None, 0),
+            Hourly
+        );
     }
 
     #[test]

@@ -96,7 +96,19 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
         let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
-        let partition_time_level = get_partition_time_level(stream_type);
+        let partition_time_level = infra::schema::get_stream_partition_time_level(
+            stream_type,
+            Some(stream_settings.as_ref()),
+            *offset,
+        );
+        if stream_type == StreamType::Metrics && partition_time_level == PartitionTimeLevel::Daily {
+            // Daily metrics streams are not dumped. A dump deletes the dumped rows from
+            // file_list, and the merge of a still-open day reads file_list only, so it would
+            // lose sight of the day's earlier files before the day is sealed. Daily streams
+            // also keep ~24x fewer file_list rows, which is what the dump exists to reduce.
+            need_done_ids.push(*job_id);
+            continue;
+        }
         // to avoid compacting conflict with retention, need check the data retention time
         let stream_data_retention_end = if stream_settings.data_retention > 0 {
             now - Duration::try_days(stream_settings.data_retention).unwrap()

@@ -897,6 +897,26 @@ GROUP BY stream;
         Ok(stats.into_iter().collect())
     }
 
+    async fn get_stream_stats_by_recency(
+        &self,
+        org_id: &str,
+    ) -> Result<Vec<(String, bool, StreamStats)>> {
+        let pool = CLIENT_RO.clone();
+        let ret = sqlx::query_as::<_, super::StatsRecencyRecord>(
+            "SELECT stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, is_recent FROM stream_stats WHERE org = ?;",
+        )
+        .bind(org_id)
+        .fetch_all(&pool)
+        .await?;
+        Ok(ret
+            .into_iter()
+            .map(|r| {
+                let stats: StreamStats = (&r.stats).into();
+                (r.stats.stream, r.is_recent, stats)
+            })
+            .collect())
+    }
+
     async fn del_stream_stats(
         &self,
         org_id: &str,
