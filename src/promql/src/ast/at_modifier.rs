@@ -18,6 +18,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{AtModifier, Expr, Offset};
 
+use super::timestamp_selector::timestamp_selector;
 use crate::{adjust_start_end, utils::offset_micros};
 
 /// Functions whose value follows the evaluation timestamp, so a pinned argument does not pin them.
@@ -136,8 +137,13 @@ pub(crate) fn pin(expr: &Expr) -> Result<Pin> {
             let param = agg.param.as_deref().map_or(Ok(Pin::Neutral), pin)?;
             pin(&agg.expr)?.merge(param)
         }
-        Expr::Call(call) if TIME_DEPENDENT_FUNCS.contains(&call.func.name) => Pin::Varies,
         Expr::Call(call) => {
+            if let Some(selector) = timestamp_selector(&call.func, &call.args) {
+                return selector_pin(&selector.at);
+            }
+            if TIME_DEPENDENT_FUNCS.contains(&call.func.name) {
+                return Ok(Pin::Varies);
+            }
             let mut merged = Pin::Neutral;
             for arg in &call.args.args {
                 merged = merged.merge(pin(arg)?);
@@ -309,8 +315,19 @@ mod tests {
             pin_of("predict_linear(a[1h] @ 1600000000, 60)").unwrap(),
             Pin::Varies
         );
-        assert_eq!(pin_of("timestamp(a @ 1600000000)").unwrap(), Pin::Varies);
+        assert_eq!(pin_of("timestamp(-a @ 1600000000)").unwrap(), Pin::Varies);
+        assert_eq!(
+            pin_of("timestamp(timestamp(a @ 1600000000))").unwrap(),
+            Pin::Varies
+        );
         assert_eq!(pin_of("a @ 1600000000 + time()").unwrap(), Pin::Varies);
+    }
+
+    #[test]
+    fn test_pin_follows_the_selector_under_timestamp() {
+        assert_eq!(pin_of("timestamp(a @ 1600000000)").unwrap(), Pin::At(T));
+        assert_eq!(pin_of("timestamp(((a @ 1600000000)))").unwrap(), Pin::At(T));
+        assert_eq!(pin_of("timestamp(a)").unwrap(), Pin::Varies);
     }
 
     #[test]

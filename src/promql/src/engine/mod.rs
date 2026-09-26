@@ -192,18 +192,8 @@ impl Engine {
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
             PromExpr::VectorSelector(vs) => {
-                let data = match self.try_streaming_instant_selector(vs).await? {
-                    Some(data) => data,
-                    None => {
-                        let vs = selector::plain_selector(vs, "VectorSelector")?;
-                        self.eval_vector_selector(&vs, None).await?
-                    }
-                };
-                if data.is_empty() {
-                    Value::None
-                } else {
-                    Value::Matrix(data)
-                }
+                self.exec_vector_selector(vs, selector::SelectorOutput::Value)
+                    .await?
             }
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
                 let vs = selector::plain_selector(vs, "MatrixSelector")?;
