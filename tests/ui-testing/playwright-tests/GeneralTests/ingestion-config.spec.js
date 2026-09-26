@@ -82,6 +82,7 @@ test.describe("Ingestion Configuration Tests", () => {
       { category: 'metrics', name: 'prometheus', path: '/ingestion/custom/metrics/prometheus', label: 'Prometheus' },
       { category: 'metrics', name: 'otelCollector', path: '/ingestion/custom/metrics/otelCollector', label: 'OTEL Collector' },
       { category: 'recommended', name: 'kubernetes', path: '/ingestion/recommended/kubernetes', label: 'Kubernetes' },
+      { category: 'recommended', name: 'gpu', path: '/ingestion/recommended/gpu', label: 'GPU (DCGM Exporter)' },
       { category: 'databases', name: 'postgres', path: '/ingestion/databases/postgres', label: 'PostgreSQL' },
     ];
 
@@ -145,6 +146,31 @@ test.describe("Ingestion Configuration Tests", () => {
       expect(finalCount).toBe(initialCount);
 
       testLogger.info('Global search and navigation functionality working correctly');
+    });
+  });
+
+  test.describe("GPU (DCGM Exporter)", () => {
+    test("should open GPU from Recommended with the DCGM Exporter card and both platforms", {
+      tag: ['@ingestion', '@recommended', '@gpu', '@P1']
+    }, async () => {
+      const orgId = getOrgIdentifier();
+      await pm.ingestionConfigPage.openGpuFromRecommended(orgId);
+      await pm.ingestionConfigPage.expectDcgmExporterSelected();
+
+      // Docker (default): the collector config ships to this org's OTLP endpoint.
+      const dockerShip = await pm.ingestionConfigPage.getStepCode('ship');
+      expect(dockerShip).toContain(`/api/${orgId}`);
+      expect(dockerShip).toContain("regex: 'DCGM_.*'");
+
+      // Kubernetes: the platform choice drives every step in the group.
+      await pm.ingestionConfigPage.selectStepVariant('exporter', 'kubernetes');
+      const k8sExporter = await pm.ingestionConfigPage.getStepCode('exporter');
+      expect(k8sExporter).toContain('gpu-helm-charts/dcgm-exporter');
+      expect(k8sExporter).toContain('prometheus.io/scrape');
+      const k8sShip = await pm.ingestionConfigPage.getStepCode('ship');
+      expect(k8sShip).toContain('kubectl port-forward');
+
+      testLogger.info('GPU DCGM Exporter card renders both platform paths');
     });
   });
 

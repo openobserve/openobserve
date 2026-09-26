@@ -65,6 +65,12 @@ export const ingestionSearchIndex: SearchableItem[] = [
     parentTab: "recommended",
   },
   {
+    name: "ingestFromGpu",
+    label: raw("GPU"),
+    keywords: ["gpu", "nvidia", "dcgm", "dcgm exporter", "cuda", "accelerator"],
+    parentTab: "recommended",
+  },
+  {
     name: "AWSConfig",
     label: raw("AWS"),
     keywords: ["aws", "amazon"],
