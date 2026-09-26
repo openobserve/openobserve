@@ -16,31 +16,45 @@
 use std::{path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
-use maxminddb::Reader;
+use maxminddb::{Mmap, Reader};
 
 #[derive(Clone)]
 pub struct MaxmindClient {
-    pub city_reader: Arc<Reader<Vec<u8>>>,
+    pub city_reader: Arc<Reader<Mmap>>,
 }
 
 impl MaxmindClient {
     /// Create a new instance of MaxmindClient
-    pub fn new_with_reader(city_reader: Reader<Vec<u8>>) -> Self {
+    pub fn new_with_reader(city_reader: Reader<Mmap>) -> Self {
         Self {
             city_reader: Arc::new(city_reader),
         }
     }
 
+    /// Create a new instance of MaxmindClient that shares an already open
+    /// reader, so the database is mapped once per process instead of once per
+    /// holder.
+    pub fn new_with_shared_reader(city_reader: Arc<Reader<Mmap>>) -> Self {
+        Self { city_reader }
+    }
+
     /// Create a new instance of MaxmindClient with path to city/country
-    /// database
+    /// database.
+    ///
+    /// The database is memory-mapped, so it is backed by the page cache and
+    /// reclaimable instead of being read into an anonymous heap buffer.
     pub fn new_with_path<T: AsRef<Path>>(city_database: T) -> Result<MaxmindClient> {
-        let city_reader: Reader<Vec<u8>> =
-            Reader::open_readfile(&city_database).with_context(|| {
+        // SAFETY: the mmdb files are only ever replaced by an atomic rename (see
+        // `download_utils::download_file`), so the inode a live mapping points at is
+        // never modified in place.
+        let city_reader: Reader<Mmap> = unsafe {
+            Reader::open_mmap(&city_database).with_context(|| {
                 format!(
                     "Failed to find city-database from path {:?}",
                     city_database.as_ref()
                 )
-            })?;
+            })?
+        };
         Ok(MaxmindClient::new_with_reader(city_reader))
     }
 }

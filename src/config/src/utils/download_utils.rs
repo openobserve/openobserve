@@ -16,10 +16,18 @@
 use std::{cmp::min, path::Path};
 
 use futures::stream::StreamExt;
-use reqwest::Client;
+use reqwest::{Client, Response};
 use sha256::try_digest;
 use tokio::{fs::File, io::AsyncWriteExt};
 
+/// Downloads `url` into `path`, atomically.
+///
+/// The body is streamed into a sibling `<path>.tmp` and renamed over `path`
+/// when it is complete. Rewriting the destination in place would be visible to
+/// anything that already has the file open -- the MaxMind readers memory-map
+/// their database -- and an interrupted download would leave a truncated file
+/// behind. A rename leaves the old inode intact for existing readers and swaps
+/// the name only once the new content is fully on disk.
 pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(), String> {
     // Reqwest setup
     let res = client
@@ -31,6 +39,20 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
         .content_length()
         .ok_or_else(|| format!("Failed to get content length from '{url}'"))?;
 
+    let tmp_path = format!("{path}.tmp");
+    match write_response_to_file(res, total_size, &tmp_path).await {
+        Ok(()) => tokio::fs::rename(&tmp_path, path)
+            .await
+            .or(Err(format!("Failed to rename '{tmp_path}' to '{path}'"))),
+        Err(e) => {
+            // Do not leave a half-written file behind.
+            let _ = tokio::fs::remove_file(&tmp_path).await;
+            Err(e)
+        }
+    }
+}
+
+async fn write_response_to_file(res: Response, total_size: u64, path: &str) -> Result<(), String> {
     // download chunks
     let mut file = File::create(path)
         .await
@@ -46,6 +68,9 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
         let new = min(downloaded + (chunk.len() as u64), total_size);
         downloaded = new;
     }
+    file.flush()
+        .await
+        .or(Err("Error while flushing file".to_string()))?;
 
     Ok(())
 }
@@ -67,6 +92,52 @@ pub async fn is_digest_different(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The download must not rewrite the destination in place: readers that
+    /// already hold the file open (the MaxMind readers mmap it) must keep
+    /// seeing the old inode, and no `.tmp` residue may be left behind.
+    #[tokio::test]
+    async fn test_download_file_renames_into_place() {
+        use std::io::Read;
+
+        use tokio::io::AsyncReadExt;
+
+        const BODY: &[u8] = b"new-database-contents";
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = [0_u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", BODY.len());
+            socket.write_all(head.as_bytes()).await.unwrap();
+            socket.write_all(BODY).await.unwrap();
+            socket.flush().await.unwrap();
+        });
+
+        let dir = std::env::temp_dir().join(format!("o2-download-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("db.mmdb");
+        std::fs::write(&path, b"old-database-contents").unwrap();
+        // A reader that opened the file before the download, standing in for a
+        // live mmap of the old database.
+        let mut old_handle = std::fs::File::open(&path).unwrap();
+
+        let client = Client::new();
+        let url = format!("http://{addr}/db.mmdb");
+        download_file(&client, &url, path.to_str().unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), BODY);
+        assert!(!dir.join("db.mmdb.tmp").exists());
+        let mut old_contents = Vec::new();
+        old_handle.read_to_end(&mut old_contents).unwrap();
+        assert_eq!(old_contents, b"old-database-contents");
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[tokio::test]
     async fn test_is_digest_different_with_direct_hash() {
