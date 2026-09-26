@@ -46,11 +46,16 @@ import {
   computeStepSeconds,
   computeWidenedRateWindows,
   DEFAULT_SCRAPE_INTERVAL_SECONDS,
+  baseNameOf,
   getMetricDefaults,
+  inferUnit,
   isRateBasedKind,
+  normalizeDeclaredUnit,
   resolveVariant,
+  toO2Unit,
 } from "@/utils/metrics/metricDefaults";
 import { createPreviewQueue, isCancelled, PRIORITY } from "./useMetricsPreviewQueue";
+import { useMetricsExplorerExemplars } from "./useMetricsExplorerExemplars";
 
 export interface LabelFilter {
   label: I18nText;
@@ -950,6 +955,52 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const pointsFor = (card: MetricCard) =>
     card.chartType === "heatmap" ? HEATMAP_POINTS : PREVIEW_POINTS;
 
+  const exemplars = useMetricsExplorerExemplars({
+    queue,
+    org,
+    timeRange,
+    queriesOf: (card) =>
+      ((effectiveVariant(card as MetricCard).resolved?.queries ?? []) as any[]).map((q) => ({
+        expr: q.expr,
+        legend: q.legendTemplate && !q.legendTemplate.includes("{") ? q.legendTemplate : undefined,
+      })),
+    stepOf: (card) => computeStepSeconds(rangeSeconds.value, pointsFor(card as MetricCard)),
+    valueUnitOf: (card) => {
+      const model = card as MetricCard;
+      const bucketUnit = effectiveVariant(model).defaults?.bucketUnit;
+      return toO2Unit(
+        bucketUnit ??
+          normalizeDeclaredUnit(model.declaredUnit) ??
+          inferUnit(baseNameOf(model.name)),
+      );
+    },
+  });
+
+  /** A heatmap card draws its percentiles variant while exemplars are on. */
+  const exemplarSwapsVariant = (card: MetricCard): boolean =>
+    effectiveVariant(card, pointsFor(card), { ignoreExemplars: true }).resolved?.variant?.id ===
+    "heatmap";
+
+  const exemplarEligible = (card: MetricCard): boolean => {
+    if (card.unsupported || previews.value[card.name]?.status === "error") return false;
+    if (exemplarSwapsVariant(card)) return true;
+    return effectiveVariant(card).resolved?.chartType === "line";
+  };
+
+  /** Flips one card's exemplars; a heatmap card re-runs its preview as percentiles. */
+  const toggleExemplars = (card: MetricCard) => {
+    const swaps = exemplarSwapsVariant(card);
+    const ownKeys = new Set(exemplars.exemplarKeysOf(card));
+    // Captured before the flip: afterwards previewKeysOf names the other variant's queries.
+    const supersededKeys = swaps ? previewKeysOf(card).filter((k) => !ownKeys.has(k)) : [];
+    exemplars.toggle(card);
+    if (swaps) {
+      for (const key of supersededKeys) queue.cancel(key, card.name);
+      delete previews.value[card.name];
+      void requestPreview(card);
+    }
+  };
+
   /**
    * Everything a resolved variant depends on. When this changes, every memo is
    * stale; while it holds, a card's variant cannot change.
@@ -998,14 +1049,20 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const effectiveVariant = (
     card: MetricCard,
     points = pointsFor(card),
-    opts?: { applyNanGuard?: boolean; rateWindow?: string; percentileWindow?: string },
+    opts?: {
+      applyNanGuard?: boolean;
+      rateWindow?: string;
+      percentileWindow?: string;
+      ignoreExemplars?: boolean;
+    },
   ) => {
     const epoch = variantEpoch.value;
     if (epoch !== cachedEpoch) {
       variantCache.clear();
       cachedEpoch = epoch;
     }
-    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}`;
+    const exemplarsOn = !opts?.ignoreExemplars && exemplars.enabled(card.name);
+    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}|${exemplarsOn ? 1 : 0}`;
     const hit = variantCache.get(cacheKey);
     if (hit) return hit;
 
@@ -1044,11 +1101,15 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // The card's unit already came from the family-joined rule-set pass; keep it
     // rather than re-deriving from a sub-stream's fallback metadata.
     const override = overrides.value[card.name];
-    const resolved = resolveVariant(
+    let resolved = resolveVariant(
       defaults,
       override?.variantId ?? defaults.variants[0]?.id,
       override?.options,
     );
+    // Exemplars draw on a line chart, so a heatmap card shows its percentiles while they are on; the ⚙ override is never rewritten.
+    if (exemplarsOn && resolved?.variant?.id === "heatmap") {
+      resolved = resolveVariant(defaults, "percentiles", undefined) ?? resolved;
+    }
 
     const result = { defaults, resolved };
     variantCache.set(cacheKey, result);
@@ -1402,6 +1463,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   ) => {
     if (card.unsupported) return;
     if (!timeRange.value.end_time) return;
+    exemplars.ensure(card, opts?.priority ?? PRIORITY.VISIBLE);
 
     // Captured before the first await. Every write into `previews` below happens
     // after one, by which time a bulk clear may have emptied the map and
@@ -1720,7 +1782,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const previewKeysOf = (card: MetricCard): string[] => {
     const points = pointsFor(card);
     const step = computeStepSeconds(rangeSeconds.value, points);
-    const keys = new Set<string>();
+    const keys = new Set<string>(exemplars.exemplarKeysOf(card));
 
     for (const guarded of [false, true]) {
       const { resolved } = effectiveVariant(card, points, {
@@ -1776,6 +1838,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const invalidateAll = () => {
     previewsEpoch++;
     queue.cancelAll();
+    exemplars.clearAll();
     previews.value = {};
     previewOrder = [];
     emptyMetrics.value = new Set();
@@ -2305,6 +2368,14 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     favorites,
     setOverride,
     toggleFavorite,
+
+    exemplarsEnabled: exemplars.enabled,
+    exemplarStateOf: exemplars.stateOf,
+    exemplarKeysOf: exemplars.exemplarKeysOf,
+    retryExemplars: exemplars.retry,
+    exemplarEligible,
+    exemplarSwapsVariant,
+    toggleExemplars,
 
     // previews
     requestPreview,

@@ -5851,7 +5851,36 @@
     "variableNameAlreadyExists": "已存在相同名稱的變數",
     "pivotTotal": "總計",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "顯示範例 (追蹤樣本)",
+      "hide": "隱藏範例 · 已顯示 {count}",
+      "empty": "此時間範圍內沒有範例",
+      "emptyShort": "0 個範例",
+      "loadFailed": "無法載入範例",
+      "loadFailedHint": "圖表不受影響。重試只會重新擷取範例。",
+      "retry": "重試",
+      "cardTitle": "範例",
+      "query": "查詢 {name}",
+      "returnedBy": "由 {count} 個查詢傳回 | 由 {count} 個查詢傳回",
+      "series": "序列",
+      "aboveRange": "超出圖表範圍；繪製於頂端邊緣",
+      "belowRange": "低於圖表範圍；繪製於底部邊緣",
+      "checkingTrace": "正在檢查追蹤…",
+      "openTrace": "開啟追蹤",
+      "openTraceHint": "或點選標記。返回後會回到這裡。",
+      "traceNotAvailable": "追蹤無法使用 — 已取樣排除或超過保留期限",
+      "openTraceUnverified": "開啟追蹤 (未驗證)",
+      "unverifiedTimeout": "追蹤查詢逾時，因此此追蹤可能不存在。",
+      "unverifiedForbidden": "無法確認此追蹤 — 您可能沒有追蹤的存取權限。",
+      "unverifiedPartial": "僅搜尋了部分保留期間。",
+      "unverifiedError": "無法檢查此追蹤。",
+      "noTraceId": "此範例上沒有 {label}，因此沒有可開啟的追蹤。",
+      "markersAria": "範例標記",
+      "markerAria": "{time} 的範例 {value}"
+    },
+    "showExemplarsLabel": "顯示範例",
+    "showExemplarsHelp": "為所有開啟儀表板的人在此圖表上繪製追蹤樣本。檢視者仍可從面板標題隱藏它們。"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8656,7 +8685,9 @@
         "staleCopyAria": "複製 {name} 的重新整理失敗詳細資訊",
         "stalePreamble": "重新整理失敗 — 顯示上次成功結果。",
         "staleClickToCopy": "按一下以複製詳細資訊。",
-        "lastRefreshedPrefix": "上次重新整理時間："
+        "lastRefreshedPrefix": "上次重新整理時間：",
+        "exemplarsShowHeatmap": "顯示範例 (追蹤樣本)。啟用時會將此卡片切換為百分位數。",
+        "exemplarsHideHeatmap": "隱藏範例 · 已顯示 {count}。將此卡片切回熱圖。"
       },
       "fn": {
         "subtitle": "選擇此指標的彙總方式",

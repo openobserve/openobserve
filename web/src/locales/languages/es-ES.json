@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Ya existe una variable con el mismo nombre",
     "pivotTotal": "Total",
     "pivotOthers": "Otros",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Mostrar ejemplares (muestras de trazas)",
+      "hide": "Ocultar ejemplares · {count} mostrados",
+      "empty": "No hay ejemplares en este rango de tiempo",
+      "emptyShort": "0 ejemplares",
+      "loadFailed": "No se pudieron cargar los ejemplares",
+      "loadFailedHint": "El gráfico no se ve afectado. Reintentar solo recupera los ejemplares.",
+      "retry": "Reintentar",
+      "cardTitle": "Ejemplar",
+      "query": "Consulta {name}",
+      "returnedBy": "Devuelto por {count} consulta | Devuelto por {count} consultas",
+      "series": "Series",
+      "aboveRange": "Por encima del rango del gráfico; se dibuja en el borde superior",
+      "belowRange": "Por debajo del rango del gráfico; se dibuja en el borde inferior",
+      "checkingTrace": "Comprobando la traza…",
+      "openTrace": "Abrir traza",
+      "openTraceHint": "O haz clic en el marcador. Atrás te devuelve aquí.",
+      "traceNotAvailable": "Traza no disponible: excluida por muestreo o fuera del periodo de retención",
+      "openTraceUnverified": "Abrir traza (sin verificar)",
+      "unverifiedTimeout": "La búsqueda de la traza agotó el tiempo de espera, por lo que esta traza podría faltar.",
+      "unverifiedForbidden": "No se pudo confirmar esta traza: es posible que no tengas acceso a las trazas.",
+      "unverifiedPartial": "Solo se buscó en parte del periodo de retención.",
+      "unverifiedError": "No se pudo comprobar esta traza.",
+      "noTraceId": "No hay {label} en este ejemplar, por lo que no hay ninguna traza que abrir.",
+      "markersAria": "Marcadores de ejemplares",
+      "markerAria": "Ejemplar {value} a las {time}"
+    },
+    "showExemplarsLabel": "Mostrar ejemplares",
+    "showExemplarsHelp": "Dibuja muestras de trazas en este gráfico para todos los que abran el dashboard. Los visores aún pueden ocultarlas desde el encabezado del panel."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "Copiar los detalles de actualización fallida para {name}",
         "stalePreamble": "Actualización fallida — mostrando el último resultado exitoso.",
         "staleClickToCopy": "Haga clic para copiar los detalles.",
-        "lastRefreshedPrefix": "Última actualización: "
+        "lastRefreshedPrefix": "Última actualización: ",
+        "exemplarsShowHeatmap": "Mostrar ejemplares (muestras de trazas). Cambia esta tarjeta a percentiles mientras está activado.",
+        "exemplarsHideHeatmap": "Ocultar ejemplares · {count} mostrados. Devuelve esta tarjeta al mapa de calor."
       },
       "fn": {
         "subtitle": "Elija cómo se agrega esta métrica",

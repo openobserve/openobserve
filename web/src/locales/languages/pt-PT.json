@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Já existe uma variável com o mesmo nome",
     "pivotTotal": "Total",
     "pivotOthers": "Outros",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Mostrar exemplares (amostras de rastros)",
+      "hide": "Ocultar exemplares · {count} exibidos",
+      "empty": "Nenhum exemplar neste intervalo de tempo",
+      "emptyShort": "0 exemplares",
+      "loadFailed": "Não foi possível carregar os exemplares",
+      "loadFailedHint": "O gráfico não é afetado. Tentar novamente busca apenas os exemplares.",
+      "retry": "Tentar novamente",
+      "cardTitle": "Exemplar",
+      "query": "Consulta {name}",
+      "returnedBy": "Retornado por {count} consulta | Retornado por {count} consultas",
+      "series": "Série",
+      "aboveRange": "Acima do intervalo do gráfico; desenhado na borda superior",
+      "belowRange": "Abaixo do intervalo do gráfico; desenhado na borda inferior",
+      "checkingTrace": "Verificando rastro…",
+      "openTrace": "Abrir rastro",
+      "openTraceHint": "Ou clique no marcador. Voltar retorna aqui.",
+      "traceNotAvailable": "Rastro não disponível — excluído pela amostragem ou além da retenção",
+      "openTraceUnverified": "Abrir rastro (não verificado)",
+      "unverifiedTimeout": "A busca do rastro expirou, então este rastro pode estar ausente.",
+      "unverifiedForbidden": "Não foi possível confirmar este rastro — talvez você não tenha acesso aos rastros.",
+      "unverifiedPartial": "Apenas parte da janela de retenção foi pesquisada.",
+      "unverifiedError": "Não foi possível verificar este rastro.",
+      "noTraceId": "Nenhum {label} neste exemplar, então não há rastro para abrir.",
+      "markersAria": "Marcadores de exemplares",
+      "markerAria": "Exemplar {value} em {time}"
+    },
+    "showExemplarsLabel": "Mostrar exemplares",
+    "showExemplarsHelp": "Desenha amostras de rastros neste gráfico para todos que abrirem o painel. Os visualizadores ainda podem ocultá-las no cabeçalho do painel."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "Copiar os detalhes da falha de atualização para {name}",
         "stalePreamble": "Atualização falhou — mostrando o último resultado bem-sucedido.",
         "staleClickToCopy": "Clique para copiar os detalhes.",
-        "lastRefreshedPrefix": "Última atualização em: "
+        "lastRefreshedPrefix": "Última atualização em: ",
+        "exemplarsShowHeatmap": "Mostrar exemplares (amostras de rastros). Alterna este cartão para percentis enquanto ativado.",
+        "exemplarsHideHeatmap": "Ocultar exemplares · {count} exibidos. Retorna este cartão ao mapa de calor."
       },
       "fn": {
         "subtitle": "Escolha como esta métrica é agregada",

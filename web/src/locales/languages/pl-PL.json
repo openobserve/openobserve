@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Zmienna o tej samej nazwie już istnieje",
     "pivotTotal": "Suma",
     "pivotOthers": "Inne",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Pokaż exemplary (próbki trace)",
+      "hide": "Ukryj exemplary · pokazano {count}",
+      "empty": "Brak exemplarów w tym zakresie czasu",
+      "emptyShort": "0 exemplarów",
+      "loadFailed": "Nie udało się wczytać exemplarów",
+      "loadFailedHint": "Wykres pozostaje bez zmian. Ponowna próba pobiera tylko exemplary.",
+      "retry": "Ponów",
+      "cardTitle": "Exemplar",
+      "query": "Zapytanie {name}",
+      "returnedBy": "Zwrócone przez {count} zapytanie | Zwrócone przez {count} zapytań",
+      "series": "Seria",
+      "aboveRange": "Powyżej zakresu wykresu; rysowane przy górnej krawędzi",
+      "belowRange": "Poniżej zakresu wykresu; rysowane przy dolnej krawędzi",
+      "checkingTrace": "Sprawdzanie trace…",
+      "openTrace": "Otwórz trace",
+      "openTraceHint": "Lub kliknij znacznik. Powrót przeniesie cię tutaj.",
+      "traceNotAvailable": "Trace niedostępny — poza próbkowaniem lub poza okresem retencji",
+      "openTraceUnverified": "Otwórz trace (niezweryfikowany)",
+      "unverifiedTimeout": "Wyszukiwanie trace przekroczyło limit czasu, więc ten trace może nie istnieć.",
+      "unverifiedForbidden": "Nie udało się potwierdzić tego trace — możesz nie mieć dostępu do trace'ów.",
+      "unverifiedPartial": "Przeszukano tylko część okresu retencji.",
+      "unverifiedError": "Nie udało się sprawdzić tego trace.",
+      "noTraceId": "Brak {label} w tym exemplarze, więc nie ma trace do otwarcia.",
+      "markersAria": "Znaczniki exemplarów",
+      "markerAria": "Exemplar {value} o {time}"
+    },
+    "showExemplarsLabel": "Pokaż exemplary",
+    "showExemplarsHelp": "Rysuje próbki trace na tym wykresie dla wszystkich, którzy otworzą pulpit. Przeglądający nadal mogą je ukryć w nagłówku panelu."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "Kopiuj szczegóły nieudanego odświeżenia dla {name}",
         "stalePreamble": "Odświeżenie nie powiodło się — wyświetlanie ostatniego pomyślnego wyniku.",
         "staleClickToCopy": "Kliknij, aby skopiować szczegóły.",
-        "lastRefreshedPrefix": "Ostatnio odświeżono: "
+        "lastRefreshedPrefix": "Ostatnio odświeżono: ",
+        "exemplarsShowHeatmap": "Pokaż exemplary (próbki trace). Po włączeniu przełącza tę kartę na percentyle.",
+        "exemplarsHideHeatmap": "Ukryj exemplary · pokazano {count}. Przywraca tę kartę do mapy cieplnej."
       },
       "fn": {
         "subtitle": "Wybierz, jak ta metryka jest agregowana",

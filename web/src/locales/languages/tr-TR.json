@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Aynı isimde değişken zaten mevcut",
     "pivotTotal": "Toplam",
     "pivotOthers": "Diğerleri",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Örnekleri göster (iz örnekleri)",
+      "hide": "Örnekleri gizle · {count} gösteriliyor",
+      "empty": "Bu zaman aralığında örnek yok",
+      "emptyShort": "0 örnek",
+      "loadFailed": "Örnekler yüklenemedi",
+      "loadFailedHint": "Grafik etkilenmez. Yeniden dene yalnızca örnekleri getirir.",
+      "retry": "Yeniden dene",
+      "cardTitle": "Örnek",
+      "query": "Sorgu {name}",
+      "returnedBy": "{count} sorgu tarafından döndürüldü | {count} sorgu tarafından döndürüldü",
+      "series": "Seri",
+      "aboveRange": "Grafik aralığının üstünde; üst kenarda çizilir",
+      "belowRange": "Grafik aralığının altında; alt kenarda çizilir",
+      "checkingTrace": "İz kontrol ediliyor…",
+      "openTrace": "İzi aç",
+      "openTraceHint": "Veya işaretleyiciye tıklayın. Geri düğmesi buraya döndürür.",
+      "traceNotAvailable": "İz kullanılamıyor — örnekleme dışı bırakılmış veya saklama süresi geçmiş",
+      "openTraceUnverified": "İzi aç (doğrulanmamış)",
+      "unverifiedTimeout": "İz araması zaman aşımına uğradı, bu nedenle bu iz eksik olabilir.",
+      "unverifiedForbidden": "Bu iz doğrulanamadı — izlere erişiminiz olmayabilir.",
+      "unverifiedPartial": "Saklama penceresinin yalnızca bir kısmı arandı.",
+      "unverifiedError": "Bu iz kontrol edilemedi.",
+      "noTraceId": "Bu örnekte {label} yok, bu nedenle açılacak bir iz yok.",
+      "markersAria": "Örnek işaretleyicileri",
+      "markerAria": "{time} zamanındaki örnek {value}"
+    },
+    "showExemplarsLabel": "Örnekleri göster",
+    "showExemplarsHelp": "Bu grafikte, gösterge panosunu açan herkes için iz örneklerini çizer. Görüntüleyenler bunları yine de panel başlığından gizleyebilir."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "{name} için başarısız yenileme ayrıntılarını kopyala",
         "stalePreamble": "Yenileme başarısız — son başarılı sonuç gösteriliyor.",
         "staleClickToCopy": "Ayrıntıları kopyalamak için tıklayın.",
-        "lastRefreshedPrefix": "Son Yenilenme: "
+        "lastRefreshedPrefix": "Son Yenilenme: ",
+        "exemplarsShowHeatmap": "Örnekleri göster (iz örnekleri). Açıkken bu kartı yüzdeliklere geçirir.",
+        "exemplarsHideHeatmap": "Örnekleri gizle · {count} gösteriliyor. Bu kartı ısı haritasına döndürür."
       },
       "fn": {
         "subtitle": "Bu metriğin nasıl toplanacağını seçin",

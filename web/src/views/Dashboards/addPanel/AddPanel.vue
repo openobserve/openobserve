@@ -233,6 +233,10 @@ import {
   provide,
   inject,
 } from "vue";
+import {
+  clearExemplarOverride,
+  exemplarOverrideKey,
+} from "@/composables/dashboard/useExemplarOverride";
 import { useI18nTyped } from "@/types/i18n";
 import {
   addPanel,
@@ -1397,6 +1401,15 @@ export default defineComponent({
         }
 
         isUnsavedTrackingActive = false;
+
+        // The author sees the value just saved, not an older view-mode override of this panel.
+        clearExemplarOverride(
+          exemplarOverrideKey(
+            store.state.selectedOrganization.identifier,
+            dashId,
+            String(dashboardPanelData.data.id),
+          ),
+        );
 
         // Clear variables created during session since panel is being saved
         variablesCreatedInSession.value = [];

@@ -23,6 +23,7 @@ import {
   ORDERED_SECTION_IDS,
   DEFAULT_EXPANDED_SECTIONS,
 } from "@/utils/dashboard/searchLabelsConfig";
+import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,6 +89,10 @@ export function useConfigPanel(
       step: {
         label: t("dashboard.stepValue"),
         visible: !!promqlMode.value,
+      },
+      "show-exemplars": {
+        label: t("dashboard.showExemplarsLabel"),
+        visible: !!promqlMode.value && isExemplarEligible(dashboardPanelData.data),
       },
       "panel-default-time": { label: t("dashboard.panelTimeEnabled") },
       "promql-chart-config": {

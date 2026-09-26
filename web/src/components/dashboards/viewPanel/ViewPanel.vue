@@ -27,6 +27,15 @@
         >
           {{ dashboardPanelData.data.title }}
         </span>
+        <ExemplarToggle
+          v-if="viewExemplarsEligible"
+          class="ms-2 shrink-0"
+          :on="viewExemplarsOn"
+          :loading="panelSchemaRendererRef?.exemplarsStatus === 'loading'"
+          :count="panelSchemaRendererRef?.exemplarsCount ?? 0"
+          data-test="dashboard-viewpanel-exemplars-toggle"
+          @toggle="setViewExemplarOverride(!viewExemplarsOn)"
+        />
       </div>
       <div class="flex shrink-0 items-center gap-2 max-md:ms-auto">
         <!-- histogram interval for sql queries -->
@@ -138,6 +147,7 @@
                   :width="6"
                   :searchType="searchType"
                   :showLegendsButton="true"
+                  :exemplars-override="viewExemplarOverride"
                   @error="handleChartApiError"
                   @updated:data-zoom="onDataZoom"
                   @update:initialVariableValues="onUpdateInitialVariableValues"
@@ -212,6 +222,12 @@ import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
+import {
+  exemplarOverrideKey,
+  useExemplarOverride,
+} from "@/composables/dashboard/useExemplarOverride";
+import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -234,6 +250,7 @@ export default defineComponent({
     PanelErrorButtons,
     OButton,
     OTooltip,
+    ExemplarToggle,
   },
   props: {
     panelId: {
@@ -771,6 +788,23 @@ export default defineComponent({
       return props.panelId;
     });
 
+    // Same session key as the dashboard header, so the full-screen choice carries back to the grid.
+    const viewExemplarsEligible = computed(() => isExemplarEligible(chartData.value));
+    const {
+      override: viewExemplarOverride,
+      effective: viewExemplarsOn,
+      set: setViewExemplarOverride,
+    } = useExemplarOverride(
+      computed(() =>
+        exemplarOverrideKey(
+          store.state.selectedOrganization?.identifier ?? "",
+          props.dashboardId ?? "",
+          String(props.panelId ?? ""),
+        ),
+      ),
+      computed(() => chartData.value?.config?.show_exemplars),
+    );
+
     // Computed property for LIVE merged variables (for HTML/Markdown panels and drilldown)
     // This includes global + tab + panel scoped variables with proper precedence
     const liveVariablesData = computed(() => {
@@ -843,6 +877,10 @@ export default defineComponent({
       warning: "warning",
       currentTabId,
       currentPanelId,
+      viewExemplarsEligible,
+      viewExemplarOverride,
+      viewExemplarsOn,
+      setViewExemplarOverride,
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,

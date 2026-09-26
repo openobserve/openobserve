@@ -254,4 +254,33 @@ describe("PanelErrorButtons", () => {
       expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(false);
     });
   });
+
+  describe("exemplar error", () => {
+    const tooltipStub = {
+      OTooltip: {
+        props: ["content"],
+        template: "<div><slot name='content' />{{ content }}</div>",
+      },
+    };
+
+    it("shows the warning with the server message and emits retry", async () => {
+      const wrapper = mount(PanelErrorButtons, {
+        props: { exemplarError: "scan exploded" },
+        global: { plugins: [i18n], provide: { store: mockStore }, stubs: tooltipStub },
+      });
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-error-message"]').text()).toBe(
+        "scan exploded",
+      );
+      await wrapper.find('[data-test="dashboard-panel-exemplars-retry"]').trigger("click");
+      expect(wrapper.emitted("retry-exemplars")).toHaveLength(1);
+    });
+
+    it("renders nothing for exemplars without an error", () => {
+      const wrapper = mount(PanelErrorButtons, {
+        global: { plugins: [i18n], provide: { store: mockStore } },
+      });
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-error"]').exists()).toBe(false);
+    });
+  });
 });

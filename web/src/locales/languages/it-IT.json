@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Esiste già una variabile con lo stesso nome",
     "pivotTotal": "Totale",
     "pivotOthers": "Altri",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Mostra esemplari (campioni di traccia)",
+      "hide": "Nascondi esemplari · {count} mostrati",
+      "empty": "Nessun esemplare in questo intervallo di tempo",
+      "emptyShort": "0 esemplari",
+      "loadFailed": "Impossibile caricare gli esemplari",
+      "loadFailedHint": "Il grafico non è influenzato. Il nuovo tentativo recupera solo gli esemplari.",
+      "retry": "Riprova",
+      "cardTitle": "Esemplare",
+      "query": "Query {name}",
+      "returnedBy": "Restituito da {count} query | Restituito da {count} query",
+      "series": "Serie",
+      "aboveRange": "Sopra l'intervallo del grafico; disegnato sul bordo superiore",
+      "belowRange": "Sotto l'intervallo del grafico; disegnato sul bordo inferiore",
+      "checkingTrace": "Verifica della traccia…",
+      "openTrace": "Apri traccia",
+      "openTraceHint": "Oppure fai clic sul marcatore. Indietro riporta qui.",
+      "traceNotAvailable": "Traccia non disponibile — esclusa dal campionamento o oltre il periodo di conservazione",
+      "openTraceUnverified": "Apri traccia (non verificata)",
+      "unverifiedTimeout": "La ricerca della traccia è scaduta, quindi questa traccia potrebbe mancare.",
+      "unverifiedForbidden": "Impossibile confermare questa traccia — potresti non avere accesso alle tracce.",
+      "unverifiedPartial": "È stata cercata solo una parte della finestra di conservazione.",
+      "unverifiedError": "Impossibile verificare questa traccia.",
+      "noTraceId": "Nessun {label} su questo esemplare, quindi non c'è una traccia da aprire.",
+      "markersAria": "Marcatori degli esemplari",
+      "markerAria": "Esemplare {value} a {time}"
+    },
+    "showExemplarsLabel": "Mostra esemplari",
+    "showExemplarsHelp": "Disegna campioni di traccia su questo grafico per tutti coloro che aprono la dashboard. I visualizzatori possono comunque nasconderli dall'intestazione del pannello."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "Copia i dettagli dell'aggiornamento fallito per {name}",
         "stalePreamble": "Aggiornamento fallito — mostra l'ultimo risultato riuscito.",
         "staleClickToCopy": "Clicca per copiare i dettagli.",
-        "lastRefreshedPrefix": "Ultimo aggiornamento alle: "
+        "lastRefreshedPrefix": "Ultimo aggiornamento alle: ",
+        "exemplarsShowHeatmap": "Mostra esemplari (campioni di traccia). Quando è attivo, passa questa scheda ai percentili.",
+        "exemplarsHideHeatmap": "Nascondi esemplari · {count} mostrati. Riporta questa scheda alla mappa di calore."
       },
       "fn": {
         "subtitle": "Scegli come questa metrica viene aggregata",

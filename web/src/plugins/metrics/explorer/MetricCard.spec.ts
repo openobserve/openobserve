@@ -610,4 +610,87 @@ describe("MetricCard (ported to @/lib)", () => {
       );
     });
   });
+
+  describe("exemplars toggle", () => {
+    const toggleSel = '[data-test="metrics-explorer-card-exemplars-node_cpu_seconds_total"]';
+
+    it("is absent on an ineligible card", () => {
+      wrapper = createWrapper({ exemplarsEligible: false });
+      expect(wrapper.find(toggleSel).exists()).toBe(false);
+    });
+
+    it("sits in the action row when off and emits toggle-exemplars", async () => {
+      wrapper = createWrapper({ exemplarsEligible: true, exemplarsOn: false });
+      const actions = wrapper.find(
+        '[data-test="metrics-explorer-card-actions-node_cpu_seconds_total"]',
+      );
+      const toggle = actions.find(toggleSel);
+      expect(toggle.exists()).toBe(true);
+      expect(toggle.attributes("aria-pressed")).toBe("false");
+      await toggle.trigger("click");
+      expect(wrapper.emitted("toggle-exemplars")?.[0]?.[0]).toMatchObject({ name: CARD.name });
+    });
+
+    it("stays visible at rest while on, with its loading spinner", () => {
+      wrapper = createWrapper({
+        exemplarsEligible: true,
+        exemplarsOn: true,
+        exemplars: { status: "loading", markers: [], errorMessage: "" },
+      });
+      const actions = wrapper.find(
+        '[data-test="metrics-explorer-card-actions-node_cpu_seconds_total"]',
+      );
+      expect(actions.find(toggleSel).exists()).toBe(false);
+      expect(wrapper.find(toggleSel).attributes("aria-pressed")).toBe("true");
+      expect(
+        wrapper
+          .find('[data-test="metrics-explorer-card-exemplars-loading-node_cpu_seconds_total"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("marks a heatmap card's toggle as swapping to percentiles", () => {
+      wrapper = createWrapper({ exemplarsEligible: true, exemplarsSwapsVariant: true });
+      expect(wrapper.find(toggleSel).attributes("data-swaps-variant")).toBe("percentiles");
+    });
+
+    it("shows the empty indicator and the error warning", () => {
+      wrapper = createWrapper({
+        exemplarsEligible: true,
+        exemplarsOn: true,
+        exemplars: { status: "empty", markers: [], errorMessage: "" },
+      });
+      expect(
+        wrapper
+          .find('[data-test="metrics-explorer-card-exemplars-empty-node_cpu_seconds_total"]')
+          .exists(),
+      ).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({
+        exemplarsEligible: true,
+        exemplarsOn: true,
+        exemplars: { status: "error", markers: [], errorMessage: "boom" },
+      });
+      expect(
+        wrapper
+          .find('[data-test="metrics-explorer-card-exemplars-error-node_cpu_seconds_total"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("hands its exemplars to the chart only while on", () => {
+      const exemplars = { status: "ready", markers: [], errorMessage: "" };
+      wrapper = createWrapper({
+        preview: preview({
+          results: [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] }],
+        }),
+        exemplarsEligible: true,
+        exemplarsOn: true,
+        exemplars,
+      });
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.exists()).toBe(true);
+      expect(chart.props("injectedExemplars")).toEqual(exemplars);
+    });
+  });
 });

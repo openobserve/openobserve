@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "متغير يحمل نفس الاسم موجود بالفعل",
     "pivotTotal": "المجموع",
     "pivotOthers": "آخرون",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "إظهار النماذج (عينات الآثار)",
+      "hide": "إخفاء النماذج · {count} معروض",
+      "empty": "لا توجد نماذج في هذا النطاق الزمني",
+      "emptyShort": "0 نماذج",
+      "loadFailed": "تعذّر تحميل النماذج",
+      "loadFailedHint": "المخطط غير متأثر. إعادة المحاولة تجلب النماذج فقط.",
+      "retry": "إعادة المحاولة",
+      "cardTitle": "نموذج",
+      "query": "الاستعلام {name}",
+      "returnedBy": "مُسترجَع بواسطة {count} استعلام | مُسترجَع بواسطة {count} استعلامات",
+      "series": "السلسلة",
+      "aboveRange": "أعلى نطاق المخطط؛ يُرسم عند الحافة العلوية",
+      "belowRange": "أسفل نطاق المخطط؛ يُرسم عند الحافة السفلية",
+      "checkingTrace": "جارٍ التحقق من الأثر…",
+      "openTrace": "فتح الأثر",
+      "openTraceHint": "أو انقر على العلامة. زر الرجوع يعيدك إلى هنا.",
+      "traceNotAvailable": "الأثر غير متاح — مستبعد بالمعاينة أو خارج مدة الاحتفاظ",
+      "openTraceUnverified": "فتح الأثر (غير مُتحقق منه)",
+      "unverifiedTimeout": "انتهت مهلة البحث عن الأثر، لذا قد يكون هذا الأثر مفقودًا.",
+      "unverifiedForbidden": "تعذّر تأكيد هذا الأثر — قد لا تملك صلاحية الوصول إلى الآثار.",
+      "unverifiedPartial": "تم البحث في جزء فقط من نافذة الاحتفاظ.",
+      "unverifiedError": "تعذّر التحقق من هذا الأثر.",
+      "noTraceId": "لا يوجد {label} في هذا النموذج، لذا لا يوجد أثر لفتحه.",
+      "markersAria": "علامات النماذج",
+      "markerAria": "النموذج {value} عند {time}"
+    },
+    "showExemplarsLabel": "إظهار النماذج",
+    "showExemplarsHelp": "يرسم عينات الآثار على هذا المخطط لكل من يفتح لوحة المعلومات. لا يزال بإمكان المشاهدين إخفاؤها من رأس اللوحة."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "انسخ تفاصيل التحديث الفاشلة ل {name}",
         "stalePreamble": "فشل تحديث — وأظهر آخر نتيجة ناجحة.",
         "staleClickToCopy": "انقر لنسخ التفاصيل.",
-        "lastRefreshedPrefix": "آخر تحديث في: "
+        "lastRefreshedPrefix": "آخر تحديث في: ",
+        "exemplarsShowHeatmap": "إظهار النماذج (عينات الآثار). يبدّل هذه البطاقة إلى المئينات أثناء التفعيل.",
+        "exemplarsHideHeatmap": "إخفاء النماذج · {count} معروض. يعيد هذه البطاقة إلى الخريطة الحرارية."
       },
       "fn": {
         "subtitle": "اختر كيف يتم تجميع هذا المقياس",

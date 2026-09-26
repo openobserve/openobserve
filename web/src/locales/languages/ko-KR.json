@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "같은 이름의 변수가 이미 존재합니다.",
     "pivotTotal": "총계",
     "pivotOthers": "기타",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "예시(트레이스 샘플) 표시",
+      "hide": "예시 숨기기 · {count}개 표시됨",
+      "empty": "이 시간 범위에 예시가 없습니다",
+      "emptyShort": "예시 0개",
+      "loadFailed": "예시를 불러오지 못했습니다",
+      "loadFailedHint": "차트는 영향을 받지 않습니다. 재시도하면 예시만 다시 가져옵니다.",
+      "retry": "재시도",
+      "cardTitle": "예시",
+      "query": "쿼리 {name}",
+      "returnedBy": "{count}개 쿼리에서 반환됨 | {count}개 쿼리에서 반환됨",
+      "series": "시리즈",
+      "aboveRange": "차트 범위 위에 있음. 위쪽 가장자리에 그려집니다.",
+      "belowRange": "차트 범위 아래에 있음. 아래쪽 가장자리에 그려집니다.",
+      "checkingTrace": "트레이스 확인 중…",
+      "openTrace": "트레이스 열기",
+      "openTraceHint": "또는 마커를 클릭하세요. 뒤로 가면 여기로 돌아옵니다.",
+      "traceNotAvailable": "트레이스를 사용할 수 없음 — 샘플링 제외되었거나 보존 기간이 지났습니다",
+      "openTraceUnverified": "트레이스 열기 (미확인)",
+      "unverifiedTimeout": "트레이스 조회 시간이 초과되어 이 트레이스가 없을 수 있습니다.",
+      "unverifiedForbidden": "이 트레이스를 확인하지 못했습니다 — 트레이스에 대한 액세스 권한이 없을 수 있습니다.",
+      "unverifiedPartial": "보존 기간의 일부만 검색되었습니다.",
+      "unverifiedError": "이 트레이스를 확인하지 못했습니다.",
+      "noTraceId": "이 예시에 {label}이(가) 없어서 열 트레이스가 없습니다.",
+      "markersAria": "예시 마커",
+      "markerAria": "{time}의 예시 {value}"
+    },
+    "showExemplarsLabel": "예시 표시",
+    "showExemplarsHelp": "대시보드를 여는 모든 사람을 위해 이 차트에 트레이스 샘플을 그립니다. 뷰어는 패널 헤더에서 여전히 숨길 수 있습니다."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "{name}의 새로고침 실패 세부 정보 복사",
         "stalePreamble": "새로고침 실패 — 마지막 성공 결과를 표시합니다.",
         "staleClickToCopy": "세부 정보를 복사하려면 클릭하세요.",
-        "lastRefreshedPrefix": "마지막 새로고침 시간: "
+        "lastRefreshedPrefix": "마지막 새로고침 시간: ",
+        "exemplarsShowHeatmap": "예시(트레이스 샘플) 표시. 켜져 있는 동안 이 카드를 백분위수로 전환합니다.",
+        "exemplarsHideHeatmap": "예시 숨기기 · {count}개 표시됨. 이 카드를 히트맵으로 되돌립니다."
       },
       "fn": {
         "subtitle": "이 메트릭이 집계되는 방식을 선택하세요",
