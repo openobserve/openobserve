@@ -16,7 +16,6 @@
 use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
-    io::Error,
 };
 
 use axum::{
@@ -61,7 +60,9 @@ use super::{
 };
 use crate::{
     common::meta::{
-        http::HttpResponse as MetaHttpResponse, otlp::otlp_error_response, stream::SchemaRecords,
+        http::HttpResponse as MetaHttpResponse,
+        otlp::{otlp_error_response, otlp_rejection_response},
+        stream::SchemaRecords,
     },
     ingestion::{
         TriggerAlertData, check_ingestion_allowed,
@@ -136,49 +137,41 @@ impl MetricRecords<'_> {
     }
 }
 
-pub async fn otlp_proto(
-    org_id: &str,
-    body: Bytes,
-    user: IngestUser,
-) -> Result<HttpResponse, std::io::Error> {
+pub async fn otlp_proto(org_id: &str, body: Bytes, user: IngestUser) -> HttpResponse {
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid proto: org_id: {org_id}, error: {e}");
-            return Ok(otlp_error_response(
+            return otlp_error_response(
                 OtlpRequestType::HttpProtobuf,
                 http::StatusCode::BAD_REQUEST,
                 3, // INVALID_ARGUMENT
                 format!("Invalid proto: {e}"),
-            ));
+            );
         }
     };
     match handle_otlp_request(org_id, request, OtlpRequestType::HttpProtobuf, user).await {
-        Ok(v) => Ok(v),
+        Ok(v) => v,
         Err(e) => {
             log::error!(
                 "[METRICS:OTLP] Error while handling grpc metrics request: org_id: {org_id}, error: {e}"
             );
-            // Check if this is a schema validation error (columns limit)
-            let error_msg = e.to_string();
-            if error_msg.contains("ZO_COLS_PER_RECORD_LIMIT") {
-                return Ok(MetaHttpResponse::bad_request(error_msg));
-            }
-            Err(Error::other(e))
+            write_failure_response(OtlpRequestType::HttpProtobuf, &e)
         }
     }
 }
 
-pub async fn otlp_json(
-    org_id: &str,
-    body: Bytes,
-    user: IngestUser,
-) -> Result<HttpResponse, std::io::Error> {
+pub async fn otlp_json(org_id: &str, body: Bytes, user: IngestUser) -> HttpResponse {
     let mut body_json = match serde_json::from_slice::<json::Value>(body.as_ref()) {
         Ok(v) => v,
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid json: {e}");
-            return Ok(MetaHttpResponse::bad_request(format!("Invalid json: {e}")));
+            return otlp_error_response(
+                OtlpRequestType::HttpJson,
+                http::StatusCode::BAD_REQUEST,
+                3, // INVALID_ARGUMENT
+                format!("Invalid json: {e}"),
+            );
         }
     };
     super::otlp_json_compat::normalize(&mut body_json);
@@ -186,19 +179,19 @@ pub async fn otlp_json(
         Ok(req) => req,
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid json: {e}");
-            return Ok(MetaHttpResponse::bad_request(format!("Invalid json: {e}")));
+            return otlp_error_response(
+                OtlpRequestType::HttpJson,
+                http::StatusCode::BAD_REQUEST,
+                3, // INVALID_ARGUMENT
+                format!("Invalid json: {e}"),
+            );
         }
     };
     match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, user).await {
-        Ok(v) => Ok(v),
+        Ok(v) => v,
         Err(e) => {
             log::error!("[METRICS:OTLP] Error while handling http trace request: {e}");
-            // Check if this is a schema validation error (columns limit)
-            let error_msg = e.to_string();
-            if error_msg.contains("ZO_COLS_PER_RECORD_LIMIT") {
-                return Ok(MetaHttpResponse::bad_request(error_msg));
-            }
-            Err(Error::other(e))
+            write_failure_response(OtlpRequestType::HttpJson, &e)
         }
     }
 }
@@ -212,19 +205,13 @@ pub async fn handle_otlp_request(
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
         // we do not want to log trial period expired errors
-        if matches!(e, infra::errors::Error::TrialPeriodExpired) {
-            return Ok(MetaHttpResponse::too_many_requests(e));
+        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            http::StatusCode::TOO_MANY_REQUESTS
         } else {
             log::error!("[METRICS:OTLP] ingestion error: {e}");
-            return Ok((
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                Json(MetaHttpResponse::error(
-                    http::StatusCode::SERVICE_UNAVAILABLE,
-                    e,
-                )),
-            )
-                .into_response());
-        }
+            http::StatusCode::SERVICE_UNAVAILABLE
+        };
+        return Ok(otlp_rejection_response(req_type, status, e.to_string()));
     }
 
     let start = std::time::Instant::now();
@@ -663,6 +650,15 @@ pub async fn handle_otlp_request(
     ingest::spawn_triggers(stream_trigger_map);
 
     format_response(partial_success, req_type)
+}
+
+/// Only the write path yields infra errors, so any other error means the request itself was bad.
+fn write_failure_response(req_type: OtlpRequestType, e: &anyhow::Error) -> HttpResponse {
+    let status = e.downcast_ref::<infra::errors::Error>().map_or(
+        http::StatusCode::BAD_REQUEST,
+        crate::ingestion::write_error_status,
+    );
+    otlp_rejection_response(req_type, status, e.to_string())
 }
 
 /// Flattens a data-point record exactly as a full rebuild would, without always paying for one.
@@ -3925,5 +3921,88 @@ mod tests {
             assert_eq!(metadata.help, "help text");
             assert_eq!(metadata.unit, "seconds");
         }
+    }
+
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_otlp_proto_columns_limit_is_rpc_status() {
+        use opentelemetry_proto::tonic::common::v1::AnyValue;
+
+        use crate::common::meta::{http::CONTENT_TYPE_PROTO, otlp::GoogleRpcStatus};
+
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let point = NumberDataPoint {
+            attributes: (0..=limit)
+                .map(|i| KeyValue {
+                    key: format!("attr_{i}"),
+                    value: Some(AnyValue {
+                        value: Some(AnyValueKind::IntValue(i as i64)),
+                    }),
+                    ..Default::default()
+                })
+                .collect(),
+            time_unix_nano: Utc::now().timestamp_nanos_opt().unwrap() as u64,
+            value: Some(number_data_point::Value::AsDouble(1.0)),
+            ..Default::default()
+        };
+        let request = ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                scope_metrics: vec![ScopeMetrics {
+                    metrics: vec![Metric {
+                        name: "test_columns_limit".to_string(),
+                        data: Some(Data::Gauge(Gauge {
+                            data_points: vec![point],
+                        })),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = otlp_proto(
+            "test_org_id",
+            request.encode_to_vec().into(),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await;
+        let status_code = resp.status();
+        let headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(status_code, http::StatusCode::BAD_REQUEST);
+        assert_eq!(headers[http::header::CONTENT_TYPE], CONTENT_TYPE_PROTO);
+        let status = GoogleRpcStatus::decode(body).unwrap();
+        assert_eq!(status.code, 3);
+        assert!(
+            status
+                .message
+                .contains(&format!("only {limit} columns accept"))
+        );
+        assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
+    }
+
+    #[test]
+    fn test_write_failure_keeps_write_status_mapping() {
+        let status =
+            |e: anyhow::Error| write_failure_response(OtlpRequestType::HttpProtobuf, &e).status();
+        assert_eq!(
+            status(infra::errors::Error::ResourceError("memtable is full".to_string()).into()),
+            http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            status(infra::errors::Error::ColumnsLimitExceeded("too many".to_string()).into()),
+            http::StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(infra::errors::Error::WatcherExists("wal".to_string()).into()),
+            http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(
+            status(anyhow::anyhow!("invalid label")),
+            http::StatusCode::BAD_REQUEST
+        );
     }
 }
