@@ -17096,17 +17096,17 @@
       "alertMe": "Avvisami",
       "columnHints": {
         "qps": "Chiamate al secondo — le chiamate di questa finestra divise per la sua durata, così una vista di 15 minuti e una di 4 ore restano confrontabili.",
-        "p50": "La metà di tutte le chiamate è terminata più velocemente di questo. Conta solo le chiamate completate — una query ancora in esecuzione, o una che non è mai tornata, non viene misurata qui.",
-        "p95": "La coda lenta — 1 chiamata su 20 ha richiesto almeno questo tempo. Conta solo le chiamate completate — una query ancora in esecuzione, o una che non è mai tornata, non viene misurata qui.",
-        "p99": "Il peggiore 1% delle chiamate ha richiesto almeno questo tempo. Conta solo le chiamate completate — una query ancora in esecuzione, o una che non è mai tornata, non viene misurata qui.",
-        "load": "Tempo totale che le tue applicazioni hanno trascorso in attesa su questo database. Misurato dal lato client, quindi riflette quanto traffico ha servito questo database — non quanto è caricato il server.",
+        "p50": "Metà di tutte le chiamate è terminata più velocemente di così. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
+        "p95": "La coda lenta — 1 chiamata su 20 ha impiegato almeno questo tempo. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
+        "p99": "Il peggior 1% delle chiamate ha impiegato almeno questo tempo. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
+        "load": "Tempo totale che le tue app hanno impiegato in chiamate a questo database, misurato dalle tracce della tua applicazione. Mostra quanto traffico questo database ha servito per le tue app.",
         "attention": "Quanto questa istanza è vicina a un limite pubblicato dal suo motore — oggi, connessioni rispetto a max_connections. Il peggior rapporto, non un punteggio misto. Ordinato dal più alto al più basso, con le istanze la cui salute non può essere letta in cima, perché una che non puoi vedere non è una che sai essere sana. Misurato sul server del database, quindi non è confrontabile con il tempo database accanto."
       },
       "failedChip": "{count} non riuscite",
       "columnSubLabels": {
-        "attention": "server",
-        "load": "client",
-        "calls": "client"
+        "attention": "dal database",
+        "load": "dalle tue app",
+        "calls": "dalle tue app"
       },
       "attention": {
         "connections": "connessioni",
@@ -17168,14 +17168,14 @@
         "failed": "Fallite"
       },
       "columnHints": {
-        "calls": "Quante volte è stata eseguita questa query. Il conteggio del database stesso dove lo riporta — che copre ogni client, non solo le parti del tuo sistema che inviano tracce. Le righe contrassegnate come osservate dal client vengono invece conteggiate dalle tracce, perché il database non le ha riportate.",
-        "p50": "Metà di tutte le chiamate sono terminate più velocemente di questo. Conta solo le chiamate terminate — una query ancora in esecuzione, o che non è mai tornata, non viene misurata qui.",
-        "p95": "La coda lenta — 1 chiamata su 20 ha impiegato almeno questo tempo. Conta solo le chiamate terminate — una query ancora in esecuzione, o che non è mai tornata, non viene misurata qui.",
-        "p99": "Il peggiore 1% delle chiamate ha impiegato almeno questo tempo. Conta solo le chiamate terminate — una query ancora in esecuzione, o che non è mai tornata, non viene misurata qui.",
+        "calls": "Quante volte è stata eseguita questa query, come conteggiato dal tuo database — ogni app che si connette è inclusa. Dove il tuo database non ha un conteggio per una query, l'icona delle tracce ne indica una misurata dalle tracce della tua applicazione.",
+        "p50": "Metà di tutte le chiamate è terminata più velocemente di così. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
+        "p95": "La coda lenta — 1 chiamata su 20 ha impiegato almeno questo tempo. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
+        "p99": "Il peggior 1% delle chiamate ha impiegato almeno questo tempo. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
         "max": "La singola chiamata più lenta in questa finestra — una chiamata reale, non una media.",
         "errors": "Quante di queste chiamate sono tornate con un errore.",
         "perTrace": "Quante volte viene eseguita all'interno di una singola richiesta. Un numero alto di solito significa un ciclo.",
-        "load": "Tempo totale trascorso da questa query nel database. La cifra del database stesso dove la riporta: tempo di esecuzione su Postgres, ma tempo di ATTESA su MySQL e MariaDB — ogni riga indica quale. Le righe contrassegnate come osservate dal client sono misurate dalle tracce, quindi includono il round-trip di rete."
+        "load": "Tempo totale che questa query ha trascorso nel database, come riportato dal tuo database: tempo di esecuzione su Postgres, tempo di attesa su MySQL e MariaDB — ogni riga indica quale. Le righe con l'icona delle tracce sono misurate dalle tracce della tua applicazione, quindi includono anche il viaggio verso il database e ritorno."
       },
       "errorsNone": "Nessuno",
       "errorsAll": "Tutti",
@@ -17466,8 +17466,8 @@
       },
       "serverMetrics": {
         "title": "Ciò che il database stesso ha registrato",
-        "subtitle": "Lato server — tutti i client",
-        "clientSubtitle": "Osservato dal client — solo chiamanti strumentati, solo chiamate concluse. Una query ancora in esecuzione, o che si è bloccata, non è in questi numeri.",
+        "subtitle": "Dal tuo database — ogni app che si connette",
+        "clientSubtitle": "Le cifre contrassegnate sono misurate dalle tracce della tua applicazione — le chiamate che le tue app hanno completato in questa finestra",
         "instance": "Riportato da {instance}",
         "instanceWide": "Tutti i database su questa istanza",
         "calls": "Esecuzioni",
@@ -17516,6 +17516,11 @@
         "serverReported": "riportato dai tuoi database"
       }
     },
+    "appSource": {
+      "marker": "Misurato dalle tracce della tua applicazione",
+      "markerHint": "Misurato dalle tracce della tua applicazione, aggiungendo la vista delle tue app a ciò che riporta il tuo database.",
+      "legend": "Dalle tracce della tua app"
+    },
     "page": {
       "tabs": {
         "overview": "Panoramica",
@@ -17523,7 +17528,7 @@
         "metricsHint": "Carico del database per evento di attesa e ogni metrica raccolta dai tuoi receiver del database.",
         "queries": "Query principali",
         "samples": "Chiamate più lente",
-        "samplesHintClient": "Chiamate concluse osservate dai tuoi servizi strumentati in questa finestra — i chiamanti senza tracciamento non sono contati, quindi questo è un minimo, non il totale. La tabella mostra le più lente.",
+        "samplesHintClient": "Chiamate misurate dalle tracce della tua applicazione in questa finestra, aggiungendo la vista delle tue app a ciò che riporta il tuo database. La tabella mostra le più lente.",
         "samplesHintServer": "Istruzioni che i tuoi database hanno riportato completate in questa finestra, contate all'interno del database. La tabella mostra le più lente.",
         "samplesHintUnknown": "Le chiamate di database individuali più lente in questa finestra.",
         "deadlocks": "Deadlock",
@@ -17679,7 +17684,7 @@
         "status": "Stato"
       },
       "columnHints": {
-        "duration": "Quanto è durata questa singola chiamata, misurata dal chiamante. Conta solo le chiamate completate — una query ancora in esecuzione, o che non è mai tornata, non viene misurata qui."
+        "duration": "Quanto è durata questa singola chiamata, come cronometrata dalla tua applicazione dall'inizio alla fine."
       },
       "failed": "Fallita",
       "failedWithCode": "Fallita · {code}",
