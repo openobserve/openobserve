@@ -122,8 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ row.node.display_name }}
             </OButton>
             <OTooltip
-              v-if="innerGrants(row.node).length"
-              :content="insideHint(innerGrants(row.node))"
+              v-if="insideOf(row.node).count"
+              :content="insideHint(insideOf(row.node))"
               side="right"
             >
               <OBadge
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 tabindex="0"
                 :data-test="`edit-role-module-pane-inside-${row.node.name}`"
               >
-                {{ t("iam.editRole.grantedInsideCount", { count: innerGrants(row.node).length }) }}
+                {{ t("iam.editRole.grantedInsideCount", { count: insideOf(row.node).count }) }}
               </OBadge>
             </OTooltip>
           </div>
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- A module with nothing to list still says what the scope above it covers. -->
     <div
-      v-if="!entities.length"
+      v-if="!loading && !entities.length"
       class="border-border-default text-text-secondary flex shrink-0 items-center gap-1 border-t px-3 py-2 text-xs"
       data-test="edit-role-module-pane-no-resources"
     >
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>{{ t("iam.editRole.moduleHasNoResourcesHint") }}</span>
     </div>
     <div
-      v-else-if="!filteredEntities.length"
+      v-else-if="entities.length && !filteredEntities.length"
       class="border-border-default text-text-secondary flex shrink-0 items-center gap-2 border-t px-3 py-2 text-xs"
       data-test="edit-role-module-pane-no-match"
     >
@@ -230,8 +230,8 @@ const props = defineProps<{
   isGranted: (node: any, action: string) => boolean;
   /** False for an org-wide module, whose only row is its own grant, so there is nothing to search. */
   listsResources: boolean;
-  /** Names granted one level below a drill-in row, which its own checkboxes cannot show. */
-  innerGrants: (node: any) => string[];
+  /** What is granted one level below a drill-in row, which its own checkboxes cannot show. */
+  innerGrants: (node: any, nameLimit: number) => { count: number; names: string[] };
   /** A saved grant the user has staged for removal: still held, but no longer ticked. */
   isPendingRemoval: (node: any, action: string) => boolean;
   added?: number;
@@ -355,8 +355,7 @@ const setFilter = (nextQuery: string, nextScope: string) => {
 const filteredEntities = computed(() => {
   const term = query.value.trim().toLowerCase();
   return orderedEntities.value.filter((row) => {
-    if (scope.value === "granted" && !hasEffectiveGrant(row) && !props.innerGrants(row).length)
-      return false;
+    if (scope.value === "granted" && !hasEffectiveGrant(row) && !insideOf(row).count) return false;
     return (
       !term ||
       String(row.display_name ?? row.name)
@@ -415,13 +414,16 @@ const paginationMode = computed(() =>
 
 const clearFilter = () => setFilter("", "all");
 
-// A hover bubble fits about ten names; past that the count carries the rest.
-const insideHint = (names: string[]) =>
-  names.length > INSIDE_HINT_LIMIT
-    ? t("iam.editRole.grantedInsideMore", {
-        names: names.slice(0, INSIDE_HINT_LIMIT).join(", "),
-        more: names.length - INSIDE_HINT_LIMIT,
-      })
+// Resolved once per change for the whole list; the badge, its tooltip and the Selected filter all read this.
+const insideByRow = computed(
+  () => new Map(props.entities.map((row) => [row.name, props.innerGrants(row, INSIDE_HINT_LIMIT)])),
+);
+
+const insideOf = (row: any) => insideByRow.value.get(row.name) ?? { count: 0, names: [] };
+
+const insideHint = ({ count, names }: { count: number; names: string[] }) =>
+  count > names.length
+    ? t("iam.editRole.grantedInsideMore", { names: names.join(", "), more: count - names.length })
     : t("iam.editRole.grantedInside", { names: names.join(", ") });
 
 const grantedRowCount = computed(() => props.entities.filter(hasEffectiveGrant).length);

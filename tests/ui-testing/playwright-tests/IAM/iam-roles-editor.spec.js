@@ -245,11 +245,8 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         await expect(pm.rolesPage.presetCard('Kubernetes Viewer')).toBeVisible();
     });
 
-    // FAILS TODAY, by design — this reproduces o2-enterprise#2697: opening a role
-    // holding 2 grants shows "0 Permissions" before settling on "2 Permissions".
-    // Observed sequence on pentest: ["0 Permissions", "2 Permissions"].
-    // Un-fixme when the loading state suppresses the count.
-    test.fixme('U-14 · a populated role never renders a real 0 before its grants load [o2-enterprise#2697]', async ({ page }) => {
+    // Guards o2-enterprise#2697: a populated role once read "0 Permissions" before its grants loaded.
+    test('U-14 · a populated role never renders a real 0 before its grants load [o2-enterprise#2697]', async ({ page }) => {
         const stored = (await req(page, 'GET', `/roles/${R_SMALL}/permissions`)).body || [];
         expect(stored.length).toBeGreaterThan(0);
 

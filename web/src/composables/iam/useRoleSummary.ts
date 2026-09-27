@@ -129,17 +129,36 @@ export const useRoleSummary = (deps: SummaryDeps) => {
       )
       .filter(([, grants]) => grants.length);
 
-  // A drill-in row cannot show grants one level down, so it names them: `traces:_evaluator:AllowAll` -> Traces row lists "_evaluator".
-  const innerGrantNames = (node: any): string[] => {
-    if (!node?.has_entities || !node.childName) return [];
-    const prefix = node.type === "Type" ? "" : `${node.name}/`;
-    return heldGrants(node.childName)
-      .map(([entity]) => entity)
-      .filter((entity) => !isWideEntity(entity) && entity.startsWith(prefix))
-      .map((entity) => {
-        const label = String(entityLabel(node.childName, entity));
-        return label === entity ? entity.slice(prefix.length) : label;
-      });
+  // Held item grants per resource, built once per change so a row never rescans the whole grant set.
+  const heldItemsByResource = computed(() => {
+    const byResource = new Map<string, string[]>();
+    grantsByResource.value.forEach((byEntity, resource) => {
+      const held = [...byEntity.entries()]
+        .filter(
+          ([entity, grants]) => !isWideEntity(entity) && grants.some((g) => g.state !== "removed"),
+        )
+        .map(([entity]) => entity);
+      if (held.length) byResource.set(resource, held);
+    });
+    return byResource;
+  });
+
+  // A drill-in row cannot show grants one level down, so it reports them; only the few names a tooltip shows are labelled.
+  const innerGrants = (node: any, nameLimit: number): { count: number; names: string[] } => {
+    if (!node?.has_entities || !node.childName) return { count: 0, names: [] };
+    const prefix = `${node.name}/`;
+    const loaded = new Map<string, string>(
+      (node.entities ?? []).map((item: any) => [item.name, item.display_name ?? item.name]),
+    );
+    // Dashboard, alert and report ids carry their folder as `folderId/id`; synthetics and workflow ids are plain, so only the folder's loaded items place them.
+    const inside = (heldItemsByResource.value.get(node.childName) ?? []).filter(
+      (entity) => node.type === "Type" || entity.startsWith(prefix) || loaded.has(entity),
+    );
+    const names = inside.slice(0, nameLimit).map((entity) => {
+      const label = loaded.get(entity) ?? String(entityLabel(node.childName, entity));
+      return label === entity && entity.startsWith(prefix) ? entity.slice(prefix.length) : label;
+    });
+    return { count: inside.length, names };
   };
 
   const actionsOf = (held: ReturnType<typeof heldGrants>) =>
@@ -238,7 +257,7 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     summaryActions,
     knownTotal,
     heldGrants,
-    innerGrantNames,
+    innerGrants,
     actionsOf,
     specificReach,
     moduleDescription,

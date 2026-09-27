@@ -1897,6 +1897,54 @@ describe("EditRole - pane filters start fresh at every level", () => {
   });
 });
 
+describe("EditRole - grants inside a drill-in row stay live", () => {
+  useNavigationFixture();
+
+  // The pane resolves inside-grants once per change; a tick or an undo must reach the badge without a reload.
+  it("updates the Metrics badge as a stream inside it is granted and ungranted", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    const pane = () => wrapper.findComponent({ name: "ModulePane" });
+    const metrics = () => pane().vm.entities.find((row) => row.name === "metrics");
+    expect(pane().vm.insideOf(metrics()).count).toBe(0);
+
+    wrapper.vm.updatePermissionMappings("metrics:cpu:AllowGet");
+    await flushPromises();
+    expect(pane().vm.insideOf(metrics()).count).toBe(1);
+
+    wrapper.vm.updatePermissionMappings("metrics:cpu:AllowGet");
+    await flushPromises();
+    expect(pane().vm.insideOf(metrics()).count).toBe(0);
+  });
+});
+
+describe("EditRole - review changes and the count", () => {
+  // JSON edits stage only when the view switches back, which would overwrite an undo made in JSON view.
+  it("offers Review Changes in the table view only", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.updatePermissionMappings(`logs:${ALL}:AllowGet`);
+    await flushPromises();
+    expect(wrapper.find('[data-test="edit-role-review-changes-btn"]').exists()).toBe(true);
+
+    wrapper.vm.permissionsUiType = "json";
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="edit-role-review-changes-btn"]').exists()).toBe(false);
+  });
+
+  // A populated role must never read "0 Permissions" before its grants load (o2-enterprise#2697).
+  it("shows no count while the role is loading", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.isFetchingInitialRoles = true;
+    await flushPromises();
+
+    const count = wrapper.find('[data-test="edit-role-permissions-count"]');
+    expect(count.exists()).toBe(true);
+    expect(count.text()).toBe("—");
+  });
+});
+
 describe("EditRole - pane reads the grant store", () => {
   const openMetrics = async (wrapper) => {
     wrapper.vm.activeModule = "stream";
@@ -2483,9 +2531,18 @@ describe("EditRole - navigation [characterization]", () => {
   it("reports loading while the open folder is the one in flight", async () => {
     const vm = await mountEditRoleVm();
     await drillInto(vm, "dfolder", "default");
-    vm.loadingFor = "default";
+    vm.loadingFor = "dfolder/default";
     await flushPromises();
     expect(vm.moduleLoading).toBe(true);
+  });
+
+  // Every folder module has a "default" folder; another module's load of it must not spin this one.
+  it("ignores a same-named folder loading in another module", async () => {
+    const vm = await mountEditRoleVm();
+    await drillInto(vm, "dfolder", "default");
+    vm.loadingFor = "afolder/default";
+    await flushPromises();
+    expect(vm.moduleLoading).toBe(false);
   });
 
   // A slower module must not clear the spinner of the one now on screen.

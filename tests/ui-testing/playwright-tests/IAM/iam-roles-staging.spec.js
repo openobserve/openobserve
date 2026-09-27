@@ -102,12 +102,8 @@ test.describe('IAM · Edit Role · staged changes', () => {
         await expect(pm.rolesPage.unsavedCount).toContainText('1');
     });
 
-    // SKIPPED pending triage — see S-12, same open question. After the last staged
-    // change is undone, `edit-role-unsaved-empty` never becomes visible. The drawer
-    // most likely closes once the queue empties rather than rendering an empty state,
-    // which would make the assertion wrong rather than the UI. Nothing specifies which
-    // it should be, so this pins a behaviour that was never decided.
-    test.fixme('S-05 · undoing every change empties the drawer', async ({ page }) => {
+    // The drawer closes once nothing is left to review (useRoleSummary), so there is no empty state to wait for.
+    test('S-05 · undoing every change closes the drawer and drops Review Changes', async ({ page }) => {
         const name = await openFresh(page, 'undoall');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -118,7 +114,8 @@ test.describe('IAM · Edit Role · staged changes', () => {
             await pm.rolesPage.drawerUndoButtons().first().click();
             await page.waitForTimeout(300);
         }
-        await expect(pm.rolesPage.drawerEmpty).toBeVisible({ timeout: 10000 });
+        await expect(pm.rolesPage.drawer).toBeHidden({ timeout: 10000 });
+        await expect(pm.rolesPage.reviewChangesButton).toBeHidden();
 
         // And nothing may reach the API afterwards.
         const payload = await pm.rolesPage.saveAndCapture({ expectRequest: false });
@@ -220,15 +217,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
         await page.unroute('**/api/*/roles/*');
     });
 
-    // SKIPPED pending triage. On a role with nothing staged, openDrawer() times out
-    // waiting for `edit-role-review-changes-btn` — the affordance appears not to render
-    // at all when there is nothing to review. That is a defensible design ("review
-    // changes" with no changes is meaningless), which would make this test's premise
-    // wrong, not the UI. Needs a product call on whether a clean role should offer the
-    // drawer with an empty state, or hide it; then keep or delete this test.
-    test.fixme('S-12 · the review-changes affordance reports no unsaved changes on a clean role', async ({ page }) => {
+    // A clean role has nothing to review, so the affordance is not offered at all.
+    test('S-12 · a clean role offers no Review Changes', async ({ page }) => {
         await openFresh(page, 'clean');
-        await pm.rolesPage.openDrawer();
-        await expect(pm.rolesPage.drawerEmpty).toBeVisible({ timeout: 10000 });
+        await expect(pm.rolesPage.reviewChangesButton).toBeHidden();
     });
 });

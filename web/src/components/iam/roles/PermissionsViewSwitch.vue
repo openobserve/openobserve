@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex shrink-0 items-center gap-2">
     <span data-test="edit-role-permissions-count" class="text-sm font-bold">
-      {{ t("iam.editRole.permissionCountSingular", { count }) }}
+      <!-- A populated role must never read "0 Permissions" while its grants are still loading. -->
+      {{ loading ? raw("—") : t("iam.editRole.permissionCountSingular", { count }) }}
     </span>
     <OToggleGroup
       data-test="edit-role-permissions-ui-type-toggle"
@@ -35,11 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
-defineProps<{ count: number; modelValue: string }>();
+defineProps<{ count: number; modelValue: string; loading?: boolean }>();
 
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 

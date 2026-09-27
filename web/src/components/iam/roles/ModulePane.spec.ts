@@ -61,7 +61,7 @@ async function mountPane(
       isGranted,
       isPendingRemoval,
       listsResources: true,
-      innerGrants: () => [],
+      innerGrants: () => ({ count: 0, names: [] }),
       ...extra,
     },
   });
@@ -286,7 +286,7 @@ describe("ModulePane - unsaved counts", () => {
         isGranted,
         isPendingRemoval,
         listsResources: true,
-        innerGrants: () => [],
+        innerGrants: () => ({ count: 0, names: [] }),
         added: 2,
         removed: 1,
       },
@@ -494,7 +494,8 @@ describe("ModulePane - grants one level down", () => {
   // A drill-in row's own boxes cannot show a stream granted inside it, so the row flags it inline.
   it("flags a drill-in row with a count of what is granted inside it, names on hover", async () => {
     const wrapper = await mountPane([], [folder("traces"), folder("logs")], [raw("Streams")], {
-      innerGrants: (node: any) => (node.name === "traces" ? ["_evaluator"] : []),
+      innerGrants: (node: any) =>
+        node.name === "traces" ? { count: 1, names: ["_evaluator"] } : { count: 0, names: [] },
     });
 
     expect(wrapper.find('[data-test="edit-role-module-pane-inside-traces"]').text()).toBe(
@@ -506,26 +507,22 @@ describe("ModulePane - grants one level down", () => {
     expect(wrapper.find('[data-test="edit-role-module-pane-inside-logs"]').exists()).toBe(false);
   });
 
-  it("names ten on hover and counts the rest", async () => {
-    const names = Array.from({ length: 12 }, (_, i) => `s${i}`);
+  it("names what it was given on hover and counts the rest", async () => {
+    const names = Array.from({ length: 10 }, (_, i) => `s${i}`);
     const wrapper = await mountPane([], [folder("traces")], [raw("Streams")], {
-      innerGrants: () => names,
+      innerGrants: () => ({ count: 12, names }),
     });
 
     expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe(
-      String(
-        i18n.global.t("iam.editRole.grantedInsideMore", {
-          names: names.slice(0, 10).join(", "),
-          more: 2,
-        }),
-      ),
+      String(i18n.global.t("iam.editRole.grantedInsideMore", { names: names.join(", "), more: 2 })),
     );
   });
 
   // Otherwise a role granted only on a stream inside Traces would have no path to it under Selected.
   it("keeps a row under Selected when only something inside it is granted", async () => {
     const wrapper = await mountPane([], [folder("traces"), folder("logs")], [raw("Streams")], {
-      innerGrants: (node: any) => (node.name === "traces" ? ["_evaluator"] : []),
+      innerGrants: (node: any) =>
+        node.name === "traces" ? { count: 1, names: ["_evaluator"] } : { count: 0, names: [] },
     });
 
     await wrapper.find('[data-test="edit-role-module-pane-filter-granted"]').trigger("click");
@@ -533,5 +530,21 @@ describe("ModulePane - grants one level down", () => {
 
     expect(wrapper.find('[data-test="edit-role-module-pane-open-traces"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="edit-role-module-pane-open-logs"]').exists()).toBe(false);
+  });
+});
+
+describe("ModulePane - empty states wait for the load", () => {
+  // Rows are empty until the fetch lands, so an empty note shown then would be false.
+  it("shows neither empty note while the list is loading", async () => {
+    const wrapper = await mountPane([], [], [raw("Metrics")], { loading: true });
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-resources"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-match"]').exists()).toBe(false);
+  });
+
+  it("says the module is empty once loading ends with no rows", async () => {
+    const wrapper = await mountPane([], [], [raw("Metrics")], { loading: false });
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-resources"]').exists()).toBe(true);
   });
 });

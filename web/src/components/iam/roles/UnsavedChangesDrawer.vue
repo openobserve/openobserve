@@ -22,18 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     :title="t('iam.editRole.summaryPendingTitle')"
     :sub-title="t('iam.editRole.summaryPendingHint')"
-    :secondary-button-label="changes.length ? t('iam.editRole.undoAllChanges') : undefined"
+    :secondary-button-label="t('iam.editRole.undoAllChanges')"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('undo', allKeys)"
   >
-    <OEmptyState
-      v-if="!changes.length"
-      size="block"
-      preset="no-data"
-      :title="t('iam.editRole.noUnsavedChanges')"
-      data-test="edit-role-unsaved-empty"
-    />
-    <ul v-else class="divide-border-default flex flex-col divide-y">
+    <ul class="divide-border-default flex flex-col divide-y">
       <li
         v-for="change in changes"
         :key="change.id"
@@ -86,7 +79,6 @@ import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export type PendingChange = {

@@ -342,14 +342,14 @@ describe("useRoleSummary - grants inside a drill-in row", () => {
     const s = setup();
     s.seed({ saved: [`traces:${ALL}:AllowList`, "traces:_evaluator:AllowAll"] });
 
-    expect(s.innerGrantNames(traces)).toEqual(["_evaluator"]);
+    expect(s.innerGrants(traces, 10)).toEqual({ count: 1, names: ["_evaluator"] });
   });
 
   it("names only the dashboards inside this folder, without the folder prefix", () => {
     const s = setup();
     s.seed({ saved: ["dashboard:f1/d1:AllowGet", "dashboard:f2/d9:AllowGet"] });
 
-    expect(s.innerGrantNames(folder)).toEqual(["d1"]);
+    expect(s.innerGrants(folder, 10)).toEqual({ count: 1, names: ["d1"] });
   });
 
   it("uses a loaded dashboard's title over its id", () => {
@@ -359,7 +359,7 @@ describe("useRoleSummary - grants inside a drill-in row", () => {
     };
     s.seed({ saved: ["dashboard:f1/d1:AllowGet"] });
 
-    expect(s.innerGrantNames(folder)).toEqual(["Latency"]);
+    expect(s.innerGrants(folder, 10)).toEqual({ count: 1, names: ["Latency"] });
   });
 
   // An unticked grant is leaving, so it must stop being advertised on the row above it.
@@ -367,13 +367,40 @@ describe("useRoleSummary - grants inside a drill-in row", () => {
     const s = setup();
     s.seed({ saved: ["traces:_evaluator:AllowAll"], removed: ["traces:_evaluator:AllowAll"] });
 
-    expect(s.innerGrantNames(traces)).toEqual([]);
+    expect(s.innerGrants(traces, 10)).toEqual({ count: 0, names: [] });
   });
 
   it("names nothing for a row that cannot be opened", () => {
     const s = setup();
     s.seed({ saved: ["traces:_evaluator:AllowAll"] });
 
-    expect(s.innerGrantNames({ name: "traces", has_entities: false })).toEqual([]);
+    expect(s.innerGrants({ name: "traces", has_entities: false }, 10)).toEqual({
+      count: 0,
+      names: [],
+    });
+  });
+
+  // Synthetics and workflow ids carry no folder prefix, so the folder's loaded items place them.
+  it("places a plain-id monitor in the folder whose loaded items contain it", () => {
+    const s = setup();
+    const synthFolder = {
+      name: "f1",
+      type: "Resource",
+      has_entities: true,
+      childName: "synthetics",
+      entities: [{ name: "m1", display_name: "Checkout" }],
+    };
+    s.resourceMapper.value.synthetic_folder = { entities: [synthFolder] };
+    s.seed({ saved: ["synthetics:m1:AllowGet", "synthetics:m9:AllowGet"] });
+
+    expect(s.innerGrants(synthFolder, 10)).toEqual({ count: 1, names: ["Checkout"] });
+  });
+
+  // The badge needs the full count; only the few names a tooltip shows are labelled.
+  it("counts every grant inside but names only up to the limit", () => {
+    const s = setup();
+    s.seed({ saved: ["traces:a:AllowGet", "traces:b:AllowGet", "traces:c:AllowGet"] });
+
+    expect(s.innerGrants(traces, 2)).toEqual({ count: 3, names: ["a", "b"] });
   });
 });

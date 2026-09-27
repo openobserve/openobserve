@@ -2188,7 +2188,6 @@
       "summaryChangeRemoved": "Removed",
       "reviewChanges": "Review Changes",
       "undoAllChanges": "Undo All",
-      "noUnsavedChanges": "No Unsaved Changes",
       "summaryReachAll": "All, including new ones",
       "summaryReachEveryStream": "Every stream, including new ones",
       "summaryReachAllOf": "All {module}, including new ones",

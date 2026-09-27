@@ -27,7 +27,7 @@ type NavigationDeps = {
   /** The module or folder whose rows are in flight, so only the newest load clears the spinner. */
   loadingFor: Ref<string>;
   resourceMapper: Ref<{ [key: string]: Resource }>;
-  /** The full list per stream type; a stream type's own `entities` is filter-shaped. */
+  /** The full list per stream type, set once its streams load. */
   heavyResourceEntities: Ref<{ [key: string]: Entity[] }>;
   moduleOf: (moduleKey: string) => RoleModule | undefined;
   moduleLabel: (key: string) => I18nText;
@@ -92,6 +92,16 @@ export const useModuleNavigation = (deps: NavigationDeps) => {
     };
   });
 
+  // Every folder module has a "default" folder, so a folder load is keyed by its module too.
+  const loadKey = (moduleKey: string, folderName?: string) =>
+    folderName ? `${moduleKey}/${folderName}` : moduleKey;
+
+  const isLoadingView = computed(
+    () =>
+      loadingFor.value === activeModule.value ||
+      loadingFor.value === loadKey(activeModule.value, openFolder.value?.name),
+  );
+
   const openModule = async (moduleKey: string) => {
     openFolder.value = null;
     const module = moduleOf(moduleKey);
@@ -113,16 +123,17 @@ export const useModuleNavigation = (deps: NavigationDeps) => {
 
   const openFolderRow = async (child: any) => {
     openFolder.value = child;
-    // A stream type keeps its full list in heavyResourceEntities; its own `entities` is filter-shaped.
+    // A stream type is in heavyResourceEntities once loaded, so re-opening it needs no fetch.
     if (activeModule.value === STREAM_PARENT_KEY && heavyResourceEntities.value[child.name]) return;
 
-    loadingFor.value = child.name;
+    const key = loadKey(activeModule.value, child.name);
+    loadingFor.value = key;
     try {
       await getResourceEntities(child);
     } catch (err) {
       console.log(err);
     } finally {
-      if (loadingFor.value === child.name) loadingFor.value = "";
+      if (loadingFor.value === key) loadingFor.value = "";
     }
   };
 
@@ -132,6 +143,7 @@ export const useModuleNavigation = (deps: NavigationDeps) => {
 
   return {
     activeModuleView,
+    isLoadingView,
     openModule,
     openFolderRow,
     navigateTrail,

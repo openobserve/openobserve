@@ -256,3 +256,27 @@ describe("useModuleNavigation - a list that fails to load", () => {
     expect(nav.loadingFor.value).toBe("");
   });
 });
+
+describe("useModuleNavigation - folder loads are keyed by module", () => {
+  // Dashboards and Alerts both have a "default" folder; a late load of one must not stop the other's spinner.
+  it("keeps the spinner of a same-named folder in another module", async () => {
+    const nav = setup();
+    const pending: (() => void)[] = [];
+    nav.getResourceEntities.mockImplementation(
+      () => new Promise<undefined>((resolve) => pending.push(() => resolve(undefined))),
+    );
+
+    nav.activeModule.value = "dfolder";
+    await flushPromises();
+    const dashboardsDefault = nav.openFolderRow(nav.folder);
+    nav.activeModule.value = "provider";
+    await flushPromises();
+    void nav.openFolderRow({ name: "default", entities: [] });
+    await flushPromises();
+
+    pending[1]();
+    await dashboardsDefault;
+
+    expect(nav.loadingFor.value).toBe("provider/default");
+  });
+});

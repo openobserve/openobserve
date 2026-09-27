@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <PermissionsViewSwitch
               :count="selectedPermissionsHash.size"
+              :loading="isFetchingInitialRoles"
               :model-value="permissionsUiType"
               @update:model-value="updatePermissionsUi"
             />
@@ -96,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="activeModuleView.trail.join('/')"
               v-model:page-size="modulePageSize"
               :lists-resources="!!moduleOf(activeModule)?.hasEntities"
-              :inner-grants="innerGrantNames"
+              :inner-grants="innerGrants"
               class="h-full"
               :trail="activeModuleView.trail"
               :scopes="activeModuleView.scopes"
@@ -114,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #actions>
                 <PermissionsViewSwitch
                   :count="selectedPermissionsHash.size"
+                  :loading="isFetchingInitialRoles"
                   :model-value="permissionsUiType"
                   @update:model-value="updatePermissionsUi"
                 />
@@ -130,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #actions>
                 <PermissionsViewSwitch
                   :count="selectedPermissionsHash.size"
+                  :loading="isFetchingInitialRoles"
                   :model-value="permissionsUiType"
                   @update:model-value="updatePermissionsUi"
                 />
@@ -187,9 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="bg-card-glass-bg border-border-default flex w-full items-center justify-end gap-2 border-t px-3 py-2"
       >
-        <!-- Sits beside Save because that is where the eye goes before committing. -->
+        <!-- Table view only: JSON edits stage when the view switches back, which would overwrite an undo made here. -->
         <OButton
-          v-if="pendingChanges.length"
+          v-if="pendingChanges.length && permissionsUiType === 'table'"
           variant="outline"
           size="sm-action"
           data-test="edit-role-review-changes-btn"
@@ -423,10 +426,6 @@ const openFolder = ref<any>(null);
 // Held here because the pane remounts per level, and a chosen page size should outlive that.
 const modulePageSize = ref(25);
 
-const moduleLoading = computed(
-  () => loadingFor.value === activeModule.value || loadingFor.value === openFolder.value?.name,
-);
-
 // Mirrors setPermission's guard: `org` is grantable from the meta org only.
 const grantableResources = computed(() =>
   permissionsState.resources.filter(
@@ -597,7 +596,7 @@ const getOrgId = () => {
   return store.state.selectedOrganization.identifier;
 };
 
-const { summaryModules, pendingChanges, innerGrantNames } = useRoleSummary({
+const { summaryModules, pendingChanges, innerGrants } = useRoleSummary({
   selectedPermissionsHash,
   addedPermissions,
   removedPermissions,
@@ -728,7 +727,12 @@ const { getResourceEntities } = useRoleEntityLoaders({
   updateResourceResource,
 });
 
-const { activeModuleView, openFolderRow, navigateTrail } = useModuleNavigation({
+const {
+  activeModuleView,
+  isLoadingView: moduleLoading,
+  openFolderRow,
+  navigateTrail,
+} = useModuleNavigation({
   activeModule,
   openFolder,
   loadingFor,

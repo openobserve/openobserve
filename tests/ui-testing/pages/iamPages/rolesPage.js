@@ -86,7 +86,6 @@ export class RolesPage {
 
         // ---------- unsaved drawer ----------
         this.drawer = page.locator('[data-test="edit-role-unsaved-drawer"]');
-        this.drawerEmpty = page.locator('[data-test="edit-role-unsaved-empty"]');
 
         this.toastMessages = page.locator('[data-test="o-toast-message"]');
     }
