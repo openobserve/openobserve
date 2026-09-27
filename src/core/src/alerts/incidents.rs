@@ -305,7 +305,7 @@ async fn collect_incident_destinations(
         Ok(v) => v,
         Err(e) => {
             log::warn!(
-                "[incidents] Failed to fetch alert list for destination merge (incident {incident_id}): {e}"
+                "[incidents] Failed to fetch alert list for destination merge (incident {org_id}/{incident_id}): {e}"
             );
             return destinations;
         }
@@ -426,7 +426,7 @@ async fn send_incident_notifications_inner(
         Ok(s) => s,
         Err(e) => {
             log::error!(
-                "[incidents] Failed to serialize notification payload for {incident_id}: {e}"
+                "[incidents] Failed to serialize notification payload for {org_id}/{incident_id}: {e}"
             );
             return;
         }
@@ -457,7 +457,7 @@ async fn send_incident_notifications_inner(
                     Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
                     Err(e) => {
                         log::error!(
-                            "[incidents] Failed to notify {dest_name} for incident {incident_id}: {e}"
+                            "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
                         );
                         err_parts.push(format!("{dest_name}: {e}"));
                     }
@@ -465,7 +465,7 @@ async fn send_incident_notifications_inner(
             }
             Err(e) => {
                 log::error!(
-                    "[incidents] Destination {dest_name} not found for incident {incident_id}: {e}"
+                    "[incidents] Destination {dest_name} not found for incident {org_id}/{incident_id}: {e}"
                 );
                 err_parts.push(format!("{dest_name}: {e}"));
             }
@@ -479,7 +479,7 @@ async fn send_incident_notifications_inner(
         );
     } else {
         log::error!(
-            "[incidents] Notification partially failed for incident {incident_id} ({event}): {}",
+            "[incidents] Notification partially failed for incident {org_id}/{incident_id} ({event}): {}",
             err_parts.join("; ")
         );
     }
@@ -494,7 +494,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
         Ok(v) => v,
         Err(e) => {
             log::warn!(
-                "[incidents] Failed to load alerts for severity notification (incident {incident_id}): {e}"
+                "[incidents] Failed to load alerts for severity notification (incident {org_id}/{incident_id}): {e}"
             );
             return;
         }
@@ -611,7 +611,8 @@ pub async fn correlate_alert_to_incident(
     if group_values.is_empty() {
         key_type = KeyType::AlertId;
         log::warn!(
-            "[incidents] Alert {} has no group_values - isolated by alert_id",
+            "[incidents] Alert {}/{} has no group_values - isolated by alert_id",
+            alert.org_id,
             alert.name
         );
     }
@@ -729,7 +730,10 @@ pub async fn correlate_alert_to_incident(
                 )
                 .await
                 {
-                    log::error!("[incidents] could not link on-call record for {incident_id}: {e}");
+                    log::error!(
+                        "[incidents] could not link on-call record for {}/{incident_id}: {e}",
+                        alert.org_id
+                    );
                 }
 
                 if let Err(e) = crate::alerts::scheduler::handlers::page_blast_radius(
@@ -739,11 +743,17 @@ pub async fn correlate_alert_to_incident(
                 )
                 .await
                 {
-                    log::error!("[incidents] impacted paging failed for {incident_id}: {e}");
+                    log::error!(
+                        "[incidents] impacted paging failed for {}/{incident_id}: {e}",
+                        alert.org_id
+                    );
                 }
             }
             Ok(None) => {}
-            Err(e) => log::error!("[incidents] on-call paging failed for {incident_id}: {e}"),
+            Err(e) => log::error!(
+                "[incidents] on-call paging failed for {}/{incident_id}: {e}",
+                alert.org_id
+            ),
         }
     }
 
@@ -877,7 +887,7 @@ pub async fn correlate_external_event(
     if group_values.is_empty() {
         key_type = KeyType::AlertId;
         log::warn!(
-            "[incidents] External event '{}' has no group_values - isolated by alert_id",
+            "[incidents] External event '{}' has no group_values - isolated by alert_id, org_id: {org_id}",
             external.title
         );
     }
@@ -1187,7 +1197,7 @@ async fn create_new_incident(
     // Initialize event timeline for new incident
     if let Err(e) = infra::table::incident_events::init(org_id, &incident.id).await {
         log::error!(
-            "[Incidents] Failed to init events for incident {}: {e}",
+            "[Incidents] Failed to init events for incident {org_id}/{}: {e}",
             incident.id
         );
     }
@@ -1228,7 +1238,7 @@ async fn create_new_incident(
     .await
     {
         log::error!(
-            "[Incidents] Failed to record alert event for incident {}: {e}",
+            "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
             incident.id
         );
     }
@@ -1272,7 +1282,9 @@ async fn create_new_incident(
         )
         .await
     {
-        log::error!("[SUPER_CLUSTER] Failed to publish incident create: {e}");
+        log::error!(
+            "[SUPER_CLUSTER] Failed to publish incident create: org_id: {org_id}, error: {e}"
+        );
     }
 
     spawn_topology_enrichment(
@@ -1302,7 +1314,7 @@ async fn create_new_incident(
             .await
             {
                 log::error!(
-                    "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {}: {e}",
+                    "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{}: {e}",
                     incident.id
                 );
             }
@@ -1389,7 +1401,7 @@ async fn find_or_create_incident(
             .await
             {
                 log::error!(
-                    "[Incidents] Failed to record alert event for incident {}: {e}",
+                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
                     incident.id
                 );
             }
@@ -1466,7 +1478,7 @@ async fn find_or_create_incident(
                 .await
                 {
                     log::error!(
-                        "[Incidents] Failed to record severity-upgrade event for incident {}: {e}",
+                        "[Incidents] Failed to record severity-upgrade event for incident {org_id}/{}: {e}",
                         incident.id
                     );
                 }
@@ -1539,7 +1551,7 @@ async fn find_or_create_incident(
             .await
             {
                 log::error!(
-                    "[Incidents] Failed to record alert event for incident {}: {e}",
+                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
                     existing.id
                 );
             }
@@ -1588,7 +1600,9 @@ async fn find_or_create_incident(
                 )
                 .await
                 {
-                    log::error!("[Incidents] Failed to record dimensions upgrade event: {e}");
+                    log::error!(
+                        "[Incidents] Failed to record dimensions upgrade event: org_id: {org_id}, error: {e}"
+                    );
                 }
             } else if dimensions_changed {
                 infra::table::alert_incidents::update_incident_metadata(
@@ -1618,7 +1632,9 @@ async fn find_or_create_incident(
                     )
                     .await
             {
-                log::error!("[SUPER_CLUSTER] Failed to publish incident add_alert: {e}");
+                log::error!(
+                    "[SUPER_CLUSTER] Failed to publish incident add_alert: org_id: {org_id}, error: {e}"
+                );
             }
 
             spawn_topology_enrichment(
@@ -1731,7 +1747,8 @@ pub async fn get_incident_with_alerts(
     let actual_count = incident_alerts.len() as i32;
     if incident_data.alert_count != actual_count {
         log::warn!(
-            "[incidents] Incident {} alert_count mismatch: stored={}, actual={}. Using actual count.",
+            "[incidents] Incident {}/{} alert_count mismatch: stored={}, actual={}. Using actual count.",
+            org_id,
             incident_id,
             incident_data.alert_count,
             actual_count
@@ -1788,7 +1805,8 @@ pub async fn get_incident_with_alerts(
             }
             Err(e) => {
                 log::warn!(
-                    "[incidents] Failed to fetch external alert details for incident {}: {}",
+                    "[incidents] Failed to fetch external alert details for incident {}/{}: {}",
+                    incident_org_id,
                     incident_id,
                     e
                 );
@@ -1831,14 +1849,16 @@ pub async fn get_incident_with_alerts(
                             }
                             Ok(None) => {
                                 log::warn!(
-                                    "Failed to fetch alert details for {}: {}",
+                                    "Failed to fetch alert details for {}/{}: {}",
+                                    incident_org_id,
                                     trigger.alert_id,
                                     e
                                 );
                             }
                             Err(composite_error) => {
                                 log::warn!(
-                                    "Failed to fetch composite details for {}: {}",
+                                    "Failed to fetch composite details for {}/{}: {}",
+                                    incident_org_id,
                                     trigger.alert_id,
                                     composite_error
                                 );
@@ -2260,7 +2280,7 @@ async fn emit_analysis_failure(
     .await
     {
         log::error!(
-            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {incident_id}: {e}"
+            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {org_id}/{incident_id}: {e}"
         );
     }
 }
@@ -2356,7 +2376,7 @@ pub async fn trigger_rca_for_incident(
     let incident = match infra::table::alert_incidents::get(&org_id, &incident_id).await? {
         Some(inc) => inc,
         None => {
-            log::warn!("[INCIDENTS::RCA] Incident {incident_id} not found");
+            log::warn!("[INCIDENTS::RCA] Incident {org_id}/{incident_id} not found");
             return Err(anyhow::anyhow!("Incident not found"));
         }
     };
@@ -2374,7 +2394,9 @@ pub async fn trigger_rca_for_incident(
         )
         .await
     {
-        log::error!("[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {incident_id}: {e}");
+        log::error!(
+            "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{incident_id}: {e}"
+        );
     }
 
     // AI credit check for reanalysis (cloud only)
@@ -2480,7 +2502,9 @@ pub async fn trigger_rca_for_incident(
             )
             .await
             {
-                log::error!("[INCIDENTS::RCA] Failed to save RCA result for {incident_id}: {e}");
+                log::error!(
+                    "[INCIDENTS::RCA] Failed to save RCA result for {org_id}/{incident_id}: {e}"
+                );
                 return Err(e);
             }
 
@@ -2493,7 +2517,7 @@ pub async fn trigger_rca_for_incident(
             .await
             {
                 log::error!(
-                    "[INCIDENTS::RCA] Failed to emit AIAnalysisComplete for {incident_id}: {e}"
+                    "[INCIDENTS::RCA] Failed to emit AIAnalysisComplete for {org_id}/{incident_id}: {e}"
                 );
             }
 
@@ -2503,7 +2527,7 @@ pub async fn trigger_rca_for_incident(
             Ok(())
         }
         Err(e) => {
-            log::warn!("[INCIDENTS::RCA] RCA failed for {incident_id}: {e}");
+            log::warn!("[INCIDENTS::RCA] RCA failed for {org_id}/{incident_id}: {e}");
 
             // Determine trigger type based on function context
             let trigger_type = if reanalysis {
@@ -2596,7 +2620,7 @@ pub async fn update_status(
             o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
                 .await
     {
-        log::error!("[incidents] on-call recovery failed for {incident_id}: {e}");
+        log::error!("[incidents] on-call recovery failed for {org_id}/{incident_id}: {e}");
     }
 
     // Emit status change event
@@ -2610,7 +2634,7 @@ pub async fn update_status(
     if let Some(evt) = event
         && let Err(e) = crate::incidents::append_event(org_id, incident_id, evt).await
     {
-        log::error!("[Incidents] Failed to record status event: {e}");
+        log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
     }
 
     // Trigger RCA reanalysis when incident is reopened — context is fresh,
@@ -2680,7 +2704,9 @@ pub async fn update_status(
         )
         .await
     {
-        log::error!("[SUPER_CLUSTER] Failed to publish incident update_status: {e}");
+        log::error!(
+            "[SUPER_CLUSTER] Failed to publish incident update_status: org_id: {org_id}, error: {e}"
+        );
     }
 
     model_to_incident(updated).await
@@ -2711,7 +2737,9 @@ pub async fn update_title(
         )
         .await
     {
-        log::error!("[Incidents] Failed to record title change event: {e}");
+        log::error!(
+            "[Incidents] Failed to record title change event: org_id: {org_id}, error: {e}"
+        );
     }
 
     model_to_incident(updated).await
@@ -2748,7 +2776,9 @@ pub async fn update_severity(
         )
         .await
         {
-            log::error!("[Incidents] Failed to record severity event: {e}");
+            log::error!(
+                "[Incidents] Failed to record severity event: org_id: {org_id}, error: {e}"
+            );
         }
         send_incident_severity_notification(org_id, incident_id).await;
     }

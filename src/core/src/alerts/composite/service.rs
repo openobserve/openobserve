@@ -175,7 +175,7 @@ pub async fn set_composite_enabled(
             .ok_or(CompositeServiceError::NotFound)?;
         schedule_definition(&definition).await;
     } else if let Err(error) = scheduler::delete(org, TriggerModule::CompositeAlert, id).await {
-        log::error!("[COMPOSITE_ALERT] scheduler delete failed: {error}");
+        log::error!("[COMPOSITE_ALERT] scheduler delete failed for {org}/{id}: {error}");
     }
     Ok(())
 }
@@ -521,7 +521,11 @@ async fn schedule_definition(definition: &composite_entity::Model) {
             existing.next_run_at = existing.next_run_at.min(now);
             existing.status = TriggerStatus::Waiting;
             if let Err(error) = scheduler::update_trigger(existing, false).await {
-                log::error!("[COMPOSITE_ALERT] scheduler update failed: {error}");
+                log::error!(
+                    "[COMPOSITE_ALERT] scheduler update failed for {}/{}: {error}",
+                    definition.org,
+                    definition.id
+                );
             }
             return;
         }
@@ -541,7 +545,11 @@ async fn schedule_definition(definition: &composite_entity::Model) {
             data: String::new(),
         };
         if let Err(error) = scheduler::push(trigger).await {
-            log::error!("[COMPOSITE_ALERT] scheduler push failed: {error}");
+            log::error!(
+                "[COMPOSITE_ALERT] scheduler push failed for {}/{}: {error}",
+                definition.org,
+                definition.id
+            );
         }
     }
 }
@@ -771,7 +779,7 @@ pub async fn delete_composite(org: &str, id: &str) -> Result<(), CompositeServic
     if result.is_ok()
         && let Err(error) = scheduler::delete(org, TriggerModule::CompositeAlert, id).await
     {
-        log::error!("[COMPOSITE_ALERT] scheduler delete failed: {error}");
+        log::error!("[COMPOSITE_ALERT] scheduler delete failed for {org}/{id}: {error}");
     }
     result
 }

@@ -165,7 +165,7 @@ pub async fn otlp_json(org_id: &str, body: Bytes, user: IngestUser) -> HttpRespo
     let mut body_json = match serde_json::from_slice::<json::Value>(body.as_ref()) {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[METRICS:OTLP] Invalid json: {e}");
+            log::error!("[METRICS:OTLP] Invalid json: org_id: {org_id}, error: {e}");
             return otlp_error_response(
                 OtlpRequestType::HttpJson,
                 http::StatusCode::BAD_REQUEST,
@@ -178,7 +178,7 @@ pub async fn otlp_json(org_id: &str, body: Bytes, user: IngestUser) -> HttpRespo
     let request = match serde_json::from_value::<ExportMetricsServiceRequest>(body_json) {
         Ok(req) => req,
         Err(e) => {
-            log::error!("[METRICS:OTLP] Invalid json: {e}");
+            log::error!("[METRICS:OTLP] Invalid json: org_id: {org_id}, error: {e}");
             return otlp_error_response(
                 OtlpRequestType::HttpJson,
                 http::StatusCode::BAD_REQUEST,
@@ -190,7 +190,9 @@ pub async fn otlp_json(org_id: &str, body: Bytes, user: IngestUser) -> HttpRespo
     match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, user).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[METRICS:OTLP] Error while handling http trace request: {e}");
+            log::error!(
+                "[METRICS:OTLP] Error while handling http trace request: org_id: {org_id}, error: {e}"
+            );
             write_failure_response(OtlpRequestType::HttpJson, &e)
         }
     }
@@ -208,7 +210,7 @@ pub async fn handle_otlp_request(
         let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
             http::StatusCode::TOO_MANY_REQUESTS
         } else {
-            log::error!("[METRICS:OTLP] ingestion error: {e}");
+            log::error!("[METRICS:OTLP] ingestion error: org_id: {org_id}, error: {e}");
             http::StatusCode::SERVICE_UNAVAILABLE
         };
         return Ok(otlp_rejection_response(req_type, status, e.to_string()));
@@ -324,7 +326,7 @@ pub async fn handle_otlp_request(
                         // a flattened oneof that fails to deserialize turns into
                         // None instead of an error, so surface it here
                         log::warn!(
-                            "[METRICS:OTLP] metric {metric_name} has no data points (unsupported or undecodable metric type), skipping"
+                            "[METRICS:OTLP] metric {org_id}/{metric_name} has no data points (unsupported or undecodable metric type), skipping"
                         );
                         partial_success.rejected_data_points += 1;
                         partial_success.error_message =
@@ -400,7 +402,7 @@ pub async fn handle_otlp_request(
                     .await
                     {
                         log::error!(
-                            "Failed to set metadata for metric: {metric_name} with error: {e}"
+                            "Failed to set metadata for metric: {org_id}/{metric_name} with error: {e}"
                         );
                     }
                 }
@@ -530,7 +532,9 @@ pub async fn handle_otlp_request(
 
     // warn if any records were skipped due to streams being deleted
     if skipped_records > 0 {
-        log::warn!("[METRICS:OTLP] Skipped {skipped_records} records due to streams being deleted");
+        log::warn!(
+            "[METRICS:OTLP] Skipped {skipped_records} records due to streams being deleted, org_id: {org_id}"
+        );
     }
 
     let (pipeline_outputs, failures) = ingest::run_pipelines(

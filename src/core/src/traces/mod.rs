@@ -492,7 +492,7 @@ pub async fn otlp_json(
     {
         Ok(req) => req,
         Err(e) => {
-            log::error!("[TRACES:OTLP] Invalid json: {e}");
+            log::error!("[TRACES:OTLP] Invalid json: org_id: {org_id}, error: {e}");
             return Ok(otlp_error_response(
                 OtlpRequestType::HttpJson,
                 http::StatusCode::BAD_REQUEST,
@@ -512,7 +512,9 @@ pub async fn otlp_json(
     {
         Ok(v) => Ok(v),
         Err(e) => {
-            log::error!("[TRACES:OTLP] Error while handling http trace request: {e}");
+            log::error!(
+                "[TRACES:OTLP] Error while handling http trace request: org_id: {org_id}, error: {e}"
+            );
             Err(e)
         }
     }
@@ -531,7 +533,7 @@ pub async fn handle_otlp_request(
         let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
             http::StatusCode::TOO_MANY_REQUESTS
         } else {
-            log::error!("[TRACES:OTLP] ingestion error: {e}");
+            log::error!("[TRACES:OTLP] ingestion error: org_id: {org_id}, error: {e}");
             http::StatusCode::SERVICE_UNAVAILABLE
         };
         return Ok(otlp_rejection_response(req_type, status, e.to_string()));
@@ -668,7 +670,9 @@ pub async fn handle_otlp_request(
             let spans = inst_span.spans;
             for span in spans {
                 if span.trace_id.len() != TRACE_ID_BYTES_COUNT {
-                    log::error!("[TRACES:OTLP] skipping span with invalid trace id");
+                    log::error!(
+                        "[TRACES:OTLP] skipping span with invalid trace id, org_id: {org_id}"
+                    );
                     partial_success.rejected_spans += 1;
                     continue;
                 }
@@ -676,7 +680,7 @@ pub async fn handle_otlp_request(
                     TraceId::from_bytes(span.trace_id.try_into().unwrap()).to_string();
                 if span.span_id.len() != SPAN_ID_BYTES_COUNT {
                     log::error!(
-                        "[TRACES:OTLP] skipping span with invalid span id, trace_id: {trace_id}"
+                        "[TRACES:OTLP] skipping span with invalid span id, org_id: {org_id}, trace_id: {trace_id}"
                     );
                     partial_success.rejected_spans += 1;
                     continue;
@@ -768,7 +772,7 @@ pub async fn handle_otlp_request(
                     }
                     if link.span_id.len() != SPAN_ID_BYTES_COUNT {
                         log::error!(
-                            "[TRACES:OTLP] skipping link with invalid span id, trace_id: {trace_id}"
+                            "[TRACES:OTLP] skipping link with invalid span id, org_id: {org_id}, trace_id: {trace_id}"
                         );
                         continue;
                     }
@@ -776,7 +780,7 @@ pub async fn handle_otlp_request(
                         SpanId::from_bytes(link.span_id.try_into().unwrap()).to_string();
                     if link.trace_id.len() != TRACE_ID_BYTES_COUNT {
                         log::error!(
-                            "[TRACES:OTLP] skipping link with invalid trace id, trace_id: {trace_id}"
+                            "[TRACES:OTLP] skipping link with invalid trace id, org_id: {org_id}, trace_id: {trace_id}"
                         );
                         continue;
                     }
@@ -797,14 +801,14 @@ pub async fn handle_otlp_request(
                 let timestamp = (start_time / 1000) as i64;
                 if timestamp < min_ts {
                     log::error!(
-                        "[TRACES:OTLP] skipping span with timestamp older than allowed retention period, trace_id: {trace_id}"
+                        "[TRACES:OTLP] skipping span with timestamp older than allowed retention period, org_id: {org_id}, trace_id: {trace_id}"
                     );
                     partial_success.rejected_spans += 1;
                     continue;
                 }
                 if timestamp > max_ts {
                     log::error!(
-                        "[TRACES:OTLP] skipping span with timestamp newer than allowed retention period, trace_id: {trace_id}"
+                        "[TRACES:OTLP] skipping span with timestamp newer than allowed retention period, org_id: {org_id}, trace_id: {trace_id}"
                     );
                     partial_success.rejected_spans += 1;
                     continue;
@@ -914,7 +918,7 @@ pub async fn handle_otlp_request(
                     &mut agent_observations,
                 ) {
                     log::error!(
-                        "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {trace_id}"
+                        "[TRACES:OTLP] stream did not receive a valid json object, org_id: {org_id}, trace_id: {trace_id}"
                     );
                     return Ok(otlp_rejection_response(
                         req_type,
@@ -969,13 +973,13 @@ pub async fn handle_otlp_request(
                 }
                 Ok(pl_results) => {
                     log::debug!(
-                        "[TRACES:OTLP] pipeline returned results map of size: {}",
+                        "[TRACES:OTLP] pipeline returned results map of size: {}, org_id: {org_id}",
                         pl_results.len()
                     );
                     for (stream_params, stream_pl_results) in pl_results {
                         if stream_params.stream_type != StreamType::Traces {
                             log::warn!(
-                                "[TRACES:OTLP] stream {stream_params:?} returned by pipeline is not a Trace stream. Records dropped"
+                                "[TRACES:OTLP] stream {stream_params:?} returned by pipeline is not a Trace stream. Records dropped, org_id: {org_id}"
                             );
                             continue;
                         }
@@ -986,7 +990,7 @@ pub async fn handle_otlp_request(
                                 json::Value::Object(v) => v,
                                 _ => {
                                     log::error!(
-                                        "[TRACES:OTLP] stream did not receive a valid json object"
+                                        "[TRACES:OTLP] stream did not receive a valid json object, org_id: {org_id}"
                                     );
                                     return Ok(otlp_rejection_response(
                                         req_type,
@@ -1002,7 +1006,7 @@ pub async fn handle_otlp_request(
                                 .and_then(|ts| ts.as_i64())
                             else {
                                 log::error!(
-                                    "[TRACES:OTLP] skipping span due to missing inserted timestamp",
+                                    "[TRACES:OTLP] skipping span due to missing inserted timestamp, org_id: {org_id}",
                                 );
                                 partial_success.rejected_spans += 1;
                                 continue;
@@ -1029,7 +1033,7 @@ pub async fn handle_otlp_request(
                             set_o2_ingest_ts(&mut record_val);
 
                             log::debug!(
-                                "[TRACES:OTLP] pipeline result for stream: {} got {} records",
+                                "[TRACES:OTLP] pipeline result for stream: {org_id}/{} got {} records",
                                 stream_params.stream_name,
                                 record_val.len()
                             );
@@ -1062,7 +1066,7 @@ pub async fn handle_otlp_request(
             .iter()
             .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
         log::debug!(
-            "[TRACES:OTLP] source preservation check stream={traces_stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
+            "[TRACES:OTLP] source preservation check org_id={org_id}, stream={traces_stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
             executable_pipelines.len(),
             json_data_by_stream.contains_key(&traces_stream_name)
         );
@@ -1098,7 +1102,9 @@ pub async fn handle_otlp_request(
         )
         .await
     {
-        log::error!("[TRACES:OTLP] failed to ensure db monitoring fields in schema: {e}");
+        log::error!(
+            "[TRACES:OTLP] failed to ensure db monitoring fields in schema: org_id: {org_id}, error: {e}"
+        );
     }
 
     // Apply sensitive-data redaction (SDR) regex patterns to trace records before writing.
@@ -1124,13 +1130,15 @@ pub async fn handle_otlp_request(
                         &mut data.0,
                     ) {
                         log::error!(
-                            "[TRACES] error applying SDR patterns for stream {stream}: {e}"
+                            "[TRACES] error applying SDR patterns for stream {org_id}/{stream}: {e}"
                         );
                     }
                 }
             }
             Err(e) => {
-                log::error!("[TRACES] failed to get pattern manager for SDR redaction: {e}");
+                log::error!(
+                    "[TRACES] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+                );
                 crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                     org_id,
                     StreamType::Traces,
@@ -1152,7 +1160,7 @@ pub async fn handle_otlp_request(
     )
     .await
     {
-        log::error!("Error while writing traces: {e}");
+        log::error!("[TRACES] Error while writing traces: org_id: {org_id}, error: {e}");
         return Ok(otlp_rejection_response(
             req_type,
             trace_write_error_status(&e),
@@ -1173,7 +1181,7 @@ pub async fn handle_otlp_request(
         )
         .await
     {
-        log::error!("Error while marking llm stream: {e}");
+        log::error!("[TRACES] Error while marking llm stream: org_id: {org_id}, error: {e}");
     }
 
     let time = start.elapsed().as_secs_f64();
@@ -1270,7 +1278,7 @@ pub async fn ingest_json(
         if matches!(e, infra::errors::Error::TrialPeriodExpired) {
             return Ok(MetaHttpResponse::too_many_requests(e));
         } else {
-            log::error!("[TRACES:JSON] ingestion error: {e}");
+            log::error!("[TRACES:JSON] ingestion error: org_id: {org_id}, error: {e}");
             return Ok((
                 http::StatusCode::SERVICE_UNAVAILABLE,
                 Json(MetaHttpResponse::error(
@@ -1333,16 +1341,14 @@ pub async fn ingest_json(
         let trace_id = value["trace_id"].to_string();
         if timestamp < min_ts {
             log::error!(
-                "[TRACES:JSON] skipping span with timestamp older than allowed retention period, trace_id: {}",
-                trace_id
+                "[TRACES:JSON] skipping span with timestamp older than allowed retention period, org_id: {org_id}, trace_id: {trace_id}"
             );
             partial_success.rejected_spans += 1;
             continue;
         }
         if timestamp > max_ts {
             log::error!(
-                "[TRACES:JSON] skipping span with timestamp newer than allowed retention period, trace_id: {}",
-                trace_id
+                "[TRACES:JSON] skipping span with timestamp newer than allowed retention period, org_id: {org_id}, trace_id: {trace_id}"
             );
             partial_success.rejected_spans += 1;
             continue;
@@ -1357,8 +1363,7 @@ pub async fn ingest_json(
             json::Value::Object(v) => v,
             _ => {
                 log::error!(
-                    "[TRACES:JSON] stream did not receive a valid json object, trace_id: {}",
-                    trace_id
+                    "[TRACES:JSON] stream did not receive a valid json object, org_id: {org_id}, trace_id: {trace_id}"
                 );
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -1470,7 +1475,9 @@ pub async fn ingest_json(
         )
         .await
     {
-        log::error!("[TRACES:JSON] failed to ensure db monitoring fields in schema: {e}");
+        log::error!(
+            "[TRACES:JSON] failed to ensure db monitoring fields in schema: org_id: {org_id}, error: {e}"
+        );
     }
 
     // Apply sensitive-data redaction (SDR) regex patterns to trace records before writing.
@@ -1496,13 +1503,15 @@ pub async fn ingest_json(
                         &mut data.0,
                     ) {
                         log::error!(
-                            "[TRACES] error applying SDR patterns for stream {stream}: {e}"
+                            "[TRACES] error applying SDR patterns for stream {org_id}/{stream}: {e}"
                         );
                     }
                 }
             }
             Err(e) => {
-                log::error!("[TRACES] failed to get pattern manager for SDR redaction: {e}");
+                log::error!(
+                    "[TRACES] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+                );
                 crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                     org_id,
                     StreamType::Traces,
@@ -1524,7 +1533,7 @@ pub async fn ingest_json(
     )
     .await
     {
-        log::error!("Error while writing traces: {e}");
+        log::error!("[TRACES] Error while writing traces: org_id: {org_id}, error: {e}");
         return Ok(MetaHttpResponse::error_with_header(
             trace_write_error_status(&e),
             format!("error while writing trace data: {e}"),
@@ -1544,7 +1553,7 @@ pub async fn ingest_json(
         )
         .await
     {
-        log::error!("Error while marking llm stream: {e}");
+        log::error!("[TRACES] Error while marking llm stream: org_id: {org_id}, error: {e}");
     }
 
     let time = start.elapsed().as_secs_f64();
@@ -1826,7 +1835,7 @@ async fn write_traces(
     )
     .await
     .map_err(|e| {
-        log::error!("Error while writing traces: {e}");
+        log::error!("[TRACES] Error while writing traces: org_id: {org_id}, error: {e}");
         std::io::Error::other(e)
     })?;
 

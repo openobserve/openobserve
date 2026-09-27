@@ -747,14 +747,16 @@ pub async fn handle_request(
                         &mut data.0,
                     ) {
                         log::error!(
-                            "[LOGS:OTLP] error applying SDR patterns for stream {stream}: {e}"
+                            "[LOGS:OTLP] error applying SDR patterns for stream {org_id}/{stream}: {e}"
                         );
                     }
                     super::refresh_derived_columns(&before, &mut data.0);
                 }
             }
             Err(e) => {
-                log::error!("[LOGS:OTLP] failed to get pattern manager for SDR redaction: {e}");
+                log::error!(
+                    "[LOGS:OTLP] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+                );
                 crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                     org_id,
                     StreamType::Logs,
@@ -806,7 +808,7 @@ pub async fn handle_request(
         .inc();
 
     if let Err(e) = write_result {
-        log::error!("Error while writing logs: {e}");
+        log::error!("[LOGS:OTLP] Error while writing logs: org_id: {org_id}, error: {e}");
         return Ok(otlp_rejection_response(
             req_type,
             status,

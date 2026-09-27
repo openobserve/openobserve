@@ -143,7 +143,9 @@ pub async fn ingest(
         Err(_) if !should_apply_sdr(org_id, in_stream_name) => None,
         Err(e) => {
             // Reported once the destination streams and their records are known, below.
-            log::error!("[LOGS:JSON] failed to get pattern manager for SDR redaction: {e}");
+            log::error!(
+                "[LOGS:JSON] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+            );
             None
         }
     };
@@ -305,7 +307,7 @@ pub async fn ingest(
         let mut item = match ret {
             Ok(item) => item,
             Err(e) => {
-                log::error!("IngestionError: {e:?}");
+                log::error!("[LOGS:JSON] IngestionError: org_id: {org_id}, error: {e:?}");
                 return Err(Error::IngestionError(format!("Failed processing: {e:?}")));
             }
         };
@@ -670,7 +672,9 @@ pub async fn ingest(
             if let Err(e) =
                 pattern_manager.process_at_ingestion(org_id, StreamType::Logs, stream, &mut data.0)
             {
-                log::error!("error in processing records for patterns for stream {stream} : {e}");
+                log::error!(
+                    "[LOGS:JSON] error in processing records for patterns for stream {org_id}/{stream} : {e}"
+                );
             }
             super::refresh_derived_columns(&before, &mut data.0);
         }
@@ -710,7 +714,7 @@ pub async fn ingest(
         match write_result {
             Ok(skipped) => ("200", stream_status, skipped),
             Err(e) => {
-                log::error!("Error while writing logs: {e}");
+                log::error!("[LOGS:JSON] Error while writing logs: org_id: {org_id}, error: {e}");
                 ("500", stream_status, false)
             }
         }

@@ -124,7 +124,7 @@ pub(crate) async fn ensure_default_content_template(
         }
         Err(e) => {
             log::error!(
-                "[TEMPLATES] Error checking system template '{DEFAULT_CONTENT_TEMPLATE_NAME}': {e}"
+                "[TEMPLATES] Error checking system template '{DEFAULT_CONTENT_TEMPLATE_NAME}' in {DEFAULT_ORG}: {e}"
             );
         }
     }
