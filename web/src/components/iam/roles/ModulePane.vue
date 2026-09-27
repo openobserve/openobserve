@@ -19,16 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageHeader
       :title="trail[trail.length - 1]"
       title-data-test="edit-role-module-pane-title"
-      :icon="trail.length > 1 ? undefined : icon"
-      :back="
-        trail.length > 1
-          ? {
-              label: trail[trail.length - 2],
-              onClick: () => emit('navigate', trail.length - 2),
-              dataTest: 'edit-role-module-pane-back',
-            }
-          : undefined
-      "
+      :icon="backTarget ? undefined : icon"
+      :back="backTarget"
     >
       <template #title-trail>
         <OBadge v-if="grantedRowCount" variant="primary-soft" size="sm">
@@ -231,6 +223,16 @@ const emit = defineEmits<{
   open: [row: any];
   navigate: [index: number];
 }>();
+
+const backTarget = computed(() =>
+  props.trail.length > 1
+    ? {
+        label: props.trail[props.trail.length - 2],
+        onClick: () => emit("navigate", props.trail.length - 2),
+        dataTest: "edit-role-module-pane-back",
+      }
+    : undefined,
+);
 
 const PAGE_SIZE = 25;
 
