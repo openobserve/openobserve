@@ -87,7 +87,10 @@ impl StorageProvider {
             time_range,
             matchers.clone(),
             filters,
-            prefer_blocks,
+            storage::BlockPreference {
+                enabled: prefer_blocks,
+                output_labels: &label_selector,
+            },
         )
         .await?;
         if let Some(ctx) = ctx {

@@ -25,7 +25,7 @@ use config::{
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
 };
 use datafusion::error::{DataFusionError, Result};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
     schema::{get_partition_time_level, unwrap_stream_settings},
@@ -42,6 +42,12 @@ use tracing::Instrument;
 
 use crate::search::grpc::Context;
 
+#[derive(Debug)]
+pub(super) struct BlockPreference<'a> {
+    pub enabled: bool,
+    pub output_labels: &'a HashSet<String>,
+}
+
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
     trace_id: &str,
@@ -50,7 +56,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     filters: &mut [(String, Vec<String>)],
-    prefer_blocks: bool,
+    block_preference: BlockPreference<'_>,
 ) -> Result<Option<Context>> {
     let enter_span = tracing::span::Span::current();
 
@@ -129,10 +135,11 @@ pub(crate) async fn create_context(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let block_eligible = prefer_blocks
+    let block_eligible = block_preference.enabled
         && get_config().compact.metrics_index_enabled
         && get_config().search.feature_metrics_streaming_agg_enabled
         && files.iter().all(block_parent_eligible)
+        && block_output_labels_supported(&schema, block_preference.output_labels)
         && block_matchers_supported(&schema, &matchers);
     let cache_inputs = files
         .iter()
@@ -286,6 +293,22 @@ fn block_parent_eligible(file: &FileKey) -> bool {
         && file.meta.records > 0
         && file.meta.compressed_size > 0
         && file.meta.mindex_size > 0
+}
+
+fn block_output_labels_supported(
+    schema: &arrow::datatypes::Schema,
+    label_selector: &HashSet<String>,
+) -> bool {
+    !schema.fields().iter().any(|field| {
+        (label_selector.is_empty() || label_selector.contains(field.name()))
+            && is_metrics_hash_excluded_label(field.name())
+            && matches!(
+                field.data_type(),
+                arrow::datatypes::DataType::Utf8
+                    | arrow::datatypes::DataType::LargeUtf8
+                    | arrow::datatypes::DataType::Utf8View
+            )
+    })
 }
 
 fn block_matchers_supported(schema: &arrow::datatypes::Schema, matchers: &Matchers) -> bool {
@@ -473,5 +496,31 @@ mod tests {
         let point = Matchers::new(vec![Matcher::new(MatchOp::Equal, "start_time", "x")]);
         assert!(block_matchers_supported(&schema, &path));
         assert!(!block_matchers_supported(&schema, &point));
+    }
+
+    #[test]
+    fn block_output_labels_require_identity_metadata() {
+        let schema = Schema::new(vec![
+            Field::new("path", DataType::Utf8, true),
+            Field::new("start_time", DataType::Utf8, true),
+            Field::new("flag", DataType::Utf8View, true),
+            Field::new("trace_id", DataType::LargeUtf8, true),
+            Field::new("is_monotonic", DataType::Boolean, true),
+        ]);
+        assert!(!block_output_labels_supported(&schema, &HashSet::new()));
+        for name in ["start_time", "flag", "trace_id"] {
+            assert!(!block_output_labels_supported(
+                &schema,
+                &HashSet::from([name.to_string()]),
+            ));
+        }
+        assert!(block_output_labels_supported(
+            &schema,
+            &HashSet::from(["path".to_string()]),
+        ));
+        assert!(block_output_labels_supported(
+            &schema,
+            &HashSet::from(["is_monotonic".to_string()]),
+        ));
     }
 }

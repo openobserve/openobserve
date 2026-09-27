@@ -19,6 +19,7 @@ use std::{
     cmp::Reverse,
     collections::{BinaryHeap, VecDeque},
     hash::Hasher,
+    ops::Range,
     sync::{
         Arc, LazyLock, Mutex,
         atomic::{AtomicU64, Ordering},
@@ -39,7 +40,7 @@ use config::{
     utils::hash::gxhash,
 };
 use datafusion::error::DataFusionError;
-use futures::{StreamExt, stream};
+use futures::{StreamExt, TryStreamExt, stream};
 use hashbrown::{HashMap, HashSet};
 use metrics_index::{
     block::{BlockDecoder, DecodedBlockRef, Index},
@@ -59,6 +60,7 @@ const PREFETCH_BLOCKS: usize = 128;
 const PREFETCH_BYTES: usize = 4 * 1024 * 1024;
 const COALESCE_MAX_GAP: u64 = 16 * 1024;
 const COALESCE_MAX_SPAN: u64 = 1024 * 1024;
+const REMOTE_RANGE_CONCURRENCY: usize = 10;
 static METADATA_WORKERS: LazyLock<Arc<Semaphore>> = LazyLock::new(|| {
     Arc::new(Semaphore::new(
         config::get_config().limit.cpu_num.clamp(1, 32),
@@ -250,6 +252,23 @@ impl FileCursor {
         self.head().map(|id| self.file.index.blocks.block(id).hash)
     }
 
+    async fn read_ranges(
+        account: &str,
+        sidecar: &str,
+        ranges: &[Range<u64>],
+    ) -> Result<Vec<Bytes>> {
+        if let Ok(data) =
+            infra::cache::file_data::get_ranges_opts(account, sidecar, ranges, false).await
+        {
+            return Ok(data);
+        }
+        Ok(stream::iter(ranges.iter().cloned())
+            .map(|range| infra::storage::get_range(account, sidecar, range))
+            .buffered(REMOTE_RANGE_CONCURRENCY)
+            .try_collect()
+            .await?)
+    }
+
     async fn decode_next<'a>(
         &mut self,
         decoder: &'a mut BlockDecoder,
@@ -283,13 +302,8 @@ impl FileCursor {
                 COALESCE_MAX_SPAN,
                 PREFETCH_BYTES as u64,
             )?;
-            let sidecar_path = self.file.sidecar.as_str().into();
-            let data = infra::cache::storage::get_ranges(
-                &self.file.account,
-                &sidecar_path,
-                &read_plan.ranges,
-            )
-            .await?;
+            let data = Self::read_ranges(&self.file.account, &self.file.sidecar, &read_plan.ranges)
+                .await?;
             stats.read_batches += 1;
             stats.read_ranges += read_plan.ranges.len() as u64;
             stats.read_bytes += data.iter().map(|bytes| bytes.len() as u64).sum::<u64>();
@@ -983,8 +997,8 @@ mod tests {
         block_cache::{CacheWeight, SidecarBinding},
     };
     use object_store::{
-        CopyOptions, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-        PutMultipartOptions, PutOptions, PutPayload, PutResult, path::Path,
+        CopyOptions, GetOptions, GetRange, GetResult, ListResult, MultipartUpload, ObjectMeta,
+        ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, path::Path,
     };
     use promql_parser::label::{MatchOp, Matcher, Matchers};
     use tokio::sync::Notify;
@@ -1007,7 +1021,9 @@ mod tests {
     #[derive(Debug)]
     struct TrackingStore {
         inner: Arc<object_store::memory::InMemory>,
+        sample_ends: HashMap<String, u64>,
         metadata_calls: Arc<AtomicUsize>,
+        ranged_calls: Arc<AtomicUsize>,
         metadata_blocked: Arc<AtomicBool>,
         calls: Arc<AtomicUsize>,
         active: Arc<AtomicUsize>,
@@ -1028,6 +1044,25 @@ mod tests {
             options: GetOptions,
         ) -> object_store::Result<GetResult> {
             self.metadata_calls.fetch_add(1, Ordering::SeqCst);
+            if options.range.is_some() {
+                self.ranged_calls.fetch_add(1, Ordering::SeqCst);
+            }
+            let is_sample = self
+                .sample_ends
+                .get(&location.to_string())
+                .is_some_and(|end| {
+                    matches!(options.range.as_ref(), Some(GetRange::Bounded(range)) if range.end <= *end)
+                });
+            if is_sample {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                self.active.fetch_add(1, Ordering::SeqCst);
+                let _active = ActiveRead(Arc::clone(&self.active));
+                self.entered.notify_one();
+                if let Some(gate) = &self.gate {
+                    gate.notified().await;
+                }
+                return self.inner.get_opts(location, options).await;
+            }
             if let Some(gate) = &self.metadata_gate
                 && self.metadata_blocked.load(Ordering::SeqCst)
             {
@@ -1098,6 +1133,7 @@ mod tests {
     struct Fixture {
         account: String,
         metadata_calls: Arc<AtomicUsize>,
+        ranged_calls: Arc<AtomicUsize>,
         calls: Arc<AtomicUsize>,
         active: Arc<AtomicUsize>,
         entered: Arc<Notify>,
@@ -1114,9 +1150,25 @@ mod tests {
         ) -> Self {
             let id = config::ider::uuid();
             let account = format!("{id}:default");
+            let sample_ends = files
+                .iter()
+                .filter_map(|(file, bytes)| {
+                    let sidecar = config::meta::promql::index::metrics_index_path(&file.key)?;
+                    let size = bytes.len() as u64;
+                    let tail = bytes.get(
+                        bytes
+                            .len()
+                            .checked_sub(metrics_index::block::MIDX_TRAILER_LEN)?..,
+                    )?;
+                    let trailer = metrics_index::block::MidxTrailer::read(tail, size).ok()?;
+                    Some((sidecar, trailer.blocks_end(size)))
+                })
+                .collect();
             let store = TrackingStore {
                 inner: Arc::new(object_store::memory::InMemory::new()),
+                sample_ends,
                 metadata_calls: Arc::new(AtomicUsize::new(0)),
+                ranged_calls: Arc::new(AtomicUsize::new(0)),
                 metadata_blocked: Arc::new(AtomicBool::new(metadata_blocked)),
                 calls: Arc::new(AtomicUsize::new(0)),
                 active: Arc::new(AtomicUsize::new(0)),
@@ -1140,6 +1192,7 @@ mod tests {
             let fixture = Self {
                 account,
                 metadata_calls: Arc::clone(&store.metadata_calls),
+                ranged_calls: Arc::clone(&store.ranged_calls),
                 calls: Arc::clone(&store.calls),
                 active: Arc::clone(&store.active),
                 entered: Arc::clone(&store.entered),
@@ -1696,6 +1749,35 @@ mod tests {
         );
         assert_eq!(result[1].0, vec![Arc::new(Label::new("group", "y"))]);
         assert_eq!(result[1].1, vec![(110, 3.0f64.to_bits())]);
+    }
+
+    #[tokio::test]
+    async fn cache_miss_reads_planned_ranges_without_remote_recoalescing() {
+        let fixture = Fixture::new(&[], false).await;
+        let sidecar = format!(
+            "files/o/mindex/m/2026/09/23/00/ranges-{}.midx",
+            config::ider::uuid()
+        );
+        let ranges = (0..64u64)
+            .map(|index| {
+                let start = index * 64 * 1024;
+                start..start + 512
+            })
+            .collect::<Vec<_>>();
+        infra::storage::put(
+            &fixture.account,
+            &sidecar,
+            Bytes::from(vec![0; ranges.last().unwrap().end as usize]),
+        )
+        .await
+        .unwrap();
+
+        let data = FileCursor::read_ranges(&fixture.account, &sidecar, &ranges)
+            .await
+            .unwrap();
+        assert_eq!(data.len(), ranges.len());
+        assert!(data.iter().all(|bytes| bytes.len() == 512));
+        assert_eq!(fixture.ranged_calls.load(Ordering::SeqCst), ranges.len());
     }
 
     #[tokio::test]
