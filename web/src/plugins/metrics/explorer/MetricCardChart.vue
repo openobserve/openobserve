@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selected-time-obj="selectedTimeObj"
       :variables-data="variablesData"
       :injected-promql-data="injectedPromqlData"
+      :injected-exemplars="injectedExemplars"
       :allow-alert-creation="allowAlertCreation"
       :allow-annotations-add="false"
       :allow-annotations-a-p-i="false"
@@ -44,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { computed, defineComponent, type PropType } from "vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
+import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
 
 export default defineComponent({
   name: "MetricCardChart",
@@ -76,6 +78,11 @@ export default defineComponent({
      * place to author an alert.
      */
     allowAlertCreation: { type: Boolean, default: false },
+    /** The card's exemplar state; the explorer grid owns the fetch. */
+    injectedExemplars: {
+      type: Object as PropType<InjectedExemplars | undefined>,
+      default: undefined,
+    },
   },
   /**
    * `zoom` carries the panel's `updated:data-zoom` payload (a drag-select on the

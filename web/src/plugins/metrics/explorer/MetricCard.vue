@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Pin / Open. -->
     <!-- The SAME bar the dashboard panels use — box, tint and title type all
          come from PanelBar; only this card's layout is added on top. -->
-    <PanelBar class="relative min-w-0 gap-2">
+    <PanelBar class="@container/panelbar relative min-w-0 gap-2">
       <!-- Name, then the type badge tight beside it. The name is the only
            flexible element in the row: it truncates whenever the right-hand
            cluster needs the room. -->
@@ -82,6 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex w-0 flex-nowrap items-center overflow-hidden opacity-0 group-focus-within:w-auto group-focus-within:opacity-100 group-hover:w-auto group-hover:opacity-100 max-md:w-auto max-md:opacity-100"
           :data-test="`metrics-explorer-card-actions-${card.name}`"
         >
+          <ExemplarToggle
+            v-if="exemplarsEligible && !exemplarsOn"
+            :on="false"
+            :swaps-variant="exemplarsSwapsVariant ? 'percentiles' : undefined"
+            :data-test="`metrics-explorer-card-exemplars-${card.name}`"
+            @toggle="$emit('toggle-exemplars', card)"
+          />
           <!-- Help — the SAME element the dashboard panel bar uses for its panel
              description (PanelContainer `dashboard-panel-description-info`): an
              info-outline icon with a width-capped, pre-wrapped OTooltip. NOT a
@@ -164,6 +171,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
           </OButton>
+        </div>
+
+        <!-- An on toggle stays visible at rest so the viewer can see why markers are drawn. -->
+        <div v-if="exemplarsEligible && exemplarsOn" class="flex shrink-0 items-center">
+          <OTag
+            v-if="exemplars?.status === 'empty'"
+            variant="default-soft"
+            size="sm"
+            :aria-label="t('dashboard.exemplars.empty')"
+            :data-test="`metrics-explorer-card-exemplars-empty-${card.name}`"
+          >
+            <span class="hidden @min-[32rem]/panelbar:inline">{{
+              t("dashboard.exemplars.empty")
+            }}</span>
+            <span class="@min-[32rem]/panelbar:hidden">{{
+              t("dashboard.exemplars.emptyShort")
+            }}</span>
+            <OTooltip :content="t('dashboard.exemplars.empty')" side="bottom" />
+          </OTag>
+          <OButton
+            v-if="exemplars?.status === 'error'"
+            variant="ghost-warning"
+            size="icon"
+            icon-left="warning"
+            :aria-label="t('dashboard.exemplars.loadFailed')"
+            :data-test="`metrics-explorer-card-exemplars-error-${card.name}`"
+          >
+            <OTooltip side="bottom" align="end" max-width="22.5rem" hoverable>
+              <template #content>
+                <div class="flex flex-col gap-1.5">
+                  <div class="font-medium">{{ t("dashboard.exemplars.loadFailed") }}</div>
+                  <div
+                    class="whitespace-pre-wrap"
+                    data-test="dashboard-panel-exemplars-error-message"
+                  >
+                    {{ exemplars?.errorMessage }}
+                  </div>
+                  <div>
+                    <OButton
+                      variant="outline"
+                      size="xs"
+                      icon-left="replay"
+                      data-test="dashboard-panel-exemplars-retry"
+                      @click="$emit('retry-exemplars', card)"
+                    >
+                      {{ t("dashboard.exemplars.retry") }}
+                    </OButton>
+                  </div>
+                </div>
+              </template>
+            </OTooltip>
+          </OButton>
+          <ExemplarToggle
+            :on="true"
+            :loading="exemplars?.status === 'loading'"
+            :count="exemplars?.markers?.length ?? 0"
+            :swaps-variant="exemplarsSwapsVariant ? 'percentiles' : undefined"
+            :data-test="`metrics-explorer-card-exemplars-${card.name}`"
+            :loading-data-test="`metrics-explorer-card-exemplars-loading-${card.name}`"
+            @toggle="$emit('toggle-exemplars', card)"
+          />
         </div>
 
         <!-- Refresh — revealed with the actions, just LEFT of the freshness
@@ -412,6 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :color="color"
         :time-range="dataTimeRange"
         :allow-alert-creation="true"
+        :injected-exemplars="exemplarsOn ? exemplars : undefined"
         @error="renderError = String($event ?? '')"
         @zoom="$emit('zoom', $event)"
       />
@@ -493,6 +562,8 @@ import { BADGE_LABEL_KEYS, cardColorForIndex } from "@/utils/metrics/metricPalet
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { hasSamples, type CardPreview } from "@/composables/metrics/useMetricsExplorerGrid";
+import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
+import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
 
 /** Human-facing unit text for the card footer. */
 const UNIT_LABELS: Record<string, string> = {
@@ -532,6 +603,7 @@ export default defineComponent({
     PanelBar,
     OTag,
     OTooltip,
+    ExemplarToggle,
   },
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
@@ -548,8 +620,18 @@ export default defineComponent({
       type: Object as PropType<{ start_time: number; end_time: number }>,
       default: null,
     },
+    exemplarsEligible: { type: Boolean, default: false },
+    exemplarsOn: { type: Boolean, default: false },
+    /** A heatmap card that draws its percentiles variant while exemplars are on. */
+    exemplarsSwapsVariant: { type: Boolean, default: false },
+    exemplars: {
+      type: Object as PropType<InjectedExemplars | undefined>,
+      default: undefined,
+    },
   },
   emits: [
+    "toggle-exemplars",
+    "retry-exemplars",
     "select",
     "configure",
     "toggle-favorite",
