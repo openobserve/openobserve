@@ -2570,9 +2570,51 @@ export class TracesPage {
   }
 
   /**
-   * Right-click the centre of a metrics panel chart to open the Duration-only
+   * Viewport points on a panel canvas that sit on a plotted series mark.
+   * ECharts fires its contextmenu event only on a data item, and Duration is a
+   * scatter of 5px dots, so a right-click on empty plot space never reaches it.
+   * Scans the canvas for saturated (series-coloured) pixels whose 3x3 neighbourhood
+   * is also coloured, i.e. the inside of a mark rather than an anti-aliased edge.
+   * @param {import('@playwright/test').Locator} canvas
+   * @param {number} max - Maximum number of points to return
+   * @returns {Promise<{x: number, y: number}[]>}
+   */
+  async findPlottedPoints(canvas, max = 5) {
+    return await canvas.evaluate((el, limit) => {
+      const ctx = el.getContext('2d');
+      if (!ctx || !el.width || !el.height) return [];
+      const { data, width, height } = ctx.getImageData(0, 0, el.width, el.height);
+      const coloured = (x, y) => {
+        const i = (y * width + x) * 4;
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        return data[i + 3] > 200 && Math.max(r, g, b) - Math.min(r, g, b) > 60;
+      };
+      const rect = el.getBoundingClientRect();
+      const sx = rect.width / width, sy = rect.height / height;
+      const points = [];
+      const step = Math.max(1, Math.floor(width / 200));
+      for (let x = 1; x < width - 1 && points.length < limit; x += step) {
+        for (let y = 1; y < height - 1; y++) {
+          if (!coloured(x, y)) continue;
+          let solid = true;
+          for (let dx = -1; dx <= 1 && solid; dx++) {
+            for (let dy = -1; dy <= 1 && solid; dy++) solid = coloured(x + dx, y + dy);
+          }
+          if (!solid) continue;
+          points.push({ x: rect.left + x * sx, y: rect.top + y * sy });
+          x += Math.floor(width / limit);
+          break;
+        }
+      }
+      return points;
+    }, max);
+  }
+
+  /**
+   * Right-click a plotted point of a metrics panel chart to open the Duration-only
    * gte/lte context menu, retrying because ECharts arms its contextmenu handler a
-   * beat after the panel data resolves.
+   * beat after the panel data resolves. Falls back to the canvas centre when no
+   * plotted point can be located.
    * @param {string} title - Panel title ('Duration', 'Rate', 'Errors')
    * @returns {Promise<{ dispatched: boolean, opened: boolean }>} whether the
    *   right-click reached the panel, and whether the menu opened
@@ -2588,12 +2630,15 @@ export class TracesPage {
     const box = await canvas.boundingBox();
     if (!box) return { dispatched: false, opened: false };
     // ECharts stacks canvas layers, so a locator click hits the wrong one — drive the mouse instead.
+    const points = await this.findPlottedPoints(canvas);
+    const targets = points.length ? points : [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
     let opened = false;
     for (let attempt = 0; attempt < 3 && !opened; attempt++) {
-      await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, {
-        button: 'right',
-      });
-      opened = await this.isMetricsContextMenuVisible(1000);
+      for (const point of targets) {
+        await this.page.mouse.click(point.x, point.y, { button: 'right' });
+        opened = await this.isMetricsContextMenuVisible(1000);
+        if (opened) break;
+      }
     }
     const hits = await this.getMetricsContextMenuProbeHits();
     return { dispatched: hits.includes(title), opened };

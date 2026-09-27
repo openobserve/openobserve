@@ -477,7 +477,7 @@ test.describe("Traces Charts testcases", () => {
 
   // ─── Right-click Duration gte/lte context menu (Workflow 3) ────────────────
 
-  test.fixme("P1: Right-click Duration opens the gte/lte context menu and dismisses on Escape (Duration panel is a scatter chart; ChartRenderer.vue:321 emits chart contextmenu only for bar/line)", {
+  test("P1: Right-click Duration opens the gte/lte context menu and dismisses on Escape", {
     tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
 
@@ -495,7 +495,7 @@ test.describe("Traces Charts testcases", () => {
     await pm.tracesPage.expectMetricsContextMenuHidden();
   });
 
-  test.fixme("P1: Right-click Duration then gte writes a single-sided duration >= filter (Duration panel is a scatter chart; ChartRenderer.vue:321 emits chart contextmenu only for bar/line)", {
+  test("P1: Right-click Duration then gte writes a single-sided duration >= filter", {
     tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
 
@@ -521,7 +521,7 @@ test.describe("Traces Charts testcases", () => {
     expect(panelError, 'No RED panel may error after a gte context-menu selection').toBe('');
   });
 
-  test.fixme("P1: Right-click Duration then lte writes a single-sided duration <= filter (Duration panel is a scatter chart; ChartRenderer.vue:321 emits chart contextmenu only for bar/line)", {
+  test("P1: Right-click Duration then lte writes a single-sided duration <= filter", {
     tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
 
