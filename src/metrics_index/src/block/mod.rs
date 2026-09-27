@@ -15,6 +15,7 @@
 
 mod compact;
 mod directory;
+mod header;
 mod reader;
 mod writer;
 
@@ -28,22 +29,30 @@ use arrow::{
     array::{Array, DictionaryArray, LargeStringArray, RecordBatch, StringArray, StringViewArray},
     datatypes::{DataType, Schema, SchemaRef, UInt8Type, UInt16Type, UInt32Type},
 };
+pub use config::meta::promql::midx::{MIDX_MAGIC, MIDX_TRAILER_LEN, MIDX_VERSION, MidxTrailer};
 pub use directory::{BlockDirectory, BlockIter};
-pub use reader::{BlockDecoder, decode_block, decode_index, read_footer};
+pub use header::Header;
+pub use reader::{BlockDecoder, decode_block, decode_file, decode_index};
 use serde::{Deserialize, Serialize};
 pub use writer::BlockWriter;
 
-pub const VERSION: u32 = 2;
-pub const FOOTER_LEN: usize = 32;
+/// Tail bytes a reader fetches first; a header larger than this costs cold reads one more request.
+pub const HEADER_PROBE_BYTES: u64 = 64 * 1024;
 pub const MAX_BLOCK_ROWS: usize = 8192;
-pub const MAX_LABEL_COLUMNS: usize = 128;
-const MAGIC: &[u8; 8] = b"O2MIDX02";
+/// Label count above which building a MIDX warns: the writer holds every label of every block.
+pub const WARN_LABEL_COLUMNS: usize = 128;
 const DIRECTORY_FIELDS: usize = 8;
-const PARENT_KEY: &str = "o2:midx_parent";
-const SCHEMA_KEY: &str = "o2:midx_source_schema";
-const LABELS_KEY: &str = "o2:midx_labels";
-pub const ROW_GROUP_SIZE_KEY: &str = "o2:midx_row_group_size";
-const VERSION_KEY: &str = "o2:midx_version";
+/// hash, row start, row count, min/max timestamp, block offset, block length, strictly increasing.
+const DIRECTORY_TYPES: [DataType; DIRECTORY_FIELDS] = [
+    DataType::UInt64,
+    DataType::UInt64,
+    DataType::UInt32,
+    DataType::Int64,
+    DataType::Int64,
+    DataType::UInt64,
+    DataType::UInt32,
+    DataType::Boolean,
+];
 const NON_IDENTITY: &[&str] = &[
     "exemplars",
     "is_monotonic",
@@ -58,13 +67,6 @@ const NON_IDENTITY: &[&str] = &[
 pub struct ParentMetadata {
     pub rows: u64,
     pub compressed_size: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Footer {
-    pub version: u32,
-    pub metadata_range: Range<u64>,
-    pub payload_end: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,10 +151,6 @@ pub fn max_compressed_block_len(row_count: u32) -> Result<usize> {
 }
 
 pub fn identity_label_columns(schema: &Schema) -> Result<Vec<String>> {
-    capacity(
-        schema.fields().len() <= MAX_LABEL_COLUMNS + 3 + NON_IDENTITY.len(),
-        "MAX_LABEL_COLUMNS",
-    )?;
     let mut names = HashSet::new();
     ensure!(
         schema
@@ -190,17 +188,11 @@ pub fn identity_label_columns(schema: &Schema) -> Result<Vec<String>> {
         );
         labels.push(name.to_owned());
     }
-    capacity(labels.len() <= MAX_LABEL_COLUMNS, "MAX_LABEL_COLUMNS")?;
     Ok(labels)
 }
 
 pub fn is_supported_schema(schema: &Schema) -> bool {
     identity_label_columns(schema).is_ok()
-}
-
-fn capacity(condition: bool, message: &'static str) -> Result<()> {
-    ensure!(condition, "metrics block capacity limit: {message}");
-    Ok(())
 }
 
 fn is_label_type(data_type: &DataType) -> bool {

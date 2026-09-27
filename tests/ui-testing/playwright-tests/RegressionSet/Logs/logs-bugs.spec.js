@@ -1970,6 +1970,45 @@ test.describe("Logs Regression Bug Fixes", () => {
   // Bug #14228: Builder saved view does not apply when already on the Build tab
   // https://github.com/openobserve/openobserve/issues/14228
   // ==========================================================================
+  // ==========================================================================
+  // Bug #13990: Builder saved view restores the wrong stream
+  // https://github.com/openobserve/openobserve/issues/13990
+  // ==========================================================================
+  test('Builder saved view restores the stream it was saved with @bug-13990 @P1 @regression @logsRegression @savedViews @queryBuilder', {
+    tag: ['@bug-13990', '@P1', '@regression', '@logsRegression', '@savedViews', '@queryBuilder']
+  }, async ({ page }) => {
+    testLogger.info('Test: Builder saved view restores its own stream (Bug #13990)');
+
+    const savedViewName = `streamslog_build_13990_${Date.now()}`;
+    const otherStream = 'e2e_13990_other_' + Math.random().toString(36).slice(2, 7);
+
+    // A second stream to move away to; without it the assertion would hold
+    // trivially, since the page would never have left the saved stream.
+    const orgId = getOrgIdentifier() || 'default';
+    await sendRequest(page, getIngestionUrl(orgId, otherStream), [{
+      level: 'info', job: 'test_13990', log: 'second stream for saved view restore', e2e: '1',
+    }], getHeaders());
+    fieldCacheStreamsToCleanup.push(otherStream);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=${orgId}`);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await pm.logsPage.expectLogsSearchIndexListContainsText('e2e_automate');
+
+    await createBuilderSavedView(pm, page, savedViewName, 'line');
+
+    await pm.logsPage.selectStream(otherStream);
+    await pm.logsPage.expectLogsSearchIndexListContainsText(otherStream);
+    testLogger.info(`Moved to ${otherStream} before applying the saved view`);
+
+    await applySavedViewByName(pm, page, savedViewName);
+
+    // The defect restored an unrelated stream, so the stream is the contract here
+    // rather than the chart type that #14228 covers.
+    await pm.logsPage.expectLogsSearchIndexListContainsText('e2e_automate');
+    testLogger.info('Saved view restored its original stream');
+  });
+
   test("should apply a builder saved view while already on the build tab", {
     tag: ['@bug-14228', '@P1', '@regression', '@logsRegression', '@savedViews', '@queryBuilder']
   }, async ({ page }) => {
