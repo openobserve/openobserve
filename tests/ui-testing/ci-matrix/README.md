@@ -30,6 +30,16 @@ in **both** repos automatically — no more hand-syncing two workflow files.
 
 ## Adding / moving a spec
 
+- **A regression spec** (covers a bug fix / regression scenario, not new-feature
+  coverage): place it under `playwright-tests/RegressionSet/<Feature>/`, matching
+  existing folders (`RegressionSet/Logs`, `RegressionSet/Alerts`,
+  `RegressionSet/Pipelines`, …) — never a bare top-level `playwright-tests/<Feature>/`
+  folder. Then add/extend a shard in `ci_matrix_regression.json` (drives
+  `playwright_bugfix_regression.yml`), following the `"<Feature>-Regression"`
+  testfolder naming pattern with `"actual_folder": "RegressionSet/<Feature>"`.
+  `playwright.config.js`'s `testDir` covers the whole `playwright-tests` tree with no
+  ignore, so an unplaced/unwired spec still silently runs in any full/unsharded sweep
+  instead of through a named, reported shard.
 - **A spec both OSS and ENT run:** edit `ci_matrix.json` only. Add the filename to the
   `run_files` of the right shard (`testfolder`). Done — ENT picks it up on its next run.
 - **An enterprise-only spec:** edit `o2-enterprise/tests/ui-testing/ci-matrix/ci_matrix.ent.json`
@@ -100,3 +110,81 @@ A spec cannot be in both `run_files` and `disabled` — the build fails if it is
 
 The ENT overlay only ever carries the **delta** from OSS. It must not re-list any spec
 already in `ci_matrix.json`; `build-ci-matrix.js` fails the run if it does.
+
+## What the build script validates
+
+Every workflow that builds its matrix through `build-ci-matrix.js` gets the same checks,
+so a bad manifest fails at `generate_matrix` instead of somewhere downstream:
+
+- unique `testfolder`, no shard with an empty `run_files`
+- no spec listed twice — **within a shard or across two shards**. Two shards listing the
+  same spec silently runs it twice; it happens when two PRs register the same new spec in
+  different shards.
+- no spec in both `run_files` and `disabled`
+- a shard with no `run_files` **and** no `disabled` entries is rejected: it records nothing
+  and runs nothing. An entry with no `run_files` but a populated `disabled` array is a
+  documentation-only entry (used by `ci_matrix_cloud.json` to record why a whole module
+  stays off a suite); it is skipped, never emitted, and logged as such.
+- **every `run_files` entry exists on disk.** This is the one that cannot be seen from a
+  green run: `playwright_alpha1.yml` skips a missing path with a warning, and a Playwright
+  path argument matching nothing simply selects no tests — so a renamed or split spec stops
+  running while its shard stays green. Paths resolve against `../playwright-tests/` next to
+  the manifest; the check is skipped (with a log line) if that tree is not checked out.
+
+---
+---
+
+## The alpha1 cloud matrix (`ci_matrix_cloud.json`, ENT repo)
+
+Alpha1 runs nightly against a shared, deployed cloud env, so it is **deliberately a
+subset** of the PR gate. Alpha mirrors production: a feature that is off in cloud is off
+here too, and its specs do not belong in this manifest at all.
+
+Because that manifest is standalone (no OSS base, no merge), a spec added to
+`ci_matrix.json` never reaches alpha on its own. **That is not a failure, and adding a
+spec here is nobody's obligation in a PR** — the author of an OSS spec has no way to know
+whether it works on cloud, and a guessed reason is worse than none.
+
+Review the delta on purpose now and then instead — monthly is plenty. Nothing enforces
+it, and nothing should: an alpha shard is only worth adding once someone has confirmed it
+passes there.
+
+The one thing CI does enforce is that a manifest cannot name a spec that no longer exists.
+For `ci_matrix_cloud.json` that check lives in the shard's own test step, because alpha1
+builds its matrix directly from the manifest; for the manifests built through
+`build-ci-matrix.js` it happens earlier, at `generate_matrix`. Neither existed when
+`logsQueryBuilder.spec.js` stayed listed for ~4 months after it was split — the test step
+printed a cross and carried on, so the shard lost its coverage while the job stayed green.
+
+### Deciding whether a spec belongs on alpha
+
+**Check whether the feature is even on in cloud first.** The infra repo is the source of
+truth, not the code defaults:
+
+```
+infra/apps/eks-o2-alpha/values.yaml        # alpha
+infra/apps/eks-eu1-o2-prod/values.yaml     # prod (also eks-ap1, aks-us2)
+```
+
+Off in alpha *and* prod means a product decision, not an alpha gap — `Workflows`
+(`O2_WORKFLOWS_ENABLED=false` everywhere) and `Reports` (hidden via
+`O2_CUSTOM_HIDE_MENUS`) are both. Watch for commented-out entries in those files; a
+careless grep reports flags that are not actually set.
+
+Other things that keep a spec off alpha:
+
+- needs a boot flag the deployment fixes — `ZO_QUICK_MODE_ENABLED`, `ingest_allowed_upto`
+- mutates shared state other shards depend on — org users, the org RUM token
+- the spec already self-skips on cloud (`test.skip(isCloudEnvironment(), …)`)
+- the product genuinely differs on cloud — no internal login form (Dex OIDC), tabs hidden
+
+Prove a spec passes on alpha before adding it. Adding a batch and letting the nightly
+sort them out costs the suite its credibility.
+
+### Modules with no alpha shard
+
+When every spec in a module is ruled out, there is no shard to hang the `disabled`
+entries on. Add a **documentation-only** entry: same shape, but `"run_files": []`.
+`generate_matrix` filters those out, so they never become a job — they exist only to
+record the verdict. See the `Workflows`, `Reports`, `SLO`, `RUM` and `Logs-SelectStar`
+entries.

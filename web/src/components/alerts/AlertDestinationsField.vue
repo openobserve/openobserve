@@ -73,7 +73,8 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
-import workflowService from "@/services/workflows";
+import { workflowsQuery } from "@/services/workflows.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import config from "@/aws-exports";
 
 type RawOption = string | { label: I18nText; value: string };
@@ -129,11 +130,19 @@ const workflowsEnabled = computed(
 );
 
 const workflowOptions = ref<{ label: I18nText; value: string }[]>([]);
-const fetchWorkflows = async () => {
+const fetchWorkflows = async (force = false) => {
   if (!workflowsEnabled.value) return;
   try {
-    const res = await workflowService.listWorkflows(store.state.selectedOrganization.identifier);
-    const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    const options = workflowsQuery(store.state.selectedOrganization.identifier);
+    // A workflow created in the new tab never expires this tab's cache, so refresh must force.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const list = await queryClient.fetchQuery(options);
     // Drafts aren't runnable/published, so they can't be linked to an alert —
     // only offer non-draft (published) workflows.
     workflowOptions.value = list
@@ -143,12 +152,12 @@ const fetchWorkflows = async () => {
     workflowOptions.value = [];
   }
 };
-onMounted(fetchWorkflows);
+onMounted(() => fetchWorkflows());
 
 // The combined field's single refresh reloads both lists.
 const refreshTargets = () => {
   emit("refresh");
-  fetchWorkflows();
+  fetchWorkflows(true);
 };
 
 // New tab, not navigation: leaving the form here would discard the alert

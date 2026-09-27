@@ -72,8 +72,9 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 // Mock all external services used inside EditRole.vue
-vi.mock("@/services/iam", () => ({
-  getResources: vi.fn(async () => ({
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const getResources = vi.fn(async () => ({
     data: [
       {
         key: "stream",
@@ -215,84 +216,152 @@ vi.mock("@/services/iam", () => ({
         visible: true,
         order: 17,
       },
+      {
+        key: "synthetic_environment",
+        display_name: "Synthetic Environments",
+        has_entities: true,
+        top_level: true,
+        visible: true,
+        order: 18,
+      },
     ],
-  })),
-  getResourcePermission: vi.fn(async () => ({ data: [] })),
-  getAllRolePermissions: vi.fn(async () => ({ data: [] })),
-  getRoleUsers: vi.fn(async () => ({ data: ["u1@example.com", "u2@example.com"] })),
-  updateRole: vi.fn(async () => ({ data: { code: 200 } })),
-  getGroups: vi.fn(async () => ({ data: [] })),
-  getRoles: vi.fn(async () => ({ data: [] })),
-}));
+  }));
+  const getAllRolePermissions = vi.fn(async () => ({ data: [] }));
+  return overlayServiceMock(await importOriginal(), {
+    getResources,
+    getResourcePermission: vi.fn(async () => ({ data: [] })),
+    getAllRolePermissions,
+    getRoleUsers: vi.fn(async () => ({ data: ["u1@example.com", "u2@example.com"] })),
+    updateRole: vi.fn(async () => ({ data: { code: 200 } })),
+    getGroups: vi.fn(async () => ({ data: [] })),
+    getRoles: vi.fn(async () => ({ data: [] })),
+  });
+});
 
-vi.mock("@/services/stream", () => ({ default: {} }));
-vi.mock("@/services/pipelines", () => ({
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPipelines: vi.fn(async () => ({ data: { list: [{ pipeline_id: "p1", name: "P1" }] } })),
+    },
+  });
+});
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: vi.fn(async () => ({ data: { list: [{ alertId: "a1", name: "A1" }] } })),
+    },
+  });
+});
+vi.mock("@/services/synthetics", () => ({
   default: {
-    getPipelines: vi.fn(async () => ({ data: { list: [{ pipeline_id: "p1", name: "P1" }] } })),
-  },
-}));
-vi.mock("@/services/alerts", () => ({
-  default: {
-    listByFolderId: vi.fn(async () => ({ data: { list: [{ alertId: "a1", name: "A1" }] } })),
-  },
-}));
-vi.mock("@/services/reports", () => ({
-  default: { list: vi.fn(async () => ({ data: [{ name: "r1" }] })) },
-}));
-vi.mock("@/services/alert_templates", () => ({
-  default: { list: vi.fn(async () => ({ data: [{ name: "t1" }] })) },
-}));
-vi.mock("@/services/alert_destination", () => ({
-  default: { list: vi.fn(async () => ({ data: [{ name: "dest1" }] })) },
-}));
-vi.mock("@/services/jstransform", () => ({
-  default: { list: vi.fn(async () => ({ data: { list: [{ name: "f1" }] } })) },
-}));
-vi.mock("@/services/organizations", () => ({
-  default: {
-    list: vi.fn(async () => ({ data: { data: [{ identifier: "org1" }, { identifier: "org2" }] } })),
-  },
-}));
-vi.mock("@/services/saved_views", () => ({
-  default: { get: vi.fn(async () => ({ data: { views: [{ view_id: "v1", view_name: "V1" }] } })) },
-}));
-vi.mock("@/services/dashboards", () => ({
-  default: {
-    list: vi.fn(async () => ({ data: { dashboards: [{ dashboardId: "d1", title: "D1" }] } })),
-    list_Folders: vi.fn(async () => ({
-      data: { list: [{ folderId: "default", name: "default" }] },
+    listEnvironments: vi.fn(async () => ({
+      data: [
+        { id: "org/staging", name: "staging", is_global: false },
+        { id: "global_org", name: "global", is_global: true },
+      ],
     })),
   },
 }));
-vi.mock("@/services/service_accounts", () => ({
-  default: { list: vi.fn(async () => ({ data: { data: ["svc1@example.com"] } })) },
-}));
-vi.mock("@/services/cipher_keys", () => ({
-  default: { list: vi.fn(async () => ({ data: { keys: [{ name: "key1" }] } })) },
-}));
-vi.mock("@/services/common", () => ({
-  default: {
-    list_Folders: vi.fn(async () => ({
-      data: { list: [{ folderId: "default", name: "default" }] },
-    })),
-  },
-}));
-vi.mock("@/services/online-evals.service", () => ({
-  default: {
-    providers: {
-      list: vi.fn(async () => [{ id: "openai", name: "OpenAI" }]),
+vi.mock("@/services/reports", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: [{ name: "r1" }] })) },
+  });
+});
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: [{ name: "t1" }] })) },
+  });
+});
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: [{ name: "dest1" }] })) },
+  });
+});
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: { list: [{ name: "f1" }] } })) },
+  });
+});
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(async () => ({
+        data: { data: [{ identifier: "org1" }, { identifier: "org2" }] },
+      })),
     },
-    scoreConfigs: {
-      list: vi.fn(async () => [{ entity_id: "quality-score", name: "Quality Score" }]),
+  });
+});
+vi.mock("@/services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn(async () => ({ data: { views: [{ view_id: "v1", view_name: "V1" }] } })),
     },
-    scorers: {
-      list: vi.fn(async () => [{ entityId: "llm-judge", name: "LLM Judge" }]),
+  });
+});
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(async () => ({ data: { dashboards: [{ dashboardId: "d1", title: "D1" }] } })),
+      list_Folders: vi.fn(async () => ({
+        data: { list: [{ folderId: "default", name: "default" }] },
+      })),
     },
-    jobs: {
-      list: vi.fn(async () => [{ id: "daily-eval", name: "Daily Eval" }]),
+  });
+});
+vi.mock("@/services/service_accounts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: { data: ["svc1@example.com"] } })) },
+  });
+});
+vi.mock("@/services/cipher_keys", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(async () => ({ data: { keys: [{ name: "key1" }] } })) },
+  });
+});
+vi.mock("@/services/common", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_Folders: vi.fn(async () => ({
+        data: { list: [{ folderId: "default", name: "default" }] },
+      })),
     },
-  },
-}));
+  });
+});
+vi.mock("@/services/online-evals.service", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      providers: {
+        list: vi.fn(async () => [{ id: "openai", name: "OpenAI" }]),
+      },
+      scoreConfigs: {
+        list: vi.fn(async () => [{ entity_id: "quality-score", name: "Quality Score" }]),
+      },
+      scorers: {
+        list: vi.fn(async () => [{ entityId: "llm-judge", name: "LLM Judge" }]),
+      },
+      jobs: {
+        list: vi.fn(async () => [{ id: "daily-eval", name: "Daily Eval" }]),
+      },
+    },
+  });
+});
 vi.mock("@/services/llm-queues.service", () => ({
   default: {
     list: vi.fn(async () => [{ id: "review-queue", name: "Review Queue" }]),
@@ -309,6 +378,7 @@ import EditRole from "@/components/iam/roles/EditRole.vue";
 import onlineEvalsService from "@/services/online-evals.service";
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import syntheticsService from "@/services/synthetics";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -534,6 +604,22 @@ describe("EditRole - entities population", () => {
       "name",
     );
     expect(wrapper.vm.permissionsState.permissions[0].entities.length).toBe(1);
+  });
+
+  it("getResourceEntities loads synthetic environments keyed by name", async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "synthetic_environment",
+    );
+
+    await wrapper.vm.getResourceEntities(resource);
+
+    expect(syntheticsService.listEnvironments).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+    );
+    expect(resource.entities.map((e) => e.name)).toEqual(["staging", "global"]);
+    expect(resource.is_loading).toBe(false);
   });
 
   it("getResourceEntities loads provider entities", async () => {

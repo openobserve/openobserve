@@ -32,6 +32,9 @@ pub struct ServiceGraphQuery {
     pub agent_id: Option<String>,
     pub agent_name: Option<String>,
     pub agent_env: Option<String>,
+    /// `v1` or `v4` pins the engine for side-by-side checks; anything else follows the cutover
+    /// state.
+    pub source: Option<String>,
 }
 
 /// GetCurrentTopology
@@ -49,6 +52,7 @@ pub struct ServiceGraphQuery {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph topology"),
+        ("source" = Option<String>, Query, description = "Force the engine: v1 (edge stream) or v4 (metrics); default follows the cutover state"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -74,8 +78,19 @@ pub async fn get_current_topology(
             (now - window_micros, now)
         };
 
-    if super::use_v4_source(&org_id).await {
-        return MetaHttpResponse::json(topology_v4(&org_id, &query, start_time, end_time).await);
+    let use_v4 = match query.source.as_deref() {
+        Some("v1") => false,
+        Some("v4") => true,
+        _ => super::use_v4_source(&org_id).await,
+    };
+    if use_v4 {
+        return match topology_v4(&org_id, &query, start_time, end_time).await {
+            Ok(data) => MetaHttpResponse::json(data),
+            Err(e) => {
+                log::warn!("[ServiceGraph] v4 topology read failed for org '{org_id}': {e}");
+                MetaHttpResponse::internal_error(e)
+            }
+        };
     }
     MetaHttpResponse::json(topology_v1(&org_id, &query, start_time, end_time).await)
 }
@@ -86,26 +101,19 @@ async fn topology_v4(
     query: &ServiceGraphQuery,
     start_time: i64,
     end_time: i64,
-) -> config::meta::service_graph::ServiceGraphData {
+) -> Result<config::meta::service_graph::ServiceGraphData, anyhow::Error> {
     use config::meta::service_graph::ServiceGraphData;
 
     use super::v4::read::fetch_topology;
 
     let filter = v4_read_filter(query);
-    match fetch_topology(org_id, &filter, start_time, end_time).await {
-        Ok((input, meta)) => {
-            let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology_v4(input);
-            ServiceGraphData {
-                nodes,
-                edges,
-                meta: Some(meta),
-            }
-        }
-        Err(e) => {
-            log::warn!("[ServiceGraph] v4 topology read failed for org '{org_id}': {e}");
-            empty_graph("v4")
-        }
-    }
+    let (input, meta) = fetch_topology(org_id, &filter, start_time, end_time).await?;
+    let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology_v4(input);
+    Ok(ServiceGraphData {
+        nodes,
+        edges,
+        meta: Some(meta),
+    })
 }
 
 /// `stream_name=all` is the front end's "every stream" choice, not a stream.
@@ -783,6 +791,7 @@ mod tests {
             agent_id: Some("id".to_string()),
             agent_name: Some("name".to_string()),
             agent_env: env.map(str::to_string),
+            source: None,
         };
         let f = v4_read_filter(&query(None, None));
         assert!(f.is_empty());

@@ -39,23 +39,30 @@ const {
 
 // ── Service mocks ──────────────────────────────────────────────────────────────
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    get_all_enrichment_table_statuses: mockGetAllEnrichmentTableStatuses,
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_all_enrichment_table_statuses: mockGetAllEnrichmentTableStatuses,
+    },
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
+    getStreamsFetchedAt: vi.fn(async () => undefined),
     resetStreamType: mockResetStreamType,
     getStream: mockGetStream,
   }),
 }));
 
-vi.mock("@/services/stream", () => ({
-  default: { delete: vi.fn() },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { delete: vi.fn() },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
@@ -540,14 +547,15 @@ describe("EnrichmentTableList", () => {
       vi.useFakeTimers();
       const vm = wrapper.vm as any;
       vm.currentPage = 3;
-      const setPageIndex = vi.fn();
-      vm.oTableRef = { table: { setPageIndex } };
+      const restorePage = vi.fn();
+      vm.oTableRef = { restorePage };
 
       vm.restorePageIndex();
-      expect(setPageIndex).not.toHaveBeenCalled();
+      expect(restorePage).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
-      expect(setPageIndex).toHaveBeenCalledWith(2);
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
+      expect(restorePage).toHaveBeenCalledWith(3);
     });
 
     it("keeps the page after Cancel unmounts and remounts OTable via the AddEnrichmentTable v-if swap", async () => {

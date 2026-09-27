@@ -15,7 +15,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { EscalationLevel, Rotation, ShiftRule, TimeWindow } from "@/ts/interfaces/oncall";
+import type {
+  EscalationLevel,
+  EscalationTarget,
+  Rotation,
+  ShiftRule,
+  TimeWindow,
+} from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import {
   CHANNEL_WAKES,
@@ -48,6 +54,7 @@ import {
   parseRoutingReason,
   promoteSeverityFloor,
   promoteSeverityOptions,
+  resolvableTimezones,
   resolveHolder,
   resolveLadder,
   resolveNextHolder,
@@ -318,6 +325,15 @@ describe("describeTarget", () => {
   it("says a rotation is gone rather than printing its id", () => {
     expect(describeTarget({ kind: "rotation", rotation_id: "rot_gone" }, t, null)).toBe(
       "oncall.target_rotation_deleted",
+    );
+  });
+
+  /// A retired kind from an unmigrated policy or a mixed-version deployment is
+  /// not a rotation at all, so it must not be told apart from "deleted" — that
+  /// is a specific, wrong claim about something the screen never identified.
+  it("says a target is unrecognized rather than guessing it is a deleted rotation", () => {
+    expect(describeTarget({ kind: "next_on_call" } as unknown as EscalationTarget, t, null)).toBe(
+      "oncall.target_unrecognized",
     );
   });
 });
@@ -913,6 +929,30 @@ describe("resolveNextHolder", () => {
 
   it("is null when nobody is on call", () => {
     expect(resolveNextHolder(rota("P", []), ANCHOR, IST)).toBeNull();
+  });
+});
+
+describe("resolvableTimezones", () => {
+  it("includes UTC and the zones the runtime reports", () => {
+    const zones = resolvableTimezones();
+    expect(zones).toContain("UTC");
+    expect(zones).toContain("America/New_York");
+  });
+
+  it.each(["Asia/Kolkata", "Asia/Ho_Chi_Minh", "Europe/Kyiv", "America/Nuuk"])(
+    "offers the modern name %s even though it isn't in the canonical list",
+    (zone) => {
+      expect(resolvableTimezones()).toContain(zone);
+    },
+  );
+
+  it("still offers the pre-rename id, so old data keeps resolving", () => {
+    expect(resolvableTimezones()).toContain("Asia/Calcutta");
+  });
+
+  it("adds a preferred zone missing from the list, without duplicating one already in it", () => {
+    expect(resolvableTimezones("US/Eastern")).toContain("US/Eastern");
+    expect(resolvableTimezones("UTC").filter((z) => z === "UTC")).toHaveLength(1);
   });
 });
 
@@ -1553,6 +1593,19 @@ describe("toZonedInputValue / fromZonedInputValue", () => {
     for (const partial of ["", "2026", "2026-08", "2026-08-17", "not a date"]) {
       expect(fromZonedInputValue(partial, "UTC"), partial).toBeNull();
     }
+  });
+
+  /// A date field mid-edit (e.g. the year segment re-typed digit by digit)
+  /// round-trips a *zero-padded* partial year through this function —
+  /// `@internationalized/date` pads "19" (two digits typed so far) out to
+  /// "0019". `Date.UTC`'s legacy two-digit-year rule folds any 0-99 year to
+  /// 1900-1999, so a naive implementation reads that as 1919 and commits it,
+  /// stomping whatever the user was typing (issue #14854: rotation "First
+  /// handover" year snapping to 1919 mid-edit). The correct reading is the
+  /// literal year 19.
+  it("does not fold a small zero-padded year into 19xx", () => {
+    const literalYear19 = new Date("0019-09-26T10:00:00.000Z").getTime() * 1000;
+    expect(fromZonedInputValue("0019-09-26T10:00", "UTC")).toBe(literalYear19);
   });
 
   it("falls back rather than throwing on a zone the runtime cannot resolve", () => {

@@ -251,6 +251,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { updateRoleMutation } from "@/services/iam.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { resourcesQuery } from "@/services/iam.queries";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import { cloneDeep } from "lodash-es";
 import { computed, defineAsyncComponent, nextTick, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -267,12 +274,10 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { updateRole, getResources, getAllRolePermissions, getRoleUsers } from "@/services/iam";
+import { getAllRolePermissions, getRoleUsers } from "@/services/iam";
 import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
-import templateService from "@/services/alert_templates";
-import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
 import savedviewsService from "@/services/saved_views";
@@ -288,10 +293,12 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
+import type { SyntheticsEnvironment } from "@/types/synthetics";
 import workflowService from "@/services/workflows";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
+
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
 import {
@@ -482,6 +489,9 @@ const filteredResources: Ref<any[]> = ref([]);
 
 const resourceOptions: Ref<any[]> = ref([]);
 
+const orgId = useOrgId();
+const updateRoleOne = useMutation(() => updateRoleMutation(orgId.value));
+
 const updateActiveTab = (tab: string) => {
   if (!tab) return;
   activeTab.value = tab;
@@ -490,9 +500,10 @@ const updateActiveTab = (tab: string) => {
 const getRoleDetails = () => {
   isFetchingInitialRoles.value = true;
 
-  getResources(store.state.selectedOrganization.identifier)
-    .then(async (res) => {
-      permissionsState.resources = res.data
+  queryClient
+    .fetchQuery(resourcesQuery(store.state.selectedOrganization.identifier))
+    .then(async (res: any) => {
+      permissionsState.resources = res
         .sort((a: any, b: any) => a.order - b.order)
         .filter((resource: any) => resource.visible);
 
@@ -1584,6 +1595,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     rfolder: getReportFolders,
     synthetic_folder: getSyntheticsFolders,
     synthetics: getSynthetics,
+    synthetic_environment: getSyntheticEnvironments,
     workflow_folder: getWorkflowFolders,
     workflows: getWorkflows,
     re_patterns: getRePatterns,
@@ -1767,6 +1779,13 @@ const getSynthetics = async (resource: Entity | Resource) => {
     resolve(true);
   });
 };
+const getSyntheticEnvironments = async () => {
+  // Grants are written against the environment name, so the name is the entity key.
+  const res = await syntheticsService.listEnvironments(store.state.selectedOrganization.identifier);
+  const environments: SyntheticsEnvironment[] = res.data ?? [];
+  updateResourceEntities("synthetic_environment", ["name"], [...environments]);
+  return true;
+};
 const getWorkflowFolders = async () => {
   const folders: any = await commonService.list_Folders(
     store.state.selectedOrganization.identifier,
@@ -1842,12 +1861,11 @@ const getFunctions = async () => {
 };
 
 const getDestinations = async () => {
-  const destinations = await destinationService.list({
-    sort_by: "name",
-    org_identifier: store.state.selectedOrganization.identifier,
-  });
+  const destinations = await queryClient.fetchQuery(
+    destinationsQuery(store.state.selectedOrganization.identifier),
+  );
 
-  updateResourceEntities("destination", ["name"], [...destinations.data]);
+  updateResourceEntities("destination", ["name"], [...destinations]);
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1855,11 +1873,11 @@ const getDestinations = async () => {
 };
 
 const getTemplates = async () => {
-  const templates = await templateService.list({
-    org_identifier: store.state.selectedOrganization.identifier,
-  });
+  const templates = await queryClient.fetchQuery(
+    templatesQuery(store.state.selectedOrganization.identifier),
+  );
 
-  updateResourceEntities("template", ["name"], [...templates.data]);
+  updateResourceEntities("template", ["name"], [...templates]);
 
   return new Promise((resolve) => {
     resolve(true);
@@ -2460,11 +2478,9 @@ const saveRole = () => {
     return;
   }
 
-  updateRole({
-    role_id: editingRole.value,
-    org_identifier: store.state.selectedOrganization.identifier,
-    payload,
-  })
+  // Was: invalidate, then update — the refetch raced the write.
+  updateRoleOne
+    .mutateAsync({ role_id: editingRole.value, payload })
     .then(async () => {
       // combine permissionsHash and selectedPermissionsHash
 

@@ -24,7 +24,7 @@ use config::meta::{
         components::{NodeData, PipelineSource},
     },
     search::SearchEventType,
-    stream::ListStreamParams,
+    stream::{ListStreamParams, StreamParams},
     triggers::{Trigger, TriggerModule},
 };
 
@@ -61,6 +61,34 @@ async fn validate_no_javascript_functions(pipeline: &Pipeline) -> Result<(), Pip
     Ok(())
 }
 
+/// An absent source org_id would slip past the realtime exclusivity check and never
+/// match the execution cache key, both of which compare fully-qualified StreamParams.
+fn default_source_org(pipeline: &mut Pipeline) {
+    let org = pipeline.org.clone();
+    if let PipelineSource::Realtime(stream) = &mut pipeline.source
+        && stream.org_id.is_empty()
+    {
+        stream.org_id = org.clone().into();
+    }
+    // validate() rebuilds source from the first node, discarding the line above.
+    if let Some(node) = pipeline.nodes.first_mut()
+        && let NodeData::Stream(stream) = &mut node.data
+        && stream.org_id.is_empty()
+    {
+        stream.org_id = org.into();
+    }
+}
+
+/// Sources persisted before they were qualified carry an empty org, which means the
+/// pipeline's own org: without this they escape the guard forever.
+fn qualified_org<'a>(stream: &'a StreamParams, org: &'a str) -> &'a str {
+    if stream.org_id.is_empty() {
+        org
+    } else {
+        stream.org_id.as_ref()
+    }
+}
+
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
     // check if id is missing
@@ -69,20 +97,30 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
             "Missing pipeline ID".to_string(),
         ));
     }
-    // User pipelines: only one realtime pipeline per stream
+    default_source_org(&mut pipeline);
+
+    // validate pipeline
+    if let Err(e) = pipeline.validate() {
+        return Err(PipelineError::InvalidPipeline(e.to_string()));
+    }
+
+    // Runs after validate(), which rebuilds source from the first node: checking
+    // pipeline.source before that compares a value which is never persisted.
     // Evaluation pipelines: any number allowed, no exclusivity check
     if pipeline.is_user()
         && let PipelineSource::Realtime(stream) = &pipeline.source
         && pipeline::list_streams_with_pipeline(&pipeline.org)
             .await
-            .is_ok_and(|list| list.iter().any(|existing| existing == stream))
+            .is_ok_and(|list| {
+                list.iter().any(|existing| {
+                    existing.stream_name == stream.stream_name
+                        && existing.stream_type == stream.stream_type
+                        && qualified_org(existing, &pipeline.org)
+                            == qualified_org(stream, &pipeline.org)
+                })
+            })
     {
         return Err(PipelineError::StreamInUse);
-    }
-
-    // validate pipeline
-    if let Err(e) = pipeline.validate() {
-        return Err(PipelineError::InvalidPipeline(e.to_string()));
     }
 
     // validate no JavaScript functions in pipeline
@@ -127,9 +165,13 @@ pub async fn save_user_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineEr
 
 #[tracing::instrument(skip(pipeline))]
 pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
-    let Ok(existing_pipeline) = pipeline::get_by_id(&pipeline.id).await else {
+    default_source_org(&mut pipeline);
+
+    let Ok(mut existing_pipeline) = pipeline::get_by_id(&pipeline.id).await else {
         return Err(PipelineError::NotFound(pipeline.id));
     };
+    // Both sides, or a legacy row's empty org reads as a source change on every edit.
+    default_source_org(&mut existing_pipeline);
 
     if existing_pipeline == pipeline {
         return Ok(());

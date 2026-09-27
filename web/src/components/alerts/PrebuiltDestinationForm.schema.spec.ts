@@ -80,14 +80,23 @@ describe("prebuilt credential schema - required + per-type validators", () => {
   });
 
   it("email: requires recipients", () => {
-    expect(makePrebuiltDestinationSchema(t, "email").safeParse({ recipients: "" }).success).toBe(
+    expect(makePrebuiltDestinationSchema(t, "email").safeParse({ recipients: [] }).success).toBe(
       false,
     );
     expect(
-      makePrebuiltDestinationSchema(t, "email").safeParse({
-        recipients: "user@example.com",
-      }).success,
+      makePrebuiltDestinationSchema(t, "email").safeParse({ recipients: ["user@example.com"] })
+        .success,
     ).toBe(true);
+  });
+
+  it("email: a legacy comma-separated string is normalized to an array", () => {
+    const res = makePrebuiltDestinationSchema(t, "email").safeParse({
+      recipients: "a@example.com, b@example.com",
+    });
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.recipients).toEqual(["a@example.com", "b@example.com"]);
+    }
   });
 
   it("opsgenie: optional priority/euRegion do not block a valid apiKey", () => {

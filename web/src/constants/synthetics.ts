@@ -276,6 +276,9 @@ export const DEFAULT_SETTLE_BUDGET_MS = 30000;
 export const MIN_SETTLE_BUDGET_MS = 100;
 export const MAX_SETTLE_BUDGET_MS = 60000;
 
+/** Mirrors the server's MAX_ENVIRONMENTS_PER_CHECK — job volume is envs × locations × devices. */
+export const MAX_CHECK_ENVIRONMENTS = 5;
+
 // ── Value field widths ───────────────────────────────────────────────────
 export const VALUE_WIDTH_MAP: Record<string, string> = {
   wait: "w-50!",

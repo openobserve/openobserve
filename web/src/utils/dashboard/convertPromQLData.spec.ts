@@ -4279,6 +4279,41 @@ describe("Convert PromQL Data Utils", () => {
         expect(tooltipResult).toBe(""); // Should return empty string for different panel
       });
 
+      it("should escape HTML in series names in the chart and legend tooltips", async () => {
+        const payload = '<img src=x onerror="alert(1)">';
+        const escaped = "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;";
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {},
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [{ metric: { instance: payload }, values: [[1640435200, "100"]] }],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const tooltipResult = result.options.tooltip.formatter([
+          { data: [1640435200 * 1000, 100], seriesName: payload, marker: "●" },
+        ]);
+        expect(tooltipResult).not.toContain("<img");
+        expect(tooltipResult).toContain(escaped);
+
+        const legendResult = result.options.legend.tooltip.formatter({ name: payload });
+        expect(legendResult).toBe(escaped);
+      });
+
       it("should handle empty tooltip data", async () => {
         const panelSchema = {
           id: "panel1",

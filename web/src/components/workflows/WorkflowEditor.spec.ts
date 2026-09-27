@@ -18,7 +18,7 @@
 // run-history wiring. The canvas / node forms / drawers are stubbed — the real
 // useWorkflowCanvas singleton (workflowObj) is kept, since that IS the contract.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 const { mockRouter, mockToast, uuidState } = vi.hoisted(() => ({
   mockRouter: {
@@ -55,16 +55,19 @@ vi.mock("@vue-flow/core", () => ({
   }),
 }));
 
-vi.mock("@/services/workflows", () => ({
-  default: {
-    listWorkflows: vi.fn(),
-    createWorkflow: vi.fn(),
-    updateWorkflow: vi.fn(),
-    promoteWorkflow: vi.fn(),
-    getWorkflowRun: vi.fn(),
-    testWorkflow: vi.fn(),
-  },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listWorkflows: vi.fn(),
+      createWorkflow: vi.fn(),
+      updateWorkflow: vi.fn(),
+      promoteWorkflow: vi.fn(),
+      getWorkflowRun: vi.fn(),
+      testWorkflow: vi.fn(),
+    },
+  });
+});
 
 const { stub } = vi.hoisted(() => ({
   stub: (name: string, opts: any = {}) => ({
@@ -93,7 +96,6 @@ vi.mock("@/components/flow/NodePalette.vue", () =>
   }),
 );
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";

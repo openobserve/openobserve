@@ -111,10 +111,15 @@ impl Ingest for Ingester {
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
                     // internal ingestion does not require email id
-                    openobserve_core::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, internal_user)
-                        .await
-                        .map(|_| ()) // we don't care about success response
-                        .map_err(|e| Error::IngestionError(format!("error in ingesting traces {e}")))
+                    match openobserve_core::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, internal_user).await {
+                        Err(e) => Err(Error::IngestionError(format!("error in ingesting traces {e}"))),
+                        // overload and write failures come back as an error status, not as Err
+                        Ok(res) if !res.status().is_success() => Err(Error::IngestionError(format!(
+                            "error in ingesting traces: http code {}",
+                            res.status()
+                        ))),
+                        Ok(_) => Ok(()),
+                    }
                 }
             }
             StreamType::EnrichmentTables => {

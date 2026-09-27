@@ -1474,6 +1474,8 @@
     "sessionReplay": "セッションリプレイ",
     "viewSessionReplay": "セッションリプレイを表示",
     "playSessionReplay": "セッションリプレイを再生",
+    "noReplayRecordedTitle": "このセッションのリプレイは記録されていません",
+    "noReplayRecordedMessage": "セッション {id} には再生できるリプレイセグメントがありません。",
     "discoverSessionTitle": "ユーザーインタラクションを詳細に理解するためのセッションリプレイをご覧ください",
     "discoverSessionMessage": "セッションリプレイは、ウェブサイトまたはアプリケーションでのユーザーインタラクションをキャプチャして再生します。これにより、ユーザーがどのようにナビゲートしたか、どこをクリックしたか、何を入力したか、コンテンツにどのように反応したかを視覚的に確認できます。",
     "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "無料トライアルを開始"
   },
   "login": {
+    "lockedOut": "サインインの失敗回数が多すぎます。{duration}後に再試行するか、管理者にお問い合わせください。",
     "redirectingToSsoMessage": "SSOログインページにリダイレクトしています。リダイレクトされない場合は、",
     "clickHere": "ここをクリック",
     "loginWithSso": "SSOでログイン",
@@ -1954,6 +1957,7 @@
     "ok": "OK",
     "sendInvite": "招待を送信",
     "inviteByEmail": "メールで招待します。セミコロン (;) またはコンマ (,) で区切られた複数のEメール",
+    "inviteByEmailPlaceholder": "メールで招待",
     "changePassword": "パスワードを変更",
     "oldPassword": "古いパスワード",
     "newPassword": "新しいパスワード",
@@ -1962,6 +1966,15 @@
     "fieldRequired": "フィールドは必須です",
     "passwordRequired": "パスワードが必要です。",
     "passwordPolicyHint": "パスワードは 8 ～ 128 文字で、少なくとも 1 つの小文字、1 つの大文字、1 つの数字、1 つの特殊文字を含む必要があります。",
+    "lockout": {
+      "locked": "アカウントがロックされています",
+      "autoUnlock": "{duration}後に自動的にロックが解除されます。",
+      "staged": "保存するとロックが解除されます。",
+      "unlock": "ロックを解除",
+      "undo": "ロックを維持",
+      "confirmTitle": "{email} のロックを解除しますか？",
+      "confirmMessage": "失敗回数がクリアされ、すぐに再度サインインできるようになります。パスワードは変更されません。"
+    },
     "currentPasswordRequired": "現在のパスワードが必要です。",
     "newPasswordRequired": "新しいパスワードが必要です。",
     "otherOrgInvalid": "組織名は文字で始まり、英数字、_ または-でなければなりません。",
@@ -2028,11 +2041,11 @@
       "addToGroup": "ユーザーグループに追加する",
       "addToRole": "役割を割り当てる",
       "step1Title": "トークンをコピーする",
-      "copyHint": "このトークンを今すぐコピーしてください。今後表示することはできません。",
+      "copyHint": "このトークンが表示されるのは今回だけです。今すぐコピーまたはダウンロードしてください。後から再取得することはできません。",
       "done": "完了",
       "applying": "アクセス権限を適用中...",
-      "grantedRoles": "割り当てられたロール: {roles}",
-      "grantedGroups": "ユーザーグループに追加: {groups}",
+      "rolesAssignedLabel": "割り当てられたロール",
+      "groupsAssignedLabel": "ユーザーグループに追加済み",
       "failedRoles": "ロールを割り当てられませんでした: {roles}",
       "failedGroups": "ユーザーグループに追加できませんでした: {groups}",
       "failedHint": "これらは後でロールとユーザーグループのページから付与できます。"
@@ -2042,6 +2055,9 @@
         "label": "サービスアカウント名",
         "placeholder": "例: ingest-bot",
         "help": "小文字、数字、ハイフン。名前{suffix}として保存"
+      },
+      "identifier": {
+        "label": "識別子"
       },
       "roles": {
         "label": "ロールを割り当て",
@@ -2056,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "識別子",
+        "roles": "ロール",
         "token": "トークン",
         "created": "作成されました"
       }
@@ -2183,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "これらのロールにバインドされているユーザーおよびサービスアカウントはすべてアクセスできなくなります。"
-      }
+      },
+      "assignColumn": "割り当て",
+      "assignBtn": "追加",
+      "assignedBadge": "割り当て済み",
+      "assignBannerText": "{member} をロールに追加します — 下のロールの横にある [追加] をクリックしてください。",
+      "assignBannerDone": "完了",
+      "assignSuccess": "{member} をロール \"{role}\" に追加しました。",
+      "assignError": "そのロールにアカウントを追加できませんでした。もう一度お試しください。"
     },
     "group": {
       "name": {
@@ -2214,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "これらのグループのメンバーは、付与された役割を失います。"
-      }
+      },
+      "assignColumn": "割り当て",
+      "assignBtn": "追加",
+      "assignedBadge": "割り当て済み",
+      "assignBannerText": "{member} をユーザーグループに追加します — 下のグループの横にある [追加] をクリックしてください。",
+      "assignBannerDone": "完了",
+      "assignSuccess": "{member} をグループ \"{group}\" に追加しました。",
+      "assignError": "そのグループにアカウントを追加できませんでした。もう一度お試しください。"
     },
     "appGroups": {
       "deleteGroupTitle": "グループを削除",
@@ -3568,6 +3599,12 @@
     "joinSlack": "Slack に参加しよう",
     "maybeLater": "たぶん後で"
   },
+  "connectDataSourcePopup": {
+    "title": "始めるには、まず最初のデータソースを接続しましょう。",
+    "description": "お見せしたいことがたくさんありますが、まずデータを接続する必要があります。ほとんどのチームは約1分で最初のログを確認できます。",
+    "connectButton": "データソースを接続",
+    "slackLink": "Slackコミュニティにもご参加ください"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "一時停止した場所から続行",
     "startFromNow": "今から開始します。",
@@ -3578,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "コンテンツのコピー中にエラーが発生しました。",
+    "passcodeForbiddenMessage": "取り込みトークンを表示するには管理者または Root ロールが必要です。セットアップコマンド、またはこの画面で表示するために必要なロールについて、管理者にお問い合わせください。",
     "updateRUMTokenMessage": "この組織のRUMトークンを更新してもよろしいですか？",
     "completeAwsIntegration": "AWSインテグレーションを完了",
     "deployAwsServicesOneClick": "単一のCloudFormationスタックを使用して、選択したすべてのAWSサービスをワンクリックでデプロイします。",
@@ -4484,6 +4522,8 @@
       "payloadTitle": "イベントペイロード",
       "payloadIndex": "{field} フィールドがストリームを選択します。これがないイベントは {stream} ストリームに送られます。",
       "payloadTime": "{field} フィールドはエポック秒で、小数値も使用できます。欠落している場合や正の値でない場合は、受信時刻が使用されます。",
+      "windowTitle": "取り込みウィンドウ外のタイムスタンプは破棄されます",
+      "windowBody": "{past}（既定では 5 時間）より古い、または {future}（既定では 24 時間）より先のイベントは破棄されますが、Splunk クライアントはエラーを再試行しないため、リクエストは引き続きコード 0 を返します。そのため、ハードコードされた古いタイムスタンプは、何も保存されないのに送信が成功したように見えます。",
       "payloadMetadata": "{fields} フィールドはイベントのカラムとして保存されます。",
       "healthTitle": "ヘルスチェック",
       "healthBody": "GET リクエストは認証を必要とせず、{response} を返します。",
@@ -4957,7 +4997,7 @@
     "colorLightToDarkBlue": "ライトブルーからダークブルー (値別)",
     "colorPaletteClassicBySeries": "パレット-クラシック (シリーズ別)",
     "drilldown": "ドリルダウン",
-    "drilldownTooltip": "別のダッシュボードまたは指定した URL に移動し、現在の変数をすべて引き継いでシームレスにデータを探索できます。",
+    "drilldownTooltip": "別のダッシュボードまたは指定した URL に移動し、現在のすべての変数を引き継いでシームレスにデータを探索できます。",
     "colorBySeriesTitle": "シリーズ別カラー",
     "colorBySeriesTooltip": "系列に色を適用すると、グラフが見やすくなります。各系列の色をカスタマイズして、データの視覚化を強化します。",
     "editColorBySeries": " シリーズ別に色を編集",
@@ -5380,6 +5420,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "最新の変数変更を適用するには更新してください",
       "refresh": "更新",
+      "refreshCacheReload": "キャッシュを更新して再読み込み",
+      "moreRefreshOptions": "その他の更新オプション",
       "dashboard": "ダッシュボード",
       "dashboardNotFound": "ダッシュボードが見つからないか、削除されました。ダッシュボード一覧にリダイレクトします。",
       "failedToLoadDashboard": "ダッシュボードの読み込みに失敗しました。ダッシュボード一覧にリダイレクトします。",
@@ -5814,7 +5856,36 @@
     "variableNameAlreadyExists": "同じ名前の変数が既に存在します。",
     "pivotTotal": "合計",
     "pivotOthers": "その他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "エグザンプラー（トレースサンプル）を表示",
+      "hide": "エグザンプラーを非表示 · {count} 件表示",
+      "empty": "この期間にエグザンプラーはありません",
+      "emptyShort": "エグザンプラー 0 件",
+      "loadFailed": "エグザンプラーを読み込めませんでした",
+      "loadFailedHint": "グラフは影響を受けません。再試行ではエグザンプラーのみを取得します。",
+      "retry": "再試行",
+      "cardTitle": "エグザンプラー",
+      "query": "クエリ {name}",
+      "returnedBy": "{count} 件のクエリから返されました | {count} 件のクエリから返されました",
+      "series": "シリーズ",
+      "aboveRange": "グラフの範囲より上。上端に描画されます",
+      "belowRange": "グラフの範囲より下。下端に描画されます",
+      "checkingTrace": "トレースを確認中…",
+      "openTrace": "トレースを開く",
+      "openTraceHint": "またはマーカーをクリックします。戻るとここに戻ります。",
+      "traceNotAvailable": "トレースを利用できません — サンプリング対象外、または保持期間を過ぎています",
+      "openTraceUnverified": "トレースを開く（未確認）",
+      "unverifiedTimeout": "トレースの検索がタイムアウトしたため、このトレースは存在しない可能性があります。",
+      "unverifiedForbidden": "このトレースを確認できませんでした — トレースへのアクセス権がない可能性があります。",
+      "unverifiedPartial": "保持期間の一部のみが検索されました。",
+      "unverifiedError": "このトレースを確認できませんでした。",
+      "noTraceId": "このエグザンプラーに {label} がないため、開くトレースがありません。",
+      "markersAria": "エグザンプラーマーカー",
+      "markerAria": "{time} のエグザンプラー {value}"
+    },
+    "showExemplarsLabel": "エグザンプラーを表示",
+    "showExemplarsHelp": "このダッシュボードを開くすべてのユーザーに対して、このグラフにトレースサンプルを描画します。閲覧者はパネルヘッダーから非表示にできます。"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5902,6 +5973,9 @@
         "details": "詳細",
         "json": "JSON",
         "insights": "インサイト",
+        "back": "結果に戻る",
+        "prevEvent": "前のイベント",
+        "nextEvent": "次のイベント",
         "copyLink": "リンクをコピー",
         "copy": "コピー",
         "copyValue": "値をコピー",
@@ -7486,7 +7560,10 @@
       "lastError": "最終エラー",
       "lastTrained": "最終トレーニング",
       "lookBackWindow": "ルックバックウィンドウ",
-      "lookBackWindowTooltip": "各検出でクエリが実行されるまでの時間。しばらく待ってもウィンドウをキャップします。デフォルトは [間隔ごとにチェック] です。",
+      "lookBackWindowFloor": "ルックバックウィンドウは少なくとも {min}（チェック間隔 + 検出解像度1つ分）である必要があります。より短いウィンドウでは、実行が発火する時点で完全なバケットを保持できないため、バケットがスキップされます。",
+      "lookBackWindowLegacy": "この保存済みウィンドウは最小値 {min}（チェック間隔 + 検出解像度1つ分）を下回っています。そのまま保存されますが、ウィンドウを引き上げるまで実行でバケットがスキップされる可能性があります。",
+      "lookBackWindowMinimum": "最小 {min}。推奨は {recommended} 以上 —（チェック間隔 + 検出解像度）の2倍 — に、欠落検出が有効な場合は10分を加えた値です。",
+      "lookBackWindowTooltip": "各検出実行がクエリする遡及範囲です。長時間停止した後でもウィンドウを上限で制限します。少なくともチェック間隔 + 検出解像度1つ分をカバーする必要があり、そうでないと実行が判定する前に完全なバケットがウィンドウから外れてしまいます。",
       "metricChart": "メトリクスと異常",
       "metricChartHint": "検出間隔ごとに 1 点",
       "model": "モデル",
@@ -7494,6 +7571,15 @@
       "nDays": "{days} 日 | {days} 日",
       "noDestinationsFound": "宛先が見つかりません",
       "noFieldsFound": "フィールドが見つかりません",
+      "noticeHybridFallback": "フォールバック検出",
+      "noticeHybridFallbackTooltip": "最近の実行でハイブリッドしきい値が利用できなかったため、検出は凍結しきい値にフォールバックしました。モデルが再トレーニングされるまで、スコアリングは凍結しきい値で継続されます。",
+      "noticeRetrain": "自動再トレーニング",
+      "noticeRetrainTooltip": "アップグレード後に保存済みモデルを読み取れなかったため、モデルは破棄され、設定は自動的に再トレーニングのキューに追加されました。操作は不要です。トレーニングが完了すると検出が再開されます。",
+      "noticeSkipAbsence": "欠落の評価がルックバックウィンドウに間に合わなくなり、取得できなくなったスパンはスキップされ、記録されました。",
+      "noticeSkipScored": "検出実行の間隔がルックバックウィンドウがカバーする範囲より長かったため、クローズ済みのバケットが実行の判定前にウィンドウから外れてしまいました。",
+      "noticeWindowFloor": "ウィンドウが狭すぎます",
+      "noticeWindowFloorTooltip": "ルックバックウィンドウがチェック間隔 + 検出解像度1つ分を下回っているため、実行はどのバケットも判定できません。検出を復元するにはウィンドウを引き上げてください。",
+      "noticeWindowSkip": "バケットがスキップされました",
       "notifications": "通知",
       "notificationsTooltip": "有効にすると、異常が検出されるたびに、選択した宛先に通知が送信されます。",
       "percentile": "レベル",
@@ -7590,7 +7676,9 @@
       "usernameRequired": "ユーザー名は必須です",
       "passwordRequired": "パスワードは必須です",
       "emailRecipients": "受信者メールアドレス",
-      "emailRecipientsHelp": "カンマ区切りのメールアドレス",
+      "emailRecipientsHelp": "アラートメールを受信する組織のユーザーまたはサービスアカウントを選択します",
+      "emailRecipientsGroupUsers": "ユーザー",
+      "emailRecipientsGroupServiceAccounts": "サービスアカウント",
       "invalidEmailAddresses": "無効なメールアドレス: {emails}",
       "opsgenieApiKey": "Opsgenie APIキー",
       "opsgenieApiKeyHelp": "Opsgenie統合設定からAPIキーを取得してください",
@@ -7907,7 +7995,18 @@
     "enabled": "有効",
     "paused": "一時停止",
     "impactTemplate": "使用中: {destinations} · {alerts}",
-    "impactDestination": "使用元 {alerts}"
+    "impactDestination": "{consumers} が使用中",
+    "impactUnused": "未使用",
+    "noConsumers": "コンシューマーがありません。",
+    "countCompositeAlert": "{count} 件の複合アラート | {count} 件の複合アラート",
+    "countPipeline": "{count} 件のパイプライン | {count} 件のパイプライン",
+    "countSyntheticCheck": "{count} 件の合成チェック | {count} 件の合成チェック",
+    "countOncallPolicy": "{count} 件のエスカレーションポリシー | {count} 件のエスカレーションポリシー",
+    "countOncallTeamChannel": "{count} 件のチームチャネル | {count} 件のチームチャネル",
+    "countWorkflow": "{count} 件のワークフロー | {count} 件のワークフロー",
+    "countAnomalyDetection": "{count} 件の異常検知器 | {count} 件の異常検知器",
+    "countIncidentIntegration": "{count} 件のインシデント連携 | {count} 件のインシデント連携",
+    "sectionOtherConsumers": "その他の使用元"
   },
   "alert_library": {
     "header": "アラートライブラリ",
@@ -8591,7 +8690,9 @@
         "staleCopyAria": "{name} の更新失敗詳細をコピー",
         "stalePreamble": "更新に失敗しました — 最後に成功した結果を表示しています。",
         "staleClickToCopy": "クリックして詳細をコピーします。",
-        "lastRefreshedPrefix": "最終更新日時: "
+        "lastRefreshedPrefix": "最終更新日時: ",
+        "exemplarsShowHeatmap": "エグザンプラー（トレースサンプル）を表示します。オンの間、このカードはパーセンタイルに切り替わります。",
+        "exemplarsHideHeatmap": "エグザンプラーを非表示 · {count} 件表示。このカードをヒートマップに戻します。"
       },
       "fn": {
         "subtitle": "このメトリクスの集計方法を選択",
@@ -8775,6 +8876,8 @@
     "cipherKeysDesc": "機密フィールドの暗号化キー",
     "regexPatternsDesc": "墨消し用の再利用可能なregexパターン",
     "domainManagementDesc": "サインインを許可されたSSOドメインに制限",
+    "passwordPolicy": "パスワードポリシー",
+    "passwordPolicyDesc": "ネイティブのメールアドレス/パスワードアカウント向けの認証ポリシーです。インスタンス全体に適用されます。",
     "pipelineDestinationsDesc": "パイプライン出力の外部ターゲット",
     "templatesDesc": "再利用可能なアラートメッセージテンプレート",
     "storageSettingsDesc": "組織ごとのストレージ設定",
@@ -9351,7 +9454,28 @@
     "listConjunctionAnd": "{list}、および {last}",
     "runsIn": "実行環境",
     "recommendedByFieldCoverage": "ストリームのフィールドカバレッジに基づく推奨です。",
-    "listConjunctionAndTwo": "{first} と {last}"
+    "listConjunctionAndTwo": "{first} と {last}",
+    "domainOrgMappings": {
+      "title": "ドメインと組織のマッピング",
+      "subtitle": "一致するメールドメインでサインインした新規ユーザーは、自動的に組織に追加されます。",
+      "addMapping": "マッピングを追加",
+      "editMapping": "マッピングを編集",
+      "empty": "マッピングはまだありません。「{addLabel}」を使用して追加してください。",
+      "domain": "メールドメイン",
+      "domainHelp": "ユーザーのメールアドレスで {at_sign} より後の部分。",
+      "organization": "組織",
+      "organizationPlaceholder": "組織識別子",
+      "organizationHelp": "一致するユーザーが追加される組織の識別子。",
+      "organizationRequired": "組織は必須です",
+      "baseRole": "基本ロール",
+      "baseRoleHelp": "一致するユーザーがその組織で付与されるロール。",
+      "userGroup": "ユーザーグループ",
+      "userGroupPlaceholder": "グループ名",
+      "userGroupHelp": "任意。一致するユーザーはその組織内でこのグループにも参加します。",
+      "duplicateDomain": "このドメインのマッピングはすでに存在します",
+      "confirmRemove": "{domain} のマッピングを削除してもよろしいですか？",
+      "deleteTitle": "マッピングを削除"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -13006,10 +13130,12 @@
           },
           "variables": {
             "input": {
-              "trace": "トレースのルートスパンからの入力。"
+              "trace": "トレースのルートチャット Span からの入力。",
+              "session": "最初の質問: 最初のトレースのルートチャット Span からの入力。"
             },
             "output": {
-              "trace": "トレースのルートスパンからの出力。"
+              "trace": "トレースのルートチャット Span からの出力。",
+              "session": "最終回答: 最後のトレースのルートチャット Span からの出力。"
             },
             "statistics": {
               "trace": "トレースメトリクス: スパン数、期間、LLM とツール呼び出し、エラー、トークン、コスト。",
@@ -13021,6 +13147,10 @@
             "steps": {
               "trace": "時間順のスパン。トレースが非常に長い場合は中間が折りたたまれます。",
               "session": "時間順のトレース。会話のターンとして表現されます。"
+            },
+            "tool_calls": {
+              "trace": "トレース内のすべてのツール呼び出しを、名前、入力、出力、ステータスとともに時系列順に示します。",
+              "session": "セッションのトレース全体にわたるすべてのツール呼び出しを、名前、入力、出力、ステータスとともに時系列順に示します。"
             }
           }
         }
@@ -13340,6 +13470,7 @@
       "searchHistoryNotEnabled": "検索履歴が有効になっていません。",
       "enableUsageReporting": "使用状況レポートを有効にするには、ZO_USAGE_REPORTING_ENABLED を true に設定してください。",
       "selectStreamToExtractPatterns": "パターンを抽出するストリームを選択してください",
+      "patternsUnavailableForMultiStream": "複数のストリームが選択されている場合、パターンは利用できません。ストリームを1つだけ選択してください。",
       "errorExtractingPatterns": "パターンの抽出中にエラーが発生しました。もう一度お試しください。",
       "nameOfPanelRequired": "パネルの名前が必要です",
       "errorsFixAndTryAgain": "いくつかのエラーがあります。修正してからもう一度お試しください。",
@@ -13471,6 +13602,166 @@
     "lastRefreshed": "最終更新: {time}"
   },
   "synthetics": {
+    "variables": {
+      "newButton": "新しい変数",
+      "createTitle": "変数を追加",
+      "created": "変数 {name} を作成しました",
+      "deleteConfirm": "{name} を削除しますか？",
+      "deleteFailed": "変数を削除できませんでした",
+      "deleteTitle": "変数を削除",
+      "deleteEnvFallback": "{env} はその後、グローバル値を使用します。",
+      "deleteGlobalFallback": "{envs} は独自の値を保持し、その他の環境では {name} を解決しなくなります。",
+      "overriddenInNote": "上書き環境: {envs}",
+      "overridesGlobalNote": "グローバル値を上書き",
+      "shadowGlobalTitle": "グローバル値を上書きしますか？",
+      "shadowGlobalMessage": "{env} では {name} がグローバル値を上書きします。その他の環境では引き続きグローバル値が使用されます。",
+      "shadowedGlobalTitle": "一部の環境は独自の値を保持します",
+      "shadowedGlobalMessage": "{name} はすでに {envs} で独自の値を持っています。これらの環境はその値を保持し、その他の環境ではこの値が使用されます。",
+      "deleteUsed": "{name} は {n} 件のチェックから参照されています。更新するまでリテラルテキストとして解決されます。それでも削除しますか？ | {name} は {n} 件のチェックから参照されています。更新するまでリテラルテキストとして解決されます。それでも削除しますか？",
+      "deleted": "変数を削除しました",
+      "description": "説明",
+      "editTitle": "変数を編集",
+      "emptyBody": "各チェックに値をコピーする代わりに、チェック間で値を共有します。",
+      "emptyFiltered": "検索条件に一致する変数がありません。",
+      "emptyTitle": "まだ変数がありません",
+      "example": "例",
+      "exampleHint": "値が伏せられている場所に表示されます。実際のシークレットをここに置かないでください。",
+      "examplePlaceholder": "https://shop.example.com",
+      "global": "グローバル",
+      "globalSubtitle": "すべての環境に適用されます。",
+      "globalReachesProduction": "グローバル値は本番環境を含むすべての環境に適用されます。ここでの変更は、独自の値を持たずにこの名前を使用するすべてのチェックに反映されます。",
+      "kind": "種類",
+      "kindPlain": "平文",
+      "kindSecret": "シークレット",
+      "lastUpdated": "最終更新",
+      "loadFailed": "変数を読み込めませんでした",
+      "name": "名前",
+      "nameInvalid": "英字、数字、アンダースコアを使用し、英字またはアンダースコアで始めてください",
+      "namePlaceholder": "BASE_URL",
+      "nameRequired": "名前は必須です",
+      "nameReserved": "_AUTH_ はプローブが自身で注入する認証情報のために予約されています",
+      "nameTooLong": "名前が長すぎます(最大128文字)",
+      "notSet": "未設定",
+      "replace": "置換",
+      "saveFailed": "変数を保存できませんでした",
+      "scope": "環境",
+      "scopeEnvironment": "この変数は {env} のみに適用されます。",
+      "scopeGlobal": "この変数はすべての環境に適用されます。",
+      "searchPlaceholder": "変数を検索",
+      "secretNeedsEnvironment": "グローバルにはシークレットが保持されません。シークレットは、それを保護すべき環境で作成してください。",
+      "secretWriteOnly": "この値は書き込み専用です。保存後は再び表示されることはありません。",
+      "title": "変数",
+      "updated": "変数を更新しました",
+      "usedBy": "使用元",
+      "usedByChecks": "未使用 | {n} 件のチェック | {n} 件のチェック",
+      "value": "値",
+      "valueEmpty": "空",
+      "valuePlaceholder": "値",
+      "valueRequired": "値は必須です",
+      "valueSet": "設定済み · 更新 {when}"
+    },
+    "environments": {
+      "newButton": "新規環境",
+      "backToList": "すべての環境",
+      "capReached": "チェックは最大 {cap} 個の環境を対象にできます。",
+      "cardEmpty": "環境はまだありません。合成モニタリング → 変数 で作成してください。",
+      "cardLocked": "アクセス権を持つユーザーによって選択されています。変更はできません。チェックはその環境で実行され続けます。",
+      "cardTitle": "環境",
+      "checks": "チェック",
+      "checksCount": "未使用 | {count} チェック | {count} チェック",
+      "createTitle": "環境を追加",
+      "created": "環境を作成しました",
+      "deleteBlockedChecks": "まだ {n} 個のチェックで使用されています。先にそれらから削除してください。",
+      "deleteBlockedSecrets": "この環境にはまだシークレットが含まれています。先に個別に削除してください。シークレットは復元できません。",
+      "deleteConfirm": "{name} を削除しますか？",
+      "deleteFailed": "環境を削除できませんでした",
+      "deleteTitle": "環境を削除",
+      "deleteWithVariables": "{name} と、その {n} 個の変数を削除しますか？",
+      "deleted": "環境を削除しました",
+      "description": "説明",
+      "detailSubtitle": "この環境にスコープされた変数。",
+      "editTitle": "環境を編集",
+      "emptyBody": "変数とシークレットをスコープするには、環境を作成してください（例: staging、production）。",
+      "emptyTitle": "環境はまだありません",
+      "lastUpdated": "最終更新",
+      "loadFailed": "環境を読み込めませんでした",
+      "name": "名前",
+      "nameInvalid": "英数字、ハイフン、アンダースコアを使用し、先頭にアンダースコアは使用できません",
+      "namePlaceholder": "production",
+      "nameRequired": "名前は必須です",
+      "nameTooLong": "名前が長すぎます（最大64文字）",
+      "renameBlocked": "環境は名前を変更できません。名前に対して権限が付与されるためです。",
+      "saveFailed": "環境を保存できませんでした",
+      "searchPlaceholder": "環境を検索",
+      "subtitle": "変数とシークレットをスコープし、誰が管理できるかを制御します。",
+      "title": "環境",
+      "updated": "環境が更新されました",
+      "usedByChecks": "未使用 | {n} 件のチェックで使用中 | {n} 件のチェックで使用中",
+      "variables": "変数"
+    },
+    "duplicateVariable": {
+      "body": "{name} を値ごと、同じスコープ内に複製します。",
+      "done": "変数が複製されました",
+      "failed": "変数を複製できませんでした",
+      "nameLabel": "新しい変数名"
+    },
+    "duplicate": {
+      "action": "複製",
+      "body": "{name} から変数 {n} 件すべてを新しい環境にコピーします。チェックはコピーされません。",
+      "bodyWithSecrets": "{name} から変数 {n} 件をコピーします。{secrets} 件のシークレットは値なしでコピーされ、再設定が必要です。チェックはコピーされません。",
+      "confirm": "複製",
+      "done": "環境が複製されました",
+      "failed": "環境を複製できませんでした",
+      "nameLabel": "新しい環境名",
+      "title": "{name} を複製"
+    },
+    "inherited": {
+      "notIn": "{envs} にはありません",
+      "overridesGlobal": "グローバルを上書きします",
+      "notInMany": "{count} 件の環境にはありません",
+      "overriddenByCheck": "ローカル変数によって上書きされています",
+      "title": "共有",
+      "filterAll": "すべて",
+      "filterLabel": "ソースでフィルタ",
+      "emptyIn": "{env} には共有変数がありません。",
+      "titleTooltip": "すべてのチェックと共有される値です。「環境と変数」タブで管理されます。このチェックの環境とグローバル変数が含まれます。上記のローカル変数はこれらより優先されます。",
+      "valueSet": "設定済み",
+      "valueNotSet": "未設定",
+      "emptyNone": "共有変数はありません。"
+    },
+    "promote": {
+      "done": "変数はグローバルになりました",
+      "doneShadowed": "変数はグローバルになりました。{envs} では、引き続き独自の値が優先されます。",
+      "failed": "変数をグローバルにできませんでした",
+      "secretBlocked": "シークレットは環境間で移動できません",
+      "toGlobal": "グローバルにする"
+    },
+    "promoteCheck": {
+      "action": "{name} を共有",
+      "confirm": "移動",
+      "description": "この変数をチェックから共有環境に移動し、他のチェックでも使用できるようにします。",
+      "destination": "移動先",
+      "done": "変数を移動しました",
+      "failed": "変数を移動できませんでした",
+      "global": "グローバル",
+      "secretHint": "この値はセキュアとしてマークされているため、シークレットとなりグローバルには移動できません。",
+      "title": "{name} を共有",
+      "tooltip": "共有環境に移動"
+    },
+    "split": {
+      "action": "環境にスコープする",
+      "alreadyOwn": "既に独自の値があるため、そのまま維持されます。",
+      "overrideHint": "1つの環境だけで上書きするには、その環境に変数を作成してください。",
+      "confirm": "環境にスコープする",
+      "description": "各環境に固有の値が設定されます。グローバル変数は置き換えられます。",
+      "done": "変数を環境にスコープしました。",
+      "failed": "変数をスコープできませんでした。",
+      "title": "「{name}」を環境にスコープする",
+      "unselectedWarning": "未選択: {envs}。それらの環境で実行中のチェックは、この変数を解決しなくなります。",
+      "valuePlaceholder": "この環境の値",
+      "usedBy": "{n} 件のチェックで使用中: {names}",
+      "usedByHint": "これらのチェックのいずれかが値を受け取れなくなる間は分割できません。環境を持たないチェック、またはここで値が指定されていない環境で実行されるチェックが該当します。"
+    },
     "versionPrefix": "v",
     "tokens": {
       "title": "Synthetics トークン",
@@ -13540,7 +13831,6 @@
     },
     "variablesPanel": {
       "title": "変数",
-      "referenceHint": "任意のステップ値またはURLで{token}として参照します。",
       "emptyTitle": "まだ変数がありません",
       "emptyBody": "ステップ間で値を再利用 — ベースURLやユーザー名など — シークレットはステップ値に含めないでください。",
       "newVariable": "新しい変数",
@@ -13548,8 +13838,6 @@
       "nameRequired": "名前が必要です。",
       "nameInvalid": "名前は英字またはアンダースコアで始め、英字、数字、アンダースコアのみを使用します。",
       "nameDuplicate": "この名前の変数は既に存在します。",
-      "usedInSteps": "{count} ステップで使用 | {count} ステップで使用",
-      "notReferenced": "どのステップからもまだ参照されていません",
       "removed": "{name} を削除しました",
       "undo": "元に戻す",
       "editVariable": "変数 {name} を編集",
@@ -13559,7 +13847,13 @@
       "openPanel": "変数を表示",
       "removeTitle": "変数を削除しますか？",
       "removeBody": "{name} はこのチェックから削除されます。",
-      "removeWarning": "{count} ステップから参照されており、解決できなくなります。 | {count} ステップから参照されており、解決できなくなります。"
+      "removeWarning": "{count} ステップから参照されており、解決できなくなります。 | {count} ステップから参照されており、解決できなくなります。",
+      "removeOverrideNote": "{name} を使用するステップには、今後 {scope} の値が使用されます。",
+      "countOfCap": "{count} / {cap}",
+      "local": "ローカル",
+      "resolutionOrder": "解決順序: チェック、環境、グローバルの順です。",
+      "overridesInherited": "共有変数を上書きします。この値が優先されます。",
+      "valueTooltipEmpty": "{name}: まだ値がありません"
     },
     "browserDevices": {
       "desktop": "デスクトップ",
@@ -13887,7 +14181,8 @@
       "timeoutLabel": "タイムアウト（ms）",
       "valueFallback": "値",
       "showSetupSteps": "セットアップ手順を表示",
-      "waitingForActions": "ブラウザでのアクションを待機中..."
+      "waitingForActions": "ブラウザでのアクションを待機中...",
+      "unboundVariables": "{names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。 | {names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。"
     },
     "labels": {
       "copyOf": "{name} のコピー",
@@ -14119,10 +14414,13 @@
     },
     "results": {
       "p95Label": "p95",
+      "allEnvironments": "すべての環境",
       "clearFilters": "フィルターをクリア",
       "clearFiltersDesc": "すべてのアクティブフィルターを削除",
       "device": "デバイス",
       "duration": "所要時間",
+      "environment": "環境",
+      "environmentScope": "環境スコープ",
       "editCheck": "チェックを編集",
       "error": "エラー",
       "failed": "失敗",
@@ -14291,6 +14589,7 @@
       "passRate": "合格率",
       "passRateByBrowser": "ブラウザ別合格率",
       "passRateByDevice": "デバイス別合格率",
+      "passRateByEnvironment": "環境別の合格率",
       "passRateByLocation": "ロケーション別合格率",
       "durationByLocation": "ロケーション別の期間（平均）",
       "flakyRate": "Flaky Rate",
@@ -14450,7 +14749,8 @@
       "ssh": "SSH",
       "tcp": "TCP",
       "tls": "TLS",
-      "private": "プライベートロケーション"
+      "private": "プライベートロケーション",
+      "variables": "環境と変数"
     },
     "timeline": {
       "failed": "失敗",
@@ -14494,7 +14794,8 @@
       "stepNameRequired": "このステップに名前を付けてください — 実行結果に表示されます",
       "typeTextRequired": "このステップが入力するテキストを入力してください",
       "expectedRequired": "このアサーションが期待する値を入力してください",
-      "urlInvalid": "http:// または https:// で始まる有効な URL を入力してください",
+      "urlInvalid": "http://、https://、または変数プレースホルダーで始まる URL を入力してください",
+      "navigateUrlInvalid": "http://、https://、または変数プレースホルダーで始まる URL を入力してください。",
       "urlRequired": "開始 URL は必須です",
       "fixHighlightedFields": "保存する前にハイライトされたフィールドを修正してください",
       "retiredAction": "「{action}」はサポートされなくなりました — 「{step}」を削除または置換してください",
@@ -14959,7 +15260,6 @@
       "syntheticsTokensRefresh": "トークンリストを更新",
       "aiChatToggle": "AI チャットを切り替える",
       "aiChatClose": "AI チャットを閉じる",
-      "aiChatExpand": "AI チャットを展開/折りたたむ",
       "logsSaveView": "保存済みビューとして保存",
       "logsExport": "結果を CSV としてエクスポート",
       "tracesCopyUrl": "トレース共有URLをコピー",
@@ -15572,7 +15872,8 @@
         "destinations": "宛先",
         "templates": "テンプレート",
         "reports": "レポート",
-        "llmModelPricing": "LLMモデルの価格設定"
+        "llmModelPricing": "LLMモデルの価格設定",
+        "passcode": "取り込みトークン"
       },
       "noPermissionToChangeFavorites": "お気に入りを変更する権限がありません",
       "couldNotUpdateFavoriteDashboards": "お気に入りのダッシュボードを更新できませんでした"
@@ -15810,6 +16111,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "まだデータ取り込みプロセスを開始していません。他のページを探索するには、データ取り込みを開始してください。"
+    },
+    "iam": {
+      "userSaveFailed": "ユーザーを保存できませんでした"
     }
   },
   "cipherKeys": {
@@ -16227,7 +16531,106 @@
       "exponentName": "指数"
     }
   },
+  "passwordPolicy": {
+    "complexity": "複雑さ",
+    "minLength": "最小文字数",
+    "minLengthDesc": "受け付けるパスワードの最短文字数",
+    "maxLength": "最大文字数",
+    "maxLengthDesc": "0 = 無制限",
+    "requireUppercase": "大文字を必須にする",
+    "requireUppercaseDesc": "A–Z を少なくとも1文字",
+    "requireLowercase": "小文字を必須にする",
+    "requireLowercaseDesc": "a–z を少なくとも1文字",
+    "requireDigit": "数字を必須にする",
+    "requireDigitDesc": "0–9 を少なくとも1文字",
+    "requireSpecial": "特殊文字を必須にする",
+    "requireSpecialDesc": "許可された文字セットから少なくとも1文字",
+    "specialCharSet": "許可する特殊文字",
+    "specialCharSetDesc": "空欄にすると、英数字以外のすべての文字を許可します",
+    "maxLengthTooSmall": "最大文字数は最小文字数以上、または無制限の場合は0にする必要があります。",
+    "confirmTitle": "パスワードポリシーを保存しますか？",
+    "confirmMessage": "保存すると、すべてのネイティブユーザーが続行前に新しいパスワードを設定する必要がある場合があります。root、外部ユーザー、サービスアカウントは対象外です。root アカウントでない限り、あなたも対象です。この操作は元に戻せません。",
+    "saved": "パスワードポリシーを保存しました。 | パスワードポリシーを保存しました。{count} 人のユーザーがパスワードをリセットする必要があります。 | パスワードポリシーを保存しました。{count} 人のユーザーがパスワードをリセットする必要があります。",
+    "saveFailed": "パスワードポリシーを保存できませんでした。",
+    "notAdminTitle": "管理者権限が必要です",
+    "notAdmin": "パスワードポリシーの設定には、メタ組織の管理者権限が必要です。",
+    "loadFailedTitle": "パスワードポリシーを読み込めませんでした",
+    "loadFailed": "現在のポリシーの読み取り中にエラーが発生しました。",
+    "rotation": "ローテーション",
+    "rotationDays": "ローテーション期間",
+    "rotationDaysDesc": "パスワードが有効期限切れになるまでの日数。0 = 無期限",
+    "rotationWarningDays": "有効期限前の警告",
+    "rotationWarningDaysDesc": "サインイン時の通知日数。0 = 警告なし",
+    "warningDaysTooLong": "警告期間はローテーション期間より長くできません。",
+    "rotationPreview": "今日設定したパスワードは {expires} に有効期限が切れます。サインイン時の警告は {warns} から始まります。",
+    "rotationPreviewNoWarning": "今日設定したパスワードは {expires} に有効期限が切れます。それまで警告は表示されません。",
+    "reuse": "再利用の防止",
+    "historyCount": "記憶するパスワード数",
+    "historyCountDesc": "新しいパスワードは、この数の過去のパスワードと一致してはいけません。0 = チェックなし",
+    "historyMaxRetained": "保持する履歴",
+    "historyMaxRetainedDesc": "ユーザーごとに保持される過去のパスワード数",
+    "historyRetainedTooSmall": "保持する履歴は、記憶するパスワード数以上である必要があります。",
+    "reuseExplainer": "現在のパスワードは記憶されるセットの1つとして数えられます。再利用が拒否されるのはこのルールによるもので、別のチェックによるものではありません。",
+    "lockout": "アカウントのロックアウト",
+    "lockoutThreshold": "ロックアウトまでの失敗回数",
+    "lockoutThresholdDesc": "0 = ロックアウト無効",
+    "lockoutBucketSize": "以降の各ロックアウトまでの試行回数",
+    "lockoutBucketSizeDesc": "0 = 上記の値を使用",
+    "lockoutStartSecs": "最初のロックアウト期間",
+    "lockoutStartSecsDesc": "秒",
+    "lockoutMaxSecs": "最大ロックアウト期間",
+    "lockoutMaxSecsDesc": "秒 — エスカレーションが上限とする値",
+    "lockoutStartTooLong": "最初のロックアウトは最大ロックアウトより長くできません。",
+    "lockoutBackoff": "エスカレーション",
+    "lockoutBackoffDesc": "各ロックアウトが前回からどのように延びるか",
+    "backoffExponential": "指数関数的",
+    "backoffLinear": "線形",
+    "lockoutPreview": "{threshold} 回失敗 → {first} · {bucket} 回ごとに → {rest} · 上限 {max}。サインインに成功するとすべてリセットされます。",
+    "sessionEnforcement": "セッションと適用",
+    "cookieMaxAge": "セッションの有効期間",
+    "cookieMaxAgeDesc": "サインイン済みセッションが有効な秒数。0 = {envVar} のインスタンスデフォルトを使用",
+    "applyToRoot": "root アカウントに適用",
+    "applyToRootDesc": "これがオンの場合を除き、root は上記すべてのルールから除外されます",
+    "rootWarning": "root をロックすると、システムが復旧不能な状態になる可能性があります。",
+    "rootDialogTitle": "ポリシーを root に適用しますか？",
+    "rootDialogMessage": "root は他のネイティブアカウントと同様に、ロックアウト、ローテーション、強制リセットの対象になります。root が唯一の管理アカウントである場合、ロックアウトや満たすことのできない有効期限により、このインスタンスに戻る手段がなくなる可能性があります。",
+    "rootDialogAck": "root がこのインスタンスから恒久的にロックアウトされる可能性があることを理解しました。",
+    "rootDialogConfirm": "root に適用"
+  },
+  "passwordReset": {
+    "title": "パスワードを更新",
+    "signedInAs": "{email} としてサインイン中",
+    "reasonPolicyTightened": "パスワードポリシーが変更されました。OpenObserve の使用を続けるにはパスワードを更新してください。",
+    "reasonRotationExpired": "パスワードの有効期限が切れました。OpenObserve の使用を続けるには新しいパスワードを設定してください。",
+    "reasonRotationWarning": "パスワードの有効期限がまもなく切れます。作業からロックアウトされないよう、今すぐ新しいパスワードを設定してください。",
+    "reused": "このパスワードは最近使用されています。直近 {count} 個のパスワードで使用していないものを選択してください。",
+    "expiryBanner": "{count} 日後にパスワードの有効期限が切れます。作業からロックアウトされないよう、今すぐ更新してください。 | {count} 日後にパスワードの有効期限が切れます。作業からロックアウトされないよう、今すぐ更新してください。",
+    "expiryBannerAction": "今すぐ更新",
+    "expiryBannerDismiss": "閉じる",
+    "currentPassword": "現在のパスワード",
+    "newPassword": "新しいパスワード",
+    "confirmPassword": "新しいパスワードの確認",
+    "currentPasswordRequired": "現在のパスワードは必須です。",
+    "newPasswordRequired": "新しいパスワードは必須です。",
+    "confirmPasswordRequired": "新しいパスワードを再入力してください。",
+    "mismatch": "パスワードが一致しません。",
+    "signOut": "サインアウト",
+    "submit": "パスワードを更新",
+    "updated": "パスワードを更新しました。もう一度サインインしてください。",
+    "updateFailed": "パスワードを更新できませんでした。",
+    "req": {
+      "minLength": "{count} 文字以上",
+      "maxLength": "{count} 文字以内",
+      "uppercase": "大文字 1 文字",
+      "lowercase": "小文字 1 文字",
+      "digit": "数字 1 文字",
+      "special": "特殊文字を1文字",
+      "specialFromSet": "{set} の特殊文字を1文字",
+      "unmet": "パスワードには以下が必要です: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "パスワードポリシー",
     "loginCallback": "ログインコールバック",
     "slackOAuthCallback": "Slackに接続中",
     "emptyStateDemo": "空状態デモ",
@@ -16465,13 +16868,10 @@
       "columnMemory": "メモリ(現在)",
       "columnDisk": "ディスク %(現在)",
       "columnLoad": "ロードアベレージ 15分（現在）",
+      "columnCores": "コア数",
       "columnLastSeen": "最終確認",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "ホストメトリクスダッシュボード",
-      "importConfirmTitle": "ホストメトリクスダッシュボードを追加しますか？",
-      "importConfirmMessage": "このダッシュボードはまだありません。追加すると、デフォルトフォルダに「Host Metrics」という名前のダッシュボードが作成され、このホスト用に開きます。",
-      "importConfirmOk": "追加して開く",
-      "importConfirmCancel": "キャンセル",
+      "loadPerCore": "({value}/コア)",
       "windowsLivenessNote": "Windows ホストは、エージェントがロードメトリクス（system_cpu_load_average_15m）を報告した場合にのみこのリストに表示されます。Windows エージェントが実行中なのにここに表示されない場合は、コレクター設定でロードスクレイパーを有効にするか、エージェントを更新してください。",
       "panel": {
         "cpuBusy": "CPU ビジー",
@@ -17162,6 +17562,11 @@
       "explore": "メトリクスエクスプローラーで開く",
       "railLabel": "メトリクスセクション",
       "noAccess": "{stream} を読み取る権限がありません。このストリームへの読み取りアクセスについて管理者に問い合わせてください。",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "クエリ別",
         "database": "データベース別",
@@ -17881,6 +18286,7 @@
     "target_rotation_all": "{rotation} の全員",
     "target_rotation_deleted": "このチームには存在しないローテーション",
     "target_rotation_legacy": "オンコール中の担当者",
+    "target_unrecognized": "この画面では認識されないターゲットです",
     "ladderPoolEveryone": "{rotation} の全員",
     "target_user": "特定の担当者",
     "target_whole_team": "チーム全員",
@@ -18784,6 +19190,8 @@
     "rotationNobody": "オンコール担当者はいません",
     "edit": "編集",
     "timelineLoadFailed": "この期間のスケジュールを解決できませんでした",
+    "editorReadFailed": "最新のコピーを読み込めませんでした。もう一度お試しください。",
+    "refreshFailed": "更新できませんでした。表示されている内容は古い可能性があります。",
     "scheduleDoneEditing": "スケジュールに戻る",
     "coverWhoRequired": "カバーする人を選択してください",
     "timelineCoverAria": "{who} は {rotation} を {from} から {to} までカバーしています",

@@ -21,15 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
-import {
-  findHostMetricsDashboard,
-  importHostMetricsDashboard,
-} from "@/composables/useHostMetricsDashboard";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -44,7 +37,10 @@ import { hostsPage } from "./curated/packs/hosts.page";
 import { GROUP } from "./curated/types";
 
 const props = defineProps<{
+  /** The series key every panel filters on — the collector's hostname (a pod name on a DaemonSet). */
   hostName: string;
+  /** Heading text: the node name, matching the Host column. Falls back to hostName when absent. */
+  displayName?: string | null;
   status?: string;
   /** The row's os_type — renders as a header chip when present (design 4.8). */
   osType?: string | null;
@@ -62,7 +58,6 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const router = useRouter();
 const { t } = useI18nTyped();
 
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
@@ -240,79 +235,6 @@ watch(
   },
 );
 
-// ── Footer — check first, ask before creating, then deep-link with host + range ──
-const openingDashboard = ref(false);
-const importing = ref(false);
-const confirmingImport = ref(false);
-
-const toastImportError = (kind: "forbidden" | "generic") => {
-  toast({
-    variant: "error",
-    message: t(
-      kind === "forbidden"
-        ? "ingestion.setupCard.hostDashboardImportForbidden"
-        : "ingestion.setupCard.hostDashboardImportFailed",
-    ),
-  });
-};
-
-const goToDashboard = (dashboardId: string, folderId: string) => {
-  // Hand the dashboard the window the panels are actually showing, not the seed.
-  const range = readRange();
-  router.push({
-    path: "/dashboards/view",
-    query: {
-      org_identifier: org.value,
-      dashboard: dashboardId,
-      folder: folderId,
-      "var-host_name": props.hostName,
-      from: String(range.from),
-      to: String(range.to),
-    },
-  });
-};
-
-const openHostDashboard = async () => {
-  if (openingDashboard.value) return;
-  openingDashboard.value = true;
-  try {
-    // The user can reach this drawer without ever running the setup flow.
-    const result = await findHostMetricsDashboard(org.value);
-    if (result.status === "error") {
-      toastImportError(result.kind);
-      return;
-    }
-    // Creating a dashboard in the user's org is never done off an "open" click alone.
-    if (result.status === "absent") {
-      confirmingImport.value = true;
-      return;
-    }
-    goToDashboard(result.dashboardId, result.folderId);
-  } finally {
-    openingDashboard.value = false;
-  }
-};
-
-const confirmImport = async () => {
-  if (importing.value) return;
-  importing.value = true;
-  try {
-    const result = await importHostMetricsDashboard(org.value);
-    if (result.status === "error") {
-      toastImportError(result.kind);
-      return;
-    }
-    goToDashboard(result.dashboardId, result.folderId);
-  } finally {
-    importing.value = false;
-    confirmingImport.value = false;
-  }
-};
-
-const cancelImport = () => {
-  confirmingImport.value = false;
-};
-
 const statusVariant = computed(() =>
   props.status === "ACTIVE"
     ? "success-soft"
@@ -334,7 +256,7 @@ const statusLabel = computed(() =>
     :open="true"
     side="right"
     size="xxl"
-    :title="raw(hostName)"
+    :title="raw(displayName || hostName)"
     data-test="host-detail-drawer"
     @update:open="(open: boolean) => !open && emit('close')"
   >
@@ -463,53 +385,5 @@ const statusLabel = computed(() =>
         </RenderDashboardCharts>
       </div>
     </div>
-
-    <template #footer>
-      <div class="flex w-full justify-end">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="dashboard"
-          :loading="openingDashboard"
-          data-test="host-drawer-open-dashboard"
-          @click="openHostDashboard"
-        >
-          {{ t("infra.hosts.openDashboard") }}
-        </OButton>
-      </div>
-    </template>
-
-    <ODialog
-      v-if="confirmingImport"
-      :open="true"
-      persistent
-      size="sm"
-      :title="t('infra.hosts.importConfirmTitle')"
-      data-test="host-drawer-import-confirm"
-      @update:open="(open: boolean) => !open && cancelImport()"
-    >
-      <OText>{{ t("infra.hosts.importConfirmMessage") }}</OText>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="host-drawer-import-confirm-cancel"
-            @click="cancelImport"
-          >
-            {{ t("infra.hosts.importConfirmCancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :loading="importing"
-            data-test="host-drawer-import-confirm-ok"
-            @click="confirmImport"
-          >
-            {{ t("infra.hosts.importConfirmOk") }}
-          </OButton>
-        </div>
-      </template>
-    </ODialog>
   </ODrawer>
 </template>

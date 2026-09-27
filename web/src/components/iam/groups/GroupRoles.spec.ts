@@ -13,15 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { queryClient } from "@/composables/query/queryClient";
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import GroupRoles from "@/components/iam/groups/GroupRoles.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/iam", () => ({
-  getRoles: vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] })),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const getRoles = vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] }));
+  return overlayServiceMock(await importOriginal(), {
+    getRoles,
+  });
+});
 
 vi.mock("@/composables/iam/usePermissions", () => ({
   default: vi.fn(() => ({
@@ -220,6 +225,8 @@ describe("GroupRoles Component", () => {
       const { getRoles } = await import("@/services/iam");
       const mockRolesData = ["admin", "user", "developer"];
       vi.mocked(getRoles).mockResolvedValueOnce({ data: mockRolesData });
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       await wrapper.vm.getchOrgUsers();
 
@@ -230,6 +237,8 @@ describe("GroupRoles Component", () => {
       const { getRoles } = await import("@/services/iam");
       const mockRolesData = ["admin", "user"];
       vi.mocked(getRoles).mockResolvedValueOnce({ data: mockRolesData });
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       await wrapper.vm.getchOrgUsers();
 
@@ -248,6 +257,8 @@ describe("GroupRoles Component", () => {
       const { getRoles } = await import("@/services/iam");
       const mockRolesData = ["admin", "user", "developer"];
       vi.mocked(getRoles).mockResolvedValueOnce({ data: mockRolesData });
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       // groupRoles prop contains ["admin", "user"]
       await wrapper.vm.getchOrgUsers();
@@ -281,6 +292,8 @@ describe("GroupRoles Component", () => {
       vi.mocked(getRoles).mockResolvedValueOnce({
         data: ["admin", "user"],
       });
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       await wrapper.vm.getchOrgUsers();
       await wrapper.vm.updateUserTable("all");
@@ -292,6 +305,8 @@ describe("GroupRoles Component", () => {
     it("shows no users message when no roles", async () => {
       const { getRoles } = await import("@/services/iam");
       vi.mocked(getRoles).mockResolvedValueOnce({ data: [] });
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       const emptyWrapper = mount(GroupRoles, {
         global: {
@@ -427,6 +442,8 @@ describe("GroupRoles Component", () => {
       vi.mocked(getRoles).mockResolvedValueOnce({
         data: ["admin", "user", "developer"],
       });
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
     });
 
     it("shows all roles when display is 'all'", async () => {
@@ -512,6 +529,8 @@ describe("GroupRoles Component", () => {
     it("handles empty roles data from API", async () => {
       const { getRoles } = await import("@/services/iam");
       vi.mocked(getRoles).mockResolvedValueOnce({ data: [] });
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       await wrapper.vm.getchOrgUsers();
 

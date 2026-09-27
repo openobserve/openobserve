@@ -449,9 +449,9 @@ pub async fn search(
         tables.push(Arc::new(enrichment_table) as _);
     }
 
-    // create a Union Plan to merge all tables
+    // Scan projections refer to the full schema, not the placeholder's projected output.
     let start = std::time::Instant::now();
-    let union_table = Arc::new(NewUnionTable::new(empty_exec.schema().clone(), tables));
+    let union_table = NewUnionTable::new(empty_exec.full_schema(), tables);
     log::info!(
         "{}",
         search_inspector_fields(
@@ -850,6 +850,7 @@ mod tests {
     use super::*;
     use crate::{
         datafusion::{
+            distributed_plan::empty_exec::NewEmptyExec,
             optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram,
             table_provider::empty_table::NewEmptyTable, udf::histogram_udf,
         },
@@ -869,6 +870,45 @@ mod tests {
             },
             ..Default::default()
         }
+    }
+
+    #[tokio::test]
+    async fn test_union_table_scan_uses_full_schema() -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("log", DataType::Utf8View, true),
+            Field::new("latency_ms", DataType::Float64, true),
+        ]));
+        let ctx = SessionContext::new();
+        let placeholder = NewEmptyTable::new("logs", schema.clone());
+        for projection in [None, Some(vec![2]), Some(vec![2, 0]), Some(vec![])] {
+            let plan = placeholder
+                .scan(&ctx.state(), projection.as_ref(), &[], None)
+                .await?;
+            let empty_exec = plan.downcast_ref::<NewEmptyExec>().unwrap();
+            for table_count in [0, 1, 2] {
+                let tables = (0..table_count)
+                    .map(|_| {
+                        Arc::new(datafusion::datasource::empty::EmptyTable::new(
+                            schema.clone(),
+                        )) as Arc<dyn TableProvider>
+                    })
+                    .collect();
+                let union_table = NewUnionTable::new(empty_exec.full_schema(), tables);
+                let scan = union_table
+                    .scan(
+                        &ctx.state(),
+                        empty_exec.projection(),
+                        empty_exec.filters(),
+                        empty_exec.limit(),
+                    )
+                    .await?;
+                assert_eq!(scan.schema(), empty_exec.schema());
+                let batches = datafusion::physical_plan::collect(scan, ctx.task_ctx()).await?;
+                assert!(batches.iter().all(|batch| batch.num_rows() == 0));
+            }
+        }
+        Ok(())
     }
 
     #[test]

@@ -15,11 +15,22 @@
 
 // Hosts content pack (design §7.3): ids, titles, units and query text frozen against the pre-retrofit builder.
 
-import { HOSTS_DEVICE_EXCLUSION } from "../../hostsQueries";
+import {
+  HOSTS_DEVICE_EXCLUSION,
+  HOSTS_MOUNTPOINT_EXCLUSION,
+  HOSTS_PRODUCER_GUARD,
+} from "../../hostsQueries";
 import { GROUP, STALENESS_24H_US, type CuratedPageManifest } from "../types";
 import { explorerDrilldown } from "./drilldown";
 
 const EXCL = `device!~"${HOSTS_DEVICE_EXCLUSION}"`;
+const MPEXCL = `mountpoint!~"${HOSTS_MOUNTPOINT_EXCLUSION}"`;
+// Same exclusion as the list's columns, or the drawer contradicts the row the user clicked.
+const GUARD = HOSTS_PRODUCER_GUARD;
+// Partitions repeat their whole disk's I/O, so drop them but never a bare nvme0n1, which also ends in a digit.
+const DISK_EXCL = `device!~"loop.*|nvme[0-9]+n[0-9]+p[0-9]+|sd[a-z]+[0-9]+|xvd[a-z]+[0-9]+|sr[0-9]+"`;
+// This panel sums ACROSS devices, so loopback and virtual interfaces would inflate the total.
+const NET_EXCL = `device!~"lo|veth.*|docker.*|br-.*|cni.*|flannel.*|tunl.*"`;
 
 export const hostsPage: CuratedPageManifest = {
   id: "hosts",
@@ -72,7 +83,7 @@ export const hostsPage: CuratedPageManifest = {
               queryType: "promql",
               queries: [
                 {
-                  query: '100 * (1 - avg(irate(system_cpu_time{state="idle",${scope:host}}[5m])))',
+                  query: `100 * (1 - avg(irate(system_cpu_time{state="idle",\${scope:host},${GUARD}}[5m])))`,
                   legend: "busy",
                 },
               ],
@@ -81,7 +92,7 @@ export const hostsPage: CuratedPageManifest = {
           drilldown: [
             explorerDrilldown(
               "system_cpu_time",
-              '100 * (1 - avg(irate(system_cpu_time{state="idle",${scope:host}}[5m])))',
+              `100 * (1 - avg(irate(system_cpu_time{state="idle",\${scope:host},${GUARD}}[5m])))`,
             ),
           ],
         },
@@ -98,7 +109,7 @@ export const hostsPage: CuratedPageManifest = {
               queryType: "promql",
               queries: [
                 {
-                  query: 'avg by (state)(irate(system_cpu_time{${scope:host},state!="idle"}[5m]))',
+                  query: `avg by (state)(irate(system_cpu_time{\${scope:host},state!="idle",${GUARD}}[5m]))`,
                   legend: "{state}",
                 },
               ],
@@ -107,7 +118,7 @@ export const hostsPage: CuratedPageManifest = {
           drilldown: [
             explorerDrilldown(
               "system_cpu_time",
-              'avg by (state)(irate(system_cpu_time{${scope:host},state!="idle"}[5m]))',
+              `avg by (state)(irate(system_cpu_time{\${scope:host},state!="idle",${GUARD}}[5m]))`,
             ),
           ],
         },
@@ -124,7 +135,7 @@ export const hostsPage: CuratedPageManifest = {
               queryType: "promql",
               queries: [
                 {
-                  query: "sum by (state)(system_memory_usage{${scope:host}})",
+                  query: `sum by (state)(system_memory_usage{\${scope:host},${GUARD}})`,
                   legend: "{state}",
                 },
               ],
@@ -133,7 +144,7 @@ export const hostsPage: CuratedPageManifest = {
           drilldown: [
             explorerDrilldown(
               "system_memory_usage",
-              "sum by (state)(system_memory_usage{${scope:host}})",
+              `sum by (state)(system_memory_usage{\${scope:host},${GUARD}})`,
             ),
           ],
         },
@@ -153,16 +164,19 @@ export const hostsPage: CuratedPageManifest = {
               ],
               queryType: "promql",
               queries: [
-                { query: "avg(system_cpu_load_average_1m{${scope:host}})", legend: "1m" },
-                { query: "avg(system_cpu_load_average_5m{${scope:host}})", legend: "5m" },
-                { query: "avg(system_cpu_load_average_15m{${scope:host}})", legend: "15m" },
+                { query: `avg(system_cpu_load_average_1m{\${scope:host},${GUARD}})`, legend: "1m" },
+                { query: `avg(system_cpu_load_average_5m{\${scope:host},${GUARD}})`, legend: "5m" },
+                {
+                  query: `avg(system_cpu_load_average_15m{\${scope:host},${GUARD}})`,
+                  legend: "15m",
+                },
               ],
             },
           ],
           drilldown: [
             explorerDrilldown(
               "system_cpu_load_average_1m",
-              "avg(system_cpu_load_average_1m{${scope:host}})",
+              `avg(system_cpu_load_average_1m{\${scope:host},${GUARD}})`,
             ),
           ],
         },
@@ -179,8 +193,7 @@ export const hostsPage: CuratedPageManifest = {
               queryType: "promql",
               queries: [
                 {
-                  query:
-                    'sum by (device)(irate(system_disk_io{direction="read",${scope:host},device!~"loop.*"}[5m]))',
+                  query: `sum by (device)(irate(system_disk_io{direction="read",\${scope:host},${DISK_EXCL},${GUARD}}[5m]))`,
                   legend: "{device}",
                 },
               ],
@@ -189,7 +202,7 @@ export const hostsPage: CuratedPageManifest = {
           drilldown: [
             explorerDrilldown(
               "system_disk_io",
-              'sum by (device)(irate(system_disk_io{direction="read",${scope:host},device!~"loop.*"}[5m]))',
+              `sum by (device)(irate(system_disk_io{direction="read",\${scope:host},${DISK_EXCL},${GUARD}}[5m]))`,
             ),
           ],
         },
@@ -206,8 +219,7 @@ export const hostsPage: CuratedPageManifest = {
               queryType: "promql",
               queries: [
                 {
-                  query:
-                    'sum by (device)(irate(system_disk_io{direction="write",${scope:host},device!~"loop.*"}[5m]))',
+                  query: `sum by (device)(irate(system_disk_io{direction="write",\${scope:host},${DISK_EXCL},${GUARD}}[5m]))`,
                   legend: "{device}",
                 },
               ],
@@ -216,11 +228,12 @@ export const hostsPage: CuratedPageManifest = {
           drilldown: [
             explorerDrilldown(
               "system_disk_io",
-              'sum by (device)(irate(system_disk_io{direction="write",${scope:host},device!~"loop.*"}[5m]))',
+              `sum by (device)(irate(system_disk_io{direction="write",\${scope:host},${DISK_EXCL},${GUARD}}[5m]))`,
             ),
           ],
         },
         {
+          // Grouped by device, not mountpoint: a bind mount reports byte-identical series at each mountpoint.
           id: "hd_fs_used_pct",
           titleKey: "infra.hosts.panel.filesystemUsedPct",
           type: "line",
@@ -233,8 +246,8 @@ export const hostsPage: CuratedPageManifest = {
               queryType: "promql",
               queries: [
                 {
-                  query: `100 * sum by (mountpoint)(system_filesystem_usage{state="used",\${scope:host},${EXCL}}) / sum by (mountpoint)(system_filesystem_usage{\${scope:host},${EXCL}})`,
-                  legend: "{mountpoint}",
+                  query: `100 * sum by (device)(system_filesystem_usage{state="used",\${scope:host},${EXCL},${MPEXCL},${GUARD}}) / sum by (device)(system_filesystem_usage{\${scope:host},${EXCL},${MPEXCL},${GUARD}})`,
+                  legend: "{device}",
                 },
               ],
             },
@@ -242,7 +255,7 @@ export const hostsPage: CuratedPageManifest = {
           drilldown: [
             explorerDrilldown(
               "system_filesystem_usage",
-              `100 * sum by (mountpoint)(system_filesystem_usage{state="used",\${scope:host},${EXCL}}) / sum by (mountpoint)(system_filesystem_usage{\${scope:host},${EXCL}})`,
+              `100 * sum by (device)(system_filesystem_usage{state="used",\${scope:host},${EXCL},${MPEXCL},${GUARD}}) / sum by (device)(system_filesystem_usage{\${scope:host},${EXCL},${MPEXCL},${GUARD}})`,
             ),
           ],
         },
@@ -259,7 +272,7 @@ export const hostsPage: CuratedPageManifest = {
               queryType: "promql",
               queries: [
                 {
-                  query: "sum by (direction)(irate(system_network_io{${scope:host}}[5m]))",
+                  query: `sum by (direction)(irate(system_network_io{\${scope:host},${NET_EXCL},${GUARD}}[5m]))`,
                   legend: "{direction}",
                 },
               ],
@@ -268,7 +281,7 @@ export const hostsPage: CuratedPageManifest = {
           drilldown: [
             explorerDrilldown(
               "system_network_io",
-              "sum by (direction)(irate(system_network_io{${scope:host}}[5m]))",
+              `sum by (direction)(irate(system_network_io{\${scope:host},${NET_EXCL},${GUARD}}[5m]))`,
             ),
           ],
         },

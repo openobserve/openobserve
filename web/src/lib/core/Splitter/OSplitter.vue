@@ -68,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick } from "vue";
+import { computed, ref, nextTick, watch } from "vue";
 import useResizer from "@/composables/useResizer";
 import type { OSplitterProps, OSplitterEmits } from "./OSplitter.types";
 
@@ -95,8 +95,8 @@ const maxValue = computed(() => props.limits?.[1] || (props.unit === "%" ? 100 :
 const { value: currentValue, onMouseDown } = useResizer({
   direction: !props.horizontal ? "horizontal" : "vertical",
   initialValue: props.modelValue,
-  minValue: minValue.value,
-  maxValue: maxValue.value,
+  minValue: () => minValue.value,
+  maxValue: () => maxValue.value,
   unit: props.unit,
   containerRef,
   throttleMs: 16, // 60fps for smooth movement
@@ -146,7 +146,6 @@ const handleKeyDown = (event: KeyboardEvent) => {
 };
 
 // Watch for external prop changes
-import { watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 watch(
   () => props.modelValue,

@@ -18,6 +18,7 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { calculateDynamicNameGap } from "./chartDimensionUtils";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { chartColor } from "../chartTheme";
+import { escapeHtml } from "@/utils/html";
 
 /**
  * Handles auto SQL time series conversion.
@@ -209,24 +210,28 @@ export const applyAutoSQLTimeSeries = (
             // if have than bold it
             if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
               hoverText.push(
-                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
+                `<strong>${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+                  formatUnitValue(
+                    getUnitValue(
+                      it.data[1],
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    ),
                   ),
                 )} </strong>`,
               );
             // else normal text
             else
               hoverText.push(
-                `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
+                `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+                  formatUnitValue(
+                    getUnitValue(
+                      it.data[1],
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    ),
                   ),
                 )}`,
               );
@@ -443,24 +448,28 @@ export const applyCustomSQLTimeSeries = (
               // if have than bold it
               if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
-                  `<strong>${it?.marker} ${it?.seriesName} : ${formatUnitValue(
-                    getUnitValue(
-                      it?.data?.[1],
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
+                  `<strong>${it?.marker} ${escapeHtml(it?.seriesName)} : ${escapeHtml(
+                    formatUnitValue(
+                      getUnitValue(
+                        it?.data?.[1],
+                        panelSchema.config?.unit,
+                        panelSchema.config?.unit_custom,
+                        panelSchema.config?.decimals,
+                      ),
                     ),
                   )} </strong>`,
                 );
               // else normal text
               else
                 hoverText.push(
-                  `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                    getUnitValue(
-                      it?.data?.[1],
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
+                  `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+                    formatUnitValue(
+                      getUnitValue(
+                        it?.data?.[1],
+                        panelSchema.config?.unit,
+                        panelSchema.config?.unit_custom,
+                        panelSchema.config?.decimals,
+                      ),
                     ),
                   )}`,
                 );

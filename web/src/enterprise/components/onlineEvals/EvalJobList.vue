@@ -37,16 +37,15 @@
         </template>
 
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
+            :last-run-at="lastRunAt"
+            :loading="refreshing || loading"
+            shortcut-id="evalJobsRefresh"
             data-test="eval-job-list-refresh-btn"
             @click="emit('refresh')"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="evalJobsRefresh" />
-          </OButton>
+          />
         </template>
 
         <template #subheader>
@@ -220,7 +219,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -247,6 +246,10 @@ const props = defineProps<{
   actionLoading?: boolean;
   /** ID of the job whose activate/pause request is currently in flight. */
   pendingStatusId?: string | null;
+  /** Epoch-ms of the last list read, for the refresh button's age label. */
+  lastRunAt?: number | null;
+  /** A reload is in flight — spins the refresh button and blocks a second click. */
+  refreshing?: boolean;
 }>();
 
 const emit = defineEmits<{

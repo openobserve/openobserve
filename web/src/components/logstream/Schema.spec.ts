@@ -54,16 +54,19 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-vi.mock("@/services/stream", () => ({
-  default: {
-    schema: mockStreamServiceSchema,
-    list: mockStreamServiceList,
-    deleteFields: vi.fn().mockResolvedValue({ data: { code: 200 } }),
-    updateSettings: mockUpdateSettings,
-    nameList: vi.fn().mockResolvedValue({ data: [] }),
-    getStreamStats: vi.fn().mockResolvedValue({ data: {} }),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      schema: mockStreamServiceSchema,
+      list: mockStreamServiceList,
+      deleteFields: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+      updateSettings: mockUpdateSettings,
+      nameList: vi.fn().mockResolvedValue({ data: [] }),
+      getStreamStats: vi.fn().mockResolvedValue({ data: {} }),
+    },
+  });
+});
 
 import LogStream from "@/components/logstream/schema.vue";
 

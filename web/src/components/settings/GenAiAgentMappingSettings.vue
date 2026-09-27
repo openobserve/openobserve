@@ -181,6 +181,11 @@ import genAiAgentMappingService, {
   fetchDefaultGenAiAgentMapping,
   type GenAiAgentMappingConfig,
 } from "@/services/gen-ai-agent-mapping.service";
+import {
+  clearGenAiAgentRegistryMutation,
+  saveGenAiAgentMappingMutation,
+} from "@/services/gen-ai-agent-mapping.queries";
+import { useMutation } from "@tanstack/vue-query";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -209,6 +214,10 @@ const envFieldsText = ref("");
 const versionFieldsText = ref("");
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
+
+// Both writes drop the agent scope; the mutations declare it beside the endpoint.
+const saveMapping = useMutation(() => saveGenAiAgentMappingMutation(orgId.value));
+const clearRegistry = useMutation(() => clearGenAiAgentRegistryMutation(orgId.value));
 
 const fieldsToText = (fields: string[]) => fields.join("\n");
 const textToFields = (text: string) =>
@@ -299,7 +308,7 @@ const clearAgentRegistry = async () => {
 
   clearingRegistry.value = true;
   try {
-    const result = await genAiAgentMappingService.clearRegistry(orgId.value);
+    const result = await clearRegistry.mutateAsync();
     clearRegistryDialogOpen.value = false;
     toast({
       variant: "success",
@@ -327,7 +336,7 @@ const saveConfig = async () => {
 
   saving.value = true;
   try {
-    const saved = await genAiAgentMappingService.save(orgId.value, draftConfig());
+    const saved = await saveMapping.mutateAsync(draftConfig());
     setDraft(saved);
     toast({
       variant: "success",

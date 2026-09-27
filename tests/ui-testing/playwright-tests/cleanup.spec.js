@@ -35,6 +35,7 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
+        'e2e_alert_11167_',        // alerts-query-editor-search-endpoint.spec.js (#11167)
         'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
         'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite destinations)
         'test_fv_alerts_dest_',    // alerts-form-validation.spec.js (custom destinations created by the test cases)
@@ -64,6 +65,7 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
+        'e2e_alert_11167_',        // alerts-query-editor-search-endpoint.spec.js (#11167)
         'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
         'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite templates)
         'test_fv_alerts_tmpl_',    // alerts-form-validation.spec.js (templates created by the test cases)
@@ -87,6 +89,7 @@ test.describe("Pre-Test Cleanup", () => {
     // timestamp so parallel runs cannot collide — which also means nothing ever reuses
     // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
     await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
+
 
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
@@ -294,6 +297,10 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up streams matching test patterns
     await pm.apiCleanup.cleanupStreams(
       [
+        /^e2e_slo_14269_/,             // slo-error-messages.spec.js (#14269) seeded stream
+        /^e2e_13354_/,                 // logs-field-value-rendering.spec.js (#13354)
+        /^e2e_13896_/,                 // logs-result-display.spec.js (#13896)
+        /^e2e_13990_other_/,           // logs-bugs.spec.js (#13990)
         /^e2e_sev_str_/,               // logs-histogram-severity.spec.js (#11353)
         /^e2e_sev_num_/,               // logs-histogram-severity.spec.js (#11441)
         /^e2e_ms7332_/,                // logs-multistream-share-url.spec.js (#7332)
@@ -338,6 +345,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^severity_test_\d+$/,                         // Severity test streams (severity_test_<timestamp>)
         /^alert_e2e_/,                                 // Alert e2e test streams (alert_e2e_*)
         /^alert_import_/,                              // Alert import test streams (alert_import_*)
+        /^alert_chart_missing_/,                       // Alert chart error-state test streams (alerts-chart-error-state.spec.js #14519)
         /^dedup_test_/,                                // Dedup test streams (dedup_test_*)
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream

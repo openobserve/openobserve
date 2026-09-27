@@ -15,11 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use axum::{
-    http::{StatusCode, header},
-    response::{IntoResponse, Response},
-};
-use bytes::BytesMut;
+use axum::{http::StatusCode, response::Response};
 use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
@@ -42,17 +38,16 @@ use opentelemetry_proto::tonic::{
     common::v1::InstrumentationScope,
     logs::v1::LogRecord,
 };
-use prost::Message;
 use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::meta::otlp::{otlp_export_response, otlp_rejection_response},
     db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
-        grpc::{get_val, get_val_with_type_retained},
+        grpc::{get_severity_value, get_val, get_val_with_type_retained},
     },
 };
 
@@ -109,11 +104,17 @@ fn build_otlp_log_record(
         }
     }
 
-    rec["severity"] = if !log_record.severity_text.is_empty() {
-        log_record.severity_text.to_owned().into()
+    let severity = if log_record.severity_text.is_empty() {
+        get_severity_value(log_record.severity_number)
     } else {
-        log_record.severity_number.into()
+        Some(log_record.severity_text.as_str())
     };
+    if let Some(severity) = severity {
+        rec["severity"] = severity.into();
+    }
+    if log_record.severity_number != 0 {
+        rec["severity_number"] = log_record.severity_number.into();
+    }
 
     rec["body"] = get_val(&log_record.body.as_ref());
     rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
@@ -715,68 +716,83 @@ pub async fn handle_request(
         });
     }
 
-    let (content_type, endpoint) = match req_type {
-        OtlpRequestType::HttpJson => (CONTENT_TYPE_JSON, "/api/otlp/v1/logs"),
-        OtlpRequestType::HttpProtobuf => (CONTENT_TYPE_PROTO, "/api/otlp/v1/logs"),
-        OtlpRequestType::Grpc => (CONTENT_TYPE_PROTO, "/grpc/otlp/logs"),
+    let endpoint = match req_type {
+        OtlpRequestType::Grpc => "/grpc/otlp/logs",
+        _ => "/api/otlp/v1/logs",
     };
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
-        let mut out = BytesMut::with_capacity(res.encoded_len());
-        res.encode(&mut out).expect("Out of memory");
-        return Ok((
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, content_type)],
-            out.freeze(),
-        )
-            .into_response()); // just return
+        return Ok(otlp_export_response(&res, req_type)); // just return
     }
 
-    let mut status = IngestionStatus::Record(stream_status.status);
-    let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+    // A pattern-manager failure must not fail the request; the evidence row says it failed open.
+    #[cfg(feature = "vectorscan")]
+    {
+        match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+            Ok(pattern_manager) => {
+                for (stream, data) in json_data_by_stream.iter_mut() {
+                    if config::meta::self_reporting::redaction::is_self_reporting_stream(
+                        org_id,
+                        stream,
+                        StreamType::Logs,
+                    ) {
+                        continue;
+                    }
+                    let before = super::snapshot_derived_sources(&data.0);
+                    if let Err(e) = pattern_manager.process_at_ingestion(
+                        org_id,
+                        StreamType::Logs,
+                        stream,
+                        &mut data.0,
+                    ) {
+                        log::error!(
+                            "[LOGS:OTLP] error applying SDR patterns for stream {stream}: {e}"
+                        );
+                    }
+                    super::refresh_derived_columns(&before, &mut data.0);
+                }
+            }
+            Err(e) => {
+                log::error!("[LOGS:OTLP] failed to get pattern manager for SDR redaction: {e}");
+                crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                    org_id,
+                    StreamType::Logs,
+                    json_data_by_stream
+                        .iter()
+                        .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
+                    config::meta::self_reporting::redaction::FailPosture::Open,
+                )
+                .await;
+            }
+        }
+    }
+
+    // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
+    let write_result = super::write_logs_by_stream(
         thread_id,
         org_id,
         user_email,
         (started_at, &start),
         UsageType::Logs,
-        &mut status,
+        &mut IngestionStatus::Record(stream_status.status),
         json_data_by_stream,
         size_by_stream,
         derived_streams,
         None,
     )
-    .await
-    {
-        // A deleting-stream skip is surfaced on IngestionResponse for the HEC
-        // collector; OTLP's protobuf response has no field for it, so it keeps
-        // reporting 200 exactly as before.
-        Ok(_skipped) => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            ("200", out)
-        }
-        Err(e) => {
-            log::error!("Error while writing logs: {e}");
-            stream_status.status = match status {
-                IngestionStatus::Record(status) => status,
-                IngestionStatus::Bulk(_) => unreachable!(),
-            };
-            res.partial_success = Some(ExportLogsPartialSuccess {
-                rejected_log_records: stream_status.status.failed as i64,
-                error_message: stream_status.status.error,
-            });
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            ("500", out)
-        }
+    .await;
+
+    let status = match &write_result {
+        Ok(_) => StatusCode::OK,
+        Err(e) => crate::ingestion::write_error_status(e),
     };
 
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     let label_values = [
         endpoint,
-        metric_rpt_status_code,
+        status.as_str(),
         org_id,
         StreamType::Logs.as_str(),
         "",
@@ -789,12 +805,16 @@ pub async fn handle_request(
         .with_label_values(&label_values)
         .inc();
 
-    Ok((
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, content_type)],
-        response_body.freeze(),
-    )
-        .into_response())
+    if let Err(e) = write_result {
+        log::error!("Error while writing logs: {e}");
+        return Ok(otlp_rejection_response(
+            req_type,
+            status,
+            format!("error while writing log data: {e}"),
+        ));
+    }
+
+    Ok(otlp_export_response(&res, req_type))
 }
 
 #[cfg(test)]
@@ -804,15 +824,51 @@ mod tests {
         utils::{flatten, json},
     };
     use opentelemetry_proto::tonic::{
-        collector::logs::v1::ExportLogsServiceRequest,
+        collector::logs::v1::{
+            ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
+        },
         common::v1::{
             AnyValue, InstrumentationScope, KeyValue,
             any_value::Value::{BoolValue, DoubleValue, IntValue, StringValue},
         },
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     };
+    use prost::Message;
 
-    use super::{normalized_resource_map, otlp_log_record};
+    use super::{normalized_resource_map, otlp_export_response, otlp_log_record};
+    use crate::common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        otlp::export_response_to_proto_json,
+    };
+
+    fn partial_response(rejected: i64, error: &str) -> ExportLogsServiceResponse {
+        ExportLogsServiceResponse {
+            partial_success: Some(ExportLogsPartialSuccess {
+                rejected_log_records: rejected,
+                error_message: error.to_string(),
+            }),
+        }
+    }
+
+    async fn response_parts(
+        res: ExportLogsServiceResponse,
+        req_type: OtlpRequestType,
+    ) -> (axum::http::StatusCode, String, Vec<u8>) {
+        let response = otlp_export_response(&res, req_type);
+        let status = response.status();
+        let content_type = response
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .expect("content-type header")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap()
+            .to_vec();
+        (status, content_type, body)
+    }
 
     fn kv(key: &str, value: opentelemetry_proto::tonic::common::v1::any_value::Value) -> KeyValue {
         KeyValue {
@@ -900,6 +956,34 @@ mod tests {
             })
             .is_none()
         );
+    }
+
+    #[test]
+    fn test_severity_text_derived_from_number_and_number_kept_when_set() {
+        let build = |severity_number: i32, severity_text: &str| {
+            let record = LogRecord {
+                severity_number,
+                severity_text: severity_text.to_string(),
+                ..Default::default()
+            };
+            otlp_log_record(&json::Map::new(), None, None, &record, 1)
+        };
+
+        let rec = build(17, "");
+        assert_eq!(rec["severity"], json::json!("ERROR"));
+        assert_eq!(rec["severity_number"], json::json!(17));
+
+        let rec = build(17, "Error");
+        assert_eq!(rec["severity"], json::json!("Error"));
+        assert_eq!(rec["severity_number"], json::json!(17));
+
+        let rec = build(0, "Error");
+        assert_eq!(rec["severity"], json::json!("Error"));
+        assert!(rec.get("severity_number").is_none());
+
+        let rec = build(0, "");
+        assert!(rec.get("severity").is_none());
+        assert!(rec.get("severity_number").is_none());
     }
 
     use crate::logs::otlp::handle_request;
@@ -1617,5 +1701,230 @@ mod tests {
         .await;
 
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn json_request_gets_a_json_body_not_protobuf() {
+        let (status, content_type, body) = response_parts(
+            partial_response(1, "Too old data, only last 5 hours data can be ingested."),
+            OtlpRequestType::HttpJson,
+        )
+        .await;
+
+        assert_eq!(status, axum::http::StatusCode::OK);
+        assert_eq!(content_type, CONTENT_TYPE_JSON);
+        let parsed: json::Value = json::from_slice(&body).expect("body must parse as JSON");
+        assert_eq!(
+            parsed["partialSuccess"]["rejectedLogRecords"],
+            json::Value::String("1".into())
+        );
+        assert!(
+            parsed["partialSuccess"]["errorMessage"]
+                .as_str()
+                .unwrap()
+                .contains("Too old data")
+        );
+        assert_ne!(body.first(), Some(&0x0a), "must not be a protobuf payload");
+    }
+
+    #[tokio::test]
+    async fn json_request_with_nothing_rejected_gets_an_empty_json_object() {
+        let (_, content_type, body) = response_parts(
+            ExportLogsServiceResponse {
+                partial_success: None,
+            },
+            OtlpRequestType::HttpJson,
+        )
+        .await;
+
+        assert_eq!(content_type, CONTENT_TYPE_JSON);
+        assert_eq!(String::from_utf8(body).unwrap(), "{}");
+    }
+
+    #[tokio::test]
+    async fn protobuf_request_still_gets_a_protobuf_body() {
+        let (status, content_type, body) = response_parts(
+            partial_response(1, "rejected"),
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await;
+
+        assert_eq!(status, axum::http::StatusCode::OK);
+        assert_eq!(content_type, CONTENT_TYPE_PROTO);
+        let decoded = ExportLogsServiceResponse::decode(body.as_slice()).expect("valid protobuf");
+        assert_eq!(
+            decoded.partial_success.unwrap().rejected_log_records,
+            1,
+            "protobuf clients must keep the payload they had before"
+        );
+    }
+
+    #[tokio::test]
+    async fn grpc_request_still_gets_a_protobuf_body() {
+        let (_, content_type, body) =
+            response_parts(partial_response(2, "rejected"), OtlpRequestType::Grpc).await;
+
+        assert_eq!(content_type, CONTENT_TYPE_PROTO);
+        let decoded = ExportLogsServiceResponse::decode(body.as_slice()).expect("valid protobuf");
+        assert_eq!(decoded.partial_success.unwrap().rejected_log_records, 2);
+    }
+
+    #[test]
+    fn proto_json_omits_partial_success_when_nothing_was_rejected() {
+        let res = ExportLogsServiceResponse {
+            partial_success: None,
+        };
+        assert_eq!(export_response_to_proto_json(&res), json::json!({}));
+
+        let empty = partial_response(0, "");
+        assert_eq!(export_response_to_proto_json(&empty), json::json!({}));
+    }
+
+    #[test]
+    fn proto_json_encodes_the_reject_count_as_a_decimal_string() {
+        let value = export_response_to_proto_json(&partial_response(7, "boom"));
+        assert_eq!(
+            value["partialSuccess"]["rejectedLogRecords"],
+            json::Value::String("7".into()),
+            "ProtoJSON encodes int64 as a string, not a number"
+        );
+        assert_eq!(
+            value["partialSuccess"]["errorMessage"],
+            json::Value::String("boom".into())
+        );
+    }
+
+    #[test]
+    fn test_otlp_json_decodes_non_canonical_doubles() {
+        use crate::ingestion::grpc::get_val_with_type_retained;
+
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"ratio","value":{"doubleValue":0.10}}]},"scopeLogs":[{"scope":{"name":"s","attributes":[{"key":"exp","value":{"doubleValue":1e0}}]},"logRecords":[{"timeUnixNano":"1789000000000000001","body":{"doubleValue":-2.50},"attributes":[{"key":"r","value":{"doubleValue":1.5}},{"key":"nested","value":{"kvlistValue":{"values":[{"key":"k","value":{"arrayValue":{"values":[{"doubleValue":1E-7}]}}}]}}},{"key":"id","value":{"intValue":"9223372036854775807"}}]},{"timeUnixNano":1789000000000000002,"body":{"stringValue":"valid record in the same batch"}}]}]}]}"#;
+        // arbitrary_precision is enabled workspace-wide, so the plain decode must fail here
+        assert!(json::from_slice::<ExportLogsServiceRequest>(body).is_err());
+
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_floats(body).unwrap();
+        let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
+        let resource_logs = &request.resource_logs[0];
+        let resource = resource_logs.resource.as_ref().unwrap();
+        assert_eq!(value(&resource.attributes[0]), Some(DoubleValue(0.1)));
+        let scope_logs = &resource_logs.scope_logs[0];
+        let scope = scope_logs.scope.as_ref().unwrap();
+        assert_eq!(value(&scope.attributes[0]), Some(DoubleValue(1.0)));
+
+        let records = &scope_logs.log_records;
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].time_unix_nano, 1_789_000_000_000_000_001);
+        assert_eq!(records[1].time_unix_nano, 1_789_000_000_000_000_002);
+        assert_eq!(
+            records[0].body.as_ref().and_then(|v| v.value.clone()),
+            Some(DoubleValue(-2.5))
+        );
+        assert_eq!(value(&records[0].attributes[0]), Some(DoubleValue(1.5)));
+        assert_eq!(
+            get_val_with_type_retained(&records[0].attributes[1].value.as_ref()),
+            json::json!({"k": [1e-7]})
+        );
+        assert_eq!(value(&records[0].attributes[2]), Some(IntValue(i64::MAX)));
+    }
+
+    #[test]
+    fn test_otlp_json_keeps_strict_errors() {
+        for body in [
+            &br#"{"resourceLogs":[{"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#[..],
+            br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":1}}]}]}]}"#,
+            br#"{"resourceLogs":["#,
+        ] {
+            let strict = json::from_slice::<ExportLogsServiceRequest>(body).map(|_| ());
+            let lenient =
+                json::from_slice_lenient_floats::<ExportLogsServiceRequest>(body).map(|_| ());
+            assert!(strict.is_err());
+            assert_eq!(
+                strict.map_err(|e| e.to_string()),
+                lenient.map_err(|e| e.to_string())
+            );
+        }
+
+        let float_with_bad_bytes = br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"doubleValue":1.5},"attributes":[{"key":"b","value":{"bytesValue":"!"}}]}]}]}]}"#;
+        assert!(
+            json::from_slice_lenient_floats::<ExportLogsServiceRequest>(float_with_bad_bytes)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_otlp_json_without_floats_decodes_exactly_as_before() {
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"s","value":{"stringValue":"x"}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1789000000000000001","body":{"stringValue":"x"},"attributes":[{"key":"i","value":{"intValue":"42"}},{"key":"b","value":{"boolValue":true}}]}]}]}]}"#;
+        assert_eq!(
+            json::from_slice_lenient_floats::<ExportLogsServiceRequest>(body).unwrap(),
+            json::from_slice::<ExportLogsServiceRequest>(body).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_otlp_json_float_rescues_a_body_that_repeats_a_field() {
+        // the retry decodes through a Value, which keeps the last of two repeated fields
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"r","value":{"doubleValue":1.5}}]},"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#;
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_floats(body).unwrap();
+        let scope = request.resource_logs[0].scope_logs[0]
+            .scope
+            .as_ref()
+            .unwrap();
+        assert_eq!(scope.name, "b");
+    }
+
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_request_columns_limit_is_rpc_status() {
+        use crate::common::meta::otlp::GoogleRpcStatus;
+
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let log_rec = LogRecord {
+            time_unix_nano: chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64,
+            attributes: (0..=limit)
+                .map(|i| kv(&format!("attr_{i}"), IntValue(i as i64)))
+                .collect(),
+            ..Default::default()
+        };
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs {
+                    log_records: vec![log_rec],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = super::handle_request(
+            0,
+            "test_org_id",
+            request,
+            Some("test_columns_limit"),
+            "a@a.com",
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await
+        .unwrap();
+        let status_code = resp.status();
+        let headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(status_code, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            headers[axum::http::header::CONTENT_TYPE],
+            CONTENT_TYPE_PROTO
+        );
+        let status = GoogleRpcStatus::decode(body).unwrap();
+        assert_eq!(status.code, 3);
+        assert!(
+            status
+                .message
+                .starts_with("error while writing log data: Error# Got ")
+        );
+        assert!(status.message.contains(&format!(
+            "columns for stream test_org_id/logs/test_columns_limit, only {limit} columns accept"
+        )));
+        assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
     }
 }

@@ -28,6 +28,14 @@ vi.mock("@/components/CopyContent.vue", () => ({
 
 vi.mock("../../../utils/zincutils", () => ({
   getImageURL: vi.fn().mockReturnValue("http://example.com/image.png"),
+  getIngestionURL: vi.fn(() => "https://ingest.example.com:5080"),
+  getEndPoint: vi.fn((url: string) => ({
+    url,
+    host: "ingest.example.com",
+    port: "5080",
+    protocol: "https",
+    tls: "On",
+  })),
 }));
 
 const mockStore = createStore({
@@ -86,9 +94,21 @@ describe("SplunkHec", () => {
   });
 
   describe("Endpoint resolution", () => {
-    it("should build the collector URL from the page origin", () => {
+    it("should build the collector URL from the configured ingestion endpoint", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.endpointUrl).toBe(`${window.location.origin}/services/collector`);
+      expect(wrapper.vm.endpointUrl).toBe("https://ingest.example.com:5080/services/collector");
+    });
+
+    it("should resolve the host through getIngestionURL, like every other ingestion card", async () => {
+      wrapper = createWrapper();
+      const { getEndPoint, getIngestionURL } = await vi.importMock("../../../utils/zincutils");
+      expect(getIngestionURL).toHaveBeenCalled();
+      expect(getEndPoint).toHaveBeenCalledWith("https://ingest.example.com:5080");
+    });
+
+    it("should not fall back to the browser origin serving the UI", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.endpointUrl).not.toContain(window.location.origin);
     });
 
     it("should build the collector URL at the root, with no organization segment", () => {
@@ -98,12 +118,25 @@ describe("SplunkHec", () => {
       expect(wrapper.vm.endpointUrl).not.toContain("/api/");
     });
 
-    it("should not carry a ZO_BASE_URI path, which the root-mounted collector has no prefix for", () => {
+    it("should keep a ZO_BASE_URI prefix, which the collector is served under too", async () => {
+      const { getEndPoint, getIngestionURL } = await vi.importMock("../../../utils/zincutils");
+      getIngestionURL.mockReturnValueOnce("https://ingest.example.com:5080/web");
+      getEndPoint.mockReturnValueOnce({
+        url: "https://ingest.example.com:5080/web",
+        host: "ingest.example.com",
+        port: "5080",
+        protocol: "https",
+        tls: "On",
+      });
       wrapper = createWrapper();
-      // getIngestionURL() keeps the base_uri prefix; the collector sits outside it.
-      expect(wrapper.vm.endpointUrl).not.toContain("/web/");
-      expect(wrapper.vm.endpointUrl).toMatch(/^https?:\/\/[^/]+\/services\/collector$/);
-      expect(wrapper.vm.healthContent).toMatch(/https?:\/\/[^/]+\/services\/collector\/health$/);
+      expect(wrapper.vm.endpointUrl).toBe("https://ingest.example.com:5080/web/services/collector");
+    });
+
+    it("should point the health probe at the same host", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.healthContent).toContain(
+        "https://ingest.example.com:5080/services/collector/health",
+      );
     });
   });
 
@@ -111,7 +144,9 @@ describe("SplunkHec", () => {
     it("should build a curl example carrying the Splunk auth scheme", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.curlContent).toContain("curl");
-      expect(wrapper.vm.curlContent).toContain(`${window.location.origin}/services/collector`);
+      expect(wrapper.vm.curlContent).toContain(
+        "https://ingest.example.com:5080/services/collector",
+      );
       expect(wrapper.vm.curlContent).toContain("Authorization: Splunk [SPLUNK_HEC_TOKEN]");
     });
 
@@ -121,18 +156,42 @@ describe("SplunkHec", () => {
       const parsed = JSON.parse(payload);
       expect(parsed).toHaveProperty("event");
       expect(parsed).toHaveProperty("index");
-      expect(parsed).toHaveProperty("time");
+      // A literal epoch ages past ZO_INGEST_ALLOWED_UPTO and is then discarded
+      // behind a code 0, so the copyable example must let the receipt time stand.
+      expect(parsed).not.toHaveProperty("time");
     });
 
     it("should document the full event envelope, including the metadata fields", () => {
       wrapper = createWrapper();
       const parsed = JSON.parse(wrapper.vm.payloadContent);
       expect(parsed.index).toBe("application");
-      // Fractional epoch SECONDS, which is what the collector reads.
-      expect(parsed.time).toBe(1789060000.123);
+      // Fractional epoch SECONDS, which is what the collector reads, and within the
+      // ingestion window: a literal ages out and is then discarded behind a code 0.
+      const nowSeconds = Date.now() / 1000;
+      expect(parsed.time).toBeGreaterThan(nowSeconds - 60);
+      expect(parsed.time).toBeLessThanOrEqual(nowSeconds + 60);
+      // Millisecond precision, asserted on the rendered text: `time % 1` is 0 for
+      // the one run in a thousand where Date.now() lands on a whole second.
+      expect(wrapper.vm.payloadContent).toMatch(/"time": \d+\.\d{3},/);
       expect(parsed.host).toBeDefined();
       expect(parsed.source).toBeDefined();
       expect(parsed.sourcetype).toBeDefined();
+    });
+
+    it("should refresh the reference epoch on a page held open past the window", async () => {
+      vi.useFakeTimers();
+      try {
+        wrapper = createWrapper();
+        const before = JSON.parse(wrapper.vm.payloadContent).time;
+
+        // Longer than ZO_INGEST_ALLOWED_UPTO's 5h default, which is when a frozen
+        // epoch starts being discarded behind a code 0.
+        await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+
+        expect(JSON.parse(wrapper.vm.payloadContent).time).toBeGreaterThan(before);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("should point the health check at the unauthenticated health path", () => {
@@ -165,9 +224,16 @@ describe("SplunkHec", () => {
   });
 
   describe("Operational guidance", () => {
-    it("should warn about Edge Processor and TLS", () => {
+    it("should warn about the ingestion window, Edge Processor and TLS", () => {
       wrapper = createWrapper();
-      expect(wrapper.findAll(".o-banner-mock")).toHaveLength(2);
+      expect(wrapper.findAll(".o-banner-mock")).toHaveLength(3);
+      for (const test of [
+        "ingestion-logs-splunkhec-window-note",
+        "ingestion-logs-splunkhec-edge-processor-note",
+        "ingestion-logs-splunkhec-tls-note",
+      ]) {
+        expect(wrapper.find(`[data-test="${test}"]`).exists()).toBe(true);
+      }
     });
 
     it("should mark the key sections for tests", () => {

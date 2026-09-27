@@ -155,6 +155,16 @@ class WorkflowsPage {
     this.nodeTestPassedFor = (t) =>
       `[data-test="workflow-node-${t}-test-ok"], [data-test="workflow-node-${t}-test-rehearsal"]`;
     this.nodeTestErrorFor = (t) => `[data-test="workflow-node-${t}-test-error"]`;
+    this.nodeTestRehearsalFor = (t) => `[data-test="workflow-node-${t}-test-rehearsal"]`;
+    // Branch-arm append connectors (WorkflowCanvas appendPointsFor) — the hover-revealed
+    // `+` points, each carrying an SVG path whose `d` starts at the arm's own source handle.
+    this.appendAdd = '[data-test="workflow-flow-append-add"]';
+    // Direct-child svg only: FlowAddButton's `+` icon is another svg under the same
+    // wrapper (at `> button > svg`), and counting its path too yields 2 paths per arm.
+    this.appendAddPath = '[data-test="workflow-flow-append-add"] > svg path';
+    // Node hover actions (WorkflowNode): the disable/enable toggle and the Disabled badge.
+    this.nodeDisableToggle = '[data-test="workflows-node-disable-toggle"]';
+    this.nodeDisabledBadgeFor = (t) => `[data-test="workflow-node-${t}-disabled-badge"]`;
     this.listRowPrefixFor = (n) => `[data-test^="workflow-list-${n}-"]`;
     this.listRowActionFor = (n, a) => `[data-test="workflow-list-${n}-${a}"]`;
     this.listDraftTag = '[data-test="workflow-list-draft-tag"]';
@@ -202,11 +212,9 @@ class WorkflowsPage {
     // NDV output pane — on a successful destination send this holds the sink's
     // response body, which is what makes delivery assertable.
     this.ndvOutput = '[data-test="workflow-ndv-output"]';
-    // Test-run drawer. Still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
-    // config panel became an ODialog — so its buttons stay `o-drawer-*`.
-    this.testDrawer = '[data-test="workflow-test-drawer"]';
+    // The Test panel is still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
+    // config panel became an ODialog — so its primary button stays `o-drawer-*`.
     this.testDrawerPrimary = '[data-test="workflow-test-drawer"] [data-test="o-drawer-primary-btn"]';
-    this.testSuppressSwitch = '[data-test="workflow-test-suppress-destinations-btn"]';
     // Workflow function code editor (QuickJS/JavaScript), shared with the Functions page.
     this.functionEditor = '[data-test="logs-vrl-function-editor"]';
     // Warning toast — how a blocked Publish reports itself, since it never reaches the network.
@@ -418,10 +426,15 @@ class WorkflowsPage {
     await rail.waitFor({ state: 'visible' });
   }
 
-  async addNodeFromPalette(type /* 'condition' | 'function' | 'destination' */) {
+  async addNodeFromPalette(type /* 'condition' | 'function' | 'destination' | 'branch' */) {
     await this.closeOpenDrawer();
     await this.ensureNodePaletteOpen();
-    const paletteSel = { condition: this.paletteCondition, function: this.paletteFunction, destination: this.paletteDestination }[type];
+    const paletteSel = {
+      condition: this.paletteCondition,
+      function: this.paletteFunction,
+      destination: this.paletteDestination,
+      branch: this.paletteBranch,
+    }[type];
     await this.page.locator(paletteSel).click({ timeout: DRAWER_TIMEOUT_MS });
     // "Insert-immediately" — the palette adds the node in Set-up-later mode and
     // does NOT auto-open the config panel. Click the freshly-added node to open
@@ -736,6 +749,8 @@ class WorkflowsPage {
     const toggle = this.page.locator(this.testSuppressDestinationsBtn).first();
     const state = await toggle.getAttribute('aria-checked');
     if (String(on) !== state) await toggle.click({ timeout: DRAWER_TIMEOUT_MS });
+    // A silently-dropped click would leave a delivery test running a suppressed rehearsal.
+    await expect(toggle).toHaveAttribute('aria-checked', String(on), { timeout: DRAWER_TIMEOUT_MS });
   }
 
   async expectSuppressDestinations(on) {
@@ -743,8 +758,10 @@ class WorkflowsPage {
     await expect(toggle).toHaveAttribute('aria-checked', String(on), { timeout: DRAWER_TIMEOUT_MS });
   }
 
-  async expectDispatchWarning() {
-    await expect(this.page.locator(this.testDispatchWarning)).toBeVisible();
+  async expectDispatchWarning(destName) {
+    const banner = this.page.locator(this.testDispatchWarning);
+    await expect(banner).toBeVisible();
+    if (destName) await expect(banner).toContainText(destName, { timeout: DRAWER_TIMEOUT_MS });
   }
 
   async expectNoDispatchWarning() {
@@ -977,18 +994,34 @@ class WorkflowsPage {
    * payload. Per-node results paint as ✓/✗ badges on the canvas nodes afterwards.
    */
   async testRunFromEditor({ liveSend = false } = {}) {
-    await this.page.locator(this.testBtn).click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(this.testDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.openTestDrawer();
     if (liveSend) {
-      // Destination sends are suppressed by default; send-error tests need the real dispatch.
-      const sw = this.page.locator(this.testSuppressSwitch);
-      if ((await sw.getAttribute('aria-checked')) === 'true') {
-        await sw.click({ timeout: DRAWER_TIMEOUT_MS });
-      }
+      // A silent no-op flip would run a suppressed rehearsal and green a delivery test,
+      // so the toggle landing is guarded inside setSuppressDestinations().
+      await this.setSuppressDestinations(false);
     }
     // The Test panel is still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
     // config panel became an ODialog. Its buttons stay `o-drawer-*`.
     await this.page.locator(this.testDrawerPrimary).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Assert a node passed with the REHEARSAL flask (published workflow), never the green ✓. */
+  async expectNodeTestRehearsal(nodeType, timeout = 60000) {
+    await expect(this.page.locator(this.nodeTestRehearsalFor(nodeType)))
+      .toBeVisible({ timeout });
+    await expect(this.page.locator(this.nodeTestOkFor(nodeType))).toHaveCount(0);
+  }
+
+  /**
+   * The destination node's output for a SUPPRESSED run — the `{"suppressed": true, ...}`
+   * preview, not a delivery receipt. Same two-parse shape as destinationIngestReceipt():
+   * the node output is an array of JSON strings (one per send).
+   */
+  async destinationSuppressionPreview() {
+    const raw = await this.nodeTestOutputText('destination');
+    const outer = JSON.parse(raw);
+    const first = Array.isArray(outer) ? outer[0] : outer;
+    return typeof first === 'string' ? JSON.parse(first) : first;
   }
 
   /** Assert a node painted an error badge after a test run (node_type e.g. 'destination','function').
@@ -1251,6 +1284,74 @@ class WorkflowsPage {
   // ---------- enable / disable ----------
   async toggleEnable(name) {
     await this.page.locator(this.listRowActionFor(name, 'pause-start-action')).first().click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  // ---------- list pause/resume control variant ----------
+  // The pause/resume row action is a single OButton whose `:variant` flips between
+  // ghost-destructive (enabled -> pause) and ghost-success (paused -> resume). Both the
+  // `data-row-action` state and the variant class land on the same <button> root.
+  async listActionRowState(name) {
+    const btn = this.page.locator(this.listRowActionFor(name, 'pause-start-action')).first();
+    await btn.waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+    return (await btn.getAttribute('data-row-action')) || '';
+  }
+
+  async listActionClasses(name) {
+    const btn = this.page.locator(this.listRowActionFor(name, 'pause-start-action')).first();
+    await btn.waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+    return ((await btn.getAttribute('class')) || '').split(/\s+/);
+  }
+
+  // ---------- branch-arm connector geometry ----------
+  /**
+   * Hover the Branch node to reveal its per-arm append `+` connectors, then read each
+   * connector's SVG path start-x. Each path's `d` is `M <cx> 0 ...`; the fix under test puts
+   * `cx` at the arm's OWN handle offset (small, per-arm), not the old shared convergence
+   * point (|cx| == ARM_GAP/2 == 44). Returns the parsed start-x values in DOM order.
+   */
+  async branchAppendConnectorPaths() {
+    await this.page.locator(this.nodeFor('branch')).hover({ timeout: DRAWER_TIMEOUT_MS });
+    const paths = this.page.locator(this.appendAddPath);
+    await paths.first().waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    return paths.evaluateAll((els) =>
+      els.map((el) => {
+        const d = el.getAttribute('d') || '';
+        const m = /^M\s*(-?[\d.]+)\s+0\b/.exec(d);
+        return m ? parseFloat(m[1]) : null;
+      })
+    );
+  }
+
+  // ---------- node status badges ----------
+  /**
+   * Hover the node (revealing its hover actions) and click the disable/enable toggle, which
+   * flips the step's muted state. Scoped to the node so multiple nodes can't collide.
+   */
+  async disableNode(nodeType) {
+    const node = this.page.locator(this.nodeFor(nodeType));
+    await node.hover({ timeout: DRAWER_TIMEOUT_MS });
+    const toggle = node.locator(this.nodeDisableToggle);
+    await toggle.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await toggle.click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async expectNodeDisabledBadge(nodeType) {
+    await expect(this.page.locator(this.nodeDisabledBadgeFor(nodeType))).toBeVisible({
+      timeout: DRAWER_TIMEOUT_MS,
+    });
+  }
+
+  /**
+   * The Disabled badge lives inside the status-glyph strip that must now wrap (flex-wrap) and
+   * cap its width (max-w-*) so several badges stay inside the card. Read the badge's direct
+   * parent (that strip) and assert the two structural classes are present.
+   */
+  async expectStatusStripWraps(nodeType) {
+    const badge = this.page.locator(this.nodeDisabledBadgeFor(nodeType));
+    await badge.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    const classes = await badge.evaluate((el) => (el.parentElement ? el.parentElement.className : ''));
+    expect(classes).toContain('flex-wrap');
+    expect(classes).toContain('max-w-');
   }
 }
 

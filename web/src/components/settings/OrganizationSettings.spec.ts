@@ -33,11 +33,14 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 // Mock organizations service
-vi.mock("@/services/organizations", () => ({
-  default: {
-    post_organization_settings: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      post_organization_settings: vi.fn(),
+    },
+  });
+});
 
 import organizations from "@/services/organizations";
 const mockPostOrganizationSettings = organizations.post_organization_settings as any;
@@ -305,6 +308,21 @@ describe("OrganizationSettings", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: "Invalid field names",
+        variant: "error",
+      });
+    });
+
+    it("should prefer the server's response message over the HTTP status text", async () => {
+      const wrapper = createWrapper();
+      mockPostOrganizationSettings.mockRejectedValue({
+        message: "Request failed with status code 400",
+        response: { data: { message: "No org with org id abc found" } },
+      });
+
+      await wrapper.vm.saveOrgSettings(validValue);
+
+      expect(mockToast).toHaveBeenCalledWith({
+        message: "No org with org id abc found",
         variant: "error",
       });
     });

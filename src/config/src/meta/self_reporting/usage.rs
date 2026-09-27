@@ -25,6 +25,8 @@ use crate::{
 };
 
 pub const USAGE_STREAM: &str = "usage";
+/// Duplicates the enterprise auditor's private stream name; the two are compared by value.
+pub const AUDIT_STREAM: &str = "audit";
 pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
@@ -1808,6 +1810,7 @@ mod tests {
             compressed_size: 1024 * 1024,   // 1MB
             flattened: false,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
         };
 
@@ -1895,6 +1898,7 @@ mod tests {
         assert_eq!(stats.max_ts, 0);
         assert!(stats.compressed_size.is_none());
         assert!(stats.index_size.is_none());
+        assert!(stats.mindex_size.is_none());
     }
 
     #[test]
@@ -1910,6 +1914,7 @@ mod tests {
             max_ts: 1234567999,
             compressed_size: Some(1.25),
             index_size: Some(0.75),
+            mindex_size: Some(0.0),
         };
 
         let json = serde_json::to_string(&stats).unwrap();
@@ -2631,4 +2636,6 @@ pub struct Stats {
     pub compressed_size: Option<f64>,
     #[serde(default)]
     pub index_size: Option<f64>,
+    #[serde(default)]
+    pub mindex_size: Option<f64>,
 }

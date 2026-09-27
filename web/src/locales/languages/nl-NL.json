@@ -1474,6 +1474,8 @@
     "sessionReplay": "Sessie opnieuw afspelen",
     "viewSessionReplay": "Bekijk de herhaling van de sessie",
     "playSessionReplay": "Sessie opnieuw afspelen",
+    "noReplayRecordedTitle": "Geen replay opgenomen voor deze sessie",
+    "noReplayRecordedMessage": "Sessie {id} heeft geen replay-segmenten om af te spelen.",
     "discoverSessionTitle": "Ontdek Session Replay om gebruikersinteracties in detail te begrijpen",
     "discoverSessionMessage": "Session Replay legt gebruikersinteracties op uw website of applicatie vast en herhaalt deze. Zo kun je visueel bekijken hoe gebruikers navigeren, waar ze klikken, wat ze typen en hoe ze met je inhoud omgaan.",
     "loadingErrorDetails": "Wacht even, we halen foutgegevens op.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "Start gratis proef"
   },
   "login": {
+    "lockedOut": "Te veel mislukte aanmeldpogingen. Probeer het over {duration} opnieuw, of neem contact op met uw beheerder.",
     "redirectingToSsoMessage": "Doorverwijzen naar SSO-inlogpagina. Als je niet wordt doorgestuurd, ",
     "clickHere": "klik hier",
     "loginWithSso": "Inloggen met SSO",
@@ -1954,6 +1957,7 @@
     "ok": "Oké",
     "sendInvite": "Uitnodiging verzenden",
     "inviteByEmail": "Uitnodigen via e-mail. Meerdere e-mails gescheiden door een puntkomma (;) of komma (,)",
+    "inviteByEmailPlaceholder": "Uitnodigen via e-mail",
     "changePassword": "Wachtwoord wijzigen",
     "oldPassword": "Oud wachtwoord",
     "newPassword": "Nieuw wachtwoord",
@@ -1962,6 +1966,15 @@
     "fieldRequired": "Veld is verplicht",
     "passwordRequired": "Wachtwoord is vereist.",
     "passwordPolicyHint": "Het wachtwoord moet 8-128 tekens lang zijn en minstens één kleine letter, één hoofdletter, één cijfer en één speciaal teken bevatten.",
+    "lockout": {
+      "locked": "Account vergrendeld",
+      "autoUnlock": "Wordt automatisch ontgrendeld over {duration}.",
+      "staged": "Wordt ontgrendeld wanneer u opslaat.",
+      "unlock": "Ontgrendelen",
+      "undo": "Vergrendeld houden",
+      "confirmTitle": "{email} ontgrendelen?",
+      "confirmMessage": "Hiermee wordt het aantal mislukte pogingen gewist en kan de gebruiker zich direct weer aanmelden. Het wachtwoord wordt niet gewijzigd."
+    },
     "currentPasswordRequired": "Het huidige wachtwoord is vereist.",
     "newPasswordRequired": "Een nieuw wachtwoord is vereist.",
     "otherOrgInvalid": "De naam van de organisatie moet beginnen met een letter en alfanumeriek zijn, _ of -.",
@@ -2028,11 +2041,11 @@
       "addToGroup": "Aan een gebruikersgroep toevoegen",
       "addToRole": "Een rol toewijzen",
       "step1Title": "Kopieer je token",
-      "copyHint": "Kopieer dit token nu — je zult het niet meer kunnen zien.",
+      "copyHint": "Dit is de enige keer dat u dit token te zien krijgt. Kopieer of download het nu, het kan niet opnieuw worden opgehaald.",
       "done": "Klaar",
       "applying": "Toegangsrechten toepassen...",
-      "grantedRoles": "Rollen toegewezen: {roles}",
-      "grantedGroups": "Toegevoegd aan gebruikersgroepen: {groups}",
+      "rolesAssignedLabel": "Toegewezen rollen",
+      "groupsAssignedLabel": "Toegevoegd aan gebruikersgroepen",
       "failedRoles": "Kon rollen niet toewijzen: {roles}",
       "failedGroups": "Kon niet toevoegen aan gebruikersgroepen: {groups}",
       "failedHint": "Je kunt deze later toewijzen via de pagina's Rollen en Gebruikersgroepen."
@@ -2042,6 +2055,9 @@
         "label": "Serviceaccountnaam",
         "placeholder": "bijv. ingest-bot",
         "help": "Kleine letters, cijfers en koppeltekens. Opgeslagen als naam{suffix}"
+      },
+      "identifier": {
+        "label": "Identifier"
       },
       "roles": {
         "label": "Rollen toewijzen",
@@ -2056,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Identificatie",
+        "roles": "Rollen",
         "token": "Blijk",
         "created": "Gemaakt"
       }
@@ -2183,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Alle gebruikers en serviceaccounts die aan deze rollen zijn gekoppeld, verliezen de toegang."
-      }
+      },
+      "assignColumn": "Toewijzen",
+      "assignBtn": "Toevoegen",
+      "assignedBadge": "Toegewezen",
+      "assignBannerText": "Voeg {member} toe aan een rol — klik hieronder op Toevoegen naast een rol.",
+      "assignBannerDone": "Gereed",
+      "assignSuccess": "{member} toegevoegd aan rol \"{role}\".",
+      "assignError": "Het account kon niet aan die rol worden toegevoegd. Probeer het opnieuw."
     },
     "group": {
       "name": {
@@ -2214,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Leden van deze groepen verliezen de door hen toegekende rollen."
-      }
+      },
+      "assignColumn": "Toewijzen",
+      "assignBtn": "Toevoegen",
+      "assignedBadge": "Toegewezen",
+      "assignBannerText": "Voeg {member} toe aan een gebruikersgroep — klik hieronder op Toevoegen naast een groep.",
+      "assignBannerDone": "Gereed",
+      "assignSuccess": "{member} toegevoegd aan groep \"{group}\".",
+      "assignError": "Het account kon niet aan die groep worden toegevoegd. Probeer het opnieuw."
     },
     "appGroups": {
       "deleteGroupTitle": "Groep verwijderen",
@@ -3568,6 +3599,12 @@
     "joinSlack": "Sluit je aan bij de Slack",
     "maybeLater": "Misschien later"
   },
+  "connectDataSourcePopup": {
+    "title": "Laten we om te beginnen je eerste gegevensbron verbinden.",
+    "description": "We hebben veel te laten zien, maar eerst moeten we je gegevens verbinden. De meeste teams zien hun eerste logs binnen ongeveer een minuut.",
+    "connectButton": "Een gegevensbron verbinden",
+    "slackLink": "Sluit je ook aan bij onze Slack-community"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Doorgaan vanaf waar het pauzeerde",
     "startFromNow": "Vanaf nu starten.",
@@ -3578,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Fout bij het kopiëren van inhoud.",
+    "passcodeForbiddenMessage": "Admin- of Root-rol vereist om het ingestietoken te bekijken. Vraag een beheerder om het installatiecommando, of om de rol die nodig is om het hier te zien.",
     "updateRUMTokenMessage": "Weet je zeker dat je het RUM-token voor deze organisatie wilt bijwerken?",
     "completeAwsIntegration": "AWS-integratie voltooien",
     "deployAwsServicesOneClick": "Implementeer alle geselecteerde AWS-services in één klik met behulp van een enkele CloudFormation-stack.",
@@ -4484,6 +4522,8 @@
       "payloadTitle": "Gebeurtenis-payload",
       "payloadIndex": "Het veld {field} selecteert de stream. Gebeurtenissen zonder dit veld gaan naar de stream {stream}.",
       "payloadTime": "Het veld {field} is epochseconden, en een fractionele waarde wordt geaccepteerd. Als het ontbreekt of niet positief is, wordt de ontvangsttijd gebruikt.",
+      "windowTitle": "Tijdstempels buiten het inname-venster worden verwijderd",
+      "windowBody": "Gebeurtenissen ouder dan {past} (standaard 5 uur) of verder vooruit dan {future} (standaard 24 uur) worden verwijderd, en het verzoek antwoordt toch met code 0 omdat een Splunk-client een fout niet opnieuw probeert. Een hardcoded of verouderd tijdstempel lijkt daardoor op een geslaagde verzending die niets opslaat.",
       "payloadMetadata": "De velden {fields} worden als kolommen op de gebeurtenis opgeslagen.",
       "healthTitle": "Healthcheck",
       "healthBody": "Een GET-verzoek vereist geen authenticatie en antwoordt met {response}.",
@@ -4957,7 +4997,7 @@
     "colorLightToDarkBlue": "Licht tot donkerblauw (per waarde)",
     "colorPaletteClassicBySeries": "Palette-Classic (per serie)",
     "drilldown": "Inzoomen",
-    "drilldownTooltip": "Navigeer naar een ander dashboard of een andere opgegeven URL, waarbij alle huidige variabelen worden meegenomen voor een naadloze gegevensverkenning.",
+    "drilldownTooltip": "Navigeer naar een ander dashboard of opgegeven URL, waarbij alle huidige variabelen worden meegenomen voor naadloze gegevensverkenning.",
     "colorBySeriesTitle": "Kleur per serie",
     "colorBySeriesTooltip": "Pas kleuren toe op series voor een beter visueel onderscheid in diagrammen. Pas kleuren aan voor elke serie om de datavisualisatie te verbeteren.",
     "editColorBySeries": " Kleur per serie bewerken",
@@ -5380,6 +5420,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Vernieuwen om de laatste variabelewijzigingen toe te passen",
       "refresh": "Vernieuwen",
+      "refreshCacheReload": "Cache vernieuwen en herladen",
+      "moreRefreshOptions": "Meer vernieuwingsopties",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard niet gevonden of is verwijderd. Doorverwijzen naar dashboardlijst.",
       "failedToLoadDashboard": "Kan dashboard niet laden. Doorverwijzen naar dashboardlijst.",
@@ -5814,7 +5856,36 @@
     "variableNameAlreadyExists": "Er bestaat al een variabele met dezelfde naam",
     "pivotTotal": "Totaal",
     "pivotOthers": "Overige",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Exemplaren tonen (trace-voorbeelden)",
+      "hide": "Exemplaren verbergen · {count} weergegeven",
+      "empty": "Geen exemplaren in dit tijdsbereik",
+      "emptyShort": "0 exemplaren",
+      "loadFailed": "Exemplaren konden niet worden geladen",
+      "loadFailedHint": "De grafiek blijft ongewijzigd. Opnieuw proberen haalt alleen exemplaren op.",
+      "retry": "Opnieuw proberen",
+      "cardTitle": "Exemplaar",
+      "query": "Query {name}",
+      "returnedBy": "Geretourneerd door {count} query | Geretourneerd door {count} query's",
+      "series": "Reeks",
+      "aboveRange": "Boven het grafiekbereik; getekend aan de bovenrand",
+      "belowRange": "Onder het grafiekbereik; getekend aan de onderrand",
+      "checkingTrace": "Trace controleren…",
+      "openTrace": "Trace openen",
+      "openTraceHint": "Of klik op de markering. Terug brengt je hier terug.",
+      "traceNotAvailable": "Trace niet beschikbaar — weggevallen uit de steekproef of voorbij de bewaartermijn",
+      "openTraceUnverified": "Trace openen (niet geverifieerd)",
+      "unverifiedTimeout": "Het opzoeken van de trace is verlopen, dus deze trace ontbreekt mogelijk.",
+      "unverifiedForbidden": "Deze trace kon niet worden bevestigd — mogelijk hebt u geen toegang tot traces.",
+      "unverifiedPartial": "Slechts een deel van het bewaarvenster is doorzocht.",
+      "unverifiedError": "Deze trace kon niet worden gecontroleerd.",
+      "noTraceId": "Geen {label} op dit exemplaar, dus er is geen trace om te openen.",
+      "markersAria": "Exemplaarmarkeringen",
+      "markerAria": "Exemplaar {value} op {time}"
+    },
+    "showExemplarsLabel": "Exemplaren tonen",
+    "showExemplarsHelp": "Tekent trace-voorbeelden op deze grafiek voor iedereen die het dashboard opent. Kijkers kunnen ze nog steeds verbergen via de paneelheader."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5902,6 +5973,9 @@
         "details": "Details",
         "json": "JSON",
         "insights": "Inzichten",
+        "back": "Terug naar resultaten",
+        "prevEvent": "Vorige gebeurtenis",
+        "nextEvent": "Volgende gebeurtenis",
         "copyLink": "Link kopiëren",
         "copy": "Kopiëren",
         "copyValue": "Waarde kopiëren",
@@ -7486,6 +7560,9 @@
       "lastError": "Laatste fout",
       "lastTrained": "Laatst getraind",
       "lookBackWindow": "Kijk terug naar het venster",
+      "lookBackWindowFloor": "Terugkijkvenster moet minimaal {min} zijn — Controleer elke plus één Detectieresolutie. Een korter venster kan geen volledige bucket bevatten op het moment dat een uitvoering plaatsvindt, dus buckets worden overgeslagen.",
+      "lookBackWindowLegacy": "Dit opgeslagen venster ligt onder het minimum van {min} (Controleer elke plus één Detectieresolutie). Het wordt ongewijzigd opgeslagen, maar uitvoeringen kunnen buckets overslaan totdat het venster wordt verhoogd.",
+      "lookBackWindowMinimum": "Minimaal {min}. Aanbevolen {recommended} of meer — tweemaal (Controleer elke + Detectieresolutie) — plus 10 minuten waar detectie van afwezigheid is ingeschakeld.",
       "lookBackWindowTooltip": "Hoe ver terug elke detectie voert query's uit. Sluit het venster af, zelfs na een lange pauze. De standaardinstelling is om elk interval te controleren.",
       "metricChart": "Metriek en anomalieën",
       "metricChartHint": "Eén punt per detectie-interval",
@@ -7494,6 +7571,15 @@
       "nDays": "{days} dag | {days} dagen",
       "noDestinationsFound": "Geen bestemmingen gevonden",
       "noFieldsFound": "Geen velden gevonden",
+      "noticeHybridFallback": "Terugvaldetectie",
+      "noticeHybridFallbackTooltip": "De hybride drempelwaarde was bij recente uitvoeringen niet beschikbaar, dus viel de detectie terug op de bevroren drempelwaarde. De scoring gaat door op de bevroren drempelwaarde totdat het model opnieuw wordt getraind.",
+      "noticeRetrain": "Automatische hertraining",
+      "noticeRetrainTooltip": "Het opgeslagen model kon na een upgrade niet worden gelezen, dus het is weggegooid en de configuratie is automatisch in de wachtrij voor hertraining geplaatst. Er is geen actie nodig; de detectie wordt hervat zodra de training is voltooid.",
+      "noticeSkipAbsence": "De beoordeling van afwezigheid liep achter op het Terugkijkvenster; de span die niet meer kon worden opgehaald, is overgeslagen en vastgelegd.",
+      "noticeSkipScored": "Detectie-uitvoeringen kwamen verder uit elkaar dan het Terugkijkvenster beslaat, waardoor gesloten buckets het venster verlieten voordat een uitvoering ze kon beoordelen.",
+      "noticeWindowFloor": "Venster te smal",
+      "noticeWindowFloorTooltip": "Het Terugkijkvenster ligt onder Controleer elke plus één Detectieresolutie, dus uitvoeringen kunnen geen enkele bucket beoordelen. Verhoog het venster om de detectie te herstellen.",
+      "noticeWindowSkip": "Buckets overgeslagen",
       "notifications": "Meldingen",
       "notificationsTooltip": "Wanneer ingeschakeld, wordt er een melding naar de geselecteerde bestemming gestuurd telkens wanneer een anomalie wordt gedetecteerd.",
       "percentile": "Niveau",
@@ -7590,7 +7676,9 @@
       "usernameRequired": "Gebruikersnaam is vereist",
       "passwordRequired": "Wachtwoord is vereist",
       "emailRecipients": "E-mailadressen van ontvangers",
-      "emailRecipientsHelp": "Door komma's gescheiden e-mailadressen",
+      "emailRecipientsHelp": "Selecteer de gebruikers van de organisatie of serviceaccounts die alarm-e-mails moeten ontvangen",
+      "emailRecipientsGroupUsers": "Gebruikers",
+      "emailRecipientsGroupServiceAccounts": "Serviceaccounts",
       "invalidEmailAddresses": "Ongeldige e-mailadressen: {emails}",
       "opsgenieApiKey": "Opsgenie API-sleutel",
       "opsgenieApiKeyHelp": "Haal uw API-sleutel op uit de integratie-instellingen van Opsgenie",
@@ -7907,7 +7995,18 @@
     "enabled": "Ingeschakeld",
     "paused": "Gepauzeerd",
     "impactTemplate": "Gebruikt door {destinations} · {alerts}",
-    "impactDestination": "Gebruikt door {alerts}"
+    "impactDestination": "Gebruikt door {consumers}",
+    "impactUnused": "Niet gebruikt",
+    "noConsumers": "Geen afnemers.",
+    "countCompositeAlert": "{count} samengesteld alarm | {count} samengestelde alarmen",
+    "countPipeline": "{count} pijpleiding | {count} pijpleidingen",
+    "countSyntheticCheck": "{count} synthetische check | {count} synthetische checks",
+    "countOncallPolicy": "{count} escalatiebeleid | {count} escalatiebeleidsregels",
+    "countOncallTeamChannel": "{count} teamkanaal | {count} teamkanalen",
+    "countWorkflow": "{count} workflow | {count} workflows",
+    "countAnomalyDetection": "{count} anomaliedetector | {count} anomaliedetectoren",
+    "countIncidentIntegration": "{count} incidentintegratie | {count} incidentintegraties",
+    "sectionOtherConsumers": "Ook gebruikt door"
   },
   "alert_library": {
     "header": "Meldingenbibliotheek",
@@ -8591,7 +8690,9 @@
         "staleCopyAria": "Kopieer de mislukte-vernieuwingsdetails voor {name}",
         "stalePreamble": "Vernieuwing mislukt — toon het laatste succesvolle resultaat.",
         "staleClickToCopy": "Klik om de details te kopiëren.",
-        "lastRefreshedPrefix": "Laatst vernieuwd om: "
+        "lastRefreshedPrefix": "Laatst vernieuwd om: ",
+        "exemplarsShowHeatmap": "Exemplaren tonen (trace-voorbeelden). Schakelt deze kaart naar percentielen zolang dit aan staat.",
+        "exemplarsHideHeatmap": "Exemplaren verbergen · {count} weergegeven. Zet deze kaart terug naar heatmap."
       },
       "fn": {
         "subtitle": "Kies hoe deze metriek wordt geaggregeerd",
@@ -8775,6 +8876,8 @@
     "cipherKeysDesc": "Versleutelingssleutels voor gevoelige velden",
     "regexPatternsDesc": "Herbruikbare regex-patronen voor redactie",
     "domainManagementDesc": "Aanmelden beperken tot toegestane SSO-domeinen",
+    "passwordPolicy": "Wachtwoordbeleid",
+    "passwordPolicyDesc": "Authenticatiebeleid voor native e-mail-/wachtwoordaccounts, toegepast op de hele instantie.",
     "pipelineDestinationsDesc": "Externe doelen voor pipeline-uitvoer",
     "templatesDesc": "Herbruikbare sjablonen voor waarschuwingsberichten",
     "storageSettingsDesc": "Opslagconfiguratie per organisatie",
@@ -9351,7 +9454,28 @@
     "listConjunctionAnd": "{list} en {last}",
     "runsIn": "Draait in",
     "recommendedByFieldCoverage": "Aanbevolen op basis van velddekking in uw streams.",
-    "listConjunctionAndTwo": "{first} en {last}"
+    "listConjunctionAndTwo": "{first} en {last}",
+    "domainOrgMappings": {
+      "title": "Domein naar organisatie-toewijzingen",
+      "subtitle": "Nieuwe gebruikers die inloggen met een overeenkomend e-maildomein worden automatisch aan de organisatie toegevoegd.",
+      "addMapping": "Toewijzing toevoegen",
+      "editMapping": "Toewijzing bewerken",
+      "empty": "Nog geen toewijzingen. Gebruik “{addLabel}” om er een toe te voegen.",
+      "domain": "E-maildomein",
+      "domainHelp": "Het deel na {at_sign} in het e-mailadres van de gebruiker.",
+      "organization": "Organisatie",
+      "organizationPlaceholder": "Organisatie-identificatie",
+      "organizationHelp": "De identificatie van de organisatie waaraan overeenkomende gebruikers worden toegevoegd.",
+      "organizationRequired": "Organisatie is vereist",
+      "baseRole": "Basisrol",
+      "baseRoleHelp": "De rol die overeenkomende gebruikers in die organisatie krijgen.",
+      "userGroup": "Gebruikersgroep",
+      "userGroupPlaceholder": "Groepsnaam",
+      "userGroupHelp": "Optioneel. Overeenkomende gebruikers worden ook lid van deze groep in die organisatie.",
+      "duplicateDomain": "Er bestaat al een toewijzing voor dit domein",
+      "confirmRemove": "Weet je zeker dat je de toewijzing voor {domain} wilt verwijderen?",
+      "deleteTitle": "Toewijzing verwijderen"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -13006,10 +13130,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Invoer van de root-span van de trace."
+              "trace": "Invoer van de root chat-span van de trace.",
+              "session": "De openingsvraag: invoer van de root chat-span van de eerste trace."
             },
             "output": {
-              "trace": "Uitvoer van de root-span van de trace."
+              "trace": "Uitvoer van de root chat-span van de trace.",
+              "session": "Het uiteindelijke antwoord: uitvoer van de root chat-span van de laatste trace."
             },
             "statistics": {
               "trace": "Trace-metrieken: span-aantal, duur, LLM- en toolcalls, fouten, tokens en kosten.",
@@ -13021,6 +13147,10 @@
             "steps": {
               "trace": "Spans in tijdsvolgorde; het midden wordt samengevouwen wanneer de trace erg lang is.",
               "session": "Traces in tijdsvolgorde, weergegeven als gespreksbeurten."
+            },
+            "tool_calls": {
+              "trace": "Elke toolaanroep in de trace, in tijdvolgorde, met de naam, invoer, uitvoer en status.",
+              "session": "Elke toolaanroep in alle traces van de sessie, in tijdvolgorde, met de naam, invoer, uitvoer en status."
             }
           }
         }
@@ -13340,6 +13470,7 @@
       "searchHistoryNotEnabled": "Zoekgeschiedenis is niet ingeschakeld.",
       "enableUsageReporting": "Stel ZO_USAGE_REPORTING_ENABLED in op true om gebruiksrapportage in te schakelen.",
       "selectStreamToExtractPatterns": "Selecteer een stream om patronen te extraheren",
+      "patternsUnavailableForMultiStream": "Patronen zijn niet beschikbaar wanneer meerdere streams zijn geselecteerd. Selecteer één stream.",
       "errorExtractingPatterns": "Fout bij extraheren van patronen. Probeer het opnieuw.",
       "nameOfPanelRequired": "Naam van paneel is vereist",
       "errorsFixAndTryAgain": "Er zijn fouten, corrigeer deze en probeer het opnieuw",
@@ -13471,6 +13602,166 @@
     "lastRefreshed": "Laatst ververst: {time}"
   },
   "synthetics": {
+    "variables": {
+      "newButton": "Nieuwe variabele",
+      "createTitle": "Variabele toevoegen",
+      "created": "Variabele {name} aangemaakt",
+      "deleteConfirm": "{name} verwijderen?",
+      "deleteFailed": "Kan de variabele niet verwijderen",
+      "deleteTitle": "Variabele verwijderen",
+      "deleteEnvFallback": "{env} gebruikt dan de globale waarde.",
+      "deleteGlobalFallback": "{envs} behouden hun eigen waarden; in andere omgevingen is {name} niet langer beschikbaar.",
+      "overriddenInNote": "Overschreven in {envs}",
+      "overridesGlobalNote": "Overschrijft globaal",
+      "shadowGlobalTitle": "Globale waarde overschrijven?",
+      "shadowGlobalMessage": "{name} overschrijft de globale waarde in {env}. Andere omgevingen blijven de globale waarde gebruiken.",
+      "shadowedGlobalTitle": "Sommige omgevingen behouden hun eigen waarden",
+      "shadowedGlobalMessage": "{name} heeft al een eigen waarde in: {envs}. Die omgevingen behouden hun waarde; overal elders wordt deze gebruikt.",
+      "deleteUsed": "{name} wordt gebruikt door {n} check. Deze wordt als letterlijke tekst opgelost totdat je die aanpast. Toch verwijderen? | {name} wordt gebruikt door {n} checks. Deze worden als letterlijke tekst opgelost totdat je ze aanpast. Toch verwijderen?",
+      "deleted": "Variabele verwijderd",
+      "description": "Beschrijving",
+      "editTitle": "Variabele bewerken",
+      "emptyBody": "Deel een waarde over meerdere checks in plaats van deze in elke check te kopiëren.",
+      "emptyFiltered": "Geen variabelen gevonden voor uw zoekopdracht.",
+      "emptyTitle": "Nog geen variabelen",
+      "example": "Voorbeeld",
+      "exampleHint": "Weergegeven op plaatsen waar de waarde wordt verborgen. Vul hier nooit een echt geheim in.",
+      "examplePlaceholder": "https://shop.example.com",
+      "global": "Globaal",
+      "globalSubtitle": "Geldt in elke omgeving.",
+      "globalReachesProduction": "Globale waarden gelden in elke omgeving, inclusief productie. Een wijziging hier bereikt elke check die deze naam gebruikt zonder eigen waarde.",
+      "kind": "Soort",
+      "kindPlain": "Normaal",
+      "kindSecret": "Geheim",
+      "lastUpdated": "Laatst bijgewerkt",
+      "loadFailed": "Kan variabelen niet laden",
+      "name": "Naam",
+      "nameInvalid": "Gebruik letters, cijfers en underscores, beginnend met een letter of underscore",
+      "namePlaceholder": "BASE_URL",
+      "nameRequired": "Naam is verplicht",
+      "nameReserved": "_AUTH_ is gereserveerd voor inloggegevens die de probe zelf injecteert",
+      "nameTooLong": "Naam is te lang (maximaal 128 tekens)",
+      "notSet": "Niet ingesteld",
+      "replace": "Vervangen",
+      "saveFailed": "Kan de variabele niet opslaan",
+      "scope": "Omgevingen",
+      "scopeEnvironment": "Deze variabele geldt alleen in {env}.",
+      "scopeGlobal": "Deze variabele geldt in elke omgeving.",
+      "searchPlaceholder": "Zoek variabelen",
+      "secretNeedsEnvironment": "Global bevat geen secrets. Maak het secret aan in de omgeving die het moet beveiligen.",
+      "secretWriteOnly": "De waarde is alleen-schrijven. Na opslaan wordt deze nergens meer getoond.",
+      "title": "Variabelen",
+      "updated": "Variabele bijgewerkt",
+      "usedBy": "Gebruikt door",
+      "usedByChecks": "Ongebruikt | {n} check | {n} checks",
+      "value": "Waarde",
+      "valueEmpty": "Leeg",
+      "valuePlaceholder": "Waarde",
+      "valueRequired": "Waarde is verplicht",
+      "valueSet": "Ingesteld · bijgewerkt {when}"
+    },
+    "environments": {
+      "newButton": "Nieuwe omgeving",
+      "backToList": "Alle omgevingen",
+      "capReached": "Een controle kan in maximaal {cap} omgevingen worden uitgevoerd.",
+      "cardEmpty": "Nog geen omgevingen. Maak ze aan onder Synthetics → Variabelen.",
+      "cardLocked": "Geselecteerd door een gebruiker met toegang. Je kunt het niet wijzigen — de controle blijft daar draaien.",
+      "cardTitle": "Omgevingen",
+      "checks": "Controles",
+      "checksCount": "Ongebruikt | {count} controle | {count} controles",
+      "createTitle": "Omgeving toevoegen",
+      "created": "Omgeving aangemaakt",
+      "deleteBlockedChecks": "Nog in gebruik door {n} controles. Verwijder het daar eerst uit.",
+      "deleteBlockedSecrets": "Deze omgeving bevat nog geheimen. Verwijder ze eerst afzonderlijk — een geheim kan niet worden hersteld.",
+      "deleteConfirm": "Verwijder {name}?",
+      "deleteFailed": "Kan de omgeving niet verwijderen",
+      "deleteTitle": "Omgeving verwijderen",
+      "deleteWithVariables": "Verwijder {name} en zijn {n} variabelen?",
+      "deleted": "Omgeving verwijderd",
+      "description": "Beschrijving",
+      "detailSubtitle": "Variabelen die alleen voor deze omgeving gelden.",
+      "editTitle": "Omgeving bewerken",
+      "emptyBody": "Maak er een aan om variabelen en geheimen af te bakenen, zoals staging en productie.",
+      "emptyTitle": "Nog geen omgevingen",
+      "lastUpdated": "Laatst bijgewerkt",
+      "loadFailed": "Kan omgevingen niet laden",
+      "name": "Naam",
+      "nameInvalid": "Gebruik letters, cijfers, koppeltekens en underscores, niet beginnend met een underscore.",
+      "namePlaceholder": "productie",
+      "nameRequired": "Naam is verplicht",
+      "nameTooLong": "Naam is te lang (maximaal 64 tekens)",
+      "renameBlocked": "Een omgeving kan niet worden hernoemd — de naam is waar machtigingen aan zijn gekoppeld.",
+      "saveFailed": "Kan de omgeving niet opslaan",
+      "searchPlaceholder": "Omgevingen zoeken",
+      "subtitle": "Baken variabelen en geheimen af en bepaal wie ze mag beheren.",
+      "title": "Omgevingen",
+      "updated": "Omgeving bijgewerkt",
+      "usedByChecks": "Ongebruikt | Gebruikt door {n} check | Gebruikt door {n} checks",
+      "variables": "Variabelen"
+    },
+    "duplicateVariable": {
+      "body": "Maakt een kopie van {name}, inclusief de waarde, in dezelfde scope.",
+      "done": "Variabele gedupliceerd",
+      "failed": "Kan de variabele niet dupliceren",
+      "nameLabel": "Nieuwe variabelenaam"
+    },
+    "duplicate": {
+      "action": "Dupliceren",
+      "body": "Kopieert alle {n} variabelen van {name} naar een nieuwe omgeving. Controles worden niet gekopieerd.",
+      "bodyWithSecrets": "Kopieert {n} variabelen van {name}. {secrets} geheim(en) worden gekopieerd zonder hun waarden en moeten opnieuw worden ingesteld. Controles worden niet gekopieerd.",
+      "confirm": "Dupliceren",
+      "done": "Omgeving gedupliceerd",
+      "failed": "Kan de omgeving niet dupliceren",
+      "nameLabel": "Nieuwe omgevingsnaam",
+      "title": "Dupliceer {name}"
+    },
+    "inherited": {
+      "notIn": "Niet in {envs}",
+      "overridesGlobal": "overschrijft globaal",
+      "notInMany": "Niet in {count} omgevingen",
+      "overriddenByCheck": "Overschreven door lokale variabele",
+      "title": "Gedeeld",
+      "filterAll": "Alles",
+      "filterLabel": "Filteren op bron",
+      "emptyIn": "Geen gedeelde variabelen in {env}.",
+      "titleTooltip": "Waarden die met elke controle worden gedeeld, beheerd op het tabblad Omgevingen & variabelen: de omgevingen van deze controle plus globale variabelen. Lokale variabelen hierboven hebben voorrang op deze.",
+      "valueSet": "Ingesteld",
+      "valueNotSet": "Niet ingesteld",
+      "emptyNone": "Geen gedeelde variabelen."
+    },
+    "promote": {
+      "done": "Variabele is nu globaal",
+      "doneShadowed": "Variabele is nu globaal. {envs} overschrijven deze nog steeds met hun eigen waarden.",
+      "failed": "Kan de variabele niet globaal maken",
+      "secretBlocked": "Geheimen kunnen niet tussen omgevingen worden verplaatst.",
+      "toGlobal": "Globaal maken"
+    },
+    "promoteCheck": {
+      "action": "Deel {name}",
+      "confirm": "Verplaatsen",
+      "description": "Verplaatst deze variabele uit de check naar een gedeelde omgeving, waar andere checks deze ook kunnen gebruiken.",
+      "destination": "Bestemming",
+      "done": "Variabele verplaatst",
+      "failed": "Kon de variabele niet verplaatsen",
+      "global": "Globaal",
+      "secretHint": "Deze waarde is gemarkeerd als beveiligd, dus wordt het een secret en kan niet naar globaal.",
+      "title": "Deel {name}",
+      "tooltip": "Verplaats naar een gedeelde omgeving"
+    },
+    "split": {
+      "action": "Beperken tot omgevingen",
+      "alreadyOwn": "Heeft al een eigen waarde — blijft zoals het is.",
+      "overrideHint": "Om in slechts één omgeving te overschrijven, maak de variabele daar in plaats daarvan aan.",
+      "confirm": "Beperken tot omgevingen",
+      "description": "Elke omgeving krijgt zijn eigen waarde. De globale variabele wordt vervangen.",
+      "done": "Variabele is per omgeving ingesteld",
+      "failed": "De variabele kon niet per omgeving worden ingesteld",
+      "title": "Stel {name} per omgeving in",
+      "unselectedWarning": "Niet geselecteerd: {envs}. Controles die in deze omgevingen draaien, stoppen met het oplossen van deze variabele.",
+      "valuePlaceholder": "Waarde voor deze omgeving",
+      "usedBy": "Gebruikt door {n} checks: {names}",
+      "usedByHint": "De splitsing wordt geweigerd zolang een van deze checks de waarde zou verliezen: een check zonder omgevingen, of een die draait in een omgeving waarvoor hier geen waarde is opgegeven."
+    },
     "versionPrefix": "v",
     "tokens": {
       "title": "Synthetics-tokens",
@@ -13540,7 +13831,6 @@
     },
     "variablesPanel": {
       "title": "Variabelen",
-      "referenceHint": "Gebruik {token} als referentie in elke stapwaarde of URL.",
       "emptyTitle": "Nog geen variabelen",
       "emptyBody": "Hergebruik waarden tussen stappen — zoals een basis-URL of een gebruikersnaam — en houd geheimen buiten stapwaarden.",
       "newVariable": "Nieuwe variabele",
@@ -13548,8 +13838,6 @@
       "nameRequired": "Naam is verplicht.",
       "nameInvalid": "Namen beginnen met een letter of underscore en gebruiken alleen letters, cijfers en underscores.",
       "nameDuplicate": "Er bestaat al een variabele met deze naam.",
-      "usedInSteps": "Gebruikt in {count} stap | Gebruikt in {count} stappen",
-      "notReferenced": "Nog in geen enkele stap gebruikt",
       "removed": "{name} verwijderd",
       "undo": "Ongedaan maken",
       "editVariable": "Variabele {name} bewerken",
@@ -13559,7 +13847,13 @@
       "openPanel": "Variabelen tonen",
       "removeTitle": "Variabele verwijderen?",
       "removeBody": "{name} wordt uit deze controle verwijderd.",
-      "removeWarning": "Het wordt gebruikt door {count} stap, die niet langer zal worden opgelost. | Het wordt gebruikt door {count} stappen, die niet langer zullen worden opgelost."
+      "removeWarning": "Het wordt gebruikt door {count} stap, die niet langer zal worden opgelost. | Het wordt gebruikt door {count} stappen, die niet langer zullen worden opgelost.",
+      "removeOverrideNote": "Stappen die {name} gebruiken, krijgen nu de {scope}-waarde.",
+      "countOfCap": "{count} van {cap}",
+      "local": "Lokaal",
+      "resolutionOrder": "Oplossingsvolgorde: check, dan omgeving, dan globaal.",
+      "overridesInherited": "Overschrijft een gedeelde variabele — deze waarde wint.",
+      "valueTooltipEmpty": "{name}: nog geen waarde"
     },
     "browserDevices": {
       "desktop": "Desktop",
@@ -13887,7 +14181,8 @@
       "timeoutLabel": "Time-out (ms)",
       "valueFallback": "Waarde",
       "showSetupSteps": "Toon instellingsstappen",
-      "waitingForActions": "Wachten op acties in de browser…"
+      "waitingForActions": "Wachten op acties in de browser…",
+      "unboundVariables": "{names} is niet gedefinieerd in deze check, de bijbehorende omgevingen of globaal, dus wordt het getypt zoals geschreven. | {names} zijn niet gedefinieerd in deze check, de bijbehorende omgevingen of globaal, dus worden ze getypt zoals geschreven."
     },
     "labels": {
       "copyOf": "Kopie van {name}",
@@ -14119,10 +14414,13 @@
     },
     "results": {
       "p95Label": "p95",
+      "allEnvironments": "Alle omgevingen",
       "clearFilters": "Filters wissen",
       "clearFiltersDesc": "Alle actieve filters verwijderen",
       "device": "Apparaat",
       "duration": "Duur",
+      "environment": "Omgeving",
+      "environmentScope": "Omgevingsbereik",
       "editCheck": "Controle bewerken",
       "error": "Fout",
       "failed": "Mislukt",
@@ -14291,6 +14589,7 @@
       "passRate": "Slagingspercentage",
       "passRateByBrowser": "Slagingspercentage per browser",
       "passRateByDevice": "Slagingspercentage per apparaat",
+      "passRateByEnvironment": "Slagingspercentage per omgeving",
       "passRateByLocation": "Slagingspercentage per locatie",
       "durationByLocation": "Duur per locatie (gem.)",
       "flakyRate": "Flaky Rate",
@@ -14450,7 +14749,8 @@
       "ssh": "SSH",
       "tcp": "TCP",
       "tls": "TLS",
-      "private": "Privélocaties"
+      "private": "Privélocaties",
+      "variables": "Omgevingen en variabelen"
     },
     "timeline": {
       "failed": "Mislukt",
@@ -14494,7 +14794,8 @@
       "stepNameRequired": "Geef deze stap een naam — dit is wat runresultaten tonen",
       "typeTextRequired": "Voer de tekst in die deze stap moet typen",
       "expectedRequired": "Voer de waarde in die deze assertie moet verwachten",
-      "urlInvalid": "Voer een geldige URL in die begint met http:// of https://",
+      "urlInvalid": "Voer een URL in die begint met http://, https:// of een variabele-placeholder",
+      "navigateUrlInvalid": "Voer een URL in die begint met http://, https:// of een variabele-placeholder.",
       "urlRequired": "Start-URL is verplicht",
       "fixHighlightedFields": "Corrigeer de gemarkeerde velden voordat u opslaat",
       "retiredAction": "\"{action}\" wordt niet meer ondersteund — verwijder of vervang \"{step}\"",
@@ -14959,7 +15260,6 @@
       "syntheticsTokensRefresh": "Tokenlijst vernieuwen",
       "aiChatToggle": "AI-chat inschakelen",
       "aiChatClose": "AI-chat sluiten",
-      "aiChatExpand": "AI-chat uitvouwen/invouwen",
       "logsSaveView": "Opslaan als opgeslagen weergave",
       "logsExport": "Exporteer resultaten als CSV",
       "tracesCopyUrl": "Kopieer trace-deel-URL",
@@ -15572,7 +15872,8 @@
         "destinations": "Bestemmingen",
         "templates": "Sjablonen",
         "reports": "Rapporten",
-        "llmModelPricing": "LLM-modelprijzen"
+        "llmModelPricing": "LLM-modelprijzen",
+        "passcode": "Ingestietoken"
       },
       "noPermissionToChangeFavorites": "Je hebt geen toestemming om favorieten te wijzigen",
       "couldNotUpdateFavoriteDashboards": "Kan favoriete dashboards niet bijwerken"
@@ -15810,6 +16111,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "U bent nog niet begonnen met het data-ingestieproces. Om andere pagina's te verkennen, start u de data-ingestie."
+    },
+    "iam": {
+      "userSaveFailed": "Kon de gebruiker niet opslaan"
     }
   },
   "cipherKeys": {
@@ -16227,7 +16531,106 @@
       "exponentName": "Exponent"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Complexiteit",
+    "minLength": "Minimumlengte",
+    "minLengthDesc": "Kortste geaccepteerde wachtwoord",
+    "maxLength": "Maximumlengte",
+    "maxLengthDesc": "0 = onbeperkt",
+    "requireUppercase": "Hoofdletter vereisen",
+    "requireUppercaseDesc": "Ten minste één A–Z",
+    "requireLowercase": "Kleine letter vereisen",
+    "requireLowercaseDesc": "Ten minste één a–z",
+    "requireDigit": "Cijfer vereisen",
+    "requireDigitDesc": "Ten minste één 0–9",
+    "requireSpecial": "Speciaal teken vereisen",
+    "requireSpecialDesc": "Ten minste één uit de toegestane set",
+    "specialCharSet": "Toegestane speciale tekens",
+    "specialCharSetDesc": "Laat leeg om elk niet-alfanumeriek teken te accepteren",
+    "maxLengthTooSmall": "Maximumlengte moet ten minste de minimumlengte zijn, of 0 voor onbeperkt.",
+    "confirmTitle": "Wachtwoordbeleid opslaan?",
+    "confirmMessage": "Opslaan kan ertoe leiden dat elke native gebruiker een nieuw wachtwoord moet instellen voordat deze verder kan. Root, externe gebruikers en serviceaccounts zijn uitgezonderd — dit geldt ook voor u, tenzij u het rootaccount bent. Dit kan niet ongedaan worden gemaakt.",
+    "saved": "Wachtwoordbeleid opgeslagen. | Wachtwoordbeleid opgeslagen. {count} gebruiker moet zijn wachtwoord opnieuw instellen. | Wachtwoordbeleid opgeslagen. {count} gebruikers moeten hun wachtwoord opnieuw instellen.",
+    "saveFailed": "Kon het wachtwoordbeleid niet opslaan.",
+    "notAdminTitle": "Beheerdersrechten vereist",
+    "notAdmin": "Voor het configureren van het wachtwoordbeleid is een beheerder van de meta-organisatie vereist.",
+    "loadFailedTitle": "Kon het wachtwoordbeleid niet laden",
+    "loadFailed": "Er is iets misgegaan bij het lezen van het huidige beleid.",
+    "rotation": "Rotatie",
+    "rotationDays": "Rotatieperiode",
+    "rotationDaysDesc": "Dagen voordat een wachtwoord verloopt. 0 = verloopt nooit",
+    "rotationWarningDays": "Waarschuwen voor afloop",
+    "rotationWarningDaysDesc": "Dagen van kennisgeving bij aanmelding. 0 = geen waarschuwing",
+    "warningDaysTooLong": "Het waarschuwingsvenster kan niet langer zijn dan de rotatieperiode.",
+    "rotationPreview": "Een vandaag ingesteld wachtwoord verloopt op {expires}. De aanmeldwaarschuwing begint op {warns}.",
+    "rotationPreviewNoWarning": "Een vandaag ingesteld wachtwoord verloopt op {expires}. Er wordt voor die tijd geen waarschuwing getoond.",
+    "reuse": "Hergebruikpreventie",
+    "historyCount": "Onthouden wachtwoorden",
+    "historyCountDesc": "Een nieuw wachtwoord mag niet overeenkomen met dit aantal eerdere wachtwoorden. 0 = geen controle",
+    "historyMaxRetained": "Bewaarde geschiedenis",
+    "historyMaxRetainedDesc": "Hoeveel eerdere wachtwoorden per gebruiker worden bewaard",
+    "historyRetainedTooSmall": "Bewaarde geschiedenis moet ten minste gelijk zijn aan het aantal onthouden wachtwoorden.",
+    "reuseExplainer": "Het huidige wachtwoord telt als een van de onthouden wachtwoorden — hergebruik ervan wordt door deze regel geweigerd, niet door een aparte controle.",
+    "lockout": "Accountvergrendeling",
+    "lockoutThreshold": "Mislukte pogingen voor vergrendeling",
+    "lockoutThresholdDesc": "0 = vergrendeling uitgeschakeld",
+    "lockoutBucketSize": "Pogingen voor elke volgende vergrendeling",
+    "lockoutBucketSizeDesc": "0 = hergebruik de waarde hierboven",
+    "lockoutStartSecs": "Duur van eerste vergrendeling",
+    "lockoutStartSecsDesc": "Seconden",
+    "lockoutMaxSecs": "Maximale vergrendelingsduur",
+    "lockoutMaxSecsDesc": "Seconden — het plafond waarnaar escalatie wordt afgekapt",
+    "lockoutStartTooLong": "De eerste vergrendeling kan niet langer zijn dan de maximale vergrendeling.",
+    "lockoutBackoff": "Escalatie",
+    "lockoutBackoffDesc": "Hoe elke vergrendeling groeit ten opzichte van de vorige",
+    "backoffExponential": "Exponentieel",
+    "backoffLinear": "Lineair",
+    "lockoutPreview": "{threshold} fouten → {first} · elke {bucket} meer → {rest} · gemaximeerd op {max}. Een succesvolle aanmelding reset alles.",
+    "sessionEnforcement": "Sessie en handhaving",
+    "cookieMaxAge": "Sessielevensduur",
+    "cookieMaxAgeDesc": "Seconden dat een aangemelde sessie geldig blijft. 0 = gebruik de standaardwaarde van de instantie uit {envVar}",
+    "applyToRoot": "Toepassen op het rootaccount",
+    "applyToRootDesc": "Root is vrijgesteld van alle bovenstaande regels tenzij dit is ingeschakeld",
+    "rootWarning": "Het vergrendelen van root kan ertoe leiden dat het systeem in een onherstelbare staat terechtkomt.",
+    "rootDialogTitle": "Het beleid toepassen op root?",
+    "rootDialogMessage": "Root zal net als elk ander systeemeigen account onderhevig zijn aan vergrendeling, rotatie en gedwongen resets. Als root uw enige beheerdersaccount is, kan een vergrendeling of een vervaldatum waaraan niet kan worden voldaan, ervoor zorgen dat er geen weg terug is naar deze instantie.",
+    "rootDialogAck": "Ik begrijp dat root permanent buitengesloten kan worden van deze instantie.",
+    "rootDialogConfirm": "Toepassen op root"
+  },
+  "passwordReset": {
+    "title": "Uw wachtwoord bijwerken",
+    "signedInAs": "Aangemeld als {email}",
+    "reasonPolicyTightened": "Het wachtwoordbeleid is gewijzigd. Werk uw wachtwoord bij om OpenObserve te blijven gebruiken.",
+    "reasonRotationExpired": "Uw wachtwoord is verlopen. Stel een nieuw wachtwoord in om OpenObserve te blijven gebruiken.",
+    "reasonRotationWarning": "Uw wachtwoord verloopt binnenkort. Stel nu een nieuw wachtwoord in om te voorkomen dat u buitengesloten raakt van uw werk.",
+    "reused": "Dit wachtwoord is onlangs gebruikt. Kies een wachtwoord dat u niet hebt gebruikt in uw laatste {count} wachtwoorden.",
+    "expiryBanner": "Uw wachtwoord verloopt over {count} dag. Werk het nu bij om te voorkomen dat u buitengesloten raakt van uw werk. | Uw wachtwoord verloopt over {count} dagen. Werk het nu bij om te voorkomen dat u buitengesloten raakt van uw werk.",
+    "expiryBannerAction": "Nu bijwerken",
+    "expiryBannerDismiss": "Sluiten",
+    "currentPassword": "Huidig wachtwoord",
+    "newPassword": "Nieuw wachtwoord",
+    "confirmPassword": "Bevestig nieuw wachtwoord",
+    "currentPasswordRequired": "Huidig wachtwoord is vereist.",
+    "newPasswordRequired": "Nieuw wachtwoord is vereist.",
+    "confirmPasswordRequired": "Voer het nieuwe wachtwoord opnieuw in.",
+    "mismatch": "Wachtwoorden komen niet overeen.",
+    "signOut": "Uitloggen",
+    "submit": "Wachtwoord bijwerken",
+    "updated": "Uw wachtwoord is bijgewerkt. Meld u opnieuw aan.",
+    "updateFailed": "Uw wachtwoord kon niet worden bijgewerkt.",
+    "req": {
+      "minLength": "Minimaal {count} tekens",
+      "maxLength": "Maximaal {count} tekens",
+      "uppercase": "Eén hoofdletter",
+      "lowercase": "Eén kleine letter",
+      "digit": "Eén cijfer",
+      "special": "Eén speciaal teken",
+      "specialFromSet": "Eén speciaal teken uit {set}",
+      "unmet": "Wachtwoord moet bevatten: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Wachtwoordbeleid",
     "loginCallback": "Login-callback",
     "slackOAuthCallback": "Slack verbinden",
     "emptyStateDemo": "Lege-statusdemo",
@@ -16465,13 +16868,10 @@
       "columnMemory": "Geheugen (huidig)",
       "columnDisk": "Schijf % (huidig)",
       "columnLoad": "Load 15m (huidig)",
+      "columnCores": "Kernen",
       "columnLastSeen": "Laatst gezien",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Dashboard Hostmetrieken",
-      "importConfirmTitle": "Het dashboard Hostmetrieken toevoegen?",
-      "importConfirmMessage": "Je hebt dit dashboard nog niet. Als je het toevoegt, wordt een dashboard met de naam 'Host Metrics' aangemaakt in je map Default en daarna voor deze host geopend.",
-      "importConfirmOk": "Toevoegen en openen",
-      "importConfirmCancel": "Annuleren",
+      "loadPerCore": "({value}/kern)",
       "windowsLivenessNote": "Windows-hosts verschijnen alleen in deze lijst wanneer de agent de loadmetriek (system_cpu_load_average_15m) rapporteert — als je Windows-agents draaien maar hier ontbreken, schakel dan de load-scraper in de collectorconfiguratie in of werk de agent bij.",
       "panel": {
         "cpuBusy": "CPU bezet",
@@ -17162,6 +17562,11 @@
       "explore": "Openen in Metrieken Verkenner",
       "railLabel": "Metriekensecties",
       "noAccess": "Je hebt geen toestemming om {stream} te lezen. Vraag een beheerder om leestoegang tot deze stream.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "per query",
         "database": "per database",
@@ -17881,6 +18286,7 @@
     "target_rotation_all": "Iedereen in {rotation}",
     "target_rotation_deleted": "Een rotatie die dit team niet meer heeft",
     "target_rotation_legacy": "Wie er dienst heeft",
+    "target_unrecognized": "Een doel dat dit scherm niet herkent",
     "ladderPoolEveryone": "iedereen in {rotation}",
     "target_user": "Een specifieke persoon",
     "target_whole_team": "Het hele team",
@@ -18784,6 +19190,8 @@
     "rotationNobody": "Niemand heeft dienst",
     "edit": "Bewerken",
     "timelineLoadFailed": "Kon het rooster voor dit tijdsvenster niet laden",
+    "editorReadFailed": "Kon de nieuwste versie niet laden om te bewerken. Probeer het opnieuw.",
+    "refreshFailed": "Kon niet vernieuwen. Wat wordt weergegeven, kan verouderd zijn.",
     "scheduleDoneEditing": "Terug naar rooster",
     "coverWhoRequired": "Kies wie waarneemt",
     "timelineCoverAria": "{who} neemt {rotation} waar, van {from} tot {to}",
@@ -18894,7 +19302,7 @@
     "routingSaysPlace": "Alle alarmen en incidenten van {value} {noun}",
     "routingSaysPlaces": "Alle alarmen en incidenten van {scope}",
     "routingSaysAnything": "Alle alarmen en incidenten",
-    "routingNoLadder": "nog geen escalatieladder",
+    "routingNoLadder": "Nog geen escalatieladder",
     "routingPagesTeam": "roept {team} op",
     "routingCaughtLast": "{count} oproep · afgelopen {when} | {count} oproepen · afgelopen {when}",
     "routingEmptyBodyNamed": "{team} wordt niet opgeroepen totdat een regel een inkomend alarm matcht.",

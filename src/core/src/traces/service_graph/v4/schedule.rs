@@ -124,16 +124,11 @@ pub fn window_ends(offset: i64, horizon: i64, flush: i64, max_windows: usize) ->
 
 /// A pairing pass that was needed but failed keeps its trigger so the range is retried, not
 /// skipped.
-pub fn settle_ql_trigger(
-    table: &mut ResolutionTable,
-    need_ql: bool,
-    pairing_ok: bool,
-    horizon: i64,
-) {
-    if !need_ql {
-        table.pairing_up_to = table.pairing_up_to.max(horizon);
-    } else if pairing_ok {
+pub fn settle_ql_trigger(table: &mut ResolutionTable, need_ql: bool, horizon: i64) {
+    if need_ql {
         table.has_unresolved = false;
+    } else {
+        table.pairing_up_to = table.pairing_up_to.max(horizon);
     }
 }
 
@@ -356,7 +351,7 @@ async fn learn_org(org: &str, streams: &[String], table: &TableRef, settings: &S
         LearnKind::SelfIdentity,
     )
     .await;
-    let pairing_ok = if need_ql {
+    if need_ql {
         learn_chunks(
             org,
             &cols_by_stream,
@@ -366,14 +361,12 @@ async fn learn_org(org: &str, streams: &[String], table: &TableRef, settings: &S
             now,
             LearnKind::Pairing,
         )
-        .await
-    } else {
-        false
-    };
-    settle_ql_trigger(&mut *table.write().await, need_ql, pairing_ok, horizon);
+        .await;
+    }
+    settle_ql_trigger(&mut *table.write().await, need_ql, horizon);
 }
 
-/// `LEARN_INTERVAL` chunks; a boundary moves only after a fully successful chunk.
+/// `LEARN_INTERVAL` chunks; a failing stream is skipped so it cannot starve the org's learning.
 async fn learn_chunks(
     org: &str,
     streams: &[(String, Columns)],
@@ -382,7 +375,7 @@ async fn learn_chunks(
     horizon: i64,
     now: i64,
     kind: LearnKind,
-) -> bool {
+) {
     let step = LEARN_INTERVAL_SECS * SECOND_MICRO_SECS;
     let mut start = from;
     while start < horizon {
@@ -404,7 +397,6 @@ async fn learn_chunks(
                     log::warn!(
                         "[ServiceGraph] {org}/{stream}: {kind:?} learning failed at {start}: {e}"
                     );
-                    return false;
                 }
             }
         }
@@ -425,7 +417,6 @@ async fn learn_chunks(
         }
         start = end;
     }
-    true
 }
 
 async fn snapshot_if_due(org: &str, table: &TableRef, now: i64) {
@@ -592,12 +583,15 @@ async fn fetch_window(
         .iter()
         .filter_map(Q1Row::parse)
         .collect();
-    let q2: Vec<Q2Row> = run_graph_search(org, build_q2(cols, stream, start, end), start, end)
-        .await
-        .map_err(|e| anyhow::anyhow!("Q2 failed: {e}"))?
-        .iter()
-        .filter_map(Q2Row::parse)
-        .collect();
+    let q2: Vec<Q2Row> = match build_q2(cols, stream, start, end) {
+        Some(sql) => run_graph_search(org, sql, start, end)
+            .await
+            .map_err(|e| anyhow::anyhow!("Q2 failed: {e}"))?
+            .iter()
+            .filter_map(Q2Row::parse)
+            .collect(),
+        None => vec![],
+    };
     let q3 = run_optional(
         org,
         stream,
@@ -1016,16 +1010,13 @@ mod tests {
     }
 
     #[test]
-    fn test_ql_trigger_survives_failed_pass() {
+    fn test_ql_trigger_settles_after_a_pass() {
         let mut t = ResolutionTable::new(100, 100);
         t.has_unresolved = true;
-        settle_ql_trigger(&mut t, true, false, 900);
-        assert!(t.has_unresolved);
-        assert_eq!(t.pairing_up_to, 100);
-        let need_ql = t.has_unresolved;
-        settle_ql_trigger(&mut t, need_ql, true, 900);
+        settle_ql_trigger(&mut t, true, 900);
         assert!(!t.has_unresolved);
-        settle_ql_trigger(&mut t, false, false, 900);
+        assert_eq!(t.pairing_up_to, 100);
+        settle_ql_trigger(&mut t, false, 900);
         assert_eq!(t.pairing_up_to, 900);
     }
 }

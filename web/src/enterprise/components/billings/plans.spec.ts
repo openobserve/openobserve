@@ -35,15 +35,18 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock BillingService
-vi.mock("@/services/billings", () => ({
-  default: {
-    list_subscription: vi.fn(),
-    resume_subscription: vi.fn(),
-    get_hosted_url: vi.fn(),
-    get_session_url: vi.fn(),
-    retrieve_hosted_page: vi.fn(),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_subscription: vi.fn(),
+      resume_subscription: vi.fn(),
+      get_hosted_url: vi.fn(),
+      get_session_url: vi.fn(),
+      retrieve_hosted_page: vi.fn(),
+    },
+  });
+});
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({

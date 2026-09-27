@@ -50,6 +50,8 @@ const props = defineProps<{
   modelValue: BrowserStep[];
   readonly?: boolean;
   startUrl?: string; // URL shown in the recording banner
+  /** Names the check resolves; a step value naming anything else is warned about. */
+  knownVariables?: ReadonlySet<string>;
   /**
    * DOM attribute the recorder selects on, from the monitor's config.
    * Absent falls back to DEFAULT_TEST_ID_ATTR — see useSyntheticsRecorder.
@@ -1738,6 +1740,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           "
           :value-error-message="fieldError(row.id, 'value')"
           :expected-error-message="fieldError(row.id, 'assertion.expected')"
+          :known-variables="knownVariables"
           @update:step="(next: BrowserStep) => handleStepReplace(row, next)"
           @action-edited="
             clearFirstStepError();

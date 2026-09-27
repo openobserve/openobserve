@@ -121,8 +121,8 @@ impl super::FileList for SqliteFileList {
         let meta = &file.meta;
         let now_ts = now_micros();
 
-        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);"#)
+        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);"#)
         .bind(&file.account)
         .bind(org_id)
         .bind(stream_key)
@@ -135,6 +135,7 @@ impl super::FileList for SqliteFileList {
         .bind(meta.original_size)
         .bind(meta.compressed_size)
         .bind(meta.index_size)
+        .bind(meta.mindex_size)
         .bind(meta.bloom_ver)
         .bind(meta.flattened)
         .bind(now_ts)
@@ -273,7 +274,7 @@ impl super::FileList for SqliteFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, file, date
+SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, file, date
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -380,7 +381,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
     async fn list(&self) -> Result<Vec<FileKey>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened FROM file_list;"#,
+            r#"SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened FROM file_list;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -402,7 +403,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
         let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
+SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
@@ -416,7 +417,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                 "#,
@@ -448,7 +449,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#,
@@ -517,7 +518,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
 
         let pool = CLIENT_RO.clone();
         let sql = r#"
-SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE stream = $1 AND date = $2 AND index_size > 0 AND bloom_ver = 0;
+SELECT id, account, stream, date, file, records, index_size, mindex_size FROM file_list WHERE stream = $1 AND date = $2 AND index_size > 0 AND bloom_ver = 0;
                 "#;
         let ret = sqlx::query_as::<_, super::FileRecord>(sql)
             .bind(stream_key)
@@ -551,7 +552,7 @@ SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver FROM file_list WHERE id IN ({ids})"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver FROM file_list WHERE id IN ({ids})"
             );
             let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
                 .fetch_all(&pool)
@@ -846,7 +847,8 @@ SELECT
     SUM(records) AS records,
     SUM(original_size) AS original_size,
     SUM(compressed_size) AS compressed_size,
-    SUM(index_size) AS index_size
+    SUM(index_size) AS index_size,
+    SUM(mindex_size) AS mindex_size
 FROM file_list
 WHERE stream = $1 {time_filter}
 GROUP BY stream;
@@ -924,8 +926,8 @@ GROUP BY stream;
         if let Err(e) = sqlx::query(
             r#"
 INSERT INTO stream_stats
-    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, is_recent)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, is_recent)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (stream, is_recent)
 DO UPDATE SET
     file_num = EXCLUDED.file_num,
@@ -934,7 +936,8 @@ DO UPDATE SET
     records = EXCLUDED.records,
     original_size = EXCLUDED.original_size,
     compressed_size = EXCLUDED.compressed_size,
-    index_size = EXCLUDED.index_size;
+    index_size = EXCLUDED.index_size,
+    mindex_size = EXCLUDED.mindex_size;
             "#,
         )
         .bind(org_id)
@@ -946,6 +949,7 @@ DO UPDATE SET
         .bind(stats.storage_size as i64)
         .bind(stats.compressed_size as i64)
         .bind(stats.index_size as i64)
+        .bind(stats.mindex_size as i64)
         .bind(is_recent)
         .execute(&mut *tx)
         .await
@@ -967,7 +971,7 @@ DO UPDATE SET
 
     async fn reset_stream_stats(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0, index_size = 0;"#)
+        sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0, index_size = 0, mindex_size = 0;"#)
         .execute(&client)
        .await?;
         Ok(())
@@ -1406,8 +1410,8 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         sqlx::query(
             r#"
 INSERT INTO file_list_dump_stats
-    (org, stream, date, file, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    (org, stream, date, file, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT (stream, date, file)
 DO UPDATE SET
     file_num = EXCLUDED.file_num,
@@ -1416,7 +1420,8 @@ DO UPDATE SET
     records = EXCLUDED.records,
     original_size = EXCLUDED.original_size,
     compressed_size = EXCLUDED.compressed_size,
-    index_size = EXCLUDED.index_size;
+    index_size = EXCLUDED.index_size,
+    mindex_size = EXCLUDED.mindex_size;
             "#,
         )
         .bind(org_id)
@@ -1430,6 +1435,7 @@ DO UPDATE SET
         .bind(stats.storage_size as i64)
         .bind(stats.compressed_size as i64)
         .bind(stats.index_size as i64)
+        .bind(stats.mindex_size as i64)
         .execute(&client)
         .await?;
         Ok(())
@@ -1480,7 +1486,8 @@ SELECT
     SUM(records) AS records,
     SUM(original_size) AS original_size,
     SUM(compressed_size) AS compressed_size,
-    SUM(index_size) AS index_size
+    SUM(index_size) AS index_size,
+    SUM(mindex_size) AS mindex_size
 FROM file_list_dump_stats
 WHERE stream = $1 {time_filter}
 GROUP BY stream;
@@ -1565,8 +1572,8 @@ impl SqliteFileList {
         }
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
+INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);
         "#).as_str(),
     )
         .bind(id)
@@ -1582,6 +1589,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
         .bind(meta.original_size)
         .bind(meta.compressed_size)
         .bind(meta.index_size)
+        .bind(meta.mindex_size)
         .bind(meta.bloom_ver)
         .bind(meta.flattened)
         .bind(now_ts)
@@ -1631,7 +1639,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)").as_str(),
+                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, updated_at)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let id = if item.id > 0 { Some(item.id) } else { None };
@@ -1651,6 +1659,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                         .push_bind(item.meta.original_size)
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
+                        .push_bind(item.meta.mindex_size)
                         .push_bind(item.meta.bloom_ver)
                         .push_bind(item.meta.flattened)
                         .push_bind(now_ts);
@@ -1753,6 +1762,7 @@ CREATE TABLE IF NOT EXISTS file_list
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL,
     bloom_ver       BIGINT default 0 not null,
     updated_at      BIGINT not null
 );
@@ -1779,6 +1789,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL,
     bloom_ver       BIGINT default 0 not null,
     updated_at      BIGINT not null
 );
@@ -1839,6 +1850,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL,
     is_recent       BOOLEAN default false not null
 );
         "#,
@@ -1861,36 +1873,47 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     records         BIGINT default 0 not null,
     original_size   BIGINT default 0 not null,
     compressed_size BIGINT default 0 not null,
-    index_size      BIGINT default 0 not null
+    index_size      BIGINT default 0 not null,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL
 );
         "#,
     )
     .execute(&client)
     .await?;
 
-    // create column flattened for old version <= 0.10.5
+    // create column flattened for version <= 0.10.5
     let column = "flattened";
     let data_type = "BOOLEAN default false not null";
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
     add_column(&client, "file_list_deleted", column, data_type).await?;
 
-    // create column started_at for old version <= 0.10.8
+    // create column started_at for version <= 0.10.8
     let column = "started_at";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list_jobs", column, data_type).await?;
 
-    // create column index_size for old version <= 0.13.1
+    // create column index_size for version <= 0.13.1
     let column = "index_size";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
     add_column(&client, "stream_stats", column, data_type).await?;
+    add_column(&client, "file_list_dump_stats", column, data_type).await?;
+
+    // create column mindex_size for version <=1.0.0
+    let column = "mindex_size";
+    let data_type = "BIGINT default 0 not null";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
+    add_column(&client, "stream_stats", column, data_type).await?;
+    add_column(&client, "file_list_dump_stats", column, data_type).await?;
+
     let column = "index_file";
     let data_type = "BOOLEAN default false not null";
     add_column(&client, "file_list_deleted", column, data_type).await?;
 
-    // create col dumped for file_list_jobs for version <=0.14.0
+    // create column dumped for file_list_jobs for version <=0.14.0
     add_column(
         &client,
         "file_list_jobs",
@@ -2108,6 +2131,7 @@ mod tests {
             compressed_size: 10000,
             flattened: false,
             index_size: 5000,
+            mindex_size: 1700,
             bloom_ver: 0,
         }
     }
@@ -2399,6 +2423,7 @@ mod tests {
             storage_size: 50000.0,
             compressed_size: 10000.0,
             index_size: 5000.0,
+            mindex_size: 1700.0,
         };
 
         // Set stream stats (should use INSERT OR REPLACE now)
@@ -2418,6 +2443,7 @@ mod tests {
             storage_size: 25000.0,
             compressed_size: 5000.0,
             index_size: 2500.0,
+            mindex_size: 850.0,
         };
 
         let result2 = sqlite_list
@@ -2662,5 +2688,286 @@ mod tests {
         // Conversion to FileMeta must carry the value through.
         let meta = FileMeta::from(&rec);
         assert_eq!(meta.bloom_ver, bv);
+    }
+    #[tokio::test]
+    #[ignore = "Requires an isolated SQL database configured for this backend"]
+    async fn test_mindex_size_sqlite_persistence_and_stats() {
+        let list = SqliteFileList::new();
+        list.create_table().await.unwrap();
+        list.create_table_index().await.unwrap();
+        list.create_table().await.unwrap();
+        let org = format!("mindex_{}", now_micros());
+        let stream = format!("{org}/metrics/test");
+        let date = "2021/01/01/00";
+        let mut first = create_test_file_key(
+            "account",
+            &format!("files/{stream}/{date}/a.parquet"),
+            false,
+        );
+        first.meta.max_ts = first.meta.min_ts + 10;
+        let mut second = first.clone();
+        second.key = format!("files/{stream}/{date}/b.vortex");
+        second.meta.mindex_size = 2300;
+        let id = list
+            .add(&first.account, &first.key, &first.meta)
+            .await
+            .unwrap();
+        list.batch_add(std::slice::from_ref(&second)).await.unwrap();
+        assert_eq!(list.get(&first.key).await.unwrap().mindex_size, 1700);
+        assert_eq!(list.get(&second.key).await.unwrap().mindex_size, 2300);
+        assert_eq!(list.get(&second.key).await.unwrap().index_size, 5000);
+        list.update_compressed_size(&first.key, 9000).await.unwrap();
+        assert_eq!(list.get(&first.key).await.unwrap().mindex_size, 1700);
+        let range = (first.meta.min_ts, first.meta.max_ts);
+        for flattened in [None, Some(false)] {
+            let files = list
+                .query(
+                    &org,
+                    StreamType::Metrics,
+                    "test",
+                    PartitionTimeLevel::Hourly,
+                    range,
+                    flattened,
+                )
+                .await
+                .unwrap();
+            assert_eq!(files.len(), 2);
+            assert_eq!(files.iter().map(|f| f.meta.mindex_size).sum::<i64>(), 4000);
+        }
+        let files = list
+            .query_for_merge(
+                &org,
+                StreamType::Metrics,
+                "test",
+                ("2021/01/01/00".into(), "2021/01/02/00".into()),
+                i64::MAX,
+            )
+            .await
+            .unwrap();
+        assert_eq!(files.iter().map(|f| f.meta.mindex_size).sum::<i64>(), 4000);
+        let files = list
+            .query_for_bloom(&org, StreamType::Metrics, "test", date)
+            .await
+            .unwrap();
+        assert_eq!(files.iter().map(|f| f.meta.mindex_size).sum::<i64>(), 4000);
+        let files = list.query_by_ids(&[id], Some(range)).await.unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].meta.mindex_size, 1700);
+        let dumped = list
+            .query_for_dump(&org, StreamType::Metrics, "test", range)
+            .await
+            .unwrap();
+        assert_eq!(dumped.iter().map(|f| f.mindex_size).sum::<i64>(), 4000);
+        list.add_history(&first.account, &first.key, &first.meta)
+            .await
+            .unwrap();
+        list.batch_add_history(std::slice::from_ref(&second))
+            .await
+            .unwrap();
+        let history: Vec<FileRecord> =
+            sqlx::query_as("SELECT * FROM file_list_history WHERE stream = $1")
+                .bind(&stream)
+                .fetch_all(&*CLIENT_RW)
+                .await
+                .unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.iter().map(|f| f.mindex_size).sum::<i64>(), 4000);
+        let stats = list
+            .stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(stats.mindex_size, 4000.0);
+        assert_eq!(stats.index_size, 10000.0);
+        assert_eq!(
+            list.org_stats_by_account(&org, "account").await.unwrap(),
+            (100000, 10000)
+        );
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &stats, false)
+            .await
+            .unwrap();
+        let mut recent = stats;
+        recent.mindex_size = 333.0;
+        recent.index_size = 222.0;
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &recent, true)
+            .await
+            .unwrap();
+        recent.mindex_size = 444.0;
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &recent, true)
+            .await
+            .unwrap();
+        let merged = list
+            .get_stream_stats(&org, Some(StreamType::Metrics), Some("test"))
+            .await
+            .unwrap();
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].1.mindex_size, 4444.0);
+        assert_eq!(merged[0].1.index_size, 10222.0);
+        let org_stats = list.get_stream_stats(&org, None, None).await.unwrap();
+        assert_eq!(org_stats[0].1.mindex_size, 4444.0);
+        let dump_stream = format!("{org}/{}/test_metrics", StreamType::Filelist);
+        let dump_key = format!("files/{dump_stream}/{date}/dump.parquet");
+        list.insert_dump_stats(&dump_key, &recent).await.unwrap();
+        recent.mindex_size = 888.0;
+        list.insert_dump_stats(&dump_key, &recent).await.unwrap();
+        let dump_stats = list
+            .query_dump_stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(dump_stats.mindex_size, 888.0);
+        assert_eq!(dump_stats.index_size, 222.0);
+        let mut dump_file = first.clone();
+        dump_file.key = dump_key.clone();
+        dump_file.meta.mindex_size = 777;
+        list.update_dump_records(&dump_file, &[(id, date.to_string())])
+            .await
+            .unwrap();
+        assert!(!list.contains(&first.key).await.unwrap());
+        assert_eq!(list.get(&dump_key).await.unwrap().mindex_size, 777);
+        let dumps = list
+            .query_for_dump_by_updated_at((0, now_micros()))
+            .await
+            .unwrap();
+        assert_eq!(
+            dumps
+                .iter()
+                .find(|f| f.stream == dump_stream)
+                .unwrap()
+                .mindex_size,
+            777
+        );
+        list.reset_stream_stats().await.unwrap();
+        let reset = list.get_stream_stats(&org, None, None).await.unwrap();
+        assert_eq!(reset[0].1.mindex_size, 0.0);
+        let rebuilt = list
+            .stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rebuilt.mindex_size, 2300.0);
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &rebuilt, false)
+            .await
+            .unwrap();
+        assert_eq!(
+            list.get_stream_stats(&org, None, None).await.unwrap()[0]
+                .1
+                .mindex_size,
+            2300.0
+        );
+        second.deleted = true;
+        list.batch_process(std::slice::from_ref(&second))
+            .await
+            .unwrap();
+        assert_eq!(
+            list.stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new())
+            )
+            .await
+            .unwrap()
+            .mindex_size,
+            0.0
+        );
+        list.delete_dump_stats(&dump_key).await.unwrap();
+        assert_eq!(
+            list.query_dump_stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new())
+            )
+            .await
+            .unwrap()
+            .mindex_size,
+            0.0
+        );
+    }
+
+    #[tokio::test]
+    async fn test_mindex_size_sqlite_legacy_upgrade() {
+        let pool = fresh_in_memory_pool().await;
+        let tables = [
+            "file_list",
+            "file_list_history",
+            "file_list_dump_stats",
+            "stream_stats",
+        ];
+        for table in tables {
+            sqlx::query(&format!(
+                "CREATE TABLE {table} (id INTEGER PRIMARY KEY, index_size BIGINT NOT NULL)"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+            sqlx::query(&format!(
+                "INSERT INTO {table} (id, index_size) VALUES (1, 59)"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        for table in tables {
+            add_column(&pool, table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL")
+                .await
+                .unwrap();
+        }
+        for table in tables {
+            let old: (i64, i64) = sqlx::query_as(&format!(
+                "SELECT index_size, mindex_size FROM {table} WHERE id = 1"
+            ))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(old, (59, 0));
+            sqlx::query(&format!(
+                "UPDATE {table} SET mindex_size = 701 WHERE id = 1"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+            sqlx::query(&format!(
+                "INSERT INTO {table} (id, index_size) VALUES (2, 61)"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        for table in tables {
+            add_column(&pool, table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL")
+                .await
+                .unwrap();
+        }
+        for table in tables {
+            let rows: Vec<(i64, i64)> = sqlx::query_as(&format!(
+                "SELECT index_size, mindex_size FROM {table} ORDER BY id"
+            ))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            assert_eq!(rows, vec![(59, 701), (61, 0)]);
+            assert!(
+                sqlx::query(&format!(
+                    "UPDATE {table} SET mindex_size = NULL WHERE id = 1"
+                ))
+                .execute(&pool)
+                .await
+                .is_err()
+            );
+        }
     }
 }

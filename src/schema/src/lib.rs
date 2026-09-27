@@ -87,10 +87,11 @@ pub fn get_future_discard_error() -> anyhow::Error {
 }
 
 pub fn get_request_columns_limit_error(stream_name: &str, num_fields: usize) -> anyhow::Error {
-    anyhow::anyhow!(
+    infra::errors::Error::ColumnsLimitExceeded(format!(
         "Got {num_fields} columns for stream {stream_name}, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_columns>",
         get_config().limit.req_cols_per_record_limit
-    )
+    ))
+    .into()
 }
 
 /// The `ZO_COLS_PER_RECORD_LIMIT` rule, with the ingest-error counter the rejection is counted by.

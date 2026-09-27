@@ -15,7 +15,7 @@
 
 import { reactive, ref } from "vue";
 import type { TranslateFn } from "@/types/i18n";
-import { mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { mapWireSteps, substituteVariables } from "@/utils/synthetics/mapRecordedStep";
 import type {
   BrowserStep,
   RecorderCommand,
@@ -31,7 +31,6 @@ import type {
   StructuredError,
   WireStep,
 } from "@/types/synthetics";
-import { substituteVariables } from "@/utils/synthetics/mapRecordedStep";
 import { classifyRestoreFailure } from "@/utils/synthetics/replayFailure";
 import { DEFAULT_TEST_ID_ATTR, MIN_EXTENSION_VERSION } from "@/constants/synthetics";
 

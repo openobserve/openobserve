@@ -83,10 +83,12 @@ pub mod status_pages;
 pub mod super_cluster_oncall;
 pub mod synthetics_agents;
 pub mod synthetics_checks;
+pub mod synthetics_environments;
 pub mod synthetics_jobs;
 pub mod synthetics_locations;
 pub mod synthetics_probe_tokens;
 pub mod synthetics_runs;
+pub mod synthetics_variables;
 pub mod system_prompts;
 pub mod system_settings;
 pub mod templates;
@@ -94,6 +96,8 @@ pub mod timed_annotation_panels;
 pub mod timed_annotations;
 #[cfg(feature = "cloud")]
 pub mod trial_quota_usage;
+pub mod user_auth_state;
+pub mod user_password_history;
 pub mod users;
 pub mod workflows;
 
@@ -145,6 +149,8 @@ pub async fn create_user_tables() -> Result<(), anyhow::Error> {
     organizations::create_table().await?;
     users::create_table().await?;
     org_users::create_table().await?;
+    user_password_history::create_table().await?;
+    user_auth_state::create_table().await?;
 
     Ok(())
 }

@@ -495,6 +495,8 @@ pub struct PanelConfig {
     panel_time_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_range: Option<PanelTimeRange>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_exemplars: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1768,5 +1770,39 @@ mod tests {
         assert!(!json.contains("table_pivot_sticky_col_totals"));
         assert!(!json.contains("panel_time_enabled"));
         assert!(!json.contains("panel_time_range"));
+        assert!(!json.contains("show_exemplars"));
+    }
+
+    #[test]
+    fn test_panel_config_show_exemplars_round_trip() {
+        for on in [true, false] {
+            let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+                "show_legends": true,
+                "legends_position": null,
+                "base_map": null,
+                "map_view": null,
+                "show_exemplars": on
+            }))
+            .unwrap();
+            assert_eq!(cfg.show_exemplars, Some(on));
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json["show_exemplars"], serde_json::json!(on));
+            let back: PanelConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_panel_config_show_exemplars_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.show_exemplars, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("show_exemplars").is_none());
     }
 }

@@ -37,24 +37,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { configQuery } from "@/services/config.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
 import InvitationList from "@/components/iam/users/InvitationList.vue";
 import config from "@/aws-exports";
-import configService from "@/services/config";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { getUserInfo, getDecodedUserInfo, checkCallBackValues } from "@/utils/zincutils";
-import usersService from "@/services/users";
-import organizationsService from "@/services/organizations";
 import {
+  getUserInfo,
+  getDecodedUserInfo,
+  checkCallBackValues,
   useLocalCurrentUser,
   useLocalOrganization,
   invalidateLoginData,
   useLocalUserInfo,
   getImageURL,
 } from "@/utils/zincutils";
+import usersService from "@/services/users";
+import organizationsService from "@/services/organizations";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
@@ -82,13 +85,13 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       if (!router?.currentRoute.value.hash) {
-        await configService
-          .get_config()
-          .then(async (res) => {
+        await queryClient
+          .fetchQuery(configQuery())
+          .then(async (data: any) => {
             // Never replace an already-loaded full config with the bootstrap
             // subset (e.g. a logged-in user navigating to /login).
             if (!store.state.zoConfig?.version) {
-              store.commit("setConfig", res.data);
+              store.commit("setConfig", data);
             }
           })
           .catch((err) => {
@@ -160,9 +163,11 @@ export default defineComponent({
             store.dispatch("setSelectedOrganization", tempDefaultOrg);
           }
           //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
+          // skip the onboarding prompt for invited users, who get new_user_login == true too on their first login
           if (
             config.isCloud == "true" &&
-            checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true"
+            checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true" &&
+            checkCallBackValues(router.currentRoute.value.hash, "pending_invites") != "true"
           ) {
             localStorage.setItem("isFirstTimeLogin", "true");
           }
@@ -304,14 +309,14 @@ export default defineComponent({
      */
 
     if (this.$route.hash) {
-      configService
-        .get_config()
-        .then(async (res) => {
+      queryClient
+        .fetchQuery(configQuery())
+        .then(async (data: any) => {
           // "setZoConfig" never existed as a mutation, so this fetch stored
           // nothing; commit through the real mutation, with the same
           // don't-clobber-the-full-config guard as everywhere else.
           if (!this.store.state.zoConfig?.version) {
-            this.store.commit("setConfig", res.data);
+            this.store.commit("setConfig", data);
           }
           const token = getUserInfo(this.$route.hash);
 

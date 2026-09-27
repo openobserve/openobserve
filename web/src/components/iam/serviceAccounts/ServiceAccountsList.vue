@@ -72,20 +72,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="iamServiceAccountsRefresh"
               data-test="iam-service-accounts-refresh-btn"
-              @click="getServiceAccountsUsers"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamServiceAccountsRefresh"
-              />
-            </OButton>
+              @click="refreshServiceAccounts"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -127,6 +122,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-first_name="{ row }">
             <template v-if="row.is_system && row.description">{{ row.description }}</template>
             <template v-else>{{ row.first_name }}</template>
+          </template>
+
+          <template v-if="showRolesColumn" #cell-roles="{ row }">
+            <span
+              :data-test="`service-accounts-roles-${row.email}`"
+              class="text-text-secondary truncate text-xs"
+              :title="serviceAccountRolesText(row.email)"
+              >{{ serviceAccountRolesText(row.email) }}</span
+            >
           </template>
 
           <template #cell-token="{ row }">
@@ -311,9 +315,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            an access summary (creation only — rotate shows the token alone). -->
       <div data-test="service-accounts-token-wizard">
         <div data-test="service-accounts-token-step-1">
-          <p class="text-text-secondary mb-3 text-xs">
+          <OBanner
+            variant="warning"
+            icon="warning"
+            dense
+            data-test="service-accounts-token-copy-hint"
+            class="mb-3"
+          >
             {{ t("serviceAccounts.tokenReveal.copyHint") }}
-          </p>
+          </OBanner>
 
           <OTabs v-model="tokenTab" dense align="left">
             <OTab name="curl" :label="t('serviceAccounts.tokenReveal.curl')" />
@@ -323,27 +333,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OTabPanels v-model="tokenTab" animated>
             <OTabPanel name="curl">
-              <pre
-                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenCurlSnippet }}</pre>
+              <OCodeBlock
+                data-test="service-accounts-token-curl-code"
+                :code="tokenCurlSnippet"
+                lang="bash"
+                wrap
+                :copy-message="t('serviceAccounts.toast.tokenCopied')"
+              />
             </OTabPanel>
             <OTabPanel name="header">
-              <pre
-                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenHeaderSnippet }}</pre>
+              <OCodeBlock
+                data-test="service-accounts-token-header-code"
+                :code="tokenHeaderSnippet"
+                lang="http"
+                wrap
+                :copy-message="t('serviceAccounts.toast.tokenCopied')"
+              />
             </OTabPanel>
             <OTabPanel name="env">
-              <pre
-                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenEnvSnippet }}</pre>
+              <OCodeBlock
+                data-test="service-accounts-token-env-code"
+                :code="tokenEnvSnippet"
+                lang="bash"
+                wrap
+                :copy-message="t('serviceAccounts.toast.tokenCopied')"
+              />
             </OTabPanel>
           </OTabPanels>
 
-          <div class="mt-3 flex items-center gap-2">
+          <div class="mt-3 grid grid-cols-2 gap-2">
             <OButton
               data-test="service-accounts-list-token-copy-btn"
               variant="outline"
-              size="icon-md"
+              size="sm"
+              icon-left="content-copy"
               :title="t('serviceAccounts.copyToken')"
               @click.stop="
                 copyToClipboard(serviceToken, t, {
@@ -352,23 +375,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 })
               "
             >
-              <OIcon name="content-copy" size="sm" />
+              {{ t("serviceAccounts.copyToken") }}
             </OButton>
-            <span class="text-text-secondary text-xs">{{ t("serviceAccounts.copyToken") }}</span>
 
             <OButton
               data-test="service-accounts-list-token-download-btn"
               variant="outline"
-              size="icon-md"
-              class="ms-2"
+              size="sm"
+              icon-left="file-download"
               :title="t('serviceAccounts.downloadToken')"
               @click.stop="downloadTokenAsFile(serviceToken)"
             >
-              <OIcon name="file-download" size="sm" />
+              {{ t("serviceAccounts.downloadToken") }}
             </OButton>
-            <span class="text-text-secondary text-xs">{{
-              t("serviceAccounts.downloadToken")
-            }}</span>
           </div>
 
           <!-- ── Access grant status ──
@@ -394,13 +413,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-accounts-token-access-summary"
             class="mt-4"
           >
-            <div v-if="grantedRolesText" class="mb-1 flex items-start gap-2">
-              <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
-              <span class="text-text-secondary text-xs">{{ grantedRolesText }}</span>
+            <div v-if="tokenAccess?.assigned.roles.length" class="mb-2">
+              <div class="text-text-secondary mb-1 text-xs font-medium">
+                {{ t("serviceAccounts.tokenReveal.rolesAssignedLabel") }}
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <OBadge
+                  v-for="role in tokenAccess.assigned.roles"
+                  :key="role"
+                  variant="success"
+                  icon="check"
+                  size="sm"
+                  >{{ role }}</OBadge
+                >
+              </div>
             </div>
-            <div v-if="grantedGroupsText" class="mb-1 flex items-start gap-2">
-              <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
-              <span class="text-text-secondary text-xs">{{ grantedGroupsText }}</span>
+            <div v-if="tokenAccess?.assigned.groups.length" class="mb-2">
+              <div class="text-text-secondary mb-1 text-xs font-medium">
+                {{ t("serviceAccounts.tokenReveal.groupsAssignedLabel") }}
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <OBadge
+                  v-for="group in tokenAccess.assigned.groups"
+                  :key="group"
+                  variant="success"
+                  icon="check"
+                  size="sm"
+                  >{{ group }}</OBadge
+                >
+              </div>
             </div>
 
             <div
@@ -480,7 +521,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { serviceAccountsQuery } from "@/services/service_accounts.queries";
+import { allUserRolesQuery } from "@/services/users.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -488,7 +534,11 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -519,7 +569,6 @@ import { COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed } from "vue";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -538,8 +587,12 @@ export default defineComponent({
     OIcon,
     OPageLayout,
     OTooltip,
+    ORefreshButton,
     OTable,
     OTag,
+    OBadge,
+    OBanner,
+    OCodeBlock,
     OCodeCell,
     OUserCell,
     OTimeCell,
@@ -594,20 +647,6 @@ export default defineComponent({
       () =>
         !!tokenAccess.value &&
         tokenAccess.value.failed.roles.length + tokenAccess.value.failed.groups.length > 0,
-    );
-    const grantedRolesText = computed(() =>
-      tokenAccess.value?.assigned.roles.length
-        ? t("serviceAccounts.tokenReveal.grantedRoles", {
-            roles: tokenAccess.value.assigned.roles.join(", "),
-          })
-        : "",
-    );
-    const grantedGroupsText = computed(() =>
-      tokenAccess.value?.assigned.groups.length
-        ? t("serviceAccounts.tokenReveal.grantedGroups", {
-            groups: tokenAccess.value.assigned.groups.join(", "),
-          })
-        : "",
     );
     const failedRolesText = computed(() =>
       tokenAccess.value?.failed.roles.length
@@ -704,8 +743,38 @@ export default defineComponent({
     const confirmBulkDelete = ref(false);
     const bulkDeleteLoading = ref(false);
 
+    // Email -> role names for the Roles column; one batched org-wide request instead of per-row lookups.
+    const serviceAccountRoles = ref<Record<string, string[]> | null>(null);
+
+    const loadServiceAccountRoles = async (force = false) => {
+      if (!showRolesColumn) return;
+      try {
+        const options = allUserRolesQuery(store.state.selectedOrganization.identifier);
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        serviceAccountRoles.value = (await queryClient.fetchQuery(options)) ?? {};
+      } catch {
+        // Silent: roles are context for this column, not load-bearing — the
+        // list stays fully usable without them.
+        serviceAccountRoles.value = null;
+      }
+    };
+
+    const serviceAccountRolesText = (email: string): string => {
+      const roles = serviceAccountRoles.value?.[email];
+      return roles?.length ? roles.join(", ") : "—";
+    };
+
     onBeforeMount(async () => {
+      // Not forced: a route-change read stays cached. Only the refresh button
+      // and the post-write reloads below pass `true`.
       await getServiceAccountsUsers();
+      loadServiceAccountRoles();
 
       // Only `action=update&email=…` auto-opens the edit dialog so a shared
       // edit link still lands directly on the user's form. `action=add` is
@@ -720,6 +789,10 @@ export default defineComponent({
         if (match) addUser({ row: match }, true);
       }
     });
+
+    // Roles/Groups are an enterprise/cloud-only concept (OSS has no RBAC UI),
+    // so the column — and the lookup backing it — is skipped entirely there.
+    const showRolesColumn = config.isEnterprise === "true" || config.isCloud === "true";
 
     const columns: OTableColumnDef[] = [
       {
@@ -743,6 +816,21 @@ export default defineComponent({
         minSize: 160,
         meta: { align: "left", flex: true },
       },
+      ...(showRolesColumn
+        ? [
+            {
+              id: "roles",
+              header: t("serviceAccounts.list.col.roles"),
+              accessorKey: "roles",
+              sortable: false,
+              resizable: true,
+              hideable: true,
+              size: 160,
+              minSize: 120,
+              meta: { align: "left" },
+            } satisfies OTableColumnDef,
+          ]
+        : []),
       {
         id: "token",
         header: t("serviceAccounts.list.col.token"),
@@ -793,49 +881,82 @@ export default defineComponent({
       deleteUserEmail = row.email;
       deleteUserEmailIdentifier.value = row.email;
     };
-    const loading = ref(false);
-    const forbidden = ref(false);
-    const getServiceAccountsUsers = async () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("serviceAccounts.toast.loading"),
-        timeout: 0,
+    const orgIdForList = useOrgId();
+    const serviceAccountsList = useQuery(() =>
+      Object.assign(serviceAccountsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    const loading = serviceAccountsList.isPending;
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = serviceAccountsList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = serviceAccountsList.dataUpdatedAt;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = serviceAccountsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
+    // Bound to refresh / post-write reloads: always hits the server.
+    const refreshServiceAccounts = () => {
+      loadServiceAccountRoles(true);
+      return getServiceAccountsUsers(true);
+    };
+
+    const applyServiceAccounts = (accounts: any[]) => {
+      resultTotal.value = accounts.length;
+      currentUserRole.value = "";
+      serviceAccountsState.service_accounts_users = accounts.map((data: any) => {
+        return {
+          email: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          token: data.token || "",
+          role: data.role || "ServiceAccount",
+          is_system: data.is_system || false,
+          description: data.description || null,
+          created_at: data.created_at || 0,
+        };
       });
+    };
 
-      loading.value = true;
-      forbidden.value = false;
-      return new Promise((resolve, reject) => {
-        service_accounts
-          .list(store.state.selectedOrganization.identifier)
-          .then((res) => {
-            resultTotal.value = res.data.data.length;
-            currentUserRole.value = "";
-            serviceAccountsState.service_accounts_users = res.data.data.map((data: any) => {
-              return {
-                email: data.email,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                token: data.token || "",
-                role: data.role || "ServiceAccount",
-                is_system: data.is_system || false,
-                description: data.description || null,
-                created_at: data.created_at || 0,
-              };
-            });
+    // The table is the query now: a service-account write invalidates the scope
+    // and these rows repaint without this component asking.
+    watch(serviceAccountsList.data, (rows: any) => {
+      if (rows) applyServiceAccounts(rows);
+    });
 
-            dismiss();
-
-            resolve(true);
-          })
-          .catch((err: any) => {
-            forbidden.value = err?.response?.status === 403;
-            dismiss();
-            reject(false);
-          })
-          .finally(() => {
-            loading.value = false;
+    // The cold-read toast, kept: shown only while there is nothing on screen.
+    let dismissLoadingToast: (() => void) | null = null;
+    watch(
+      loading,
+      (isCold) => {
+        if (isCold && !dismissLoadingToast) {
+          dismissLoadingToast = toast({
+            variant: "loading",
+            message: t("serviceAccounts.toast.loading"),
+            timeout: 0,
           });
-      });
+        } else if (!isCold && dismissLoadingToast) {
+          dismissLoadingToast();
+          dismissLoadingToast = null;
+        }
+      },
+      { immediate: true },
+    );
+
+    watch(serviceAccountsList.error, (error: any) => {
+      if (!error) return;
+      dismissLoadingToast?.();
+      dismissLoadingToast = null;
+    });
+
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself. The cold-read
+    // toast is driven by `loading` above, so it is not sequenced here.
+    const getServiceAccountsUsers = async (force = false) => {
+      if (force) await serviceAccountsList.refetch();
+      return true;
     };
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
@@ -1002,7 +1123,7 @@ export default defineComponent({
               message: t("serviceAccounts.toast.deleted"),
               variant: "success",
             });
-            await getServiceAccountsUsers();
+            await getServiceAccountsUsers(true);
           }
         })
         .catch((err: any) => {
@@ -1053,7 +1174,7 @@ export default defineComponent({
 
         selectedAccounts.value = [];
         confirmBulkDelete.value = false;
-        await getServiceAccountsUsers();
+        await getServiceAccountsUsers(true);
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
@@ -1082,7 +1203,7 @@ export default defineComponent({
             variant: "success",
           });
 
-          getServiceAccountsUsers();
+          getServiceAccountsUsers(true);
         })
         .catch((err) => {
           if (err.response?.status != 403) {
@@ -1124,7 +1245,7 @@ export default defineComponent({
       {
         id: "iamServiceAccountsRefresh",
         handler: () => {
-          if (!isInputFocused()) getServiceAccountsUsers();
+          if (!isInputFocused()) refreshServiceAccounts();
         },
       },
       {
@@ -1135,6 +1256,7 @@ export default defineComponent({
       },
     ]);
     return {
+      refreshServiceAccounts,
       t,
       router,
       store,
@@ -1142,6 +1264,8 @@ export default defineComponent({
       serviceAccountsState,
       columns,
       loading,
+      fetching,
+      lastUpdatedAt,
       forbidden,
       orgData,
       confirmDelete,
@@ -1166,8 +1290,6 @@ export default defineComponent({
       tokenAccessPending,
       hasAccessGrants,
       hasAccessFailures,
-      grantedRolesText,
-      grantedGroupsText,
       failedRolesText,
       failedGroupsText,
       isSyntheticSA,
@@ -1206,6 +1328,9 @@ export default defineComponent({
       isSystemAccount,
       isRowSelectable,
       deleteUserEmailIdentifier,
+      showRolesColumn,
+      serviceAccountRoles,
+      serviceAccountRolesText,
     };
   },
 });

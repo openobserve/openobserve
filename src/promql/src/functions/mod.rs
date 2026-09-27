@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::{
-    CounterSeries, EvalContext, ExtrapolationKind, LabelsExt, RangeValue, Sample, Value,
+    CounterSeries, EvalContext, ExtrapolationKind, Label, Labels, LabelsExt, RangeValue, Sample,
+    Value,
 };
 use datafusion::error::{DataFusionError, Result};
+use hashbrown::HashMap;
 use rayon::prelude::*;
 use strum::EnumString;
 
@@ -43,9 +45,11 @@ mod math_operations;
 mod max_over_time;
 mod min_over_time;
 mod predict_linear;
+mod present_over_time;
 mod quantile_over_time;
 mod resets;
 mod scalar;
+mod sort;
 mod stddev_over_time;
 mod stdvar_over_time;
 mod sum_over_time;
@@ -63,6 +67,7 @@ pub(crate) use math_operations::*;
 pub(crate) use predict_linear::predict_linear;
 pub(crate) use quantile_over_time::quantile_over_time;
 pub(crate) use scalar::scalar;
+pub(crate) use sort::sort;
 pub(crate) use time_operations::*;
 pub(crate) use vector::vector;
 
@@ -110,6 +115,7 @@ pub(crate) enum Func {
     Minute,
     Month,
     PredictLinear,
+    PresentOverTime,
     QuantileOverTime,
     Rate,
     Resets,
@@ -186,6 +192,7 @@ impl Func {
             Func::LastOverTime => Box::new(last_over_time::LastOverTimeFunc),
             Func::MaxOverTime => Box::new(max_over_time::MaxOverTimeFunc),
             Func::MinOverTime => Box::new(min_over_time::MinOverTimeFunc),
+            Func::PresentOverTime => Box::new(present_over_time::PresentOverTimeFunc),
             Func::Rate => Box::new(ExtrapolationKind::Rate),
             Func::Resets => Box::new(resets::ResetsFunc),
             Func::StddevOverTime => Box::new(stddev_over_time::StddevOverTimeFunc),
@@ -307,6 +314,8 @@ pub(crate) struct SeriesRange<'a, F: ?Sized> {
     start_index: usize,
     end_index: usize,
     counter: Option<CounterSeries<'a>>,
+    /// The window end an `@` modifier pins every step to.
+    pinned: Option<i64>,
 }
 
 impl<'a, F: RangeFunc + ?Sized> SeriesRange<'a, F> {
@@ -332,7 +341,13 @@ impl<'a, F: RangeFunc + ?Sized> SeriesRange<'a, F> {
                 eval_ctx,
                 range_micros,
             ),
+            pinned: None,
         }
+    }
+
+    pub(crate) fn pinned_at(mut self, at: Option<i64>) -> Self {
+        self.pinned = at;
+        self
     }
 }
 
@@ -341,10 +356,11 @@ impl<F: RangeFunc + ?Sized> Iterator for SeriesRange<'_, F> {
 
     fn next(&mut self) -> Option<Self::Item> {
         for (slot, &eval_ts) in self.timestamps.by_ref() {
+            let window_end = self.pinned.unwrap_or(eval_ts);
             let window_samples = advance_sample_window(
                 self.samples,
-                eval_ts - self.range_micros,
-                eval_ts,
+                window_end - self.range_micros,
+                window_end,
                 &mut self.start_index,
                 &mut self.end_index,
             );
@@ -353,7 +369,7 @@ impl<F: RangeFunc + ?Sized> Iterator for SeriesRange<'_, F> {
             }
             let value = match &self.counter {
                 Some(counter) => {
-                    counter.extrapolate(self.start_index, self.end_index, eval_ts, self.range)
+                    counter.extrapolate(self.start_index, self.end_index, window_end, self.range)
                 }
                 None => self.func.exec(window_samples, eval_ts, &self.range),
             };
@@ -376,6 +392,19 @@ pub(crate) fn instant_lookback_func() -> std::sync::Arc<dyn RangeFunc> {
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
+where
+    F: RangeFunc,
+{
+    eval_range_at(data, func, eval_ctx, None)
+}
+
+/// `eval_range` over the one window ending at `pinned`, still evaluated at every step.
+pub(crate) fn eval_range_at<F>(
+    data: Value,
+    func: F,
+    eval_ctx: &EvalContext,
+    pinned: Option<i64>,
+) -> Result<Value>
 where
     F: RangeFunc,
 {
@@ -420,6 +449,7 @@ where
             let mut result_samples = Vec::with_capacity(timestamps.len());
             result_samples.extend(
                 SeriesRange::new(&metric.samples, &func, range, eval_ctx, &timestamps)
+                    .pinned_at(pinned)
                     .map(|(slot, value)| Sample::new(timestamps[slot], value)),
             );
 
@@ -465,6 +495,51 @@ pub(crate) fn advance_sample_window<'a>(
     &samples[*start_index..*end_index]
 }
 
+/// Upserts a label keeping labels sorted by name; an empty value deletes it, as Prometheus does.
+pub(crate) fn set_label(labels: &mut Labels, name: &str, value: &str) {
+    labels.retain(|label| label.name != name);
+    if !value.is_empty() {
+        labels.push(Arc::new(Label::new(name, value)));
+    }
+    labels.sort();
+}
+
+/// Merges series with identical labels; overlapping timestamps are an error, as in Prometheus.
+pub(crate) fn merge_same_labelset(matrix: Vec<RangeValue>) -> Result<Vec<RangeValue>> {
+    if matrix.len() < 2 {
+        return Ok(matrix);
+    }
+    let mut merged: Vec<RangeValue> = Vec::with_capacity(matrix.len());
+    let mut by_signature: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matrix.len());
+    let mut touched = Vec::new();
+    for series in matrix {
+        let slots = by_signature.entry(series.labels.signature()).or_default();
+        let Some(&slot) = slots.iter().find(|&&i| merged[i].labels == series.labels) else {
+            slots.push(merged.len());
+            merged.push(series);
+            continue;
+        };
+        let target = &mut merged[slot];
+        target.samples.extend(series.samples);
+        if let Some(exemplars) = series.exemplars {
+            target.exemplars.get_or_insert_default().extend(exemplars);
+        }
+        touched.push(slot);
+    }
+    touched.sort_unstable();
+    touched.dedup();
+    for slot in touched {
+        let samples = &mut merged[slot].samples;
+        samples.sort_by_key(|sample| sample.timestamp);
+        if samples.windows(2).any(|w| w[0].timestamp == w[1].timestamp) {
+            return Err(DataFusionError::Execution(
+                "vector cannot contain metrics with the same labelset".into(),
+            ));
+        }
+    }
+    Ok(merged)
+}
+
 fn map_samples(data: Value, operation: &str, map: impl Fn(&Sample) -> f64 + Sync) -> Result<Value> {
     match data {
         Value::Matrix(mut matrix) => {
@@ -487,6 +562,52 @@ fn map_samples(data: Value, operation: &str, map: impl Fn(&Sample) -> f64 + Sync
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn range_value(labels: &[(&str, &str)], timestamps: &[i64]) -> RangeValue {
+        RangeValue {
+            labels: labels
+                .iter()
+                .map(|(name, value)| Arc::new(Label::new(*name, *value)))
+                .collect(),
+            samples: timestamps.iter().map(|ts| Sample::new(*ts, 1.0)).collect(),
+            exemplars: None,
+            time_window: None,
+        }
+    }
+
+    #[test]
+    fn test_merge_same_labelset_merges_disjoint_timestamps() {
+        let merged = merge_same_labelset(vec![
+            range_value(&[("job", "x")], &[3000]),
+            range_value(&[("job", "y")], &[1000]),
+            range_value(&[("job", "x")], &[1000, 2000]),
+        ])
+        .unwrap();
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].labels.get_value("job"), "x");
+        let timestamps: Vec<_> = merged[0].samples.iter().map(|s| s.timestamp).collect();
+        assert_eq!(timestamps, vec![1000, 2000, 3000]);
+        assert_eq!(merged[1].labels.get_value("job"), "y");
+    }
+
+    #[test]
+    fn test_merge_same_labelset_rejects_overlapping_timestamps() {
+        let result = merge_same_labelset(vec![
+            range_value(&[("job", "x")], &[1000, 2000]),
+            range_value(&[("job", "x")], &[2000]),
+        ]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_merge_same_labelset_compares_labels_not_only_signature() {
+        let merged = merge_same_labelset(vec![
+            range_value(&[("a", "bc")], &[1000]),
+            range_value(&[("ab", "c")], &[1000]),
+        ])
+        .unwrap();
+        assert_eq!(merged.len(), 2);
+    }
 
     #[test]
     fn test_series_range_matches_independent_window_selection() {

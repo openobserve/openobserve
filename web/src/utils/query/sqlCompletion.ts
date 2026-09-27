@@ -774,6 +774,17 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
 //   aggregates            — bare column
 //   histogram             — column + interval literal (useAlertForm.ts:463)
 
+/**
+ * match_all is the function almost everyone reaches for first. Without an
+ * explicit ordering here, Monaco falls back to sorting by label, so it lands
+ * wherever "match_all" happens to fall alphabetically (or worse, wherever
+ * fuzzy-match ranking puts it) relative to match_all_raw, str_match, etc. —
+ * the "sometimes first, sometimes not" behaviour this fixes. Everything else
+ * keeps its existing relative (alphabetical-by-declaration) order.
+ */
+const functionSortText = (name: string): string =>
+  SORT_LANE.function + (name === "match_all" ? "0" : "1") + name;
+
 export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
   {
     name: "match_all",
@@ -785,6 +796,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "match_all('${1:value}')",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("match_all"),
   },
   {
     name: "match_all_raw",
@@ -797,6 +809,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     insertText: "match_all_raw('${1:value}')",
     insertTextRules: SNIPPET,
     deprecated: true,
+    sortText: functionSortText("match_all_raw"),
   },
   {
     name: "match_all_raw_ignore_case",
@@ -809,6 +822,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     insertText: "match_all_raw_ignore_case('${1:value}')",
     insertTextRules: SNIPPET,
     deprecated: true,
+    sortText: functionSortText("match_all_raw_ignore_case"),
   },
   {
     name: "re_match",
@@ -820,6 +834,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "re_match(${1:field}, '${2:regex}')",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("re_match"),
   },
   {
     name: "re_not_match",
@@ -831,6 +846,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "re_not_match(${1:field}, '${2:regex}')",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("re_not_match"),
   },
   {
     name: "str_match",
@@ -842,6 +858,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "str_match(${1:field}, '${2:value}')",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("str_match"),
   },
   {
     name: "str_match_ignore_case",
@@ -853,6 +870,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "str_match_ignore_case(${1:field}, '${2:value}')",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("str_match_ignore_case"),
   },
   {
     name: "arr_descending",
@@ -864,6 +882,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "arr_descending(${1:field})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("arr_descending"),
   },
   {
     name: "arrcount",
@@ -875,6 +894,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "arrcount(${1:field})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("arrcount"),
   },
   {
     name: "arrsort",
@@ -886,6 +906,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "arrsort(${1:field})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("arrsort"),
   },
   {
     name: "cast_to_arr",
@@ -897,6 +918,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "cast_to_arr(${1:field})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("cast_to_arr"),
   },
   {
     name: "arrindex",
@@ -908,6 +930,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "arrindex(${1:field}, ${2:1}, ${3:10})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("arrindex"),
   },
   {
     name: "arrjoin",
@@ -919,6 +942,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "arrjoin(${1:field}, '${2:delimiter}')",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("arrjoin"),
   },
   {
     name: "arrzip",
@@ -930,6 +954,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "arrzip(${1:field1}, ${2:field2}, '${3:delimiter}')",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("arrzip"),
   },
   {
     name: "spath",
@@ -941,6 +966,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "spath(${1:field}, '${2:path}')",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("spath"),
   },
   {
     name: "to_array_string",
@@ -952,6 +978,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "to_array_string(${1:field})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("to_array_string"),
   },
   {
     name: "unnest",
@@ -963,6 +990,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "unnest(${1:array})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("unnest"),
   },
   {
     name: "array_extract",
@@ -974,6 +1002,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "array_extract(${1:array}, ${2:1})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("array_extract"),
   },
   {
     name: "sum",
@@ -985,6 +1014,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "sum(${1:field})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("sum"),
   },
   {
     name: "avg",
@@ -996,6 +1026,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "avg(${1:field})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("avg"),
   },
   {
     name: "count",
@@ -1007,6 +1038,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "count(${1:field})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("count"),
   },
   {
     name: "max",
@@ -1018,6 +1050,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "max(${1:field})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("max"),
   },
   {
     name: "min",
@@ -1029,6 +1062,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "min(${1:field})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("min"),
   },
   {
     name: "histogram",
@@ -1040,6 +1074,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "histogram(${1:_timestamp}, '${2:30 second}')",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("histogram"),
   },
   {
     name: "approx_topk",
@@ -1051,6 +1086,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "approx_topk(${1:field}, ${2:10})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("approx_topk"),
   },
   {
     name: "approx_topk_distinct",
@@ -1062,6 +1098,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     },
     insertText: "approx_topk_distinct(${1:field}, ${2:field2}, ${3:10})",
     insertTextRules: SNIPPET,
+    sortText: functionSortText("approx_topk_distinct"),
   },
 ];
 

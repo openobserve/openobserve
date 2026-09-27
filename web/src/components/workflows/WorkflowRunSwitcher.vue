@@ -168,7 +168,7 @@ const sortedRuns = computed(() =>
 // hide something when nothing is hidden is noise.
 const hiddenTestRunCount = computed(() => (showTestRuns.value ? 0 : testRunCount.value));
 
-const fetchRuns = async () => {
+const fetchRuns = async (force = false) => {
   if (!props.workflowId || runsLoading.value) return;
   // Re-pull the window the Runs page fetched for; fall back to a wide 10y window
   // when this view was deep-linked / opened without the list ever being fetched.
@@ -179,9 +179,10 @@ const fetchRuns = async () => {
     workflowId: props.workflowId,
     start: start || nowUs - 10 * 365 * 24 * 60 * 60 * 1_000_000,
     end: end || nowUs,
+    force,
   });
 };
-const refresh = () => fetchRuns();
+const refresh = () => fetchRuns(true);
 
 const onSelect = (runId: string) => {
   open.value = false;

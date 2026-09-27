@@ -36,13 +36,16 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => ({
   mapRunLocationResult: vi.fn((row: any) => row),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    artifactUrl: vi.fn(
-      (org: string, key: string) => `/api/${org}/artifact?key=${encodeURIComponent(key)}`,
-    ),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      artifactUrl: vi.fn(
+        (org: string, key: string) => `/api/${org}/artifact?key=${encodeURIComponent(key)}`,
+      ),
+    },
+  });
+});
 
 vi.mock("vuex", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vuex")>();

@@ -271,9 +271,8 @@ export default defineComponent({
     const router = useRouter();
 
     onMounted(async () => {
-      if (!store.state.organizationData.foldersByType?.[props.type]) {
-        await getFoldersListByType(store, props.type);
-      }
+      // A folder-list 403 must not strand the folder selection below.
+      await getFoldersListByType(store, props.type).catch(() => null);
       if (router.currentRoute.value.query.folder) {
         activeFolderId.value = router.currentRoute.value.query.folder as string;
       } else if (!props.showFavorites) {

@@ -1181,10 +1181,12 @@ const reprocessCorrelatedHighlight = (clearCache: boolean) => {
 watch(
   () => tableColumns.value,
   () => reprocessCorrelatedHighlight(true),
+  { immediate: true },
 );
 watch(
   () => (pagedResults as any)?.value,
   () => reprocessCorrelatedHighlight(false),
+  { immediate: true },
 );
 
 const getCorrelatedRowStatusColor = (row: any): string | undefined =>

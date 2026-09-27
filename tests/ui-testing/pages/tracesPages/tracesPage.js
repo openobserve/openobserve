@@ -2236,21 +2236,12 @@ export class TracesPage {
   }
 
   /**
-   * Assert the no-stream prompt is shown before a stream has been selected.
+   * Assert the no-stream prompt is absent, i.e. a stream was auto-selected.
+   * @param {string} message - Assertion message
    */
-  async expectNoStreamCardVisible() {
-    await expect(this.page.locator(this.tracesNoStreamCard))
-      .toBeVisible({ timeout: 15000 });
-  }
-
-  /**
-   * Count of rendered metric panel canvases under the metrics dashboard.
-   * @returns {Promise<number>}
-   */
-  async countMetricsPanelCanvases() {
-    return await this.page
-      .locator(`${this.tracesMetricsDashboard} [data-test-panel-title] canvas`)
-      .count();
+  async expectNoStreamCardHidden(message) {
+    await expect(this.page.locator(this.tracesNoStreamCard), message)
+      .toBeHidden({ timeout: 15000 });
   }
 
   /**

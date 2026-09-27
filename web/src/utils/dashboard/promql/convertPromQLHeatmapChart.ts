@@ -16,6 +16,7 @@
 import { PromQLChartConverter, ProcessedPromQLData, TOOLTIP_SCROLL_STYLE } from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { chartColor } from "@/utils/chartTheme";
+import { escapeHtml } from "@/utils/html";
 import { deaccumulateHistogramSeries, HistogramSeriesInput } from "./shared/histogramBuckets";
 import {
   HEATMAP_SPLIT_AREA,
@@ -342,7 +343,7 @@ export class HeatmapConverter implements PromQLChartConverter {
                   config?.decimals,
                 ),
               ) || params?.value?.[2];
-            return `${seriesName} <br/> ${params?.marker} ${params?.name} : ${value}`;
+            return `${escapeHtml(seriesName)} <br/> ${params?.marker} ${escapeHtml(params?.name)} : ${escapeHtml(value)}`;
           } catch (error) {
             return "";
           }
@@ -503,7 +504,7 @@ export class HeatmapConverter implements PromQLChartConverter {
                   config?.decimals,
                 ),
               ) || params?.value?.[2];
-            return `le ${bucketLabel} <br/> ${params?.marker} ${params?.name} : ${value}`;
+            return `le ${escapeHtml(bucketLabel)} <br/> ${params?.marker} ${escapeHtml(params?.name)} : ${escapeHtml(value)}`;
           } catch (error) {
             return "";
           }

@@ -42,9 +42,8 @@
 import { getImageURL } from "@/utils/zincutils";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
-import { defineComponent, computed, watch, type PropType } from "vue";
+import { defineComponent, computed, watch, type PropType, ref, onMounted, nextTick } from "vue";
 import { VueFlow, type Node, type Edge } from "@vue-flow/core";
-import { ref, onMounted, nextTick } from "vue";
 import CustomNode from "@/plugins/pipelines/CustomNode.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
 /* import the required styles */

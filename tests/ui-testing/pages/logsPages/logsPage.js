@@ -147,6 +147,8 @@ export class LogsPage {
         this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.errorMessage = '[data-test="logs-search-error-state"]';
+        // Stream-not-found (filter) error branch: pre-run detection of a missing stream name in a SQL query — distinct from the post-run logs-search-error-state (code 20002).
+        this.filterErrorMessage = '[data-test="logs-search-filter-error-message"]';
         // Generic error indicator (class/role based) used when no data-test error hook exists.
         this.genericErrorSelector = '[class*="error"], [class*="negative"], [role="alert"]';
         this.warningElement = 'text=warning Query execution';
@@ -502,6 +504,20 @@ export class LogsPage {
         this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
         this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
+        this.queryPlanDialog = '[data-test="query-plan-dialog"]';
+        this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
+        // useLogsHighlighter marks FTS matches with .log-highlighted inside the result cell.
+        this.highlightedMatch = '[data-test="logs-search-result-logs-table"] .log-highlighted';
+        // The "=" icon is revealed on hover over its sidebar field row.
+        this.fieldListItemPrefix = 'logs-field-list-item-';
+        this.logDetailRowPrefix = 'log-detail-row-';
+        this.fieldValuesList = '[data-test="field-values-panel-values-list"]';
+        this.fieldValueLabelPrefix = (field) => `[data-test^="logs-search-subfield-add-${field}-"]`;
+        this.fieldEqualsButton = (field) => `[data-test="log-search-index-list-filter-${field}-field-btn"]`;
+        this.logDetailRow = (field) => `[data-test="log-detail-row-${field}"]`;
+        this.logDetailFieldMenuTrigger = '[data-test="log-details-include-exclude-field-btn"]';
+        this.logDetailAddFieldItem = '[data-test="log-details-add-field-btn"]';
+        this.tableExpandCell = '[data-test="logs-search-result-logs-table"] tbody tr[data-test="o2-table-row-0"] td[data-test="o2-table-expand-cell"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -2019,6 +2035,130 @@ export class LogsPage {
         await expect(searchResult).toContainText(expectedPattern, { timeout: 15000 });
     }
 
+    /** Choose a page size without asserting the banner, for tests that assert rows instead. */
+    async selectRecordsPerPage(size) {
+        const dropdown = this.page.locator(this.recordsPerPageDropdown);
+        await dropdown.waitFor({ state: 'visible', timeout: 15000 });
+        await dropdown.click({ force: true });
+        const option = this.page.locator(this.recordsPerPageOption(size)).first();
+        await option.waitFor({ state: 'visible', timeout: 10000 });
+        await option.click({ force: true });
+        await expect(this.page.locator(this.paginationRowCountTitle))
+            .toContainText(`1 to ${size}`, { timeout: 30000 });
+    }
+
+    /**
+     * Wait until the banner reports the expected total.
+     *
+     * Ingest acknowledges before every row is searchable, so a query fired
+     * immediately after seeding sees an arbitrary prefix of the rows -- the same
+     * seed produced 12, then 6, then 3 across consecutive runs. Re-running the
+     * query while polling lets the index catch up.
+     */
+    async waitForResultTotal(expected, attempts = 12) {
+        for (let i = 0; i < attempts; i++) {
+            const title = await this.getResultTitleText();
+            const total = Number((title.match(/out of\s+([\d.]+)/) || [])[1]);
+            if (total === expected) return title;
+            await this.page.waitForTimeout(2000);
+            await this.clickRefreshButton();
+            await this.expectResultsGridSettledWithRows();
+        }
+        throw new Error(
+            `banner never reported ${expected} events; last was "${(await this.getResultTitleText()).replace(/\n/g, ' | ')}"`,
+        );
+    }
+
+    /** The "1 to N out of M events" banner, used to compare the claim against rendered rows. */
+    async getResultTitleText() {
+        return (await this.page.locator(this.paginationRowCountTitle).first().innerText()).trim();
+    }
+
+    /** #9542: match_all matches must render highlighted, not plain. */
+    async expectHighlightedMatchesRendered() {
+        await expect(this.page.locator(this.highlightedMatch).first()).toBeVisible({ timeout: 20000 });
+    }
+
+    async getHighlightedMatchCount() {
+        return await this.page.locator(this.highlightedMatch).count();
+    }
+
+    /**
+     * Rendered text and wrapping of a sidebar field's first value row.
+     *
+     * The wrapping lives on an inner value div carrying `title`, not on the
+     * labelled element itself, so reading the label's own computed style
+     * reports the wrapper's `normal` and misses the fix entirely.
+     */
+    async getFirstFieldValueRendering(field) {
+        const label = this.page.locator(this.fieldValueLabelPrefix(field)).first();
+        await label.waitFor({ state: 'visible', timeout: 20000 });
+        const value = label.locator('div[title]').first();
+        await value.waitFor({ state: 'visible', timeout: 10000 });
+        return await value.evaluate((el) => ({
+            whiteSpace: getComputedStyle(el).whiteSpace,
+            text: el.innerText,
+            newlineCount: (el.innerText.match(/\n/g) || []).length,
+        }));
+    }
+
+    /** Sidebar fields that offer an "=" filter, in render order; the set varies by dataset. */
+    async getFilterableSidebarFields(count = 2) {
+        const fields = await this.page
+            .locator(`[data-test^="${this.fieldListItemPrefix}"]`)
+            .evaluateAll((items, prefix) =>
+                items.map((i) => (i.getAttribute('data-test') || '').replace(prefix, '')),
+            this.fieldListItemPrefix);
+        const usable = fields.filter((f) => f && f !== '_timestamp');
+        if (usable.length < count) {
+            throw new Error(`need ${count} filterable sidebar fields, saw: ${fields.join(', ')}`);
+        }
+        return usable.slice(0, count);
+    }
+
+    /** Click a sidebar field's "=" icon; it only renders while its row is hovered. */
+    async addEqualsFilterForField(field) {
+        await this.page.locator(this.fieldListItem(field)).first().hover();
+        const button = this.page.locator(this.fieldEqualsButton(field)).first();
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        await button.click();
+    }
+
+    async expandFirstResultRow() {
+        await this.page.locator(this.tableExpandCell).click();
+        await expect(this.page.locator(this.logDetailRow('_timestamp'))).toBeVisible({ timeout: 15000 });
+    }
+
+    /** First expanded-row field that offers the add/remove action; timestamp never does. */
+    async getFirstActionableDetailField() {
+        const fields = await this.page
+            .locator(`[data-test^="${this.logDetailRowPrefix}"]`)
+            .evaluateAll((rows, prefix) =>
+                rows.map((r) => (r.getAttribute('data-test') || '').replace(prefix, '')),
+            this.logDetailRowPrefix);
+        const field = fields.find((f) => f && f !== '_timestamp');
+        if (!field) throw new Error(`no actionable field in the expanded row, saw: ${fields.join(', ')}`);
+        return field;
+    }
+
+    /**
+     * Open one expanded-row field's action menu and read its add/remove label.
+     * The menu is scoped to its own log-detail-row: the timestamp column renders no
+     * add item at all, so an unscoped lookup finds nothing.
+     */
+    async getAddOrRemoveFieldLabel(field) {
+        const row = this.page.locator(this.logDetailRow(field));
+        await row.hover();
+        await row.locator(this.logDetailFieldMenuTrigger).first().click();
+        const item = this.page.locator(this.logDetailAddFieldItem).first();
+        await item.waitFor({ state: 'visible', timeout: 10000 });
+        return (await item.innerText()).trim();
+    }
+
+    async clickAddOrRemoveFieldItem() {
+        await this.page.locator(this.logDetailAddFieldItem).first().click();
+    }
+
     async pageNotVisible() {
         // When LIMIT caps results below per-page floor, OSelect records-per-page dropdown hides.
         const recordsDropdown = this.page.locator(this.recordsPerPageDropdown);
@@ -3485,6 +3625,48 @@ export class LogsPage {
             return expectedSubstring ? last.includes(expectedSubstring) : last.trim().length > 0;
         }, { timeout, intervals: [300, 500, 800, 1200] }).toBe(true);
         return last;
+    }
+
+    async getSelectedStreamTriggerLabel() {
+        const trigger = this.page.locator(this.indexDropDownTrigger);
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        return await trigger.getAttribute('data-test-selected-label');
+    }
+
+    async getRenderedStreamNameStyles() {
+        // Assert computed text-transform, not textContent — o2-enterprise#1745 regresses via CSS capitalize, not the stored name.
+        const triggerSel = this.indexDropDownTrigger;
+        return await this.page.evaluate((sel) => {
+            const out = [];
+            const record = (el) => {
+                const text = (el.textContent || '').trim();
+                if (text) out.push({ text, textTransform: getComputedStyle(el).textTransform });
+            };
+            const trigger = document.querySelector(sel);
+            if (trigger) trigger.querySelectorAll('span').forEach(record);
+            document.querySelectorAll('.text-field-list-group-text').forEach(record);
+            return out;
+        }, triggerSel);
+    }
+
+    async clearPersistedStreamSelection() {
+        const orgId = getOrgIdentifier();
+        await this.page.evaluate((id) => {
+            try {
+                localStorage.removeItem(`oo_selected_stream_logs_${id}`);
+                localStorage.removeItem(`oo_logs_stream_type_${id}`);
+            } catch (e) { /* storage unavailable in this context */ }
+        }, orgId);
+    }
+
+    async expectSelectStreamPrompt() {
+        await expect(this.page.locator(this.noStreamHero)).toBeVisible({ timeout: 20000 });
+        await expect(this.page.locator(this.selectStreamCard)).toBeVisible();
+        await expect(this.page.locator(this.queryGuideCard)).toBeVisible();
+    }
+
+    async isRunQueryButtonVisible(timeout = 3000) {
+        return await this.page.locator(this.searchBarRefreshButton).first().isVisible({ timeout }).catch(() => false);
     }
 
     async clickLogTableColumnSource() {
@@ -10868,6 +11050,87 @@ export class LogsPage {
         testLogger.info('Results grid settled with rows, no skeleton or loading banner');
     }
 
+    /** Bounds the query/results splitter advertises; #12452's fix is that a max exists at all. */
+    async getQueryEditorSplitterBounds() {
+        const separator = this.page.locator(this.queryEditorSplitter);
+        const [now, min, max] = await Promise.all([
+            separator.getAttribute('aria-valuenow'),
+            separator.getAttribute('aria-valuemin'),
+            separator.getAttribute('aria-valuemax'),
+        ]);
+        return { now: Number(now), min: Number(min), max: Number(max) };
+    }
+
+    async getViewportHeight() {
+        return await this.page.evaluate(() => window.innerHeight);
+    }
+
+    /** Drive the splitter from the keyboard; End requests the maximum in one step. */
+    async pressQueryEditorSplitterKey(key, times = 1) {
+        const separator = this.page.locator(this.queryEditorSplitter);
+        await separator.focus();
+        for (let i = 0; i < times; i++) {
+            await separator.press(key);
+        }
+    }
+
+    /** Drag the splitter down by deltaY, the gesture #12452 was reported against. */
+    async dragQueryEditorSplitterBy(deltaY) {
+        const separator = this.page.locator(this.queryEditorSplitter);
+        const box = await separator.boundingBox();
+        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await this.page.mouse.down();
+        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + deltaY, { steps: 12 });
+        await this.page.mouse.up();
+    }
+
+    /** Distance from the separator to the bottom of the viewport; negative means off-screen. */
+    async getQueryEditorSplitterViewportGap() {
+        return await this.page.locator(this.queryEditorSplitter).evaluate(
+            (el) => window.innerHeight - el.getBoundingClientRect().bottom,
+        );
+    }
+
+    /** Assert the query execution plan dialog actually opened. */
+    async expectQueryPlanDialogVisible() {
+        await expect(this.page.locator(this.queryPlanDialog)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Query plan dialog is visible');
+    }
+
+    /** Assert the query execution plan dialog closed. */
+    async expectQueryPlanDialogHidden() {
+        await expect(this.page.locator(this.queryPlanDialog)).toBeHidden({ timeout: 10000 });
+        testLogger.info('Query plan dialog is hidden');
+    }
+
+    /** The logs table delegates scrolling to an unnamed ancestor, so resolve it at runtime. */
+    async getResultsScrollTop() {
+        return await this.page.locator(this.logsSearchResultLogsTable).evaluate((el) => {
+            let node = el.parentElement;
+            while (node && node !== document.body) {
+                const overflowY = getComputedStyle(node).overflowY;
+                if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight + 20) {
+                    return node.scrollTop;
+                }
+                node = node.parentElement;
+            }
+            return null;
+        });
+    }
+
+    /** Wheel over the results grid; hovering first is required or the wheel lands elsewhere. */
+    async scrollResultsGrid(deltaY = 400) {
+        await this.page.locator(this.logsSearchResultLogsTable).hover();
+        await this.page.mouse.wheel(0, deltaY);
+    }
+
+    /** The #9996 contract: the grid must keep rendering rows, never blank out mid-scroll. */
+    async expectResultsGridStillRendersRows() {
+        await expect(this.page.locator(this.logsSearchResultTableRows).first()).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator(this.resultsSkeleton)).toHaveCount(0);
+        await expect(this.page.locator(this.noResultsFoundText)).toHaveCount(0);
+    }
+
     /** Assert the results progress bar has faded out once the search settled. */
     async expectResultsProgressBarFadedOut() {
         // The bar stays mounted to run its own fade, so absence is opacity-0, not detachment.
@@ -12214,6 +12477,71 @@ export class LogsPage {
         const hero = this.page.locator(this.noStreamHero);
         await hero.waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('No-stream hero is visible');
+    }
+
+    /**
+     * Asserts the generic "no stream selected" hero is NOT visible — the regression
+     * this feature fixes: the filter-error branch must win over the empty state.
+     */
+    async expectNoStreamHeroNotVisible() {
+        await expect(
+            this.page.locator(this.noStreamHero),
+            'No-stream-selected hero should NOT be visible when the filter error is shown',
+        ).not.toBeVisible();
+        testLogger.info('No-stream hero is not visible');
+    }
+
+    /**
+     * Waits for the stream-not-found (filter) error branch to become visible.
+     */
+    async waitForStreamNotFoundError(timeout = 15000) {
+        await expect(
+            this.page.locator(this.filterErrorMessage),
+            'Stream-not-found error should be visible',
+        ).toBeVisible({ timeout });
+        testLogger.info('Stream-not-found error is visible');
+    }
+
+    /**
+     * Asserts the stream-not-found (filter) error branch is NOT visible.
+     */
+    async expectStreamNotFoundErrorNotVisible() {
+        await expect(
+            this.page.locator(this.filterErrorMessage),
+            'Stream-not-found error should NOT be visible',
+        ).not.toBeVisible();
+        testLogger.info('Stream-not-found error is not visible');
+    }
+
+    /**
+     * Waits for the stream-not-found (filter) error branch to disappear (query
+     * cleared or a stream selected).
+     */
+    async waitForStreamNotFoundErrorHidden(timeout = 15000) {
+        await expect(
+            this.page.locator(this.filterErrorMessage),
+            'Stream-not-found error should be hidden',
+        ).toBeHidden({ timeout });
+        testLogger.info('Stream-not-found error is hidden');
+    }
+
+    /**
+     * Reads the stream-not-found error summary text (the exact `Stream "<name>"
+     * does not exist` message), polling until the summary is populated.
+     */
+    async getStreamNotFoundErrorText(timeout = 15000) {
+        const summary = this.page.locator(this.searchErrorSummary).first();
+        let text = '';
+        await expect
+            .poll(
+                async () => {
+                    text = ((await summary.textContent().catch(() => null)) || '').trim();
+                    return text;
+                },
+                { timeout, message: 'Stream-not-found error summary never populated' },
+            )
+            .not.toBe('');
+        return text;
     }
 
     /**

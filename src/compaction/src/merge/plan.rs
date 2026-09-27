@@ -182,6 +182,7 @@ mod tests {
                 original_size,
                 compressed_size: original_size / 2,
                 index_size: 0,
+                mindex_size: 0,
                 flattened: false,
                 bloom_ver: 0,
             },
@@ -297,6 +298,7 @@ mod tests {
         let files = vec![
             metrics_file("indexed-v1-1.parquet", 300),
             metrics_file("indexed-v1-2.parquet", 300),
+            metrics_file("indexed-v1-3.parquet", 300),
             metrics_file("7.parquet", 300),
             metrics_file("8.parquet", 300),
         ];
@@ -310,6 +312,23 @@ mod tests {
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(matches!(batches[0].1, MergeMode::Classic));
         assert_eq!(names(&batches[0].0), ["7.parquet", "8.parquet"]);
+    }
+
+    #[test]
+    fn test_plan_batches_indexed_file_is_not_rewritten() {
+        let files = vec![
+            metrics_file("indexed-v1-1.parquet", 300),
+            metrics_file("hash-sorted-v1-2.parquet", 300),
+        ];
+        let batches = plan_batches(
+            files,
+            &MergeMode::MetricsIndexed,
+            &limits(&MergeStrategy::FileSize, 0, false),
+            "test",
+        );
+        assert_eq!(batches.len(), 1);
+        assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
+        assert_eq!(names(&batches[0].0), ["hash-sorted-v1-2.parquet"]);
     }
 
     fn hash_file(name: &str, compressed_size: i64) -> FileKey {

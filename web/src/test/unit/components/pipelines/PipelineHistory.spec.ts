@@ -21,20 +21,23 @@ import i18n from "@/locales";
 import router from "../../helpers/router";
 
 // Mock services
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    getPipelines: vi.fn(() =>
-      Promise.resolve({
-        data: {
-          list: [
-            { name: "test-pipeline-1", pipeline_id: "pid1" },
-            { name: "test-pipeline-2", pipeline_id: "pid2" },
-          ],
-        },
-      }),
-    ),
-  },
-}));
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPipelines: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            list: [
+              { name: "test-pipeline-1", pipeline_id: "pid1" },
+              { name: "test-pipeline-2", pipeline_id: "pid2" },
+            ],
+          },
+        }),
+      ),
+    },
+  });
+});
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({

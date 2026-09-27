@@ -108,6 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`ai-queue-workbench-nav-item-${i}`"
             @click="selectItem(i)"
           >
+            <!-- Preview first, id second: the reviewer needs to tell items apart
+                 before opening them, and a bare target id cannot do that. -->
             <div class="flex w-full min-w-0 items-center gap-1.5 text-xs">
               <OIcon
                 :name="item.status === 'reviewed' ? 'check-circle' : 'fiber-manual-record'"
@@ -117,7 +119,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   item.status === 'reviewed' ? 'text-status-success-text' : 'text-text-disabled'
                 "
               />
-              <span class="min-w-0 flex-1 truncate text-left font-mono">{{ item.refId }}</span>
+              <span
+                v-if="item.inputPreview"
+                class="flex min-w-0 flex-1 flex-col text-left"
+                :title="item.inputPreview"
+              >
+                <span
+                  class="text-text-body truncate"
+                  :data-test="`ai-queue-workbench-nav-preview-${i}`"
+                  >{{ item.inputPreview }}</span
+                >
+                <span class="text-text-secondary text-2xs truncate font-mono">{{
+                  item.refId
+                }}</span>
+              </span>
+              <span v-else class="min-w-0 flex-1 truncate text-left font-mono">{{
+                item.refId
+              }}</span>
             </div>
           </OTab>
         </OTabs>
@@ -690,6 +708,11 @@ import llmQueuesService, {
   type ScoreConfigDataType,
 } from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import {
+  pushQueueItemToDatasetMutation,
+  submitQueueReviewMutation,
+} from "@/services/llm-queues.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { toggleFullscreen as domToggleFullscreen } from "@/utils/dom";
 
 defineOptions({ name: "AIQueueWorkbenchPage" });
@@ -705,6 +728,9 @@ const router = useRouter();
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const queueId = computed<string>(() => String(route.params.id ?? ""));
+
+const submitReview = useMutation(() => submitQueueReviewMutation(orgId.value));
+const pushToDataset = useMutation(() => pushQueueItemToDatasetMutation(orgId.value));
 
 const queue = ref<LlmQueue | null>(null);
 
@@ -981,6 +1007,11 @@ async function loadCurrentItem() {
     if (request !== detailRequest) return;
     currentDetail.value = detail;
     currentReviews.value = detail.reviews;
+    // Items enqueued before previews existed get theirs backfilled on open;
+    // reflect that in the navigator without refetching the whole list.
+    if (!item.inputPreview && detail.item?.inputPreview) {
+      item.inputPreview = detail.item.inputPreview;
+    }
   } catch {
     if (request !== detailRequest) return;
     toast({ variant: "error", message: t("aiObservability.queues.detail.loadError") });
@@ -1043,22 +1074,26 @@ async function submit() {
   currentSubmissionId.value = submissionId;
   submitting.value = true;
   try {
-    await llmQueuesService.submitReview(orgId.value, queueId.value, item.id, {
-      submissionId,
-      sourceStream: detail.sourceStream,
-      scores: boundConfigs.value.map((config) => {
-        const value = draft[config.scoreConfigId];
-        return {
-          scoreConfigRowId: config.rowId,
-          value:
-            config.dataType === "boolean"
-              ? value === "true"
-              : config.dataType === "numeric"
-                ? Number(value)
-                : String(value),
-        };
-      }),
-      comments: comment.value.trim() || null,
+    await submitReview.mutateAsync({
+      queueId: queueId.value,
+      itemId: item.id,
+      payload: {
+        submissionId,
+        sourceStream: detail.sourceStream,
+        scores: boundConfigs.value.map((config) => {
+          const value = draft[config.scoreConfigId];
+          return {
+            scoreConfigRowId: config.rowId,
+            value:
+              config.dataType === "boolean"
+                ? value === "true"
+                : config.dataType === "numeric"
+                  ? Number(value)
+                  : String(value),
+          };
+        }),
+        comments: comment.value.trim() || null,
+      },
     });
     item.status = "reviewed";
     item.reviewedAt = Date.now();
@@ -1136,11 +1171,15 @@ async function confirmDistill() {
   if (!item || !canConfirmDistill.value || distilling.value) return;
   distilling.value = true;
   try {
-    const result = await llmQueuesService.pushToDataset(orgId.value, queueId.value, item.id, {
-      datasetId: distillDatasetId.value,
-      reviewSubmissionId: adjudicationSubmissionId.value,
-      expectedOutput: distillExpected.value.trim(),
-      tags: distillTags.value,
+    const result = await pushToDataset.mutateAsync({
+      queueId: queueId.value,
+      itemId: item.id,
+      payload: {
+        datasetId: distillDatasetId.value,
+        reviewSubmissionId: adjudicationSubmissionId.value,
+        expectedOutput: distillExpected.value.trim(),
+        tags: distillTags.value,
+      },
     });
     const datasetId = distillDatasetId.value;
     distillOpen.value = false;

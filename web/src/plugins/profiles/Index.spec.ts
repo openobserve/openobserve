@@ -184,10 +184,10 @@ describe("Profiles page", () => {
     expect(lastSeriesCall[1]).toBe("profiles-b");
     expect(lastSeriesCall[2]).toEqual(
       expect.objectContaining({
-        data_source: "collector-a",
         service_name: "service-a",
       }),
     );
+    expect(lastSeriesCall[2].data_source).toBeUndefined();
   });
 
   it("recomputes relative time when running a query again", async () => {

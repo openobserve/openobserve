@@ -85,6 +85,7 @@ class WorkflowFoldersPage {
 
     // ---------- editor folder picker (create only) ----------
     this.editorFolderDropdown = page.locator('[data-test="workflow-editor-folder"]');
+    this.editorFolderStatic = page.locator('[data-test="workflow-editor-folder-static"]');
     this.inlineFolderTrigger = page.locator('[data-test="inline-select-folder-dropdown"]');
     this.inlineFolderAddBtn = page.locator('[data-test="inline-select-folder-dropdown-add"]');
     this.inlineFolderDialog = page.locator('[data-test="inline-select-folder-dropdown-dialog"]');
@@ -246,7 +247,8 @@ class WorkflowFoldersPage {
 
   async renameFolder(folderName, newName) {
     await this.clickMoreIcon(folderName);
-    await this.editFolderIcon.click({ force: true });
+    await this.editFolderIcon.waitFor({ state: 'visible', timeout: 5000 });
+    await this.editFolderIcon.click();
     await expect(this.folderNameInput).toBeVisible({ timeout: DIALOG_TIMEOUT_MS });
     await this.folderNameInput.fill(newName);
     await this.folderSaveBtn.click();
@@ -279,7 +281,12 @@ class WorkflowFoldersPage {
   // ---------- move ----------
 
   async openMoveDialog(workflowName) {
-    await this.moveWorkflowBtn(workflowName).click({ force: true });
+    // Not hovered into view first: the row's view control owns a large tooltip panel that
+    // would then overlay these buttons. The move icon is rendered outright for a published
+    // row, so a plain click's actionability wait is enough — no force needed.
+    const moveBtn = this.moveWorkflowBtn(workflowName);
+    await moveBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await moveBtn.click();
     await expect(this.moveDialog).toBeVisible({ timeout: DIALOG_TIMEOUT_MS });
   }
 
@@ -373,13 +380,21 @@ class WorkflowFoldersPage {
   }
 
   async refreshList() {
-    await this.listRefreshBtn.click({ force: true, timeout: 5000 }).catch(() => {});
+    await this.listRefreshBtn.click({ timeout: 5000 });
     await this.page.waitForLoadState('networkidle', { timeout: DIALOG_TIMEOUT_MS }).catch(() => {});
   }
 
   async selectListTab(value) {
     await this.listTab(value).click();
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  }
+
+  // Reka's ToggleGroupItem marks the selected tab data-state="on"; pinning it is what
+  // proves a following "row is gone" assertion was made under the filter, not mid-render.
+  async expectListTabActive(value) {
+    await expect(this.listTab(value)).toHaveAttribute('data-state', 'on', {
+      timeout: DIALOG_TIMEOUT_MS,
+    });
   }
 
   // ---------- row assertions ----------
@@ -467,6 +482,14 @@ class WorkflowFoldersPage {
 
   async expectEditorFolderPickerHidden() {
     await expect(this.editorFolderDropdown).toBeHidden({ timeout: DIALOG_TIMEOUT_MS });
+  }
+
+  // The static text falls back to the folderId when the store has no such folder, so
+  // asserting the NAME is what catches an editor that lost the folder it was opened from.
+  async expectEditorFolderStatic(folderName) {
+    await expect(this.editorFolderStatic).toContainText(folderName, {
+      timeout: EDITOR_TIMEOUT_MS,
+    });
   }
 }
 

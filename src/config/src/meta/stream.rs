@@ -341,6 +341,8 @@ pub struct FileMeta {
     pub compressed_size: i64,
     pub index_size: i64,
     #[serde(default)]
+    pub mindex_size: i64,
+    #[serde(default)]
     pub bloom_ver: i64, // 0 = no .bf; otherwise = microsecond ts encoded in .bf filename
     pub flattened: bool,
 }
@@ -468,13 +470,18 @@ pub struct StreamStats {
     pub storage_size: f64,
     pub compressed_size: f64,
     pub index_size: f64,
+    #[serde(default)]
+    pub mindex_size: f64,
 }
 
 impl StreamStats {
-    /// Returns true iff [start, end] time range intersects with the stream's
-    /// time range.
+    /// Returns true iff [start, end] intersects the stream's time range, or the stream has no
+    /// stats yet.
     pub fn time_range_intersects(&self, start: i64, end: i64) -> bool {
-        assert!(start <= end);
+        // stats are built from persisted files only, so a stream with none is unknown, not empty
+        if self.doc_time_max == 0 {
+            return true;
+        }
         let (min, max) = self.time_range();
         // [min, max] does *not* intersect with [start, end] if either
         //
@@ -492,11 +499,16 @@ impl StreamStats {
 
     fn time_range(&self) -> (i64, i64) {
         assert!(self.doc_time_min <= self.doc_time_max);
-        let file_push_interval = Duration::try_seconds(get_config().limit.file_push_interval as _)
+        let cfg = get_config();
+        // stats lag ingestion by the WAL retention plus the stats job interval, not just the push
+        let slack_secs = cfg.limit.file_push_interval
+            + cfg.limit.max_file_retention_time
+            + cfg.limit.calculate_stats_interval;
+        let slack = Duration::try_seconds(slack_secs as _)
             .unwrap()
             .num_microseconds()
             .unwrap();
-        (self.doc_time_min, self.doc_time_max + file_push_interval)
+        (self.doc_time_min, self.doc_time_max + slack)
     }
 
     pub fn add_file_meta(&mut self, meta: &FileMeta) {
@@ -513,11 +525,15 @@ impl StreamStats {
         self.storage_size += meta.original_size as f64;
         self.compressed_size += meta.compressed_size as f64;
         self.index_size += meta.index_size as f64;
+        self.mindex_size += meta.mindex_size as f64;
         if self.storage_size < 0.0 {
             self.storage_size = 0.0;
         }
         if self.compressed_size < 0.0 {
             self.compressed_size = 0.0;
+        }
+        if self.mindex_size < 0.0 {
+            self.mindex_size = 0.0;
         }
         if self.index_size < 0.0 {
             self.index_size = 0.0;
@@ -530,6 +546,7 @@ impl StreamStats {
         self.storage_size = stats.storage_size;
         self.compressed_size = stats.compressed_size;
         self.index_size = stats.index_size;
+        self.mindex_size = stats.mindex_size;
         self.doc_time_min = if self.doc_time_min == 0 {
             stats.doc_time_min
         } else if stats.doc_time_min == 0 {
@@ -555,6 +572,7 @@ impl StreamStats {
         self.storage_size += other.storage_size;
         self.compressed_size += other.compressed_size;
         self.index_size += other.index_size;
+        self.mindex_size += other.mindex_size;
     }
 }
 
@@ -587,6 +605,7 @@ impl From<Stats> for StreamStats {
             storage_size: meta.original_size,
             compressed_size: meta.compressed_size.unwrap_or_default(),
             index_size: meta.index_size.unwrap_or_default(),
+            mindex_size: meta.mindex_size.unwrap_or_default(),
         }
     }
 }
@@ -610,6 +629,7 @@ impl std::ops::Sub<&StreamStats> for &StreamStats {
             storage_size: self.storage_size - rhs.storage_size,
             compressed_size: self.compressed_size - rhs.compressed_size,
             index_size: self.index_size - rhs.index_size,
+            mindex_size: self.mindex_size - rhs.mindex_size,
         }
     }
 }
@@ -633,6 +653,7 @@ impl std::ops::Add<&StreamStats> for &StreamStats {
             storage_size: self.storage_size + rhs.storage_size,
             compressed_size: self.compressed_size + rhs.compressed_size,
             index_size: self.index_size + rhs.index_size,
+            mindex_size: self.mindex_size + rhs.mindex_size,
         }
     }
 }
@@ -652,6 +673,7 @@ impl From<&FileMeta> for cluster_rpc::FileMeta {
             original_size: req.original_size,
             compressed_size: req.compressed_size,
             index_size: req.index_size,
+            mindex_size: req.mindex_size,
         }
     }
 }
@@ -666,6 +688,7 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
             compressed_size: req.compressed_size,
             flattened: false,
             index_size: req.index_size,
+            mindex_size: req.mindex_size,
             bloom_ver: 0,
         }
     }
@@ -1499,6 +1522,7 @@ mod tests {
             compressed_size: 1,
             flattened: false,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
         };
 
@@ -1517,6 +1541,7 @@ mod tests {
             original_size: 1000,
             compressed_size: 500,
             index_size: 50,
+            mindex_size: 0,
             flattened: false,
             bloom_ver: 0,
         };
@@ -1534,12 +1559,14 @@ mod tests {
             original_size: -100,
             compressed_size: -50,
             index_size: -10,
+            mindex_size: 0,
             ..meta
         };
         let mut negative_stats = StreamStats {
             storage_size: 50.0,
             compressed_size: 25.0,
             index_size: 5.0,
+            mindex_size: 0.0,
             ..Default::default()
         };
         negative_stats.add_file_meta(&negative_meta);
@@ -1913,7 +1940,7 @@ mod tests {
 
     #[test]
     fn test_stream_stats_time_range_intersects() {
-        // Use large timestamps so file_push_interval (10s = 10_000_000 µs) doesn't confuse results
+        // Use large timestamps so the stats slack (~20 min in µs) doesn't confuse results
         let base: i64 = 1_700_000_000_000_000; // ~2023-11-14 in µs
         let stats = StreamStats {
             doc_time_min: base,
@@ -1930,8 +1957,21 @@ mod tests {
         assert!(stats.time_range_intersects(base - 1_000_000, base + 5_000_000));
         // query ends exactly at stream min — no intersection (min < end: base < base is false)
         assert!(!stats.time_range_intersects(base - 1_000_000, base));
-        // query starts well after effective max (doc_time_max + file_push_interval ~10s)
-        assert!(!stats.time_range_intersects(base + 20_000_000, base + 30_000_000));
+        // the WAL and the stats job can hold data back for a while, so the upper bound is slack
+        let cfg = get_config();
+        let slack = ((cfg.limit.file_push_interval
+            + cfg.limit.max_file_retention_time
+            + cfg.limit.calculate_stats_interval)
+            * 1_000_000) as i64;
+        // query starts exactly at effective max (doc_time_max + slack) — still intersects
+        assert!(stats.time_range_intersects(base + slack, base + slack + 1_000_000));
+        // query starts after effective max
+        assert!(!stats.time_range_intersects(base + slack + 2_000_000, base + slack + 3_000_000));
+        // a stream with no persisted files has no stats and must not be filtered out
+        let no_stats = StreamStats::default();
+        assert!(no_stats.time_range_intersects(base, base + 1_000_000));
+        // an inverted range does not panic
+        assert!(!stats.time_range_intersects(base + 1_000_000, base));
     }
 
     // ── PartitionTimeLevel ────────────────────────────────────────────────────
@@ -2008,6 +2048,7 @@ mod tests {
             original_size: 1024,
             compressed_size: 512,
             index_size: 0,
+            mindex_size: 0,
             flattened: false,
             bloom_ver: 0,
         };
@@ -2072,6 +2113,7 @@ mod tests {
             storage_size: 2048.0,
             compressed_size: 1024.0,
             index_size: 10.0,
+            mindex_size: 0.0,
             doc_time_min: 200,
             doc_time_max: 800,
             ..Default::default()
@@ -2094,6 +2136,7 @@ mod tests {
             storage_size: 300.0,
             compressed_size: 150.0,
             index_size: 5.0,
+            mindex_size: 0.0,
             doc_time_min: 1000,
             doc_time_max: 2000,
             created_at: 100,
@@ -2104,6 +2147,7 @@ mod tests {
             storage_size: 200.0,
             compressed_size: 100.0,
             index_size: 3.0,
+            mindex_size: 0.0,
             doc_time_min: 500,
             doc_time_max: 3000,
             created_at: 50,
@@ -2253,6 +2297,7 @@ mod tests {
             max_ts: 200,
             compressed_size: None,
             index_size: None,
+            mindex_size: None,
         };
         let stream_stats = StreamStats::from(usage);
         assert_eq!(stream_stats.doc_num, 50);
@@ -2274,6 +2319,7 @@ mod tests {
             max_ts: 5000,
             compressed_size: Some(1024.0),
             index_size: Some(50.0),
+            mindex_size: Some(0.0),
         };
         let stream_stats = StreamStats::from(usage);
         assert_eq!(stream_stats.doc_num, 100);
@@ -2429,6 +2475,7 @@ mod tests {
             original_size: 4,
             compressed_size: 5,
             index_size: 6,
+            mindex_size: 0,
             flattened: true,
             bloom_ver: 42,
         };
@@ -2448,6 +2495,7 @@ mod tests {
             "original_size": 4,
             "compressed_size": 5,
             "index_size": 6,
+            "mindex_size": 0,
             "flattened": false
         }"#;
         let parsed: FileMeta = serde_json::from_str(legacy).unwrap();
@@ -2478,5 +2526,51 @@ mod tests {
         assert_eq!(m.min_ts, 10);
         assert_eq!(m.max_ts, 20);
         assert_eq!(m.bloom_ver, 0);
+    }
+    #[test]
+    fn mindex_size_is_independent_in_stats_json_and_rpc() {
+        let meta = FileMeta {
+            records: 2,
+            index_size: 7,
+            mindex_size: 13,
+            ..Default::default()
+        };
+        let rpc = cluster_rpc::FileMeta::from(&meta);
+        assert_eq!(FileMeta::from(&rpc), meta);
+        let mut json = serde_json::to_value(&meta).unwrap();
+        json.as_object_mut().unwrap().remove("mindex_size");
+        assert_eq!(
+            serde_json::from_value::<FileMeta>(json)
+                .unwrap()
+                .mindex_size,
+            0
+        );
+        let mut a = StreamStats::default();
+        a.add_file_meta(&meta);
+        let b = StreamStats {
+            mindex_size: 5.0,
+            index_size: 12.0,
+            ..Default::default()
+        };
+        assert_eq!((&a + &b).mindex_size, 18.0);
+        assert_eq!((&a - &b).mindex_size, 8.0);
+        a.merge(&b);
+        assert_eq!((a.mindex_size, a.index_size), (18.0, 19.0));
+        let mut copied = StreamStats::default();
+        copied.format_by(&a);
+        assert_eq!(copied.mindex_size, 18.0);
+        copied.add_file_meta(&FileMeta {
+            mindex_size: -50,
+            ..Default::default()
+        });
+        assert_eq!((copied.mindex_size, copied.index_size), (0.0, 19.0));
+        let mut json = serde_json::to_value(&a).unwrap();
+        json.as_object_mut().unwrap().remove("mindex_size");
+        assert_eq!(
+            serde_json::from_value::<StreamStats>(json)
+                .unwrap()
+                .mindex_size,
+            0.0
+        );
     }
 }

@@ -71,6 +71,7 @@ struct PendingMigrations {
     annotation_queues_datasets: bool,
     llm_workbench: bool,
     workflow_folders: bool,
+    synthetic_environments: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -510,6 +511,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.workflow_folders {
         keys.push("workflow_folder");
     }
+    if pending.synthetic_environments {
+        keys.push("synthetic_environment");
+    }
     keys
 }
 
@@ -546,6 +550,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_42 = version_compare::Version::from("0.0.42").unwrap();
     let v0_0_46 = version_compare::Version::from("0.0.46").unwrap();
     let v0_0_47 = version_compare::Version::from("0.0.47").unwrap();
+    let v0_0_48 = version_compare::Version::from("0.0.48").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -645,6 +650,11 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     if existing_model_version < v0_0_47 {
         log::info!("[OFGA:Local] workflow folders permissions migration needed");
         pending.workflow_folders = true;
+    }
+    // 0.0.48: 0.0.47 (workflow folders) is the last version enterprise main shipped.
+    if existing_model_version < v0_0_48 {
+        log::info!("[OFGA:Local] synthetic environments permissions migration needed");
+        pending.synthetic_environments = true;
     }
 
     pending

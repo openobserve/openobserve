@@ -80,6 +80,7 @@ describe("llmQueuesService queue and item contracts", () => {
             refType: "trace",
             refId: "trace-1",
             refTraceStartTime: 1_700_000_000_000_000,
+            inputPreview: "How do I rotate keys?",
             status: "pending",
             archivedAt: null,
             createdAt: 10,
@@ -110,6 +111,7 @@ describe("llmQueuesService queue and item contracts", () => {
       id: "item-1",
       queueId: "queue-1",
       refTraceStartTime: 1_700_000_000_000_000,
+      inputPreview: "How do I rotate keys?",
     });
   });
 });

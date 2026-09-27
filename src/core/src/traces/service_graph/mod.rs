@@ -83,8 +83,10 @@ pub async fn use_v4_source(org: &str) -> bool {
     if stopped {
         v4::V1_STOPPED_SEEN.store(true, Ordering::Relaxed);
     }
+    // the gRPC ServiceGraph arm writes through logs::ingest, so the v1 stream lives as a Logs
+    // stream
     let v1_exists =
-        !stopped && infra::schema::exists(org, StreamType::ServiceGraph, "_o2_service_graph").await;
+        !stopped && infra::schema::exists(org, StreamType::Logs, "_o2_service_graph").await;
     pick_source(stopped, v1_exists) == Source::V4
 }
 

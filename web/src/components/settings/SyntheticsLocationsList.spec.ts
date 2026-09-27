@@ -37,7 +37,10 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true" },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which pulls other
+// zincutils exports — a wholesale mock leaves them undefined at import time.
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   getImageURL: vi.fn((path: string) => path),
 }));
 
@@ -53,13 +56,16 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 
 // ── Mock synthetics service ────────────────────────────────────────────────────
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    getLocations: (...args: any[]) => mockGetLocations(...args),
-    updateLocation: (...args: any[]) => mockUpdateLocation(...args),
-    deleteLocation: (...args: any[]) => mockDeleteLocation(...args),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getLocations: (...args: any[]) => mockGetLocations(...args),
+      updateLocation: (...args: any[]) => mockUpdateLocation(...args),
+      deleteLocation: (...args: any[]) => mockDeleteLocation(...args),
+    },
+  });
+});
 
 // ── Stubs ──────────────────────────────────────────────────────────────────────
 

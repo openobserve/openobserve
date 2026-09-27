@@ -1474,6 +1474,8 @@
     "sessionReplay": "Phát lại phiên",
     "viewSessionReplay": "Xem phát lại phiên",
     "playSessionReplay": "Phát lại phiên",
+    "noReplayRecordedTitle": "Không có phát lại nào được ghi cho phiên này",
+    "noReplayRecordedMessage": "Phiên {id} không có phân đoạn phát lại nào để phát.",
     "discoverSessionTitle": "Khám phá Phát lại phiên để hiểu chi tiết tương tác người dùng",
     "discoverSessionMessage": "Phát lại phiên ghi lại và phát lại các tương tác của người dùng trên trang web hoặc ứng dụng của bạn. Điều này cho phép bạn xem xét trực quan cách người dùng điều hướng, nơi họ nhấp, nội dung họ gõ và cách họ tương tác với nội dung của bạn",
     "loadingErrorDetails": "Hãy chờ một chút, chúng tôi đang lấy chi tiết lỗi.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "Bắt đầu dùng thử miễn phí"
   },
   "login": {
+    "lockedOut": "Quá nhiều lần đăng nhập thất bại. Thử lại sau {duration}, hoặc liên hệ quản trị viên.",
     "redirectingToSsoMessage": "Đang chuyển hướng đến trang đăng nhập SSO. Nếu bạn không được chuyển hướng, vui lòng",
     "clickHere": "bấm vào đây",
     "loginWithSso": "Đăng nhập bằng SSO",
@@ -1954,6 +1957,7 @@
     "ok": "OK",
     "sendInvite": "Gửi Lời mời",
     "inviteByEmail": "Mời qua email. Nhiều email cách nhau bằng dấu chấm phẩy (;) hoặc dấu phẩy (,).",
+    "inviteByEmailPlaceholder": "Mời bằng email",
     "changePassword": "Đổi Mật khẩu",
     "oldPassword": "Mật khẩu cũ",
     "newPassword": "Mật khẩu mới",
@@ -1962,6 +1966,15 @@
     "fieldRequired": "Trường này là bắt buộc",
     "passwordRequired": "Mật khẩu là bắt buộc.",
     "passwordPolicyHint": "Mật khẩu phải có 8-128 ký tự và chứa ít nhất một chữ cái thường, một chữ cái in hoa, một chữ số và một ký tự đặc biệt.",
+    "lockout": {
+      "locked": "Tài khoản đã bị khóa",
+      "autoUnlock": "Tự động mở khóa sau {duration}.",
+      "staged": "Sẽ được mở khóa khi bạn lưu.",
+      "unlock": "Mở khóa",
+      "undo": "Giữ khóa",
+      "confirmTitle": "Mở khóa {email}?",
+      "confirmMessage": "Thao tác này xóa số lần đăng nhập thất bại và cho phép họ đăng nhập lại ngay lập tức. Mật khẩu của họ không thay đổi."
+    },
     "currentPasswordRequired": "Mật khẩu hiện tại là bắt buộc.",
     "newPasswordRequired": "Mật khẩu mới là bắt buộc.",
     "otherOrgInvalid": "Tên tổ chức phải bắt đầu bằng chữ cái và chỉ gồm chữ cái, số, _ hoặc -.",
@@ -2028,11 +2041,11 @@
       "addToGroup": "Thêm vào nhóm người dùng",
       "addToRole": "Gán vai trò",
       "step1Title": "Sao chép mã của bạn",
-      "copyHint": "Sao chép mã này ngay — bạn sẽ không thể xem lại nó.",
+      "copyHint": "Đây là lần duy nhất bạn nhìn thấy token này. Hãy sao chép hoặc tải xuống ngay, không thể truy xuất lại lần nữa.",
       "done": "Hoàn tất",
       "applying": "Đang áp dụng quyền truy cập…",
-      "grantedRoles": "Vai trò đã gán: {roles}",
-      "grantedGroups": "Đã thêm vào nhóm người dùng: {groups}",
+      "rolesAssignedLabel": "Vai trò đã gán",
+      "groupsAssignedLabel": "Đã thêm vào nhóm người dùng",
       "failedRoles": "Không thể gán vai trò: {roles}",
       "failedGroups": "Không thể thêm vào nhóm người dùng: {groups}",
       "failedHint": "Bạn có thể cấp các quyền này sau từ trang Vai trò và Nhóm người dùng."
@@ -2042,6 +2055,9 @@
         "label": "Tên tài khoản dịch vụ",
         "placeholder": "ví dụ: ingest-bot",
         "help": "Chữ thường, số và dấu gạch ngang. Lưu dưới dạng name{suffix}"
+      },
+      "identifier": {
+        "label": "Định danh"
       },
       "roles": {
         "label": "Gán vai trò",
@@ -2056,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Định danh",
+        "roles": "Vai trò",
         "token": "Mã",
         "created": "Đã tạo"
       }
@@ -2183,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Mọi người dùng và tài khoản dịch vụ liên kết với các vai trò này sẽ mất quyền truy cập."
-      }
+      },
+      "assignColumn": "Gán",
+      "assignBtn": "Thêm",
+      "assignedBadge": "Đã gán",
+      "assignBannerText": "Thêm {member} vào một vai trò — nhấp Thêm bên cạnh vai trò bên dưới.",
+      "assignBannerDone": "Xong",
+      "assignSuccess": "Đã thêm {member} vào vai trò \"{role}\".",
+      "assignError": "Không thể thêm tài khoản vào vai trò đó. Vui lòng thử lại."
     },
     "group": {
       "name": {
@@ -2214,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Các thành viên của những nhóm này sẽ mất các vai trò được cấp bởi chúng."
-      }
+      },
+      "assignColumn": "Gán",
+      "assignBtn": "Thêm",
+      "assignedBadge": "Đã gán",
+      "assignBannerText": "Thêm {member} vào một nhóm người dùng — nhấp Thêm bên cạnh nhóm bên dưới.",
+      "assignBannerDone": "Xong",
+      "assignSuccess": "Đã thêm {member} vào nhóm \"{group}\".",
+      "assignError": "Không thể thêm tài khoản vào nhóm đó. Vui lòng thử lại."
     },
     "appGroups": {
       "deleteGroupTitle": "Xóa nhóm",
@@ -3568,6 +3599,12 @@
     "joinSlack": "Tham gia Slack",
     "maybeLater": "Để sau"
   },
+  "connectDataSourcePopup": {
+    "title": "Để bắt đầu, hãy kết nối nguồn dữ liệu đầu tiên của bạn.",
+    "description": "Chúng tôi có rất nhiều điều để cho bạn xem, nhưng trước tiên chúng tôi cần kết nối dữ liệu của bạn. Hầu hết các nhóm thấy nhật ký đầu tiên của họ trong khoảng một phút.",
+    "connectButton": "Kết nối nguồn dữ liệu",
+    "slackLink": "Ngoài ra, hãy tham gia cộng đồng Slack của chúng tôi"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Tiếp tục từ nơi đã tạm dừng",
     "startFromNow": "Bắt đầu từ bây giờ.",
@@ -3578,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Lỗi khi sao chép nội dung.",
+    "passcodeForbiddenMessage": "Cần vai trò Admin hoặc Root để xem token tiếp nhận dữ liệu. Hãy hỏi quản trị viên để biết lệnh thiết lập, hoặc vai trò cần thiết để xem token này tại đây.",
     "updateRUMTokenMessage": "Bạn có chắc chắn muốn cập nhật mã thông báo RUM cho tổ chức này không?",
     "completeAwsIntegration": "Hoàn tất tích hợp AWS",
     "deployAwsServicesOneClick": "Triển khai tất cả các dịch vụ AWS đã chọn chỉ bằng một cú nhấp chuột với một ngăn xếp CloudFormation duy nhất.",
@@ -4484,6 +4522,8 @@
       "payloadTitle": "Payload sự kiện",
       "payloadIndex": "Trường {field} chọn stream. Các sự kiện không có nó sẽ đi vào stream {stream}.",
       "payloadTime": "Trường {field} là epoch giây, và giá trị thập phân cũng được chấp nhận. Khi nó bị thiếu hoặc không dương, thời gian nhận sẽ được dùng.",
+      "windowTitle": "Dấu thời gian ngoài cửa sổ thu nhận sẽ bị loại bỏ",
+      "windowBody": "Các sự kiện cũ hơn {past} (mặc định 5 giờ) hoặc xa hơn {future} (mặc định 24 giờ) sẽ bị loại bỏ, và yêu cầu vẫn trả về mã 0 vì ứng dụng khách Splunk không thử lại khi gặp lỗi. Do đó, một dấu thời gian cố định hoặc đã cũ trông giống như một lần gửi thành công nhưng không lưu gì cả.",
       "payloadMetadata": "Các trường {fields} được lưu dưới dạng cột trên sự kiện.",
       "healthTitle": "Kiểm tra tình trạng",
       "healthBody": "Yêu cầu GET không cần xác thực và trả về {response}.",
@@ -5380,6 +5420,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Làm mới để áp dụng các thay đổi biến mới nhất",
       "refresh": "Làm mới",
+      "refreshCacheReload": "Làm mới cache & tải lại",
+      "moreRefreshOptions": "Thêm tùy chọn làm mới",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Không tìm thấy dashboard hoặc đã bị xóa. Đang chuyển hướng đến danh sách dashboard.",
       "failedToLoadDashboard": "Không thể tải dashboard. Đang chuyển hướng đến danh sách dashboard.",
@@ -5814,7 +5856,36 @@
     "variableNameAlreadyExists": "Biến có cùng tên đã tồn tại",
     "pivotTotal": "Tổng",
     "pivotOthers": "Khác",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Hiển thị exemplar (mẫu trace)",
+      "hide": "Ẩn exemplar · hiển thị {count}",
+      "empty": "Không có exemplar trong khoảng thời gian này",
+      "emptyShort": "0 exemplar",
+      "loadFailed": "Không thể tải exemplar",
+      "loadFailedHint": "Biểu đồ không bị ảnh hưởng. Thao tác thử lại chỉ tải exemplar.",
+      "retry": "Thử lại",
+      "cardTitle": "Exemplar",
+      "query": "Truy vấn {name}",
+      "returnedBy": "Được trả về bởi {count} truy vấn | Được trả về bởi {count} truy vấn",
+      "series": "Chuỗi",
+      "aboveRange": "Nằm trên phạm vi biểu đồ; được vẽ ở cạnh trên",
+      "belowRange": "Nằm dưới phạm vi biểu đồ; được vẽ ở cạnh dưới",
+      "checkingTrace": "Đang kiểm tra trace…",
+      "openTrace": "Mở trace",
+      "openTraceHint": "Hoặc nhấp vào điểm đánh dấu. Nút Quay lại sẽ đưa bạn về đây.",
+      "traceNotAvailable": "Trace không khả dụng — bị loại do lấy mẫu hoặc ngoài thời gian lưu trữ",
+      "openTraceUnverified": "Mở trace (chưa xác minh)",
+      "unverifiedTimeout": "Tra cứu trace đã hết thời gian chờ, nên trace này có thể không tồn tại.",
+      "unverifiedForbidden": "Không thể xác nhận trace này — bạn có thể không có quyền truy cập trace.",
+      "unverifiedPartial": "Chỉ một phần của khoảng thời gian lưu trữ được tìm kiếm.",
+      "unverifiedError": "Không thể kiểm tra trace này.",
+      "noTraceId": "Exemplar này không có {label}, nên không có trace để mở.",
+      "markersAria": "Điểm đánh dấu exemplar",
+      "markerAria": "Exemplar {value} lúc {time}"
+    },
+    "showExemplarsLabel": "Hiển thị exemplar",
+    "showExemplarsHelp": "Vẽ mẫu trace trên biểu đồ này cho tất cả những ai mở bảng điều khiển. Người xem vẫn có thể ẩn chúng từ tiêu đề panel."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5902,6 +5973,9 @@
         "details": "Chi tiết",
         "json": "JSON",
         "insights": "Phân tích",
+        "back": "Quay lại kết quả",
+        "prevEvent": "Sự kiện trước",
+        "nextEvent": "Sự kiện tiếp theo",
         "copyLink": "Sao chép liên kết",
         "copy": "Sao chép",
         "copyValue": "Sao chép giá trị",
@@ -7486,6 +7560,9 @@
       "lastError": "Lỗi cuối cùng",
       "lastTrained": "Lần huấn luyện cuối",
       "lookBackWindow": "Cửa sổ nhìn lại",
+      "lookBackWindowFloor": "Cửa sổ nhìn lại phải tối thiểu {min} — Tần suất kiểm tra cộng một Độ phân giải phát hiện. Cửa sổ ngắn hơn không thể chứa trọn một bucket vào lúc một lượt chạy diễn ra, nên các bucket sẽ bị bỏ qua.",
+      "lookBackWindowLegacy": "Cửa sổ đã lưu này thấp hơn mức tối thiểu {min} (Tần suất kiểm tra cộng một Độ phân giải phát hiện). Nó vẫn được lưu nguyên trạng, nhưng các lượt chạy có thể bỏ qua bucket cho đến khi cửa sổ được tăng lên.",
+      "lookBackWindowMinimum": "Tối thiểu {min}. Khuyến nghị {recommended} trở lên — gấp đôi (Tần suất kiểm tra + Độ phân giải phát hiện) — cộng thêm 10 phút khi bật phát hiện vắng mặt.",
       "lookBackWindowTooltip": "Khoảng thời gian tối đa mà mỗi lần chạy phát hiện truy vấn. Giới hạn cửa sổ ngay cả sau khi tạm dừng lâu. Mặc định là khoảng thời gian Kiểm tra mỗi lần.",
       "metricChart": "Chỉ số và bất thường",
       "metricChartHint": "Một điểm cho mỗi khoảng phát hiện",
@@ -7494,6 +7571,15 @@
       "nDays": "{days} ngày | {days} ngày",
       "noDestinationsFound": "Không tìm thấy đích nào",
       "noFieldsFound": "Không tìm thấy trường nào",
+      "noticeHybridFallback": "Phát hiện dự phòng",
+      "noticeHybridFallbackTooltip": "Ngưỡng hybrid không khả dụng trong các lượt chạy gần đây, nên quá trình phát hiện đã chuyển sang ngưỡng đóng băng. Việc tính điểm tiếp tục dựa trên ngưỡng đóng băng cho đến khi mô hình được huấn luyện lại.",
+      "noticeRetrain": "Tự động huấn luyện lại",
+      "noticeRetrainTooltip": "Không thể đọc mô hình đã lưu sau khi nâng cấp, nên nó đã bị loại bỏ và cấu hình được tự động xếp hàng để huấn luyện lại. Không cần thực hiện thao tác nào; quá trình phát hiện sẽ tiếp tục sau khi huấn luyện hoàn tất.",
+      "noticeSkipAbsence": "Việc chấm điểm vắng mặt bị chậm hơn Cửa sổ nhìn lại; span không còn có thể truy xuất đã bị bỏ qua và được ghi lại.",
+      "noticeSkipScored": "Các lượt chạy phát hiện diễn ra cách xa nhau hơn phạm vi Cửa sổ nhìn lại, nên các bucket đã đóng đã ra khỏi cửa sổ trước khi một lượt chạy có thể đánh giá chúng.",
+      "noticeWindowFloor": "Cửa sổ quá hẹp",
+      "noticeWindowFloorTooltip": "Cửa sổ nhìn lại thấp hơn Tần suất kiểm tra cộng một Độ phân giải phát hiện, nên các lượt chạy không thể đánh giá bất kỳ bucket nào. Hãy tăng cửa sổ để khôi phục phát hiện.",
+      "noticeWindowSkip": "Bucket bị bỏ qua",
       "notifications": "Thông báo",
       "notificationsTooltip": "Khi được bật, một thông báo sẽ được gửi đến đích đã chọn mỗi khi phát hiện bất thường.",
       "percentile": "Mức",
@@ -7590,7 +7676,9 @@
       "usernameRequired": "Tên người dùng là bắt buộc",
       "passwordRequired": "Mật khẩu là bắt buộc",
       "emailRecipients": "Địa chỉ email người nhận",
-      "emailRecipientsHelp": "Địa chỉ email được phân tách bằng dấu phẩy",
+      "emailRecipientsHelp": "Chọn người dùng trong tổ chức hoặc tài khoản dịch vụ sẽ nhận email cảnh báo",
+      "emailRecipientsGroupUsers": "Người dùng",
+      "emailRecipientsGroupServiceAccounts": "Tài khoản dịch vụ",
       "invalidEmailAddresses": "Địa chỉ email không hợp lệ: {emails}",
       "opsgenieApiKey": "Khóa API Opsgenie",
       "opsgenieApiKeyHelp": "Lấy khóa API của bạn từ cài đặt tích hợp Opsgenie",
@@ -7907,7 +7995,18 @@
     "enabled": "Đã bật",
     "paused": "Đã tạm dừng",
     "impactTemplate": "Được sử dụng bởi {destinations} · {alerts}",
-    "impactDestination": "Được sử dụng bởi {alerts}"
+    "impactDestination": "Được sử dụng bởi {consumers}",
+    "impactUnused": "Không được sử dụng",
+    "noConsumers": "Không có đối tượng sử dụng.",
+    "countCompositeAlert": "{count} cảnh báo tổng hợp | {count} cảnh báo tổng hợp",
+    "countPipeline": "{count} pipeline | {count} pipeline",
+    "countSyntheticCheck": "{count} kiểm tra Synthetics | {count} kiểm tra Synthetics",
+    "countOncallPolicy": "{count} chính sách leo thang | {count} chính sách leo thang",
+    "countOncallTeamChannel": "{count} kênh nhóm | {count} kênh nhóm",
+    "countWorkflow": "{count} quy trình làm việc | {count} quy trình làm việc",
+    "countAnomalyDetection": "{count} bộ phát hiện bất thường | {count} bộ phát hiện bất thường",
+    "countIncidentIntegration": "{count} tích hợp sự cố | {count} tích hợp sự cố",
+    "sectionOtherConsumers": "Cũng được sử dụng bởi"
   },
   "alert_library": {
     "header": "Thư viện cảnh báo",
@@ -8591,7 +8690,9 @@
         "staleCopyAria": "Sao chép chi tiết làm mới thất bại cho {name}",
         "stalePreamble": "Làm mới thất bại — hiển thị kết quả thành công gần nhất.",
         "staleClickToCopy": "Nhấp để sao chép chi tiết.",
-        "lastRefreshedPrefix": "Lần làm mới cuối cùng lúc: "
+        "lastRefreshedPrefix": "Lần làm mới cuối cùng lúc: ",
+        "exemplarsShowHeatmap": "Hiển thị exemplar (mẫu trace). Chuyển thẻ này sang percentile khi bật.",
+        "exemplarsHideHeatmap": "Ẩn exemplar · hiển thị {count}. Đưa thẻ này trở lại heatmap."
       },
       "fn": {
         "subtitle": "Chọn cách tổng hợp số liệu này",
@@ -8775,6 +8876,8 @@
     "cipherKeysDesc": "Khóa mã hóa cho trường nhạy cảm",
     "regexPatternsDesc": "Mẫu regex tái sử dụng cho việc làm rõ",
     "domainManagementDesc": "Giới hạn đăng nhập vào tên miền SSO được phép",
+    "passwordPolicy": "Chính sách mật khẩu",
+    "passwordPolicyDesc": "Chính sách xác thực cho các tài khoản email/mật khẩu nội bộ, áp dụng trên toàn instance.",
     "pipelineDestinationsDesc": "Mục tiêu bên ngoài cho đầu ra pipeline",
     "templatesDesc": "Mẫu tin nhắn cảnh báo tái sử dụng",
     "storageSettingsDesc": "Cấu hình lưu trữ theo tổ chức",
@@ -9351,7 +9454,28 @@
     "listConjunctionAnd": "{list} và {last}",
     "runsIn": "Chạy trong",
     "recommendedByFieldCoverage": "Được đề xuất dựa trên mức độ bao phủ trường trong các luồng của bạn.",
-    "listConjunctionAndTwo": "{first} và {last}"
+    "listConjunctionAndTwo": "{first} và {last}",
+    "domainOrgMappings": {
+      "title": "Ánh xạ tên miền đến tổ chức",
+      "subtitle": "Người dùng mới đăng nhập bằng tên miền email khớp sẽ tự động được thêm vào tổ chức.",
+      "addMapping": "Thêm ánh xạ",
+      "editMapping": "Chỉnh sửa ánh xạ",
+      "empty": "Chưa có ánh xạ nào. Sử dụng “{addLabel}” để thêm.",
+      "domain": "Tên miền email",
+      "domainHelp": "Phần sau {at_sign} trong địa chỉ email của người dùng.",
+      "organization": "Tổ chức",
+      "organizationPlaceholder": "Mã định danh tổ chức",
+      "organizationHelp": "Mã định danh của tổ chức mà người dùng khớp được thêm vào.",
+      "organizationRequired": "Tổ chức là bắt buộc",
+      "baseRole": "Vai trò cơ bản",
+      "baseRoleHelp": "Vai trò được gán cho người dùng khớp trong tổ chức đó.",
+      "userGroup": "Nhóm người dùng",
+      "userGroupPlaceholder": "Tên nhóm",
+      "userGroupHelp": "Tùy chọn. Người dùng khớp cũng sẽ tham gia nhóm này trong tổ chức đó.",
+      "duplicateDomain": "Đã tồn tại ánh xạ cho tên miền này",
+      "confirmRemove": "Bạn có chắc chắn muốn xóa ánh xạ cho {domain} không?",
+      "deleteTitle": "Xóa ánh xạ"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -13006,10 +13130,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Đầu vào từ span gốc của trace."
+              "trace": "Đầu vào từ span chat gốc của trace.",
+              "session": "Câu hỏi mở đầu: đầu vào từ span chat gốc của trace đầu tiên."
             },
             "output": {
-              "trace": "Đầu ra từ span gốc của trace."
+              "trace": "Đầu ra từ span chat gốc của trace.",
+              "session": "Câu trả lời cuối cùng: đầu ra từ span chat gốc của trace cuối cùng."
             },
             "statistics": {
               "trace": "Số liệu trace: số span, thời lượng, số lần gọi LLM và công cụ, lỗi, token và chi phí.",
@@ -13021,6 +13147,10 @@
             "steps": {
               "trace": "Các span theo thứ tự thời gian; phần giữa được thu gọn khi trace rất dài.",
               "session": "Các trace theo thứ tự thời gian, được biểu diễn dưới dạng các lượt hội thoại."
+            },
+            "tool_calls": {
+              "trace": "Mọi lệnh gọi công cụ trong trace, theo thứ tự thời gian, kèm tên, đầu vào, đầu ra và trạng thái.",
+              "session": "Mọi lệnh gọi công cụ trong các trace của phiên, theo thứ tự thời gian, kèm tên, đầu vào, đầu ra và trạng thái."
             }
           }
         }
@@ -13340,6 +13470,7 @@
       "searchHistoryNotEnabled": "Lịch sử tìm kiếm không được bật.",
       "enableUsageReporting": "Đặt ZO_USAGE_REPORTING_ENABLED thành true để bật báo cáo sử dụng.",
       "selectStreamToExtractPatterns": "Vui lòng chọn một stream để trích xuất mẫu",
+      "patternsUnavailableForMultiStream": "Không có mẫu khi chọn nhiều stream. Vui lòng chọn một stream.",
       "errorExtractingPatterns": "Lỗi khi trích xuất mẫu. Vui lòng thử lại.",
       "nameOfPanelRequired": "Tên của bảng là bắt buộc",
       "errorsFixAndTryAgain": "Có một số lỗi, vui lòng sửa chúng và thử lại",
@@ -13471,6 +13602,166 @@
     "lastRefreshed": "Cập nhật lần cuối: {time}"
   },
   "synthetics": {
+    "variables": {
+      "newButton": "Biến mới",
+      "createTitle": "Thêm biến",
+      "created": "Đã tạo biến {name}",
+      "deleteConfirm": "Xóa {name}?",
+      "deleteFailed": "Không thể xóa biến",
+      "deleteTitle": "Xóa biến",
+      "deleteEnvFallback": "{env} sẽ sử dụng giá trị toàn cục.",
+      "deleteGlobalFallback": "{envs} giữ giá trị riêng của chúng; các môi trường khác sẽ ngừng phân giải {name}.",
+      "overriddenInNote": "Bị ghi đè trong {envs}",
+      "overridesGlobalNote": "Ghi đè giá trị toàn cục",
+      "shadowGlobalTitle": "Ghi đè giá trị toàn cục?",
+      "shadowGlobalMessage": "{name} sẽ ghi đè giá trị toàn cục trong {env}. Các môi trường khác tiếp tục sử dụng giá trị toàn cục.",
+      "shadowedGlobalTitle": "Một số môi trường giữ giá trị riêng của chúng",
+      "shadowedGlobalMessage": "{name} đã có giá trị riêng trong: {envs}. Các môi trường đó giữ giá trị riêng của chúng; mọi môi trường khác sẽ sử dụng giá trị này.",
+      "deleteUsed": "{name} được tham chiếu bởi {n} kiểm tra. Nó sẽ được phân giải thành văn bản nguyên văn cho đến khi bạn cập nhật. Vẫn xóa? | {name} được tham chiếu bởi {n} kiểm tra. Chúng sẽ được phân giải thành văn bản nguyên văn cho đến khi bạn cập nhật. Vẫn xóa?",
+      "deleted": "Đã xóa biến",
+      "description": "Mô tả",
+      "editTitle": "Chỉnh sửa biến",
+      "emptyBody": "Chia sẻ một giá trị giữa các kiểm tra thay vì sao chép nó vào từng kiểm tra.",
+      "emptyFiltered": "Không có biến nào khớp với tìm kiếm của bạn.",
+      "emptyTitle": "Chưa có biến nào",
+      "example": "Ví dụ",
+      "exampleHint": "Hiển thị ở những nơi giá trị bị ẩn. Không bao giờ đặt bí mật thật vào đây.",
+      "examplePlaceholder": "https://shop.example.com",
+      "global": "Toàn cục",
+      "globalSubtitle": "Áp dụng trong mọi môi trường.",
+      "globalReachesProduction": "Giá trị toàn cục áp dụng trong mọi môi trường, kể cả production. Thay đổi ở đây sẽ ảnh hưởng đến mọi kiểm tra dùng tên này mà không có giá trị riêng.",
+      "kind": "Loại",
+      "kindPlain": "Thường",
+      "kindSecret": "Bí mật",
+      "lastUpdated": "Cập nhật lần cuối",
+      "loadFailed": "Không thể tải biến",
+      "name": "Tên",
+      "nameInvalid": "Chỉ dùng chữ cái, chữ số và dấu gạch dưới, bắt đầu bằng chữ cái hoặc dấu gạch dưới",
+      "namePlaceholder": "BASE_URL",
+      "nameRequired": "Tên là bắt buộc",
+      "nameReserved": "_AUTH_ được dành riêng cho thông tin xác thực do probe tự chèn vào",
+      "nameTooLong": "Tên quá dài (tối đa 128 ký tự)",
+      "notSet": "Chưa đặt",
+      "replace": "Thay thế",
+      "saveFailed": "Không thể lưu biến",
+      "scope": "Môi trường",
+      "scopeEnvironment": "Biến này chỉ áp dụng trong {env}.",
+      "scopeGlobal": "Biến này áp dụng trong mọi môi trường.",
+      "searchPlaceholder": "Tìm kiếm biến",
+      "secretNeedsEnvironment": "Global không lưu secret. Hãy tạo secret trong môi trường sẽ bảo vệ nó.",
+      "secretWriteOnly": "Giá trị này chỉ ghi. Không có gì hiển thị lại nó sau khi được lưu.",
+      "title": "Biến",
+      "updated": "Đã cập nhật biến",
+      "usedBy": "Được sử dụng bởi",
+      "usedByChecks": "Không dùng | {n} kiểm tra | {n} kiểm tra",
+      "value": "Giá trị",
+      "valueEmpty": "Trống",
+      "valuePlaceholder": "Giá trị",
+      "valueRequired": "Giá trị là bắt buộc",
+      "valueSet": "Đã đặt · cập nhật {when}"
+    },
+    "environments": {
+      "newButton": "Môi trường mới",
+      "backToList": "Tất cả môi trường",
+      "capReached": "Một lượt kiểm tra có thể nhắm tới tối đa {cap} môi trường.",
+      "cardEmpty": "Chưa có môi trường nào. Hãy tạo chúng trong Synthetics → Biến.",
+      "cardLocked": "Được chọn bởi người dùng có quyền truy cập. Bạn không thể thay đổi nó — kiểm tra vẫn tiếp tục chạy tại đó.",
+      "cardTitle": "Môi trường",
+      "checks": "Kiểm tra",
+      "checksCount": "Chưa sử dụng | {count} kiểm tra | {count} kiểm tra",
+      "createTitle": "Thêm môi trường",
+      "created": "Đã tạo môi trường",
+      "deleteBlockedChecks": "Vẫn được {n} kiểm tra sử dụng. Hãy gỡ nó khỏi các kiểm tra đó trước.",
+      "deleteBlockedSecrets": "Môi trường này vẫn còn biến bí mật. Hãy xóa từng biến trước — biến bí mật không thể khôi phục.",
+      "deleteConfirm": "Xóa {name}?",
+      "deleteFailed": "Không thể xóa môi trường",
+      "deleteTitle": "Xóa môi trường",
+      "deleteWithVariables": "Xóa {name} và {n} biến của nó?",
+      "deleted": "Đã xóa môi trường",
+      "description": "Mô tả",
+      "detailSubtitle": "Các biến nằm trong phạm vi môi trường này.",
+      "editTitle": "Chỉnh sửa môi trường",
+      "emptyBody": "Tạo một môi trường để phân phạm vi biến và bí mật, chẳng hạn như staging và production.",
+      "emptyTitle": "Chưa có môi trường nào",
+      "lastUpdated": "Cập nhật lần cuối",
+      "loadFailed": "Không thể tải các môi trường.",
+      "name": "Tên",
+      "nameInvalid": "Chỉ dùng chữ cái, chữ số, dấu gạch ngang và gạch dưới, không bắt đầu bằng dấu gạch dưới",
+      "namePlaceholder": "production",
+      "nameRequired": "Tên là bắt buộc",
+      "nameTooLong": "Tên quá dài (tối đa 64 ký tự)",
+      "renameBlocked": "Không thể đổi tên môi trường — tên là cơ sở để cấp quyền.",
+      "saveFailed": "Không thể lưu môi trường",
+      "searchPlaceholder": "Tìm kiếm môi trường",
+      "subtitle": "Phân phạm vi các biến và bí mật, đồng thời kiểm soát ai có thể quản lý chúng.",
+      "title": "Môi trường",
+      "updated": "Đã cập nhật môi trường",
+      "usedByChecks": "Không dùng | Được dùng bởi {n} kiểm tra | Được dùng bởi {n} kiểm tra",
+      "variables": "Biến"
+    },
+    "duplicateVariable": {
+      "body": "Tạo một bản sao của {name}, bao gồm cả giá trị của nó, trong cùng phạm vi.",
+      "done": "Đã nhân bản biến",
+      "failed": "Không thể nhân bản biến",
+      "nameLabel": "Tên biến mới"
+    },
+    "duplicate": {
+      "action": "Nhân bản",
+      "body": "Sao chép tất cả {n} biến từ {name} vào một môi trường mới. Các kiểm tra sẽ không được sao chép.",
+      "bodyWithSecrets": "Sao chép {n} biến từ {name}. {secrets} bí mật được sao chép mà không có giá trị và phải đặt lại. Các kiểm tra không được sao chép.",
+      "confirm": "Nhân bản",
+      "done": "Đã nhân bản môi trường",
+      "failed": "Không thể nhân bản môi trường",
+      "nameLabel": "Tên môi trường mới",
+      "title": "Nhân bản {name}"
+    },
+    "inherited": {
+      "notIn": "Không có trong {envs}",
+      "overridesGlobal": "ghi đè toàn cục",
+      "notInMany": "Không có trong {count} môi trường",
+      "overriddenByCheck": "Bị ghi đè bởi biến cục bộ",
+      "title": "Dùng chung",
+      "filterAll": "Tất cả",
+      "filterLabel": "Lọc theo nguồn",
+      "emptyIn": "Không có biến dùng chung trong {env}.",
+      "titleTooltip": "Giá trị được chia sẻ với mọi kiểm tra, quản lý trên tab Môi trường & Biến: các môi trường của kiểm tra này cộng với các biến toàn cục. Các biến cục bộ phía trên được ưu tiên hơn.",
+      "valueSet": "Đã đặt",
+      "valueNotSet": "Chưa đặt",
+      "emptyNone": "Không có biến dùng chung."
+    },
+    "promote": {
+      "done": "Biến giờ là biến toàn cục.",
+      "doneShadowed": "Biến giờ là biến toàn cục. {envs} vẫn ghi đè nó bằng giá trị riêng của chúng.",
+      "failed": "Không thể chuyển biến thành biến toàn cục.",
+      "secretBlocked": "Không thể di chuyển bí mật giữa các môi trường",
+      "toGlobal": "Đặt làm toàn cục"
+    },
+    "promoteCheck": {
+      "action": "Chia sẻ {name}",
+      "confirm": "Di chuyển",
+      "description": "Di chuyển biến này ra khỏi kiểm tra vào một môi trường chia sẻ, nơi các kiểm tra khác cũng có thể dùng nó.",
+      "destination": "Đích",
+      "done": "Đã di chuyển biến",
+      "failed": "Không thể di chuyển biến",
+      "global": "Toàn cục",
+      "secretHint": "Giá trị này được đánh dấu bảo mật, nên nó trở thành secret và không thể chuyển sang toàn cục.",
+      "title": "Chia sẻ {name}",
+      "tooltip": "Di chuyển đến môi trường chia sẻ"
+    },
+    "split": {
+      "action": "Chuyển sang phạm vi môi trường",
+      "alreadyOwn": "Đã có giá trị riêng — giữ nguyên.",
+      "overrideHint": "Để ghi đè chỉ trong một môi trường, hãy tạo biến trong chính môi trường đó.",
+      "confirm": "Chuyển sang phạm vi môi trường",
+      "description": "Mỗi môi trường có giá trị riêng. Biến toàn cục sẽ được thay thế.",
+      "done": "Biến có phạm vi theo môi trường.",
+      "failed": "Không thể đặt phạm vi cho biến.",
+      "title": "Đặt phạm vi {name} theo môi trường.",
+      "unselectedWarning": "Không được chọn: {envs}. Các kiểm tra chạy trên các môi trường đó sẽ ngừng phân giải biến này.",
+      "valuePlaceholder": "Giá trị cho môi trường này",
+      "usedBy": "Được dùng bởi {n} kiểm tra: {names}",
+      "usedByHint": "Việc tách bị từ chối khi bất kỳ kiểm tra nào trong số này sẽ mất giá trị: một kiểm tra không có môi trường, hoặc một kiểm tra chạy trong môi trường chưa được gán giá trị ở đây."
+    },
     "versionPrefix": "v",
     "tokens": {
       "title": "Token Synthetics",
@@ -13540,7 +13831,6 @@
     },
     "variablesPanel": {
       "title": "Biến",
-      "referenceHint": "Tham chiếu trong giá trị bước hoặc URL dưới dạng {token}.",
       "emptyTitle": "Chưa có biến",
       "emptyBody": "Tái sử dụng giá trị giữa các bước — như URL gốc hoặc tên người dùng — và giữ bí mật khỏi giá trị bước.",
       "newVariable": "Biến mới",
@@ -13548,8 +13838,6 @@
       "nameRequired": "Bắt buộc nhập tên.",
       "nameInvalid": "Tên bắt đầu bằng chữ cái hoặc dấu gạch dưới và chỉ sử dụng chữ cái, chữ số và dấu gạch dưới.",
       "nameDuplicate": "Một biến có tên này đã tồn tại.",
-      "usedInSteps": "Được sử dụng trong {count} bước | Được sử dụng trong {count} bước",
-      "notReferenced": "Chưa được tham chiếu bởi bất kỳ bước nào",
       "removed": "Đã xóa {name}",
       "undo": "Hoàn tác",
       "editVariable": "Chỉnh sửa biến {name}",
@@ -13559,7 +13847,13 @@
       "openPanel": "Hiện biến",
       "removeTitle": "Xóa biến?",
       "removeBody": "{name} sẽ bị xóa khỏi kiểm tra này.",
-      "removeWarning": "Nó được tham chiếu bởi {count} bước, bước đó sẽ không còn phân giải được nữa. | Nó được tham chiếu bởi {count} bước, bước đó sẽ không còn phân giải được nữa."
+      "removeWarning": "Nó được tham chiếu bởi {count} bước, bước đó sẽ không còn phân giải được nữa. | Nó được tham chiếu bởi {count} bước, bước đó sẽ không còn phân giải được nữa.",
+      "removeOverrideNote": "Các bước sử dụng {name} giờ sẽ nhận giá trị của {scope}.",
+      "countOfCap": "{count} trên {cap}",
+      "local": "Cục bộ",
+      "resolutionOrder": "Thứ tự phân giải: kiểm tra, sau đó môi trường, rồi toàn cục.",
+      "overridesInherited": "Ghi đè một biến dùng chung — giá trị này được ưu tiên.",
+      "valueTooltipEmpty": "{name}: chưa có giá trị"
     },
     "browserDevices": {
       "desktop": "Máy tính để bàn",
@@ -13887,7 +14181,8 @@
       "timeoutLabel": "Thời gian chờ (ms)",
       "valueFallback": "Giá trị",
       "showSetupSteps": "Hiển thị các bước thiết lập",
-      "waitingForActions": "Đang chờ hành động trong trình duyệt…"
+      "waitingForActions": "Đang chờ hành động trong trình duyệt…",
+      "unboundVariables": "{names} không được định nghĩa trong kiểm tra này, các môi trường của nó hoặc toàn cục, nên nó được nhập nguyên văn. | {names} không được định nghĩa trong kiểm tra này, các môi trường của nó hoặc toàn cục, nên chúng được nhập nguyên văn."
     },
     "labels": {
       "copyOf": "Bản sao của {name}",
@@ -14119,10 +14414,13 @@
     },
     "results": {
       "p95Label": "p95",
+      "allEnvironments": "Tất cả các môi trường",
       "clearFilters": "Xóa bộ lọc",
       "clearFiltersDesc": "Xóa tất cả bộ lọc đang hoạt động",
       "device": "Thiết bị",
       "duration": "Thời lượng",
+      "environment": "Môi trường",
+      "environmentScope": "Phạm vi môi trường",
       "editCheck": "Chỉnh sửa kiểm tra",
       "error": "Lỗi",
       "failed": "Thất bại",
@@ -14291,6 +14589,7 @@
       "passRate": "Tỷ lệ đạt",
       "passRateByBrowser": "Tỷ lệ đạt theo trình duyệt",
       "passRateByDevice": "Tỷ lệ đạt theo thiết bị",
+      "passRateByEnvironment": "Tỷ lệ đạt theo môi trường",
       "passRateByLocation": "Tỷ lệ đạt theo vị trí",
       "durationByLocation": "Thời lượng theo vị trí (Trung bình)",
       "flakyRate": "Flaky Rate",
@@ -14450,7 +14749,8 @@
       "ssh": "SSH",
       "tcp": "TCP",
       "tls": "TLS",
-      "private": "Vị trí riêng tư"
+      "private": "Vị trí riêng tư",
+      "variables": "Môi trường & Biến"
     },
     "timeline": {
       "failed": "Thất bại",
@@ -14494,7 +14794,8 @@
       "stepNameRequired": "Đặt tên cho bước này — đây là tên sẽ hiển thị trong kết quả chạy",
       "typeTextRequired": "Nhập văn bản mà bước này sẽ nhập",
       "expectedRequired": "Nhập giá trị mà xác nhận này sẽ mong đợi",
-      "urlInvalid": "Nhập URL hợp lệ bắt đầu bằng http:// hoặc https://",
+      "urlInvalid": "Nhập một URL bắt đầu bằng http://, https:// hoặc một placeholder biến",
+      "navigateUrlInvalid": "Nhập URL bắt đầu bằng http://, https:// hoặc một biến giữ chỗ.",
       "urlRequired": "URL bắt đầu là bắt buộc",
       "fixHighlightedFields": "Sửa các trường được đánh dấu trước khi lưu",
       "retiredAction": "\"{action}\" không còn được hỗ trợ — hãy xóa hoặc thay thế \"{step}\"",
@@ -14959,7 +15260,6 @@
       "syntheticsTokensRefresh": "Làm mới danh sách token",
       "aiChatToggle": "Bật/tắt trò chuyện AI",
       "aiChatClose": "Đóng trò chuyện AI",
-      "aiChatExpand": "Mở rộng/thu gọn trò chuyện AI",
       "logsSaveView": "Lưu dưới dạng chế độ xem đã lưu",
       "logsExport": "Xuất kết quả dưới dạng CSV",
       "tracesCopyUrl": "Sao chép URL chia sẻ dấu vết",
@@ -15572,7 +15872,8 @@
         "destinations": "Điểm đến",
         "templates": "Mẫu",
         "reports": "Báo cáo",
-        "llmModelPricing": "Giá mô hình LLM"
+        "llmModelPricing": "Giá mô hình LLM",
+        "passcode": "Token tiếp nhận dữ liệu"
       },
       "noPermissionToChangeFavorites": "Bạn không có quyền thay đổi mục yêu thích",
       "couldNotUpdateFavoriteDashboards": "Không thể cập nhật bảng điều khiển yêu thích"
@@ -15810,6 +16111,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "Bạn chưa bắt đầu quá trình thu thập dữ liệu. Để khám phá các trang khác, vui lòng bắt đầu thu thập dữ liệu."
+    },
+    "iam": {
+      "userSaveFailed": "Không thể lưu người dùng"
     }
   },
   "cipherKeys": {
@@ -16227,7 +16531,106 @@
       "exponentName": "Lũy thừa"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Độ phức tạp",
+    "minLength": "Độ dài tối thiểu",
+    "minLengthDesc": "Mật khẩu ngắn nhất được chấp nhận",
+    "maxLength": "Độ dài tối đa",
+    "maxLengthDesc": "0 = không giới hạn",
+    "requireUppercase": "Yêu cầu chữ hoa",
+    "requireUppercaseDesc": "Ít nhất một ký tự A–Z",
+    "requireLowercase": "Yêu cầu chữ thường",
+    "requireLowercaseDesc": "Ít nhất một ký tự a–z",
+    "requireDigit": "Yêu cầu chữ số",
+    "requireDigitDesc": "Ít nhất một chữ số 0–9",
+    "requireSpecial": "Yêu cầu ký tự đặc biệt",
+    "requireSpecialDesc": "Ít nhất một ký tự trong tập được phép",
+    "specialCharSet": "Ký tự đặc biệt được phép",
+    "specialCharSetDesc": "Để trống để chấp nhận mọi ký tự không phải chữ và số",
+    "maxLengthTooSmall": "Độ dài tối đa phải ít nhất bằng độ dài tối thiểu, hoặc 0 để không giới hạn.",
+    "confirmTitle": "Lưu chính sách mật khẩu?",
+    "confirmMessage": "Việc lưu có thể buộc mọi người dùng nội bộ đặt mật khẩu mới trước khi có thể tiếp tục. Tài khoản root, người dùng bên ngoài và tài khoản dịch vụ được miễn trừ — bao gồm cả bạn, trừ khi bạn là tài khoản root. Thao tác này không thể hoàn tác.",
+    "saved": "Đã lưu chính sách mật khẩu. | Đã lưu chính sách mật khẩu. {count} người dùng phải đặt lại mật khẩu. | Đã lưu chính sách mật khẩu. {count} người dùng phải đặt lại mật khẩu.",
+    "saveFailed": "Không thể lưu chính sách mật khẩu.",
+    "notAdminTitle": "Cần quyền quản trị viên",
+    "notAdmin": "Việc cấu hình chính sách mật khẩu yêu cầu quyền quản trị viên của tổ chức meta.",
+    "loadFailedTitle": "Không thể tải chính sách mật khẩu",
+    "loadFailed": "Đã xảy ra lỗi khi đọc chính sách hiện tại.",
+    "rotation": "Luân chuyển",
+    "rotationDays": "Chu kỳ luân chuyển",
+    "rotationDaysDesc": "Số ngày trước khi mật khẩu hết hạn. 0 = không bao giờ hết hạn",
+    "rotationWarningDays": "Cảnh báo trước khi hết hạn",
+    "rotationWarningDaysDesc": "Số ngày cảnh báo khi đăng nhập. 0 = không cảnh báo",
+    "warningDaysTooLong": "Khoảng thời gian cảnh báo không thể dài hơn chu kỳ luân chuyển.",
+    "rotationPreview": "Mật khẩu đặt hôm nay sẽ hết hạn vào {expires}. Cảnh báo đăng nhập bắt đầu từ {warns}.",
+    "rotationPreviewNoWarning": "Mật khẩu đặt hôm nay sẽ hết hạn vào {expires}. Không có cảnh báo nào trước thời điểm đó.",
+    "reuse": "Ngăn chặn tái sử dụng",
+    "historyCount": "Số mật khẩu ghi nhớ",
+    "historyCountDesc": "Mật khẩu mới không được trùng với số mật khẩu trước đó này. 0 = không kiểm tra",
+    "historyMaxRetained": "Số mật khẩu lưu giữ",
+    "historyMaxRetainedDesc": "Số mật khẩu cũ được lưu cho mỗi người dùng",
+    "historyRetainedTooSmall": "Số mật khẩu lưu giữ phải ít nhất bằng số mật khẩu ghi nhớ.",
+    "reuseExplainer": "Mật khẩu hiện tại được tính là một trong tập mật khẩu ghi nhớ — việc tái sử dụng nó bị từ chối bởi quy tắc này, chứ không phải bởi một kiểm tra riêng.",
+    "lockout": "Khóa tài khoản",
+    "lockoutThreshold": "Số lần thử thất bại trước khi khóa",
+    "lockoutThresholdDesc": "0 = tắt khóa tài khoản",
+    "lockoutBucketSize": "Số lần thử trước mỗi lần khóa tiếp theo",
+    "lockoutBucketSizeDesc": "0 = dùng lại giá trị ở trên",
+    "lockoutStartSecs": "Thời gian khóa lần đầu",
+    "lockoutStartSecsDesc": "Giây",
+    "lockoutMaxSecs": "Thời gian khóa tối đa",
+    "lockoutMaxSecsDesc": "Giây — giới hạn tối đa mà mức tăng dừng lại",
+    "lockoutStartTooLong": "Thời gian khóa lần đầu không được dài hơn thời gian khóa tối đa.",
+    "lockoutBackoff": "Mức tăng dần",
+    "lockoutBackoffDesc": "Cách mỗi lần khóa tăng lên so với lần trước",
+    "backoffExponential": "Lũy thừa",
+    "backoffLinear": "Tuyến tính",
+    "lockoutPreview": "{threshold} lần thất bại → {first} · cứ thêm {bucket} lần → {rest} · tối đa {max}. Đăng nhập thành công sẽ đặt lại mọi thứ.",
+    "sessionEnforcement": "Phiên làm việc & thực thi",
+    "cookieMaxAge": "Thời hạn phiên",
+    "cookieMaxAgeDesc": "Số giây một phiên đăng nhập còn hiệu lực. 0 = dùng giá trị mặc định của instance từ {envVar}",
+    "applyToRoot": "Áp dụng cho tài khoản root",
+    "applyToRootDesc": "Tài khoản root được miễn mọi quy tắc ở trên trừ khi bật tùy chọn này",
+    "rootWarning": "Khóa tài khoản root có thể khiến hệ thống rơi vào trạng thái không thể khôi phục.",
+    "rootDialogTitle": "Áp dụng chính sách cho tài khoản root?",
+    "rootDialogMessage": "Tài khoản root sẽ bị khóa, xoay mật khẩu và buộc đặt lại như mọi tài khoản native khác. Nếu root là tài khoản quản trị duy nhất của bạn, việc bị khóa hoặc hết hạn mà tài khoản không thể đáp ứng sẽ khiến bạn không còn cách nào truy cập lại instance này.",
+    "rootDialogAck": "Tôi hiểu rằng tài khoản root có thể bị khóa vĩnh viễn khỏi instance này.",
+    "rootDialogConfirm": "Áp dụng cho root"
+  },
+  "passwordReset": {
+    "title": "Cập nhật mật khẩu của bạn",
+    "signedInAs": "Đã đăng nhập với {email}",
+    "reasonPolicyTightened": "Chính sách mật khẩu đã thay đổi. Hãy cập nhật mật khẩu để tiếp tục sử dụng OpenObserve.",
+    "reasonRotationExpired": "Mật khẩu của bạn đã hết hạn. Hãy đặt mật khẩu mới để tiếp tục sử dụng OpenObserve.",
+    "reasonRotationWarning": "Mật khẩu của bạn sắp hết hạn. Hãy đặt mật khẩu mới ngay để tránh bị khóa khỏi công việc của bạn.",
+    "reused": "Mật khẩu này đã được dùng gần đây. Hãy chọn mật khẩu bạn chưa dùng trong {count} mật khẩu gần nhất.",
+    "expiryBanner": "Mật khẩu của bạn sẽ hết hạn sau {count} ngày. Hãy cập nhật ngay để tránh bị khóa khỏi công việc của bạn. | Mật khẩu của bạn sẽ hết hạn sau {count} ngày. Hãy cập nhật ngay để tránh bị khóa khỏi công việc của bạn.",
+    "expiryBannerAction": "Cập nhật ngay",
+    "expiryBannerDismiss": "Bỏ qua",
+    "currentPassword": "Mật khẩu hiện tại",
+    "newPassword": "Mật khẩu mới",
+    "confirmPassword": "Xác nhận mật khẩu mới",
+    "currentPasswordRequired": "Cần nhập mật khẩu hiện tại.",
+    "newPasswordRequired": "Cần nhập mật khẩu mới.",
+    "confirmPasswordRequired": "Vui lòng nhập lại mật khẩu mới.",
+    "mismatch": "Mật khẩu không khớp.",
+    "signOut": "Đăng xuất",
+    "submit": "Cập nhật mật khẩu",
+    "updated": "Mật khẩu của bạn đã được cập nhật. Vui lòng đăng nhập lại.",
+    "updateFailed": "Không thể cập nhật mật khẩu của bạn.",
+    "req": {
+      "minLength": "Ít nhất {count} ký tự",
+      "maxLength": "Không quá {count} ký tự",
+      "uppercase": "Một chữ cái in hoa",
+      "lowercase": "Một chữ cái in thường",
+      "digit": "Một chữ số",
+      "special": "Một ký tự đặc biệt",
+      "specialFromSet": "Một ký tự đặc biệt từ {set}",
+      "unmet": "Mật khẩu phải có: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Chính sách mật khẩu",
     "loginCallback": "Callback đăng nhập",
     "slackOAuthCallback": "Đang kết nối Slack",
     "emptyStateDemo": "Demo trạng thái trống",
@@ -16465,13 +16868,10 @@
       "columnMemory": "Bộ nhớ (hiện tại)",
       "columnDisk": "Đĩa % (hiện tại)",
       "columnLoad": "Tải 15m (hiện tại)",
+      "columnCores": "Nhân",
       "columnLastSeen": "Lần cuối xuất hiện",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Bảng điều khiển Host Metrics",
-      "importConfirmTitle": "Thêm bảng điều khiển Host Metrics?",
-      "importConfirmMessage": "Bạn chưa có bảng điều khiển này. Thêm nó sẽ tạo một bảng điều khiển tên 'Host Metrics' trong thư mục Mặc định của bạn, rồi mở nó cho host này.",
-      "importConfirmOk": "Thêm và mở",
-      "importConfirmCancel": "Hủy",
+      "loadPerCore": "({value}/nhân)",
       "windowsLivenessNote": "Host Windows chỉ xuất hiện trong danh sách này khi agent báo cáo chỉ số tải (system_cpu_load_average_15m) — nếu các agent Windows của bạn đang chạy nhưng không có ở đây, hãy bật load scraper trong cấu hình collector hoặc cập nhật agent.",
       "panel": {
         "cpuBusy": "CPU bận",
@@ -17162,6 +17562,11 @@
       "explore": "Mở trong Metrics Explorer",
       "railLabel": "Các mục chỉ số",
       "noAccess": "Bạn không có quyền đọc {stream}. Hãy yêu cầu quản trị viên cấp quyền đọc Stream này.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "theo truy vấn",
         "database": "theo cơ sở dữ liệu",
@@ -17881,6 +18286,7 @@
     "target_rotation_all": "Mọi người trong {rotation}",
     "target_rotation_deleted": "Một vòng trực mà nhóm này không còn nữa",
     "target_rotation_legacy": "Bất kỳ ai đang trực",
+    "target_unrecognized": "Một mục tiêu mà màn hình này không nhận diện được",
     "ladderPoolEveryone": "mọi người trong {rotation}",
     "target_user": "Một người cụ thể",
     "target_whole_team": "Cả nhóm",
@@ -18784,6 +19190,8 @@
     "rotationNobody": "Không có ai trực",
     "edit": "Chỉnh sửa",
     "timelineLoadFailed": "Không thể phân giải lịch cho khoảng thời gian này",
+    "editorReadFailed": "Không thể tải bản mới nhất để chỉnh sửa. Hãy thử lại.",
+    "refreshFailed": "Không thể làm mới. Nội dung hiển thị có thể đã lỗi thời.",
     "scheduleDoneEditing": "Quay lại lịch trực",
     "coverWhoRequired": "Chọn người trực thay",
     "timelineCoverAria": "{who} đang trực {rotation}, từ {from} đến {to}",
@@ -18894,7 +19302,7 @@
     "routingSaysPlace": "Tất cả cảnh báo và sự cố từ {value} {noun}",
     "routingSaysPlaces": "Tất cả cảnh báo và sự cố từ {scope}",
     "routingSaysAnything": "Tất cả cảnh báo và sự cố",
-    "routingNoLadder": "chưa có thang leo thang",
+    "routingNoLadder": "Chưa có thang leo thang",
     "routingPagesTeam": "gọi {team}",
     "routingCaughtLast": "{count} lần gọi · lần cuối {when} | {count} lần gọi · lần cuối {when}",
     "routingEmptyBodyNamed": "{team} sẽ không được gọi cho đến khi một quy tắc khớp với cảnh báo đến.",

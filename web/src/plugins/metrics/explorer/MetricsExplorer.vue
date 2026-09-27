@@ -509,6 +509,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :index="row.index * columns + offset"
                 :is-favorite="grid.favorites.value.includes(card.name)"
                 :time-range="grid.timeRange.value"
+                :exemplars-eligible="grid.exemplarEligible(card)"
+                :exemplars-on="grid.exemplarsEnabled(card.name)"
+                :exemplars-swaps-variant="grid.exemplarSwapsVariant(card)"
+                :exemplars="grid.exemplarStateOf(card.name)"
+                @toggle-exemplars="grid.toggleExemplars"
+                @retry-exemplars="grid.retryExemplars"
                 @visible="onCardVisible"
                 @hidden="onCardHidden"
                 @refresh="grid.refreshCard"
@@ -1732,7 +1738,8 @@ export default defineComponent({
     onMounted(async () => {
       mountedAt = performance.now();
       syncTimeRange();
-      await grid.loadStreams(true);
+      // Cache-first: the route remounts on every visit, so a force would discard the shared list.
+      await grid.loadStreams();
 
       track("metrics_explorer_opened", {
         metric_count: grid.cards.value.length,
