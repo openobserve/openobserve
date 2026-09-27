@@ -206,9 +206,7 @@ pub(crate) async fn create_context(
             files.len()
         );
     }
-    if !block_eligible {
-        cache_metrics_index_files(trace_id, org_id, &files).await;
-    }
+    cache_metrics_index_files(trace_id, org_id, &files).await;
 
     let mut keep_filters = true;
     if !block_eligible {
@@ -339,7 +337,12 @@ async fn cache_metrics_index_files(trace_id: &str, org_id: &str, files: &[FileKe
         return;
     }
     let start = std::time::Instant::now();
-    let mut sidecar_stats = ScanStats::default();
+    let mut sidecar_stats = ScanStats {
+        compressed_size: sidecars.iter().fold(0i64, |size, (file, _)| {
+            size.saturating_add(file.meta.mindex_size)
+        }),
+        ..Default::default()
+    };
     let (cache_type, cache_hits, cache_misses) = cache_files(
         trace_id,
         &sidecars
@@ -365,8 +368,9 @@ async fn cache_metrics_index_files(trace_id: &str, org_id: &str, files: &[FileKe
         .with_label_values(&[org_id, &StreamType::Metrics.to_string(), "midx"])
         .inc_by(cache_misses);
     log::info!(
-        "[trace_id {trace_id}] promql->search->storage: metrics index files {}, memory cached {}, disk cached {}, downloading others into {cache_type:?} in background, took: {} ms",
+        "[trace_id {trace_id}] promql->search->storage: metrics index files {}, compressed_size {}, memory cached {}, disk cached {}, downloading others into {cache_type:?} in background, took: {} ms",
         sidecars.len(),
+        sidecar_stats.compressed_size,
         sidecar_stats.querier_memory_cached_files,
         sidecar_stats.querier_disk_cached_files,
         start.elapsed().as_millis()

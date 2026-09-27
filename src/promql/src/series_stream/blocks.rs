@@ -283,9 +283,10 @@ impl FileCursor {
                 COALESCE_MAX_SPAN,
                 PREFETCH_BYTES as u64,
             )?;
-            let data = infra::storage::get_ranges(
+            let sidecar_path = self.file.sidecar.as_str().into();
+            let data = infra::cache::storage::get_ranges(
                 &self.file.account,
-                &self.file.sidecar,
+                &sidecar_path,
                 &read_plan.ranges,
             )
             .await?;
