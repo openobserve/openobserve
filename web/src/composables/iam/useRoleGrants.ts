@@ -52,7 +52,7 @@ export const useRoleGrants = () => {
     () => Object.keys(added.value).length > 0 || Object.keys(removed.value).length > 0,
   );
 
-  // One pass per change, so none of the ~50 rail badges ever scans the whole grant set.
+  // One pass per change, so the ~50 rail badges never rescan: unticking saved `logs:app:AllowGet` and ticking `metrics:mem:AllowGet` -> logs { granted 0, removed 1 }, metrics { granted 1, added 1 }.
   const statsByResource: ComputedRef<Map<string, ResourceGrantStat>> = computed(() => {
     const stats = new Map<string, ResourceGrantStat>();
     const bump = (key: string, field: keyof ResourceGrantStat) => {
