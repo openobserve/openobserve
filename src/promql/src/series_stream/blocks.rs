@@ -1811,12 +1811,52 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn missing_filter_label_rejects_block_preflight_before_payload_reads() {
+    async fn missing_file_label_selects_no_blocks_without_payload_reads() {
         let data = file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]);
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
-        let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "/api/bar")]);
-        let error = prepare(
-            &fixture.scan([data.0]),
+        for matcher in [
+            Matcher::new(MatchOp::Equal, "path", "/api/bar"),
+            Matcher::new(MatchOp::Equal, "path", ""),
+            Matcher::new(MatchOp::NotEqual, "path", "/api/bar"),
+            Matcher::new(MatchOp::Re(".*".parse().unwrap()), "path", ".*"),
+            Matcher::new(MatchOp::NotRe("api.*".parse().unwrap()), "path", "api.*"),
+        ] {
+            let prepared = prepare(
+                &fixture.scan([data.0.clone()]),
+                &Matchers::new(vec![matcher]),
+                columns(),
+                &intervals(),
+                100,
+                20,
+                &eval(),
+            )
+            .await
+            .unwrap();
+            assert_eq!(prepared[0].stats.selected_blocks, 0);
+            for partition in prepared {
+                let mut stream = BlockSeriesStream::new(partition);
+                assert!(stream.advance().await.unwrap().is_none());
+            }
+        }
+        assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn new_label_selects_only_new_schema_file() {
+        let old = file(&[(1, 10, 1.0, Some("old"))]);
+        let source = batch(&[(2, 10, 3.0, Some("new")), (2, 20, 4.0, Some("new"))]);
+        let mut fields = source.schema().fields().to_vec();
+        fields.push(Arc::new(Field::new("env", DataType::Utf8, true)));
+        let mut arrays = source.columns().to_vec();
+        arrays.push(Arc::new(StringArray::from(vec!["prod", "prod"])));
+        let new = file_batch(
+            RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap(),
+            vec!["group".into(), "env".into()],
+        );
+        let fixture = Fixture::new(&[old.clone(), new.clone()], false).await;
+        let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "env", "prod")]);
+        let prepared = prepare(
+            &fixture.scan([old.0, new.0]),
             &matchers,
             columns(),
             &intervals(),
@@ -1825,9 +1865,39 @@ mod tests {
             &eval(),
         )
         .await
-        .err()
         .unwrap();
-        assert!(error.to_string().contains("MIDX lacks identity label path"));
+        assert_eq!(prepared[0].stats.selected_blocks, 1);
+        let mut stream = BlockSeriesStream::new(prepared.into_iter().next().unwrap());
+        assert!(stream.advance().await.unwrap().is_some());
+        assert_eq!(stream.labels(), vec![Arc::new(Label::new("group", "new"))]);
+        let mut samples = Vec::new();
+        stream.consume(&mut samples).await.unwrap();
+        assert_eq!(
+            samples
+                .iter()
+                .map(|sample| sample.value)
+                .collect::<Vec<_>>(),
+            [3.0, 4.0]
+        );
+        assert!(stream.advance().await.unwrap().is_none());
+        assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn projected_label_missing_from_midx_still_fails() {
+        let data = file(&[(1, 10, 1.0, Some("x"))]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let file = fixture.scan([data.0]).files.remove(0);
+        let index = load_metrics_block_index(&file, &[]).await.unwrap();
+        let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "group", "x")]);
+        let error = metrics_index::matching_blocks(&index, &matchers)
+            .err()
+            .unwrap();
+        assert!(
+            error
+                .to_string()
+                .contains("MIDX lacks identity label group")
+        );
         assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
     }
 

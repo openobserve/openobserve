@@ -343,6 +343,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_null_label_matches_no_source_rows() {
+        use promql_parser::label::Matcher;
+
+        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
+            "env",
+            DataType::Utf8,
+            true,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![Arc::new(StringArray::from(vec![None::<&str>]))],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        for matcher in [
+            Matcher::new(MatchOp::Equal, "env", "prod"),
+            Matcher::new(MatchOp::Equal, "env", ""),
+            Matcher::new(MatchOp::NotEqual, "env", "prod"),
+            Matcher::new(MatchOp::Re(".*".parse().unwrap()), "env", ".*"),
+            Matcher::new(MatchOp::NotRe("prod".parse().unwrap()), "env", "prod"),
+        ] {
+            let rows = apply_matchers(
+                ctx.read_batch(batch.clone()).unwrap(),
+                &Matchers::new(vec![matcher]),
+            )
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+            assert_eq!(rows.iter().map(RecordBatch::num_rows).sum::<usize>(), 0);
+        }
+    }
+
+    #[tokio::test]
     async fn test_apply_matchers_exact_regex_supports_utf8_view() {
         use promql_parser::label::Matcher;
 
