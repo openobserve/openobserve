@@ -963,10 +963,13 @@ async fn stats_settled_offset(org_id: &str) -> Option<i64> {
     let live = db::schema::list_streams_from_cache(org_id, StreamType::Traces).await;
     let mut unclaimed_eligible = false;
     for stream in live.iter().filter(|s| !offsets.contains_key(*s)) {
-        unclaimed_eligible = match infra::schema::get(org_id, stream, StreamType::Traces).await {
-            Ok(schema) => openobserve_core::db_monitoring::stream_supports_db_monitoring(&schema),
-            Err(_) => true,
-        };
+        unclaimed_eligible =
+            match infra::schema::get_cache(org_id, stream, StreamType::Traces).await {
+                Ok(schema) => {
+                    openobserve_core::db_monitoring::stream_supports_db_monitoring(schema.schema())
+                }
+                Err(_) => true,
+            };
         if unclaimed_eligible {
             break;
         }
@@ -2472,6 +2475,20 @@ mod tests {
         assert!(
             !body.contains("STATS_READ_SIZE as i64, 30, true)"),
             "an unconditional cached stats read undercounts windows written after caching"
+        );
+    }
+
+    #[test]
+    fn stats_settled_offset_reads_the_cached_schema_without_cloning_it() {
+        let src = dbm_prod_source();
+        let start = src
+            .find("async fn stats_settled_offset(")
+            .expect("stats_settled_offset");
+        let body = src[start..].split("\n}\n").next().expect("body");
+        assert!(body.contains("infra::schema::get_cache("));
+        assert!(
+            !body.contains("infra::schema::get("),
+            "every stats read would deep-clone each unclaimed stream's schema"
         );
     }
 
