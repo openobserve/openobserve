@@ -107,17 +107,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-heading truncate font-medium">{{ row.label }}</span>
             <span class="text-text-secondary truncate text-xs">{{ row.hint }}</span>
           </div>
-          <OButton
+          <div
             v-else-if="row.node.has_entities && row.node.childName"
-            variant="ghost-primary"
-            size="sm"
-            icon-right="chevron-right"
-            :title="t('iam.editRole.openFolder')"
-            :data-test="`edit-role-module-pane-open-${row.node.name}`"
-            @click="emit('open', row.node)"
+            class="flex min-w-0 items-center gap-1"
           >
-            {{ row.node.display_name }}
-          </OButton>
+            <OButton
+              variant="ghost-primary"
+              size="sm"
+              icon-right="chevron-right"
+              :title="t('iam.editRole.openFolder')"
+              :data-test="`edit-role-module-pane-open-${row.node.name}`"
+              @click="emit('open', row.node)"
+            >
+              {{ row.node.display_name }}
+            </OButton>
+            <OTooltip
+              v-if="innerGrants(row.node).length"
+              :content="insideHint(innerGrants(row.node))"
+              side="right"
+            >
+              <OBadge
+                variant="default-soft"
+                size="sm"
+                tabindex="0"
+                :data-test="`edit-role-module-pane-inside-${row.node.name}`"
+              >
+                {{ t("iam.editRole.grantedInsideCount", { count: innerGrants(row.node).length }) }}
+              </OBadge>
+            </OTooltip>
+          </div>
           <span v-else class="truncate" :title="row.node.display_name">
             {{ row.node.display_name }}
           </span>
@@ -185,6 +203,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 
@@ -211,6 +230,8 @@ const props = defineProps<{
   isGranted: (node: any, action: string) => boolean;
   /** False for an org-wide module, whose only row is its own grant, so there is nothing to search. */
   listsResources: boolean;
+  /** Names granted one level below a drill-in row, which its own checkboxes cannot show. */
+  innerGrants: (node: any) => string[];
   /** A saved grant the user has staged for removal: still held, but no longer ticked. */
   isPendingRemoval: (node: any, action: string) => boolean;
   added?: number;
@@ -235,6 +256,8 @@ const backTarget = computed(() =>
 );
 
 const PAGE_SIZE = 25;
+
+const INSIDE_HINT_LIMIT = 10;
 
 const ALLOW_ALL = "AllowAll";
 
@@ -332,7 +355,8 @@ const setFilter = (nextQuery: string, nextScope: string) => {
 const filteredEntities = computed(() => {
   const term = query.value.trim().toLowerCase();
   return orderedEntities.value.filter((row) => {
-    if (scope.value === "granted" && !hasEffectiveGrant(row)) return false;
+    if (scope.value === "granted" && !hasEffectiveGrant(row) && !props.innerGrants(row).length)
+      return false;
     return (
       !term ||
       String(row.display_name ?? row.name)
@@ -390,6 +414,15 @@ const paginationMode = computed(() =>
 );
 
 const clearFilter = () => setFilter("", "all");
+
+// A hover bubble fits about ten names; past that the count carries the rest.
+const insideHint = (names: string[]) =>
+  names.length > INSIDE_HINT_LIMIT
+    ? t("iam.editRole.grantedInsideMore", {
+        names: names.slice(0, INSIDE_HINT_LIMIT).join(", "),
+        more: names.length - INSIDE_HINT_LIMIT,
+      })
+    : t("iam.editRole.grantedInside", { names: names.join(", ") });
 
 const grantedRowCount = computed(() => props.entities.filter(hasEffectiveGrant).length);
 

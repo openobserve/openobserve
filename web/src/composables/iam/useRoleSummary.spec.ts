@@ -133,7 +133,7 @@ function setup() {
     removedPermissions.value = Object.fromEntries(removed.map((key) => [key, true]));
   };
 
-  return { ...summary, seed, heavyResourceEntities, unsavedDrawerOpen };
+  return { ...summary, seed, heavyResourceEntities, resourceMapper, unsavedDrawerOpen };
 }
 
 afterEach(() => {
@@ -331,5 +331,49 @@ describe("useRoleSummary - pending changes [characterization]", () => {
     await flushPromises();
 
     expect(summary.unsavedDrawerOpen.value).toBe(false);
+  });
+});
+
+describe("useRoleSummary - grants inside a drill-in row", () => {
+  const traces = { name: "traces", type: "Type", has_entities: true, childName: "traces" };
+  const folder = { name: "f1", type: "Resource", has_entities: true, childName: "dashboard" };
+
+  it("names the streams granted inside a stream type, leaving out the type-wide grant", () => {
+    const s = setup();
+    s.seed({ saved: [`traces:${ALL}:AllowList`, "traces:_evaluator:AllowAll"] });
+
+    expect(s.innerGrantNames(traces)).toEqual(["_evaluator"]);
+  });
+
+  it("names only the dashboards inside this folder, without the folder prefix", () => {
+    const s = setup();
+    s.seed({ saved: ["dashboard:f1/d1:AllowGet", "dashboard:f2/d9:AllowGet"] });
+
+    expect(s.innerGrantNames(folder)).toEqual(["d1"]);
+  });
+
+  it("uses a loaded dashboard's title over its id", () => {
+    const s = setup();
+    s.resourceMapper.value.dfolder = {
+      entities: [{ name: "f1", entities: [{ name: "f1/d1", display_name: "Latency" }] }],
+    };
+    s.seed({ saved: ["dashboard:f1/d1:AllowGet"] });
+
+    expect(s.innerGrantNames(folder)).toEqual(["Latency"]);
+  });
+
+  // An unticked grant is leaving, so it must stop being advertised on the row above it.
+  it("drops a grant that is staged for removal", () => {
+    const s = setup();
+    s.seed({ saved: ["traces:_evaluator:AllowAll"], removed: ["traces:_evaluator:AllowAll"] });
+
+    expect(s.innerGrantNames(traces)).toEqual([]);
+  });
+
+  it("names nothing for a row that cannot be opened", () => {
+    const s = setup();
+    s.seed({ saved: ["traces:_evaluator:AllowAll"] });
+
+    expect(s.innerGrantNames({ name: "traces", has_entities: false })).toEqual([]);
   });
 });

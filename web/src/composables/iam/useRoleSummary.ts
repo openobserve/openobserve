@@ -129,6 +129,19 @@ export const useRoleSummary = (deps: SummaryDeps) => {
       )
       .filter(([, grants]) => grants.length);
 
+  // A drill-in row cannot show grants one level down, so it names them: `traces:_evaluator:AllowAll` -> Traces row lists "_evaluator".
+  const innerGrantNames = (node: any): string[] => {
+    if (!node?.has_entities || !node.childName) return [];
+    const prefix = node.type === "Type" ? "" : `${node.name}/`;
+    return heldGrants(node.childName)
+      .map(([entity]) => entity)
+      .filter((entity) => !isWideEntity(entity) && entity.startsWith(prefix))
+      .map((entity) => {
+        const label = String(entityLabel(node.childName, entity));
+        return label === entity ? entity.slice(prefix.length) : label;
+      });
+  };
+
   const actionsOf = (held: ReturnType<typeof heldGrants>) =>
     summaryActions(held.flatMap(([, grants]) => grants.map((grant) => grant.action)));
 
@@ -225,6 +238,7 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     summaryActions,
     knownTotal,
     heldGrants,
+    innerGrantNames,
     actionsOf,
     specificReach,
     moduleDescription,

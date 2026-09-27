@@ -61,6 +61,7 @@ async function mountPane(
       isGranted,
       isPendingRemoval,
       listsResources: true,
+      innerGrants: () => [],
       ...extra,
     },
   });
@@ -285,6 +286,7 @@ describe("ModulePane - unsaved counts", () => {
         isGranted,
         isPendingRemoval,
         listsResources: true,
+        innerGrants: () => [],
         added: 2,
         removed: 1,
       },
@@ -483,5 +485,53 @@ describe("ModulePane - search bar", () => {
     const wrapper = await mountPane([], []);
 
     expect(wrapper.find('[data-test="edit-role-module-pane-search"]').exists()).toBe(false);
+  });
+});
+
+describe("ModulePane - grants one level down", () => {
+  const folder = (name: string) => ({ ...makeNode(name), has_entities: true, childName: "traces" });
+
+  // A drill-in row's own boxes cannot show a stream granted inside it, so the row flags it inline.
+  it("flags a drill-in row with a count of what is granted inside it, names on hover", async () => {
+    const wrapper = await mountPane([], [folder("traces"), folder("logs")], [raw("Streams")], {
+      innerGrants: (node: any) => (node.name === "traces" ? ["_evaluator"] : []),
+    });
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-inside-traces"]').text()).toBe(
+      String(i18n.global.t("iam.editRole.grantedInsideCount", { count: 1 })),
+    );
+    expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      String(i18n.global.t("iam.editRole.grantedInside", { names: "_evaluator" })),
+    );
+    expect(wrapper.find('[data-test="edit-role-module-pane-inside-logs"]').exists()).toBe(false);
+  });
+
+  it("names ten on hover and counts the rest", async () => {
+    const names = Array.from({ length: 12 }, (_, i) => `s${i}`);
+    const wrapper = await mountPane([], [folder("traces")], [raw("Streams")], {
+      innerGrants: () => names,
+    });
+
+    expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      String(
+        i18n.global.t("iam.editRole.grantedInsideMore", {
+          names: names.slice(0, 10).join(", "),
+          more: 2,
+        }),
+      ),
+    );
+  });
+
+  // Otherwise a role granted only on a stream inside Traces would have no path to it under Selected.
+  it("keeps a row under Selected when only something inside it is granted", async () => {
+    const wrapper = await mountPane([], [folder("traces"), folder("logs")], [raw("Streams")], {
+      innerGrants: (node: any) => (node.name === "traces" ? ["_evaluator"] : []),
+    });
+
+    await wrapper.find('[data-test="edit-role-module-pane-filter-granted"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-open-traces"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit-role-module-pane-open-logs"]').exists()).toBe(false);
   });
 });
