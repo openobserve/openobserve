@@ -1813,6 +1813,81 @@ describe("EditRole - module navigation", () => {
   });
 });
 
+describe("EditRole - pane filters start fresh at every level", () => {
+  useNavigationFixture();
+
+  const search = (wrapper) => wrapper.find('[data-test="edit-role-module-pane-search"] input');
+
+  const typeInPane = async (wrapper, value) => {
+    await search(wrapper).setValue(value);
+    await flushPromises();
+  };
+
+  // A term typed one level up names that level's rows, so carried down it hides every row below.
+  it("clears the search when a stream type is opened", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    await typeInPane(wrapper, "metrics");
+
+    await wrapper.vm.openFolderRow(
+      wrapper.vm.activeModuleView.entities.find((row) => row.name === "metrics"),
+    );
+    await flushPromises();
+
+    expect(search(wrapper).element.value).toBe("");
+  });
+
+  it("clears the search when going back up a level", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    await wrapper.vm.openFolderRow(
+      wrapper.vm.activeModuleView.entities.find((row) => row.name === "metrics"),
+    );
+    await flushPromises();
+    await typeInPane(wrapper, "cpu");
+
+    await wrapper.find('[data-test="edit-role-module-pane-back"]').trigger("click");
+    await flushPromises();
+
+    expect(search(wrapper).element.value).toBe("");
+  });
+
+  // The pane remounts per level, so the chosen page size lives in the page, not the pane.
+  it("keeps the chosen page size when a stream type is opened", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    wrapper.findComponent({ name: "ModulePane" }).vm.onPaginationChange({ page: 1, size: 50 });
+    await flushPromises();
+
+    await wrapper.vm.openFolderRow(
+      wrapper.vm.activeModuleView.entities.find((row) => row.name === "metrics"),
+    );
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "ModulePane" }).props("pageSize")).toBe(50);
+  });
+
+  it("drops the Selected filter when a stream type is opened", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    const selected = () => wrapper.find('[data-test="edit-role-module-pane-filter-granted"]');
+    await selected().trigger("click");
+    await flushPromises();
+    expect(selected().attributes("data-state")).toBe("on");
+
+    await wrapper.vm.openFolderRow(
+      wrapper.vm.activeModuleView.entities.find((row) => row.name === "metrics"),
+    );
+    await flushPromises();
+
+    expect(selected().attributes("data-state")).toBe("off");
+  });
+});
+
 describe("EditRole - pane reads the grant store", () => {
   const openMetrics = async (wrapper) => {
     wrapper.vm.activeModule = "stream";

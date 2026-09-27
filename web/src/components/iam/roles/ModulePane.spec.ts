@@ -436,3 +436,18 @@ describe("ModulePane - filter matches nothing", () => {
     expect(entityBox(wrapper, "cpu", "AllowGet").exists()).toBe(true);
   });
 });
+
+describe("ModulePane - search bar", () => {
+  // Hiding it at one row made the same screen look different from org to org.
+  it("offers search for a list with a single row", async () => {
+    const wrapper = await mountPane([], [makeNode("cpu")]);
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-search"]').exists()).toBe(true);
+  });
+
+  it("hides search when there is nothing to search", async () => {
+    const wrapper = await mountPane([], []);
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-search"]').exists()).toBe(false);
+  });
+});

@@ -90,8 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="edit-role-permissions-table-section"
             class="rounded-default min-h-0 flex-1 overflow-y-auto"
           >
+            <!-- Keyed by level, so each module or folder opens with its own empty search and filter. -->
             <ModulePane
               v-if="permissionsUiType === 'table' && activeModuleView"
+              :key="activeModuleView.trail.join('/')"
+              v-model:page-size="modulePageSize"
               class="h-full"
               :trail="activeModuleView.trail"
               :scopes="activeModuleView.scopes"
@@ -414,6 +417,9 @@ const unsavedDrawerOpen = ref(false);
 
 // The folder opened inside a folder module, or null at the module's top level.
 const openFolder = ref<any>(null);
+
+// Held here because the pane remounts per level, and a chosen page size should outlive that.
+const modulePageSize = ref(25);
 
 const moduleLoading = computed(
   () => loadingFor.value === activeModule.value || loadingFor.value === openFolder.value?.name,

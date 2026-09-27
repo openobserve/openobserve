@@ -57,17 +57,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OPageHeader>
 
     <div
-      v-if="entities.length > 1"
+      v-if="entities.length"
       class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2"
     >
       <OSearchInput
-        v-model="query"
+        :model-value="query"
         clearable
         class="w-72 max-md:w-full"
         :placeholder="t('iam.editRole.searchModuleResources')"
         data-test="edit-role-module-pane-search"
+        @update:model-value="(value) => setFilter(String(value ?? ''), scope)"
       />
-      <OToggleGroup v-model="scope">
+      <OToggleGroup
+        :model-value="scope"
+        @update:model-value="(value) => setFilter(query, String(value ?? 'all'))"
+      >
         <OToggleGroupItem value="all" size="sm" data-test="edit-role-module-pane-filter-all">
           {{ t("iam.editRole.moduleScopeAll") }}
         </OToggleGroupItem>
@@ -238,13 +242,6 @@ const query = ref("");
 
 const scope = ref("all");
 
-const clearFilters = () => {
-  query.value = "";
-  scope.value = "all";
-};
-
-watch(() => props.trail.join("/"), clearFilters);
-
 const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "label",
@@ -277,7 +274,7 @@ type PaneRow =
 
 const page = ref(1);
 
-const pageSize = ref(PAGE_SIZE);
+const pageSize = defineModel<number>("pageSize", { default: PAGE_SIZE });
 
 const onPaginationChange = ({ page: next, size }: { page: number; size: number }) => {
   page.value = size === pageSize.value ? next : 1;
@@ -305,7 +302,7 @@ const grantedAtOpen = ref(new Set<string>());
 
 watch(
   // Length, not identity: the loaders push into the same array, so the reference never changes.
-  [() => props.trail.join("/"), () => props.entities.length],
+  () => props.entities.length,
   () => {
     grantedAtOpen.value = new Set(props.entities.filter(hasOwnGrant).map((row) => row.name));
   },
@@ -321,7 +318,12 @@ const orderedEntities = computed(() => {
   ];
 });
 
-watch([query, scope, () => props.trail.join("/")], () => (page.value = 1));
+// A new filter narrows the list, so it always starts from the first page.
+const setFilter = (nextQuery: string, nextScope: string) => {
+  query.value = nextQuery;
+  scope.value = nextScope;
+  page.value = 1;
+};
 
 const filteredEntities = computed(() => {
   const term = query.value.trim().toLowerCase();
@@ -381,10 +383,7 @@ const checkboxTest = (row: PaneRow, action: string) =>
 // OTable snapshots `pagination` at mount, so the mode change is keyed to remount the table.
 const paginationMode = computed(() => (props.entities.length ? "server" : "none"));
 
-const clearFilter = () => {
-  query.value = "";
-  scope.value = "all";
-};
+const clearFilter = () => setFilter("", "all");
 
 const grantedRowCount = computed(() => props.entities.filter(hasEffectiveGrant).length);
 
