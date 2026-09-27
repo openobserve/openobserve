@@ -68,7 +68,7 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::{
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
-        otlp::otlp_error_response,
+        otlp::{otlp_error_response, otlp_rejection_response},
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext},
     },
@@ -493,7 +493,12 @@ pub async fn otlp_json(
         Ok(req) => req,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid json: {e}");
-            return Ok(MetaHttpResponse::bad_request(format!("Invalid json: {e}")));
+            return Ok(otlp_error_response(
+                OtlpRequestType::HttpJson,
+                http::StatusCode::BAD_REQUEST,
+                3, // INVALID_ARGUMENT
+                format!("Invalid json: {e}"),
+            ));
         }
     };
     match handle_otlp_request(
@@ -523,31 +528,32 @@ pub async fn handle_otlp_request(
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         // we do not want to log trial period expired errors
-        if matches!(e, infra::errors::Error::TrialPeriodExpired) {
-            return Ok(MetaHttpResponse::too_many_requests(e));
+        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            http::StatusCode::TOO_MANY_REQUESTS
         } else {
             log::error!("[TRACES:OTLP] ingestion error: {e}");
-            return Ok((
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                Json(MetaHttpResponse::error(
-                    http::StatusCode::SERVICE_UNAVAILABLE,
-                    e,
-                )),
-            )
-                .into_response());
-        }
+            http::StatusCode::SERVICE_UNAVAILABLE
+        };
+        return Ok(otlp_rejection_response(req_type, status, e.to_string()));
     }
 
     #[cfg(feature = "cloud")]
     {
         match super::organization::is_org_in_free_trial_period(org_id).await {
             Ok(false) => {
-                return Ok(MetaHttpResponse::forbidden(format!(
-                    "org {org_id} has expired its trial period"
-                )));
+                return Ok(otlp_rejection_response(
+                    req_type,
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    format!("org {org_id} has expired its trial period"),
+                ));
             }
+            // a failed org lookup is not a trial expiry
             Err(e) => {
-                return Ok(MetaHttpResponse::forbidden(e.to_string()));
+                return Ok(otlp_rejection_response(
+                    req_type,
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e.to_string(),
+                ));
             }
             _ => {}
         }
@@ -910,20 +916,13 @@ pub async fn handle_otlp_request(
                     log::error!(
                         "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {trace_id}"
                     );
-                    return Ok((
+                    return Ok(otlp_rejection_response(
+                        req_type,
                         http::StatusCode::INTERNAL_SERVER_ERROR,
-                        [(
-                            ERROR_HEADER,
-                            error_header_value(&format!(
-                                "[trace_id: {trace_id}] stream did not receive a valid json object"
-                            )),
-                        )],
-                        Json(MetaHttpResponse::error(
-                            http::StatusCode::INTERNAL_SERVER_ERROR,
-                            "stream did not receive a valid json object",
-                        )),
-                    )
-                        .into_response());
+                        format!(
+                            "[trace_id: {trace_id}] stream did not receive a valid json object"
+                        ),
+                    ));
                 }
             }
         }
@@ -989,7 +988,8 @@ pub async fn handle_otlp_request(
                                     log::error!(
                                         "[TRACES:OTLP] stream did not receive a valid json object"
                                     );
-                                    return Ok(MetaHttpResponse::error_with_header(
+                                    return Ok(otlp_rejection_response(
+                                        req_type,
                                         http::StatusCode::INTERNAL_SERVER_ERROR,
                                         "stream did not receive a valid json object",
                                     ));
@@ -1153,7 +1153,8 @@ pub async fn handle_otlp_request(
     .await
     {
         log::error!("Error while writing traces: {e}");
-        return Ok(MetaHttpResponse::error_with_header(
+        return Ok(otlp_rejection_response(
+            req_type,
             trace_write_error_status(&e),
             format!("error while writing trace data: {e}"),
         ));
@@ -3378,5 +3379,80 @@ mod tests {
             trace_write_error_status(&fault),
             http::StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_otlp_request_columns_limit_is_rpc_status() {
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            common::v1::{AnyValue, KeyValue, any_value::Value},
+            trace::v1::{ResourceSpans, ScopeSpans, Span},
+        };
+        use prost::Message;
+
+        use crate::common::meta::{http::CONTENT_TYPE_PROTO, otlp::GoogleRpcStatus};
+
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let now = chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64;
+        let span = Span {
+            trace_id: vec![1; 16],
+            span_id: vec![2; 8],
+            name: "op".to_string(),
+            start_time_unix_nano: now,
+            end_time_unix_nano: now + 1000,
+            attributes: (0..=limit)
+                .map(|i| KeyValue {
+                    key: format!("attr_{i}"),
+                    value: Some(AnyValue {
+                        value: Some(Value::IntValue(i as i64)),
+                    }),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                scope_spans: vec![ScopeSpans {
+                    spans: vec![span],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = super::handle_otlp_request(
+            "test_org_id",
+            request,
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+            Some("test_columns_limit"),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        let status_code = resp.status();
+        let headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(status_code, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            headers[axum::http::header::CONTENT_TYPE],
+            CONTENT_TYPE_PROTO
+        );
+        let status = GoogleRpcStatus::decode(body).unwrap();
+        assert_eq!(status.code, 3);
+        assert!(
+            status
+                .message
+                .starts_with("error while writing trace data: ")
+        );
+        assert!(
+            status
+                .message
+                .contains(&format!("only {limit} columns accept"))
+        );
+        assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
     }
 }

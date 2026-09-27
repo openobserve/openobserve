@@ -3,9 +3,9 @@ import { mount, shallowMount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import AddPanel from "./AddPanel.vue";
 import { createStore } from "vuex";
-import { createRouter, createWebHistory, onBeforeRouteLeave } from "vue-router";
+import { createRouter, createWebHistory, onBeforeRouteLeave, useRoute } from "vue-router";
 import { isEqual } from "lodash-es";
-import { getDashboard } from "@/utils/commons";
+import { getDashboard, updatePanel } from "@/utils/commons";
 import useDashboardPanel from "@/composables/dashboard/useDashboardPanel";
 import { createI18n } from "vue-i18n";
 
@@ -4694,6 +4694,39 @@ describe("AddPanel.vue", () => {
       // Save is a submit button bound to the OForm id (Enter + click submit).
       expect(saveBtn.attributes("form")).toBe("add-panel-form");
       expect(wrapper.find("#add-panel-form").exists()).toBe(true);
+    });
+  });
+
+  describe("Exemplar override on save", () => {
+    it("clears this panel's view-mode override after a successful save", async () => {
+      const route = {
+        query: { dashboard: "d1", panelId: "p1", tab: "t1", folder: "f1" },
+        params: {},
+      };
+      vi.mocked(useRoute).mockReturnValue(route as any);
+      vi.mocked(getDashboard).mockResolvedValue({
+        title: "d",
+        tabs: [{ tabId: "t1", panels: [] }],
+      });
+      vi.mocked(updatePanel).mockResolvedValue(undefined as any);
+      const key = "o2.exemplars.test-org.d1.p1";
+      window.sessionStorage.setItem(key, "0");
+
+      wrapper = shallowMount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          stubs: { PanelEditor: true, DateTimePickerDashboard: true, QueryInspector: true },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      wrapper.vm.dashboardPanelData.data.id = "p1";
+      wrapper.vm.dashboardPanelData.data.title = "Latency";
+      await wrapper.vm.savePanelChangesToDashboard("d1");
+
+      expect(updatePanel).toHaveBeenCalled();
+      expect(window.sessionStorage.getItem(key)).toBeNull();
+      vi.mocked(useRoute).mockReset();
     });
   });
 });
