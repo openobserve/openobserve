@@ -258,6 +258,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import userServiece from "@/services/users";
+import { userKeys } from "@/services/users.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   getImageURL,
   useLocalCurrentUser,
@@ -420,6 +422,11 @@ export default defineComponent({
       if (selectedOrg == "other") {
         selectedOrg = encodeURIComponent(value.other_organization);
       }
+      // Keyed by the plain org id, not the URL-encoded one; the destination form hosts this drawer and never re-reads users.
+      const writtenOrg =
+        organization.value == "other" ? value.other_organization : organization.value;
+      const expireUsers = () =>
+        void queryClient.invalidateQueries({ queryKey: userKeys.usersAll(writtenOrg) });
       if (beingUpdated.value) {
         const userEmail = editRecord.value?.email ?? value.email;
         // Round-trip the original record with the edited fields, minus email.
@@ -458,6 +465,7 @@ export default defineComponent({
         }
         try {
           const res: any = await userServiece.update(payload, selectedOrg, userEmail);
+          expireUsers();
           if (
             value.change_password == true &&
             loggedInUserEmail.value === props.modelValue?.email
@@ -491,6 +499,7 @@ export default defineComponent({
             selectedOrg,
             userEmail,
           );
+          expireUsers();
           emit(
             "updated",
             res.data,
@@ -527,6 +536,7 @@ export default defineComponent({
             delete payload.custom_role;
           }
           const res: any = await userServiece.create(payload, selectedOrg);
+          expireUsers();
           emit("updated", res.data, payload, "created");
           emit("update:open", false);
         } catch (err: any) {

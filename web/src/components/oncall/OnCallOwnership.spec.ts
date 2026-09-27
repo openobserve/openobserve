@@ -20,10 +20,17 @@ import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
+import serviceStreamsService from "@/services/service_streams";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/alerts", () => ({
-  default: { getSemanticGroups: vi.fn() },
+// The queries call these through the default export, so that is what is mocked.
+vi.mock("@/services/service_streams", () => ({
+  default: {
+    getSemanticGroups: vi.fn(),
+    getServicesList: vi.fn(),
+    getIdentityConfig: vi.fn(),
+    getDimensionAnalytics: vi.fn(),
+  },
 }));
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -40,6 +47,7 @@ vi.mock("@/services/oncall", () => ({
 }));
 
 const service = vi.mocked(oncallService);
+const correlation = vi.mocked(serviceStreamsService);
 const ORG = store.state.selectedOrganization.identifier;
 
 /// The list is stubbed so this file is about the WIRING between it and the
@@ -110,6 +118,11 @@ describe("OnCallOwnership", () => {
     service.unroutedSignals.mockResolvedValue({ data: [] } as any);
     service.createOwnershipRule.mockResolvedValue({ data: {} } as any);
     service.updateOwnershipRule.mockResolvedValue({ data: {} } as any);
+    // Defined data, or nothing is cached and a remount re-reads anyway.
+    correlation.getSemanticGroups.mockResolvedValue({ data: [] } as any);
+    correlation.getServicesList.mockResolvedValue({ data: [] } as any);
+    correlation.getIdentityConfig.mockResolvedValue({ data: { sets: [] } } as any);
+    correlation.getDimensionAnalytics.mockResolvedValue({ data: { dimensions: [] } } as any);
   });
 
   /// Scoped to this team: the org-wide stats endpoint would otherwise show
@@ -328,6 +341,43 @@ describe("OnCallOwnership", () => {
       org_identifier: ORG,
       signal_id: "s7",
     });
+  });
+
+  /// A revisit inside the tier costs nothing; a rule write moves the queue the rules decide.
+  it("serves a revisit from the cache and re-reads both lists after a write", async () => {
+    service.deleteOwnershipRule.mockResolvedValue({ data: {} } as any);
+
+    const first = render();
+    await flushPromises();
+    expect(service.ownershipStats).toHaveBeenCalledTimes(1);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const wrapper = render();
+    await flushPromises();
+    expect(service.ownershipStats).toHaveBeenCalledTimes(1);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(1);
+
+    list(wrapper).vm.$emit("remove", { rule_id: "r9" });
+    await wrapper.vm.$nextTick();
+    await wrapper.findAllComponents({ name: "ConfirmDialog" })[0].vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(service.ownershipStats).toHaveBeenCalledTimes(2);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+  });
+
+  // The rule editor's pickers read service correlation's own entries, so switching back to this tab costs nothing.
+  it("serves the four correlation reads to a remount from the cache", async () => {
+    render().unmount();
+    await flushPromises();
+    render();
+    await flushPromises();
+
+    expect(correlation.getSemanticGroups).toHaveBeenCalledTimes(1);
+    expect(correlation.getServicesList).toHaveBeenCalledTimes(1);
+    expect(correlation.getIdentityConfig).toHaveBeenCalledTimes(1);
+    expect(correlation.getDimensionAnalytics).toHaveBeenCalledTimes(1);
   });
 
   /// A team with no unrouted traffic and a server without the endpoint look

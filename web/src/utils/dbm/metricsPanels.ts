@@ -213,6 +213,15 @@ export function panelErrorIsForbidden(event: { code?: unknown } | null | undefin
   return String(event?.code ?? "") === "403";
 }
 
+/** Whether a panel error is the engine's "Search stream not found" (code 20002). */
+export function panelErrorIsStreamMissing(
+  event: { code?: unknown; message?: unknown } | null | undefined,
+): boolean {
+  // The loader reports the HTTP status ahead of the body's 20002, so the message is the reliable half.
+  if (String(event?.code ?? "") === "20002") return true;
+  return /search stream not found/i.test(String(event?.message ?? ""));
+}
+
 /** `postgresql_bgwriter_buffers_allocated` → `Bgwriter buffers allocated`. */
 export function humanizeDbmMetricName(streamName: string): string {
   let rest = streamName;

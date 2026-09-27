@@ -43,7 +43,7 @@ use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, otlp::otlp_export_response},
+    common::meta::otlp::{otlp_export_response, otlp_rejection_response},
     db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
@@ -807,7 +807,8 @@ pub async fn handle_request(
 
     if let Err(e) = write_result {
         log::error!("Error while writing logs: {e}");
-        return Ok(MetaHttpResponse::error_with_header(
+        return Ok(otlp_rejection_response(
+            req_type,
             status,
             format!("error while writing log data: {e}"),
         ));
@@ -1869,5 +1870,61 @@ mod tests {
             .as_ref()
             .unwrap();
         assert_eq!(scope.name, "b");
+    }
+
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_request_columns_limit_is_rpc_status() {
+        use crate::common::meta::otlp::GoogleRpcStatus;
+
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let log_rec = LogRecord {
+            time_unix_nano: chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64,
+            attributes: (0..=limit)
+                .map(|i| kv(&format!("attr_{i}"), IntValue(i as i64)))
+                .collect(),
+            ..Default::default()
+        };
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs {
+                    log_records: vec![log_rec],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = super::handle_request(
+            0,
+            "test_org_id",
+            request,
+            Some("test_columns_limit"),
+            "a@a.com",
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await
+        .unwrap();
+        let status_code = resp.status();
+        let headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(status_code, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            headers[axum::http::header::CONTENT_TYPE],
+            CONTENT_TYPE_PROTO
+        );
+        let status = GoogleRpcStatus::decode(body).unwrap();
+        assert_eq!(status.code, 3);
+        assert!(
+            status
+                .message
+                .starts_with("error while writing log data: Error# Got ")
+        );
+        assert!(status.message.contains(&format!(
+            "columns for stream test_org_id/logs/test_columns_limit, only {limit} columns accept"
+        )));
+        assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
     }
 }

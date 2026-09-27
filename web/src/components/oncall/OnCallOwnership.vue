@@ -79,15 +79,26 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallRoutingList from "@/components/oncall/OnCallRoutingList.vue";
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import alertsService from "@/services/alerts";
-import {
-  getDimensionAnalytics,
-  getIdentityConfig,
-  getServicesList,
-} from "@/services/service_streams";
 import type { IdentitySet } from "@/services/service_streams";
+import {
+  dimensionAnalyticsQuery,
+  identityConfigQuery,
+  semanticGroupsQuery,
+  servicesListQuery,
+} from "@/services/service_streams.queries";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  createOwnershipRuleMutation,
+  deleteOwnershipRuleMutation,
+  dismissUnroutedSignalMutation,
+  ownershipStatsQuery,
+  setRoutingConfigMutation,
+  unroutedSignalsQuery,
+  updateOwnershipRuleMutation,
+} from "@/services/oncall.queries";
 import type {
   DimensionCatalogue,
   DiscoveredService,
@@ -126,11 +137,7 @@ const services = ref<DiscoveredService[]>([]);
 /// hierarchy — cluster contains namespace — which is what lets the rule editor
 /// offer levels to claim instead of a flat list of registry rows.
 const sets = ref<IdentitySet[]>([]);
-const {
-  config: routingConfig,
-  load: loadRoutingConfig,
-  refresh: refreshRoutingConfig,
-} = useOnCallRoutingConfig();
+const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfig();
 
 /// Who holds the path the rule editor is currently drafting.
 const conflict = ref<RoutingPreview | null>(null);
@@ -151,6 +158,13 @@ const teamName = computed(() => props.teams.find((team) => team.id === props.tea
 /// the worklist, and the confirmation has to count the same set.
 const openSignals = computed(() => signals.value.filter((signal) => !signal.dismissed_at));
 
+// Getter form, so every write follows an org switch.
+const ruleCreate = useMutation(() => createOwnershipRuleMutation(orgId.value));
+const ruleUpdate = useMutation(() => updateOwnershipRuleMutation(orgId.value));
+const ruleDelete = useMutation(() => deleteOwnershipRuleMutation(orgId.value));
+const signalDismiss = useMutation(() => dismissUnroutedSignalMutation(orgId.value));
+const routingConfigWrite = useMutation(() => setRoutingConfigMutation(orgId.value));
+
 function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {
   const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
   toast({ variant: "error", message: raw(message) || fallback });
@@ -160,8 +174,7 @@ function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) 
 /// every other section here still answers its question without it.
 async function fetchAliases() {
   try {
-    const res = await alertsService.getSemanticGroups(orgId.value);
-    aliases.value = res.data ?? [];
+    aliases.value = (await queryClient.fetchQuery(semanticGroupsQuery(orgId.value))) ?? [];
   } catch {
     aliases.value = [];
   }
@@ -175,10 +188,9 @@ async function fetchAliases() {
 /// choice, not three fields the reader has to reconstruct.
 async function fetchServices() {
   try {
-    const res = await getServicesList(orgId.value);
-    const rows: unknown[] = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    const rows = await queryClient.fetchQuery(servicesListQuery(orgId.value));
     const seen = new Map<string, DiscoveredService>();
-    for (const row of rows as Record<string, any>[]) {
+    for (const row of rows) {
       const name = String(row.service_name ?? "");
       if (!name) continue;
       const identity = (row.disambiguation ?? {}) as Record<string, string>;
@@ -213,6 +225,7 @@ async function previewConflict(dimensions: Record<string, string>) {
     return;
   }
   try {
+    // Never cached: a dry run per keystroke, each on a draft no entry could be keyed on.
     const res = await oncallService.previewRouting({
       org_identifier: orgId.value,
       data: { dimensions },
@@ -225,8 +238,7 @@ async function previewConflict(dimensions: Record<string, string>) {
 
 async function fetchSets() {
   try {
-    const res = await getIdentityConfig(orgId.value);
-    sets.value = res.data?.sets ?? [];
+    sets.value = (await queryClient.fetchQuery(identityConfigQuery(orgId.value)))?.sets ?? [];
   } catch {
     // No sets means no levels, and the rule editor falls back to the field
     // builder — which is exactly what this screen offered before.
@@ -236,10 +248,10 @@ async function fetchSets() {
 
 async function fetchCatalogue() {
   try {
-    const res = await getDimensionAnalytics(orgId.value);
-    const dims = res.data?.dimensions ?? [];
+    const summary = await queryClient.fetchQuery(dimensionAnalyticsQuery(orgId.value));
+    const dims = summary?.dimensions ?? [];
     catalogue.value = {
-      present: res.data?.recommended_priority_dimensions ?? dims.map((d) => d.dimension_name),
+      present: summary?.recommended_priority_dimensions ?? dims.map((d) => d.dimension_name),
       values: Object.fromEntries(dims.map((d) => [d.dimension_name, d.value_counts ?? {}])),
     };
   } catch {
@@ -249,14 +261,12 @@ async function fetchCatalogue() {
   }
 }
 
+/// Never forced: a write expires these entries, so the re-read after one costs one request.
 async function fetchRules() {
   loadingRules.value = true;
   try {
-    const res = await oncallService.ownershipStats({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-    });
-    rules.value = res.data?.rules ?? [];
+    const stats = await queryClient.fetchQuery(ownershipStatsQuery(orgId.value, props.teamId));
+    rules.value = stats?.rules ?? [];
   } catch (err) {
     failed(err, t("oncall.loadRulesFailed"));
   } finally {
@@ -266,8 +276,7 @@ async function fetchRules() {
 
 async function fetchSignals() {
   try {
-    const res = await oncallService.unroutedSignals({ org_identifier: orgId.value });
-    signals.value = res.data ?? [];
+    signals.value = (await queryClient.fetchQuery(unroutedSignalsQuery(orgId.value))) ?? [];
   } catch {
     // Additive: a team with no unrouted traffic and an endpoint that is not
     // there look the same from here, and neither is worth an error toast.
@@ -292,13 +301,9 @@ async function saveRule(draft: RuleDraft & { rule?: OwnershipRuleStats | null })
   const data = { team_id: draft.team_id || props.teamId, dimensions: draft.dimensions };
   try {
     if (draft.rule) {
-      await oncallService.updateOwnershipRule({
-        org_identifier: orgId.value,
-        rule_id: draft.rule.rule_id,
-        data,
-      });
+      await ruleUpdate.mutateAsync({ ruleId: draft.rule.rule_id, data });
     } else {
-      await oncallService.createOwnershipRule({ org_identifier: orgId.value, data });
+      await ruleCreate.mutateAsync(data);
     }
     toast({
       variant: "success",
@@ -317,11 +322,9 @@ async function deleteRule() {
   ruleToDelete.value = null;
   if (!rule) return;
   try {
-    await oncallService.deleteOwnershipRule({
-      org_identifier: orgId.value,
-      rule_id: rule.rule_id,
-    });
-    await fetchRules();
+    await ruleDelete.mutateAsync(rule.rule_id);
+    // The queue moves with the rules: a path nobody owns again lands unrouted.
+    await Promise.all([fetchRules(), fetchSignals()]);
   } catch (err) {
     failed(err, t("oncall.deleteRuleFailed"));
   }
@@ -330,14 +333,9 @@ async function deleteRule() {
 async function saveDefaultTeam(teamId: string | null) {
   savingDefault.value = true;
   try {
-    await oncallService.setRoutingConfig({
-      org_identifier: orgId.value,
-      data: { default_team_id: teamId },
-    });
-    // Re-read rather than patching this copy: the value is shared now, and a
-    // local assignment would leave the policy editor's ladder-end warning
-    // still saying no catch-all exists.
-    await refreshRoutingConfig(orgId.value);
+    await routingConfigWrite.mutateAsync(teamId);
+    // Shared with the policy editor's ladder-end warning, which a local patch leaves stale.
+    await loadRoutingConfig(orgId.value);
     toast({
       variant: "success",
       message: teamId ? t("oncall.defaultTeamSaved") : t("oncall.defaultTeamCleared"),
@@ -372,9 +370,9 @@ async function claimAll() {
   let claimed = 0;
   for (const signal of openSignals.value) {
     try {
-      await oncallService.createOwnershipRule({
-        org_identifier: orgId.value,
-        data: { team_id: props.teamId, dimensions: routableDimensions(signal) },
+      await ruleCreate.mutateAsync({
+        team_id: props.teamId,
+        dimensions: routableDimensions(signal),
       });
       claimed += 1;
     } catch {
@@ -391,10 +389,7 @@ async function claimAll() {
 
 async function dismissSignal(signal: UnroutedSignal) {
   try {
-    await oncallService.dismissUnroutedSignal({
-      org_identifier: orgId.value,
-      signal_id: signal.id,
-    });
+    await signalDismiss.mutateAsync(signal.id);
     await fetchSignals();
   } catch (err) {
     failed(err, t("oncall.unroutedDismissFailed"));
