@@ -711,13 +711,13 @@ fn pending_writer_requires_source_metadata_and_verifies_final_parquet_rows() {
 }
 
 #[test]
-fn v3_tail_header_locates_labels_before_directory() {
+fn v1_tail_header_locates_labels_before_directory() {
     let blob = fixture();
     let size = blob.len() as u64;
     let trailer = &blob[blob.len() - MIDX_TRAILER_LEN..];
     assert_eq!(MIDX_TRAILER_LEN, 32);
-    assert_eq!(&trailer[20..24], &3u32.to_le_bytes());
-    assert_eq!(&trailer[24..], b"O2MIDX03");
+    assert_eq!(&trailer[20..24], &1u32.to_le_bytes());
+    assert_eq!(&trailer[24..], b"O2MIDX01");
     let (data, header_start) = header_data(&blob);
     let regions = trailer_of(&blob);
     assert_eq!(
@@ -886,8 +886,8 @@ fn vortex_finalizer_preserves_schema_without_row_groups() {
 fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     let directory = tempfile::tempdir().unwrap();
-    let data_path = directory.path().join("indexed-v3-before.parquet");
-    let midx_path = directory.path().join("indexed-v3-before.midx");
+    let data_path = directory.path().join("indexed-v1-before.parquet");
+    let midx_path = directory.path().join("indexed-v1-before.midx");
     let input = batch(&rows());
     let original = parquet_bytes(&input, 3);
     std::fs::write(&data_path, &original).unwrap();
@@ -898,8 +898,8 @@ fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
     std::fs::write(&midx_path, build_from_parquet(original, source).unwrap()).unwrap();
     let moved = directory.path().join("moved");
     std::fs::create_dir(&moved).unwrap();
-    let moved_data = moved.join("indexed-v3-after.parquet");
-    let moved_index = moved.join("indexed-v3-after.midx");
+    let moved_data = moved.join("indexed-v1-after.parquet");
+    let moved_index = moved.join("indexed-v1-after.midx");
     std::fs::rename(data_path, &moved_data).unwrap();
     std::fs::rename(midx_path, &moved_index).unwrap();
     let source =

@@ -22,8 +22,8 @@ use crate::{
     meta::stream::{FileKey, StreamType},
 };
 
-pub const MIDX_VERSION: u32 = 3;
-pub const MIDX_MAGIC: &[u8; 8] = b"O2MIDX03";
+pub const MIDX_VERSION: u32 = 1;
+pub const MIDX_MAGIC: &[u8; 8] = b"O2MIDX01";
 pub const MIDX_TRAILER_LEN: usize = 32;
 
 /// Lengths of the label, directory and header regions preceding the trailer, in file order.
@@ -105,7 +105,7 @@ pub fn metrics_index_path(path: &str) -> Option<String> {
     let name = *parts.last()?;
     let format = FileFormat::from_extension(name)?;
     let stem = name.strip_suffix(format.extension())?;
-    if stem.strip_prefix("indexed-v3-").is_none_or(str::is_empty) {
+    if stem.strip_prefix("indexed-v1-").is_none_or(str::is_empty) {
         return None;
     }
     parts[2] = "mindex";
@@ -146,7 +146,9 @@ mod tests {
             (trailer(0, MIDX_VERSION, MIDX_MAGIC), 100),
             (trailer(u32::MAX, MIDX_VERSION, MIDX_MAGIC), 1024),
             (trailer(10, 2, MIDX_MAGIC), 100),
+            (trailer(10, 3, MIDX_MAGIC), 100),
             (trailer(10, MIDX_VERSION, b"O2MIDX02"), 100),
+            (trailer(10, MIDX_VERSION, b"O2MIDX03"), 100),
             (trailer(10, MIDX_VERSION, MIDX_MAGIC)[1..].to_vec(), 100),
             (overflow, u64::MAX),
             (empty_directory, 100),

@@ -1282,7 +1282,7 @@ mod tests {
         let min_ts = *timestamps.values().iter().min().unwrap();
         let max_ts = *timestamps.values().iter().max().unwrap();
         let key = format!(
-            "files/o/metrics/m/2026/09/18/06/indexed-v3-{}.parquet",
+            "files/o/metrics/m/2026/09/18/06/indexed-v1-{}.parquet",
             config::ider::uuid()
         );
         let parent = ParentIdentity {

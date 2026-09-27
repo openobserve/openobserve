@@ -2992,7 +2992,7 @@ mod tests {
         .await
         .unwrap();
         sqlx::query(
-            "INSERT INTO file_list_deleted (id, account, stream, date, file, index_file, flattened) VALUES (1, 'a', 'org/metrics/cpu', '2026/09/22/10', 'indexed-v3-old.parquet', false, false)",
+            "INSERT INTO file_list_deleted (id, account, stream, date, file, index_file, flattened) VALUES (1, 'a', 'org/metrics/cpu', '2026/09/22/10', 'indexed-v1-old.parquet', false, false)",
         )
         .execute(&pool)
         .await
@@ -3007,7 +3007,7 @@ mod tests {
         .unwrap();
         for (id, has_index) in [(2, false), (3, true)] {
             sqlx::query(
-                "INSERT INTO file_list_deleted (id, account, stream, date, file, index_file, mindex_file, flattened) VALUES (?, 'a', 'org/metrics/cpu', '2026/09/22/10', 'indexed-v3-new.parquet', false, ?, false)",
+                "INSERT INTO file_list_deleted (id, account, stream, date, file, index_file, mindex_file, flattened) VALUES (?, 'a', 'org/metrics/cpu', '2026/09/22/10', 'indexed-v1-new.parquet', false, ?, false)",
             )
             .bind(id)
             .bind(has_index)
