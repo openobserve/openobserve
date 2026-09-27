@@ -244,7 +244,7 @@ struct RecentIngestedTraceStream {
 // and nothing parses the window back out of the WHERE clause, so inline text can
 // never narrow the scan.
 //
-// The stats family wants `(start, end)` over rows stamped at the window END,
+// The stats family wants rows stamped at a window END `E ∈ (start, end]`,
 // which is not the payload's interval; that shift is applied to the PAYLOAD, in
 // `stats_read_range` (openobserve-api-management:
 // request/db_monitoring/service/common.rs).
