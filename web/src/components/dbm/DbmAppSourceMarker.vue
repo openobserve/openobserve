@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :label="t('dbm.appSource.marker')"
     :data-test="dataTest"
   >
-    <OTooltip v-if="withTooltip" :content="t('dbm.appSource.markerHint')" />
+    <OTooltip :content="t('dbm.appSource.markerHint')" />
   </OIcon>
 </template>
 
@@ -38,11 +38,9 @@ import { useI18nTyped } from "@/types/i18n";
 
 withDefaults(
   defineProps<{
-    /** Off where the host already carries a tooltip (a tab), so two never stack. */
-    withTooltip?: boolean;
     dataTest?: string;
   }>(),
-  { withTooltip: true, dataTest: "dbm-app-source-marker" },
+  { dataTest: "dbm-app-source-marker" },
 );
 
 const { t } = useI18nTyped();

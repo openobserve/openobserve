@@ -38,9 +38,8 @@ describe("DbmAppSourceMarker", () => {
     expect(tooltip.props("content")).not.toMatch(/instrumented|didn't|client-observed/i);
   });
 
-  it("drops its own tooltip where the host already has one", () => {
-    const wrapper = mount(DbmAppSourceMarker, { props: { withTooltip: false }, global });
-    expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(false);
+  it("has no tooltip opt-out prop", () => {
+    expect(Object.keys(DbmAppSourceMarker.props ?? {})).not.toContain("withTooltip");
   });
 });
 

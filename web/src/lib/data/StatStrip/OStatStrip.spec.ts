@@ -137,6 +137,17 @@ describe("OStatStrip", () => {
       expect(wrapper.text()).not.toContain("From traces");
     });
 
+    it("tooltips the glyph with subTooltip, falling back to sub", () => {
+      const tip = (item: Record<string, unknown>) =>
+        mountCard({ sub: raw("From traces"), subIcon: "account-tree", ...item })
+          .findComponent({ name: "OTooltip" })
+          .props("content");
+      expect(tip({ subTooltip: raw("Measured from your traces") })).toBe(
+        "Measured from your traces",
+      );
+      expect(tip({})).toBe("From traces");
+    });
+
     it("keeps the text qualifier when no glyph is given", () => {
       const wrapper = mountCard({ sub: raw("wait time") });
       expect(wrapper.find("[data-test='o-stat-card-sub-icon']").exists()).toBe(false);

@@ -196,7 +196,9 @@ describe("QueriesPage sources its overlap measures from the database", () => {
         source.indexOf("const summaryStats ="),
         source.indexOf("const visibleSummaryStats ="),
       );
-      expect(stats).toContain('key === APP_SOURCE_QUALIFIER ? { subIcon: "account-tree" } : {}');
+      expect(stats).toContain(
+        'key === APP_SOURCE_QUALIFIER\n      ? { subIcon: "account-tree", subTooltip: t("dbm.appSource.markerHint") }\n      : {}',
+      );
       expect(stats).toContain('t("dbm.appSource.marker")');
       expect(source).not.toContain("dbm.list.overlap.clientObserved");
     });

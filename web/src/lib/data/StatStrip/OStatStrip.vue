@@ -81,6 +81,7 @@ const onCardClick = (item: StatItem) => {
       :value="item.value"
       :sub="item.sub"
       :sub-icon="item.subIcon"
+      :sub-tooltip="item.subTooltip"
       :icon="item.icon"
       :tone="item.tone"
       :trend="item.trend"

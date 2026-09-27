@@ -37,8 +37,10 @@ const props = withDefaults(
      * time"). Not a second metric and never a trend.
      */
     sub?: I18nText;
-    /** Render the qualifier as this glyph; `sub` becomes its accessible name and tooltip. */
+    /** Render the qualifier as this glyph; `sub` becomes its accessible name and default tooltip. */
     subIcon?: IconName;
+    /** The glyph's tooltip when it should say more than `sub`. */
+    subTooltip?: I18nText;
     icon?: IconName;
     tone?: StatTone;
     trend?: StatTrend;
@@ -187,7 +189,7 @@ const trendClass = computed(() =>
           class="text-text-label self-center max-lg:hidden"
           data-test="o-stat-card-sub-icon"
         >
-          <OTooltip :content="sub" />
+          <OTooltip :content="subTooltip || sub" />
         </OIcon>
         <span v-else-if="sub" class="text-text-label text-2xs min-w-0 truncate max-lg:hidden">{{
           sub

@@ -1126,8 +1126,10 @@ const summaryStats = computed<StatItem[]>(() => {
         ? t("dbm.appSource.marker")
         : t(`dbm.list.overlap.${key}` as "dbm.list.overlap.serverWait");
   // An app-sourced total shows the traces glyph; `sub` becomes its accessible name.
-  const qualifierIcon = (key: string | null): { subIcon?: IconName } =>
-    key === APP_SOURCE_QUALIFIER ? { subIcon: "account-tree" } : {};
+  const qualifierIcon = (key: string | null): { subIcon?: IconName; subTooltip?: I18nText } =>
+    key === APP_SOURCE_QUALIFIER
+      ? { subIcon: "account-tree", subTooltip: t("dbm.appSource.markerHint") }
+      : {};
 
   // Whether the vantage these totals were summed from produced ANY row. A sum
   // cannot say so itself — `[].reduce(+, 0)` is the same 0 as a row that
