@@ -3657,6 +3657,8 @@
     "logstash": "Logstash",
     "syslogNg": "Syslog-ng",
     "loongCollector": "LoongCollector",
+    "kinesisFirehose": "Kinesis Firehose",
+    "gcpLogs": "透過 (Pub/Sub) 的 GCP 日誌",
     "metrics": {
       "prometheus": "Prometheus",
       "vmagent": "vmagent",

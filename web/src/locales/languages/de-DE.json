@@ -3657,6 +3657,8 @@
     "logstash": "Logstash",
     "syslogNg": "Syslog-ng",
     "loongCollector": "LoongCollector",
+    "kinesisFirehose": "Kinesis Firehose",
+    "gcpLogs": "GCP Logs über (Pub/Sub)",
     "metrics": {
       "prometheus": "Prometheus",
       "vmagent": "vmagent",
