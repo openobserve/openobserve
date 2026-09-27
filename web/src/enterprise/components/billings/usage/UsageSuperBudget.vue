@@ -107,7 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :default-columns="false"
           :loading="costsLoading"
-          class="compact-inputs min-h-0 flex-1"
+          dense
+          class="min-h-0 flex-1"
           data-test="billings-usagesuperbudget-table"
         >
           <template #cell-name="{ row }">
@@ -618,12 +619,3 @@ const kpiCards = computed(() => {
   return cards;
 });
 </script>
-
-<style scoped>
-/* keep(lib-override:OInput): OInput's smallest size is 34px tall, which makes eleven
-   editable rows taller than the table needs. Its height sits on the field wrapper
-   (.bg-input-bg) and the input fills it, so shrinking the wrapper is enough here. */
-.compact-inputs :deep(.bg-input-bg) {
-  height: 1.75rem;
-}
-</style>
