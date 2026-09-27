@@ -47,10 +47,7 @@ use metrics_index::{
     block_cache::{CacheKey, CachedIndex, INDEX_CACHE, IndexCache, ParentIdentity, cache_limit},
 };
 use promql_parser::label::Matchers;
-use tokio::{
-    sync::{OwnedSemaphorePermit, Semaphore},
-    task::JoinSet,
-};
+use tokio::task::JoinSet;
 
 use super::{SeriesStream, block_ranges::plan_coalesced_ranges, plan::LabelColumns};
 use crate::series_loader::label_interner::LabelInterner;
@@ -61,11 +58,6 @@ const PREFETCH_BYTES: usize = 4 * 1024 * 1024;
 const COALESCE_MAX_GAP: u64 = 16 * 1024;
 const COALESCE_MAX_SPAN: u64 = 1024 * 1024;
 const REMOTE_RANGE_CONCURRENCY: usize = 10;
-static METADATA_WORKERS: LazyLock<Arc<Semaphore>> = LazyLock::new(|| {
-    Arc::new(Semaphore::new(
-        config::get_config().limit.cpu_num.clamp(1, 32),
-    ))
-});
 static FILE_LOADS: LazyLock<Arc<loads::LoadRegistry>> =
     LazyLock::new(|| Arc::new(loads::LoadRegistry::default()));
 struct MetadataLoad<'a> {
@@ -74,7 +66,6 @@ struct MetadataLoad<'a> {
     key: CacheKey,
     sidecar: String,
     limit: usize,
-    permit: Arc<OwnedSemaphorePermit>,
     cache: &'a Mutex<IndexCache>,
     flights: &'a Arc<loads::LoadRegistry>,
 }
@@ -87,7 +78,6 @@ impl MetadataLoad<'_> {
             key,
             sidecar,
             limit,
-            permit,
             cache,
             flights,
         } = self;
@@ -99,15 +89,7 @@ impl MetadataLoad<'_> {
                 .is_some_and(|missing| missing.is_empty())
             {
                 let binding = seed.as_ref().map(|entry| entry.binding.clone());
-                let loaded = load_entry(
-                    file,
-                    labels,
-                    &key.parent,
-                    &sidecar,
-                    seed,
-                    Arc::clone(&permit),
-                )
-                .await;
+                let loaded = load_entry(file, labels, &key.parent, &sidecar, seed).await;
                 let entry = match loaded {
                     Ok(value) => value,
                     Err(error) => {
@@ -139,15 +121,7 @@ impl MetadataLoad<'_> {
                     }
                     let binding = seed.as_ref().map(|entry| entry.binding.clone());
                     let prior = seed.clone();
-                    let loaded = load_entry(
-                        file,
-                        labels,
-                        &key.parent,
-                        &sidecar,
-                        seed,
-                        Arc::clone(&permit),
-                    )
-                    .await;
+                    let loaded = load_entry(file, labels, &key.parent, &sidecar, seed).await;
                     match loaded {
                         Ok(entry) => {
                             let admitted = if prior
@@ -512,11 +486,7 @@ struct ValidatedPartition {
 }
 
 pub async fn load_metrics_block_index(file: &FileKey, labels: &[String]) -> Result<Arc<Index>> {
-    Ok(Arc::clone(
-        &load_index_inner(file, labels, Arc::clone(&METADATA_WORKERS))
-            .await?
-            .index,
-    ))
+    Ok(Arc::clone(&load_index(file, labels).await?.index))
 }
 
 pub(super) async fn prepare(
@@ -564,27 +534,7 @@ pub(super) async fn prepare(
         .min(config::get_config().limit.cpu_num.max(1))
         .clamp(1, 32);
     let load_labels = Arc::new(labels);
-    let jobs = scan
-        .files
-        .iter()
-        .cloned()
-        .enumerate()
-        .map(|(index, file)| {
-            let labels = Arc::clone(&load_labels);
-            Box::pin(async move { load_index(&file, &labels).await.map(|file| (index, file)) })
-                as futures::future::BoxFuture<'static, Result<(usize, Arc<LoadedFile>)>>
-        })
-        .collect::<Vec<_>>();
-    let mut loads = stream::iter(jobs).buffer_unordered(concurrency);
-    let mut loaded = vec![None; scan.files.len()];
-    while let Some(file) = loads.next().await {
-        let (index, file) = file?;
-        loaded[index] = Some(file);
-    }
-    let loaded = loaded
-        .into_iter()
-        .map(|file| file.expect("all metadata jobs completed"))
-        .collect::<Vec<_>>();
+    let loaded = load_metadata(&scan.files, Arc::clone(&load_labels), partitions.len()).await?;
     let metadata_ms = metadata_started.elapsed().as_secs_f64() * 1000.0;
     let selection_started = Instant::now();
     let matchers = Arc::new(matchers.clone());
@@ -724,23 +674,47 @@ fn label_value<'a>(index: &'a Index, row: usize, name: &str) -> Result<Option<&'
     index.label_value(row, name)
 }
 
-async fn load_index(file: &FileKey, labels: &[String]) -> Result<Arc<LoadedFile>> {
-    load_index_inner(file, labels, Arc::clone(&METADATA_WORKERS)).await
+async fn load_metadata(
+    files: &[FileKey],
+    labels: Arc<Vec<String>>,
+    target_partitions: usize,
+) -> Result<Vec<Arc<LoadedFile>>> {
+    let workers = target_partitions.min(files.len());
+    ensure!(workers > 0, "empty metadata load");
+    let mut groups = (0..workers).map(|_| Vec::new()).collect::<Vec<_>>();
+    for (index, file) in files.iter().cloned().enumerate() {
+        groups[index % workers].push((index, file));
+    }
+    let jobs = groups.into_iter().map(|group| {
+        let labels = Arc::clone(&labels);
+        async move {
+            let mut loaded = Vec::with_capacity(group.len());
+            for (index, file) in group {
+                loaded.push((index, load_index(&file, &labels).await?));
+            }
+            Ok(loaded)
+        }
+    });
+    let mut loaded = vec![None; files.len()];
+    for group in collect_preflight_tasks(jobs, workers).await? {
+        for (index, file) in group {
+            loaded[index] = Some(file);
+        }
+    }
+    Ok(loaded
+        .into_iter()
+        .map(|file| file.expect("all metadata jobs completed"))
+        .collect())
 }
 
-async fn load_index_inner(
-    file: &FileKey,
-    labels: &[String],
-    workers: Arc<Semaphore>,
-) -> Result<Arc<LoadedFile>> {
+async fn load_index(file: &FileKey, labels: &[String]) -> Result<Arc<LoadedFile>> {
     let limit = cache_limit();
-    load_index_cached(file, labels, workers, &INDEX_CACHE, &FILE_LOADS, limit).await
+    load_index_cached(file, labels, &INDEX_CACHE, &FILE_LOADS, limit).await
 }
 
 async fn load_index_cached(
     file: &FileKey,
     labels: &[String],
-    workers: Arc<Semaphore>,
     cache: &Mutex<IndexCache>,
     flights: &Arc<loads::LoadRegistry>,
     limit: usize,
@@ -769,19 +743,12 @@ async fn load_index_cached(
         cache.trim(limit);
         cache.get(&key)
     };
-    let permit = Arc::new(
-        workers
-            .acquire_owned()
-            .await
-            .context("metrics metadata admission closed")?,
-    );
     MetadataLoad {
         file,
         labels,
         key,
         sidecar,
         limit,
-        permit,
         cache,
         flights,
     }
@@ -795,7 +762,6 @@ async fn load_entry(
     parent: &ParentIdentity,
     sidecar: &str,
     cached: Option<Arc<CachedIndex>>,
-    permit: Arc<OwnedSemaphorePermit>,
 ) -> Result<Arc<CachedIndex>> {
     if cached
         .as_ref()
@@ -805,7 +771,6 @@ async fn load_entry(
     {
         return Ok(cached.unwrap());
     }
-    let _permit = permit;
     Ok(metrics_index::fetch_parsed_index(
         &file.account,
         sidecar,
@@ -1215,30 +1180,23 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn metadata_admission_bounds_remote_io_and_cancels_waiters() {
+    async fn cancelling_shared_metadata_load_cleans_inflight() {
         let data = file(&[(1, 10, 1.0, Some("x"))]);
         let fixture = Fixture::with_gates(std::slice::from_ref(&data), false, true).await;
         let key = fixture.scan([data.0]).files.remove(0);
-        let workers = Arc::new(Semaphore::new(1));
         let first_file = key.clone();
-        let first_workers = Arc::clone(&workers);
-        let first =
-            tokio::spawn(async move { load_index_inner(&first_file, &[], first_workers).await });
+        let first = tokio::spawn(async move { load_index(&first_file, &[]).await });
         fixture.entered.notified().await;
         let second_file = key.clone();
-        let second_workers = Arc::clone(&workers);
-        let second =
-            tokio::spawn(async move { load_index_inner(&second_file, &[], second_workers).await });
+        let second = tokio::spawn(async move { load_index(&second_file, &[]).await });
         tokio::task::yield_now().await;
         assert_eq!(fixture.active.load(Ordering::SeqCst), 1);
-        assert_eq!(workers.available_permits(), 0);
         second.abort();
         assert!(matches!(second.await, Err(error) if error.is_cancelled()));
         assert_eq!(fixture.active.load(Ordering::SeqCst), 1);
         first.abort();
         assert!(matches!(first.await, Err(error) if error.is_cancelled()));
         assert_eq!(fixture.active.load(Ordering::SeqCst), 0);
-        assert_eq!(workers.available_permits(), 1);
         assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
         let cache_key = CacheKey {
             account: key.account.clone(),
@@ -1255,8 +1213,28 @@ mod tests {
                 .get(&cache_key)
                 .is_none()
         );
-        workers.close();
-        assert!(load_index_inner(&key, &[], workers).await.is_err());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn metadata_load_respects_target_partitions() {
+        let files = (0..3)
+            .map(|hash| file(&[(hash, 10, 1.0, Some("x"))]))
+            .collect::<Vec<_>>();
+        let fixture = Fixture::with_gates(&files, false, true).await;
+        let scan = fixture.scan(files.into_iter().map(|(file, _)| file));
+        let loading =
+            tokio::spawn(async move { load_metadata(&scan.files, Arc::new(vec![]), 2).await });
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while fixture.active.load(Ordering::SeqCst) < 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(fixture.active.load(Ordering::SeqCst), 2);
+        assert_eq!(fixture.metadata_calls.load(Ordering::SeqCst), 2);
+        loading.abort();
+        assert!(matches!(loading.await, Err(error) if error.is_cancelled()));
         assert_eq!(fixture.active.load(Ordering::SeqCst), 0);
     }
 
@@ -1863,16 +1841,9 @@ mod tests {
         let file = fixture.scan([data.0]).files.remove(0);
         let cache = Mutex::new(IndexCache::default());
         let flights = Arc::new(loads::LoadRegistry::default());
-        let loaded = load_index_cached(
-            &file,
-            &["group".into()],
-            Arc::new(Semaphore::new(2)),
-            &cache,
-            &flights,
-            0,
-        )
-        .await
-        .unwrap();
+        let loaded = load_index_cached(&file, &["group".into()], &cache, &flights, 0)
+            .await
+            .unwrap();
         assert!(cache.lock().unwrap().is_empty());
         let reads = fixture.metadata_calls.load(Ordering::SeqCst);
         assert!(reads > 0);
