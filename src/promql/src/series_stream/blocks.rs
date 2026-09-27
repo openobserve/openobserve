@@ -513,8 +513,8 @@ pub(super) async fn prepare(
     lookback: i64,
     eval: &EvalContext,
 ) -> Result<Vec<PreparedPartition>> {
-    let window = query_window(eval, offset, lookback)
-        .context("unsupported sparse or overflowing time window")?;
+    let window =
+        query_window(eval, offset, lookback).context("invalid or overflowing block time window")?;
     ensure!(
         !scan.files.is_empty() && !partitions.is_empty(),
         "empty block source"
@@ -802,21 +802,10 @@ async fn load_entry(
     .await?)
 }
 
-pub(super) fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
+pub(crate) fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
     let start = eval.start.checked_sub(offset)?;
     let end = eval.end.checked_sub(offset)?;
     if lookback < 0 || end < start {
-        return None;
-    }
-    if start != end
-        && eval.step > 0
-        && eval.step >= lookback.checked_mul(5)?
-        && end
-            .checked_sub(start)?
-            .checked_div(eval.step)?
-            .checked_add(1)?
-            < 30
-    {
         return None;
     }
     Some((start.checked_sub(lookback)?, end))
@@ -1477,15 +1466,50 @@ mod tests {
     }
 
     #[test]
-    fn time_window_preserves_offset_and_rejects_sparse_evaluation() {
+    fn time_window_preserves_offset_and_accepts_sparse_evaluation() {
         let eval = EvalContext::new(1_000_000, 3_000_000, 500_000, "test".into());
         assert_eq!(
             query_window(&eval, 200_000, 1_000_000),
             Some((-200_000, 2_800_000))
         );
         let sparse = EvalContext::new(10_000_000, 20_000_000, 10_000_000, "test".into());
-        assert_eq!(query_window(&sparse, 0, 1_000_000), None);
+        assert_eq!(
+            query_window(&sparse, 0, 1_000_000),
+            Some((9_000_000, 20_000_000))
+        );
         assert_eq!(query_window(&eval, i64::MIN, 1), None);
+    }
+
+    #[tokio::test]
+    async fn sparse_evaluation_uses_block_source() {
+        let data = file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let ctx = SessionContext::new_with_config(
+            SessionConfig::new()
+                .with_target_partitions(2)
+                .with_extension(Arc::new(fixture.scan([data.0]))),
+        );
+        let matchers = Matchers::empty();
+        let selector = StreamingSelector {
+            table_name: "m",
+            matchers: &matchers,
+            offset: 100,
+        };
+        let eval = EvalContext::new(130, 230, 100, "sparse-block".into());
+        let sources = execute_partitioned(
+            &ctx,
+            schema().as_ref(),
+            &selector,
+            LabelColumns::grouped(vec!["group".into()]),
+            20,
+            &eval,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        for source in sources {
+            assert!(matches!(source.await.unwrap(), SeriesSource::Block(_)));
+        }
     }
 
     #[tokio::test]
@@ -2224,28 +2248,6 @@ mod tests {
         .err()
         .unwrap();
         assert!(!error.to_string().is_empty());
-        assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
-
-        let sparse = EvalContext::new(10, 40, 100, "sparse".into());
-        let source_selector = StreamingSelector {
-            table_name: "m",
-            matchers: &matchers,
-            offset: 0,
-        };
-        let sources = execute_partitioned(
-            &ctx,
-            schema().as_ref(),
-            &source_selector,
-            LabelColumns::grouped(vec!["group".into()]),
-            20,
-            &sparse,
-        )
-        .await
-        .unwrap()
-        .unwrap();
-        for source in sources {
-            assert!(matches!(source.await.unwrap(), SeriesSource::DataFusion(_)));
-        }
         assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
     }
 
