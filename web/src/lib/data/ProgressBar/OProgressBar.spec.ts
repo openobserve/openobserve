@@ -177,4 +177,20 @@ describe("OProgressBar", () => {
       }
     });
   });
+
+  describe("color", () => {
+    it("paints the fill with a category colour instead of the variant class", () => {
+      const wrapper = mount(OProgressBar, { props: { value: 0.5, color: "rgb(1, 2, 3)" } });
+      const fill = wrapper.find("[role='progressbar'] div");
+      expect(fill.attributes("style")).toContain("background-color: rgb(1, 2, 3)");
+      expect(fill.classes()).not.toContain("bg-progress-bar-default");
+    });
+
+    it("keeps the variant class when no colour is given", () => {
+      const wrapper = mount(OProgressBar, { props: { value: 0.5 } });
+      expect(wrapper.find("[role='progressbar'] div").classes()).toContain(
+        "bg-progress-bar-default",
+      );
+    });
+  });
 });

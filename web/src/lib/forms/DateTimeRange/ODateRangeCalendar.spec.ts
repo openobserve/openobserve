@@ -43,6 +43,37 @@ describe("ODateRangeCalendar", () => {
 
   // ── Props ─────────────────────────────────────────────────────
 
+  it("greys out days before unavailableBefore, gives the reason, and keeps paging back open", () => {
+    wrapper = mount(ODateRangeCalendar, {
+      attachTo: document.body,
+      props: {
+        startDate: "2024/03/10",
+        endDate: "2024/03/20",
+        unavailableBefore: "2024/03/05",
+        unavailableReason: "History starts Mar 5",
+      },
+    });
+    const before = wrapper.find('[data-test="daterangecalendar-cell-2024-03-04"]');
+    const from = wrapper.find('[data-test="daterangecalendar-cell-2024-03-05"]');
+    expect(before.attributes("data-unavailable")).toBeDefined();
+    expect(before.element.parentElement?.getAttribute("title")).toBe("History starts Mar 5");
+    expect(from.attributes("data-unavailable")).toBeUndefined();
+    expect(from.element.parentElement?.getAttribute("title")).toBeNull();
+    // Unlike minDate, earlier months stay reachable.
+    expect(
+      wrapper.find('[data-test="daterangecalendar-prev"]').attributes("data-disabled"),
+    ).toBeUndefined();
+  });
+
+  it("marks no day unavailable when unavailableBefore is not set", () => {
+    wrapper = mount(ODateRangeCalendar, {
+      attachTo: document.body,
+      props: { startDate: "2024/03/10", endDate: "2024/03/20" },
+    });
+    expect(wrapper.findAll("[data-unavailable]")).toHaveLength(0);
+    expect(wrapper.findAll("[title]")).toHaveLength(0);
+  });
+
   it("should mount without error when startDate and endDate are provided", () => {
     expect(() => {
       wrapper = mount(ODateRangeCalendar, {

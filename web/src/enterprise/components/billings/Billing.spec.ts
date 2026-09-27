@@ -125,13 +125,6 @@ describe("Billing Component", () => {
       expect(wrapper.vm.$options.name).toBe("PageIngestion");
     });
 
-    it("should initialize with correct data", () => {
-      expect(wrapper.vm.billingtab).toBe("plans"); // Should be set to "plans" in onMounted after fetchBillingInfo
-      expect(wrapper.vm.usageDataType).toBe("gb");
-      expect(wrapper.vm.splitterModel).toBe(220);
-      expect(wrapper.vm.usageDate).toBe("30days");
-    });
-
     it("should expose all required properties from setup", () => {
       expect(wrapper.vm.t).toBeDefined();
       expect(wrapper.vm.store).toBeDefined();
@@ -140,26 +133,7 @@ describe("Billing Component", () => {
       expect(wrapper.vm.billingtab).toBeDefined();
       expect(wrapper.vm.getImageURL).toBeDefined();
       expect(wrapper.vm.headerBasedOnRoute).toBeDefined();
-      expect(wrapper.vm.selectUsageDate).toBeDefined();
-      expect(wrapper.vm.updateActiveTab).toBeDefined();
-    });
-
-    it("should have correct tabs configuration", () => {
-      expect(wrapper.vm.tabs).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ label: "GB", value: "gb" }),
-          expect.objectContaining({ label: "MB", value: "mb" }),
-        ]),
-      );
-    });
-
-    it("should have correct options configuration", () => {
-      expect(wrapper.vm.options).toEqual([
-        { label: "30 Days", value: "30days" },
-        { label: "60 Days", value: "60days" },
-        { label: "3 Months", value: "3months" },
-        { label: "6 Months", value: "6months" },
-      ]);
+      expect(wrapper.vm.isUsageRoute).toBeDefined();
     });
   });
 
@@ -321,126 +295,12 @@ describe("Billing Component", () => {
     });
   });
 
-  describe("selectUsageDate Function", () => {
-    it("should navigate to usage route with correct parameters", () => {
-      wrapper.vm.usageDate = "60days";
-      wrapper.vm.usageDataType = "mb";
-
-      wrapper.vm.selectUsageDate();
-
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: "60days",
-          data_type: "mb",
-        },
-      });
-    });
-
-    it("should use default values when properties are not set", () => {
-      wrapper.vm.usageDate = undefined;
-      wrapper.vm.usageDataType = undefined;
-
-      wrapper.vm.selectUsageDate();
-
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: undefined,
-          data_type: undefined,
-        },
-      });
-    });
-
-    it("should handle empty string values", () => {
-      wrapper.vm.usageDate = "";
-      wrapper.vm.usageDataType = "";
-
-      wrapper.vm.selectUsageDate();
-
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: "",
-          data_type: "",
-        },
-      });
-    });
-  });
-
-  describe("updateActiveTab Function", () => {
-    it("should update usageDataType and call router push", () => {
-      mockRouter.push.mockClear();
-
-      wrapper.vm.updateActiveTab("mb");
-
-      expect(wrapper.vm.usageDataType).toBe("mb");
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: wrapper.vm.usageDate,
-          data_type: "mb",
-        },
-      });
-    });
-
-    it("should handle different tab values", () => {
-      mockRouter.push.mockClear();
-
-      wrapper.vm.updateActiveTab("gb");
-
-      expect(wrapper.vm.usageDataType).toBe("gb");
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: wrapper.vm.usageDate,
-          data_type: "gb",
-        },
-      });
-    });
-
-    it("should handle null value", () => {
-      mockRouter.push.mockClear();
-
-      wrapper.vm.updateActiveTab(null);
-
-      expect(wrapper.vm.usageDataType).toBe(null);
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: wrapper.vm.usageDate,
-          data_type: null,
-        },
-      });
-    });
-  });
-
   describe("Reactive Data Properties", () => {
     it("should have reactive billingtab", async () => {
       wrapper.vm.billingtab = "usage";
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.billingtab).toBe("usage");
-    });
-
-    it("should have reactive usageDataType", async () => {
-      wrapper.vm.usageDataType = "mb";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.usageDataType).toBe("mb");
-    });
-
-    it("should have reactive usageDate", async () => {
-      wrapper.vm.usageDate = "60days";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.usageDate).toBe("60days");
     });
 
     it("should have reactive splitterModel", async () => {
@@ -455,18 +315,6 @@ describe("Billing Component", () => {
     it("should access correct store state properties", () => {
       expect(wrapper.vm.store.state.selectedOrganization).toBeDefined();
       expect(wrapper.vm.store.state.selectedOrganization.identifier).toBeDefined();
-    });
-
-    it("should use store state in router navigation", () => {
-      wrapper.vm.selectUsageDate();
-
-      expect(mockRouter.push).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({
-            org_identifier: store.state.selectedOrganization.identifier,
-          }),
-        }),
-      );
     });
   });
 
@@ -486,134 +334,6 @@ describe("Billing Component", () => {
     });
   });
 
-  describe("Query Parameter Initialization", () => {
-    it("should initialize usageDataType from router query", async () => {
-      mockRouter.currentRoute.value.query.data_type = "mb";
-
-      const testWrapper = mount(Billing, {
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            "router-view": true,
-            OIcon: true,
-            ConfirmDialog: true,
-            Usage: true,
-            AppTabs: {
-              template: "<div></div>",
-              props: ["tabs", "activeTab"],
-              emits: ["update:activeTab"],
-            },
-          },
-        },
-      });
-
-      await testWrapper.vm.$nextTick();
-
-      expect(testWrapper.vm.usageDataType).toBe("mb");
-      testWrapper.unmount();
-    });
-
-    it("should initialize usageDate from router query", async () => {
-      mockRouter.currentRoute.value.query.usage_date = "3months";
-
-      const testWrapper = mount(Billing, {
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            "router-view": true,
-            OIcon: true,
-            ConfirmDialog: true,
-            Usage: true,
-            AppTabs: {
-              template: "<div></div>",
-              props: ["tabs", "activeTab"],
-              emits: ["update:activeTab"],
-            },
-          },
-        },
-      });
-
-      await testWrapper.vm.$nextTick();
-
-      expect(testWrapper.vm.usageDate).toBe("3months");
-      testWrapper.unmount();
-    });
-
-    it("should use default values when query parameters are missing", async () => {
-      mockRouter.currentRoute.value.query = {};
-
-      const testWrapper = mount(Billing, {
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            "router-view": true,
-            OIcon: true,
-            ConfirmDialog: true,
-            Usage: true,
-            AppTabs: {
-              template: "<div></div>",
-              props: ["tabs", "activeTab"],
-              emits: ["update:activeTab"],
-            },
-          },
-        },
-      });
-
-      await testWrapper.vm.$nextTick();
-
-      expect(testWrapper.vm.usageDataType).toBe("gb");
-      expect(testWrapper.vm.usageDate).toBe("30days");
-      testWrapper.unmount();
-    });
-  });
-
-  describe("Return Object from Setup", () => {
-    it("should return all required properties", () => {
-      const expectedProps = [
-        "t",
-        "store",
-        "router",
-        "config",
-        "billingtab",
-        "getImageURL",
-        "splitterModel",
-        "headerBasedOnRoute",
-        "options",
-        "usageDate",
-        "selectUsageDate",
-        "isUsageRoute",
-        "tabs",
-        "usageDataType",
-        "updateActiveTab",
-      ];
-
-      expectedProps.forEach((prop) => {
-        expect(wrapper.vm).toHaveProperty(prop);
-      });
-    });
-
-    it("should have correct types for returned properties", () => {
-      expect(typeof wrapper.vm.t).toBe("function");
-      expect(typeof wrapper.vm.store).toBe("object");
-      expect(typeof wrapper.vm.router).toBe("object");
-      expect(typeof wrapper.vm.config).toBe("object");
-      expect(typeof wrapper.vm.billingtab).toBe("string");
-      expect(typeof wrapper.vm.getImageURL).toBe("function");
-      expect(typeof wrapper.vm.splitterModel).toBe("number");
-      expect(typeof wrapper.vm.headerBasedOnRoute).toBe("function");
-      expect(Array.isArray(wrapper.vm.options)).toBe(true);
-      expect(typeof wrapper.vm.usageDate).toBe("string");
-      expect(typeof wrapper.vm.selectUsageDate).toBe("function");
-      expect(typeof wrapper.vm.isUsageRoute).toBe("boolean");
-      expect(Array.isArray(wrapper.vm.tabs)).toBe(true);
-      expect(typeof wrapper.vm.usageDataType).toBe("string");
-      expect(typeof wrapper.vm.updateActiveTab).toBe("function");
-    });
-  });
-
   describe("Edge Cases and Error Handling", () => {
     it("should handle missing router gracefully", () => {
       expect(wrapper.vm.router).toBeDefined();
@@ -623,31 +343,6 @@ describe("Billing Component", () => {
     it("should handle empty store state gracefully", () => {
       expect(wrapper.vm.store).toBeDefined();
       expect(wrapper.vm.store.state).toBeDefined();
-    });
-
-    it("should handle function calls with undefined parameters", () => {
-      expect(() => wrapper.vm.updateActiveTab(undefined)).not.toThrow();
-    });
-  });
-
-  describe("Daily-view date range", () => {
-    it("exposes usageStreamEnabled from org settings", () => {
-      store.state.organizationData.organizationSettings.usage_stream_enabled = true;
-      expect(wrapper.vm.usageStreamEnabled).toBe(true);
-      store.state.organizationData.organizationSettings.usage_stream_enabled = false;
-    });
-
-    it("resolves a relative range into micros and bumps the key", () => {
-      const before = wrapper.vm.usageStreamEnabled;
-      wrapper.vm.dateRange = {
-        valueType: "relative",
-        relativeTimePeriod: "7d",
-      };
-      wrapper.vm.onRangeChange();
-      // getConsumableRelativeTime returns start<end micros
-      // (usageRange is provided to the child; here we just assert the handler ran)
-      expect(typeof wrapper.vm.onRangeChange).toBe("function");
-      expect(before).toBeDefined();
     });
   });
 });

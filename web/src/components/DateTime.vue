@@ -22,7 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
     }"
   >
-    <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
+    <OTooltip
+      v-if="!hideRangeShift"
+      :content="
+        isPrevShiftDisabled() && queryRangeRestrictionMsg
+          ? raw(queryRangeRestrictionMsg)
+          : t('common.previous')
+      "
+    >
       <OButton
         data-test="date-time-prev-btn"
         variant="ghost"
@@ -30,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-button-outline-border h-auto! rounded-e-none! border-e!"
         icon-left="chevron-left"
         :aria-label="t('common.previous')"
-        :disabled="disable"
+        :disabled="disable || isPrevShiftDisabled()"
         @click.prevent.stop="shiftTimeRange('prev')"
       />
     </OTooltip>
@@ -236,7 +243,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ODateRangeCalendar
                     :start-date="selectedDate.from"
                     :end-date="selectedDate.to"
-                    :min-date="calendarMinDate"
+                    :min-date="dataStartDate ? undefined : calendarMinDate"
+                    :unavailable-before="dataStartDate"
+                    :unavailable-reason="
+                      dataStartDate ? queryRangeRestrictionMsg || undefined : undefined
+                    "
                     :max-date="calendarMaxDate"
                     @update:start-date="selectedDate.from = $event"
                     @update:end-date="selectedDate.to = $event"
@@ -620,6 +631,15 @@ export default defineComponent({
       if (props.disableRelative && props.minDate) return props.minDate;
       return "1999/01/01";
     });
+
+    /**
+     * A consumer-set `minDate` (with relative off) marks where its data starts: earlier
+     * months stay browsable but greyed, with the restriction message as the reason.
+     * Every other picker keeps the plain 1999 floor through `minDate` as before.
+     */
+    const dataStartDate = computed(() =>
+      props.disableRelative && props.minDate ? props.minDate : undefined,
+    );
 
     const calendarMaxDate = computed(() => {
       return timestampToTimezoneDate(new Date().getTime(), store.state.timezone, "yyyy/MM/dd");
@@ -1250,6 +1270,16 @@ export default defineComponent({
       if (!(duration > 0)) return;
 
       let delta = (direction === "prev" ? -1 : 1) * duration;
+      if (direction === "prev" && dataStartDate.value) {
+        // Greyed days before the data start are not pickable, so a backward step
+        // stops there: the range lands on that day and keeps its length.
+        const floor = convertToUtcTimestamp(
+          `${dataStartDate.value} 00:00:00`,
+          store.state.timezone,
+        );
+        if (startTime + delta < floor) delta = floor - startTime;
+        if (delta >= 0) return;
+      }
       if (direction === "next") {
         // The calendar rejects future dates, so a forward shift stops at now.
         delta = Math.min(delta, Date.now() * 1000 - endTime);
@@ -1266,6 +1296,12 @@ export default defineComponent({
 
       menuOpen.value = false;
       if (!props.autoApply) saveDate("absolute");
+    };
+
+    /** With a `minDate`, stepping back stops once the range already starts on or before it. */
+    const isPrevShiftDisabled = () => {
+      if (!props.disableRelative || !props.minDate) return false;
+      return selectedType.value === "absolute" && selectedDate.value.from <= props.minDate;
     };
 
     const isNextShiftDisabled = () => {
@@ -1504,6 +1540,7 @@ export default defineComponent({
       setDateType,
       shiftTimeRange,
       isNextShiftDisabled,
+      isPrevShiftDisabled,
       onPickerKeydown,
       getConsumableDateTime,
       relativeDatesInHour,
@@ -1519,6 +1556,7 @@ export default defineComponent({
       onHide,
       calendarMinDate,
       calendarMaxDate,
+      dataStartDate,
       timezoneSelectOptions,
       isTimezoneSelectOpen,
     };

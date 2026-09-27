@@ -582,6 +582,96 @@ describe("DateTime Component", () => {
       expect(wrapper.vm.selectedType).toBe("absolute");
     });
 
+    it("stops a backward shift on minDate, keeping the range length, then disables prev", () => {
+      wrapper = createWrapper({ disableRelative: true, minDate: "2026/03/01" });
+      store.state.savedViewFlag = false;
+
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.selectedDate = { from: "2026/03/05", to: "2026/04/04" };
+      wrapper.vm.selectedTime = { startTime: "00:00:00", endTime: "00:00:00" };
+
+      expect(wrapper.vm.isPrevShiftDisabled()).toBe(false);
+      wrapper.vm.shiftTimeRange("prev");
+
+      // A full step would land on Feb 3, a greyed day; the range stops on Mar 1 instead.
+      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/03/01", to: "2026/03/31" });
+      expect(wrapper.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "00:00:00" });
+      expect(wrapper.vm.isPrevShiftDisabled()).toBe(true);
+
+      wrapper.vm.shiftTimeRange("prev");
+      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/03/01", to: "2026/03/31" });
+    });
+
+    it("does not limit a backward shift without minDate", () => {
+      wrapper = createWrapper();
+      store.state.savedViewFlag = false;
+
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.selectedDate = { from: "2026/03/05", to: "2026/04/04" };
+      wrapper.vm.selectedTime = { startTime: "00:00:00", endTime: "00:00:00" };
+
+      wrapper.vm.shiftTimeRange("prev");
+      expect(wrapper.vm.selectedDate.from).toBe("2026/02/03");
+      expect(wrapper.vm.isPrevShiftDisabled()).toBe(false);
+    });
+
+    describe("shift under a max query range", () => {
+      // The logs SearchBar passes queryRangeRestrictionInHour but no minDate: the limit
+      // caps the window's length, and a shift moves the window without changing it.
+      const MICROS_PER_HOUR = 3_600_000_000;
+      const span = (vm: any) => {
+        const { startTime, endTime } = vm.getConsumableDateTime();
+        return endTime - startTime;
+      };
+
+      it("keeps a window inside the limit at the same length when shifting back", () => {
+        wrapper = createWrapper({ queryRangeRestrictionInHour: 24 });
+        store.state.savedViewFlag = false;
+
+        wrapper.vm.selectedType = "absolute";
+        wrapper.vm.selectedDate = { from: "2026/03/05", to: "2026/03/05" };
+        wrapper.vm.selectedTime = { startTime: "06:00:00", endTime: "18:00:00" };
+        const before = span(wrapper.vm);
+
+        wrapper.vm.shiftTimeRange("prev");
+
+        expect(wrapper.vm.selectedDate).toEqual({ from: "2026/03/04", to: "2026/03/05" });
+        expect(wrapper.vm.selectedTime).toEqual({ startTime: "18:00:00", endTime: "06:00:00" });
+        expect(span(wrapper.vm)).toBe(before);
+        expect(span(wrapper.vm)).toBeLessThanOrEqual(24 * MICROS_PER_HOUR);
+      });
+
+      it("never stops a backward step early or disables prev without a minDate", () => {
+        wrapper = createWrapper({ queryRangeRestrictionInHour: 24 });
+        store.state.savedViewFlag = false;
+
+        wrapper.vm.selectedType = "absolute";
+        wrapper.vm.selectedDate = { from: "2020/01/02", to: "2020/01/02" };
+        wrapper.vm.selectedTime = { startTime: "00:00:00", endTime: "12:00:00" };
+
+        wrapper.vm.shiftTimeRange("prev");
+
+        expect(wrapper.vm.selectedDate).toEqual({ from: "2020/01/01", to: "2020/01/02" });
+        expect(wrapper.vm.selectedTime).toEqual({ startTime: "12:00:00", endTime: "00:00:00" });
+        expect(wrapper.vm.isPrevShiftDisabled()).toBe(false);
+      });
+
+      it("keeps the window length when shifting forward", () => {
+        wrapper = createWrapper({ queryRangeRestrictionInHour: 24 });
+        store.state.savedViewFlag = false;
+
+        wrapper.vm.selectedType = "absolute";
+        wrapper.vm.selectedDate = { from: "2026/03/05", to: "2026/03/05" };
+        wrapper.vm.selectedTime = { startTime: "06:00:00", endTime: "18:00:00" };
+        const before = span(wrapper.vm);
+
+        wrapper.vm.shiftTimeRange("next");
+
+        expect(wrapper.vm.selectedDate).toEqual({ from: "2026/03/05", to: "2026/03/06" });
+        expect(span(wrapper.vm)).toBe(before);
+      });
+    });
+
     it("should shift the range forward within the same day", () => {
       wrapper = createWrapper();
       store.state.savedViewFlag = false;

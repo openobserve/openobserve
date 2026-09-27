@@ -54,12 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 exact
                 name="usage"
                 :to="
-                  '/billings/usage?org_identifier=' +
-                  store.state.selectedOrganization.identifier +
-                  '&usage_date=' +
-                  usageDate +
-                  '&data_type=' +
-                  usageDataType
+                  '/billings/usage?org_identifier=' + store.state.selectedOrganization.identifier
                 "
                 :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
                 :label="t('billing.usageLabel')"
@@ -103,56 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-slot:after>
         <div class="flex h-full w-full flex-col pt-2">
-          <div
-            v-if="isUsageRoute"
-            class="ms-2 me-3 mb-2 flex shrink-0 items-center justify-end gap-2 overflow-y-auto px-3 py-2"
-          >
-            <!-- The billing-cycle range dropdown only applies to the totals
-                 view. When self-usage reporting is on, the daily view renders
-                 its own date-range picker, so hide this to avoid two selectors. -->
-            <div v-if="!usageStreamEnabled" class="custom-usage-date-select">
-              <OSelect
-                v-model="usageDate"
-                :options="options"
-                labelKey="label"
-                valueKey="value"
-                @update:model-value="selectUsageDate"
-                class="mx-0 mt-1 h-10 p-0"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="schedule" size="xs" class="me-2 mt-1" @click.stop.prevent />
-                </template>
-              </OSelect>
-            </div>
-            <!-- Daily view's date-range picker — same toolbar line as GB/MB. -->
-            <DateTimePickerDashboard
-              v-if="usageStreamEnabled"
-              ref="dateTimePicker"
-              v-model="dateRange"
-              size="sm"
-              data-test="usage-daily-date-picker"
-              @hide="onRangeChange"
-            />
-            <div class="flex items-center">
-              <div class="app-tabs-container h-9">
-                <AppTabs
-                  class="tabs-selection-container"
-                  :tabs="tabs"
-                  :activeTab="usageDataType"
-                  @update:activeTab="(value: any) => updateActiveTab(value)"
-                />
-              </div>
-            </div>
-          </div>
           <div class="flex min-h-0 flex-1 gap-2.5 pe-2.5 pb-2.5">
-            <div
-              v-if="isUsageRoute && billingMembers.length > 0"
-              class="h-full w-65 shrink-0"
-              data-test="usage-member-list"
-            >
-              <UsageMemberList v-model="usageMember.selected" :members="billingMembers" />
-            </div>
-            <div class="h-full min-w-0 flex-1 overflow-y-auto pb-3">
+            <div class="h-full min-w-0 flex-1 overflow-y-auto">
               <router-view title=""> </router-view>
             </div>
           </div>
@@ -165,7 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 // @ts-ignore
 import { defineComponent, ref, computed, onMounted, provide, reactive, watch } from "vue";
@@ -176,15 +122,10 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
-import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import BillingService from "@/services/billings";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import UsageMemberList from "./UsageMemberList.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import { getConsumableRelativeTime } from "@/utils/date";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -192,13 +133,8 @@ export default defineComponent({
     OPageLayout,
     OTabs,
     ORouteTab,
-    AppTabs,
-    OSelect,
-    OIcon,
     OSplitter,
     OButton,
-    UsageMemberList,
-    DateTimePickerDashboard,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -210,32 +146,12 @@ export default defineComponent({
     const billingtab = ref(
       resolveTab("billings", router.currentRoute.value.name as string, "plans"),
     );
-    const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);
     const splitterModel = ref(220);
     const billingProvider = ref(""); // empty until loaded
     const isPaidUser = ref(false);
     const billingInfoLoaded = ref(false);
-
-    // Billing-group members for the Usage member selector (rendered as a
-    // sidebar beside the usage view). Shared with usage.vue via provide/inject.
-    const billingMembers = ref<{ id: string; name: string }[]>([]);
-    const usageMember = reactive({ selected: "" });
-    provide("usageMember", usageMember);
-    const fetchBillingMembers = () => {
-      if (config.isCloud !== "true") return;
-      BillingService.list_billing_group_members(store.state.selectedOrganization.identifier)
-        .then((res: any) => {
-          billingMembers.value = (res.data ?? []).map((m: any) => ({
-            id: m.member_org_id,
-            name: m.member_org_name,
-          }));
-        })
-        .catch(() => {
-          billingMembers.value = [];
-        });
-    };
 
     // Fetch billing info to determine provider
     const fetchBillingInfo = async () => {
@@ -256,21 +172,6 @@ export default defineComponent({
     // Check if invoice tab should be shown (only for Stripe, and only after loading)
     const showInvoiceTab = computed(() => {
       return billingInfoLoaded.value && billingProvider.value === "stripe";
-    });
-    const options = computed(() => {
-      const periods = [
-        { label: t("billing.period30Days"), value: "30days" },
-        { label: t("billing.period60Days"), value: "60days" },
-        { label: t("billing.period3Months"), value: "3months" },
-        { label: t("billing.period6Months"), value: "6months" },
-      ];
-      return billingInfoLoaded.value && billingProvider.value === "stripe" && isPaidUser.value
-        ? [
-            { label: t("billing.previousCycle"), value: "-1cycle" },
-            { label: t("billing.currentCycle"), value: "1cycle" },
-            ...periods,
-          ]
-        : periods;
     });
     const collapseSidebar = () => {
       showSidebar.value = !showSidebar.value;
@@ -294,18 +195,6 @@ export default defineComponent({
     onMounted(async () => {
       // Fetch billing info to determine provider type
       await fetchBillingInfo();
-      fetchBillingMembers();
-
-      // Default to current cycle for paid Stripe users (only on the usage tab)
-      if (
-        router.currentRoute.value.name == "usage" &&
-        !router.currentRoute.value.query.usage_date &&
-        billingProvider.value === "stripe" &&
-        isPaidUser.value
-      ) {
-        usageDate.value = "1cycle";
-        selectUsageDate();
-      }
 
       if (
         router.currentRoute.value.name == "billings" ||
@@ -331,55 +220,9 @@ export default defineComponent({
       }
       return "";
     };
-    const usageDate = ref(router.currentRoute.value.query.usage_date || "30days");
-
     const isUsageRoute = computed(() => {
       return router.currentRoute.value.name == "usage";
     });
-    // Self-usage reporting on → the Usage tab renders the daily view (which has
-    // its own date-range picker), so the billing-cycle range dropdown is hidden.
-    const usageStreamEnabled = computed(
-      () => !!store.state?.organizationData?.organizationSettings?.usage_stream_enabled,
-    );
-
-    // Daily-view date range: the picker lives here (toolbar, next to GB/MB) and
-    // shares the RESOLVED window (microseconds) with the child usage.vue via
-    // provide/inject. `key` bumps on every change so the charts re-render.
-    const dateTimePicker = ref<any>(null);
-    const dateRange = ref<any>({
-      valueType: "relative",
-      relativeTimePeriod: "7d",
-    });
-    const usageRange = reactive({
-      start: (new Date().getTime() - 7 * 24 * 60 * 60 * 1000) * 1000,
-      end: new Date().getTime() * 1000,
-      key: 0,
-    });
-    provide("usageRange", usageRange);
-    const onRangeChange = () => {
-      const v: any = dateRange.value;
-      if (v?.valueType === "relative" && v.relativeTimePeriod) {
-        const r = getConsumableRelativeTime(v.relativeTimePeriod);
-        if (r) {
-          usageRange.start = r.startTime;
-          usageRange.end = r.endTime;
-        }
-      } else if (v?.valueType === "absolute" && v.startTime && v.endTime) {
-        usageRange.start = v.startTime;
-        usageRange.end = v.endTime;
-      } else if (dateTimePicker.value?.getConsumableDateTime) {
-        // Fallback: ask the picker to resolve its current selection.
-        const d = dateTimePicker.value.getConsumableDateTime();
-        if (d?.startTime && d?.endTime) {
-          usageRange.start = d.startTime;
-          usageRange.end = d.endTime;
-        }
-      }
-      usageRange.key++;
-    };
-    // Apply on any value change (relative or absolute), not just on @hide, so a
-    // calendar selection immediately re-renders the charts below.
-    watch(dateRange, onRangeChange, { deep: true });
     const isOrgGroupRoute = computed(() => {
       return router.currentRoute.value.name == "billing_group";
     });
@@ -390,33 +233,6 @@ export default defineComponent({
       canInvite: false,
     });
     provide("orgGroupInvite", orgGroupInvite);
-    const selectUsageDate = () => {
-      router.push({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: usageDate.value,
-          data_type: usageDataType.value,
-        },
-      });
-    };
-    const updateActiveTab = (value: any) => {
-      usageDataType.value = value;
-      selectUsageDate();
-    };
-    const tabs = [
-      {
-        label: raw("GB"),
-        value: "gb",
-        icon: "storage",
-      },
-      {
-        label: raw("MB"),
-        value: "mb",
-        icon: "database",
-      },
-    ];
-
     return {
       raw,
       t,
@@ -427,27 +243,15 @@ export default defineComponent({
       getImageURL,
       splitterModel,
       headerBasedOnRoute,
-      options,
-      usageStreamEnabled,
-      dateTimePicker,
-      dateRange,
-      onRangeChange,
-      usageDate,
-      selectUsageDate,
       isUsageRoute,
       isOrgGroupRoute,
       orgGroupInvite,
-      tabs,
-      usageDataType,
-      updateActiveTab,
       collapseSidebar,
       showSidebar,
       lastSplitterPosition,
       showInvoiceTab,
       billingProvider,
       isPaidUser,
-      billingMembers,
-      usageMember,
     };
   },
 });
