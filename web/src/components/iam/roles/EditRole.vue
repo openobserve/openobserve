@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="permissionsUiType === 'table' && activeModuleView"
               :key="activeModuleView.trail.join('/')"
               v-model:page-size="modulePageSize"
+              :lists-resources="!!moduleOf(activeModule)?.hasEntities"
               class="h-full"
               :trail="activeModuleView.trail"
               :scopes="activeModuleView.scopes"

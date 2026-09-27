@@ -53,7 +53,16 @@ async function mountPane(
 ) {
   const wrapper = mount(ModulePane, {
     global: { plugins: [i18n, store, router] },
-    props: { trail, scopes, entities, loading: false, isGranted, isPendingRemoval, ...extra },
+    props: {
+      trail,
+      scopes,
+      entities,
+      loading: false,
+      isGranted,
+      isPendingRemoval,
+      listsResources: true,
+      ...extra,
+    },
   });
   await flushPromises();
   return wrapper;
@@ -275,6 +284,7 @@ describe("ModulePane - unsaved counts", () => {
         loading: false,
         isGranted,
         isPendingRemoval,
+        listsResources: true,
         added: 2,
         removed: 1,
       },
@@ -443,6 +453,30 @@ describe("ModulePane - search bar", () => {
     const wrapper = await mountPane([], [makeNode("cpu")]);
 
     expect(wrapper.find('[data-test="edit-role-module-pane-search"]').exists()).toBe(true);
+  });
+
+  // Search Jobs, Service Streams and the like are one org-wide grant, not a list.
+  it("hides search for a module whose only row is its own grant", async () => {
+    const wrapper = await mountPane([], [makeNode("search_jobs")], [raw("Search Jobs")], {
+      listsResources: false,
+    });
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-search"]').exists()).toBe(false);
+  });
+
+  // One row needs no pager; "Showing 1 - 1 of 1" is noise under an org-wide grant.
+  it("drops the pagination footer for a module whose only row is its own grant", async () => {
+    const wrapper = await mountPane([], [makeNode("search_jobs")], [raw("Search Jobs")], {
+      listsResources: false,
+    });
+
+    expect(wrapper.find('[data-test^="o2-table-pagination"]').exists()).toBe(false);
+  });
+
+  it("keeps the pagination footer for a real list", async () => {
+    const wrapper = await mountPane([], [makeNode("cpu")]);
+
+    expect(wrapper.find('[data-test^="o2-table-pagination"]').exists()).toBe(true);
   });
 
   it("hides search when there is nothing to search", async () => {

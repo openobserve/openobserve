@@ -1870,6 +1870,15 @@ describe("EditRole - pane filters start fresh at every level", () => {
     expect(wrapper.findComponent({ name: "ModulePane" }).props("pageSize")).toBe(50);
   });
 
+  it("offers no search on a module that is one org-wide grant", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "role";
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "ModulePane" }).exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit-role-module-pane-search"]').exists()).toBe(false);
+  });
+
   it("drops the Selected filter when a stream type is opened", async () => {
     const wrapper = await mountEditRole();
     wrapper.vm.activeModule = "stream";

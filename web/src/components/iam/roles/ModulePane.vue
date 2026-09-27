@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OPageHeader>
 
     <div
-      v-if="entities.length"
+      v-if="listsResources && entities.length"
       class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2"
     >
       <OSearchInput
@@ -217,6 +217,8 @@ const props = defineProps<{
   entities: any[];
   loading: boolean;
   isGranted: (node: any, action: string) => boolean;
+  /** False for an org-wide module, whose only row is its own grant, so there is nothing to search. */
+  listsResources: boolean;
   /** A saved grant the user has staged for removal: still held, but no longer ticked. */
   isPendingRemoval: (node: any, action: string) => boolean;
   added?: number;
@@ -381,7 +383,9 @@ const checkboxTest = (row: PaneRow, action: string) =>
       : "";
 
 // OTable snapshots `pagination` at mount, so the mode change is keyed to remount the table.
-const paginationMode = computed(() => (props.entities.length ? "server" : "none"));
+const paginationMode = computed(() =>
+  props.listsResources && props.entities.length ? "server" : "none",
+);
 
 const clearFilter = () => setFilter("", "all");
 
