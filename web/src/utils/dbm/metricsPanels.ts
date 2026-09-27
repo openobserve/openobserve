@@ -577,8 +577,8 @@ export function buildDbmLoadPanelSchema(
   if (scope.namespace) predicates.push(`o2_dbm_database = '${dbmSqlEscape(scope.namespace)}'`);
   const where = predicates.join(" AND ");
 
-  // GROUP BY repeats the expression: the planner refuses to resolve a SELECT
-  // alias of an expression there (llmInsightsPanels groups the same way).
+  // GROUP BY repeats every expression, `ts` and `poll` included: a stream column of
+  // the same name (the log recipes write `ts`) outranks a SELECT alias there.
   // Per-bucket poll counts come from DENSE_RANK + MAX windows over ONE scan —
   // a COUNT(DISTINCT) self-join reads the stream twice for the same numbers
   // (verified identical), and window COUNT(DISTINCT) is unsupported. The
@@ -589,7 +589,7 @@ export function buildDbmLoadPanelSchema(
     `(SELECT ts, segment, cnt, MAX(rnk) OVER (PARTITION BY ts) AS polls FROM ` +
     `(SELECT ts, segment, poll, cnt, DENSE_RANK() OVER (PARTITION BY ts ORDER BY poll) AS rnk FROM ` +
     `(SELECT histogram(_timestamp) AS ts, ${dim} AS segment, o2_dbm_timestamp AS poll, COUNT(*) AS cnt ` +
-    `FROM "${DBM_SERVER_STREAM}" WHERE ${where} GROUP BY ts, ${dim}, poll) AS b) AS w) AS x ` +
+    `FROM "${DBM_SERVER_STREAM}" WHERE ${where} GROUP BY histogram(_timestamp), ${dim}, o2_dbm_timestamp) AS b) AS w) AS x ` +
     `GROUP BY ts, segment ORDER BY ts ASC LIMIT 30000`;
 
   return buildDbmSqlPanelSchema({
