@@ -90,7 +90,7 @@ export const useRoleSummary = (deps: SummaryDeps) => {
 
   type GrantState = "saved" | "added" | "removed";
 
-  // resource -> entity -> grants, including staged removals so they stay reviewable until saved.
+  // resource -> entity -> grants, staged removals included so they stay reviewable until saved: saved `logs:_all_default:AllowGet` + removed `metrics:_all_default:AllowGet` -> { logs: { _all_default: [{ AllowGet, saved }] }, metrics: { _all_default: [{ AllowGet, removed }] } }.
   const grantsByResource = computed(() => {
     const byResource = new Map<string, Map<string, { action: string; state: GrantState }[]>>();
     const record = (key: string, state: GrantState) => {
