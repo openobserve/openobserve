@@ -367,7 +367,11 @@ describe("panelValidation", () => {
       const errors: string[] = [];
       validateSQLPanelFields(
         gt,
-        { type: "gauge", queryType: "sql", queries: [{ customQuery: true, fields: { x: [], y: [] } }] },
+        {
+          type: "gauge",
+          queryType: "sql",
+          queries: [{ customQuery: true, fields: { x: [], y: [] } }],
+        },
         0,
         "X",
         "Y",
@@ -376,5 +380,4 @@ describe("panelValidation", () => {
       expect(errors).toEqual([]);
     });
   });
-
 });
