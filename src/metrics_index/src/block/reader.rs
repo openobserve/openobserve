@@ -18,8 +18,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, Int64Array, RecordBatch, RecordBatchOptions, UInt32Array,
-        UInt64Array,
+        Array, ArrayRef, Int64Array, RecordBatch, RecordBatchOptions, UInt32Array, UInt64Array,
     },
     datatypes::Schema,
 };
@@ -106,14 +105,12 @@ impl BlockDecoder {
         let planes: [&[u8]; 8] =
             std::array::from_fn(|byte| &value_bytes[byte * count..(byte + 1) * count]);
         let mut previous: Option<i64> = None;
-        let mut strictly_increasing = true;
         for (i, bytes) in timestamp_bytes.chunks_exact(8).enumerate() {
             // chunks_exact guarantees the width; no unchecked reads or casts.
             let encoded = i64::from_le_bytes(bytes.try_into().expect("8-byte timestamp chunk"));
             let timestamp = previous.map_or(encoded, |last| last.wrapping_add(encoded));
             if let Some(last) = previous {
                 ensure!(timestamp >= last, "decoded timestamps decreased");
-                strictly_increasing &= timestamp > last;
             }
             previous = Some(timestamp);
             self.timestamps.push(timestamp);
@@ -132,10 +129,6 @@ impl BlockDecoder {
             self.timestamps[0] == block.min_timestamp
                 && self.timestamps[count - 1] == block.max_timestamp,
             "decoded timestamp bounds mismatch"
-        );
-        ensure!(
-            strictly_increasing == block.strictly_increasing,
-            "decoded strictness mismatch"
         );
         Ok(())
     }
@@ -319,10 +312,6 @@ fn decode_directory(
         .as_any()
         .downcast_ref::<UInt32Array>()
         .context("length type")?;
-    let strict = columns[7]
-        .as_any()
-        .downcast_ref::<BooleanArray>()
-        .context("strict type")?;
     let mut blocks = super::directory::DirectoryBuilder::new(count, parent.rows, blocks_end);
     let mut next_row = 0u64;
     let mut next_offset = 0u64;
@@ -336,7 +325,6 @@ fn decode_directory(
             max_timestamp: max_times.value(i),
             block_offset: offsets.value(i),
             block_length: lengths.value(i),
-            strictly_increasing: strict.value(i),
         };
         ensure!(
             block.row_count > 0 && block.row_count as usize <= MAX_BLOCK_ROWS,
@@ -360,13 +348,8 @@ fn decode_directory(
         );
         if block.row_count == 1 {
             ensure!(
-                block.min_timestamp == block.max_timestamp && block.strictly_increasing,
+                block.min_timestamp == block.max_timestamp,
                 "invalid single-sample descriptor"
-            );
-        } else if block.strictly_increasing {
-            ensure!(
-                block.min_timestamp < block.max_timestamp,
-                "invalid strict time bounds"
             );
         }
         next_row = next_row
@@ -417,7 +400,6 @@ mod decoder_tests {
             max_timestamp: samples.last().unwrap().0,
             block_offset: 0,
             block_length: block_bytes.len() as u32,
-            strictly_increasing: samples.windows(2).all(|w| w[0].0 < w[1].0),
         };
         (block_bytes, block)
     }
@@ -486,15 +468,12 @@ mod decoder_tests {
         bad_frame.block_length = bad_zstd.len() as u32;
         let mut bad_endpoint = block.clone();
         bad_endpoint.max_timestamp += 1;
-        let mut bad_strict = block.clone();
-        bad_strict.strictly_increasing = false;
         let mut too_many = block.clone();
         too_many.row_count = MAX_BLOCK_ROWS as u32 + 1;
         for (bytes, metadata) in [
             (&corrupt[..], &block),
             (&bad_zstd[..], &bad_frame),
             (&block_bytes[..], &bad_endpoint),
-            (&block_bytes[..], &bad_strict),
             (&block_bytes[..], &too_many),
         ] {
             assert!(decoder.decode(bytes, metadata).is_err());

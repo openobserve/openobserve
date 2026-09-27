@@ -20,7 +20,6 @@ use super::BlockMeta;
 #[derive(Debug)]
 pub struct BlockDirectory {
     entries: Box<[PackedBlock]>,
-    strict: Box<[u8]>,
     rows: u64,
     blocks_end: u64,
 }
@@ -54,7 +53,6 @@ impl BlockDirectory {
             block_offset: entry.block_offset,
             block_length: u32::try_from(next_offset - entry.block_offset)
                 .expect("validated block byte span"),
-            strictly_increasing: self.strict[index / 8] & (1 << (index % 8)) != 0,
         }
     }
 
@@ -79,7 +77,7 @@ impl BlockDirectory {
     }
 
     pub fn allocated_bytes(&self) -> usize {
-        std::mem::size_of_val(self.entries.as_ref()).saturating_add(self.strict.len())
+        std::mem::size_of_val(self.entries.as_ref())
     }
 
     pub(crate) fn row_start(&self, index: usize) -> u64 {
@@ -150,7 +148,6 @@ struct PackedBlock {
 
 pub(crate) struct DirectoryBuilder {
     entries: Vec<PackedBlock>,
-    strict: Vec<u8>,
     rows: u64,
     blocks_end: u64,
 }
@@ -159,17 +156,12 @@ impl DirectoryBuilder {
     pub(crate) fn new(count: usize, rows: u64, blocks_end: u64) -> Self {
         Self {
             entries: Vec::with_capacity(count),
-            strict: vec![0; count.div_ceil(8)],
             rows,
             blocks_end,
         }
     }
 
     pub(crate) fn push(&mut self, block: BlockMeta) {
-        let index = self.entries.len();
-        if block.strictly_increasing {
-            self.strict[index / 8] |= 1 << (index % 8);
-        }
         self.entries.push(PackedBlock {
             hash: block.hash,
             row_start: block.row_start,
@@ -182,7 +174,6 @@ impl DirectoryBuilder {
     pub(crate) fn finish(self) -> BlockDirectory {
         BlockDirectory {
             entries: self.entries.into_boxed_slice(),
-            strict: self.strict.into_boxed_slice(),
             rows: self.rows,
             blocks_end: self.blocks_end,
         }
@@ -205,7 +196,6 @@ mod tests {
                 max_timestamp: i64::MAX,
                 block_offset: 0,
                 block_length: u32::MAX,
-                strictly_increasing: false,
             },
             BlockMeta {
                 hash: u64::MAX,
@@ -215,7 +205,6 @@ mod tests {
                 max_timestamp: i64::MAX,
                 block_offset: u64::from(u32::MAX),
                 block_length: u32::MAX,
-                strictly_increasing: true,
             },
         ];
         let mut builder =

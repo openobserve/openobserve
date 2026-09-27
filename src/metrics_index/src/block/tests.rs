@@ -230,8 +230,6 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
     let blob = fixture();
     let index = index(&blob, &["label_b", "label_a", "missing"]).unwrap();
     assert_eq!(index.blocks.len(), 4);
-    assert!(!index.blocks.block(0).strictly_increasing);
-    assert!(index.blocks.block(1).strictly_increasing);
     assert_eq!(
         decoded_rows(&blob, &index),
         rows().iter().map(|r| (r.0, r.1, r.2)).collect::<Vec<_>>()
@@ -464,7 +462,7 @@ fn duplicates_across_chunk_boundary_remain_exact_and_visible() {
     writer.write(&input).unwrap();
     let blob = writer.finish().unwrap();
     let index = index(&blob, &[]).unwrap();
-    assert!(index.blocks.iter().all(|block| block.strictly_increasing));
+    assert!(index.blocks.iter().all(|block| block.row_count == 1));
     assert_eq!(
         index.blocks.block(0).max_timestamp,
         index.blocks.block(1).min_timestamp
@@ -589,11 +587,15 @@ fn header_rejects_truncation_corruption_and_excessive_claims() {
                 (h["labels"][0]["compressed"].as_u64().unwrap() - 1).into()
         },
         &|h| h["directory"][0]["raw"] = u64::MAX.into(),
-        &|h| h["directory"][7]["compressed"] = 0.into(),
+        &|h| h["directory"][6]["compressed"] = 0.into(),
         &|h| h["labels"][0]["compressed"] = u64::MAX.into(),
         &|h| h["labels"][1]["raw"] = 4.into(),
         &|h| h["labels"][1]["name"] = "label_a".into(),
-        &|h| h["directory"].as_array_mut().unwrap().truncate(7),
+        &|h| h["directory"].as_array_mut().unwrap().truncate(6),
+        &|h| {
+            let extra = h["directory"][6].clone();
+            h["directory"].as_array_mut().unwrap().push(extra);
+        },
         &|h| h["row_group_size"] = 0.into(),
     ] {
         let mut h = json.clone();

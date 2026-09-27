@@ -42,8 +42,7 @@ pub const HEADER_PROBE_BYTES: u64 = 64 * 1024;
 pub const MAX_BLOCK_ROWS: usize = 8192;
 /// Label count above which building a MIDX warns: the writer holds every label of every block.
 pub const WARN_LABEL_COLUMNS: usize = 128;
-const DIRECTORY_FIELDS: usize = 8;
-/// hash, row start, row count, min/max timestamp, block offset, block length, strictly increasing.
+const DIRECTORY_FIELDS: usize = 7;
 const DIRECTORY_TYPES: [DataType; DIRECTORY_FIELDS] = [
     DataType::UInt64,
     DataType::UInt64,
@@ -52,7 +51,6 @@ const DIRECTORY_TYPES: [DataType; DIRECTORY_FIELDS] = [
     DataType::Int64,
     DataType::UInt64,
     DataType::UInt32,
-    DataType::Boolean,
 ];
 const NON_IDENTITY: &[&str] = &[
     "exemplars",
@@ -79,7 +77,6 @@ pub struct BlockMeta {
     pub max_timestamp: i64,
     pub block_offset: u64,
     pub block_length: u32,
-    pub strictly_increasing: bool,
 }
 
 impl BlockMeta {

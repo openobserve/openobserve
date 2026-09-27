@@ -163,7 +163,6 @@ impl Header {
         let mut directory = Vec::with_capacity(DIRECTORY_FIELDS);
         for (section, kind) in data.directory.into_iter().zip(DIRECTORY_TYPES) {
             let width = match kind {
-                DataType::Boolean => 1,
                 DataType::UInt32 => 4,
                 _ => 8,
             };
