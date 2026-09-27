@@ -31,7 +31,7 @@ pub(super) type CachedSelection = (Arc<Vec<Range<usize>>>, Option<u32>);
 #[derive(Clone)]
 enum CacheValue {
     Rows(CachedSelection),
-    Blocks(Arc<Vec<usize>>),
+    Blocks(Arc<Vec<Range<usize>>>),
 }
 
 pub(super) struct MetricsIndexSelectionCache {
@@ -54,8 +54,8 @@ impl MetricsIndexSelectionCache {
             CacheValue::Rows((ranges, _)) => {
                 std::mem::size_of::<Vec<Range<usize>>>() + std::mem::size_of_val(ranges.as_slice())
             }
-            CacheValue::Blocks(ids) => {
-                std::mem::size_of::<Vec<usize>>() + std::mem::size_of_val(ids.as_slice())
+            CacheValue::Blocks(ranges) => {
+                std::mem::size_of::<Vec<Range<usize>>>() + std::mem::size_of_val(ranges.as_slice())
             }
         };
         key.len() + content
@@ -72,15 +72,15 @@ impl MetricsIndexSelectionCache {
         self.insert_value(key, CacheValue::Rows(selection));
     }
 
-    fn get_blocks(&mut self, key: &str) -> Option<Arc<Vec<usize>>> {
+    fn get_blocks(&mut self, key: &str) -> Option<Arc<Vec<Range<usize>>>> {
         match self.entries.get(key)? {
-            CacheValue::Blocks(ids) => Some(Arc::clone(ids)),
+            CacheValue::Blocks(ranges) => Some(Arc::clone(ranges)),
             CacheValue::Rows(_) => None,
         }
     }
 
-    fn insert_blocks(&mut self, key: String, ids: Arc<Vec<usize>>) {
-        self.insert_value(key, CacheValue::Blocks(ids));
+    fn insert_blocks(&mut self, key: String, ranges: Arc<Vec<Range<usize>>>) {
+        self.insert_value(key, CacheValue::Blocks(ranges));
     }
 
     fn insert_value(&mut self, key: String, value: CacheValue) {
@@ -117,6 +117,20 @@ impl MetricsIndexSelectionCache {
     }
 }
 
+fn compact_block_ids(ids: &[usize]) -> Vec<Range<usize>> {
+    let mut ranges: Vec<Range<usize>> = Vec::new();
+    for &id in ids {
+        if let Some(last) = ranges.last_mut()
+            && last.end == id
+        {
+            last.end = id.saturating_add(1);
+        } else {
+            ranges.push(id..id.saturating_add(1));
+        }
+    }
+    ranges
+}
+
 fn block_key(file: &FileKey, matchers: &Matchers) -> String {
     format!(
         "blocks\0{}\0{}\0{}\0{}\0{}\0{matchers:?}",
@@ -124,7 +138,7 @@ fn block_key(file: &FileKey, matchers: &Matchers) -> String {
     )
 }
 
-pub fn cached_blocks(file: &FileKey, matchers: &Matchers) -> Option<Arc<Vec<usize>>> {
+pub fn cached_blocks(file: &FileKey, matchers: &Matchers) -> Option<Arc<Vec<Range<usize>>>> {
     if !get_config().search.metrics_selection_cache_enabled {
         return None;
     }
@@ -143,13 +157,19 @@ pub fn cached_blocks(file: &FileKey, matchers: &Matchers) -> Option<Arc<Vec<usiz
     value
 }
 
-pub fn cache_blocks(file: &FileKey, matchers: &Matchers, ids: Arc<Vec<usize>>) {
+pub fn cache_blocks(
+    file: &FileKey,
+    matchers: &Matchers,
+    ids: Vec<usize>,
+) -> Arc<Vec<Range<usize>>> {
+    let ranges = Arc::new(compact_block_ids(&ids));
     if get_config().search.metrics_selection_cache_enabled {
         METRICS_INDEX_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|error| error.into_inner())
-            .insert_blocks(block_key(file, matchers), ids);
+            .insert_blocks(block_key(file, matchers), Arc::clone(&ranges));
     }
+    ranges
 }
 
 #[cfg(test)]
@@ -160,10 +180,19 @@ mod tests {
     fn block_ids_and_source_ranges_remain_separate_cache_values() {
         let mut cache = MetricsIndexSelectionCache::default();
         cache.insert("rows".into(), (Arc::new(vec![0..3, 4..5]), Some(8)));
-        cache.insert_blocks("blocks".into(), Arc::new(vec![0, 2]));
+        cache.insert_blocks("blocks".into(), Arc::new(vec![0..1, 2..3]));
         assert_eq!(cache.get("rows").unwrap().0.as_ref(), &vec![0..3, 4..5]);
-        assert_eq!(cache.get_blocks("blocks").unwrap().as_ref(), &vec![0, 2]);
+        assert_eq!(
+            cache.get_blocks("blocks").unwrap().as_ref(),
+            &vec![0..1, 2..3]
+        );
         assert!(cache.get_blocks("rows").is_none());
         assert!(cache.get("blocks").is_none());
+    }
+
+    #[test]
+    fn consecutive_block_ids_share_one_range() {
+        assert_eq!(compact_block_ids(&[]), Vec::<Range<usize>>::new());
+        assert_eq!(compact_block_ids(&[1, 2, 3, 4, 10]), vec![1..5, 10..11]);
     }
 }

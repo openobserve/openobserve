@@ -468,6 +468,11 @@ impl SeriesStream for BlockSeriesStream {
     }
 }
 
+struct RangeSelectedFile {
+    file: Arc<LoadedFile>,
+    ranges: Arc<Vec<Range<usize>>>,
+}
+
 struct SelectedFile {
     file: Arc<LoadedFile>,
     ids: Vec<usize>,
@@ -546,10 +551,11 @@ pub(super) async fn prepare(
             let source = source.clone();
             let matchers = Arc::clone(&matchers);
             async move {
-                let ids = if matchers.matchers.is_empty() && matchers.or_matchers.is_empty() {
-                    (0..file.index.blocks.len()).collect()
-                } else if let Some(ids) = metrics_index::cached_blocks(&source, &matchers) {
-                    ids.as_ref().clone()
+                let ranges = if matchers.matchers.is_empty() && matchers.or_matchers.is_empty() {
+                    let len = file.index.blocks.len();
+                    Arc::new((len > 0).then_some(0..len).into_iter().collect())
+                } else if let Some(ranges) = metrics_index::cached_blocks(&source, &matchers) {
+                    ranges
                 } else {
                     let index = Arc::clone(&file.index);
                     let filter = Arc::clone(&matchers);
@@ -557,15 +563,15 @@ pub(super) async fn prepare(
                         metrics_index::matching_blocks(&index, &filter)
                     })
                     .await??;
-                    metrics_index::cache_blocks(&source, &matchers, Arc::new(ids.clone()));
-                    ids
+                    metrics_index::cache_blocks(&source, &matchers, ids)
                 };
                 ensure!(
-                    ids.iter().all(|id| *id < file.index.blocks.len())
-                        && ids.windows(2).all(|pair| pair[0] < pair[1]),
-                    "block selection is not unique and ordered"
+                    ranges.iter().all(
+                        |range| range.start < range.end && range.end <= file.index.blocks.len()
+                    ) && ranges.windows(2).all(|pair| pair[0].end < pair[1].start),
+                    "block selection ranges are not unique and ordered"
                 );
-                Ok(SelectedFile { file, ids })
+                Ok(RangeSelectedFile { file, ranges })
             }
         })
         .collect::<Vec<_>>();
@@ -833,23 +839,24 @@ where
 }
 
 async fn bucket_selected_file(
-    selected: SelectedFile,
+    selected: RangeSelectedFile,
     partitions: Arc<Vec<(u64, u64)>>,
 ) -> Result<Vec<SelectedFile>> {
     let mut shards = (0..partitions.len())
         .map(|_| Vec::new())
         .collect::<Vec<_>>();
-    for chunk in selected.ids.chunks(PREFLIGHT_CPU_CHUNK) {
-        for &id in chunk {
-            let block = &selected.file.index.blocks.block(id);
-            let shard = partitions.partition_point(|range| range.1 < block.hash);
-            ensure!(
-                shard < partitions.len() && block.hash >= partitions[shard].0,
-                "hash outside shard intervals"
-            );
-            shards[shard].push(id);
+    let ids = selected.ranges.iter().flat_map(|range| range.clone());
+    for (position, id) in ids.enumerate() {
+        let block = &selected.file.index.blocks.block(id);
+        let shard = partitions.partition_point(|range| range.1 < block.hash);
+        ensure!(
+            shard < partitions.len() && block.hash >= partitions[shard].0,
+            "hash outside shard intervals"
+        );
+        shards[shard].push(id);
+        if (position + 1).is_multiple_of(PREFLIGHT_CPU_CHUNK) {
+            tokio::task::yield_now().await;
         }
-        tokio::task::yield_now().await;
     }
     Ok(shards
         .into_iter()
