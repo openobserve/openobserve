@@ -484,34 +484,9 @@ struct SelectedFile {
     ids: Vec<usize>,
 }
 
-enum SeriesIntervals {
-    One((i64, i64)),
-    Many(Vec<(i64, i64)>),
-}
-
-impl SeriesIntervals {
-    fn push(&mut self, interval: (i64, i64)) {
-        match self {
-            Self::One(first) => *self = Self::Many(vec![*first, interval]),
-            Self::Many(intervals) => intervals.push(interval),
-        }
-    }
-
-    fn disjoint(&mut self) -> bool {
-        match self {
-            Self::One(_) => true,
-            Self::Many(intervals) => {
-                intervals.sort_unstable();
-                intervals.windows(2).all(|pair| pair[0].1 < pair[1].0)
-            }
-        }
-    }
-}
-
 struct SeriesValidation {
     first_file: usize,
     first_block: usize,
-    intervals: SeriesIntervals,
 }
 
 struct ValidatedPartition {
@@ -928,10 +903,6 @@ async fn validate_partition(
             for &id in chunk {
                 let block = &file.file.index.blocks.block(id);
                 ensure!(
-                    block.strictly_increasing,
-                    "duplicate timestamps require source-reader tie semantics"
-                );
-                ensure!(
                     block.min_timestamp.checked_add(offset).is_some()
                         && block.max_timestamp.checked_add(offset).is_some(),
                     "timestamp offset overflow"
@@ -941,14 +912,10 @@ async fn validate_partition(
                         entry.insert(SeriesValidation {
                             first_file: file_id,
                             first_block: id,
-                            intervals: SeriesIntervals::One((
-                                block.min_timestamp,
-                                block.max_timestamp,
-                            )),
                         });
                     }
-                    hashbrown::hash_map::Entry::Occupied(mut entry) => {
-                        let previous = entry.get_mut();
+                    hashbrown::hash_map::Entry::Occupied(entry) => {
+                        let previous = entry.get();
                         if previous.first_file != file_id {
                             for name in labels.iter() {
                                 ensure!(
@@ -961,21 +928,9 @@ async fn validate_partition(
                                 );
                             }
                         }
-                        previous
-                            .intervals
-                            .push((block.min_timestamp, block.max_timestamp));
                     }
                 }
             }
-            tokio::task::yield_now().await;
-        }
-    }
-    for (position, series) in identities.values_mut().enumerate() {
-        ensure!(
-            series.intervals.disjoint(),
-            "overlapping file/block timestamps require source-reader tie semantics"
-        );
-        if (position + 1) % PREFLIGHT_CPU_CHUNK == 0 {
             tokio::task::yield_now().await;
         }
     }
@@ -1471,7 +1426,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn parallel_preflight_validates_fragments_outside_query_time_before_pruning() {
+    async fn parallel_preflight_checks_labels_outside_query_time_before_pruning() {
         let first = file(&[(1, -100, 1.0, None), (9, 20, 9.0, Some("inside"))]);
         let overlap = file(&[(1, -100, 2.0, None)]);
         let changed_label = file(&[(1, -90, 3.0, Some("changed"))]);
@@ -1486,26 +1441,38 @@ mod tests {
             false,
         )
         .await;
-        for (files, expected) in [
-            (vec![first.0.clone(), overlap.0], "overlapping"),
-            (
-                vec![first.0.clone(), changed_label.0],
-                "different projected labels",
-            ),
-            (vec![duplicate.0], "duplicate timestamps"),
-        ] {
-            let error = prepare(
-                &fixture.scan(files),
-                &Matchers::empty(),
-                columns(),
-                &intervals(),
-                100,
-                20,
-                &eval(),
-            )
-            .await;
-            assert!(error.err().unwrap().to_string().contains(expected));
+        for files in [vec![first.0.clone(), overlap.0], vec![duplicate.0]] {
+            assert!(
+                prepare(
+                    &fixture.scan(files),
+                    &Matchers::empty(),
+                    columns(),
+                    &intervals(),
+                    100,
+                    20,
+                    &eval(),
+                )
+                .await
+                .is_ok()
+            );
         }
+        let error = prepare(
+            &fixture.scan([first.0, changed_label.0]),
+            &Matchers::empty(),
+            columns(),
+            &intervals(),
+            100,
+            20,
+            &eval(),
+        )
+        .await;
+        assert!(
+            error
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("different projected labels")
+        );
         assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
     }
 
@@ -2104,7 +2071,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn preflight_rejects_duplicate_timestamps_and_cross_file_ties_without_payload() {
+    async fn preflight_preserves_duplicate_timestamps_and_overlapping_files() {
         let a = file(&[
             (1, 10, 1.0, Some("x")),
             (1, 20, 2.0, Some("x")),
@@ -2112,23 +2079,111 @@ mod tests {
         ]);
         let b = file(&[(1, 30, 9.0, Some("x")), (1, 40, 10.0, Some("x"))]);
         let duplicate = file(&[(2, 10, 1.0, Some("x")), (2, 10, 2.0, Some("x"))]);
-        let fixture = Fixture::new(&[a.clone(), b.clone(), duplicate.clone()], false).await;
-        for scan in [fixture.scan([a.0, b.0]), fixture.scan([duplicate.0])] {
+        let boundary = file(&[
+            (3, 10, 1.0, Some("x")),
+            (3, 20, 2.0, Some("x")),
+            (3, 20, 3.0, Some("x")),
+            (3, 30, 4.0, Some("x")),
+        ]);
+        let fixture = Fixture::new(
+            &[a.clone(), b.clone(), duplicate.clone(), boundary.clone()],
+            false,
+        )
+        .await;
+        for (scan, expected) in [
+            (
+                fixture.scan([a.0, b.0]),
+                vec![(110, 1.0), (120, 2.0), (130, 3.0), (130, 9.0), (140, 10.0)],
+            ),
+            (fixture.scan([duplicate.0]), vec![(110, 1.0), (110, 2.0)]),
+            (
+                fixture.scan([boundary.0]),
+                vec![(110, 1.0), (120, 2.0), (120, 3.0), (130, 4.0)],
+            ),
+        ] {
+            let reads = fixture.calls.load(Ordering::SeqCst);
+            let prepared = prepare(
+                &scan,
+                &Matchers::empty(),
+                columns(),
+                &intervals(),
+                100,
+                20,
+                &eval(),
+            )
+            .await
+            .unwrap();
+            assert_eq!(fixture.calls.load(Ordering::SeqCst), reads);
+            let mut actual = Vec::new();
+            for partition in prepared {
+                let mut stream = BlockSeriesStream::new(partition);
+                while stream.advance().await.unwrap().is_some() {
+                    let mut samples = Vec::new();
+                    stream.consume(&mut samples).await.unwrap();
+                    actual.extend(
+                        samples
+                            .into_iter()
+                            .map(|sample| (sample.timestamp, sample.value)),
+                    );
+                }
+            }
+            actual.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.total_cmp(&b.1)));
+            assert_eq!(actual, expected);
+            assert!(fixture.calls.load(Ordering::SeqCst) > reads);
+        }
+    }
+
+    #[tokio::test]
+    async fn duplicate_timestamps_do_not_fail_range_functions() {
+        use std::time::Duration;
+
+        use crate::{functions, streaming_eval};
+
+        let data = file(&[
+            (1, 10, 1.0, Some("x")),
+            (1, 20, 2.0, Some("x")),
+            (1, 30, 3.0, Some("x")),
+            (1, 30, 4.0, Some("x")),
+        ]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let scan = Arc::new(fixture.scan([data.0]));
+        let ctx = SessionContext::new_with_config(
+            SessionConfig::new()
+                .with_target_partitions(28)
+                .with_extension(scan),
+        );
+        let eval = EvalContext::new(120, 130, 5, "duplicate-range-functions".into());
+        for name in ["count_over_time", "irate", "rate", "resets"] {
+            let matchers = Matchers::empty();
+            let selector = StreamingSelector {
+                table_name: "m",
+                matchers: &matchers,
+                offset: 100,
+            };
+            let sources = execute_partitioned(
+                &ctx,
+                schema().as_ref(),
+                &selector,
+                LabelColumns::grouped(vec!["group".into()]),
+                20,
+                &eval,
+            )
+            .await
+            .unwrap()
+            .unwrap();
+            let func: Arc<dyn functions::RangeFunc> =
+                Arc::from(functions::fusable_range_func(name).unwrap());
+            let range = Arc::new(streaming_eval::RangeExpr::new(
+                func,
+                Duration::from_micros(20),
+                &eval,
+            ));
             assert!(
-                prepare(
-                    &scan,
-                    &Matchers::empty(),
-                    columns(),
-                    &intervals(),
-                    100,
-                    20,
-                    &eval()
-                )
-                .await
-                .is_err()
+                streaming_eval::eval_range(sources, range).await.is_ok(),
+                "{name}"
             );
         }
-        assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+        assert!(fixture.calls.load(Ordering::SeqCst) > 0);
     }
 
     #[tokio::test]
