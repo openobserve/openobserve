@@ -211,10 +211,10 @@ pub(super) fn attach_cached_labels(
         metrics.iter().map(|partition| partition.len()).sum(),
         per_partition,
     );
-    config::metrics::QUERY_METRICS_LABEL_CACHE_HIT_COUNT
+    config::metrics::promql::LABEL_CACHE_HIT_COUNT
         .with_label_values(&[org_id])
         .inc_by(misses.hits() as u64);
-    config::metrics::QUERY_METRICS_LABEL_CACHE_MISS_COUNT
+    config::metrics::promql::LABEL_CACHE_MISS_COUNT
         .with_label_values(&[org_id])
         .inc_by(misses.count() as u64);
     misses

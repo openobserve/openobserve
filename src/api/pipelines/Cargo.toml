@@ -27,6 +27,7 @@ cloud = [
     "stream/cloud",
 ]
 vectorscan = [
+    "enrichment-data/vectorscan",
     "openobserve-core/vectorscan",
     "search_service/vectorscan",
     "stream/vectorscan",

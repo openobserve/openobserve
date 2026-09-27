@@ -522,7 +522,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
-import { overviewRange } from "@/services/service_graph";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 
 const AlertHistoryDrawer = defineAsyncComponent(
@@ -803,12 +802,10 @@ const loadAnomalies = async (force = false) => {
 // Alert trigger history feeds recentEvents only
 const loadHistoryAndSplit = async (force = false) => {
   try {
-    // Quantised range: the raw timestamps move on every mount, so a key built
-    // from them could never hit — which is why switching tabs re-requested this.
-    const q = overviewRange(timeRange.value.startTime, timeRange.value.endTime);
+    // Exact bounds: `alertHistoryQuery` rounds only its key, so the newest minutes still reach the server.
     const historyOptions = alertHistoryQuery(orgId.value, {
-      start_time: q.start,
-      end_time: q.end,
+      start_time: timeRange.value.startTime,
+      end_time: timeRange.value.endTime,
       from: 0,
       size: 500,
       sort_by: "timestamp",

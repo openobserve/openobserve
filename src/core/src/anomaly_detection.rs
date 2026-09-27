@@ -130,6 +130,12 @@ pub struct CreateAnomalyConfigRequest {
     pub detection_window_seconds: i64,
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
+    /// The GET response names this `threshold`, so a read-modify-write must round-trip.
+    #[serde(
+        default,
+        alias = "threshold",
+        deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub percentile: Option<f64>,
     /// Delivered-alert budget per day; mutually exclusive with `percentile` in one request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -187,6 +193,12 @@ pub struct UpdateAnomalyConfigRequest {
     pub schedule_interval: Option<String>,
     pub detection_window_seconds: Option<i64>,
     pub training_window_days: Option<i32>,
+    /// The GET response names this `threshold`, so a read-modify-write must round-trip.
+    #[serde(
+        default,
+        alias = "threshold",
+        deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub percentile: Option<f64>,
     /// Double-option like `priority`: `None` leaves the stored budget, `Some(None)` clears it
     /// (back to percentile mode), `Some(Some(b))` sets it. A plain Option could never clear.
@@ -2910,7 +2922,8 @@ pub async fn execute_anomaly_query(
         regions: vec![],
         clusters: vec![],
         timeout: 0,
-        search_type: None,
+        // Untagged, this multi-day training scan routes to the interactive nodes serving the UI.
+        search_type: Some(config::meta::search::SearchEventType::DerivedStream),
         search_event_context: None,
         use_cache: false,
         clear_cache: false,
@@ -6681,5 +6694,43 @@ mod tests {
         // `NaN as i32` saturates to 0, which would have stored percentile 0.
         assert_eq!(f64::NAN.clamp(50.0, 99.9) as i32, 0);
         assert_eq!(clamped_threshold(f64::NAN), 97);
+    }
+
+    #[test]
+    fn threshold_is_accepted_as_an_alias_for_percentile_on_both_request_bodies() {
+        let create: CreateAnomalyConfigRequest = serde_json::from_value(serde_json::json!({
+            "name": "a",
+            "stream_name": "s",
+            "stream_type": "logs",
+            "query_mode": "filters",
+            "histogram_interval": "5m",
+            "schedule_interval": "5m",
+            "detection_window_seconds": 1200,
+            "threshold": 99,
+        }))
+        .expect("threshold must deserialize into percentile");
+        assert_eq!(create.percentile, Some(99.0));
+
+        let update: UpdateAnomalyConfigRequest =
+            serde_json::from_value(serde_json::json!({ "threshold": 99.9 }))
+                .expect("threshold must deserialize into percentile");
+        assert_eq!(update.percentile, Some(99.9));
+
+        let canonical: UpdateAnomalyConfigRequest =
+            serde_json::from_value(serde_json::json!({ "percentile": 55.0 })).unwrap();
+        assert_eq!(canonical.percentile, Some(55.0));
+    }
+
+    #[test]
+    fn the_training_search_type_routes_to_background_nodes() {
+        use config::meta::{cluster::RoleGroup, search::SearchEventType};
+
+        assert_eq!(
+            RoleGroup::from(SearchEventType::DerivedStream),
+            RoleGroup::Background,
+            "training scans must not land on the interactive nodes serving the UI"
+        );
+        // An untagged request yields no role group at all, which is the bug this pins.
+        assert_ne!(RoleGroup::from(SearchEventType::UI), RoleGroup::Background);
     }
 }

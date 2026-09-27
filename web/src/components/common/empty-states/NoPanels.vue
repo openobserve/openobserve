@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #actions>
       <QuickStartCard
-        v-if="!viewOnly"
+        v-if="!viewOnly && !hideAddAction"
         icon="add"
         :label="t('emptyState.noPanels.action')"
         :sublabel="t('emptyState.noPanels.actionDesc')"
@@ -49,6 +49,6 @@ import QuickStartCard from "./QuickStartCard.vue";
 
 const { t } = useI18nTyped();
 
-defineProps<{ viewOnly?: boolean }>();
+defineProps<{ viewOnly?: boolean; hideAddAction?: boolean }>();
 defineEmits<{ add: [] }>();
 </script>
