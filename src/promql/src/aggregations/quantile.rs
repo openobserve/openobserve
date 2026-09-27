@@ -19,38 +19,48 @@ use datafusion::error::Result;
 use crate::{
     aggregations::{Accumulate, AggFunc, group_series},
     common::quantile_in_place,
+    scalar_param::ScalarParam,
 };
 
 /// Note: quantile aggregates all series into a single result (no label grouping)
-pub fn quantile(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+pub(crate) fn quantile(qtile: ScalarParam, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
     log::info!(
-        "[trace_id: {}] [PromQL Timing] quantile_range({qtile}) started",
+        "[trace_id: {}] [PromQL Timing] quantile_range({qtile:?}) started",
         eval_ctx.trace_id,
     );
 
     // Handle invalid quantile parameter by returning special values
-    if !(0.0..=1.0).contains(&qtile) {
+    if let ScalarParam::Const(qtile) = qtile
+        && !(0.0..=1.0).contains(&qtile)
+    {
         let value = quantile_in_place(&mut [], qtile).unwrap();
         return crate::functions::vector(Value::Float(value), eval_ctx);
     }
 
-    let result = super::eval_aggregate(&None, data, Quantile { qtile }, eval_ctx);
+    let result = super::eval_aggregate(
+        &None,
+        data,
+        Quantile {
+            qtile: qtile.clone(),
+        },
+        eval_ctx,
+    );
     log::info!(
-        "[trace_id: {}] [PromQL Timing] quantile_range({qtile}) execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] quantile_range({qtile:?}) execution took: {:?}",
         eval_ctx.trace_id,
         start.elapsed()
     );
     result
 }
 
-pub struct Quantile {
-    qtile: f64,
+pub(crate) struct Quantile {
+    qtile: ScalarParam,
 }
 
 #[cfg(test)]
 impl Quantile {
-    pub(super) fn new(qtile: f64) -> Self {
+    pub(super) fn new(qtile: ScalarParam) -> Self {
         Self { qtile }
     }
 }
@@ -64,7 +74,7 @@ impl AggFunc for Quantile {
 
     fn build(&self, slots: usize) -> Self::Accumulator {
         QuantileAccumulate {
-            qtile: self.qtile,
+            qtile: self.qtile.clone(),
             values: vec![Vec::new(); slots],
         }
     }
@@ -76,8 +86,8 @@ impl AggFunc for Quantile {
     }
 }
 
-pub struct QuantileAccumulate {
-    qtile: f64,
+pub(crate) struct QuantileAccumulate {
+    qtile: ScalarParam,
     values: Vec<Vec<f64>>,
 }
 
@@ -113,7 +123,7 @@ impl Accumulate for QuantileAccumulate {
                 if values.is_empty() {
                     return None;
                 }
-                quantile_in_place(&mut values, self.qtile)
+                quantile_in_place(&mut values, self.qtile.at_slot(slot))
                     .map(|quantile_val| Sample::new(timestamps[slot], quantile_val))
             })
             .collect();
@@ -129,7 +139,7 @@ mod tests {
     fn test_quantile_value_none_input() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(0.5, Value::None, &eval_ctx).unwrap();
+        let result = quantile(ScalarParam::Const(0.5), Value::None, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -137,7 +147,7 @@ mod tests {
     fn test_quantile_invalid_input_returns_err() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(0.5, Value::Float(1.0), &eval_ctx);
+        let result = quantile(ScalarParam::Const(0.5), Value::Float(1.0), &eval_ctx);
         assert!(result.is_err());
     }
 
@@ -145,7 +155,7 @@ mod tests {
     fn test_quantile_out_of_range_positive_returns_infinity() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(1.5, Value::None, &eval_ctx).unwrap();
+        let result = quantile(ScalarParam::Const(1.5), Value::None, &eval_ctx).unwrap();
         match result {
             Value::Matrix(m) => {
                 assert_eq!(m.len(), 1);
@@ -160,7 +170,7 @@ mod tests {
     fn test_quantile_out_of_range_negative_returns_neg_infinity() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(-0.1, Value::None, &eval_ctx).unwrap();
+        let result = quantile(ScalarParam::Const(-0.1), Value::None, &eval_ctx).unwrap();
         match result {
             Value::Matrix(m) => {
                 assert_eq!(m.len(), 1);
@@ -175,7 +185,7 @@ mod tests {
     fn test_quantile_nan_returns_nan_samples() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(f64::NAN, Value::None, &eval_ctx).unwrap();
+        let result = quantile(ScalarParam::Const(f64::NAN), Value::None, &eval_ctx).unwrap();
         match result {
             Value::Matrix(m) => {
                 assert_eq!(m.len(), 1);

@@ -206,6 +206,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : undefined
                         "
                         @update:model-value="onCustomPeriodSelect"
+                        @focus="onCustomValueFocus"
+                        @blur="onCustomValueBlur"
                       />
                     </div>
                     <div class="flex min-w-0 flex-1 flex-col">
@@ -368,6 +370,15 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 const MICROS_PER_SECOND = 1_000_000;
+// Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
+const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
+  s: 315_360_000,
+  m: 5_256_000,
+  h: 87_600,
+  d: 3_650,
+  w: 520,
+  M: 120,
+};
 
 interface ConsumableDateTime {
   startTime: number;
@@ -478,6 +489,7 @@ export default defineComponent({
     });
     const relativePeriod = ref("m");
     const relativeValue = ref(15);
+    const lastValidCustomValue = ref(15);
     const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const timezone = ref(currentTimezone);
     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
@@ -701,22 +713,37 @@ export default defineComponent({
       if (props.autoApply) saveDate("relative");
     };
 
+    const isValidCustomValue = (value: unknown) =>
+      value !== "" && value !== null && Number.isFinite(Number(value));
+
     const onCustomPeriodSelect = () => {
+      // An emptied or non-numeric field is mid-edit: apply nothing until a number is typed.
+      if (!isValidCustomValue(relativeValue.value)) return;
+
+      let value = Math.max(1, Math.trunc(Number(relativeValue.value)));
+      const restrictedMax = relativePeriodsMaxValue.value[relativePeriod.value];
       if (
         selectedType.value == "relative" &&
         props.queryRangeRestrictionInHour > 0 &&
-        relativeValue.value > relativePeriodsMaxValue.value[relativePeriod.value]
+        value > restrictedMax
       ) {
-        relativeValue.value =
-          relativePeriodsMaxValue.value[relativePeriod.value] > -1
-            ? relativePeriodsMaxValue.value[relativePeriod.value]
-            : 15;
+        value = restrictedMax > -1 ? restrictedMax : 15;
       }
-
-      // relativeValue can hold a string at runtime (text input); parseInt coerces
-      relativeValue.value = parseInt(relativeValue.value as unknown as string);
+      relativeValue.value = Math.min(
+        value,
+        MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? value,
+      );
+      lastValidCustomValue.value = relativeValue.value;
 
       if (props.autoApply) saveDate("relative-custom");
+    };
+
+    const onCustomValueFocus = () => {
+      lastValidCustomValue.value = relativeValue.value;
+    };
+    const onCustomValueBlur = () => {
+      if (!isValidCustomValue(relativeValue.value))
+        relativeValue.value = lastValidCustomValue.value;
     };
 
     const setRelativeTime = (period: string) => {
@@ -1086,7 +1113,10 @@ export default defineComponent({
 
     const getDisplayValue = computed(() => {
       if (!props.disableRelative && selectedType.value === "relative") {
-        return t(pastPeriodKey.value, { count: relativeValue.value });
+        const count = isValidCustomValue(relativeValue.value)
+          ? relativeValue.value
+          : lastValidCustomValue.value;
+        return t(pastPeriodKey.value, { count });
       } else {
         if (selectedDate.value != null) {
           // Here as if multiple dates is selected we get object with from and to keys
@@ -1472,6 +1502,8 @@ export default defineComponent({
       datetimeBtn,
       getImageURL,
       onCustomPeriodSelect,
+      onCustomValueFocus,
+      onCustomValueBlur,
       setRelativeDate,
       relativePeriods,
       relativeDates,

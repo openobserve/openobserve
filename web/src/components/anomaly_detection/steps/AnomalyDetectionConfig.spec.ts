@@ -64,7 +64,10 @@ vi.mock("@/components/QueryEditor.vue", () => ({
 }));
 
 import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
-import { anomalyDetectionConfigDefaults } from "./AnomalyDetectionConfig.schema";
+import {
+  anomalyDetectionConfigDefaults,
+  lookBackWindowFloorSeconds,
+} from "./AnomalyDetectionConfig.schema";
 import { defaultAnomalyConfig } from "@/composables/useAlertForm";
 
 // ---------------------------------------------------------------------------
@@ -81,8 +84,9 @@ function buildConfig(configOverrides: Record<string, unknown> = {}) {
     detection_function_field: "",
     filters: [] as Array<{ field: string; operator: string; value: string }>,
     custom_sql: "",
-    detection_window_value: 30,
-    detection_window_unit: "m",
+    // Above the schedule+histogram floor (1h + 5m) so unrelated tests stay floor-clean.
+    detection_window_value: 2,
+    detection_window_unit: "h",
     training_window_days: 7,
     threshold: 97,
     ...configOverrides,
@@ -98,10 +102,13 @@ const mountOptions = {
   },
 };
 
-function mountConfig(configOverrides: Record<string, unknown> = {}) {
+function mountConfig(
+  configOverrides: Record<string, unknown> = {},
+  extraProps: Record<string, unknown> = {},
+) {
   return mount(AnomalyDetectionConfig, {
     ...mountOptions,
-    props: { config: buildConfig(configOverrides) },
+    props: { config: buildConfig(configOverrides), ...extraProps },
   });
 }
 
@@ -1113,6 +1120,169 @@ describe("AnomalyDetectionConfig", () => {
         "level",
       );
       expect(values).toEqual(["ERROR", "INFO"]);
+    });
+  });
+
+  // §4.3/§4.6: floor = Check Every + one Detection Resolution, computed locally — no settle margin.
+  describe("look back window floor (schedule + histogram)", () => {
+    const submitted = async (
+      overrides: Record<string, unknown>,
+      extraProps: Record<string, unknown> = {},
+    ): Promise<VueWrapper> => {
+      const w = mountConfig(overrides, extraProps);
+      await flushPromises();
+      await getForm(w).handleSubmit();
+      await nextTick();
+      return w;
+    };
+
+    it("is Check Every plus one Detection Resolution", () => {
+      expect(lookBackWindowFloorSeconds(1, "h", 5, "m")).toBe(3900);
+      expect(lookBackWindowFloorSeconds(5, "m", 5, "m")).toBe(600);
+      expect(lookBackWindowFloorSeconds(90, "s", 30, "s")).toBe(120);
+      expect(lookBackWindowFloorSeconds(1, "d", 1, "h")).toBe(90000);
+    });
+
+    it("is absent when either governing value is not a positive s/m/h/d interval", () => {
+      expect(lookBackWindowFloorSeconds(0, "m", 5, "m")).toBeNull();
+      expect(lookBackWindowFloorSeconds(5, "x", 5, "m")).toBeNull();
+      expect(lookBackWindowFloorSeconds(5, "m", Number.NaN, "m")).toBeNull();
+    });
+
+    it("rejects the live broken shape: 5m window on a 5m schedule and 5m buckets", async () => {
+      wrapper = await submitted({
+        schedule_interval_value: 5,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+        detection_window_value: 5,
+        detection_window_unit: "m",
+      });
+
+      expect(fieldError(wrapper, "detection_window_value")).toContain("10m");
+      expect(getForm(wrapper).state.isValid).toBe(false);
+    });
+
+    it("accepts exactly the floor and refuses one bucket under it", async () => {
+      const shape = {
+        schedule_interval_value: 5,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+        detection_window_unit: "m",
+      };
+      wrapper = await submitted({ ...shape, detection_window_value: 10 });
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      wrapper.unmount();
+
+      wrapper = await submitted({ ...shape, detection_window_value: 9 });
+      expect(fieldError(wrapper, "detection_window_value")).toBeDefined();
+    });
+
+    it("states the minimum and the 2x recommendation at the field", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      const hint = wrapper.find('[data-test="anomaly-detection-window-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).toContain("1h 5m");
+      expect(hint.text()).toContain("2h 10m");
+    });
+  });
+
+  // D4/N11: suppression by value vs the fetched triple, never touched-flags; bytes are pinned in the payload spec.
+  describe("client grandfathering of legacy rows (D4/N11/N12)", () => {
+    // A stored below-floor row: window 10m against a 1h schedule + 5m buckets (floor 1h 5m).
+    const storedBelowFloor = () => ({
+      histogram: { raw: "5m", value: 5, unit: "m", parsed: true },
+      schedule: { raw: "1h", value: 1, unit: "h", parsed: true },
+      window: { raw: 600, value: 10, unit: "m", parsed: true },
+    });
+    // The form state the stored triple seeds (schedule 1h is the mount default).
+    const matchingConfig = {
+      histogram_interval_value: 5,
+      histogram_interval_unit: "m",
+      detection_window_value: 10,
+      detection_window_unit: "m",
+    };
+
+    const mountStored = async (stored: Record<string, unknown>) => {
+      const w = mountConfig(matchingConfig, { storedIntervals: stored });
+      await flushPromises();
+      return w;
+    };
+
+    it("an untouched below-floor triple passes: a description-only edit saves", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      await getForm(wrapper).handleSubmit();
+      await nextTick();
+
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      expect(getForm(wrapper).state.isValid).toBe(true);
+    });
+
+    it("a below-floor window EDIT is rejected", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      getForm(wrapper).setFieldValue("detection_window_value", 20);
+      await getForm(wrapper).handleSubmit();
+      await nextTick();
+
+      expect(fieldError(wrapper, "detection_window_value")).toContain("1h 5m");
+    });
+
+    it("edit-and-revert is clean again (value comparison, not touched-flags)", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      const form = getForm(wrapper);
+      form.setFieldValue("detection_window_value", 20);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBeDefined();
+
+      form.setFieldValue("detection_window_value", 10);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      expect(form.state.isValid).toBe(true);
+    });
+
+    it("unparsable stored values: no floor, no warning -- but W>0 still enforced (N12)", async () => {
+      const stored = storedBelowFloor();
+      stored.schedule = { raw: "1x", value: 1, unit: "h", parsed: false };
+      wrapper = await mountStored(stored);
+      const form = getForm(wrapper);
+
+      // The window edit cannot be floored against an unparsable schedule.
+      form.setFieldValue("detection_window_value", 6);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      expect(wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]').exists()).toBe(
+        false,
+      );
+
+      // N12: tolerance never waives W > 0.
+      form.setFieldValue("detection_window_value", 0);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBe("Field is required!");
+    });
+
+    it("warns on a grandfathered below-floor row, stating the correctly parsed minimum", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+
+      const warning = wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]');
+      expect(warning.exists()).toBe(true);
+      expect(warning.text()).toContain("1h 5m");
+    });
+
+    it("clears the legacy warning once the triple is edited", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      getForm(wrapper).setFieldValue("detection_window_value", 70);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]').exists()).toBe(
+        false,
+      );
     });
   });
 });

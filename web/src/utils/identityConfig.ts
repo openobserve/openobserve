@@ -29,7 +29,12 @@ export async function loadIdentityConfig(orgIdentifier: string): Promise<Service
   const state = queryClient.getQueryState<ServiceIdentityConfig>(
     serviceStreamKeys.identityConfig(orgIdentifier),
   );
-  if (state?.data !== undefined && Date.now() - state.dataUpdatedAt < CACHE_TTL_MS) {
+  // An invalidated entry is stale whatever its age, or a config save's invalidation never reaches this path.
+  if (
+    state?.data !== undefined &&
+    !state.isInvalidated &&
+    Date.now() - state.dataUpdatedAt < CACHE_TTL_MS
+  ) {
     return state.data;
   }
   try {

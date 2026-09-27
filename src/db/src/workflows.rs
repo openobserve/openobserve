@@ -64,6 +64,9 @@ pub enum WorkflowTriggerType {
     Retry,
     // A trigger type written by a newer node. Decoding to a real variant instead would
     // relabel it as that trigger, and run history is searched across regions.
+    // `other` covers the JSON envelope too: without it an unknown tag fails the whole
+    // `WorkflowTrigger` parse, so one new variant stops an old node reading any trigger.
+    #[serde(other)]
     Unknown,
 }
 
@@ -598,6 +601,20 @@ mod tests {
         assert_eq!(WorkflowTriggerType::from(""), WorkflowTriggerType::Unknown);
         assert_ne!(
             WorkflowTriggerType::from("SomeFutureTrigger"),
+            WorkflowTriggerType::AlertFired
+        );
+    }
+
+    #[test]
+    fn an_unknown_trigger_type_decodes_from_json_rather_than_failing_the_envelope() {
+        // `From<&str>` covers the database and the history key. The envelope is what
+        // crosses regions, and one unknown tag used to fail the whole `WorkflowTrigger`.
+        assert_eq!(
+            serde_json::from_str::<WorkflowTriggerType>(r#""AlertResolved""#).unwrap(),
+            WorkflowTriggerType::Unknown
+        );
+        assert_eq!(
+            serde_json::from_str::<WorkflowTriggerType>(r#""AlertFired""#).unwrap(),
             WorkflowTriggerType::AlertFired
         );
     }

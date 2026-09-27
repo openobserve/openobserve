@@ -149,6 +149,10 @@ pub async fn get_latest_sessions(
         Some(v) => v.to_string(),
         None => "".to_string(),
     };
+    // F2: the filter is spliced into the page query, so it has to be one boolean expression.
+    if let Err(e) = config::utils::sql::validate_optional_where_fragment(&filter) {
+        return MetaHttpResponse::bad_request(format!("invalid filter: {e}"));
+    }
     let search = LatestSessionSearch::from_query(&query);
     let sort = match LatestSessionSort::from_query(&query) {
         Ok(sort) => sort,
@@ -870,11 +874,11 @@ async fn fetch_session_trace_hits(
         } else {
             ""
         };
-        let svc_sql = format!(
-            "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
-             count(*) AS svc_count, max(duration) AS svc_duration \
-             FROM \"{stream_name}\" WHERE {multi_trace_id_predicate} \
-             GROUP BY trace_id, {service_key_expr}"
+        let svc_sql = build_session_service_breakdown_sql(
+            stream_name,
+            service_key_expr,
+            svc_type_select,
+            &multi_trace_id_predicate,
         );
         req.query.sql = svc_sql;
         req.query.from = 0;
@@ -930,6 +934,21 @@ async fn fetch_session_trace_hits(
         .collect())
 }
 
+fn build_session_service_breakdown_sql(
+    stream_name: &str,
+    service_key_expr: &str,
+    svc_type_select: &str,
+    trace_id_predicate: &str,
+) -> String {
+    let stream_ident = traces::session::quote_identifier(stream_name);
+    format!(
+        "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
+         count(*) AS svc_count, max(duration) AS svc_duration \
+         FROM {stream_ident} WHERE {trace_id_predicate} \
+         GROUP BY trace_id, {service_key_expr}"
+    )
+}
+
 fn build_session_trace_details_sql(
     stream_name: &str,
     validated: &super::schema_compat::ValidatedLlmSchema,
@@ -958,6 +977,7 @@ fn build_session_trace_details_sql(
          array_agg(DISTINCT {user_id_col}) \
              FILTER (WHERE {user_id_col} IS NOT NULL AND {user_id_col} != '') AS user_ids"
     );
+    let stream_ident = traces::session::quote_identifier(stream_name);
 
     if validated.has_gen_ai {
         let first_msg_clause = if validated.has_input_messages {
@@ -1023,7 +1043,7 @@ fn build_session_trace_details_sql(
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
             {trace_selects} \
-            FROM \"{stream_name}\" \
+            FROM {stream_ident} \
             WHERE {trace_id_predicate} \
             GROUP BY trace_id"
         )
@@ -1049,7 +1069,7 @@ fn build_session_trace_details_sql(
             array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
             {trace_selects} \
-            FROM \"{stream_name}\" \
+            FROM {stream_ident} \
             WHERE {trace_id_predicate} \
             GROUP BY trace_id"
         )
@@ -1476,10 +1496,11 @@ fn build_latest_session_page_sql(
             )
         }
     };
+    let stream_ident = traces::session::quote_identifier(stream_name);
     format!(
         "SELECT {session_id_col} as session_id, \
          max(end_time) as session_last_activity{sort_projection} \
-         FROM \"{stream_name}\" \
+         FROM {stream_ident} \
          WHERE {session_id_col} IS NOT NULL AND {session_id_col} != '' \
          GROUP BY {session_id_col}{membership_filter} \
          ORDER BY {order_by}"
@@ -1603,6 +1624,7 @@ fn build_latest_sessions_sql(
         "gen_ai_usage_cost_net_cache_impact",
         "gen_ai_usage_cost_net_cache_impact",
     );
+    let stream_ident = traces::session::quote_identifier(stream_name);
 
     format!(
         "SELECT {session_id_col} as session_id, \
@@ -1626,7 +1648,7 @@ fn build_latest_sessions_sql(
          array_agg(DISTINCT {user_id_col}) \
              FILTER (WHERE {user_id_col} IS NOT NULL AND {user_id_col} != '') as user_ids, \
          {first_message_expr} \
-         FROM \"{stream_name}\" \
+         FROM {stream_ident} \
          WHERE {session_id_col} IN ({session_ids_sql}) \
          GROUP BY {session_id_col}"
     )
@@ -1939,6 +1961,7 @@ mod tests {
         validated.has_total_tokens = true;
         validated.has_cache_read_input_tokens = true;
         let filter = "gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM \"bench_traces\" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY gen_ai_conversation_id)";
+        assert!(config::utils::sql::validate_optional_where_fragment(filter).is_ok());
         let page_sql = build_latest_session_page_sql(
             "bench_traces",
             filter,
@@ -1994,6 +2017,7 @@ mod tests {
     fn latest_session_page_sql_keeps_unrelated_subqueries_unchanged() {
         let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
         let filter = "gen_ai_conversation_id IN (SELECT other_id FROM other_stream WHERE active = true GROUP BY other_id)";
+        assert!(config::utils::sql::validate_optional_where_fragment(filter).is_ok());
         let sql = build_latest_session_page_sql(
             "bench_traces",
             filter,
@@ -2171,6 +2195,7 @@ mod tests {
     #[test]
     fn page_sql_ands_keyword_onto_a_parenthesised_agent_filter() {
         let filter = "gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2'";
+        assert!(config::utils::sql::validate_optional_where_fragment(filter).is_ok());
         let sql = build_latest_session_page_sql(
             "bench_traces",
             filter,
@@ -2461,5 +2486,36 @@ mod tests {
         let input = json::json!({"prompt": "hello"});
         let result = extract_first_user_message(&input, 30);
         assert_eq!(result, Some("{\"prompt\":\"hello\"}".to_string()));
+    }
+
+    #[test]
+    fn session_sql_quotes_a_stream_name_that_contains_a_quote() {
+        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        let page = build_latest_session_page_sql(
+            "bench\"traces",
+            "",
+            &LatestSessionSearch::default(),
+            &LatestSessionSort::default(),
+            &validated,
+        );
+        let summary =
+            build_latest_sessions_sql("bench\"traces", &["session-1".to_string()], &validated);
+        let details = build_session_trace_details_sql(
+            "bench\"traces",
+            &validated,
+            false,
+            "service_name",
+            "\"trace_id\" IN ('trace-1')",
+        );
+        let services = build_session_service_breakdown_sql(
+            "bench\"traces",
+            "service_name",
+            "",
+            "\"trace_id\" IN ('trace-1')",
+        );
+        for sql in [&page, &summary, &details, &services] {
+            assert!(sql.contains("FROM \"bench\"\"traces\""), "{sql}");
+            assert!(!sql.contains("FROM \"bench\"traces\""), "{sql}");
+        }
     }
 }

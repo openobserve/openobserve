@@ -15,6 +15,7 @@
 
 use config::meta::otlp::OtlpRequestType;
 use ingestion_common::IngestUser;
+use openobserve_core::metrics::otlp::write_failure_response;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
     metrics_service_server::MetricsService,
@@ -67,7 +68,7 @@ impl MetricsService for MetricsIngester {
             user,
         )
         .await
-        .map_err(|e| Status::internal(e.to_string()))?;
+        .unwrap_or_else(|e| write_failure_response(OtlpRequestType::Grpc, &e));
         let reply = export_reply(resp).await?;
         observe_ok("/otlp/v1/metrics", start);
         Ok(Response::new(reply))
@@ -81,5 +82,35 @@ mod tests {
     #[test]
     fn test_metrics_ingester_default() {
         let _server = MetricsIngester;
+    }
+
+    #[tokio::test]
+    async fn test_write_failure_reaches_grpc_with_its_code() {
+        use infra::errors::Error;
+        use tonic::Code;
+
+        for (e, code) in [
+            (
+                Error::ColumnsLimitExceeded("too many columns".to_string()).into(),
+                Code::InvalidArgument,
+            ),
+            (
+                Error::ResourceError("memtable is full".to_string()).into(),
+                Code::Unavailable,
+            ),
+            (
+                Error::IngestionError("wal write failed".to_string()).into(),
+                Code::Internal,
+            ),
+            (anyhow::anyhow!("invalid label"), Code::InvalidArgument),
+        ] {
+            let message = e.to_string();
+            let resp = write_failure_response(OtlpRequestType::Grpc, &e);
+            let status = export_reply::<ExportMetricsServiceResponse>(resp)
+                .await
+                .unwrap_err();
+            assert_eq!(status.code(), code, "{message}");
+            assert_eq!(status.message(), message);
+        }
     }
 }

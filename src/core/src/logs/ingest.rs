@@ -112,6 +112,16 @@ fn is_blocked_internal_rollup_write(
     is_internal_rollup_stream(stream_name) && !is_derived && matches!(user, IngestUser::User(_))
 }
 
+/// Keyed on the destination: gRPC relabels forwarded customer writes as `InternalGrpc`.
+#[cfg(any(feature = "vectorscan", test))]
+fn should_apply_sdr(org_id: &str, stream_name: &str) -> bool {
+    !config::meta::self_reporting::redaction::is_self_reporting_stream(
+        org_id,
+        stream_name,
+        StreamType::Logs,
+    )
+}
+
 pub async fn ingest(
     thread_id: usize,
     org_id: &str,
@@ -126,8 +136,17 @@ pub async fn ingest(
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
     let log_ingestion_errors = ingestion_log_enabled().await;
+    // A scanner outage must never fail ingestion; the evidence row says it failed open.
     #[cfg(feature = "vectorscan")]
-    let pattern_manager = get_pattern_manager().await?;
+    let pattern_manager = match get_pattern_manager().await {
+        Ok(manager) => Some(manager),
+        Err(_) if !should_apply_sdr(org_id, in_stream_name) => None,
+        Err(e) => {
+            // Reported once the destination streams and their records are known, below.
+            log::error!("[LOGS:JSON] failed to get pattern manager for SDR redaction: {e}");
+            None
+        }
+    };
     let stream_type = StreamType::Logs;
 
     // check stream
@@ -202,6 +221,7 @@ pub async fn ingest(
 
     let flatten_level = get_flatten_level(org_id, &stream_name, stream_type).await;
 
+    // JsonColumnar::plan already refuses the fast path under vectorscan, before this is consulted.
     let needs_json_records = !executable_pipelines.is_empty()
         || extend_json.is_some()
         || matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)))
@@ -617,21 +637,42 @@ pub async fn ingest(
     drop(user_defined_schema_map);
 
     #[cfg(feature = "vectorscan")]
-    {
-        for (stream, data) in json_data_by_stream.iter_mut() {
-            match pattern_manager.process_at_ingestion(
-                org_id,
-                StreamType::Logs,
-                stream,
-                &mut data.0,
-            ) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!(
-                        "error in processing records for patterns for stream {stream} : {e}"
-                    );
-                }
+    if pattern_manager.is_none() {
+        // One row per destination stream: a pipeline fans a request out to several.
+        for (stream, data) in json_data_by_stream.iter() {
+            if !should_apply_sdr(org_id, stream) {
+                continue;
             }
+            let records = &data.0;
+            crate::self_reporting::redaction_evidence::publish_scan_unavailable(
+                &config::meta::self_reporting::redaction::EvidenceScope::new(
+                    org_id,
+                    stream,
+                    StreamType::Logs,
+                ),
+                config::meta::self_reporting::redaction::FailPosture::Open,
+                records.len() as u64,
+                config::meta::self_reporting::redaction::DataWindow::from_timestamps(
+                    records.iter().map(|(ts, _)| *ts),
+                ),
+            )
+            .await;
+        }
+    }
+
+    #[cfg(feature = "vectorscan")]
+    if let Some(pattern_manager) = pattern_manager.as_ref() {
+        for (stream, data) in json_data_by_stream.iter_mut() {
+            if !should_apply_sdr(org_id, stream) {
+                continue;
+            }
+            let before = super::snapshot_derived_sources(&data.0);
+            if let Err(e) =
+                pattern_manager.process_at_ingestion(org_id, StreamType::Logs, stream, &mut data.0)
+            {
+                log::error!("error in processing records for patterns for stream {stream} : {e}");
+            }
+            super::refresh_derived_columns(&before, &mut data.0);
         }
     }
 
@@ -1324,6 +1365,13 @@ fn construct_values_from_open_telemetry_v1_metric(
 #[cfg(test)]
 mod tests {
 
+    use config::meta::self_reporting::{
+        redaction::REDACTION_EVIDENCE_STREAM,
+        usage::{
+            AUDIT_STREAM, DATA_RETENTION_USAGE_STREAM, ERROR_STREAM, STATS_STREAM, TRIGGERS_STREAM,
+            USAGE_STREAM,
+        },
+    };
     use ingestion_common::{IngestUser, SystemJobType};
 
     use super::*;
@@ -1496,6 +1544,50 @@ mod tests {
             &user,
             true
         ));
+    }
+
+    #[test]
+    fn test_should_apply_sdr_exempts_only_self_reporting_streams() {
+        for stream in [REDACTION_EVIDENCE_STREAM, USAGE_STREAM, TRIGGERS_STREAM] {
+            assert!(
+                !should_apply_sdr("any_org", stream),
+                "{stream} is per-org and must not be scanned in any org"
+            );
+        }
+        for stream in [
+            AUDIT_STREAM,
+            ERROR_STREAM,
+            STATS_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
+        ] {
+            assert!(
+                !should_apply_sdr(config::META_ORG_ID, stream),
+                "{stream} must not be scanned in the meta org"
+            );
+        }
+    }
+
+    #[test]
+    fn test_should_apply_sdr_scans_customer_streams() {
+        // The gRPC funnel stamps InternalGrpc on these too, and they carry customer data.
+        for stream in ["default", "app_logs", "_o2_service_graph", "k8s_events"] {
+            assert!(should_apply_sdr("acme", stream), "{stream} must be scanned");
+        }
+    }
+
+    #[test]
+    fn a_customer_stream_named_like_a_meta_only_one_is_still_scanned() {
+        for stream in [
+            AUDIT_STREAM,
+            ERROR_STREAM,
+            STATS_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
+        ] {
+            assert!(
+                should_apply_sdr("acme", stream),
+                "acme/{stream} is customer data and must be scanned"
+            );
+        }
     }
 
     #[test]

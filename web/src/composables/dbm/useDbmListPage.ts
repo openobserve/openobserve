@@ -39,6 +39,7 @@ import {
   DBM_CONTEXT_KEY,
   type ContextProvider,
 } from "@/composables/contextProviders";
+import { refreshDbmFleet } from "@/composables/dbm/useDbmFleetInstances";
 import { useDbmRequestSeq, type DbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import { useDbmScopeSyncScope } from "@/composables/dbm/useDbmScopeSync";
@@ -223,6 +224,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
   const onRefresh = () => {
     void options.load();
     tabCountsContext.refresh({ force: true });
+    refreshDbmFleet();
   };
 
   /** Mirror the scope into the URL so it survives a tab switch and a reload. */

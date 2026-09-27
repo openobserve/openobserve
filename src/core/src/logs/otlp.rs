@@ -43,7 +43,7 @@ use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, otlp::otlp_export_response},
+    common::meta::otlp::{otlp_export_response, otlp_rejection_response},
     db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
@@ -726,6 +726,48 @@ pub async fn handle_request(
         return Ok(otlp_export_response(&res, req_type)); // just return
     }
 
+    // A pattern-manager failure must not fail the request; the evidence row says it failed open.
+    #[cfg(feature = "vectorscan")]
+    {
+        match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+            Ok(pattern_manager) => {
+                for (stream, data) in json_data_by_stream.iter_mut() {
+                    if config::meta::self_reporting::redaction::is_self_reporting_stream(
+                        org_id,
+                        stream,
+                        StreamType::Logs,
+                    ) {
+                        continue;
+                    }
+                    let before = super::snapshot_derived_sources(&data.0);
+                    if let Err(e) = pattern_manager.process_at_ingestion(
+                        org_id,
+                        StreamType::Logs,
+                        stream,
+                        &mut data.0,
+                    ) {
+                        log::error!(
+                            "[LOGS:OTLP] error applying SDR patterns for stream {stream}: {e}"
+                        );
+                    }
+                    super::refresh_derived_columns(&before, &mut data.0);
+                }
+            }
+            Err(e) => {
+                log::error!("[LOGS:OTLP] failed to get pattern manager for SDR redaction: {e}");
+                crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                    org_id,
+                    StreamType::Logs,
+                    json_data_by_stream
+                        .iter()
+                        .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
+                    config::meta::self_reporting::redaction::FailPosture::Open,
+                )
+                .await;
+            }
+        }
+    }
+
     // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
     let write_result = super::write_logs_by_stream(
         thread_id,
@@ -765,7 +807,8 @@ pub async fn handle_request(
 
     if let Err(e) = write_result {
         log::error!("Error while writing logs: {e}");
-        return Ok(MetaHttpResponse::error_with_header(
+        return Ok(otlp_rejection_response(
+            req_type,
             status,
             format!("error while writing log data: {e}"),
         ));
@@ -1827,5 +1870,61 @@ mod tests {
             .as_ref()
             .unwrap();
         assert_eq!(scope.name, "b");
+    }
+
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_request_columns_limit_is_rpc_status() {
+        use crate::common::meta::otlp::GoogleRpcStatus;
+
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let log_rec = LogRecord {
+            time_unix_nano: chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64,
+            attributes: (0..=limit)
+                .map(|i| kv(&format!("attr_{i}"), IntValue(i as i64)))
+                .collect(),
+            ..Default::default()
+        };
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs {
+                    log_records: vec![log_rec],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = super::handle_request(
+            0,
+            "test_org_id",
+            request,
+            Some("test_columns_limit"),
+            "a@a.com",
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await
+        .unwrap();
+        let status_code = resp.status();
+        let headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(status_code, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            headers[axum::http::header::CONTENT_TYPE],
+            CONTENT_TYPE_PROTO
+        );
+        let status = GoogleRpcStatus::decode(body).unwrap();
+        assert_eq!(status.code, 3);
+        assert!(
+            status
+                .message
+                .starts_with("error while writing log data: Error# Got ")
+        );
+        assert!(status.message.contains(&format!(
+            "columns for stream test_org_id/logs/test_columns_limit, only {limit} columns accept"
+        )));
+        assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
     }
 }

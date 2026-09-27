@@ -27,6 +27,8 @@ export type DestinationModule = "alert" | "pipeline";
 export const destinationKeys = {
   // Prefix, not the exact module: an edit can move a destination between modules.
   all: (org: string) => orgKey(org, "alerts", "destinations"),
-  list: (org: string, module?: DestinationModule) =>
-    orgKey(org, "alerts", "destinations", module ?? "all"),
+  // includeUsage rides the key: a picker fetch (false) and the dependency page's
+  // fetch (true) return different shapes, so they must never share a cache entry.
+  list: (org: string, module?: DestinationModule, includeUsage?: boolean) =>
+    orgKey(org, "alerts", "destinations", module ?? "all", includeUsage ? "with-usage" : "plain"),
 };

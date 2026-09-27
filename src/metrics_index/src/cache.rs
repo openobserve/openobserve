@@ -60,11 +60,11 @@ impl MetricsIndexSelectionCache {
             self.release(Self::entry_size(&key, &previous.0));
         }
         self.memory_size += size;
-        metrics::METRICS_INDEX_SELECTION_CACHE_MEMORY_USAGE
+        metrics::promql::INDEX_SELECTION_CACHE_MEMORY_USAGE
             .with_label_values::<&str>(&[])
             .add(size as i64);
         if self.memory_size > max_bytes {
-            metrics::METRICS_INDEX_SELECTION_CACHE_GC_TOTAL
+            metrics::promql::INDEX_SELECTION_CACHE_GC_TOTAL
                 .with_label_values::<&str>(&[])
                 .inc();
         }
@@ -78,7 +78,7 @@ impl MetricsIndexSelectionCache {
 
     fn release(&mut self, size: usize) {
         self.memory_size = self.memory_size.saturating_sub(size);
-        metrics::METRICS_INDEX_SELECTION_CACHE_MEMORY_USAGE
+        metrics::promql::INDEX_SELECTION_CACHE_MEMORY_USAGE
             .with_label_values::<&str>(&[])
             .sub(size as i64);
     }

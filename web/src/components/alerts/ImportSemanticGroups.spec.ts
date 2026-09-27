@@ -54,7 +54,9 @@ vi.mock("@/services/alerts", async (importOriginal) => {
 });
 
 import ImportSemanticGroups from "@/components/alerts/ImportSemanticGroups.vue";
+import { queryClient } from "@/composables/query/queryClient";
 import alertsService from "@/services/alerts";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 
 const ODialogStub = {
   name: "ODialog",
@@ -358,6 +360,25 @@ describe("ImportSemanticGroups - applyChanges", () => {
     await (w.vm as any).applyChanges();
     await flushPromises();
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  // The groups are cached, and dimension analytics is computed from them, so an import expires the whole scope.
+  it("expires the service-correlation cache after a successful apply, and not after a failed one", async () => {
+    const scope = { queryKey: serviceStreamKeys.all("default") };
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const w = await mountComp();
+    (w.vm as any).diffData = mockDiffData;
+    (w.vm as any).selectedAdditions = ["add-1"];
+
+    vi.mocked(alertsService.saveSemanticGroups).mockRejectedValueOnce(new Error("boom"));
+    await (w.vm as any).applyChanges();
+    await flushPromises();
+    expect(spy).not.toHaveBeenCalledWith(scope);
+
+    await (w.vm as any).applyChanges();
+    await flushPromises();
+    expect(spy).toHaveBeenCalledWith(scope);
+    spy.mockRestore();
   });
 
   it("sets isApplying to false after completion", async () => {
