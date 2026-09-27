@@ -868,10 +868,13 @@ fn decode_meta_records(rows: Vec<SqliteRow>) -> sqlx::Result<Vec<super::MetaReco
     for row in rows {
         match super::MetaRecord::from_row(&row) {
             Ok(record) => records.push(record),
-            Err(e @ sqlx::Error::ColumnDecode { .. }) => {
+            // NULLs and type mismatches are also ColumnDecode; only bad UTF-8 is skippable.
+            Err(sqlx::Error::ColumnDecode { index, source })
+                if source.is::<std::str::Utf8Error>() =>
+            {
                 let id = row.try_get::<i64, _>("id").unwrap_or_default();
                 log::error!(
-                    "[SQLITE] skipping undecodable row in meta table, id: {id}, error: {e}"
+                    "[SQLITE] skipping meta row with invalid UTF-8, id: {id}, column: {index}, error: {source}"
                 );
             }
             Err(e) => return Err(e),
@@ -1412,5 +1415,18 @@ mod tests {
         let records = decode_meta_records(rows).unwrap();
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].key2, "logs/good");
+
+        sqlx::query("UPDATE meta SET start_dt = 'not-a-number' WHERE key2 = 'logs/good'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rows = sqlx::query(sql).fetch_all(&pool).await.unwrap();
+        assert!(
+            matches!(
+                decode_meta_records(rows),
+                Err(sqlx::Error::ColumnDecode { .. })
+            ),
+            "a non-UTF-8 decode error must propagate"
+        );
     }
 }
