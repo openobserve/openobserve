@@ -52,8 +52,6 @@ export const useRoleGrants = () => {
     () => Object.keys(added.value).length > 0 || Object.keys(removed.value).length > 0,
   );
 
-  const grantCount = computed(() => current.value.size);
-
   // One pass per change, so none of the ~50 rail badges ever scans the whole grant set.
   const statsByResource: ComputedRef<Map<string, ResourceGrantStat>> = computed(() => {
     const stats = new Map<string, ResourceGrantStat>();
@@ -145,7 +143,6 @@ export const useRoleGrants = () => {
     added,
     removed,
     isDirty,
-    grantCount,
     statsByResource,
     has,
     statFor,
