@@ -18,7 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{Context, Result, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, DictionaryArray, Int64Array, LargeStringArray, StringArray,
+        Array, ArrayRef, DictionaryArray, Int64Array, LargeStringArray, StringArray,
         StringViewArray, UInt8Array, UInt16Array, UInt32Array, UInt64Array,
     },
     datatypes::{DataType, UInt8Type, UInt16Type, UInt32Type},
@@ -141,16 +141,6 @@ fn encode_column(col: &dyn Array) -> Result<Vec<u8>> {
                 out.extend_from_slice(&v.to_le_bytes());
             }
         }
-        DataType::Boolean => {
-            ensure!(col.null_count() == 0, "null compact bool");
-            let col = col
-                .as_any()
-                .downcast_ref::<BooleanArray>()
-                .context("bool")?;
-            for i in 0..col.len() {
-                out.push(u8::from(col.value(i)));
-            }
-        }
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
             return encode_string_column(col);
         }
@@ -217,15 +207,6 @@ fn decode_column(raw: &[u8], kind: &DataType, rows: usize) -> Result<ArrayRef> {
             Ok(Arc::new(UInt32Array::from_iter_values(
                 raw.chunks_exact(4)
                     .map(|v| u32::from_le_bytes(v.try_into().unwrap())),
-            )))
-        }
-        DataType::Boolean => {
-            ensure!(
-                raw.len() == rows && raw.iter().all(|v| *v <= 1),
-                "invalid compact boolean"
-            );
-            Ok(Arc::new(BooleanArray::from(
-                raw.iter().map(|v| *v != 0).collect::<Vec<_>>(),
             )))
         }
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {

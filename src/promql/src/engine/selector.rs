@@ -105,18 +105,37 @@ impl Engine {
         selector: &VectorSelector,
         time_range: (i64, i64),
         labels: &hashbrown::HashSet<String>,
+        prefer_blocks: bool,
     ) -> Result<SelectorContexts> {
-        self.ctx
-            .table_provider
-            .create_context(
-                &self.ctx.query_ctx.org_id,
-                selector.name.as_deref().unwrap(),
-                time_range,
-                selector.matchers.clone(),
-                labels.clone(),
-                &mut equal_matcher_filters(&selector.matchers),
-            )
-            .await
+        let org_id = &self.ctx.query_ctx.org_id;
+        let name = selector.name.as_deref().unwrap();
+        let matchers = selector.matchers.clone();
+        let mut filters = equal_matcher_filters(&selector.matchers);
+        if prefer_blocks {
+            self.ctx
+                .table_provider
+                .create_context_prefer_blocks(
+                    org_id,
+                    name,
+                    time_range,
+                    matchers,
+                    labels.clone(),
+                    &mut filters,
+                )
+                .await
+        } else {
+            self.ctx
+                .table_provider
+                .create_context(
+                    org_id,
+                    name,
+                    time_range,
+                    matchers,
+                    labels.clone(),
+                    &mut filters,
+                )
+                .await
+        }
     }
 
     /// An instant selector, streamed when the layout allows it; `None` when nothing is selected.
@@ -374,7 +393,7 @@ impl Engine {
         let ctxs = match ctxs {
             Some(ctxs) => ctxs,
             None => {
-                self.create_selector_contexts(selector, (start, end), &label_selector)
+                self.create_selector_contexts(selector, (start, end), &label_selector, false)
                     .await?
             }
         };
