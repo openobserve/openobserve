@@ -38,6 +38,7 @@ use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
 
 pub mod accounts;
 mod local;
+pub(crate) mod range_plan;
 mod remote;
 pub mod wal;
 

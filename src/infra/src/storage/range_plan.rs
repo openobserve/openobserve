@@ -18,13 +18,13 @@ use std::ops::Range;
 use anyhow::{Context, Result, ensure};
 use bytes::Bytes;
 
-pub(super) struct ReadPlan {
-    pub(super) ranges: Vec<Range<u64>>,
+pub(crate) struct ReadPlan {
+    pub(crate) ranges: Vec<Range<u64>>,
     payloads: Vec<(usize, Range<usize>)>,
 }
 
 impl ReadPlan {
-    pub(super) fn into_payloads(self, reads: Vec<Bytes>) -> Result<Vec<Bytes>> {
+    pub(crate) fn into_payloads(self, reads: Vec<Bytes>) -> Result<Vec<Bytes>> {
         ensure!(
             reads.len() == self.ranges.len(),
             "incomplete coalesced read response"
@@ -47,7 +47,7 @@ impl ReadPlan {
     }
 }
 
-pub(super) fn plan_coalesced_ranges(
+pub(crate) fn plan_coalesced_ranges(
     source: &[Range<u64>],
     max_gap: u64,
     max_span: u64,

@@ -13,22 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::{ops::Range, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, metrics};
-use futures::{StreamExt, stream::BoxStream};
+use futures::{
+    StreamExt, TryStreamExt,
+    stream::{self, BoxStream},
+};
 use object_store::{
     CopyOptions, Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
-    ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
-    path::Path,
+    ObjectStore, ObjectStoreExt as _, PutMultipartOptions, PutOptions, PutPayload, PutResult,
+    Result, limit::LimitStore, path::Path,
 };
 
 use crate::storage::CONCURRENT_REQUESTS;
 
 // test only
 const TEST_FILE: &str = "o2_test/check.txt";
+const MIDX_RANGE_CONCURRENCY: usize = 10;
 
 #[derive(Debug)]
 pub struct StorageConfig {
@@ -178,6 +182,19 @@ impl ObjectStore for Remote {
         }
 
         Ok(result)
+    }
+
+    async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
+        let path = Path::from(self.format_key(location.as_ref()));
+        if location.as_ref().ends_with(".midx") {
+            stream::iter(ranges.iter().cloned())
+                .map(|range| self.client.get_range(&path, range))
+                .buffered(MIDX_RANGE_CONCURRENCY)
+                .try_collect()
+                .await
+        } else {
+            self.client.get_ranges(&path, ranges).await
+        }
     }
 
     fn delete_stream(

@@ -18,7 +18,6 @@
 //! a hash-sorted scan, one over an already-materialized matrix, behind the same
 //! contract.
 
-mod block_ranges;
 pub(crate) mod blocks;
 pub(crate) mod hash_sorted;
 pub(crate) mod matrix;

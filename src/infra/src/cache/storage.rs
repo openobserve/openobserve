@@ -35,6 +35,10 @@ pub struct CacheFS {}
 
 static DEFAULT: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(CacheFS::new_store);
 
+const MIDX_MAX_GAP: u64 = 16 * 1024;
+const MIDX_MAX_SPAN: u64 = 16 * 1024 * 1024;
+const MIDX_MIN_READ_BUDGET: u64 = 16 * 1024 * 1024;
+
 impl std::fmt::Display for CacheFS {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Self::name())
@@ -157,15 +161,40 @@ impl ObjectStoreExt for CacheFS {
             return Ok(Vec::new());
         }
         let path = location.to_string();
-        // Single cache lookup for ALL ranges: memory cache → in-memory slice,
-        // disk cache → one File::open + N preads. Falls back to remote on
-        // cache miss (which itself does batched ranges per backend).
-        if let Ok(v) = file_data::get_ranges_opts(account, &path, ranges, false).await {
-            return Ok(v);
+        let ordered = ranges.iter().all(|range| range.start < range.end)
+            && ranges.windows(2).all(|pair| pair[0].end <= pair[1].start);
+        let plan = if path.ends_with(".midx") && ranges.len() > 1 && ordered {
+            let selected = ranges.iter().try_fold(0u64, |total, range| {
+                total.checked_add(range.end - range.start)
+            });
+            let selected = selected.ok_or_else(|| crate::storage::Error::BadRange(path.clone()))?;
+            Some(
+                storage::range_plan::plan_coalesced_ranges(
+                    ranges,
+                    MIDX_MAX_GAP,
+                    MIDX_MAX_SPAN,
+                    selected.max(MIDX_MIN_READ_BUDGET),
+                )
+                .map_err(|error| Error::Generic {
+                    store: "CacheFS",
+                    source: Box::new(std::io::Error::other(error.to_string())),
+                })?,
+            )
+        } else {
+            None
+        };
+        let fetched_ranges = plan.as_ref().map_or(ranges, |plan| plan.ranges.as_slice());
+        let data = match file_data::get_ranges_opts(account, &path, fetched_ranges, false).await {
+            Ok(data) => data,
+            Err(_) => storage::get_ranges(account, &path, fetched_ranges).await?,
+        };
+        match plan {
+            Some(plan) => plan.into_payloads(data).map_err(|error| Error::Generic {
+                store: "CacheFS",
+                source: Box::new(std::io::Error::other(error.to_string())),
+            }),
+            None => Ok(data),
         }
-
-        // default to storage
-        storage::get_ranges(account, &path, ranges).await
     }
 
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta> {
