@@ -8,25 +8,29 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use openobserve_api_common::extractors::Headers;
+use db::authz::set_ownership;
+use openobserve_api_common::{auth::validator::list_objects_for_user, extractors::Headers};
 use openobserve_core::{
-    auth::UserEmail,
+    auth::{UserEmail, is_ofga_object_visible},
     prompts::{self, MutationContext, PromptError, PromptSelector, PromptSource, ResolvePurpose},
 };
 use serde::Deserialize;
 use utoipa::IntoParams;
 
-use crate::models::prompts::{
-    CreatePromptRequestBody, CreatePromptVersionRequestBody, ListPromptActivityResponseBody,
-    ListPromptVersionsResponseBody, ListPromptsResponseBody, MatchPromptsRequestBody,
-    MatchPromptsResponseBody, MovePromptLabelRequestBody, PromptActivityResponseBody,
-    PromptErrorResponseBody, PromptLabelResponseBody, PromptMatchResponseBody,
-    PromptMutationResponseBody, PromptResponseBody, PromptSecretRequestBody,
-    PromptSecretResponseBody, PromptSettingsRequestBody, PromptSettingsResponseBody,
-    PromptVersionResponseBody, ResolvedPromptResponseBody, UpdatePromptRequestBody,
-};
 #[cfg(feature = "enterprise")]
 use crate::service::auth::check_permissions;
+use crate::{
+    common::meta::authz::Authz,
+    models::prompts::{
+        CreatePromptRequestBody, CreatePromptVersionRequestBody, ListPromptActivityResponseBody,
+        ListPromptVersionsResponseBody, ListPromptsResponseBody, MatchPromptsRequestBody,
+        MatchPromptsResponseBody, MovePromptLabelRequestBody, PromptActivityResponseBody,
+        PromptErrorResponseBody, PromptLabelResponseBody, PromptMatchResponseBody,
+        PromptMutationResponseBody, PromptResponseBody, PromptSecretRequestBody,
+        PromptSecretResponseBody, PromptSettingsRequestBody, PromptSettingsResponseBody,
+        PromptVersionResponseBody, ResolvedPromptResponseBody, UpdatePromptRequestBody,
+    },
+};
 
 const FOLDER_WARNING: &str = "299 OpenObserve \"prompt folder assertion mismatch\"";
 
@@ -84,24 +88,24 @@ async fn can_move_protected_label(
     if !settings.protected_labels.contains(label) {
         return Ok(false);
     }
-    #[cfg(feature = "enterprise")]
-    {
-        Ok(check_permissions(
-            label, org_id, _user_id, "prompts", "PUT", None, false, false, false,
-        )
-        .await)
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        Ok(true)
-    }
+    Ok(can_manage_protected_labels(org_id, _user_id).await)
 }
 
-async fn can_manage_prompt_settings(org_id: &str, _user_id: &str) -> bool {
+/// Org-wide grant on `prompt_labels`. Editors are not blanket-approved for it,
+/// so only admins and roles granted it explicitly pass.
+async fn can_manage_protected_labels(org_id: &str, _user_id: &str) -> bool {
     #[cfg(feature = "enterprise")]
     {
         check_permissions(
-            org_id, org_id, _user_id, "prompts", "PUT", None, false, false, false,
+            org_id,
+            org_id,
+            _user_id,
+            "prompt_labels",
+            "PUT",
+            None,
+            true,
+            false,
+            false,
         )
         .await
     }
@@ -111,15 +115,32 @@ async fn can_manage_prompt_settings(org_id: &str, _user_id: &str) -> bool {
     }
 }
 
-async fn require_prompt_write(org_id: &str, user_id: &str) -> Result<(), Response> {
-    if can_manage_prompt_settings(org_id, user_id).await {
-        Ok(())
-    } else {
-        Err(machine_error(
-            StatusCode::FORBIDDEN,
-            "unauthorized_access",
-            "Unauthorized Access",
-        ))
+/// `None` means every prompt is visible (admin, RBAC off, or list filtering off).
+async fn readable_prompts(org_id: &str, user_id: &str) -> Result<Option<Vec<String>>, Response> {
+    list_objects_for_user(org_id, user_id, "GET", "prompt")
+        .await
+        .map_err(|error| {
+            machine_error(
+                StatusCode::FORBIDDEN,
+                "unauthorized_access",
+                error.to_string(),
+            )
+        })
+}
+
+/// `/resolve` names the prompt by name, so the route table can only check the
+/// org-wide LIST; the per-prompt GET happens here once the name is resolved.
+async fn can_read_prompt(org_id: &str, _user_id: &str, _entity_id: &str) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        check_permissions(
+            _entity_id, org_id, _user_id, "prompts", "GET", None, false, false, true,
+        )
+        .await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        true
     }
 }
 
@@ -225,11 +246,22 @@ pub(crate) fn prompt_error_response(error: PromptError) -> Response {
 )]
 pub async fn list_prompts(
     Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
     Query(query): Query<ListPromptsQuery>,
 ) -> Response {
+    let readable = match readable_prompts(&org_id, &user.user_id).await {
+        Ok(readable) => readable,
+        Err(response) => return response,
+    };
     match prompts::list_prompts(&org_id, query.include_archived, query.folder_id.as_deref()).await {
         Ok(list) => Json(ListPromptsResponseBody {
-            list: list.into_iter().map(Into::into).collect(),
+            list: list
+                .into_iter()
+                .filter(|p| {
+                    is_ofga_object_visible(&org_id, "prompt", &p.entity_id, readable.as_deref())
+                })
+                .map(Into::into)
+                .collect(),
         })
         .into_response(),
         Err(error) => prompt_error_response(error),
@@ -247,9 +279,6 @@ pub async fn create_prompt(
     headers: HeaderMap,
     Json(body): Json<CreatePromptRequestBody>,
 ) -> Response {
-    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
-        return response;
-    }
     let idempotency_key = match idempotency_key(&headers) {
         Ok(key) => key,
         Err(response) => return response,
@@ -267,7 +296,10 @@ pub async fn create_prompt(
     )
     .await
     {
-        Ok(result) => Json(PromptMutationResponseBody::from(result)).into_response(),
+        Ok(result) => {
+            set_ownership(&org_id, "prompts", Authz::new(&result.prompt.entity_id)).await;
+            Json(PromptMutationResponseBody::from(result)).into_response()
+        }
         Err(error) => prompt_error_response(error),
     }
 }
@@ -279,8 +311,13 @@ pub async fn create_prompt(
 )]
 pub async fn match_prompts(
     Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
     Json(body): Json<MatchPromptsRequestBody>,
 ) -> Response {
+    let readable = match readable_prompts(&org_id, &user.user_id).await {
+        Ok(readable) => readable,
+        Err(response) => return response,
+    };
     let (prompt_type, payload, config) = match body.into_core() {
         Ok(request) => request,
         Err(error) => return prompt_error_response(error),
@@ -295,6 +332,9 @@ pub async fn match_prompts(
     };
     let mut matches = Vec::with_capacity(versions.len());
     for version in versions {
+        if !is_ofga_object_visible(&org_id, "prompt", &version.entity_id, readable.as_deref()) {
+            continue;
+        }
         let prompt = match prompts::get_prompt(&org_id, &version.entity_id).await {
             Ok(prompt) => prompt,
             Err(PromptError::PromptNotFound) => continue,
@@ -328,6 +368,7 @@ pub async fn match_prompts(
 )]
 pub async fn resolve_prompt(
     Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
     Query(query): Query<ResolvePromptQuery>,
     headers: HeaderMap,
 ) -> Response {
@@ -355,6 +396,13 @@ pub async fn resolve_prompt(
         Ok(resolved) => resolved,
         Err(error) => return prompt_error_response(error),
     };
+    if !can_read_prompt(&org_id, &user.user_id, &resolved.prompt.entity_id).await {
+        return machine_error(
+            StatusCode::FORBIDDEN,
+            "unauthorized_access",
+            "Unauthorized Access",
+        );
+    }
     let etag = format!(
         "\"{}\"",
         infra::idempotency::canonical_sha256(&serde_json::json!({
@@ -410,13 +458,6 @@ pub async fn update_prompt_settings(
     Headers(user): Headers<UserEmail>,
     Json(mut body): Json<PromptSettingsRequestBody>,
 ) -> Response {
-    if !can_manage_prompt_settings(&org_id, &user.user_id).await {
-        return machine_error(
-            StatusCode::FORBIDDEN,
-            "unauthorized_access",
-            "Unauthorized Access",
-        );
-    }
     body.protected_labels = match validate_protected_labels(body.protected_labels) {
         Ok(labels) => labels,
         Err(error) => return prompt_error_response(error),
@@ -436,6 +477,22 @@ pub async fn update_prompt_settings(
             return internal_error();
         }
     };
+    // Unprotecting a label is as good as moving it, so changing the set needs
+    // the same grant. An empty set is stored as the default.
+    let requested = if body.protected_labels.is_empty() {
+        db::prompt_settings::PromptSettings::default().protected_labels
+    } else {
+        body.protected_labels.clone()
+    };
+    if requested != current.protected_labels
+        && !can_manage_protected_labels(&org_id, &user.user_id).await
+    {
+        return machine_error(
+            StatusCode::FORBIDDEN,
+            "protected_label_forbidden",
+            "Changing protected labels requires the Prompt Protected Labels permission",
+        );
+    }
     let secret_ref = current.webhook.and_then(|webhook| webhook.secret_ref);
     match db::prompt_settings::set(&org_id, &user.user_id, body.into_settings(secret_ref)).await {
         Ok(settings) => Json(PromptSettingsResponseBody::from(settings)).into_response(),
@@ -456,13 +513,6 @@ pub async fn update_prompt_secret(
     Headers(user): Headers<UserEmail>,
     Json(body): Json<PromptSecretRequestBody>,
 ) -> Response {
-    if !can_manage_prompt_settings(&org_id, &user.user_id).await {
-        return machine_error(
-            StatusCode::FORBIDDEN,
-            "unauthorized_access",
-            "Unauthorized Access",
-        );
-    }
     if body.secret.is_empty() {
         return machine_error(
             StatusCode::BAD_REQUEST,
@@ -502,9 +552,6 @@ pub async fn update_prompt(
     Headers(user): Headers<UserEmail>,
     Json(body): Json<UpdatePromptRequestBody>,
 ) -> Response {
-    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
-        return response;
-    }
     match prompts::update_head(
         &org_id,
         &entity_id,
@@ -527,9 +574,6 @@ pub async fn archive_prompt(
     Path((org_id, entity_id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
-    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
-        return response;
-    }
     match prompts::archive(&org_id, &entity_id, &context(&user, PromptSource::Ui)).await {
         Ok(prompt) => Json(PromptResponseBody::from(prompt)).into_response(),
         Err(error) => prompt_error_response(error),
@@ -564,9 +608,6 @@ pub async fn create_prompt_version(
     headers: HeaderMap,
     Json(body): Json<CreatePromptVersionRequestBody>,
 ) -> Response {
-    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
-        return response;
-    }
     let idempotency_key = match idempotency_key(&headers) {
         Ok(key) => key,
         Err(response) => return response,
@@ -633,9 +674,6 @@ pub async fn move_prompt_label(
     Headers(user): Headers<UserEmail>,
     Json(body): Json<MovePromptLabelRequestBody>,
 ) -> Response {
-    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
-        return response;
-    }
     let can_move_protected = match can_move_protected_label(&org_id, &user.user_id, &label).await {
         Ok(allowed) => allowed,
         Err(response) => return response,
@@ -665,9 +703,6 @@ pub async fn delete_prompt_label(
     Query(query): Query<DeletePromptLabelQuery>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
-    if let Err(response) = require_prompt_write(&org_id, &user.user_id).await {
-        return response;
-    }
     let can_move_protected = match can_move_protected_label(&org_id, &user.user_id, &label).await {
         Ok(allowed) => allowed,
         Err(response) => return response,

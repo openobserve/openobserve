@@ -72,6 +72,7 @@ struct PendingMigrations {
     llm_workbench: bool,
     workflow_folders: bool,
     synthetic_environments: bool,
+    prompts: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -514,6 +515,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.synthetic_environments {
         keys.push("synthetic_environment");
     }
+    if pending.prompts {
+        keys.extend(["prompts", "prompt_labels"]);
+    }
     keys
 }
 
@@ -551,6 +555,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_46 = version_compare::Version::from("0.0.46").unwrap();
     let v0_0_47 = version_compare::Version::from("0.0.47").unwrap();
     let v0_0_48 = version_compare::Version::from("0.0.48").unwrap();
+    let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -655,6 +660,12 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     if existing_model_version < v0_0_48 {
         log::info!("[OFGA:Local] synthetic environments permissions migration needed");
         pending.synthetic_environments = true;
+    }
+    // 0.0.49 added `prompt` without a back-fill, so orgs that crossed it still
+    // lack the `_all_` tuple. Gate on 0.0.50 to cover them and `prompt_label`.
+    if existing_model_version < v0_0_50 {
+        log::info!("[OFGA:Local] prompt permissions migration needed");
+        pending.prompts = true;
     }
 
     pending
