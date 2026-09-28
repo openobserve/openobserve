@@ -240,6 +240,7 @@
              they on next. -->
         <OTabPanel name="members" stretch>
           <OnCallMembers
+            ref="membersRef"
             :team-id="teamId"
             :members="members"
             :rotations="schedule?.rotations ?? []"
@@ -414,7 +415,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -562,6 +563,10 @@ const coverOpen = ref(false);
 /// landed on the server and left the list under the calendar unchanged.
 const coverListRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
 
+/// So the attention banner's "Add a member" can land the cursor in the
+/// picker even when switching to this tab is a no-op because it is already open.
+const membersRef = ref<{ focusMemberPicker: () => void } | null>(null);
+
 /// Both things a written cover invalidates: the calendar, which the server
 /// resolves, and the list of covers beneath it. Never one without the other —
 /// a band that moves over a list that does not is the same confusion by half.
@@ -688,8 +693,17 @@ function openOnCallList() {
 }
 
 // A coverage_gap finding has no single rotation to point at, so land in create mode instead of leaving the drawer closed.
-function onAttentionAct(tab: string, rotation?: string | null) {
+async function onAttentionAct(tab: string, rotation?: string | null) {
+  const wasAlreadyThere = activeTab.value === tab;
   activeTab.value = tab;
+  if (tab === "members") {
+    // Switching tabs is a no-op when already on Members, and the panel only
+    // mounts on the tick after switching from elsewhere — either way, the
+    // picker isn't necessarily there yet.
+    if (!wasAlreadyThere) await nextTick();
+    membersRef.value?.focusMemberPicker();
+    return;
+  }
   if (tab !== "schedule") return;
   if (!rotation) {
     openScheduleEditor({ mode: "new" });

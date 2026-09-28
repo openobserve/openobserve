@@ -943,6 +943,38 @@ describe("OnCallTeamDetail", () => {
     expect(editor.props("intent")).toBeFalsy();
   });
 
+  /// The banner's "Add a member" fix is the Members tab itself, so on an
+  /// empty team the reader is already there — `activeTab.value = "members"`
+  /// is a no-op write, and nothing else used to react to the click.
+  it("focuses the member picker from the attention banner, even when already on Members", async () => {
+    const focusMemberPicker = vi.fn();
+    service.listMembers.mockResolvedValue({ data: [] } as any);
+    const wrapper = mount(OnCallTeamDetail, {
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ...stubs,
+          OnCallMembers: {
+            name: "OnCallMembers",
+            template: "<div />",
+            setup(_: unknown, { expose }: { expose: (exposed: object) => void }) {
+              expose({ focusMemberPicker });
+            },
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    const panels = wrapper.findComponent({ name: "OTabPanels" });
+    expect(panels.props("modelValue")).toBe("members");
+
+    wrapper.findComponent({ name: "OnCallTeamAttention" }).vm.$emit("act", "members");
+    await flushPromises();
+
+    expect(focusMemberPicker).toHaveBeenCalled();
+  });
+
   /// The panel and the overview list both read this team's own pages; asking
   /// for the whole org's would count other teams' work as this team's.
   it("asks only for this team's pages", async () => {
