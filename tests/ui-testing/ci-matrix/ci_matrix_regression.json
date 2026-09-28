@@ -6,7 +6,9 @@
     "run_files": [
       "logs-bugs.spec.js",
       "logs-query-editor-resize-bounds.spec.js",
-      "logs-result-display.spec.js"
+      "logs-result-display.spec.js",
+      "logs-nonsql-limit.spec.js",
+      "logs-stream-type-scope.spec.js"
     ],
     "disabled": []
   },
@@ -152,7 +154,9 @@
     "browser": "chrome",
     "run_files": [
       "function-delete-confirm.spec.js",
-      "pipeline-query-filter-removal.spec.js"
+      "pipeline-query-filter-removal.spec.js",
+      "enrichment-explore-context.spec.js",
+      "pipeline-default-destination-guard.spec.js"
     ],
     "disabled": []
   },
