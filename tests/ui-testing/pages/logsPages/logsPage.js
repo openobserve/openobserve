@@ -3692,6 +3692,34 @@ export class LogsPage {
         return await this.page.locator(this.includeFieldButton).click();
     }
 
+    // Loading the SQL through the URL guarantees the editor holds it before the first run.
+    async openLogsWithSqlQuery(stream, sql, period = '15m') {
+        const orgId = getOrgIdentifier() || 'default';
+        const query = encodeURIComponent(Buffer.from(sql).toString('base64'));
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=${encodeURIComponent(stream)}&period=${period}&sql_mode=true&quick_mode=false&query=${query}`);
+        await this.getQueryEditorTextWhenReady(stream);
+    }
+
+    async getResultRowTexts() {
+        return await this.page.locator(this.logsSearchResultTableRows).allInnerTexts();
+    }
+
+    async openLogDetailForRowContaining(text) {
+        const row = this.page.locator(this.logsSearchResultTableRows).filter({ hasText: text }).first();
+        await row.locator('[data-test^="o2-table-cell-"]').first().click();
+        await this.page.locator(this.logDetailDialog).waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async getLogDetailDialogText() {
+        return await this.page.locator(this.logDetailDialog).innerText();
+    }
+
+    // "Add field to the table" shares the include data-test, so the menu item is picked by its label.
+    async includeLogDetailFieldValue(field) {
+        await this.page.locator(this.logDetailDialog).locator(`[data-test="log-details-include-exclude-field-btn-${field}"]`).click();
+        await this.page.locator(this.includeFieldButton).filter({ hasText: 'Include Search Term' }).click();
+    }
+
     async clickCloseDialog() {
         return await this.page.locator(this.closeDialog).click();
     }

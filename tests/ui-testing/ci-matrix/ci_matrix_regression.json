@@ -6,7 +6,8 @@
     "run_files": [
       "logs-bugs.spec.js",
       "logs-query-editor-resize-bounds.spec.js",
-      "logs-result-display.spec.js"
+      "logs-result-display.spec.js",
+      "logs-14376-int64-precision.spec.js"
     ],
     "disabled": []
   },
@@ -87,7 +88,8 @@
       "traces-span-kind-badges.spec.js",
       "traces-11615-flame-graph-span-selection.spec.js",
       "traces-6591-explorer-state.spec.js",
-      "traces-6591-details-interactions.spec.js"
+      "traces-6591-details-interactions.spec.js",
+      "traces-14317-error-filter-pagination.spec.js"
     ],
     "disabled": []
   },
