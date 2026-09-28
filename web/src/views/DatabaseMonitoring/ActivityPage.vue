@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :frame="false"
         :toolbar-bordered="false"
         :error="error"
+        :forbidden="forbidden"
         sorting="client"
         :show-global-filter="false"
         table-id="dbm-activity"
@@ -391,6 +392,7 @@ const {
   tabCountsContext,
   loading,
   error,
+  forbidden,
   search,
   lastRunAt,
   org,

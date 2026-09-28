@@ -51,11 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :frame="false"
         :toolbar-bordered="false"
         :error="error"
+        :forbidden="forbidden"
         sorting="client"
         expansion="multiple"
         :expand-on-row-click="true"
         :show-global-filter="false"
         table-id="dbm-deadlocks"
+        persist-columns
         :get-row-style="rowStyle"
         :total-count-exact="!truncated"
         data-test="dbm-deadlocks-table"
@@ -495,6 +497,7 @@ const {
   tabCountsContext,
   loading,
   error,
+  forbidden,
   search,
   lastRunAt,
   org,
@@ -733,6 +736,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
   },
   {
     id: "applications",
+    hideable: true,
     accessorKey: "applications",
     header: t("dbm.deadlocks.columns.applications"),
     size: 132,
@@ -741,6 +745,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
   },
   {
     id: "objects",
+    hideable: true,
     accessorKey: "objects",
     header: t("dbm.deadlocks.columns.objects"),
     size: 104,
@@ -749,6 +754,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
   },
   {
     id: "lastSeen",
+    hideable: true,
     accessorKey: "lastSeen",
     header: t("dbm.deadlocks.columns.lastSeen"),
     size: 96,
@@ -756,6 +762,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
   },
   {
     id: "count",
+    hideable: true,
     accessorKey: "count",
     header: t("dbm.deadlocks.columns.count"),
     size: 120,

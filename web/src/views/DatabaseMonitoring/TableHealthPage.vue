@@ -140,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="rowKey"
         :loading="loading"
         :error="error"
+        :forbidden="forbidden"
         :frame="false"
         :toolbar-bordered="false"
         sorting="client"
@@ -377,6 +378,7 @@ const {
   tabCountsContext,
   loading,
   error,
+  forbidden,
   search,
   lastRunAt,
   org,

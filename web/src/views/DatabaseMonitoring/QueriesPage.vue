@@ -133,6 +133,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
+        <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
+        <OTableColumnToggle
+          v-if="!serverListShown"
+          :columns="columns"
+          :column-visibility="columnVisibility"
+          :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+          @update:column-visibility="setColumnVisibility"
+          @reset:column-sizes="tableRef?.resetColumnSizes?.()"
+        />
         <DbmRefreshButton
           mode="status"
           :loading="loading"
@@ -176,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :sort-by="sortBy"
         sort-order="desc"
         :show-global-filter="false"
-        :column-visibility="defaultColumnVisibility"
+        :column-visibility="columnVisibility"
         :persist-columns="true"
         table-id="dbm-queries"
         :enable-column-resize="true"
@@ -588,6 +597,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -946,7 +957,12 @@ const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
  * does not type-check — OTable is a generic component, so its instance type has
  * no construct signature to instantiate.
  */
-const tableRef = ref<{ scrollToTop?: () => void; $el?: HTMLElement } | null>(null);
+const tableRef = ref<{
+  scrollToTop?: () => void;
+  $el?: HTMLElement;
+  hasResizedColumns?: boolean;
+  resetColumnSizes?: () => void;
+} | null>(null);
 const stmtClass = ref<string>("query");
 const sortBy = ref<QuerySortKey>("total_time_ns");
 
@@ -2151,6 +2167,8 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
 /** The extra percentiles are available but off: the mockup's column set is
  *  what fits without horizontal scrolling at 1440. */
 const defaultColumnVisibility = { p99_ns: false, max_ns: false, services: false };
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-queries");
+if (!Object.keys(columnVisibility.value).length) columnVisibility.value = defaultColumnVisibility;
 
 /**
  * The table emits the column id; the ids of sortable columns are deliberately

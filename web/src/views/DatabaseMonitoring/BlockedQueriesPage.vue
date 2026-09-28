@@ -47,9 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :frame="false"
         :toolbar-bordered="false"
         :error="error"
+        :forbidden="forbidden"
         sorting="client"
         :show-global-filter="false"
         table-id="dbm-blocked"
+        persist-columns
         :get-row-style="rowStyle"
         :total-count-exact="!truncated"
         data-test="dbm-blocked-table"
@@ -491,6 +493,7 @@ const {
   tabCountsContext,
   loading,
   error,
+  forbidden,
   search,
   lastRunAt,
   org,
@@ -702,6 +705,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "session",
+          hideable: true,
           accessorKey: "pid",
           header: t("dbm.blocked.columns.session"),
           size: 80,
@@ -709,6 +713,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "application",
+          hideable: true,
           accessorKey: "application",
           header: t("dbm.blocked.columns.application"),
           size: 140,
@@ -716,6 +721,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "blocking",
+          hideable: true,
           accessorKey: "blockingCount",
           header: t("dbm.blocked.columns.blocking"),
           size: 96,
@@ -723,6 +729,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "waiting",
+          hideable: true,
           accessorKey: "waitSeconds",
           header: t("dbm.blocked.columns.waiting"),
           size: 120,
@@ -746,6 +753,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "session",
+          hideable: true,
           accessorKey: "pid",
           header: t("dbm.blocked.columns.session"),
           size: 80,
@@ -753,6 +761,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "waitingFor",
+          hideable: true,
           header: t("dbm.blocked.columns.waitingFor"),
           size: 144,
           enableSorting: false,
@@ -760,6 +769,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "heldUpBy",
+          hideable: true,
           accessorKey: "blockerApplication",
           header: t("dbm.blocked.columns.heldUpBy"),
           size: 176,
@@ -767,6 +777,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "waiting",
+          hideable: true,
           accessorKey: "waitSeconds",
           header: t("dbm.blocked.columns.waiting"),
           size: 120,

@@ -70,6 +70,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :filters="dimensionFilters"
           @clear="clearScope"
         />
+        <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
+        <OTableColumnToggle
+          v-if="!serverListShown"
+          :columns="columns"
+          :column-visibility="columnVisibility"
+          :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+          @update:column-visibility="setColumnVisibility"
+          @reset:column-sizes="tableRef?.resetColumnSizes?.()"
+        />
         <DbmRefreshButton
           mode="status"
           :loading="loading"
@@ -101,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            why the usual list is empty. -->
       <OTable
         v-if="!serverListShown"
+        ref="tableRef"
         :enable-column-resize="true"
         :data="rows"
         :columns="columns"
@@ -112,6 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         :show-global-filter="false"
         table-id="dbm-samples"
+        persist-columns
+        :column-visibility="columnVisibility"
         :total-count-exact="!truncated"
         data-test="dbm-samples-table"
         @row-click="onRowClick"
@@ -344,6 +356,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, { type ServerSampleRow } from "@/services/db_monitoring";
@@ -376,6 +390,8 @@ const ChartRenderer = defineAsyncComponent(
 );
 
 const { t } = useI18nTyped();
+const tableRef = ref<{ hasResizedColumns?: boolean; resetColumnSizes?: () => void } | null>(null);
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-samples");
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -549,6 +565,7 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
   },
   {
     id: "timestamp",
+    hideable: true,
     accessorKey: "timestamp",
     header: t("dbm.samples.columns.when"),
     size: 140,
@@ -556,6 +573,7 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
   },
   {
     id: "duration",
+    hideable: true,
     accessorKey: "durationNs",
     header: t("dbm.samples.columns.duration"),
     size: 120,
@@ -567,6 +585,7 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
   },
   {
     id: "service",
+    hideable: true,
     accessorKey: "serviceName",
     header: t("dbm.samples.columns.service"),
     size: 144,
@@ -574,6 +593,7 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
   },
   {
     id: "status",
+    hideable: true,
     accessorKey: "isError",
     header: t("dbm.samples.columns.status"),
     size: 120,
