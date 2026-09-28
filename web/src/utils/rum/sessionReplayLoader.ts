@@ -70,24 +70,6 @@ export function isFetchable(state: LoaderState, index: number): boolean {
   return status === "missing" || status === "fetchedMissing";
 }
 
-// Segments after the run edge come first; holes before it are filled only once the tail is done.
-export function nextBatch(state: LoaderState, fromIndex: number, max = SEGMENT_BATCH): number[] {
-  const count = state.status.length;
-  let first = -1;
-  for (let i = Math.max(0, fromIndex); i < count && first === -1; i++) {
-    if (isFetchable(state, i)) first = i;
-  }
-  for (let i = 0; i < Math.min(fromIndex, count) && first === -1; i++) {
-    if (isFetchable(state, i)) first = i;
-  }
-  if (first === -1) return [];
-  const batch: number[] = [];
-  for (let i = first; i < count && batch.length < max && isFetchable(state, i); i++) {
-    batch.push(i);
-  }
-  return batch;
-}
-
 export function markInFlight(state: LoaderState, indexes: number[]): void {
   for (const i of indexes) state.status[i] = "inFlight";
 }

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <template v-if="isLive" #title-trail>
+    <template v-if="isLive && loadState !== 'error'" #title-trail>
       <OBadge variant="error" size="sm" dot data-test="session-viewer-live-badge">{{
         t("rum.sessionReplayLiveBadge")
       }}</OBadge>
@@ -221,6 +221,7 @@ import {
 } from "@/utils/zincutils";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import { collapseViewDocuments } from "@/utils/rum/viewDocuments";
+import { rumField } from "@/utils/rum/fields";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import {
   dedupManifest,
@@ -380,6 +381,7 @@ let lastLogsTs = 0;
 // Formatted events by stream key, so a poll overlapping the last one adds nothing twice.
 const rumEvents = new Map<string, any>();
 const logEvents = new Map<string, any>();
+const rumEventArrivals = new Map<string, number>();
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -1009,6 +1011,8 @@ const getSessionSegments = async () => {
     );
     adoptManifest(rows, complete);
     if (!rows.length) {
+      // Nothing is followed without a manifest, so the badge must not claim otherwise.
+      isLive.value = false;
       loadState.value = "empty";
       return;
     }
@@ -1218,6 +1222,18 @@ const fetchEventPages = async (sql: string, window: QueryWindow) => {
   return hits;
 };
 
+// Re-sends of a view share its date, so the document version marks the newer one, and a later arrival when there is none.
+const isNewerRumEvent = (key: string, hit: any, field: string) => {
+  if (!rumEvents.has(key)) return true;
+  if (hit.type !== "view") return false;
+  const version = Number(rumField(hit, "document_version"));
+  const storedVersion = Number(rumField(rawEventsMap.value.get(hit.view_id), "document_version"));
+  if (Number.isFinite(version) && Number.isFinite(storedVersion) && version !== storedVersion) {
+    return version > storedVersion;
+  }
+  return (Number(hit[field]) || 0) > (rumEventArrivals.get(key) ?? 0);
+};
+
 // A re-sent view merges into the stored one (latest document, earliest date), because a view is updated under the same view_id; other rows are kept once.
 const addRumEvents = (hits: any[]) => {
   const start = Number(sessionState.data.selectedSession?.start_time);
@@ -1226,13 +1242,14 @@ const addRumEvents = (hits: any[]) => {
   for (const hit of hits) {
     lastEventsTs = Math.max(lastEventsTs, Number(hit[field]) || 0);
     if (!RUM_EVENT_TYPES.includes(hit.type) || !(hit.date >= start)) continue;
-    const key = eventKey(hit) ?? `unkeyed|${rumEvents.size}`;
-    if (rumEvents.has(key) && hit.type !== "view") continue;
+    const key = eventKey(hit) ?? `unkeyed|${hit.type}|${hit[field]}|${hit.date}`;
+    if (!isNewerRumEvent(key, hit, field)) continue;
     const eventId = hit[`${hit.type}_id`];
     const previous = rumEvents.has(key) && eventId ? rawEventsMap.value.get(eventId) : undefined;
     const row = previous ? collapseViewDocuments([previous, hit])[0] : hit;
     if (eventId) rawEventsMap.value.set(eventId, row);
     rumEvents.set(key, formatEvent(row));
+    rumEventArrivals.set(key, Number(hit[field]) || 0);
     changed = true;
   }
   return changed;
@@ -1264,18 +1281,18 @@ const publishEvents = () => {
   videoPlayerRef.value?.updatePlayerState?.();
 };
 
+// Paged in full, because the live cursor is the largest arrival time seen and a cut-off first page would skip the rest.
 const getSessionEvents = () => {
-  const req = eventsRequest(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US), 0);
   isLoading.value.push(true);
-  searchWithRetry(req)
-    .then((res: any) => {
+  fetchEventPages(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US))
+    .then((hits: any[]) => {
       // Test the SOURCE field, not the rendered value: user_email is filled with
       // t("common.unknownUser") when absent, so comparing it to the English
       // literal stopped this backfill firing in every non-English locale.
       if (!sessionState.data.selectedSession?.user_email)
-        sessionDetails.value.user_email = res.data.hits[0]?.usr_email;
+        sessionDetails.value.user_email = hits[0]?.usr_email;
 
-      addRumEvents(res.data.hits);
+      addRumEvents(hits);
       publishEvents();
       getSessionErrorLogs();
     })
@@ -1286,11 +1303,10 @@ const getSessionEvents = () => {
 };
 
 const getSessionErrorLogs = () => {
-  const req = eventsRequest(errorLogsSql(), serverWindowUs(EVENTS_TAIL_US), 0);
   isLoading.value.push(true);
-  searchWithRetry(req)
-    .then((res: any) => {
-      addErrorLogs(res.data.hits);
+  fetchEventPages(errorLogsSql(), serverWindowUs(EVENTS_TAIL_US))
+    .then((hits: any[]) => {
+      addErrorLogs(hits);
       publishEvents();
     })
     .catch((error) => {

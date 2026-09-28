@@ -2094,7 +2094,9 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
       action_type: "click",
       ...at(100 + i),
     }));
-    server.rum = [server.rum[1], { ...server.rum[0], view_url: "/b", ...at(10) }, ...more];
+    // The re-send keeps the view's date but arrives later.
+    const resent = { ...server.rum[0], view_url: "/b", _timestamp: (L + 300) * 1000 };
+    server.rum = [server.rum[1], resent, ...more];
     await vi.advanceTimersByTimeAsync(30_000);
 
     expect(vm.segmentEvents).toHaveLength(162);
@@ -2155,10 +2157,81 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     wrapper.unmount();
   });
 
-  it("clears the poll timer on unmount", async () => {
+  it("clears the poll timer and the visibility listener on unmount", async () => {
+    const removeListener = vi.spyOn(document, "removeEventListener");
     const wrapper = await mountLive();
+    expect(vi.getTimerCount()).toBe(1);
+
     wrapper.unmount();
-    await vi.advanceTimersByTimeAsync(120_000);
-    expect(manifestPolls()).toHaveLength(0);
+
+    expect(vi.getTimerCount()).toBe(0);
+    expect(removeListener).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
+    removeListener.mockRestore();
+  });
+
+  it("pages the first events load, so the live cursor never skips events past the first page", async () => {
+    const at = (offset: number) => ({ date: L + offset, _timestamp: (L + offset) * 1000 });
+    // A fresh re-send of the view sorts first by date, so a single page would put the cursor at its arrival.
+    server.rum = [
+      { type: "view", view_id: "v1", view_url: "/a", date: L + 1, _timestamp: NOW * 1000 },
+      ...Array.from({ length: 200 }, (_, i) => ({
+        type: "action",
+        action_id: `a${i}`,
+        action_type: "click",
+        ...at(10 + i),
+      })),
+    ];
+    const wrapper = await mountLive();
+
+    expect((wrapper.vm as any).segmentEvents).toHaveLength(201);
+    wrapper.unmount();
+  });
+
+  it("keeps an event without an id once across overlapping polls", async () => {
+    server.rum = [
+      { type: "action", action_type: "click", date: L + 20, _timestamp: (L + 20) * 1000 },
+    ];
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    expect(vm.segmentEvents).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(vm.segmentEvents).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("keeps the view re-send with the latest arrival time, whatever order it comes in", async () => {
+    const view = (url: string, arrival: number) => ({
+      type: "view",
+      view_id: "v1",
+      view_loading_type: "initial_load",
+      view_url: url,
+      date: L + 10,
+      _timestamp: arrival,
+    });
+    server.rum = [view("/new", (L + 900) * 1000), view("/old", (L + 100) * 1000)];
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    expect(vm.segmentEvents.map((event: any) => event.name)).toEqual(["initial_load : /new"]);
+
+    server.rum = [view("/old", (L + 100) * 1000)];
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(vm.segmentEvents.map((event: any) => event.name)).toEqual(["initial_load : /new"]);
+    expect(vm.rawEventsMap.get("v1").view_url).toBe("/new");
+    wrapper.unmount();
+  });
+
+  it("drops the LIVE badge when there is no manifest to follow or the load failed", async () => {
+    server.rows = [];
+    const empty = await mountLive();
+    expect((empty.vm as any).loadState).toBe("empty");
+    expect(empty.find('[data-test="session-viewer-live-badge"]').exists()).toBe(false);
+    empty.unmount();
+
+    resetStreaming(() => ({ error: { status: 403 } }));
+    const failed = await mountLive();
+    expect((failed.vm as any).loadState).toBe("error");
+    expect(failed.find('[data-test="session-viewer-live-badge"]').exists()).toBe(false);
+    failed.unmount();
   });
 });

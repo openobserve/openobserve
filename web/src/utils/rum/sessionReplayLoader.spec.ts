@@ -27,39 +27,12 @@ import {
   markSkipped,
   markStored,
   networkSkippedIndexes,
-  nextBatch,
   requeueNetworkSkips,
   settleBatch,
   withRetries,
 } from "./sessionReplayLoader";
 
 const noWait = () => Promise.resolve();
-
-describe("nextBatch", () => {
-  it("takes contiguous missing segments after the run edge, at most 25", () => {
-    const state = createLoaderState(60);
-    expect(nextBatch(state, 3)).toEqual(Array.from({ length: 25 }, (_, i) => i + 3));
-  });
-
-  it("stops a batch at the first segment that is not missing", () => {
-    const state = createLoaderState(10);
-    markStored(state, 6);
-    expect(nextBatch(state, 2)).toEqual([2, 3, 4, 5]);
-  });
-
-  it("fills holes before the edge only once the tail is done", () => {
-    const state = createLoaderState(6);
-    for (const i of [3, 4, 5]) markStored(state, i);
-    expect(nextBatch(state, 3)).toEqual([0, 1, 2]);
-  });
-
-  it("never returns skipped segments, so the watchdog has nothing to loop on", () => {
-    const state = createLoaderState(3);
-    for (const i of [0, 1, 2]) markSkipped(state, i, "network");
-    expect(nextBatch(state, 0)).toEqual([]);
-    expect(isFetchable(state, 1)).toBe(false);
-  });
-});
 
 describe("settleBatch", () => {
   it("re-queues a segment a successful batch did not return, at most twice", () => {
@@ -68,13 +41,13 @@ describe("settleBatch", () => {
       markInFlight(state, [0]);
       settleBatch(state, [0]);
       expect(state.status[0]).toBe("fetchedMissing");
-      expect(nextBatch(state, 0)).toEqual([0]);
+      expect(isFetchable(state, 0)).toBe(true);
     }
     markInFlight(state, [0]);
     settleBatch(state, [0]);
     expect(state.status[0]).toBe("skipped");
     expect(state.skipReason[0]).toBe("missing");
-    expect(nextBatch(state, 0)).toEqual([]);
+    expect(isFetchable(state, 0)).toBe(false);
   });
 
   it("leaves segments that were stored alone", () => {
