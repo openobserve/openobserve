@@ -26,8 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="flex min-w-0 flex-1 flex-wrap items-center gap-2 overflow-hidden max-lg:overflow-visible"
+    class="flex min-w-0 flex-1 flex-wrap items-center gap-2 overflow-hidden max-lg:overflow-visible max-md:contents"
   >
+    <!-- contents on phones: the filters share the table toolbar's first row with the date and refresh, search takes the next. -->
     <div class="w-64 shrink-0 max-lg:order-last max-lg:w-full max-lg:basis-full">
       <OSearchInput
         :model-value="search"

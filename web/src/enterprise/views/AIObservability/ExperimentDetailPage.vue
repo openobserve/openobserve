@@ -156,7 +156,7 @@
           @row-click="openRow"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-md:contents">
               <OInput
                 v-model="rowSearch"
                 class="min-w-0 flex-1"
@@ -172,7 +172,7 @@
               />
               <OSelect
                 v-model="statusFilter"
-                class="shrink-0"
+                class="shrink-0 max-md:w-36"
                 width="sm"
                 :options="statusOptions"
                 :placeholder="t('aiObservability.experiments.detail.statusFilterAll')"

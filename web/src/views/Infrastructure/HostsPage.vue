@@ -430,7 +430,7 @@ const osToggleLabel = (slug: string) =>
     <!-- Undetected: onboarding, not a dead end — the embedded card carries the auto-import wiring. -->
     <div v-else-if="hostsState !== 'detected'" class="min-h-0 flex-1 overflow-y-auto">
       <div
-        class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
+        class="max-lg:px-page-edge mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
         data-test="hosts-empty-state"
       >
         <OText tag="h2" class="text-xl font-semibold">{{ t("infra.hosts.emptyHeadline") }}</OText>
