@@ -507,8 +507,7 @@ mod tests {
 
     #[test]
     fn test_generate_quick_mode_fields_no_duplicates() {
-        // Each column is reachable from several guards (fts, built-in, trace type);
-        // a duplicate fails the plan with "duplicate qualified field name".
+        // A column several guards can add must appear once, or DataFusion rejects the plan.
         let over_cutoff = get_config().limit.quick_mode_num_fields + 100;
         let mut fields = (0..over_cutoff)
             .map(|i| Arc::new(Field::new(format!("field{i}"), DataType::Utf8, true)))
@@ -531,7 +530,7 @@ mod tests {
         for field in &result {
             assert!(names.insert(field.name()), "duplicate {}", field.name());
         }
-        assert!(names.contains(&"session_id".to_string()));
+        assert!(result.iter().any(|f| f.name() == "session_id"));
     }
 
     #[test]
