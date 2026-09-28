@@ -145,3 +145,7 @@ multer.workspace = true
 [[bench]]
 name = "db_enrich"
 harness = false
+
+[[bench]]
+name = "trace_enrich"
+harness = false

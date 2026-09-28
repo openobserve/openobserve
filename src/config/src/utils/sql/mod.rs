@@ -32,7 +32,7 @@ pub use simple_aggregate_query::is_simple_aggregate_query;
 pub use simple_distinct_query::is_simple_distinct_query;
 pub use timestamp_selected::is_timestamp_selected;
 pub use visitors::TimestampVisitor;
-pub use where_fragment::validate_where_fragment;
+pub use where_fragment::{validate_optional_where_fragment, validate_where_fragment};
 
 pub const AGGREGATE_UDF_LIST: [&str; 17] = [
     "min",

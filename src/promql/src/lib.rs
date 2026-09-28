@@ -38,6 +38,7 @@ pub mod common;
 pub mod engine;
 pub mod exec;
 mod functions;
+mod scalar_param;
 mod series_loader;
 mod series_stream;
 mod streaming_eval;

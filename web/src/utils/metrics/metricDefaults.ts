@@ -117,7 +117,7 @@ interface UnitRule {
 }
 
 /** A panel's unit config: a formatter id plus an optional custom-unit label. */
-interface O2Unit {
+export interface O2Unit {
   unit: string;
   unitCustom: string | null;
 }

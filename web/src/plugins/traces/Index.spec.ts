@@ -3012,10 +3012,17 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.errorMsg).toBe("");
 
       // A genuine error for the CURRENT (non-superseded) search must still work.
+      // getQueryData()'s error handler sets errorMsg synchronously, so assert
+      // immediately — before yielding to the event loop via flushPromises().
+      // An unrelated component instance left over from an earlier test in this
+      // file can still have a mount-triggered search pending (onUnmounted does
+      // not cancel in-flight work); if its own getQueryData() call happens to
+      // settle during our flushPromises() here, it resets the shared
+      // mockSearchObj.data.errorMsg back to "" before we get a chance to read
+      // it, unrelated to the cancellation behavior this test is verifying.
       capturedHandlers[1].error({}, { message: "real failure from search #2", code: 500 });
-      await flushPromises();
-
       expect(mockSearchObj.data.errorMsg).toBe("real failure from search #2");
+      await flushPromises();
 
       mockFetchQueryDataWithHttpStream.mockReset();
     });

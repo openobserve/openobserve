@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Biến có cùng tên đã tồn tại",
     "pivotTotal": "Tổng",
     "pivotOthers": "Khác",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Hiển thị exemplar (mẫu trace)",
+      "hide": "Ẩn exemplar · hiển thị {count}",
+      "empty": "Không có exemplar trong khoảng thời gian này",
+      "emptyShort": "0 exemplar",
+      "loadFailed": "Không thể tải exemplar",
+      "loadFailedHint": "Biểu đồ không bị ảnh hưởng. Thao tác thử lại chỉ tải exemplar.",
+      "retry": "Thử lại",
+      "cardTitle": "Exemplar",
+      "query": "Truy vấn {name}",
+      "returnedBy": "Được trả về bởi {count} truy vấn | Được trả về bởi {count} truy vấn",
+      "series": "Chuỗi",
+      "aboveRange": "Nằm trên phạm vi biểu đồ; được vẽ ở cạnh trên",
+      "belowRange": "Nằm dưới phạm vi biểu đồ; được vẽ ở cạnh dưới",
+      "checkingTrace": "Đang kiểm tra trace…",
+      "openTrace": "Mở trace",
+      "openTraceHint": "Hoặc nhấp vào điểm đánh dấu. Nút Quay lại sẽ đưa bạn về đây.",
+      "traceNotAvailable": "Trace không khả dụng — bị loại do lấy mẫu hoặc ngoài thời gian lưu trữ",
+      "openTraceUnverified": "Mở trace (chưa xác minh)",
+      "unverifiedTimeout": "Tra cứu trace đã hết thời gian chờ, nên trace này có thể không tồn tại.",
+      "unverifiedForbidden": "Không thể xác nhận trace này — bạn có thể không có quyền truy cập trace.",
+      "unverifiedPartial": "Chỉ một phần của khoảng thời gian lưu trữ được tìm kiếm.",
+      "unverifiedError": "Không thể kiểm tra trace này.",
+      "noTraceId": "Exemplar này không có {label}, nên không có trace để mở.",
+      "markersAria": "Điểm đánh dấu exemplar",
+      "markerAria": "Exemplar {value} lúc {time}"
+    },
+    "showExemplarsLabel": "Hiển thị exemplar",
+    "showExemplarsHelp": "Vẽ mẫu trace trên biểu đồ này cho tất cả những ai mở bảng điều khiển. Người xem vẫn có thể ẩn chúng từ tiêu đề panel."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7531,6 +7560,9 @@
       "lastError": "Lỗi cuối cùng",
       "lastTrained": "Lần huấn luyện cuối",
       "lookBackWindow": "Cửa sổ nhìn lại",
+      "lookBackWindowFloor": "Cửa sổ nhìn lại phải tối thiểu {min} — Tần suất kiểm tra cộng một Độ phân giải phát hiện. Cửa sổ ngắn hơn không thể chứa trọn một bucket vào lúc một lượt chạy diễn ra, nên các bucket sẽ bị bỏ qua.",
+      "lookBackWindowLegacy": "Cửa sổ đã lưu này thấp hơn mức tối thiểu {min} (Tần suất kiểm tra cộng một Độ phân giải phát hiện). Nó vẫn được lưu nguyên trạng, nhưng các lượt chạy có thể bỏ qua bucket cho đến khi cửa sổ được tăng lên.",
+      "lookBackWindowMinimum": "Tối thiểu {min}. Khuyến nghị {recommended} trở lên — gấp đôi (Tần suất kiểm tra + Độ phân giải phát hiện) — cộng thêm 10 phút khi bật phát hiện vắng mặt.",
       "lookBackWindowTooltip": "Khoảng thời gian tối đa mà mỗi lần chạy phát hiện truy vấn. Giới hạn cửa sổ ngay cả sau khi tạm dừng lâu. Mặc định là khoảng thời gian Kiểm tra mỗi lần.",
       "metricChart": "Chỉ số và bất thường",
       "metricChartHint": "Một điểm cho mỗi khoảng phát hiện",
@@ -7539,6 +7571,15 @@
       "nDays": "{days} ngày | {days} ngày",
       "noDestinationsFound": "Không tìm thấy đích nào",
       "noFieldsFound": "Không tìm thấy trường nào",
+      "noticeHybridFallback": "Phát hiện dự phòng",
+      "noticeHybridFallbackTooltip": "Ngưỡng hybrid không khả dụng trong các lượt chạy gần đây, nên quá trình phát hiện đã chuyển sang ngưỡng đóng băng. Việc tính điểm tiếp tục dựa trên ngưỡng đóng băng cho đến khi mô hình được huấn luyện lại.",
+      "noticeRetrain": "Tự động huấn luyện lại",
+      "noticeRetrainTooltip": "Không thể đọc mô hình đã lưu sau khi nâng cấp, nên nó đã bị loại bỏ và cấu hình được tự động xếp hàng để huấn luyện lại. Không cần thực hiện thao tác nào; quá trình phát hiện sẽ tiếp tục sau khi huấn luyện hoàn tất.",
+      "noticeSkipAbsence": "Việc chấm điểm vắng mặt bị chậm hơn Cửa sổ nhìn lại; span không còn có thể truy xuất đã bị bỏ qua và được ghi lại.",
+      "noticeSkipScored": "Các lượt chạy phát hiện diễn ra cách xa nhau hơn phạm vi Cửa sổ nhìn lại, nên các bucket đã đóng đã ra khỏi cửa sổ trước khi một lượt chạy có thể đánh giá chúng.",
+      "noticeWindowFloor": "Cửa sổ quá hẹp",
+      "noticeWindowFloorTooltip": "Cửa sổ nhìn lại thấp hơn Tần suất kiểm tra cộng một Độ phân giải phát hiện, nên các lượt chạy không thể đánh giá bất kỳ bucket nào. Hãy tăng cửa sổ để khôi phục phát hiện.",
+      "noticeWindowSkip": "Bucket bị bỏ qua",
       "notifications": "Thông báo",
       "notificationsTooltip": "Khi được bật, một thông báo sẽ được gửi đến đích đã chọn mỗi khi phát hiện bất thường.",
       "percentile": "Mức",
@@ -8649,7 +8690,9 @@
         "staleCopyAria": "Sao chép chi tiết làm mới thất bại cho {name}",
         "stalePreamble": "Làm mới thất bại — hiển thị kết quả thành công gần nhất.",
         "staleClickToCopy": "Nhấp để sao chép chi tiết.",
-        "lastRefreshedPrefix": "Lần làm mới cuối cùng lúc: "
+        "lastRefreshedPrefix": "Lần làm mới cuối cùng lúc: ",
+        "exemplarsShowHeatmap": "Hiển thị exemplar (mẫu trace). Chuyển thẻ này sang percentile khi bật.",
+        "exemplarsHideHeatmap": "Ẩn exemplar · hiển thị {count}. Đưa thẻ này trở lại heatmap."
       },
       "fn": {
         "subtitle": "Chọn cách tổng hợp số liệu này",
@@ -17152,17 +17195,17 @@
       "alertMe": "Cảnh báo tôi",
       "columnHints": {
         "qps": "Lời gọi mỗi giây — số lời gọi trong cửa sổ này chia cho độ dài của nó, để chế độ xem 15 phút và chế độ xem 4 giờ vẫn so sánh được.",
-        "p50": "Một nửa số lời gọi hoàn thành nhanh hơn mức này. Chỉ tính các lời gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ trả về sẽ không được đo ở đây.",
-        "p95": "Phần đuôi chậm — 1 trong 20 lời gọi mất ít nhất thời gian này. Chỉ tính các lời gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ trả về sẽ không được đo ở đây.",
-        "p99": "1% tệ nhất các lời gọi mất ít nhất thời gian này. Chỉ tính các lời gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ trả về sẽ không được đo ở đây.",
-        "load": "Tổng thời gian ứng dụng của bạn chờ đợi cơ sở dữ liệu này. Được đo từ phía máy khách, vì vậy nó phản ánh lượng lưu lượng mà cơ sở dữ liệu này phục vụ — không phải mức độ tải của máy chủ.",
+        "p50": "Một nửa số lệnh gọi hoàn tất nhanh hơn mức này. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
+        "p95": "Phần đuôi chậm — 1 trong 20 lệnh gọi mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
+        "p99": "1% lệnh gọi tệ nhất mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
+        "load": "Tổng thời gian ứng dụng của bạn dành cho các lệnh gọi đến cơ sở dữ liệu này, được đo từ trace của ứng dụng của bạn. Nó cho thấy cơ sở dữ liệu này đã phục vụ bao nhiêu lưu lượng cho ứng dụng của bạn.",
         "attention": "Phiên bản này gần đến mức nào so với giới hạn mà công cụ của chính nó công bố — hôm nay, số kết nối so với max_connections. Tỷ lệ tệ nhất, không phải điểm tổng hợp. Sắp xếp theo thứ tự giảm dần, với các phiên bản không thể đọc tình trạng ở trên cùng, vì một phiên bản bạn không thể thấy không phải là phiên bản bạn biết là khỏe mạnh. Được đo trên máy chủ cơ sở dữ liệu, vì vậy nó không thể so sánh với Thời gian cơ sở dữ liệu bên cạnh."
       },
       "failedChip": "{count} thất bại",
       "columnSubLabels": {
-        "attention": "máy chủ",
-        "load": "máy khách",
-        "calls": "máy khách"
+        "attention": "từ cơ sở dữ liệu",
+        "load": "từ ứng dụng của bạn",
+        "calls": "từ ứng dụng của bạn"
       },
       "attention": {
         "connections": "kết nối",
@@ -17224,14 +17267,14 @@
         "failed": "Thất bại"
       },
       "columnHints": {
-        "calls": "Số lần truy vấn này được thực thi. Số đếm của cơ sở dữ liệu của bạn ở nơi nó báo cáo — bao gồm mọi máy khách, không chỉ các phần của hệ thống gửi trace. Các hàng được đánh dấu client-observed được đếm từ trace, vì cơ sở dữ liệu của bạn không báo cáo chúng.",
-        "p50": "Một nửa số cuộc gọi hoàn thành nhanh hơn mức này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
-        "p95": "Đuôi chậm — 1 trong 20 cuộc gọi mất ít nhất khoảng thời gian này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
-        "p99": "1% cuộc gọi tệ nhất mất ít nhất khoảng thời gian này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
+        "calls": "Số lần truy vấn này đã chạy, theo số đếm của cơ sở dữ liệu của bạn — bao gồm mọi ứng dụng kết nối. Khi cơ sở dữ liệu của bạn không có số đếm cho một truy vấn, biểu tượng trace đánh dấu truy vấn được đo từ trace của ứng dụng của bạn.",
+        "p50": "Một nửa số lệnh gọi hoàn tất nhanh hơn mức này. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
+        "p95": "Phần đuôi chậm — 1 trong 20 lệnh gọi mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
+        "p99": "1% lệnh gọi tệ nhất mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
         "max": "Cuộc gọi chậm nhất duy nhất trong cửa sổ này — một cuộc gọi thực sự, không phải trung bình.",
         "errors": "Có bao nhiêu cuộc gọi trong số này trả về lỗi.",
         "perTrace": "Số lần điều này chạy bên trong một yêu cầu. Số cao thường có nghĩa là một vòng lặp.",
-        "load": "Tổng thời gian truy vấn này dành cho cơ sở dữ liệu. Số liệu của chính cơ sở dữ liệu của bạn ở nơi nó báo cáo: thời gian thực thi trên Postgres, nhưng thời gian CHỜ trên MySQL và MariaDB — mỗi hàng cho biết loại nào. Các hàng được đánh dấu client-observed được đo từ trace, vì vậy chúng bao gồm cả thời gian khứ hồi mạng."
+        "load": "Tổng thời gian truy vấn này đã ở trong cơ sở dữ liệu, theo báo cáo của cơ sở dữ liệu của bạn: thời gian thực thi trên Postgres, thời gian chờ trên MySQL và MariaDB — mỗi dòng ghi rõ là loại nào. Các dòng có biểu tượng trace được đo từ trace của ứng dụng của bạn, nên chúng cũng bao gồm cả chặng đi đến cơ sở dữ liệu và quay về."
       },
       "errorsNone": "không có",
       "errorsAll": "tất cả",
@@ -17495,8 +17538,7 @@
       "overlap": {
         "serverExecution": "Thời gian {engine} dành để thực thi nó",
         "serverWait": "Thời gian {engine} chờ nó — thời gian chờ, không phải thời gian thực thi",
-        "serverCounted": "Được đếm bởi {engine}, trên mọi máy khách",
-        "clientObserved": "Được quan sát bởi các bên gọi được cài đặt đo lường — cơ sở dữ liệu của bạn không báo cáo điều này."
+        "serverCounted": "Được đếm bởi {engine}, trên mọi máy khách"
       },
       "endpointsConcentrated": "Một endpoint chiếm {percent} thời gian của truy vấn này. Sửa {endpoint} là bạn đã sửa xong truy vấn này.",
       "typicalMarker": "lời gọi chậm {value}",
@@ -17523,8 +17565,8 @@
       },
       "serverMetrics": {
         "title": "Dữ liệu do cơ sở dữ liệu tự ghi nhận",
-        "subtitle": "Phía máy chủ — mọi máy khách",
-        "clientSubtitle": "Quan sát từ phía máy khách — chỉ các bên gọi được đo lường, chỉ các cuộc gọi hoàn tất. Một truy vấn vẫn đang chạy hoặc bị treo sẽ không nằm trong những con số này.",
+        "subtitle": "Từ cơ sở dữ liệu của bạn — mọi ứng dụng kết nối",
+        "clientSubtitle": "Các số liệu được đánh dấu được đo từ trace của ứng dụng của bạn — những lệnh gọi mà ứng dụng của bạn đã hoàn tất trong khoảng thời gian này",
         "instance": "Do {instance} báo cáo",
         "instanceWide": "Tất cả cơ sở dữ liệu trên instance này",
         "calls": "Số lần thực thi",
@@ -17570,9 +17612,13 @@
         "serverExecution": "thời gian thực thi",
         "serverWait": "thời gian chờ",
         "serverCounted": "số lượng máy chủ",
-        "clientObserved": "quan sát từ máy khách",
         "serverReported": "được báo cáo bởi các cơ sở dữ liệu của bạn"
       }
+    },
+    "appSource": {
+      "marker": "Được đo từ trace của ứng dụng của bạn",
+      "markerHint": "Được đo từ trace của ứng dụng của bạn, bổ sung góc nhìn của ứng dụng vào những gì cơ sở dữ liệu của bạn báo cáo.",
+      "legend": "Từ trace của ứng dụng của bạn"
     },
     "page": {
       "tabs": {
@@ -17581,7 +17627,7 @@
         "metricsHint": "Tải cơ sở dữ liệu theo sự kiện chờ, và mọi chỉ số mà các receiver cơ sở dữ liệu của bạn thu thập.",
         "queries": "Truy vấn hàng đầu",
         "samples": "Cuộc gọi chậm nhất",
-        "samplesHintClient": "Các cuộc gọi hoàn tất mà các dịch vụ được đo lường của bạn quan sát được trong khoảng thời gian này — các bên gọi không được truy vết không được tính, vì vậy đây là mức tối thiểu, không phải tổng số. Bảng hiển thị những cuộc gọi chậm nhất trong số đó.",
+        "samplesHintClient": "Các lệnh gọi được đo từ trace của ứng dụng của bạn trong khoảng thời gian này, bổ sung góc nhìn của ứng dụng vào những gì cơ sở dữ liệu của bạn báo cáo. Bảng hiển thị những lệnh gọi chậm nhất trong số đó.",
         "samplesHintServer": "Các câu lệnh mà cơ sở dữ liệu của bạn báo cáo đã hoàn thành trong khoảng thời gian này, được đếm trong cơ sở dữ liệu. Bảng hiển thị những câu lệnh chậm nhất.",
         "samplesHintUnknown": "Các cuộc gọi cơ sở dữ liệu riêng lẻ chậm nhất trong khoảng thời gian này.",
         "deadlocks": "Bế tắc",
@@ -17618,6 +17664,11 @@
       "explore": "Mở trong Metrics Explorer",
       "railLabel": "Các mục chỉ số",
       "noAccess": "Bạn không có quyền đọc {stream}. Hãy yêu cầu quản trị viên cấp quyền đọc Stream này.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "theo truy vấn",
         "database": "theo cơ sở dữ liệu",
@@ -17732,7 +17783,7 @@
         "status": "Trạng thái"
       },
       "columnHints": {
-        "duration": "Cuộc gọi này mất bao lâu, được đo bởi người gọi. Chỉ tính các cuộc gọi đã hoàn thành — một truy vấn đang chạy hoặc không bao giờ quay lại sẽ không được đo ở đây."
+        "duration": "Thời gian lệnh gọi này mất, theo đo đạc của ứng dụng từ lúc bắt đầu đến khi kết thúc."
       },
       "failed": "Thất bại",
       "failedWithCode": "Thất bại · {code}",
@@ -19241,6 +19292,8 @@
     "rotationNobody": "Không có ai trực",
     "edit": "Chỉnh sửa",
     "timelineLoadFailed": "Không thể phân giải lịch cho khoảng thời gian này",
+    "editorReadFailed": "Không thể tải bản mới nhất để chỉnh sửa. Hãy thử lại.",
+    "refreshFailed": "Không thể làm mới. Nội dung hiển thị có thể đã lỗi thời.",
     "scheduleDoneEditing": "Quay lại lịch trực",
     "coverWhoRequired": "Chọn người trực thay",
     "timelineCoverAria": "{who} đang trực {rotation}, từ {from} đến {to}",

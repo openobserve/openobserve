@@ -53,7 +53,7 @@ pub use url_processor::init_url_processor;
 pub async fn save_enrichment_data(
     org_id: &str,
     table_name: &str,
-    payload: Vec<json::Map<String, json::Value>>,
+    mut payload: Vec<json::Map<String, json::Value>>,
     append_data: bool,
 ) -> Result<HttpResponse, Error> {
     // let start = std::time::Instant::now();
@@ -143,6 +143,11 @@ pub async fn save_enrichment_data(
         stream_schema_map.remove(&stream_name);
     }
 
+    // Taken before redaction: a dropped field is a redaction outcome, not a schema change.
+    let schema_probe: Option<json::Map<String, json::Value>> = payload.first().cloned();
+
+    apply_redaction(org_id, &stream_name, &mut payload).await;
+
     let mut records = vec![];
     let mut records_size = 0;
     let timestamp = Utc::now().timestamp_micros();
@@ -167,11 +172,18 @@ pub async fn save_enrichment_data(
     }
 
     // disallow schema change for enrichment tables
-    let value_iter = record_vals.iter().take(1).cloned().collect::<Vec<_>>();
+    let mut probe = schema_probe.unwrap_or_default();
+    if !probe.is_empty() {
+        probe.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number(timestamp.into()),
+        );
+    }
+    let probe_ref = vec![&probe];
     let inferred_schema = infer_json_schema_from_map(
         &stream_name,
         StreamType::EnrichmentTables,
-        value_iter.into_iter(),
+        probe_ref.into_iter(),
     )
     .map_err(|_e| std::io::Error::other("Error inferring schema"))?;
     let db_schema = stream_schema_map
@@ -477,6 +489,63 @@ pub async fn delete_from_file_list(
         }
     }
     Ok(())
+}
+
+/// Redacts an enrichment payload in place, so sensitive values cannot reach a search-result join.
+pub(crate) async fn apply_redaction(
+    _org_id: &str,
+    _stream_name: &str,
+    _payload: &mut [json::Map<String, json::Value>],
+) {
+    #[cfg(feature = "vectorscan")]
+    {
+        if config::meta::self_reporting::redaction::is_self_reporting_stream(
+            _org_id,
+            _stream_name,
+            config::meta::stream::StreamType::EnrichmentTables,
+        ) {
+            return;
+        }
+        // Enrichment rows genuinely carry no timestamp; a real zero would claim a 1970 window.
+        let mut rows: Vec<(i64, json::Map<String, json::Value>)> = _payload
+            .iter_mut()
+            .map(|record| (0_i64, std::mem::take(record)))
+            .collect();
+        match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+            Ok(pattern_manager) => {
+                if let Err(e) = pattern_manager.process_at_ingestion(
+                    _org_id,
+                    StreamType::EnrichmentTables,
+                    _stream_name,
+                    &mut rows,
+                ) {
+                    log::error!(
+                        "[ENRICHMENT_TABLE] error applying SDR patterns for table {_stream_name}: {e}"
+                    );
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[ENRICHMENT_TABLE] failed to get pattern manager for SDR redaction: {e}"
+                );
+                let scope = config::meta::self_reporting::redaction::EvidenceScope::new(
+                    _org_id,
+                    _stream_name,
+                    StreamType::EnrichmentTables,
+                );
+                usage_reporting::redaction_evidence::publish_scan_unavailable(
+                    &scope,
+                    config::meta::self_reporting::redaction::FailPosture::Open,
+                    rows.len() as u64,
+                    config::meta::self_reporting::redaction::DataWindow::default(),
+                )
+                .await;
+            }
+        }
+        for (record, (_, redacted)) in _payload.iter_mut().zip(rows) {
+            *record = redacted;
+        }
+    }
 }
 
 #[cfg(test)]

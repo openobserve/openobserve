@@ -28,6 +28,7 @@ use super::Engine;
 use crate::{
     ast::at_modifier::{Pin, pin},
     functions::{self, Func, RangeFunc, SingleArgFunc},
+    scalar_param::ScalarParam,
 };
 
 impl Engine {
@@ -40,10 +41,9 @@ impl Engine {
             DataFusionError::NotImplemented(format!("Unsupported function: {}", func.name))
         })?;
 
-        // TODO: check this implementation
         if func_name == Func::Time {
             self.ensure_args_len(args, 0, "Invalid args passed to the function")?;
-            return Ok(Value::Float((self.eval_ctx.start / 1_000_000) as f64));
+            return Ok(functions::time(&self.eval_ctx));
         }
 
         let start = std::time::Instant::now();
@@ -85,13 +85,10 @@ impl Engine {
                 let err = "Invalid args, expected clamp(v instant-vector, min scalar, max scalar)";
                 self.ensure_args_len(args, 3, err)?;
                 let input = self.call_expr_arg(args, 0).await?;
-                let min_f = self.call_scalar_arg(args, 1, err).await?;
-                let max_f = self.call_scalar_arg(args, 2, err).await?;
+                let min = self.call_scalar_arg(args, 1, err).await?;
+                let max = self.call_scalar_arg(args, 2, err).await?;
 
-                if min_f > max_f {
-                    return Ok(Value::Matrix(vec![]));
-                }
-                functions::clamp(input, min_f, max_f)
+                functions::clamp(input, &min, &max)
             }
             Func::ClampMax | Func::ClampMin => {
                 let is_max = func_name == Func::ClampMax;
@@ -104,20 +101,20 @@ impl Engine {
                 let input = self.call_expr_arg(args, 0).await?;
                 let bound = self.call_scalar_arg(args, 1, err).await?;
                 let (min, max) = if is_max {
-                    (f64::MIN, bound)
+                    (ScalarParam::Const(f64::NEG_INFINITY), bound)
                 } else {
-                    (bound, f64::MAX)
+                    (bound, ScalarParam::Const(f64::INFINITY))
                 };
 
-                functions::clamp(input, min, max)
+                functions::clamp(input, &min, &max)
             }
             Func::HistogramQuantile => {
                 let err = "Invalid args, expected histogram_quantile(phi scalar, b instant-vector)";
                 self.ensure_args_len(args, 2, err)?;
-                let phi_f = self.call_scalar_arg(args, 0, err).await?;
+                let phi = self.call_scalar_arg(args, 0, err).await?;
                 let input = self.call_expr_arg(args, 1).await?;
 
-                functions::histogram_quantile(phi_f, input, &self.eval_ctx)
+                functions::histogram_quantile(&phi, input, &self.eval_ctx)
             }
             Func::HoltWinters => {
                 let err =
@@ -173,28 +170,28 @@ impl Engine {
                 let err = "Invalid args, expected predict_linear(v range-vector, t scalar)";
                 self.ensure_args_len(args, 2, err)?;
                 let (input, pinned) = self.call_range_arg(args, 0).await?;
-                let prediction_steps_f = self.call_scalar_arg(args, 1, err).await?;
+                let duration = self.call_scalar_arg(args, 1, err).await?;
 
-                functions::predict_linear(input, prediction_steps_f, &self.eval_ctx, pinned)
+                functions::predict_linear(input, duration, &self.eval_ctx, pinned)
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected quantile_over_time(scalar, range-vector)";
                 self.ensure_args_len(args, 2, err)?;
-                let phi_quantile_f = self.call_scalar_arg(args, 0, err).await?;
+                let phi = self.call_scalar_arg(args, 0, err).await?;
                 let (input, pinned) = self.call_range_arg(args, 1).await?;
 
-                functions::quantile_over_time(phi_quantile_f, input, &self.eval_ctx, pinned)
+                functions::quantile_over_time(phi, input, &self.eval_ctx, pinned)
             }
             Func::Round => {
                 let err = "Invalid args, expected round(v instant-vector, to_nearest=1 scalar)";
                 let input = self.call_expr_arg(args, 0).await?;
                 let to_nearest = match args.len() {
-                    1 => 1.0,
+                    1 => ScalarParam::Const(1.0),
                     2 => self.call_scalar_arg(args, 1, err).await?,
                     _ => return Err(DataFusionError::NotImplemented(err.into())),
                 };
 
-                functions::round(input, to_nearest)
+                functions::round(input, &to_nearest)
             }
             Func::Sort | Func::SortDesc => {
                 let err = "Invalid args, expected sort(v instant-vector)";
@@ -284,11 +281,10 @@ impl Engine {
         args: &FunctionArgs,
         index: usize,
         err: &str,
-    ) -> Result<f64> {
-        match self.call_expr_arg(args, index).await? {
-            Value::Float(value) => Ok(value),
-            _ => Err(DataFusionError::NotImplemented(err.into())),
-        }
+    ) -> Result<ScalarParam> {
+        let value = self.call_expr_arg(args, index).await?;
+        ScalarParam::from_value(value, &self.eval_ctx)
+            .ok_or_else(|| DataFusionError::NotImplemented(err.into()))
     }
 
     async fn call_string_arg(
@@ -306,7 +302,7 @@ impl Engine {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{collections::BTreeMap, sync::Arc};
 
     use promql_parser::parser::{FunctionArgs, NumberLiteral};
 
@@ -607,7 +603,7 @@ mod tests {
                 .call_scalar_arg(&args, 0, "scalar error")
                 .await
                 .unwrap(),
-            42.0
+            ScalarParam::Const(42.0)
         );
         assert_eq!(
             engine
@@ -804,6 +800,166 @@ mod tests {
             assert_eq!(val, 42.0);
         } else {
             panic!("Expected Value::Float");
+        }
+    }
+
+    const SECOND: i64 = 1_000_000;
+    const BASE: i64 = 1_640_995_200;
+
+    async fn eval_at(query: &str, eval_ctx: EvalContext) -> Value {
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            eval_ctx,
+        );
+        let expr = promql_parser::parser::parse(query).unwrap();
+        engine
+            .exec_expr(&expr)
+            .await
+            .unwrap_or_else(|err| panic!("{query}: {err}"))
+    }
+
+    /// Three steps a minute apart from `BASE` seconds.
+    fn range_ctx() -> EvalContext {
+        EvalContext::new(
+            BASE * SECOND,
+            (BASE + 120) * SECOND,
+            60 * SECOND,
+            "test".into(),
+        )
+    }
+
+    /// (labels, timestamp) -> value bits of every sample.
+    fn samples(value: Value) -> BTreeMap<(String, i64), u64> {
+        let Value::Matrix(matrix) = value else {
+            return BTreeMap::new();
+        };
+        let mut samples = BTreeMap::new();
+        for series in matrix {
+            let labels: Vec<_> = series
+                .labels
+                .iter()
+                .map(|label| format!("{}={}", label.name, label.value))
+                .collect();
+            for sample in series.samples {
+                let key = (labels.join(","), sample.timestamp);
+                assert!(samples.insert(key, sample.value.to_bits()).is_none());
+            }
+        }
+        samples
+    }
+
+    fn step_values(value: Value) -> Vec<(i64, f64)> {
+        samples(value)
+            .into_iter()
+            .map(|((_, timestamp), bits)| (timestamp, f64::from_bits(bits)))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_time_is_the_evaluation_time_at_every_step() {
+        let instant = 1_500_250 * 1_000;
+        let eval_ctx = EvalContext::new(instant, instant, 0, "test".into());
+        assert!(matches!(eval_at("time()", eval_ctx).await, Value::Float(t) if t == 1500.25));
+
+        // a sub-second start keeps its milliseconds on every step
+        let start = BASE * SECOND + 500_000;
+        let eval_ctx = EvalContext::new(start, start + 120 * SECOND, 60 * SECOND, "test".into());
+        let expected: Vec<_> = (0..3)
+            .map(|i| {
+                let timestamp = start + i * 60 * SECOND;
+                (timestamp, timestamp as f64 / 1e6)
+            })
+            .collect();
+        for query in ["time()", "vector(time())"] {
+            assert_eq!(
+                step_values(eval_at(query, eval_ctx.clone()).await),
+                expected,
+                "{query}"
+            );
+        }
+
+        // subquery steps are aligned to multiples of their own step, so the last one is on the
+        // minute
+        let on_the_minute: Vec<_> = expected
+            .iter()
+            .map(|&(timestamp, seconds)| (timestamp, seconds.floor()))
+            .collect();
+        assert_eq!(
+            step_values(eval_at("max_over_time(vector(time())[10m:1m])", eval_ctx).await),
+            on_the_minute
+        );
+    }
+
+    #[tokio::test]
+    async fn test_time_minus_timestamp_is_zero_in_every_context() {
+        let instant = EvalContext::new(BASE * SECOND, BASE * SECOND, 0, "test".into());
+        for (eval_ctx, steps) in [(instant, 1), (range_ctx(), 3)] {
+            for query in [
+                "time() - timestamp(vector(1))",
+                "timestamp(vector(1)) - time()",
+                "max_over_time(vector(time())[10m:1m]) - time()",
+            ] {
+                let values = step_values(eval_at(query, eval_ctx.clone()).await);
+                assert_eq!(values.len(), steps, "{query}");
+                assert!(values.iter().all(|(_, value)| *value == 0.0), "{query}");
+            }
+        }
+    }
+
+    /// A parameter that differs at every step answers each step as that step's constant would.
+    #[tokio::test]
+    async fn test_per_step_parameters_match_the_constant_at_each_step() {
+        let series = format!(
+            r#"(label_replace(vector(time() - {BASE}), "s", "a", "", "") or label_replace(vector(2 * (time() - {BASE})), "s", "b", "", "") or label_replace(vector(10), "s", "c", "", ""))"#
+        );
+        let buckets = r#"(label_replace(vector(50), "le", "1", "", "") or label_replace(vector(100), "le", "2", "", "") or label_replace(vector(100), "le", "+Inf", "", ""))"#;
+        let squares = format!("vector((time() - {BASE}) ^ 2)[3m:1m]");
+        let cases = [
+            // the lower bound passes the upper one on the last step, which clamp answers empty
+            (format!("clamp({series}, {{p}}, 100)"), 0.0, 70.0),
+            (format!("clamp_min({series}, {{p}})"), 5.0, 50.0),
+            (format!("clamp_max({series}, {{p}})"), 5.0, 50.0),
+            (format!("round({series}, {{p}})"), 7.0, 30.0),
+            (format!("topk({{p}}, {series})"), 0.0, 1.0),
+            (format!("bottomk({{p}}, {series})"), 1.0, 1.0),
+            (format!("quantile({{p}}, {series})"), 0.0, 0.5),
+            (format!("histogram_quantile({{p}}, {buckets})"), 0.1, 0.4),
+            (
+                "quantile_over_time({p}, vector(time())[3m:1m])".to_string(),
+                0.0,
+                0.5,
+            ),
+            (
+                "predict_linear(vector(time())[3m:1m], {p})".to_string(),
+                60.0,
+                60.0,
+            ),
+            (format!("holt_winters({squares}, {{p}}, 0.5)"), 0.2, 0.3),
+            (format!("holt_winters({squares}, 0.5, {{p}})"), 0.2, 0.3),
+        ];
+        for (template, base, slope) in cases {
+            let per_step = template.replace(
+                "{p}",
+                &format!("({base} + {slope} * ((time() - {BASE}) / 60))"),
+            );
+            let actual = samples(eval_at(&per_step, range_ctx()).await);
+            let mut expected = BTreeMap::new();
+            for step in 0..3 {
+                let constant = template.replace("{p}", &(base + slope * step as f64).to_string());
+                let timestamp = (BASE + step * 60) * SECOND;
+                expected.extend(
+                    samples(eval_at(&constant, range_ctx()).await)
+                        .into_iter()
+                        .filter(|((_, sample_ts), _)| *sample_ts == timestamp),
+                );
+            }
+            assert!(!expected.is_empty(), "{per_step}");
+            assert_eq!(actual, expected, "{per_step}");
         }
     }
 }
