@@ -345,11 +345,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="border-border-subtle relative h-4 min-w-0 flex-1 border-b border-dashed"
                     >
+                      <!-- On phones a transparent ::before widens the 8px dot to a 24px tap target. -->
                       <button
                         v-for="point in lane.points"
                         :key="point.id"
                         type="button"
-                        class="absolute top-1 size-2 -translate-x-1/2 rounded-full"
+                        class="absolute top-1 size-2 -translate-x-1/2 rounded-full max-md:before:absolute max-md:before:-inset-2"
                         :class="
                           point.id === row.selectedEvent?.id
                             ? 'bg-status-error-text ring-accent ring-2'
