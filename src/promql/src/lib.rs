@@ -44,6 +44,8 @@ mod series_stream;
 mod streaming_eval;
 pub mod utils;
 
+pub use series_stream::blocks::load_metrics_block_index;
+
 pub const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
 pub const MAX_DATA_POINTS: i64 = 256; // Width of panel: window.innerWidth / 4
@@ -63,6 +65,27 @@ pub trait TableProvider: Sync + Send + 'static {
         label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
     ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>>;
+
+    /// Allows a provider to consider MIDX blocks before registering a source scan.
+    async fn create_context_prefer_blocks(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        time_range: (i64, i64),
+        matchers: Matchers,
+        label_selector: HashSet<String>,
+        filters: &mut [(String, Vec<String>)],
+    ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+        self.create_context(
+            org_id,
+            stream_name,
+            time_range,
+            matchers,
+            label_selector,
+            filters,
+        )
+        .await
+    }
 
     /// Registers this evaluation with the host's query cancellation service.
     ///
