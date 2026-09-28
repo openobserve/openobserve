@@ -1534,7 +1534,6 @@ mod tests {
             &eval,
         )
         .await
-        .unwrap()
         .unwrap();
         for source in sources {
             assert!(matches!(source.await.unwrap(), SeriesSource::Block(_)));
@@ -2001,7 +2000,6 @@ mod tests {
                 &eval,
             )
             .await
-            .unwrap()
             .unwrap();
             let func: Arc<dyn functions::RangeFunc> =
                 Arc::from(functions::fusable_range_func("rate").unwrap());
@@ -2112,7 +2110,6 @@ mod tests {
                     &eval,
                 )
                 .await
-                .unwrap()
                 .unwrap();
                 let func: Arc<dyn functions::RangeFunc> =
                     Arc::from(functions::fusable_range_func(name).unwrap());
@@ -2242,7 +2239,6 @@ mod tests {
                 &eval,
             )
             .await
-            .unwrap()
             .unwrap();
             let func: Arc<dyn functions::RangeFunc> =
                 Arc::from(functions::fusable_range_func(name).unwrap());
@@ -2361,7 +2357,7 @@ mod tests {
                     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
                     continue;
                 }
-                let sources = result.unwrap().unwrap();
+                let sources = result.unwrap();
                 let mut actual = Vec::new();
                 for source in sources {
                     let mut source = source.await.unwrap();
