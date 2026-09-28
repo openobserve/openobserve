@@ -239,8 +239,6 @@ const mockReplaceRangeWithSubtest = vi.fn();
 const mockReplayUpTo = vi.fn();
 // Exposed by the real BrowserJourney; the host's "Save & re-run" goes through it.
 const mockRequestReplay = vi.fn();
-// Exposed by the real BrowserJourney; the host returns focus through it when the panel closes.
-const mockFocusVariablesToggle = vi.fn();
 // Every open/close of the missing-value dialog stub, so a test can see that one closed before the next opened.
 const missingDialogLog: string[] = [];
 
@@ -308,7 +306,7 @@ const baseStubs = {
   BrowserJourney: {
     // Renders the host's slots, so the view-owned toolbar parts can be found.
     template:
-      '<div data-test="synthetics-browser-journey"><slot name="start-pill" :locked="false" /><slot name="replay-menu" :disabled="false" /></div>',
+      '<div data-test="synthetics-browser-journey"><slot name="replay-menu" :disabled="false" /></div>',
     props: [
       "modelValue",
       "fieldIssues",
@@ -340,7 +338,6 @@ const baseStubs = {
       replaceRangeWithSubtest: (...args: unknown[]) => mockReplaceRangeWithSubtest(...args),
       replayUpTo: (...args: unknown[]) => mockReplayUpTo(...args),
       requestReplay: (...args: unknown[]) => mockRequestReplay(...args),
-      focusVariablesToggle: () => mockFocusVariablesToggle(),
     },
   },
   JourneyStartPill: {
@@ -433,8 +430,10 @@ const baseStubs = {
       "foldersLoading",
       "validationErrors",
       "targetHint",
+      "variablesPanelOpen",
       "class",
     ],
+    emits: ["close-variables-panel"],
   },
   CreateBrowserTestSkeleton: {
     template: '<div data-test="synthetics-loading-skeleton" />',
@@ -1961,6 +1960,8 @@ describe("CreateBrowserTest", () => {
       props: ["content"],
       template: '<span data-test="step-count-tooltip" :data-tooltip="content" />',
     };
+    // Scoped to the stepper caption: the page header carries tooltips of its own.
+    const COUNT_TOOLTIP = '[data-test="o-step-description-1"] [data-test="step-count-tooltip"]';
     const click = (id: string): BrowserStep => ({
       id,
       action: "click",
@@ -2000,7 +2001,7 @@ describe("CreateBrowserTest", () => {
       const count = wrapper.find(STEPPER_COUNT);
       expect(count.exists()).toBe(true);
       expect(count.text()).toBe("4 steps");
-      expect(wrapper.find('[data-test="step-count-tooltip"]').exists()).toBe(false);
+      expect(wrapper.find(COUNT_TOOLTIP).exists()).toBe(false);
     });
 
     it("shows the executed count and the subtests under Journey, red over the limit, with the tooltip", async () => {
@@ -2028,7 +2029,7 @@ describe("CreateBrowserTest", () => {
       expect(isRed(count)).toBe(true);
       const describedBy = count.attributes("aria-describedby");
       expect(document.getElementById(describedBy!)?.textContent).toContain("This test executes 51");
-      expect(wrapper.find('[data-test="step-count-tooltip"]').attributes("data-tooltip")).toBe(
+      expect(wrapper.find(COUNT_TOOLTIP).attributes("data-tooltip")).toBe(
         '3 steps in this test, 31 from "Login (shared)", and 17 from "Add items to cart". This test executes 51 of the 50 allowed.',
       );
     });
@@ -2076,19 +2077,22 @@ describe("CreateBrowserTest", () => {
     });
   });
 
-  // The variables panel is journey-only and now starts COLLAPSED: the journey is
-  // the point of this step, and the labelled toolbar button brings the panel in
-  // when it is wanted. While collapsed the splitter must hand the whole width to
-  // the journey, so nothing is left behind an invisible drag handle.
-  describe("Journey step — variables panel", () => {
+  // One header toggle drives the Variables panel on both steps; it starts collapsed.
+  describe("Variables panel", () => {
+    const TOGGLE = '[data-test="synthetics-journey-toggle-variables-btn"]';
     const journeyStub = (w: VueWrapper) =>
       w.findComponent('[data-test="synthetics-browser-journey"]');
+    const configureStub = (w: VueWrapper) => w.findComponent(baseStubs.CheckConfigure);
     const panel = (w: VueWrapper) => w.find('[data-test="synthetics-check-variables-panel"]');
     const splitter = (w: VueWrapper) => w.findComponent(OSplitter);
 
-    /** The journey toolbar's toggle button, as the view receives it. */
-    async function toggleFromToolbar(w: VueWrapper) {
-      journeyStub(w).vm.$emit("toggle-variables-panel");
+    async function toggle(w: VueWrapper) {
+      await w.find(TOGGLE).trigger("click");
+      await flushPromises();
+    }
+
+    async function goToConfigure(w: VueWrapper) {
+      (w.vm as any).currentStep = 2;
       await flushPromises();
     }
 
@@ -2097,6 +2101,19 @@ describe("CreateBrowserTest", () => {
 
       expect(wrapper.find('[data-test="synthetics-browser-journey"]').exists()).toBe(true);
       expect(panel(wrapper).exists()).toBe(false);
+    });
+
+    it("renders the toggle in the page header, pressed only while the panel is open", async () => {
+      wrapper = await mountValidEdit();
+
+      const toggleEl = wrapper.find(`[data-test="page-actions"] ${TOGGLE}`);
+      expect(toggleEl.exists()).toBe(true);
+      expect(toggleEl.attributes("aria-pressed")).toBe("false");
+      expect(toggleEl.attributes("aria-label")).toBe("Show variables");
+
+      await toggle(wrapper);
+      expect(wrapper.find(TOGGLE).attributes("aria-pressed")).toBe("true");
+      expect(wrapper.find(TOGGLE).attributes("aria-label")).toBe("Collapse variables");
     });
 
     it("should give the journey the full width while the panel is collapsed", async () => {
@@ -2108,23 +2125,19 @@ describe("CreateBrowserTest", () => {
       expect(splitter(wrapper).props("disable")).toBe(true);
     });
 
-    // BrowserJourney renders its toolbar toggle only when this prop is not
-    // `undefined`, so it must arrive as an explicit `false` — leaving it off
-    // would collapse the panel AND remove the only control that reopens it.
     it("should tell BrowserJourney the panel is closed rather than omitting the prop", async () => {
       wrapper = await mountValidEdit();
 
       expect(journeyStub(wrapper).props("variablesPanelOpen")).toBe(false);
     });
 
-    it("should reveal the panel when the journey toolbar toggles it", async () => {
+    it("should reveal the panel when the header toggle is pressed", async () => {
       wrapper = await mountValidEdit();
 
-      await toggleFromToolbar(wrapper);
+      await toggle(wrapper);
 
       expect(panel(wrapper).exists()).toBe(true);
       expect(journeyStub(wrapper).props("variablesPanelOpen")).toBe(true);
-      // The split becomes draggable again, between the shared limits.
       expect(splitter(wrapper).props("limits")).toEqual(VARIABLES_SPLITTER_LIMITS);
       expect(splitter(wrapper).props("separator")).toBe(true);
       expect(splitter(wrapper).props("disable")).toBe(false);
@@ -2133,25 +2146,139 @@ describe("CreateBrowserTest", () => {
     it("should hide the panel again on a second toggle", async () => {
       wrapper = await mountValidEdit();
 
-      await toggleFromToolbar(wrapper);
-      await toggleFromToolbar(wrapper);
+      await toggle(wrapper);
+      await toggle(wrapper);
 
       expect(panel(wrapper).exists()).toBe(false);
       expect(journeyStub(wrapper).props("variablesPanelOpen")).toBe(false);
       expect(splitter(wrapper).props("modelValue")).toBe(100);
     });
 
-    it("closes the panel on its close event and returns focus to the variables toggle", async () => {
+    it("still opens from a subtest row's Add it under Variables link", async () => {
       wrapper = await mountValidEdit();
-      await toggleFromToolbar(wrapper);
-      mockFocusVariablesToggle.mockClear();
+
+      journeyStub(wrapper).vm.$emit("toggle-variables-panel");
+      await flushPromises();
+
+      expect(panel(wrapper).exists()).toBe(true);
+    });
+
+    it("closes the panel on its close event and returns focus to the header toggle", async () => {
+      wrapper = await mountValidEdit();
+      await toggle(wrapper);
+      const focus = vi.spyOn(HTMLElement.prototype, "focus");
 
       wrapper.findComponent({ name: "CheckVariablesPanel" }).vm.$emit("close");
       await flushPromises();
 
       expect(panel(wrapper).exists()).toBe(false);
       expect(journeyStub(wrapper).props("variablesPanelOpen")).toBe(false);
-      expect(mockFocusVariablesToggle).toHaveBeenCalledTimes(1);
+      expect(focus.mock.contexts).toContain(wrapper.find(TOGGLE).element);
+      focus.mockRestore();
+    });
+
+    it("drives the Configure step's panel with the same flag, and keeps the toggle there", async () => {
+      wrapper = await mountValidEdit();
+      await goToConfigure(wrapper);
+
+      expect(configureStub(wrapper).props("variablesPanelOpen")).toBe(false);
+      expect(wrapper.find(TOGGLE).exists()).toBe(true);
+
+      await toggle(wrapper);
+      expect(configureStub(wrapper).props("variablesPanelOpen")).toBe(true);
+
+      configureStub(wrapper).vm.$emit("close-variables-panel");
+      await flushPromises();
+      expect(configureStub(wrapper).props("variablesPanelOpen")).toBe(false);
+    });
+
+    it("carries an open panel from the Journey step to Configure", async () => {
+      wrapper = await mountValidEdit();
+      await toggle(wrapper);
+
+      await goToConfigure(wrapper);
+
+      expect(configureStub(wrapper).props("variablesPanelOpen")).toBe(true);
+    });
+  });
+
+  // URL, Runs in and the variables toggle sit in the page header, after the used-by button.
+  describe("Header start controls", () => {
+    const pillStub = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-journey-start-pill-stub"]') as VueWrapper<any>;
+    const journeyStub = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-browser-journey"]') as VueWrapper<any>;
+
+    it("renders the used-by button, then the start controls, then the variables toggle", async () => {
+      mockServiceReferencedBy.mockResolvedValue({
+        data: {
+          references: [{ id: "p1", name: "One", folder_id: "f1" }],
+          hidden_reference_count: 0,
+        },
+      });
+      wrapper = await mountValidEdit();
+
+      const actions = wrapper.find('[data-test="page-actions"]');
+      const order = [
+        '[data-test="synthetics-journey-used-by-stub"]',
+        '[data-test="synthetics-journey-start-pill-stub"]',
+        '[data-test="synthetics-journey-toggle-variables-btn"]',
+      ].map((sel) => actions.find(sel).element);
+      for (let i = 1; i < order.length; i++) {
+        expect(
+          order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+      }
+      expect(
+        journeyStub(wrapper).find('[data-test="synthetics-journey-start-pill-stub"]').exists(),
+      ).toBe(false);
+    });
+
+    it("renders no start controls in the gate phase or when the edit load failed", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      expect(pillStub(wrapper).exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-toggle-variables-btn"]').exists()).toBe(
+        false,
+      );
+      wrapper.unmount();
+
+      mockServiceGet.mockRejectedValue(new Error("boom"));
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-create-load-error"]').exists()).toBe(true);
+      expect(pillStub(wrapper).exists()).toBe(false);
+    });
+
+    it("locks the URL and Runs in triggers while the journey reports locked, never the toggle", async () => {
+      wrapper = await mountValidEdit();
+      expect(pillStub(wrapper).props("disabled")).toBe(false);
+
+      journeyStub(wrapper).vm.$emit("locked-changed", true);
+      await flushPromises();
+
+      expect(pillStub(wrapper).props("disabled")).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="synthetics-journey-toggle-variables-btn"]')
+          .attributes("disabled"),
+      ).toBeUndefined();
+
+      journeyStub(wrapper).vm.$emit("locked-changed", false);
+      await flushPromises();
+      expect(pillStub(wrapper).props("disabled")).toBe(false);
+    });
+
+    it("treats the journey as unlocked once it is unmounted on the Configure step", async () => {
+      wrapper = await mountValidEdit();
+      journeyStub(wrapper).vm.$emit("locked-changed", true);
+      await flushPromises();
+
+      (wrapper.vm as any).currentStep = 2;
+      await flushPromises();
+
+      expect(journeyStub(wrapper).exists()).toBe(false);
+      expect(pillStub(wrapper).props("disabled")).toBe(false);
     });
   });
 

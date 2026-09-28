@@ -14269,6 +14269,15 @@
         "capChild": "{count} from \"{name}\"",
         "capRemedy": "Remove a subtest, or shorten this test's own steps."
       },
+      "subtestMenu": {
+        "help": "Reuse a shared flow. Edits to it update every test that uses it.",
+        "searchPlaceholder": "Search tests",
+        "loading": "Loading tests…",
+        "noMatch": "No tests match \"{query}\"",
+        "addRow": "Add \"{name}\" as a subtest",
+        "blockedGroup": "Can't be nested",
+        "tip": "Tip: select steps, then Extract to subtest to create one."
+      },
       "replayValues": {
         "secretUnreadable": "{name} is a secret in {environment}. A replay runs in your browser, which can't read a stored secret.",
         "recordUnresolved": "Recording can't start: {name} has no value in {environment}.",
@@ -14299,13 +14308,14 @@
         "urlTitle": "Starting URL",
         "urlHelp": "Opened before step 1. Use a variable to change it per environment.",
         "opensIn": "Opens in this test's environments:",
-        "envLabel": "Environments",
         "envAria": "Environments: none, Global values only. Change | Environments: {count} selected. Change | Environments: {count} selected. Change",
         "envTitle": "Test environments",
         "envHelp": "Saved with the test. Each scheduled run executes once per environment and location, and opens:",
         "noAccess": "No access",
         "capLine": "{count} of {cap} · Global values always apply",
-        "replayNote": "Replay uses the environment on the Replay button."
+        "replayNote": "Replay uses the environment on the Replay button.",
+        "runsIn": "Runs in",
+        "envOverflow": "{first} +{count}"
       },
       "replayEnv": {
         "buttonLabel": "Replay · {environment}",
@@ -14313,7 +14323,9 @@
         "menuTitle": "Replay and record in",
         "sessionOnly": "This session only — not saved with the test.",
         "notInTest": "Not in this test's environments",
-        "selected": "Selected"
+        "selected": "Selected",
+        "inLabel": "In",
+        "triggerAria": "Replay environment: {environment}"
       },
       "replaySecrets": {
         "title": "Secrets for this replay in {environment}",
@@ -14335,10 +14347,7 @@
       },
       "addMenu": {
         "addStep": "Add step",
-        "menuAria": "Add step or subtest",
-        "step": "Step",
         "stepHint": "A single action",
-        "subtest": "Subtest",
         "subtestHint": "Reuse a shared flow",
         "addSubtest": "Add subtest"
       },

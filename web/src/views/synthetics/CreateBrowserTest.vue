@@ -107,6 +107,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
 import ExtractSubtestDialog from "@/components/synthetics/journey/ExtractSubtestDialog.vue";
 import MissingValueDialog from "@/components/synthetics/journey/MissingValueDialog.vue";
@@ -145,11 +146,14 @@ const { t } = useI18nTyped();
 // Shared with CheckConfigure so a drag on either page carries to the other.
 const { variablesSplitter } = useCheckWizardUi();
 
-// Journey-only: the toggle lives in the journey toolbar, so sharing the flag
-// would hide the panel on Configure with no control there to bring it back.
-// Collapsed by default — the journey is the point of this page, and the
-// labelled toolbar button is there to bring the panel in when it is needed.
+// One flag for both steps: the header toggle is on both, so the panel follows the author across them.
 const variablesPanelOpen = ref(false);
+const variablesToggleRef = ref<InstanceType<typeof OButton> | null>(null);
+const variablesToggleLabel = computed(() =>
+  variablesPanelOpen.value
+    ? t("synthetics.variablesPanel.collapsePanel")
+    : t("synthetics.variablesPanel.openPanel"),
+);
 const journeySplitter = computed({
   get: () => (variablesPanelOpen.value ? variablesSplitter.value : 100),
   set: (v: number) => (variablesSplitter.value = v),
@@ -160,7 +164,7 @@ const journeySplitterLimits = computed<[number, number]>(() =>
 
 function closeVariablesPanel() {
   variablesPanelOpen.value = false;
-  nextTick(() => journeyRef.value?.focusVariablesToggle());
+  nextTick(() => (variablesToggleRef.value?.$el as HTMLElement | undefined)?.focus());
 }
 
 const variablesHintParams = computed(() => ({
@@ -211,6 +215,13 @@ const startUrl = ref("");
 const props = defineProps<{ editId?: string | null }>();
 const isLoadingEdit = ref(false);
 const loadError = ref(false);
+/** Header controls for the check's start show only once there is a loaded check to edit. */
+const showStartControls = computed(
+  () => phase.value === "editor" && !isLoadingEdit.value && !loadError.value,
+);
+/** Reported by BrowserJourney; it only exists on the Journey step, so elsewhere nothing is running. */
+const journeyLocked = ref(false);
+const startControlsLocked = computed(() => currentStep.value === 1 && journeyLocked.value);
 const urlError = ref("");
 const validationErrors = ref<Record<string, string>>({});
 
@@ -1826,13 +1837,38 @@ function onClearResults() {
         <BetaBadge />
       </span>
     </template>
-    <template v-if="referencedByCount > 0" #actions>
+    <template v-if="referencedByCount > 0 || showStartControls" #actions>
       <JourneyUsedByPopover
+        v-if="referencedByCount > 0"
         :references="referencedByList"
         :hidden="referencedByHidden"
         :folders="folders"
         :org-identifier="orgIdentifier"
       />
+      <template v-if="showStartControls">
+        <JourneyStartPill
+          :url="check.url"
+          :environments="sharedEnvironments"
+          :selected-ids="check.environments ?? []"
+          :check-variables="check.variables ?? []"
+          :globals="sharedGlobals"
+          :disabled="startControlsLocked"
+          @update:url="onConfigureUpdate({ ...check, url: $event })"
+          @update:selected-ids="onConfigureUpdate({ ...check, environments: $event })"
+        />
+        <OButton
+          ref="variablesToggleRef"
+          :variant="variablesPanelOpen ? 'outline-primary' : 'outline'"
+          size="icon-sm-split"
+          :aria-label="variablesToggleLabel"
+          :aria-pressed="variablesPanelOpen"
+          data-test="synthetics-journey-toggle-variables-btn"
+          @click="variablesPanelOpen = !variablesPanelOpen"
+        >
+          <OTooltip :content="variablesToggleLabel" side="bottom" />
+          <OIcon name="data-object" size="sm" aria-hidden="true" />
+        </OButton>
+      </template>
     </template>
     <!-- ── Gate phase: URL + name ── -->
     <main v-if="phase === 'gate'" class="flex flex-1 flex-col items-center justify-center">
@@ -2059,20 +2095,8 @@ function onClearResults() {
                     @clear-results="onClearResults"
                     @auto-record-consumed="autoRecord = false"
                     @selection-changed="journeySelectionState = $event"
+                    @locked-changed="journeyLocked = $event"
                   >
-                    <template #start-pill="{ locked }">
-                      <JourneyStartPill
-                        class="max-md:order-last max-md:basis-full"
-                        :url="check.url"
-                        :environments="sharedEnvironments"
-                        :selected-ids="check.environments ?? []"
-                        :check-variables="check.variables ?? []"
-                        :globals="sharedGlobals"
-                        :disabled="locked"
-                        @update:url="onConfigureUpdate({ ...check, url: $event })"
-                        @update:selected-ids="onConfigureUpdate({ ...check, environments: $event })"
-                      />
-                    </template>
                     <template #replay-menu="{ disabled }">
                       <ReplayEnvironmentMenu
                         :options="replayMenuOptions"
@@ -2128,12 +2152,14 @@ function onClearResults() {
               :validation-errors="validationErrors"
               :allow-private-locations="privateLocationsEnabled"
               :target-hint="targetHint"
+              :variables-panel-open="variablesPanelOpen"
               class="border-border-default w-full! border-t"
               @refresh:destinations="loadDestinations(true)"
               @update:check="onConfigureUpdate"
               @new-location="openAgentSetup()"
               @add-agent="(id: string) => openAgentSetup(id)"
               @refresh-locations="fetchLocations"
+              @close-variables-panel="closeVariablesPanel"
             />
           </OStep>
         </OStepper>

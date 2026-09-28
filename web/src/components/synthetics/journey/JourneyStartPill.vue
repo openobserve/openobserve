@@ -20,7 +20,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 import { MAX_CHECK_ENVIRONMENTS } from "@/constants/synthetics";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -34,6 +33,9 @@ import { atEnvironmentCap, lockedEnvironmentIds, toggleEnvironment } from "./sta
 import { makeStartUrlSchema, type StartUrlForm } from "./JourneyStartPill.schema";
 
 const FORM_ID = "synthetics-journey-start-pill-url-form";
+// Past either limit the names collapse to "first +N"; the tooltip keeps the full list.
+const ENV_LABEL_MAX_NAMES = 2;
+const ENV_LABEL_MAX_CHARS = 24;
 
 const props = defineProps<{
   /** The check's Starting URL as written, placeholders included. */
@@ -86,6 +88,32 @@ const lockedIds = computed(() => lockedEnvironmentIds(props.selectedIds, named.v
 const atCap = computed(() => atEnvironmentCap(props.selectedIds));
 const selectedCount = computed(() => props.selectedIds.length);
 
+// An environment the author cannot read is named by its id, as the picker lists it.
+const selectedNames = computed(() =>
+  props.selectedIds.map((id) => named.value.find((env) => env.id === id)?.name ?? id),
+);
+const envsFullLabel = computed(() =>
+  selectedNames.value.length
+    ? raw(selectedNames.value.join(", "))
+    : t("synthetics.journey.replayValues.global"),
+);
+const envsCollapsed = computed(
+  () =>
+    selectedNames.value.length > ENV_LABEL_MAX_NAMES ||
+    (selectedNames.value.length > 1 && envsFullLabel.value.length > ENV_LABEL_MAX_CHARS),
+);
+const envsLabel = computed(() =>
+  envsCollapsed.value
+    ? t("synthetics.journey.startPill.envOverflow", {
+        first: selectedNames.value[0],
+        count: selectedNames.value.length - 1,
+      })
+    : envsFullLabel.value,
+);
+const envsTooltip = computed(() =>
+  envsCollapsed.value ? envsFullLabel.value : t("synthetics.journey.startPill.editEnvironments"),
+);
+
 const form = useOForm<StartUrlForm>({
   defaultValues: { url: props.url },
   schema: makeStartUrlSchema(t),
@@ -119,10 +147,21 @@ function onToggleEnvironment(id: string) {
           :aria-label="t('synthetics.journey.startPill.urlAria', { url })"
           data-test="synthetics-journey-start-pill-url"
         >
-          <OIcon name="language" size="sm" aria-hidden="true" />
-          <span v-if="url" class="max-w-72 truncate font-normal">{{ url }}</span>
-          <span v-else class="font-normal">{{ t("synthetics.journey.startPill.noUrl") }}</span>
+          <!-- First child so it anchors to the whole button rather than the URL text. -->
           <OTooltip :content="t('synthetics.journey.startPill.editUrl')" side="bottom" />
+          <OIcon name="language" size="sm" class="md:hidden" aria-hidden="true" />
+          <span v-if="url" class="max-w-72 truncate font-mono font-normal max-md:hidden">{{
+            url
+          }}</span>
+          <span v-else class="font-normal max-md:hidden">{{
+            t("synthetics.journey.startPill.noUrl")
+          }}</span>
+          <OIcon
+            name="edit"
+            size="sm"
+            class="text-text-secondary max-md:hidden"
+            aria-hidden="true"
+          />
         </OButton>
       </template>
       <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-3">
@@ -185,15 +224,18 @@ function onToggleEnvironment(id: string) {
           "
           data-test="synthetics-journey-start-pill-envs"
         >
-          <span>{{ t("synthetics.journey.startPill.envLabel") }}</span>
-          <OBadge
-            variant="default"
-            size="sm"
-            data-test="synthetics-journey-start-pill-envs-count"
-            >{{ selectedCount }}</OBadge
+          <!-- First child so it anchors to the whole button rather than the names. -->
+          <OTooltip :content="envsTooltip" side="bottom" />
+          <OIcon name="dns" size="sm" aria-hidden="true" />
+          <span class="text-text-secondary font-normal max-md:hidden">
+            {{ t("synthetics.journey.startPill.runsIn") }}
+          </span>
+          <span
+            class="max-w-60 truncate max-md:hidden"
+            data-test="synthetics-journey-start-pill-envs-label"
+            >{{ envsLabel }}</span
           >
-          <OIcon name="arrow-drop-down" size="sm" aria-hidden="true" />
-          <OTooltip :content="t('synthetics.journey.startPill.editEnvironments')" side="bottom" />
+          <OIcon name="arrow-drop-down" size="sm" class="max-md:hidden" aria-hidden="true" />
         </OButton>
       </template>
       <div class="flex flex-col gap-3">

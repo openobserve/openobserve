@@ -25,7 +25,6 @@ import useSyntheticsRecorder, {
 } from "@/composables/useSyntheticsRecorder";
 import { getUUIDv7 } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -37,11 +36,13 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneyStepCount from "./JourneyStepCount.vue";
 import JourneySteps from "./JourneySteps.vue";
 import JourneySuggestions from "./JourneySuggestions.vue";
+import SubtestMenu from "./SubtestMenu.vue";
 import {
   createSuggestedAssertionStep,
   deriveJourneySuggestions,
@@ -188,6 +189,8 @@ const emit = defineEmits<{
    */
   "verify-extension": [];
   "toggle-variables-panel": [];
+  /** Whether the host's Starting URL and environments controls must be locked. */
+  "locked-changed": [locked: boolean];
   /** Open the referenced check's editor; the host owns the router. */
   "open-child": [child: ChildJourney];
   "edit-secrets": [failedAtStep: number];
@@ -737,7 +740,6 @@ defineExpose({
   // issues cannot use this channel — see the `fieldIssues` prop.
   validateStepSelectors: validateJourneySteps,
   revealCapNotice,
-  focusVariablesToggle,
   replayUpTo,
   requestReplay,
 });
@@ -991,19 +993,17 @@ const replayDisabled = computed(
     isRecording.value,
 );
 
-const replayLabel = computed(() =>
-  props.replayEnvironmentLabel
+// The environment has its own trigger beside Replay, so the button says only what it does.
+const replayTooltip = computed(() => {
+  if (props.usesTypedSecrets) {
+    return t("synthetics.journey.replaySecrets.usesTyped", {
+      environment: props.replayEnvironmentLabel ?? "",
+    });
+  }
+  return props.replayEnvironmentLabel
     ? t("synthetics.journey.replayEnv.buttonLabel", { environment: props.replayEnvironmentLabel })
-    : t("synthetics.journey.replay"),
-);
-
-const replayTooltip = computed(() =>
-  props.usesTypedSecrets
-    ? t("synthetics.journey.replaySecrets.usesTyped", {
-        environment: props.replayEnvironmentLabel ?? "",
-      })
-    : replayLabel.value,
-);
+    : t("synthetics.journey.replay");
+});
 
 /** The last typed secret used at or before the failed row: that row may fail without typing it. */
 const failedSecretNote = computed(() => {
@@ -1262,12 +1262,6 @@ function retryChildLoad(row: BrowserStep) {
   void ensureChildLoaded(row);
 }
 
-const variablesToggleLabel = computed(() =>
-  props.variablesPanelOpen
-    ? t("synthetics.variablesPanel.collapsePanel")
-    : t("synthetics.variablesPanel.openPanel"),
-);
-
 // `=== true` so an unknown flag hides the button, as the step editor does.
 const isCompositionEnabled = computed(
   () => store.state.zoConfig?.synthetics_subtests_enabled === true,
@@ -1277,32 +1271,35 @@ const addDisabled = computed(
   () => !!props.readonly || isRecording.value || isRestoring.value || isReplayLocked.value,
 );
 
+// The phone's toolbar menu; on md and up these are the Add step button and the Add subtest menu.
 const addMenuItems = computed(() => [
   {
     key: "step",
     icon: "ads-click" as const,
-    label: t("synthetics.journey.addMenu.step"),
-    phoneLabel: t("synthetics.journey.addMenu.addStep"),
+    label: t("synthetics.journey.addMenu.addStep"),
     hint: t("synthetics.journey.addMenu.stepHint"),
     disabled: addDisabled.value,
     onSelect: addStep,
-    dataTest: "synthetics-journey-add-menu-step",
-    phoneDataTest: "synthetics-journey-toolbar-menu-add-step",
+    dataTest: "synthetics-journey-toolbar-menu-add-step",
   },
   {
     key: "subtest",
     icon: "account-tree" as const,
-    label: t("synthetics.journey.addMenu.subtest"),
-    phoneLabel: t("synthetics.journey.addMenu.addSubtest"),
+    label: t("synthetics.journey.addMenu.addSubtest"),
     hint: isCompositionEnabled.value
       ? t("synthetics.journey.addMenu.subtestHint")
       : t("synthetics.journey.subtest.disabledTooltip"),
     disabled: !isCompositionEnabled.value || addDisabled.value,
     onSelect: addSubtestStep,
-    dataTest: "synthetics-journey-add-subtest-btn",
-    phoneDataTest: "synthetics-journey-toolbar-menu-add-subtest",
+    dataTest: "synthetics-journey-toolbar-menu-add-subtest",
   },
 ]);
+
+/** The value the removed toolbar slot passed as `locked`, now reported to the host. */
+const hostControlsLocked = computed(
+  () => !!props.readonly || isRecording.value || isReplayLocked.value || isRestoring.value,
+);
+watch(hostControlsLocked, (locked) => emit("locked-changed", locked), { immediate: true });
 
 useShortcuts([
   {
@@ -1331,12 +1328,6 @@ function revealCapNotice() {
   journeyRootRef.value
     ?.querySelector('[data-test="synthetics-journey-cap-notice"]')
     ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-}
-
-function focusVariablesToggle() {
-  journeyRootRef.value
-    ?.querySelector<HTMLElement>('[data-test="synthetics-journey-toggle-variables-btn"]')
-    ?.focus();
 }
 
 // ── Step CRUD — find by id and mutate ──────────────────────────────────────
@@ -1409,6 +1400,17 @@ function addStep() {
 // No locator, matching what the editor writes when an action becomes subtest.
 function addSubtestStep() {
   appendStep({ id: getUUIDv7(true), action: "subtest", name: "", subtest: undefined });
+}
+/** Appends a reference the Add subtest menu already resolved, then loads its child like any subtest row. */
+function addSubtestReference(child: { id: string; name: string }) {
+  const step: BrowserStep = {
+    id: getUUIDv7(true),
+    action: "subtest",
+    name: "",
+    subtest: { id: child.id, name: child.name },
+  };
+  appendStep(step);
+  void ensureChildLoaded(step);
 }
 function appendStep(step: BrowserStep) {
   emit("update:modelValue", [...props.modelValue, step]);
@@ -1530,8 +1532,10 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
 
 <template>
   <div ref="journeyRootRef" class="flex min-h-0 w-full flex-col py-4">
-    <div class="ms-6.5 mb-3 flex items-center gap-4 px-3 max-lg:flex-wrap max-lg:gap-y-2">
-      <div class="flex min-w-0 items-center gap-4 max-lg:basis-full max-md:contents">
+    <div class="ms-6.5 mb-3 flex items-center gap-2 px-3 max-lg:flex-wrap max-lg:gap-y-2">
+      <div
+        class="flex min-w-0 items-center gap-2 max-lg:basis-full max-md:flex-1 max-md:basis-auto"
+      >
         <!-- Select-all — visibility:hidden during replay to preserve layout -->
         <OCheckbox
           :model-value="allSelected || undefined"
@@ -1548,217 +1552,177 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           class="md:hidden"
           data-test="synthetics-journey-toolbar-step-count"
         />
-
-        <JourneySuggestions
-          v-if="!readonly"
-          :suggestions="suggestions"
-          @action="onSuggestionAction"
-        />
-
-        <slot
-          name="start-pill"
-          :locked="!!readonly || isRecording || isReplayLocked || isRestoring"
-        />
-      </div>
-
-      <div class="flex min-w-0 flex-1 items-center gap-4">
         <OInput
           v-model="filterQuery"
           :placeholder="t('synthetics.journey.filterSteps')"
-          class="min-w-0 flex-1 max-md:min-w-40"
+          class="w-52 max-md:w-auto max-md:min-w-0 max-md:flex-1"
           data-test="synthetics-journey-filter-input"
         >
           <template #icon-right>
             <OShortcut id="syntheticsJourneyFocusSearch" />
           </template>
         </OInput>
-        <div class="flex shrink-0 items-center justify-end gap-2">
-          <OButtonGroup radius="sm" class="max-md:hidden">
-            <OButton
-              variant="outline"
-              size="icon-sm-split"
-              icon-left="add"
-              :disabled="addDisabled"
-              :aria-label="t('synthetics.journey.addMenu.addStep')"
-              data-test="synthetics-journey-add-step-btn"
-              @click="addStep"
-            >
-              <OTooltip :content="t('synthetics.journey.addMenu.addStep')" side="bottom" />
-            </OButton>
-            <ODropdown side="bottom" align="end">
-              <template #trigger>
-                <OButton
-                  variant="outline"
-                  size="icon-sm-split"
-                  icon-left="arrow-drop-down"
-                  :disabled="addDisabled"
-                  :aria-label="t('synthetics.journey.addMenu.menuAria')"
-                  data-test="synthetics-journey-add-menu-trigger"
-                >
-                  <OTooltip :content="t('synthetics.journey.addMenu.menuAria')" side="bottom" />
-                </OButton>
-              </template>
-              <ODropdownItem
-                v-for="item in addMenuItems"
-                :key="item.key"
-                :icon-left="item.icon"
-                :disabled="item.disabled"
-                :data-test="item.dataTest"
-                @select="item.onSelect"
-              >
-                <span class="flex flex-col">
-                  <span>{{ item.label }}</span>
-                  <span class="text-text-secondary text-xs">{{ item.hint }}</span>
-                </span>
-              </ODropdownItem>
-            </ODropdown>
-          </OButtonGroup>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="add"
+          :disabled="addDisabled"
+          class="max-md:hidden"
+          data-test="synthetics-journey-add-step-btn"
+          @click="addStep"
+        >
+          {{ t("synthetics.journey.addMenu.addStep") }}
+        </OButton>
+        <SubtestMenu
+          :own-check-id="ownCheckId"
+          :disabled="addDisabled"
+          :composition-enabled="isCompositionEnabled"
+          class="max-md:hidden"
+          @pick="addSubtestReference"
+        />
+      </div>
 
-          <!-- Run replay / Stop / Re-run — positionally stable, same slot -->
-          <OButtonGroup
-            v-if="replayPhase === 'idle' || isReplayTerminal"
-            radius="sm"
-            class="max-md:hidden"
-          >
-            <OButton
-              variant="outline"
-              size="sm"
-              :disabled="replayDisabled"
-              data-test="synthetics-journey-replay-btn"
-              @click="onReplayButtonClick"
-              icon-left="replay"
-            >
-              <span class="max-w-40 truncate">{{ replayLabel }}</span>
-              <OIcon v-if="usesTypedSecrets" name="key" size="sm" aria-hidden="true" />
-              <OTooltip :content="replayTooltip" side="bottom" />
-            </OButton>
-            <slot name="replay-menu" :disabled="replayDisabled" />
-          </OButtonGroup>
-          <OButton
-            v-else-if="replayPhase === 'running'"
-            variant="destructive"
-            size="sm"
-            data-test="synthetics-journey-stop-replay-btn"
-            @click="emit('stop-replay')"
-            icon-left="stop"
-          >
-            {{ t("synthetics.journey.stop") }}
-          </OButton>
-          <!-- Stop acknowledged, extension not yet confirmed. Same slot, so no layout
-             shift; disabled so a second click cannot queue another stopReplay. -->
-          <OButton
-            v-else-if="isReplayStopping"
-            variant="destructive"
-            size="sm"
-            loading
-            disabled
-            data-test="synthetics-journey-stopping-replay-btn"
-            icon-left="stop"
-          >
-            {{ t("synthetics.journey.stopping") }}
-          </OButton>
+      <div class="flex-1 max-lg:hidden" />
+      <OSeparator vertical class="h-6 max-lg:hidden" />
 
-          <OButton
-            v-if="isRecording"
-            variant="outline"
-            size="sm"
-            data-test="synthetics-journey-cancel-btn"
-            @click="cancelRecording"
-            icon-left="close"
-          >
-            {{ t("synthetics.journey.cancel") }}
-          </OButton>
-
-          <OButton
-            v-if="isRecording"
-            variant="destructive"
-            size="sm"
-            data-test="synthetics-journey-stop-btn"
-            @click="stopRecording"
-            icon-left="stop"
-          >
-            {{ t("synthetics.journey.stop") }}
-          </OButton>
-          <OButton
-            v-else
-            variant="primary"
-            size="sm"
-            :disabled="readonly || isRecording || isReplayLocked || isRestoring"
-            class="max-md:hidden"
-            data-test="synthetics-journey-record-btn"
-            @click="onRecordButtonClick"
-            icon-left="smart-display"
-          >
-            {{ t("synthetics.journey.record") }}
-          </OButton>
-
-          <!-- Phones have no recorder extension, so Replay and Record are listed but unavailable. -->
-          <ODropdown side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                variant="ghost"
-                size="sm"
-                icon-left="more-vert"
-                class="md:hidden"
-                :aria-label="t('synthetics.journey.moreActions')"
-                data-test="synthetics-journey-toolbar-menu"
-              >
-                <OTooltip :content="t('synthetics.journey.moreActions')" side="bottom" />
-              </OButton>
-            </template>
-            <ODropdownItem
-              v-for="item in addMenuItems"
-              :key="item.key"
-              :icon-left="item.icon"
-              :disabled="item.disabled"
-              :data-test="item.phoneDataTest"
-              @select="item.onSelect"
-            >
-              <span class="flex flex-col">
-                <span>{{ item.phoneLabel }}</span>
-                <span class="text-text-secondary text-xs">{{ item.hint }}</span>
-              </span>
-            </ODropdownItem>
-            <ODropdownItem
-              icon-left="replay"
-              disabled
-              data-test="synthetics-journey-toolbar-menu-replay"
-            >
-              <span class="flex flex-col">
-                <span>{{ t("synthetics.journey.replay") }}</span>
-                <span class="text-text-secondary text-xs">{{
-                  t("synthetics.journey.needsDesktopRecorder")
-                }}</span>
-              </span>
-            </ODropdownItem>
-            <ODropdownItem
-              icon-left="smart-display"
-              disabled
-              data-test="synthetics-journey-toolbar-menu-record"
-            >
-              <span class="flex flex-col">
-                <span>{{ t("synthetics.journey.record") }}</span>
-                <span class="text-text-secondary text-xs">{{
-                  t("synthetics.journey.needsDesktopRecorder")
-                }}</span>
-              </span>
-            </ODropdownItem>
-          </ODropdown>
-
-          <!-- Variables panel toggle — only when the host provides that panel -->
-          <OButton
-            v-if="variablesPanelOpen !== undefined"
-            :variant="variablesPanelOpen ? 'outline-primary' : 'outline'"
-            size="icon-sm-split"
-            icon-left="data-object"
-            :aria-label="variablesToggleLabel"
-            :aria-pressed="variablesPanelOpen"
-            data-test="synthetics-journey-toggle-variables-btn"
-            @click="emit('toggle-variables-panel')"
-          >
-            <OTooltip :content="variablesToggleLabel" side="bottom" />
-          </OButton>
+      <div class="flex shrink-0 items-center gap-2">
+        <!-- Rendered through a run as well, so Replay and Stop never shift sideways. -->
+        <div class="contents max-md:hidden">
+          <slot name="replay-menu" :disabled="replayDisabled || isReplayLocked" />
         </div>
+        <!-- Run replay / Re-run — positionally stable, same slot as Stop -->
+        <OButton
+          v-if="replayPhase === 'idle' || isReplayTerminal"
+          variant="outline"
+          size="sm"
+          :disabled="replayDisabled"
+          class="max-md:hidden"
+          data-test="synthetics-journey-replay-btn"
+          @click="onReplayButtonClick"
+        >
+          <!-- First child so it anchors to the whole button rather than the icon. -->
+          <OTooltip :content="replayTooltip" side="bottom" />
+          <OIcon name="replay" size="sm" aria-hidden="true" />
+          <span>{{ t("synthetics.journey.replay") }}</span>
+          <OIcon v-if="usesTypedSecrets" name="key" size="sm" aria-hidden="true" />
+        </OButton>
+        <OButton
+          v-else-if="replayPhase === 'running'"
+          variant="destructive"
+          size="sm"
+          data-test="synthetics-journey-stop-replay-btn"
+          @click="emit('stop-replay')"
+          icon-left="stop"
+        >
+          {{ t("synthetics.journey.stop") }}
+        </OButton>
+        <!-- Stop acknowledged, extension not yet confirmed. Same slot, so no layout
+             shift; disabled so a second click cannot queue another stopReplay. -->
+        <OButton
+          v-else-if="isReplayStopping"
+          variant="destructive"
+          size="sm"
+          loading
+          disabled
+          data-test="synthetics-journey-stopping-replay-btn"
+          icon-left="stop"
+        >
+          {{ t("synthetics.journey.stopping") }}
+        </OButton>
+
+        <OButton
+          v-if="isRecording"
+          variant="outline"
+          size="sm"
+          data-test="synthetics-journey-cancel-btn"
+          @click="cancelRecording"
+          icon-left="close"
+        >
+          {{ t("synthetics.journey.cancel") }}
+        </OButton>
+
+        <OButton
+          v-if="isRecording"
+          variant="destructive"
+          size="sm"
+          data-test="synthetics-journey-stop-btn"
+          @click="stopRecording"
+          icon-left="stop"
+        >
+          {{ t("synthetics.journey.stop") }}
+        </OButton>
+        <OButton
+          v-else
+          variant="primary"
+          size="sm"
+          :disabled="readonly || isRecording || isReplayLocked || isRestoring"
+          class="max-md:hidden"
+          data-test="synthetics-journey-record-btn"
+          @click="onRecordButtonClick"
+          icon-left="smart-display"
+        >
+          {{ t("synthetics.journey.record") }}
+        </OButton>
+
+        <!-- Phones have no recorder extension, so Replay and Record are listed but unavailable. -->
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="sm"
+              icon-left="more-vert"
+              class="md:hidden"
+              :aria-label="t('synthetics.journey.moreActions')"
+              data-test="synthetics-journey-toolbar-menu"
+            >
+              <OTooltip :content="t('synthetics.journey.moreActions')" side="bottom" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-for="item in addMenuItems"
+            :key="item.key"
+            :icon-left="item.icon"
+            :disabled="item.disabled"
+            :data-test="item.dataTest"
+            @select="item.onSelect"
+          >
+            <span class="flex flex-col">
+              <span>{{ item.label }}</span>
+              <span class="text-text-secondary text-xs">{{ item.hint }}</span>
+            </span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="replay"
+            disabled
+            data-test="synthetics-journey-toolbar-menu-replay"
+          >
+            <span class="flex flex-col">
+              <span>{{ t("synthetics.journey.replay") }}</span>
+              <span class="text-text-secondary text-xs">{{
+                t("synthetics.journey.needsDesktopRecorder")
+              }}</span>
+            </span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="smart-display"
+            disabled
+            data-test="synthetics-journey-toolbar-menu-record"
+          >
+            <span class="flex flex-col">
+              <span>{{ t("synthetics.journey.record") }}</span>
+              <span class="text-text-secondary text-xs">{{
+                t("synthetics.journey.needsDesktopRecorder")
+              }}</span>
+            </span>
+          </ODropdownItem>
+        </ODropdown>
+
+        <OSeparator v-if="!readonly && suggestions.length > 0" vertical class="h-6 max-md:hidden" />
+        <JourneySuggestions
+          v-if="!readonly"
+          :suggestions="suggestions"
+          @action="onSuggestionAction"
+        />
       </div>
     </div>
 

@@ -146,26 +146,43 @@ describe("ReplayEnvironmentMenu", () => {
     expect(wrapper.emitted("update:selected-id")).toEqual([[""]]);
   });
 
-  it("renders no arrow when the org offers no other environment", () => {
+  it("renders the trigger, enabled, even when the org offers a single environment", () => {
     wrapper = mountMenu({ options: [PROD], selectedId: "env-prod" });
-    expect(wrapper.find(TRIGGER).exists()).toBe(false);
-    expect(wrapper.find(item("env-prod")).exists()).toBe(false);
-
-    wrapper.unmount();
-    wrapper = mountMenu({ options: [], selectedId: "" });
-    expect(wrapper.find(TRIGGER).exists()).toBe(false);
+    const trigger = wrapper.get(TRIGGER);
+    expect(trigger.attributes("disabled")).toBeUndefined();
+    expect(wrapper.find(item("env-prod")).exists()).toBe(true);
   });
 
-  it("shows the arrow for a one-environment test when the org has other environments", () => {
+  it("shows the trigger for a one-environment test when the org has other environments", () => {
     wrapper = mountMenu({ options: [PROD, QA], selectedId: "env-prod" });
     expect(wrapper.find(TRIGGER).exists()).toBe(true);
     expect(wrapper.find(item("env-qa")).exists()).toBe(true);
   });
 
-  it("the arrow has a name and a tooltip, and follows disabled", async () => {
+  it("the trigger reads In and the selected environment, with the dns icon and a caret", () => {
     wrapper = mountMenu();
     const trigger = wrapper.get(TRIGGER);
-    expect(trigger.attributes("aria-label")).toBe("Replay environment");
+    expect(trigger.text()).toContain("In");
+    expect(trigger.text()).toContain("Staging");
+    expect(trigger.get(".text-text-secondary").text()).toBe("In");
+    const icons = trigger.findAll("[data-icon]").map((i) => i.attributes("data-icon"));
+    expect(icons[0]).toBe("dns");
+    expect(icons.at(-1)).toBe("arrow-drop-down");
+  });
+
+  it("the trigger is a labelled outline button", () => {
+    wrapper = mountMenu();
+    const trigger = wrapper
+      .findAllComponents(OButton)
+      .find((b) => b.attributes("data-test") === "synthetics-journey-replay-menu-trigger");
+    expect(trigger?.props("variant")).toBe("outline");
+    expect(trigger?.props("size")).toBe("sm");
+  });
+
+  it("the trigger has a name and a tooltip, and follows disabled", async () => {
+    wrapper = mountMenu();
+    const trigger = wrapper.get(TRIGGER);
+    expect(trigger.attributes("aria-label")).toBe("Replay environment: Staging");
     expect(trigger.attributes("disabled")).toBeUndefined();
     const tips = wrapper.findAllComponents(OTooltipStub).map((c) => c.props("content"));
     expect(tips).toContain("Replay environment");
@@ -174,15 +191,13 @@ describe("ReplayEnvironmentMenu", () => {
     expect(wrapper.get(TRIGGER).attributes("disabled")).toBeDefined();
   });
 
-  it("the arrow uses the split-segment size", () => {
-    wrapper = mountMenu();
-    const trigger = wrapper
-      .findAllComponents(OButton)
-      .find((b) => b.attributes("data-test") === "synthetics-journey-replay-menu-trigger");
-    expect(trigger?.props("size")).toBe("icon-sm-split");
-    expect(
-      trigger!.classes().filter((c) => /^!?(min-)?h-/.test(c) && c !== "h-[2.125rem]"),
-    ).toEqual([]);
+  it("marks the trigger when a typed secret failed in the last replay", async () => {
+    const DOT = '[data-test="synthetics-journey-replay-menu-secret-failed"]';
+    wrapper = mountMenu({ secretsNeeded: 1, secretsEntered: 1, secretFailed: true });
+    expect(wrapper.get(TRIGGER).find(DOT).exists()).toBe(true);
+
+    await wrapper.setProps({ secretFailed: false });
+    expect(wrapper.get(TRIGGER).find(DOT).exists()).toBe(false);
   });
 
   it("says the choice is for this session only", () => {

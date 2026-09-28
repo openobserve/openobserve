@@ -87,27 +87,29 @@ function run(kind: JourneySuggestionActionKind) {
     v-if="count > 0"
     v-model:open="open"
     side="bottom"
-    align="start"
+    align="end"
     content-class="w-104 max-w-[calc(100vw-2rem)] p-3"
     :aria-label="label"
   >
     <template #trigger>
-      <OBadge
-        variant="default"
-        size="sm"
-        clickable
+      <OButton
+        variant="outline"
+        size="icon-sm-split"
         :aria-label="label"
         data-test="synthetics-journey-suggestions-chip"
       >
-        <!-- Child-mode tooltip, deliberately the FIRST child: its anchor binds to
-             the nearest PREVIOUS sibling, so anything placed before it would
-             become the hover target instead of the chip as a whole. Suppressed
-             while the panel is open, or hovering the chip you just clicked
-             floats a bubble over the panel it opened. -->
-        <OTooltip :content="label" :disabled="open" />
-        <OIcon name="lightbulb" size="xs" aria-hidden="true" />
-        {{ count }}
-      </OBadge>
+        <!-- First child so it anchors to the whole button; suppressed while the panel is open. -->
+        <OTooltip :content="label" :disabled="open" side="bottom" />
+        <OIcon name="lightbulb" size="sm" class="text-status-warning-text" aria-hidden="true" />
+        <OBadge
+          variant="warning"
+          size="xs"
+          class="pointer-events-none absolute -end-1.5 -top-1.5"
+          aria-hidden="true"
+          data-test="synthetics-journey-suggestions-count"
+          >{{ count }}</OBadge
+        >
+      </OButton>
     </template>
 
     <div class="flex flex-col gap-3" data-test="synthetics-journey-suggestions-panel">

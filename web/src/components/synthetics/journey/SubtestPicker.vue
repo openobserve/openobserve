@@ -15,17 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import { useStore } from "vuex";
-import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
-import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
-import { syntheticsFolderName } from "@/utils/synthetics/routes";
 import { browserMaxSteps } from "@/utils/synthetics/runBudget";
+import {
+  candidateSummary,
+  useSubtestCandidates,
+  type SubtestCandidate,
+} from "./useSubtestCandidates";
 
 /** Executed count including this reference (the `after` figure); undefined withholds the delta. */
 const props = defineProps<{
@@ -48,25 +50,23 @@ const org = computed(() => store.state.selectedOrganization.identifier as string
 
 const DEFAULT_JOURNEY_BUDGET_MS = 300_000;
 
-interface ListRow {
-  id: string;
-  name: string;
-  type: string;
-  folder_id?: string;
-  steps?: number | null;
-  referenced_by?: number;
-  references?: number | null;
-  enabled?: boolean;
-  status?: string;
-  last_check_at?: number | null;
-}
+const { usable, blocked, isLoading, isEmpty } = useSubtestCandidates(() => props.ownCheckId, {
+  immediate: true,
+  onError: (err) => {
+    console.error("[synthetics] failed to load browser tests for the subtest picker", err);
+    toast({ variant: "error", message: t("synthetics.journey.subtest.pickLoadFailed") });
+  },
+});
 
-const usableOptions = ref<SelectOption[]>([]);
+const usableOptions = computed(() => usable.value.map(rowOption));
 /** Tests that already hold a subtest: listed so the author sees why, never pickable. */
-const blockedOptions = ref<SelectOption[]>([]);
-const isLoading = ref(true);
-/** True only once the list has loaded and holds no other browser test. */
-const isEmpty = ref(false);
+const blockedOptions = computed<SelectOption[]>(() =>
+  blocked.value.map((c) => ({
+    ...rowOption(c),
+    disabled: true,
+    subLabel: t("synthetics.journey.subtest.pickNested"),
+  })),
+);
 // OSelect renders the raw value when no option matches, so the saved name is seeded until the list has it.
 const options = computed<SelectOption[]>(() => {
   const saved = props.modelValue;
@@ -86,30 +86,13 @@ const options = computed<SelectOption[]>(() => {
 const childSteps = ref<number | null>(null);
 const lastRunSeconds = ref<number | null>(null);
 
-/** Everything on a row comes from the list response — nothing costs a request per option. */
-function rowOption(r: ListRow): SelectOption {
-  const folders = store.state.organizationData?.foldersByType?.synthetics ?? [];
-  const steps =
-    r.steps != null ? t("synthetics.journey.subtest.pickSteps", { count: r.steps }, r.steps) : "";
-  const usedByCount = r.referenced_by ?? 0;
-  const usedBy =
-    usedByCount > 0
-      ? t("synthetics.journey.subtest.pickUsedBy", { count: usedByCount }, usedByCount)
-      : "";
-  const paused = r.enabled === false ? resolveBadgeLabel("alertStatus", "paused") : "";
-  const lastRun =
-    r.last_check_at && r.status !== "unknown"
-      ? t("synthetics.journey.subtest.pickLastRun", {
-          status: resolveBadgeLabel("serviceStatus", r.status),
-          ago: formatDistanceToNowStrict(new Date(r.last_check_at / 1000), { addSuffix: true }),
-        })
-      : "";
+function rowOption(c: SubtestCandidate): SelectOption {
   return {
-    label: raw(r.name),
-    value: r.id,
-    badge: syntheticsFolderName(folders, r.folder_id),
+    label: raw(c.name),
+    value: c.id,
+    badge: c.folderName,
     badgeMuted: true,
-    subLabel: raw([steps, usedBy, paused, lastRun].filter(Boolean).join(" · ")),
+    subLabel: raw(candidateSummary([c.stepsLabel, c.usedByLabel, c.pausedLabel, c.lastRunLabel])),
   };
 }
 
@@ -117,30 +100,6 @@ function rowOption(r: ListRow): SelectOption {
 function optionGroup(label: I18nText, rows: SelectOption[]): SelectOption[] {
   return rows.length ? [{ label, header: true }, ...rows] : [];
 }
-
-onMounted(async () => {
-  try {
-    // undefined omits ?folder= so every folder is listed: references are cross-folder by design.
-    const res = await syntheticsService.listByFolderId(org.value, undefined);
-    const rows = ((res.data.checks ?? []) as ListRow[]).filter(
-      (r) => r.type === "browser" && r.id !== props.ownCheckId,
-    );
-    // Nesting is one level deep, so a check that already holds a reference is shown but not pickable.
-    const holdsSubtest = (r: ListRow) => (r.references ?? 0) > 0;
-    usableOptions.value = rows.filter((r) => !holdsSubtest(r)).map(rowOption);
-    blockedOptions.value = rows.filter(holdsSubtest).map((r) => ({
-      ...rowOption(r),
-      disabled: true,
-      subLabel: t("synthetics.journey.subtest.pickNested"),
-    }));
-    isEmpty.value = rows.length === 0;
-  } catch (err) {
-    console.error("[synthetics] failed to load browser tests for the subtest picker", err);
-    toast({ variant: "error", message: t("synthetics.journey.subtest.pickLoadFailed") });
-  } finally {
-    isLoading.value = false;
-  }
-});
 
 async function onPick(id: string) {
   let check;

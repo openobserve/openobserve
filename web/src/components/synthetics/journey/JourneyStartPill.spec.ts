@@ -77,6 +77,7 @@ const sel = (suffix: string) => `[data-test="synthetics-journey-start-pill${suff
 const URL_HALF = sel("-url");
 const ENVS_HALF = sel("-envs");
 const ENVS_COUNT = sel("-envs-count");
+const ENVS_LABEL = sel("-envs-label");
 const URL_INPUT_FIELD = sel("-url-input-field");
 const URL_INPUT_ERROR = sel("-url-input-error");
 
@@ -145,13 +146,14 @@ describe("JourneyStartPill", () => {
     expect(root.contains(wrapper.get(ENVS_HALF).element)).toBe(true);
   });
 
-  it("the URL button shows no Opens label and no pencil", () => {
+  it("the URL button shows no Opens label and a trailing edit icon in the secondary colour", () => {
     wrapper = mountPill();
     const half = wrapper.get(URL_HALF);
 
     expect(half.text()).not.toContain("Opens");
-    expect(half.find('[data-icon="edit"]').exists()).toBe(false);
-    expect(half.find('[data-icon="language"]').exists()).toBe(true);
+    const icons = half.findAll("[data-icon]");
+    expect(icons.at(-1)?.attributes("data-icon")).toBe("edit");
+    expect(icons.at(-1)?.classes()).toContain("text-text-secondary");
   });
 
   it("the URL button shows its text at normal weight, with or without a URL", () => {
@@ -173,43 +175,72 @@ describe("JourneyStartPill", () => {
     expect(emptySpan?.classes()).toContain("font-normal");
   });
 
-  it("the URL button is not monospaced; the popover input is", async () => {
+  it("the URL button shows the URL monospaced and truncated", () => {
     wrapper = mountPill();
-    const half = wrapper.get(URL_HALF);
+    const urlSpan = wrapper.get(URL_HALF).get(".font-mono");
 
-    expect(half.classes()).not.toContain("font-mono");
-    expect(half.findAll(".font-mono")).toHaveLength(0);
-
-    await openUrl(wrapper);
-    expect(wrapper.get(URL_INPUT_FIELD).element.closest(".font-mono")).not.toBeNull();
+    expect(urlSpan.text()).toBe("{{BASE_URL}}/login");
+    expect(urlSpan.classes()).toEqual(expect.arrayContaining(["truncate", "font-normal"]));
   });
 
-  it("the Environments button shows its label and a count badge: 0 with none, N with N, locked ids counted", () => {
+  it("below md both triggers are icon-only and keep their accessible names", () => {
+    wrapper = mountPill();
+    const url = wrapper.get(URL_HALF);
+    const envs = wrapper.get(ENVS_HALF);
+
+    const labels = [url, envs].flatMap((b) => b.findAll(".contents > span:not(.o-tooltip-stub)"));
+    expect(labels.length).toBeGreaterThan(0);
+    for (const span of labels) {
+      expect(span.classes(), span.text()).toContain("max-md:hidden");
+    }
+    expect(url.get('[data-icon="language"]').classes()).toContain("md:hidden");
+    expect(envs.get('[data-icon="dns"]').classes()).not.toContain("max-md:hidden");
+    expect(url.attributes("aria-label")).toBeTruthy();
+    expect(envs.attributes("aria-label")).toBeTruthy();
+  });
+
+  it("the Runs in button names the selected environments, or Global when none, with no count badge", () => {
     wrapper = mountPill({ selectedIds: [] });
-    expect(wrapper.get(ENVS_HALF).text()).toContain("Environments");
-    expect(wrapper.get(ENVS_HALF).text()).not.toContain("Global");
-    expect(wrapper.get(`${ENVS_HALF} ${ENVS_COUNT}`).text()).toBe("0");
-    const badge = wrapper.findComponent({ name: "OBadge" });
-    expect(badge.props("variant")).toBe("default");
-    expect(badge.props("size")).toBe("sm");
+    expect(wrapper.get(ENVS_HALF).text()).toContain("Runs in");
+    expect(wrapper.get(ENVS_LABEL).text()).toBe("Global");
+    expect(wrapper.find(ENVS_COUNT).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OBadge" }).exists()).toBe(false);
     wrapper.unmount();
 
     wrapper = mountPill({ selectedIds: ["env-prod", "env-stg"] });
-    expect(wrapper.get(ENVS_COUNT).text()).toBe("2");
-    expect(wrapper.get(ENVS_HALF).text()).not.toContain("Production");
+    expect(wrapper.get(ENVS_LABEL).text()).toBe("Production, Staging");
     wrapper.unmount();
 
+    // An environment the author cannot read is named by its id, as the picker lists it.
     wrapper = mountPill({ selectedIds: ["env-prod", "env-hidden"] });
-    expect(wrapper.get(ENVS_COUNT).text()).toBe("2");
-    expect(wrapper.get(ENVS_HALF).text()).not.toContain("env-hidden");
+    expect(wrapper.get(ENVS_LABEL).text()).toBe("Production, env-hidden");
   });
 
-  it("the Environments button keeps its arrow", () => {
-    wrapper = mountPill();
-    const half = wrapper.get(ENVS_HALF);
+  it("a long list collapses to the first name and +N, with the full list in the tooltip", () => {
+    const LONG = env("env-long", "Customer acceptance EU");
+    wrapper = mountPill({
+      environments: [...ENVIRONMENTS, LONG],
+      selectedIds: ["env-prod", "env-long"],
+    });
+    expect(wrapper.get(ENVS_LABEL).text()).toBe("Production +1");
+    wrapper.unmount();
 
-    expect(half.find('[data-icon="arrow-drop-down"]').exists()).toBe(true);
-    expect(half.text()).toContain("Environments");
+    wrapper = mountPill({ selectedIds: ["env-prod", "env-stg", "env-qa"] });
+
+    expect(wrapper.get(ENVS_LABEL).text()).toBe("Production +2");
+    const tips = wrapper
+      .findAllComponents(OTooltipStub)
+      .map((c) => c.props("content") as string | undefined);
+    expect(tips).toContain("Production, Staging, QA");
+    expect(tips).not.toContain("Change environments");
+  });
+
+  it("the Runs in button leads with the dns icon and keeps its arrow", () => {
+    wrapper = mountPill();
+    const icons = wrapper.get(ENVS_HALF).findAll("[data-icon]");
+
+    expect(icons.at(0)?.attributes("data-icon")).toBe("dns");
+    expect(icons.at(-1)?.attributes("data-icon")).toBe("arrow-drop-down");
   });
 
   it("the Environments aria-label is plural: none, 1 selected, N selected", () => {

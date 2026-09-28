@@ -163,6 +163,14 @@ const ODropdownGroupStub = {
 };
 const ODropdownSeparatorStub = { template: "<hr />" };
 const OButtonGroupStub = { template: "<div><slot /></div>" };
+// Emits an already-resolved pick; the menu's own list, search and GET are covered in SubtestMenu.spec.ts.
+const SubtestMenuStub = {
+  name: "SubtestMenu",
+  props: ["ownCheckId", "disabled", "compositionEnabled"],
+  emits: ["pick"],
+  template:
+    '<button type="button" data-test="synthetics-journey-add-subtest-btn" :disabled="disabled || !compositionEnabled" />',
+};
 
 const STUBS = {
   OButton: OButtonStub,
@@ -180,6 +188,7 @@ const STUBS = {
   ODropdownGroup: ODropdownGroupStub,
   ODropdownSeparator: ODropdownSeparatorStub,
   OButtonGroup: OButtonGroupStub,
+  SubtestMenu: SubtestMenuStub,
 };
 
 // ── Bridge transport helpers ──────────────────────────────────────────────
@@ -1052,16 +1061,19 @@ describe("BrowserJourney reveals a newly created step", () => {
   });
 });
 
-describe("BrowserJourney Add Subtest button", () => {
+describe("BrowserJourney Add Subtest menu", () => {
   let wrapper: VueWrapper;
   let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
 
   const ADD_SUBTEST = '[data-test="synthetics-journey-add-subtest-btn"]';
   const ADD_STEP = '[data-test="synthetics-journey-add-step-btn"]';
+  const CHILD = { id: "child-1", name: "Login flow" };
 
   beforeEach(() => {
     mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
-    mockSyntheticsList.mockResolvedValue({ data: { checks: [] } });
+    mockSyntheticsGet.mockResolvedValue({
+      data: { id: CHILD.id, name: CHILD.name, config: { steps: [] } },
+    });
     originalScrollIntoView = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = vi.fn();
   });
@@ -1069,23 +1081,20 @@ describe("BrowserJourney Add Subtest button", () => {
   afterEach(() => {
     Element.prototype.scrollIntoView = originalScrollIntoView;
     mockStoreState.zoConfig = {};
-    mockSyntheticsList.mockReset();
+    mockSyntheticsGet.mockReset();
     wrapper?.unmount();
     vi.restoreAllMocks();
   });
 
   // revealStep needs the row rendered on the next tick, so the parent writes the emit back synchronously.
-  function mountWithModel(initial: BrowserStep[], withExpansion = false) {
+  function mountWithModel(initial: BrowserStep[], props: Record<string, unknown> = {}) {
     const w = mount(BrowserJourney, {
       props: {
         modelValue: initial,
         "onUpdate:modelValue": (steps: BrowserStep[]) => w.setProps({ modelValue: steps }),
+        ...props,
       },
-      global: {
-        stubs: withExpansion
-          ? { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion }
-          : { ...STUBS },
-      },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion } },
     }) as VueWrapper;
     return w;
   }
@@ -1094,19 +1103,36 @@ describe("BrowserJourney Add Subtest button", () => {
     return (w.props() as Record<string, unknown>).modelValue as BrowserStep[];
   }
 
+  async function pick(w: VueWrapper, child = CHILD) {
+    w.findComponent(SubtestMenuStub).vm.$emit("pick", child);
+    await flushPromises();
+  }
+
   it("should be disabled while readonly, like Add Step", () => {
     wrapper = mountJourney({ readonly: true });
 
     expect(wrapper.find(ADD_STEP).attributes("disabled")).toBeDefined();
-    expect(
-      wrapper.find('[data-test="synthetics-journey-add-menu-trigger"]').attributes("disabled"),
-    ).toBeDefined();
+    expect(wrapper.findComponent(SubtestMenuStub).props("disabled")).toBe(true);
+    expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeDefined();
   });
 
-  it("should append a step whose action is already subtest", async () => {
+  it("is told whether composition is on, and which check to leave out", () => {
+    wrapper = mountWithModel([], { ownCheckId: "self" });
+    const menu = wrapper.findComponent(SubtestMenuStub);
+    expect(menu.props("compositionEnabled")).toBe(true);
+    expect(menu.props("ownCheckId")).toBe("self");
+    expect(menu.props("disabled")).toBe(false);
+    wrapper.unmount();
+
+    mockStoreState.zoConfig = {};
+    wrapper = mountWithModel([]);
+    expect(wrapper.findComponent(SubtestMenuStub).props("compositionEnabled")).toBe(false);
+    expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeDefined();
+  });
+
+  it("a pick appends a filled reference, not a blank subtest row", async () => {
     wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }]);
-    await wrapper.find(ADD_SUBTEST).trigger("click");
-    await flushPromises();
+    await pick(wrapper);
 
     const steps = currentSteps(wrapper);
     expect(steps).toHaveLength(2);
@@ -1114,27 +1140,39 @@ describe("BrowserJourney Add Subtest button", () => {
       id: expect.any(String),
       action: "subtest",
       name: "",
-      subtest: undefined,
+      subtest: { id: "child-1", name: "Login flow" },
     });
   });
 
-  it("should reveal the new step with the subtest picker in its expanded row", async () => {
-    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }], true);
-    await wrapper.find(ADD_SUBTEST).trigger("click");
-    await flushPromises();
+  it("reveals the new reference and loads its child like any subtest row", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }]);
+    await pick(wrapper);
 
     const steps = currentSteps(wrapper);
     expect(wrapper.findComponent(JourneyStepsStubWithExpansion).props("expandedIds")).toContain(
       steps[1].id,
     );
-    const rows = wrapper.findAll(".step-row");
-    expect(rows).toHaveLength(2);
-    expect(rows[1].find('[data-test="synthetics-journey-step-subtest-picker"]').exists()).toBe(
-      true,
-    );
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
       block: "nearest",
       behavior: "smooth",
+    });
+    expect(mockSyntheticsGet).toHaveBeenCalledWith("default", "child-1");
+  });
+
+  it("clears an active filter so the new reference is visible", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }]);
+    await wrapper.find('[data-test="synthetics-journey-filter-input"]').setValue("nothing");
+    mockToast.mockClear();
+
+    await pick(wrapper);
+
+    expect(
+      (wrapper.find('[data-test="synthetics-journey-filter-input"]').element as HTMLInputElement)
+        .value,
+    ).toBe("");
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "info",
+      message: "synthetics.journey.filterClearedForNewStep",
     });
   });
 });
@@ -1144,9 +1182,7 @@ describe("BrowserJourney add menu and step filter", () => {
   let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
 
   const ADD_STEP = '[data-test="synthetics-journey-add-step-btn"]';
-  const ADD_MENU = '[data-test="synthetics-journey-add-menu-trigger"]';
-  const MENU_STEP = '[data-test="synthetics-journey-add-menu-step"]';
-  const MENU_SUBTEST = '[data-test="synthetics-journey-add-subtest-btn"]';
+  const ADD_SUBTEST = '[data-test="synthetics-journey-add-subtest-btn"]';
   const FILTER = '[data-test="synthetics-journey-filter-input"]';
 
   const OTooltipWithContentStub = {
@@ -1203,73 +1239,53 @@ describe("BrowserJourney add menu and step filter", () => {
     return w;
   }
 
-  const tooltips = (w: VueWrapper) =>
-    w.findAll("[data-tooltip]").map((t) => t.attributes("data-tooltip"));
   const currentSteps = (w: VueWrapper) =>
     (w.props() as Record<string, unknown>).modelValue as BrowserStep[];
 
-  it("the + button adds a step and is named Add step, with a tooltip", async () => {
+  it("Add step is a labelled outline button that appends a step", async () => {
     wrapper = mountToolbar();
 
     const add = wrapper.find(ADD_STEP);
+    expect(add.attributes("variant")).toBe("outline");
+    expect(add.attributes("size")).toBe("sm");
     expect(add.attributes("icon-left")).toBe("add");
-    expect(add.text()).toBe("");
-    expect(add.attributes("aria-label")).toBe("synthetics.journey.addMenu.addStep");
-    expect(tooltips(wrapper)).toContain("synthetics.journey.addMenu.addStep");
+    expect(add.text()).toBe("synthetics.journey.addMenu.addStep");
 
     await add.trigger("click");
     await flushPromises();
     expect(currentSteps(wrapper)).toHaveLength(4);
   });
 
-  it("the + and the Add arrow use the split-segment size", () => {
+  it("the desktop add split button and its dropdown are gone", () => {
     wrapper = mountToolbar();
 
-    expect(wrapper.find(ADD_STEP).attributes("size")).toBe("icon-sm-split");
-    expect(wrapper.find(ADD_MENU).attributes("size")).toBe("icon-sm-split");
-    expect(wrapper.find('[data-test="synthetics-journey-replay-btn"]').attributes("size")).toBe(
-      "sm",
-    );
-    for (const segment of [ADD_STEP, ADD_MENU]) {
-      const classes = wrapper.find(segment).classes();
-      expect(classes.filter((c) => /^!?(min-)?h-/.test(c))).toEqual([]);
-    }
+    expect(wrapper.find('[data-test="synthetics-journey-add-menu-trigger"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="synthetics-journey-add-menu-step"]').exists()).toBe(false);
   });
 
-  it("the add menu arrow has a name and a tooltip; the menu offers Step and Subtest; Subtest adds a subtest row", async () => {
+  it("the left group reads select-all, filter, Add step, Add subtest, in that order", () => {
     wrapper = mountToolbar();
 
-    const trigger = wrapper.find(ADD_MENU);
-    expect(trigger.exists()).toBe(true);
-    expect(trigger.attributes("aria-label")).toBe("synthetics.journey.addMenu.menuAria");
-    expect(tooltips(wrapper)).toContain("synthetics.journey.addMenu.menuAria");
-
-    const step = wrapper.find(MENU_STEP);
-    expect(step.text()).toContain("synthetics.journey.addMenu.step");
-    expect(step.text()).toContain("synthetics.journey.addMenu.stepHint");
-    const subtest = wrapper.find(MENU_SUBTEST);
-    expect(subtest.text()).toContain("synthetics.journey.addMenu.subtest");
-    expect(subtest.text()).toContain("synthetics.journey.addMenu.subtestHint");
-
-    await subtest.trigger("click");
-    await flushPromises();
-    const steps = currentSteps(wrapper);
-    expect(steps).toHaveLength(4);
-    expect(steps[3].action).toBe("subtest");
+    const order = [
+      '[data-test="synthetics-journey-select-all"]',
+      FILTER,
+      ADD_STEP,
+      ADD_SUBTEST,
+    ].map((sel) => wrapper.find(sel).element);
+    for (let i = 1; i < order.length; i++) {
+      expect(
+        order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    expect(order[0].parentElement).toBe(order[3].parentElement);
   });
 
-  it("Subtest is unavailable, with the reason, when composition is off", () => {
-    for (const zoConfig of [{ synthetics_subtests_enabled: false }, {}]) {
-      mockStoreState.zoConfig = zoConfig;
-      wrapper = mountToolbar();
+  it("the filter has a fixed width instead of growing", () => {
+    wrapper = mountToolbar();
 
-      const subtest = wrapper.find(MENU_SUBTEST);
-      expect(wrapper.find(MENU_STEP).exists()).toBe(true);
-      expect(subtest.attributes("disabled")).toBeDefined();
-      expect(subtest.text()).toContain("synthetics.journey.subtest.disabledTooltip");
-      expect(subtest.text()).not.toContain("synthetics.journey.addMenu.subtestHint");
-      wrapper.unmount();
-    }
+    const classes = String(wrapper.findComponent(OInputWithIconStub).vm.$attrs.class).split(" ");
+    expect(classes).toContain("w-52");
+    expect(classes).not.toContain("flex-1");
   });
 
   it("the add controls are disabled while restoring", async () => {
@@ -1280,8 +1296,8 @@ describe("BrowserJourney add menu and step filter", () => {
     await flushPromises();
 
     expect(wrapper.find(ADD_STEP).attributes("disabled")).toBeDefined();
-    expect(wrapper.find(ADD_MENU).exists()).toBe(true);
-    expect(wrapper.find(ADD_MENU).attributes("disabled")).toBeDefined();
+    expect(wrapper.find(ADD_SUBTEST).exists()).toBe(true);
+    expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeDefined();
   });
 
   it("pressing / focuses the step filter", async () => {
@@ -2732,131 +2748,24 @@ describe("BrowserJourney suggestions", () => {
 });
 
 // ── Variables panel toggle ────────────────────────────────────────────────
+// The toggle lives in the page header now; the journey only keeps the row's "Add it under Variables" link.
 describe("BrowserJourney variables panel toggle", () => {
   let wrapper: VueWrapper;
 
-  const TOGGLE = '[data-test="synthetics-journey-toggle-variables-btn"]';
-
-  // The shared OIconStub swallows `name`; this one surfaces the toggle icon in the DOM.
-  const OIconWithNameStub = {
-    props: ["name"],
-    template: '<i :data-icon-name="name" />',
-  };
-  const OTooltipWithContentStub = {
-    props: ["content"],
-    template: '<div :data-tooltip="content" />',
-  };
-
-  function mountToolbar(props: Record<string, unknown> = {}, attach = false) {
-    return mount(BrowserJourney, {
-      props: { modelValue: [], ...props },
-      attachTo: attach ? document.body : undefined,
-      global: {
-        stubs: { ...STUBS, OIcon: OIconWithNameStub, OTooltip: OTooltipWithContentStub },
-      },
-    }) as VueWrapper;
-  }
-
-  const toggleIconOf = (w: VueWrapper) =>
-    w.find(TOGGLE).attributes("icon-left") ??
-    w.find(`${TOGGLE} [data-icon-name]`).attributes("data-icon-name");
-
   afterEach(() => {
     wrapper?.unmount();
-    vi.restoreAllMocks();
   });
 
-  it("renders the toggle as an outline slim icon button with the variables icon", () => {
-    wrapper = mountToolbar({ variablesPanelOpen: false });
+  it("renders no variables toggle of its own and exposes no focus hook for it", () => {
+    wrapper = mount(BrowserJourney, {
+      props: { modelValue: [], variablesPanelOpen: false },
+      global: { stubs: STUBS },
+    }) as VueWrapper;
 
-    const toggle = wrapper.find(TOGGLE);
-    expect(toggle.attributes("variant")).toBe("outline");
-    expect(toggle.attributes("size")).toBe("icon-sm-split");
-    expect(toggle.attributes("icon-left")).toBe("data-object");
-    expect(toggle.text()).toBe("");
-  });
-
-  // vue-i18n is mocked to return the key, so the key IS the rendered tooltip here.
-  it("should offer the collapse tooltip while the panel is open", () => {
-    wrapper = mountToolbar({ variablesPanelOpen: true });
-
-    expect(wrapper.find(`${TOGGLE} [data-tooltip]`).attributes("data-tooltip")).toBe(
-      "synthetics.variablesPanel.collapsePanel",
+    expect(wrapper.find('[data-test="synthetics-journey-toggle-variables-btn"]').exists()).toBe(
+      false,
     );
-  });
-
-  it("should offer the open tooltip while the panel is closed", () => {
-    wrapper = mountToolbar({ variablesPanelOpen: false });
-
-    expect(wrapper.find(`${TOGGLE} [data-tooltip]`).attributes("data-tooltip")).toBe(
-      "synthetics.variablesPanel.openPanel",
-    );
-  });
-
-  it("should size the action area to its content instead of a fixed width", () => {
-    wrapper = mountToolbar({ variablesPanelOpen: false });
-
-    expect(wrapper.findAll(".w-110")).toHaveLength(0);
-    expect(wrapper.findAll('[class~="w-24!"]')).toHaveLength(0);
-  });
-
-  // The host owns the panel; without that prop there is meant to be no panel to
-  // toggle. Skipped because the guard cannot work as written, and this predates
-  // the label change: `variablesPanelOpen?: boolean` is a Boolean-typed prop, so
-  // Vue's boolean casting resolves an omitted value to `false`, never
-  // `undefined` — verified by reading $props on a mount with the prop omitted.
-  // `v-if="variablesPanelOpen !== undefined"` is therefore always true and the
-  // toggle renders for every host. Un-skip once the component distinguishes
-  // "no panel" some other way (e.g. `variablesPanelOpen?: boolean | undefined`
-  // declared with an explicit `default: undefined`, or a separate flag prop).
-  it.skip("should not render the toggle when the host provides no variables panel", () => {
-    wrapper = mountToolbar();
-
-    expect(wrapper.find(TOGGLE).exists()).toBe(false);
-  });
-
-  it("should render the toggle when the host provides a closed variables panel", () => {
-    wrapper = mountToolbar({ variablesPanelOpen: false });
-
-    expect(wrapper.find(TOGGLE).exists()).toBe(true);
-  });
-
-  it("should emit toggle-variables-panel when pressed", async () => {
-    wrapper = mountToolbar({ variablesPanelOpen: false });
-
-    await wrapper.find(TOGGLE).trigger("click");
-
-    // OButtonStub both $emits "click" and lets the native event through (it
-    // declares no `emits`), so one press registers twice. That it fires at all,
-    // with no payload, is the contract.
-    const emitted = wrapper.emitted("toggle-variables-panel")!;
-    expect(emitted.length).toBeGreaterThan(0);
-    for (const call of emitted) expect(call).toEqual([]);
-  });
-
-  it("the variables toggle turns outline-primary and pressed while the panel is open, with no active prop", () => {
-    wrapper = mountToolbar({ variablesPanelOpen: true });
-    expect(toggleIconOf(wrapper)).toBe("data-object");
-    expect(wrapper.find(TOGGLE).attributes("variant")).toBe("outline-primary");
-    expect(wrapper.find(TOGGLE).attributes("aria-pressed")).toBe("true");
-    expect(wrapper.find(TOGGLE).attributes("active")).toBeUndefined();
-    wrapper.unmount();
-
-    wrapper = mountToolbar({ variablesPanelOpen: false });
-    expect(toggleIconOf(wrapper)).toBe("data-object");
-    expect(wrapper.find(TOGGLE).attributes("variant")).toBe("outline");
-    expect(wrapper.find(TOGGLE).attributes("aria-pressed")).toBe("false");
-    expect(wrapper.find(TOGGLE).attributes("active")).toBeUndefined();
-  });
-
-  it("focusVariablesToggle moves focus to the variables toggle", async () => {
-    wrapper = mountToolbar({ variablesPanelOpen: false }, true);
-    const vm = wrapper.vm as unknown as { focusVariablesToggle?: () => void };
-
-    expect(typeof vm.focusVariablesToggle).toBe("function");
-    vm.focusVariablesToggle?.();
-    await flushPromises();
-    expect(document.activeElement).toBe(wrapper.find(TOGGLE).element);
+    expect((wrapper.vm as unknown as Record<string, unknown>).focusVariablesToggle).toBeUndefined();
   });
 });
 
@@ -3510,11 +3419,8 @@ const JourneyStepsStubWithStartRow = {
     </div>`,
 };
 
-describe("BrowserJourney Starting URL pill slot", () => {
+describe("BrowserJourney without the Starting URL pill", () => {
   let wrapper: VueWrapper;
-
-  const PILL = '[data-test="start-pill-slot-content"]';
-  const FILTER = '[data-test="synthetics-journey-filter-input"]';
 
   beforeEach(() => {
     postMessageSpy = vi.fn();
@@ -3541,15 +3447,10 @@ describe("BrowserJourney Starting URL pill slot", () => {
     return w;
   }
 
-  it("renders the start-pill slot in the toolbar, also with no steps", () => {
+  it("no longer renders a start-pill slot in the toolbar", () => {
     wrapper = mountWithPill();
 
-    const pill = wrapper.find(PILL);
-    expect(pill.exists()).toBe(true);
-    const filter = wrapper.find(FILTER).element;
-    expect(pill.element.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
+    expect(wrapper.find('[data-test="start-pill-slot-content"]').exists()).toBe(false);
   });
 
   it("step 1 is always the first table row after a recording drops its navigate", async () => {
@@ -3624,10 +3525,25 @@ describe("BrowserJourney replay environment", () => {
     }) as VueWrapper;
   }
 
-  it("labels Replay with the replay environment", () => {
+  it("labels Replay plainly; the environment has its own trigger", () => {
     wrapper = mountReplay({ replayEnvironmentLabel: "Staging" });
 
-    expect(wrapper.find(REPLAY).text()).toBe("Replay · Staging");
+    expect(wrapper.find(REPLAY).text()).toBe("synthetics.journey.replay");
+  });
+
+  it("puts the replay-menu slot right before Replay, and keeps it through a run", () => {
+    const slot = (p: { disabled: boolean }) =>
+      h("span", { "data-test": "replay-menu-slot", "data-disabled": String(p.disabled) });
+    wrapper = mountReplay({}, slot);
+    const menu = wrapper.find('[data-test="replay-menu-slot"]').element;
+    expect(
+      menu.compareDocumentPosition(wrapper.find(REPLAY).element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    wrapper.unmount();
+
+    wrapper = mountReplay({ replayPhase: "running" }, slot);
+    expect(wrapper.find('[data-test="replay-menu-slot"]').attributes("data-disabled")).toBe("true");
+    expect(wrapper.find('[data-test="synthetics-journey-stop-replay-btn"]').exists()).toBe(true);
   });
 
   it("shows the full environment name in the Replay tooltip", () => {
@@ -3818,7 +3734,7 @@ describe("BrowserJourney toolbar while recording", () => {
   let wrapper: VueWrapper;
 
   const ADD_STEP = '[data-test="synthetics-journey-add-step-btn"]';
-  const ADD_MENU = '[data-test="synthetics-journey-add-menu-trigger"]';
+  const ADD_MENU = '[data-test="synthetics-journey-add-subtest-btn"]';
   const REPLAY = '[data-test="synthetics-journey-replay-btn"]';
 
   const journey = [
@@ -3921,21 +3837,30 @@ describe("BrowserJourney toolbar while recording", () => {
     expect(wrapper.text()).toContain("synthetics.journey.recordingIn");
   });
 
-  it("the Starting URL pill is disabled while recording", async () => {
-    const slot = (p: { locked: boolean }) =>
-      h("span", { "data-test": "start-pill-slot", "data-locked": String(p.locked) });
-    wrapper = mountToolbar({}, { "start-pill": slot });
-    const pill = () => wrapper.find('[data-test="start-pill-slot"]');
-    expect(pill().exists()).toBe(true);
-    expect(pill().attributes("data-locked")).toBe("false");
+  const lockedEvents = (w: VueWrapper) =>
+    (w.emitted("locked-changed") ?? []).map((e) => e[0] as boolean);
+
+  it("reports the host controls locked while recording, and unlocked once it stops", async () => {
+    wrapper = mountToolbar();
+    expect(lockedEvents(wrapper)).toEqual([false]);
 
     await startRecording(wrapper);
+    expect(lockedEvents(wrapper).at(-1)).toBe(true);
 
-    expect(pill().attributes("data-locked")).toBe("true");
+    await stopRecording(wrapper);
+    expect(lockedEvents(wrapper).at(-1)).toBe(false);
+  });
+
+  it("reports the host controls locked from the start when readonly or a replay runs", () => {
+    wrapper = mountToolbar({ readonly: true });
+    expect(lockedEvents(wrapper)).toEqual([true]);
     wrapper.unmount();
 
-    wrapper = mountToolbar({ readonly: true }, { "start-pill": slot });
-    expect(pill().attributes("data-locked")).toBe("true");
+    for (const replayPhase of ["running", "stopping"]) {
+      wrapper = mountToolbar({ replayPhase });
+      expect(lockedEvents(wrapper), replayPhase).toEqual([true]);
+      wrapper.unmount();
+    }
   });
 });
 
@@ -4712,11 +4637,10 @@ describe("BrowserJourney toolbar on a phone", () => {
   const MENU_RECORD = '[data-test="synthetics-journey-toolbar-menu-record"]';
   const DESKTOP_CONTROLS = [
     '[data-test="synthetics-journey-add-step-btn"]',
-    '[data-test="synthetics-journey-add-menu-trigger"]',
+    '[data-test="synthetics-journey-add-subtest-btn"]',
     '[data-test="synthetics-journey-replay-btn"]',
     '[data-test="synthetics-journey-record-btn"]',
   ];
-  const TOGGLE = '[data-test="synthetics-journey-toggle-variables-btn"]';
 
   const OTooltipWithContentStub = {
     props: ["content"],
@@ -4811,11 +4735,35 @@ describe("BrowserJourney toolbar on a phone", () => {
     expect(steps).toHaveLength(3);
   });
 
-  it("on a phone, the variables toggle is still in the toolbar", () => {
+  it("on a phone, adding a subtest from the toolbar menu still appends a blank subtest row", async () => {
     wrapper = mountAt("phone");
 
-    expect(wrapper.find(TOGGLE).exists()).toBe(true);
-    expect(hiddenOnPhone(wrapper, TOGGLE)).toBe(false);
+    await wrapper.find(MENU_ADD_SUBTEST).trigger("click");
+    await flushPromises();
+
+    const steps = (wrapper.props() as Record<string, unknown>).modelValue as BrowserStep[];
+    expect(steps).toHaveLength(3);
+    expect(steps[2]).toEqual({
+      id: expect.any(String),
+      action: "subtest",
+      name: "",
+      subtest: undefined,
+    });
+  });
+
+  it("on tablet the left and right groups wrap onto two rows; on desktop the spacer and separator split them", () => {
+    wrapper = mountAt("desktop");
+
+    const left = wrapper.find('[data-test="synthetics-journey-add-step-btn"]').element
+      .parentElement!;
+    expect(left.classList).toContain("max-lg:basis-full");
+    expect(left.parentElement!.classList).toContain("max-lg:flex-wrap");
+    const spacer = left.nextElementSibling!;
+    const separator = spacer.nextElementSibling!;
+    expect(spacer.className).toContain("flex-1");
+    expect(spacer.className).toContain("max-lg:hidden");
+    expect(separator.getAttribute("data-orientation")).toBe("vertical");
+    expect(separator.className).toContain("max-lg:hidden");
   });
 
   const STEP_COUNT = '[data-test="synthetics-journey-toolbar-step-count"]';

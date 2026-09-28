@@ -50,9 +50,6 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-// One choice is no choice, so the arrow would only add noise unless secrets need entering.
-const visible = computed(() => props.options.length > 1 || props.secretsNeeded > 0);
-
 const secretCounts = computed(() => ({
   entered: props.secretsEntered,
   needed: props.secretsNeeded,
@@ -79,17 +76,29 @@ function itemKey(option: ReplayEnvironmentOption) {
 </script>
 
 <template>
-  <ODropdown v-if="visible" side="bottom" align="end">
+  <ODropdown side="bottom" align="end">
     <template #trigger>
       <OButton
         variant="outline"
-        size="icon-sm-split"
-        icon-left="arrow-drop-down"
+        size="sm"
         :disabled="disabled"
-        :aria-label="t('synthetics.journey.replayEnv.menuAria')"
+        :aria-label="t('synthetics.journey.replayEnv.triggerAria', { environment: selectedName })"
         data-test="synthetics-journey-replay-menu-trigger"
       >
+        <!-- First child so it anchors to the whole button rather than a sibling span. -->
         <OTooltip :content="t('synthetics.journey.replayEnv.menuAria')" side="bottom" />
+        <OIcon name="dns" size="sm" aria-hidden="true" />
+        <span class="text-text-secondary font-normal">
+          {{ t("synthetics.journey.replayEnv.inLabel") }}
+        </span>
+        <span class="max-w-40 truncate">{{ selectedName }}</span>
+        <span
+          v-if="secretFailed"
+          class="bg-status-error-text size-2 shrink-0 rounded-full"
+          aria-hidden="true"
+          data-test="synthetics-journey-replay-menu-secret-failed"
+        />
+        <OIcon name="arrow-drop-down" size="sm" aria-hidden="true" />
       </OButton>
     </template>
     <div class="flex flex-col px-3 py-1.5">
