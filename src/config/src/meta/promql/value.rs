@@ -306,8 +306,7 @@ impl fmt::Write for FloatText {
     }
 }
 
-/// A microsecond timestamp as the Unix seconds, to the millisecond, that Prometheus'
-/// `jsonutil.MarshalTimestamp` writes.
+/// A microsecond timestamp as the millisecond Unix seconds `jsonutil.MarshalTimestamp` writes.
 struct SampleTimestamp(i64);
 
 impl Serialize for SampleTimestamp {

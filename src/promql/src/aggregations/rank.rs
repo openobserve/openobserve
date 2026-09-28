@@ -19,9 +19,10 @@ use config::{
     meta::promql::value::{Labels, RangeValue, Sample, signature},
     utils::sort::sort_float,
 };
+use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
-use super::{Accumulate, AggFunc};
+use super::{Accumulate, AggFunc, fits_int64};
 use crate::scalar_param::ScalarParam;
 
 /// `topk` / `bottomk`: the k best series of a group at each evaluation slot.
@@ -29,12 +30,16 @@ use crate::scalar_param::ScalarParam;
 pub(crate) struct Rank {
     k: ScalarParam,
     is_bottom: bool,
+    k_may_be_invalid: bool,
 }
 
 /// One bounded heap per slot: memory is `slots × k` whatever the series count.
 pub(crate) struct RankAccumulator {
     k: ScalarParam,
     is_bottom: bool,
+    k_may_be_invalid: bool,
+    /// The first k that is NaN or outside int64 at a slot with input.
+    invalid_k: Option<f64>,
     heaps: Vec<BinaryHeap<Ranked>>,
 }
 
@@ -53,7 +58,15 @@ struct Ranked {
 
 impl Rank {
     pub(crate) fn new(k: ScalarParam, is_bottom: bool) -> Self {
-        Self { k, is_bottom }
+        let k_may_be_invalid = match &k {
+            ScalarParam::Const(k) => !fits_int64(*k),
+            ScalarParam::PerStep { values, .. } => values.iter().any(|k| !fits_int64(*k)),
+        };
+        Self {
+            k,
+            is_bottom,
+            k_may_be_invalid,
+        }
     }
 }
 
@@ -68,6 +81,8 @@ impl AggFunc for Rank {
         RankAccumulator {
             k: self.k.clone(),
             is_bottom: self.is_bottom,
+            k_may_be_invalid: self.k_may_be_invalid,
+            invalid_k: None,
             heaps: (0..slots).map(|_| BinaryHeap::new()).collect(),
         }
     }
@@ -77,6 +92,16 @@ impl RankAccumulator {
     // a fractional k truncates and a negative or NaN one keeps nothing, as `k as usize` does
     fn limit(&self, slot: usize) -> usize {
         self.k.at_slot(slot) as usize
+    }
+
+    // Prometheus only rejects k at a step that has input
+    fn note_invalid_k(&mut self, slot: usize) {
+        if self.k_may_be_invalid && self.invalid_k.is_none() {
+            let k = self.k.at_slot(slot);
+            if !fits_int64(k) {
+                self.invalid_k = Some(k);
+            }
+        }
     }
 
     fn admits(&self, slot: usize, value: f64, signature: impl FnOnce() -> u64) -> bool {
@@ -118,6 +143,7 @@ impl Accumulate for RankAccumulator {
         // the labels are read only for an entry that enters a heap or ties with its worst
         let mut identity = SeriesIdentity::new(labels);
         for (slot, value) in values {
+            self.note_invalid_k(slot);
             if !self.admits(slot, value, || identity.get().1) {
                 continue;
             }
@@ -135,10 +161,20 @@ impl Accumulate for RankAccumulator {
     }
 
     fn merge(&mut self, other: Self) {
+        self.invalid_k = self.invalid_k.or(other.invalid_k);
         for (slot, heap) in other.heaps.into_iter().enumerate() {
             for entry in heap.into_sorted_vec() {
                 self.offer(slot, entry);
             }
+        }
+    }
+
+    fn check(&self) -> Result<()> {
+        match self.invalid_k {
+            Some(k) => Err(DataFusionError::Plan(format!(
+                "Scalar value {k} overflows int64"
+            ))),
+            None => Ok(()),
         }
     }
 

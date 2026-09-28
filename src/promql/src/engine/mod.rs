@@ -727,6 +727,15 @@ pub(crate) mod tests {
             eval_on_empty("topk(scalar(up), up)", 3).await.unwrap(),
             Value::None
         ));
+        // k is NaN on the first two steps, where the input is absent too
+        let late = "vector(time()) > 1640995260";
+        let query = format!("topk(scalar({late}) - 1640995259, {late})");
+        let series = matrix(eval_on_empty(&query, 3).await.unwrap());
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].samples.len(), 1);
+        let query = format!("topk(scalar({late}), vector(1))");
+        let err = eval_on_empty(&query, 3).await.unwrap_err().to_string();
+        assert!(err.contains("Scalar value NaN overflows int64"), "{err}");
         let series = matrix(eval_on_empty("topk(2, vector(1))", 3).await.unwrap());
         assert_eq!(series.len(), 1);
         assert_eq!(series[0].samples.len(), 3);

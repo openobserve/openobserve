@@ -471,6 +471,7 @@ async fn query_range(
         tracing::Span::none()
     };
     let trace_id = get_or_create_trace_id(headers, &http_span);
+    let parsed = parser::parse(req.query.as_deref().unwrap_or_default());
     #[cfg(feature = "enterprise")]
     {
         use db::org_users::get_cached_user_org;
@@ -481,7 +482,7 @@ async fn query_range(
             return MetaHttpResponse::too_many_requests(e);
         }
 
-        let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
+        let ast = match &parsed {
             Ok(v) => v,
             Err(e) => {
                 log::error!("[trace_id: {trace_id}] parse promql error: {e}");
@@ -496,7 +497,7 @@ async fn query_range(
             }
         };
         let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
-        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, &ast) {
+        if let Err(e) = promql::ast::visitor::walk_expr(&mut visitor, ast) {
             log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
             return (
                 StatusCode::BAD_REQUEST,
@@ -578,7 +579,8 @@ async fn query_range(
             }
         },
     };
-    if let Err(e) = check_range_query(req.query.as_deref().unwrap_or_default(), start, end) {
+    let value_type = parsed.ok().map(|expr| expr.value_type());
+    if let Err(e) = check_range_query(value_type, start, end, query_exemplars) {
         return (
             StatusCode::BAD_REQUEST,
             axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
@@ -1351,22 +1353,6 @@ fn format_query(query: &str) -> Response {
         .into_response()
 }
 
-/// The 400s Prometheus' `queryRange` gives for an end before the start or a non-instant query.
-fn check_range_query(query: &str, start: i64, end: i64) -> Result<(), String> {
-    if end < start {
-        return Err("end timestamp must not be before start time".to_string());
-    }
-    let kind = match parser::parse(query).map(|expr| expr.value_type()) {
-        Ok(parser::value::ValueType::Matrix) => "range vector",
-        Ok(parser::value::ValueType::String) => "string",
-        // a parse error is reported by the search itself
-        _ => return Ok(()),
-    };
-    Err(format!(
-        "invalid expression type \"{kind}\" for range query, must be Scalar or instant Vector"
-    ))
-}
-
 fn search_timeout(timeout: Option<String>) -> i64 {
     match timeout {
         None => 0,
@@ -1758,20 +1744,50 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
     }
 }
 
+/// Prometheus' 400s for an end before the start and for a non-instant range query.
+fn check_range_query(
+    value_type: Option<parser::value::ValueType>,
+    start: i64,
+    end: i64,
+    query_exemplars: bool,
+) -> Result<(), String> {
+    if end < start {
+        return Err("end timestamp must not be before start time".to_string());
+    }
+    if query_exemplars {
+        return Ok(());
+    }
+    let kind = match value_type {
+        Some(parser::value::ValueType::Matrix) => "range vector",
+        Some(parser::value::ValueType::String) => "string",
+        _ => return Ok(()),
+    };
+    Err(format!(
+        "invalid expression type \"{kind}\" for range query, must be Scalar or instant Vector"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_check_range_query() {
-        assert!(check_range_query("up", 10, 10).is_ok());
-        assert!(check_range_query("sum(rate(up[5m]))", 10, 20).is_ok());
-        assert!(check_range_query("1 + 1", 10, 20).is_ok());
-        assert!(check_range_query("up{", 10, 20).is_ok());
-        let err = check_range_query("up", 20, 10).unwrap_err();
-        assert!(err.contains("end timestamp"), "{err}");
+        let check = |query: &str, start, end, query_exemplars| {
+            let value_type = parser::parse(query).ok().map(|expr| expr.value_type());
+            check_range_query(value_type, start, end, query_exemplars)
+        };
+        assert!(check("up", 10, 10, false).is_ok());
+        assert!(check("sum(rate(up[5m]))", 10, 20, false).is_ok());
+        assert!(check("1 + 1", 10, 20, false).is_ok());
+        assert!(check("up{", 10, 20, false).is_ok());
+        assert!(check("up[5m]", 10, 20, true).is_ok());
+        for query_exemplars in [false, true] {
+            let err = check("up", 20, 10, query_exemplars).unwrap_err();
+            assert!(err.contains("end timestamp"), "{err}");
+        }
         for (query, kind) in [("up[5m]", "range vector"), (r#""foo""#, "string")] {
-            let err = check_range_query(query, 10, 20).unwrap_err();
+            let err = check(query, 10, 20, false).unwrap_err();
             assert!(err.contains(&format!("\"{kind}\"")), "{query}: {err}");
         }
     }

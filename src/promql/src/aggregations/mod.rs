@@ -165,6 +165,12 @@ pub trait Accumulate: Send + Sync + Sized {
     /// least signals the Inf - Inf cancellation.
     fn merge(&mut self, other: Self);
 
+    /// The error a parameter that is invalid at a slot with input raises, checked before
+    /// [`Accumulate::evaluate`].
+    fn check(&self) -> Result<()> {
+        Ok(())
+    }
+
     /// Consumes the accumulator and produces the output series of the group.
     ///
     /// `group_labels` are the labels the group was keyed by (`by(...)` / `without(...)`
@@ -226,41 +232,6 @@ impl AggOp {
     /// label of a series rather than its group projection.
     pub(crate) fn needs_series_labels(&self) -> bool {
         matches!(self, Self::Topk(_) | Self::Bottomk(_))
-    }
-
-    /// Whether k is NaN or outside int64 at some step, which Prometheus rejects where input exists.
-    pub(crate) fn has_invalid_k(&self) -> bool {
-        match self {
-            Self::Topk(ScalarParam::Const(k)) | Self::Bottomk(ScalarParam::Const(k)) => {
-                !fits_int64(*k)
-            }
-            Self::Topk(ScalarParam::PerStep { values, .. })
-            | Self::Bottomk(ScalarParam::PerStep { values, .. }) => {
-                values.iter().any(|k| !fits_int64(*k))
-            }
-            _ => false,
-        }
-    }
-
-    /// The error Prometheus raises for a k that is NaN or outside int64 at a step with input.
-    pub(crate) fn check_k(&self, input: &Value) -> Result<()> {
-        let (Self::Topk(k) | Self::Bottomk(k)) = self else {
-            return Ok(());
-        };
-        let Value::Matrix(matrix) = input else {
-            return Ok(());
-        };
-        match matrix
-            .iter()
-            .flat_map(|series| &series.samples)
-            .map(|sample| k.at(sample.timestamp))
-            .find(|k| !fits_int64(*k))
-        {
-            Some(k) => Err(DataFusionError::Plan(format!(
-                "Scalar value {k} overflows int64"
-            ))),
-            None => Ok(()),
-        }
     }
 
     /// The generic fold over a materialized matrix.
@@ -440,6 +411,7 @@ where
     // Step 2: Process each group in parallel
     // For each group, aggregate all samples across timestamps
     let start3 = std::time::Instant::now();
+    let rejected = std::sync::OnceLock::new();
     let results: Vec<RangeValue> = groups
         .par_iter()
         .flat_map_iter(|(_, series_indices)| {
@@ -478,9 +450,16 @@ where
                 accumulate_chunk(series_indices)
             };
 
+            if let Err(e) = acc.check() {
+                let _ = rejected.set(e);
+                return Vec::new();
+            }
             acc.evaluate(labels, &timestamps)
         })
         .collect();
+    if let Some(e) = rejected.into_inner() {
+        return Err(e);
+    }
 
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) parallel aggregation took: {:?}, produced {} series",

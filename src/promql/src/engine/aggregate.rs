@@ -81,12 +81,6 @@ impl Engine {
             _ => {
                 let k = param.and_then(|param| ScalarParam::from_value(param, &eval_ctx));
                 let agg_op = AggOp::new(op, k)?;
-                // only steps with input reject k, so the rare invalid case materializes the input
-                if agg_op.has_invalid_k() {
-                    let input = self.exec_expr(expr).await?;
-                    agg_op.check_k(&input)?;
-                    return agg_op.eval_aggregate(modifier, input, &eval_ctx);
-                }
                 if let Some(value) = self.fused_agg(agg_op.clone(), expr, modifier).await? {
                     return Ok(value);
                 }

@@ -19,7 +19,7 @@
 
 use std::sync::Arc;
 
-use config::meta::promql::value::{Labels, RangeValue, Value};
+use config::meta::promql::value::{Labels, Value};
 use datafusion::error::Result;
 use hashbrown::{HashMap, hash_map::Entry};
 
@@ -86,7 +86,7 @@ where
         aggregate_partial(source, func.clone(), eval)
     })
     .await?;
-    let value = aggregate_final(folds, &eval.timestamps);
+    let value = aggregate_final(folds, &eval.timestamps)?;
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {op_name}({func_name}) execution took: {:?}, folded {series_count} series into {} series",
         start_time.elapsed(),
@@ -132,10 +132,10 @@ async fn aggregate_partial<A: AggFunc, S: SeriesStream>(
 fn aggregate_final<A: Accumulate>(
     folds: impl IntoIterator<Item = GroupAccs<A>>,
     timestamps: &[i64],
-) -> Value {
+) -> Result<Value> {
     let mut folds = folds.into_iter();
     let Some(mut merged) = folds.next() else {
-        return Value::None;
+        return Ok(Value::None);
     };
     for fold in folds {
         for (sig, entry) in fold {
@@ -147,16 +147,21 @@ fn aggregate_final<A: Accumulate>(
             }
         }
     }
-    let results: Vec<RangeValue> = merged
-        .into_values()
-        .flat_map(|entry| entry.acc.evaluate(entry.labels, timestamps))
-        .filter(|series| !series.samples.is_empty())
-        .collect();
-    if results.is_empty() {
+    let mut results = Vec::new();
+    for entry in merged.into_values() {
+        entry.acc.check()?;
+        let series = entry.acc.evaluate(entry.labels, timestamps);
+        results.extend(
+            series
+                .into_iter()
+                .filter(|series| !series.samples.is_empty()),
+        );
+    }
+    Ok(if results.is_empty() {
         Value::None
     } else {
         Value::Matrix(results)
-    }
+    })
 }
 
 #[cfg(test)]
@@ -169,7 +174,9 @@ mod tests {
         time::Duration,
     };
 
-    use config::meta::promql::value::{EvalContext, Label, Labels, Sample, TimeWindow, signature};
+    use config::meta::promql::value::{
+        EvalContext, Label, Labels, RangeValue, Sample, TimeWindow, signature,
+    };
     use datafusion::error::DataFusionError;
     use promql_parser::parser::LabelModifier;
 
@@ -772,6 +779,24 @@ mod tests {
         )
         .await;
         assert!(matches!(value, Value::None));
+    }
+
+    #[tokio::test]
+    async fn test_fused_rank_rejects_invalid_k_only_with_input() {
+        for k in [f64::NAN, 1e20] {
+            let op = AggOp::Topk(ScalarParam::Const(k));
+            let func: Arc<dyn RangeFunc> =
+                Arc::from(functions::fusable_range_func("rate").unwrap());
+            let eval = Arc::new(RangeExpr::new(func, Duration::from_secs(60), &eval_ctx()));
+            let sources =
+                partitioned_sources(streamed_input(rank_matrix(), "rate"), 2, &None, true);
+            let err = aggregate(sources, op.clone(), eval).await.unwrap_err();
+            assert!(err.to_string().contains("overflows int64"), "{k}: {err}");
+            let generic = run_generic(&None, rank_matrix(), "rate", op.clone(), &eval_ctx());
+            assert!(generic.is_err(), "{k}");
+            let value = run_partitioned(vec![], 2, "rate", op, &None).await;
+            assert!(matches!(value, Value::None), "{k}");
+        }
     }
 
     /// No aggregation output carries a window, like the generic path.
