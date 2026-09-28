@@ -624,10 +624,12 @@ mod tests {
 
     #[test]
     fn test_extrema_merge_preserves_nan_and_signed_zero_behavior() {
-        fn check(func: impl AggFunc, initial: f64) {
+        fn check(func: impl AggFunc) {
             for (values, expected) in [
-                (vec![f64::NAN], initial),
+                (vec![f64::NAN], f64::NAN),
+                (vec![f64::NAN, f64::NAN], f64::NAN),
                 (vec![f64::NAN, 7.0, f64::NAN], 7.0),
+                (vec![7.0, f64::NAN], 7.0),
                 (vec![-0.0, 0.0], -0.0),
                 (vec![0.0, -0.0], 0.0),
             ] {
@@ -651,8 +653,8 @@ mod tests {
                 }
             }
         }
-        check(Min, f64::INFINITY);
-        check(Max, f64::NEG_INFINITY);
+        check(Min);
+        check(Max);
     }
 
     #[test]
