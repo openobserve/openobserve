@@ -165,6 +165,7 @@ impl Ingest for Ingester {
                 let data = bytes::Bytes::from(in_data.data);
                 match create_log_ingestion_req(log_ingestion_type, data) {
                     Err(e) => Err(e),
+                    // Only the DBM rollup reads this reply; the other ServiceGraph senders ignore it.
                     Ok(ingestion_req) => openobserve_core::logs::ingest::ingest(
                         0,
                         &org_id,
@@ -175,7 +176,7 @@ impl Ingest for Ingester {
                         is_derived,
                     )
                     .await
-                    .map_or_else(Err, |_| Ok(())),
+                    .map(|resp| metrics_reply = Some(encode_logs_reply(&resp))),
                 }
             }
             _ => Err(Error::IngestionError(
@@ -240,6 +241,17 @@ fn encode_metrics_reply(resp: &ingestion_common::IngestionResponse) -> Ingestion
         };
     }
     ok_reply()
+}
+
+/// A logs write reports a failed WAL write as `write_failed` under a 200, so map it to 500.
+fn encode_logs_reply(resp: &ingestion_common::IngestionResponse) -> IngestionResponse {
+    if resp.write_failed {
+        return IngestionResponse {
+            status_code: 500,
+            message: "write to storage failed".to_string(),
+        };
+    }
+    encode_metrics_reply(resp)
 }
 
 #[cfg(test)]
@@ -318,6 +330,44 @@ mod tests {
         assert_eq!(reply.status_code, 207);
         let body: ingestion_common::IngestionResponse = json::from_str(&reply.message).unwrap();
         assert_eq!(body.status[0].status.failed, 2);
+    }
+
+    // The rollup holds its offset on this reply; a bare `Ok(())` would report every failure as 200.
+    #[test]
+    fn test_service_graph_arm_returns_the_logs_reply() {
+        let src = include_str!("ingest.rs");
+        let arm = &src[src
+            .find("StreamType::ServiceGraph =>")
+            .expect("ServiceGraph arm")..];
+        let arm = &arm[..arm.find("\n            _ =>").expect("arm end")];
+        assert!(
+            arm.contains(".map(|resp| metrics_reply = Some(encode_logs_reply(&resp)))"),
+            "{arm}"
+        );
+    }
+
+    #[test]
+    fn test_encode_logs_reply_write_failed_is_500() {
+        let resp = metrics_resp(200, 0, None).with_write_failed(true);
+        assert_eq!(encode_logs_reply(&resp).status_code, 500);
+    }
+
+    #[test]
+    fn test_encode_logs_reply_rejected_records_are_207() {
+        let reply = encode_logs_reply(&metrics_resp(200, 3, None));
+        assert_eq!(reply.status_code, 207);
+        let body: ingestion_common::IngestionResponse = json::from_str(&reply.message).unwrap();
+        assert_eq!(body.status[0].status.failed, 3);
+    }
+
+    #[test]
+    fn test_encode_logs_reply_clean_and_skipped_are_200() {
+        assert_eq!(
+            encode_logs_reply(&metrics_resp(200, 0, None)).status_code,
+            200
+        );
+        let skipped = metrics_resp(200, 0, None).with_stream_skipped(true);
+        assert_eq!(encode_logs_reply(&skipped).status_code, 200);
     }
 
     #[test]

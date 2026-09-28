@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Esiste già una variabile con lo stesso nome",
     "pivotTotal": "Totale",
     "pivotOthers": "Altri",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Mostra esemplari (campioni di traccia)",
+      "hide": "Nascondi esemplari · {count} mostrati",
+      "empty": "Nessun esemplare in questo intervallo di tempo",
+      "emptyShort": "0 esemplari",
+      "loadFailed": "Impossibile caricare gli esemplari",
+      "loadFailedHint": "Il grafico non è influenzato. Il nuovo tentativo recupera solo gli esemplari.",
+      "retry": "Riprova",
+      "cardTitle": "Esemplare",
+      "query": "Query {name}",
+      "returnedBy": "Restituito da {count} query | Restituito da {count} query",
+      "series": "Serie",
+      "aboveRange": "Sopra l'intervallo del grafico; disegnato sul bordo superiore",
+      "belowRange": "Sotto l'intervallo del grafico; disegnato sul bordo inferiore",
+      "checkingTrace": "Verifica della traccia…",
+      "openTrace": "Apri traccia",
+      "openTraceHint": "Oppure fai clic sul marcatore. Indietro riporta qui.",
+      "traceNotAvailable": "Traccia non disponibile — esclusa dal campionamento o oltre il periodo di conservazione",
+      "openTraceUnverified": "Apri traccia (non verificata)",
+      "unverifiedTimeout": "La ricerca della traccia è scaduta, quindi questa traccia potrebbe mancare.",
+      "unverifiedForbidden": "Impossibile confermare questa traccia — potresti non avere accesso alle tracce.",
+      "unverifiedPartial": "È stata cercata solo una parte della finestra di conservazione.",
+      "unverifiedError": "Impossibile verificare questa traccia.",
+      "noTraceId": "Nessun {label} su questo esemplare, quindi non c'è una traccia da aprire.",
+      "markersAria": "Marcatori degli esemplari",
+      "markerAria": "Esemplare {value} a {time}"
+    },
+    "showExemplarsLabel": "Mostra esemplari",
+    "showExemplarsHelp": "Disegna campioni di traccia su questo grafico per tutti coloro che aprono la dashboard. I visualizzatori possono comunque nasconderli dall'intestazione del pannello."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7531,6 +7560,9 @@
       "lastError": "Ultimo errore",
       "lastTrained": "Ultimo addestramento",
       "lookBackWindow": "Finestra di lookback",
+      "lookBackWindowFloor": "La finestra di lookback deve essere almeno {min} — Controlla ogni più una risoluzione di rilevamento. Una finestra più breve non può contenere un bucket completo nel momento in cui parte un'esecuzione, quindi i bucket verrebbero saltati.",
+      "lookBackWindowLegacy": "Questa finestra salvata è inferiore al minimo di {min} (Controlla ogni più una risoluzione di rilevamento). Verrà salvata invariata, ma le esecuzioni possono saltare dei bucket finché la finestra non viene aumentata.",
+      "lookBackWindowMinimum": "Minimo {min}. Consigliato {recommended} o più — due volte (Controlla ogni + Risoluzione di rilevamento) — più 10 minuti dove è abilitato il rilevamento delle assenze.",
       "lookBackWindowTooltip": "Quanto tempo fa ogni rilevamento ha eseguito le interrogazioni. Chiude la finestra anche dopo una lunga pausa. L'impostazione predefinita è Check Every interval.",
       "metricChart": "Metrica e anomalie",
       "metricChartHint": "Un punto per intervallo di rilevamento",
@@ -7539,6 +7571,15 @@
       "nDays": "{days} giorno | {days} giorni",
       "noDestinationsFound": "Nessuna destinazione trovata",
       "noFieldsFound": "Nessun campo trovato",
+      "noticeHybridFallback": "Rilevamento di fallback",
+      "noticeHybridFallbackTooltip": "La soglia ibrida non era disponibile nelle esecuzioni recenti, quindi il rilevamento è passato alla soglia congelata. Il punteggio continua sulla soglia congelata finché il modello non viene riaddestrato.",
+      "noticeRetrain": "Riaddestramento automatico",
+      "noticeRetrainTooltip": "Impossibile leggere il modello salvato dopo un aggiornamento, quindi è stato eliminato e la configurazione è stata messa in coda per il riaddestramento automatico. Non è richiesta alcuna azione; il rilevamento riprende al termine dell'addestramento.",
+      "noticeSkipAbsence": "La valutazione dell'assenza è rimasta indietro rispetto alla finestra di lookback; lo span che non poteva più essere recuperato è stato saltato e registrato.",
+      "noticeSkipScored": "Le esecuzioni di rilevamento sono arrivate a intervalli più lunghi di quanto copra la finestra di lookback, quindi i bucket chiusi sono usciti dalla finestra prima che un'esecuzione potesse valutarli.",
+      "noticeWindowFloor": "Finestra troppo stretta",
+      "noticeWindowFloorTooltip": "La finestra di lookback è inferiore a Controlla ogni più una risoluzione di rilevamento, quindi le esecuzioni non possono valutare alcun bucket. Aumenta la finestra per ripristinare il rilevamento.",
+      "noticeWindowSkip": "Bucket saltati",
       "notifications": "Notifiche",
       "notificationsTooltip": "Se abilitato, una notifica verrà inviata alla destinazione selezionata ogni volta che viene rilevata un'anomalia.",
       "percentile": "Livello",
@@ -8649,7 +8690,9 @@
         "staleCopyAria": "Copia i dettagli dell'aggiornamento fallito per {name}",
         "stalePreamble": "Aggiornamento fallito — mostra l'ultimo risultato riuscito.",
         "staleClickToCopy": "Clicca per copiare i dettagli.",
-        "lastRefreshedPrefix": "Ultimo aggiornamento alle: "
+        "lastRefreshedPrefix": "Ultimo aggiornamento alle: ",
+        "exemplarsShowHeatmap": "Mostra esemplari (campioni di traccia). Quando è attivo, passa questa scheda ai percentili.",
+        "exemplarsHideHeatmap": "Nascondi esemplari · {count} mostrati. Riporta questa scheda alla mappa di calore."
       },
       "fn": {
         "subtitle": "Scegli come questa metrica viene aggregata",
@@ -15344,6 +15387,9 @@
       "multiSelect": "Selezione multipla",
       "singleSelect": "Selezione singola"
     },
+    "templateInput": {
+      "suggestions": "Suggerimenti variabili"
+    },
     "time": {
       "openTimePicker": "Apri selettore ora",
       "clear": "Cancella",
@@ -17053,17 +17099,17 @@
       "alertMe": "Avvisami",
       "columnHints": {
         "qps": "Chiamate al secondo — le chiamate di questa finestra divise per la sua durata, così una vista di 15 minuti e una di 4 ore restano confrontabili.",
-        "p50": "La metà di tutte le chiamate è terminata più velocemente di questo. Conta solo le chiamate completate — una query ancora in esecuzione, o una che non è mai tornata, non viene misurata qui.",
-        "p95": "La coda lenta — 1 chiamata su 20 ha richiesto almeno questo tempo. Conta solo le chiamate completate — una query ancora in esecuzione, o una che non è mai tornata, non viene misurata qui.",
-        "p99": "Il peggiore 1% delle chiamate ha richiesto almeno questo tempo. Conta solo le chiamate completate — una query ancora in esecuzione, o una che non è mai tornata, non viene misurata qui.",
-        "load": "Tempo totale che le tue applicazioni hanno trascorso in attesa su questo database. Misurato dal lato client, quindi riflette quanto traffico ha servito questo database — non quanto è caricato il server.",
+        "p50": "Metà di tutte le chiamate è terminata più velocemente di così. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
+        "p95": "La coda lenta — 1 chiamata su 20 ha impiegato almeno questo tempo. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
+        "p99": "Il peggior 1% delle chiamate ha impiegato almeno questo tempo. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
+        "load": "Tempo totale che le tue app hanno impiegato in chiamate a questo database, misurato dalle tracce della tua applicazione. Mostra quanto traffico questo database ha servito per le tue app.",
         "attention": "Quanto questa istanza è vicina a un limite pubblicato dal suo motore — oggi, connessioni rispetto a max_connections. Il peggior rapporto, non un punteggio misto. Ordinato dal più alto al più basso, con le istanze la cui salute non può essere letta in cima, perché una che non puoi vedere non è una che sai essere sana. Misurato sul server del database, quindi non è confrontabile con il tempo database accanto."
       },
       "failedChip": "{count} non riuscite",
       "columnSubLabels": {
-        "attention": "server",
-        "load": "client",
-        "calls": "client"
+        "attention": "dal database",
+        "load": "dalle tue app",
+        "calls": "dalle tue app"
       },
       "attention": {
         "connections": "connessioni",
@@ -17125,14 +17171,14 @@
         "failed": "Fallite"
       },
       "columnHints": {
-        "calls": "Quante volte è stata eseguita questa query. Il conteggio del database stesso dove lo riporta — che copre ogni client, non solo le parti del tuo sistema che inviano tracce. Le righe contrassegnate come osservate dal client vengono invece conteggiate dalle tracce, perché il database non le ha riportate.",
-        "p50": "Metà di tutte le chiamate sono terminate più velocemente di questo. Conta solo le chiamate terminate — una query ancora in esecuzione, o che non è mai tornata, non viene misurata qui.",
-        "p95": "La coda lenta — 1 chiamata su 20 ha impiegato almeno questo tempo. Conta solo le chiamate terminate — una query ancora in esecuzione, o che non è mai tornata, non viene misurata qui.",
-        "p99": "Il peggiore 1% delle chiamate ha impiegato almeno questo tempo. Conta solo le chiamate terminate — una query ancora in esecuzione, o che non è mai tornata, non viene misurata qui.",
+        "calls": "Quante volte è stata eseguita questa query, come conteggiato dal tuo database — ogni app che si connette è inclusa. Dove il tuo database non ha un conteggio per una query, l'icona delle tracce ne indica una misurata dalle tracce della tua applicazione.",
+        "p50": "Metà di tutte le chiamate è terminata più velocemente di così. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
+        "p95": "La coda lenta — 1 chiamata su 20 ha impiegato almeno questo tempo. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
+        "p99": "Il peggior 1% delle chiamate ha impiegato almeno questo tempo. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
         "max": "La singola chiamata più lenta in questa finestra — una chiamata reale, non una media.",
         "errors": "Quante di queste chiamate sono tornate con un errore.",
         "perTrace": "Quante volte viene eseguita all'interno di una singola richiesta. Un numero alto di solito significa un ciclo.",
-        "load": "Tempo totale trascorso da questa query nel database. La cifra del database stesso dove la riporta: tempo di esecuzione su Postgres, ma tempo di ATTESA su MySQL e MariaDB — ogni riga indica quale. Le righe contrassegnate come osservate dal client sono misurate dalle tracce, quindi includono il round-trip di rete."
+        "load": "Tempo totale che questa query ha trascorso nel database, come riportato dal tuo database: tempo di esecuzione su Postgres, tempo di attesa su MySQL e MariaDB — ogni riga indica quale. Le righe con l'icona delle tracce sono misurate dalle tracce della tua applicazione, quindi includono anche il viaggio verso il database e ritorno."
       },
       "errorsNone": "Nessuno",
       "errorsAll": "Tutti",
@@ -17396,8 +17442,7 @@
       "overlap": {
         "serverExecution": "Tempo impiegato da {engine} per eseguirla",
         "serverWait": "Tempo impiegato da {engine} in attesa — tempo di attesa, non di esecuzione",
-        "serverCounted": "Contato da {engine}, su tutti i client",
-        "clientObserved": "Osservato da chiamanti strumentati — il tuo database non ha segnalato questo"
+        "serverCounted": "Contato da {engine}, su tutti i client"
       },
       "endpointsConcentrated": "Un endpoint rappresenta il {percent} del tempo di questa query. Correggi {endpoint} e hai corretto questa query.",
       "typicalMarker": "chiamate lente {value}",
@@ -17424,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "Ciò che il database stesso ha registrato",
-        "subtitle": "Lato server — tutti i client",
-        "clientSubtitle": "Osservato dal client — solo chiamanti strumentati, solo chiamate concluse. Una query ancora in esecuzione, o che si è bloccata, non è in questi numeri.",
+        "subtitle": "Dal tuo database — ogni app che si connette",
+        "clientSubtitle": "Le cifre contrassegnate sono misurate dalle tracce della tua applicazione — le chiamate che le tue app hanno completato in questa finestra",
         "instance": "Riportato da {instance}",
         "instanceWide": "Tutti i database su questa istanza",
         "calls": "Esecuzioni",
@@ -17471,9 +17516,13 @@
         "serverExecution": "tempo di esecuzione",
         "serverWait": "tempo di attesa",
         "serverCounted": "conteggio server",
-        "clientObserved": "osservato dal client",
         "serverReported": "riportato dai tuoi database"
       }
+    },
+    "appSource": {
+      "marker": "Misurato dalle tracce della tua applicazione",
+      "markerHint": "Misurato dalle tracce della tua applicazione, aggiungendo la vista delle tue app a ciò che riporta il tuo database.",
+      "legend": "Dalle tracce della tua app"
     },
     "page": {
       "tabs": {
@@ -17482,7 +17531,7 @@
         "metricsHint": "Carico del database per evento di attesa e ogni metrica raccolta dai tuoi receiver del database.",
         "queries": "Query principali",
         "samples": "Chiamate più lente",
-        "samplesHintClient": "Chiamate concluse osservate dai tuoi servizi strumentati in questa finestra — i chiamanti senza tracciamento non sono contati, quindi questo è un minimo, non il totale. La tabella mostra le più lente.",
+        "samplesHintClient": "Chiamate misurate dalle tracce della tua applicazione in questa finestra, aggiungendo la vista delle tue app a ciò che riporta il tuo database. La tabella mostra le più lente.",
         "samplesHintServer": "Istruzioni che i tuoi database hanno riportato completate in questa finestra, contate all'interno del database. La tabella mostra le più lente.",
         "samplesHintUnknown": "Le chiamate di database individuali più lente in questa finestra.",
         "deadlocks": "Deadlock",
@@ -17519,6 +17568,11 @@
       "explore": "Apri in Esplora metriche",
       "railLabel": "Sezioni delle metriche",
       "noAccess": "Non hai l'autorizzazione per leggere {stream}. Chiedi a un amministratore l'accesso in lettura a questo stream.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "per query",
         "database": "per database",
@@ -17633,7 +17687,7 @@
         "status": "Stato"
       },
       "columnHints": {
-        "duration": "Quanto è durata questa singola chiamata, misurata dal chiamante. Conta solo le chiamate completate — una query ancora in esecuzione, o che non è mai tornata, non viene misurata qui."
+        "duration": "Quanto è durata questa singola chiamata, come cronometrata dalla tua applicazione dall'inizio alla fine."
       },
       "failed": "Fallita",
       "failedWithCode": "Fallita · {code}",
@@ -19142,6 +19196,8 @@
     "rotationNobody": "Nessuno di turno",
     "edit": "Modifica",
     "timelineLoadFailed": "Impossibile calcolare il calendario per questa finestra",
+    "editorReadFailed": "Impossibile caricare la copia più recente da modificare. Riprova.",
+    "refreshFailed": "Impossibile aggiornare. Quanto mostrato potrebbe essere obsoleto.",
     "scheduleDoneEditing": "Torna al calendario",
     "coverWhoRequired": "Scegli chi copre",
     "timelineCoverAria": "{who} copre {rotation}, da {from} a {to}",

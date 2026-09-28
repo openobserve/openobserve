@@ -30,7 +30,7 @@ impl RangeFunc for IdeltaFunc {
         let [.., previous, last] = samples else {
             return None;
         };
-        Some(last.value - previous.value)
+        (last.timestamp != previous.timestamp).then_some(last.value - previous.value)
     }
 }
 
@@ -105,5 +105,11 @@ mod tests {
             }
             _ => panic!("Expected Matrix result"),
         }
+    }
+
+    #[test]
+    fn test_idelta_exec_same_timestamp_returns_none() {
+        let samples = vec![Sample::new(1000, 10.0), Sample::new(1000, 20.0)];
+        assert!(IdeltaFunc.exec(&samples, 1000, &Duration::ZERO).is_none());
     }
 }

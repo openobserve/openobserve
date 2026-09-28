@@ -5851,7 +5851,36 @@
     "variableNameAlreadyExists": "已存在相同名稱的變數",
     "pivotTotal": "總計",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "顯示範例 (追蹤樣本)",
+      "hide": "隱藏範例 · 已顯示 {count}",
+      "empty": "此時間範圍內沒有範例",
+      "emptyShort": "0 個範例",
+      "loadFailed": "無法載入範例",
+      "loadFailedHint": "圖表不受影響。重試只會重新擷取範例。",
+      "retry": "重試",
+      "cardTitle": "範例",
+      "query": "查詢 {name}",
+      "returnedBy": "由 {count} 個查詢傳回 | 由 {count} 個查詢傳回",
+      "series": "序列",
+      "aboveRange": "超出圖表範圍；繪製於頂端邊緣",
+      "belowRange": "低於圖表範圍；繪製於底部邊緣",
+      "checkingTrace": "正在檢查追蹤…",
+      "openTrace": "開啟追蹤",
+      "openTraceHint": "或點選標記。返回後會回到這裡。",
+      "traceNotAvailable": "追蹤無法使用 — 已取樣排除或超過保留期限",
+      "openTraceUnverified": "開啟追蹤 (未驗證)",
+      "unverifiedTimeout": "追蹤查詢逾時，因此此追蹤可能不存在。",
+      "unverifiedForbidden": "無法確認此追蹤 — 您可能沒有追蹤的存取權限。",
+      "unverifiedPartial": "僅搜尋了部分保留期間。",
+      "unverifiedError": "無法檢查此追蹤。",
+      "noTraceId": "此範例上沒有 {label}，因此沒有可開啟的追蹤。",
+      "markersAria": "範例標記",
+      "markerAria": "{time} 的範例 {value}"
+    },
+    "showExemplarsLabel": "顯示範例",
+    "showExemplarsHelp": "為所有開啟儀表板的人在此圖表上繪製追蹤樣本。檢視者仍可從面板標題隱藏它們。"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8656,7 +8685,9 @@
         "staleCopyAria": "複製 {name} 的重新整理失敗詳細資訊",
         "stalePreamble": "重新整理失敗 — 顯示上次成功結果。",
         "staleClickToCopy": "按一下以複製詳細資訊。",
-        "lastRefreshedPrefix": "上次重新整理時間："
+        "lastRefreshedPrefix": "上次重新整理時間：",
+        "exemplarsShowHeatmap": "顯示範例 (追蹤樣本)。啟用時會將此卡片切換為百分位數。",
+        "exemplarsHideHeatmap": "隱藏範例 · 已顯示 {count}。將此卡片切回熱圖。"
       },
       "fn": {
         "subtitle": "選擇此指標的彙總方式",
@@ -15351,6 +15382,9 @@
       "multiSelect": "多重選擇",
       "singleSelect": "單一選擇"
     },
+    "templateInput": {
+      "suggestions": "變數建議"
+    },
     "time": {
       "openTimePicker": "開啟時間選擇器",
       "clear": "清除",
@@ -17060,17 +17094,17 @@
       "alertMe": "提醒我",
       "columnHints": {
         "qps": "每秒呼叫數 — 此時間範圍的呼叫數除以時間長度，因此 15 分鐘檢視與 4 小時檢視仍然可比。",
-        "p50": "半數呼叫完成時間比這更快。只計算已完成的呼叫 — 仍在執行或從未回傳的查詢，不在此計算範圍內。",
-        "p95": "慢速尾部 — 每 20 個呼叫中有 1 個至少耗費這麼久。只計算已完成的呼叫 — 仍在執行或從未回傳的查詢，不在此計算範圍內。",
-        "p99": "最慢的 1% 呼叫至少耗費這麼久。只計算已完成的呼叫 — 仍在執行或從未回傳的查詢，不在此計算範圍內。",
-        "load": "您的應用程式等待此資料庫的總時間。從用戶端衡量，因此反映此資料庫服務的流量 — 而非伺服器的負載程度。",
+        "p50": "半數呼叫的完成速度比這個值更快。依據應用程式追蹤中已完成的呼叫測量而得。",
+        "p95": "慢速尾端 — 每 20 次呼叫就有 1 次至少耗時這麼久。依據應用程式追蹤中已完成的呼叫測量而得。",
+        "p99": "最差的 1% 呼叫至少耗時這麼久。依據應用程式追蹤中已完成的呼叫測量而得。",
+        "load": "你的應用程式呼叫此資料庫所花費的總時間，依據應用程式追蹤測量而得。這顯示此資料庫為你的應用程式承載了多少流量。",
         "attention": "此執行個體距離其引擎自行發布的限制有多近 — 目前是連線數對比 max_connections。取最差的比率，而非綜合分數。依最高的優先排序，健康狀態無法讀取的執行個體會排在頂部，因為您無法看到的執行個體，無法確定其健康。在資料庫伺服器上衡量，因此無法與旁邊的資料庫時間比較。"
       },
       "failedChip": "{count} 失敗",
       "columnSubLabels": {
-        "attention": "伺服器",
-        "load": "用戶端",
-        "calls": "用戶端"
+        "attention": "來自資料庫",
+        "load": "來自你的應用程式",
+        "calls": "來自你的應用程式"
       },
       "attention": {
         "connections": "連線",
@@ -17132,14 +17166,14 @@
         "failed": "失敗"
       },
       "columnHints": {
-        "calls": "此查詢執行的次數。如果您的資料庫有回報，則使用其自身的計數 — 這涵蓋所有用戶端，而不只是系統中傳送追蹤的部分。標記為「用戶端觀察」的列改為從追蹤中計數，因為您的資料庫未回報它們。",
-        "p50": "所有呼叫中有一半完成速度快於此。只計數已完成的呼叫 — 仍在執行或從未回傳的查詢不在此測量範圍內。",
-        "p95": "慢速尾部 — 每 20 個呼叫中有 1 個耗時至少如此。只計數已完成的呼叫 — 仍在執行或從未回傳的查詢不在此測量範圍內。",
-        "p99": "最差的 1% 呼叫耗時至少如此。只計數已完成的呼叫 — 仍在執行或從未回傳的查詢不在此測量範圍內。",
+        "calls": "此查詢執行的次數，由你的資料庫統計 — 包含所有連線的應用程式。若你的資料庫沒有某個查詢的次數，追蹤圖示會標示該次數是依據應用程式追蹤測量而得。",
+        "p50": "半數呼叫的完成速度比這個值更快。依據應用程式追蹤中已完成的呼叫測量而得。",
+        "p95": "慢速尾端 — 每 20 次呼叫就有 1 次至少耗時這麼久。依據應用程式追蹤中已完成的呼叫測量而得。",
+        "p99": "最差的 1% 呼叫至少耗時這麼久。依據應用程式追蹤中已完成的呼叫測量而得。",
         "max": "此時間範圍內最慢的單一呼叫 — 一個真實的呼叫，不是平均值。",
         "errors": "這些呼叫中有多少回傳了錯誤。",
         "perTrace": "在單一請求內執行多少次。數字高通常表示迴圈。",
-        "load": "此查詢在資料庫中花費的總時間。如果您的資料庫有回報，則使用其自身的數字：Postgres 上是執行時間，但 MySQL 和 MariaDB 上是等待時間 — 每一列都會說明。標記為用戶端觀察的列是從追蹤中測量，因此包含網路來回時間。"
+        "load": "此查詢在資料庫中花費的總時間，由你的資料庫回報：在 Postgres 上是執行時間，在 MySQL 和 MariaDB 上是等待時間 — 每一列都會標明是哪一種。附有追蹤圖示的列是依據應用程式追蹤測量而得，因此也包含往返資料庫的行程。"
       },
       "errorsNone": "無",
       "errorsAll": "全部",
@@ -17403,8 +17437,7 @@
       "overlap": {
         "serverExecution": "{engine} 執行它所花費的時間",
         "serverWait": "{engine} 等待它所花費的時間 — 等待時間，而非執行時間",
-        "serverCounted": "由 {engine} 計數，涵蓋每個用戶端",
-        "clientObserved": "由已檢測的呼叫者觀察 — 您的資料庫並未回報此項"
+        "serverCounted": "由 {engine} 計數，涵蓋每個用戶端"
       },
       "endpointsConcentrated": "單一端點佔了此查詢時間的 {percent}。修正 {endpoint} 就能修正此查詢。",
       "typicalMarker": "慢速呼叫 {value}",
@@ -17431,8 +17464,8 @@
       },
       "serverMetrics": {
         "title": "資料庫本身記錄的內容",
-        "subtitle": "伺服器端 — 所有用戶端",
-        "clientSubtitle": "用戶端觀察 — 僅限已埋點的呼叫端，且僅限已完成的呼叫。仍在執行或掛起的查詢不會出現在這些數字中。",
+        "subtitle": "來自你的資料庫 — 所有連線的應用程式",
+        "clientSubtitle": "標記的數字是依據應用程式追蹤測量而得 — 你的應用程式在此時間範圍內完成的呼叫",
         "instance": "由 {instance} 報告",
         "instanceWide": "此執行個體上的所有資料庫",
         "calls": "執行次數",
@@ -17478,9 +17511,13 @@
         "serverExecution": "執行時間",
         "serverWait": "等待時間",
         "serverCounted": "伺服器數量",
-        "clientObserved": "用戶端觀察",
         "serverReported": "由您的資料庫回報"
       }
+    },
+    "appSource": {
+      "marker": "依據應用程式追蹤測量而得",
+      "markerHint": "依據應用程式追蹤測量而得，將應用程式的視角加入資料庫所回報的內容。",
+      "legend": "來自應用程式的追蹤"
     },
     "page": {
       "tabs": {
@@ -17489,7 +17526,7 @@
         "metricsHint": "依等待事件顯示的資料庫負載，以及你的資料庫接收器所收集的每一項指標。",
         "queries": "熱門查詢",
         "samples": "最慢的呼叫",
-        "samplesHintClient": "您的已埋點服務在此時間範圍內觀察到的已完成呼叫 — 未追蹤的呼叫端不會計入，因此這是下限而非總數。表格顯示其中最慢的呼叫。",
+        "samplesHintClient": "在此時間範圍內依據應用程式追蹤測量而得的呼叫，將應用程式的視角加入資料庫所回報的內容。表格顯示其中最慢的呼叫。",
         "samplesHintServer": "您的資料庫回報在此時間範圍內完成的陳述式，在資料庫內部計數。表格顯示其中最慢的陳述式。",
         "samplesHintUnknown": "此時間範圍內最慢的個別資料庫呼叫。",
         "deadlocks": "死結",
@@ -17526,6 +17563,11 @@
       "explore": "在指標總管中開啟",
       "railLabel": "指標區段",
       "noAccess": "你沒有讀取 {stream} 的權限。請聯絡管理員以取得此串流的讀取權限。",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "依查詢",
         "database": "依資料庫",
@@ -17640,7 +17682,7 @@
         "status": "狀態"
       },
       "columnHints": {
-        "duration": "此單一呼叫花費的時間，以呼叫端測量。僅計算已完成的呼叫——仍在執行或從未回傳的查詢不在此處測量。"
+        "duration": "這一次呼叫所花費的時間，由你的應用程式從開始到結束計時。"
       },
       "failed": "失敗",
       "failedWithCode": "失敗 · {code}",
@@ -19149,6 +19191,8 @@
     "rotationNobody": "無人值班",
     "edit": "編輯",
     "timelineLoadFailed": "無法解析此時間範圍的班表",
+    "editorReadFailed": "無法載入最新副本以進行編輯。請再試一次。",
+    "refreshFailed": "無法重新整理。顯示的內容可能已過期。",
     "scheduleDoneEditing": "返回班表",
     "coverWhoRequired": "選擇由誰代班",
     "timelineCoverAria": "{who} 正在為 {rotation} 代班，{from} 至 {to}",

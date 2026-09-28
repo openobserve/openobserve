@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Variable mit demselben Namen existiert bereits",
     "pivotTotal": "Gesamt",
     "pivotOthers": "Andere",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Exemplare anzeigen (Trace-Stichproben)",
+      "hide": "Exemplare ausblenden · {count} angezeigt",
+      "empty": "Keine Exemplare in diesem Zeitraum",
+      "emptyShort": "0 Exemplare",
+      "loadFailed": "Exemplare konnten nicht geladen werden",
+      "loadFailedHint": "Das Diagramm ist nicht betroffen. Erneut versuchen lädt nur die Exemplare.",
+      "retry": "Erneut versuchen",
+      "cardTitle": "Exemplar",
+      "query": "Abfrage {name}",
+      "returnedBy": "Von {count} Abfrage zurückgegeben | Von {count} Abfragen zurückgegeben",
+      "series": "Reihe",
+      "aboveRange": "Überhalb des Diagrammbereichs; an der oberen Kante gezeichnet",
+      "belowRange": "Unterhalb des Diagrammbereichs; an der unteren Kante gezeichnet",
+      "checkingTrace": "Trace wird geprüft…",
+      "openTrace": "Trace öffnen",
+      "openTraceHint": "Oder klicken Sie auf die Markierung. Zurück führt hierher.",
+      "traceNotAvailable": "Trace nicht verfügbar – herausgesampelt oder außerhalb der Aufbewahrungsfrist",
+      "openTraceUnverified": "Trace öffnen (unbestätigt)",
+      "unverifiedTimeout": "Die Trace-Suche hat das Zeitlimit überschritten, daher fehlt dieser Trace möglicherweise.",
+      "unverifiedForbidden": "Dieser Trace konnte nicht bestätigt werden – möglicherweise haben Sie keinen Zugriff auf Traces.",
+      "unverifiedPartial": "Es wurde nur ein Teil des Aufbewahrungszeitraums durchsucht.",
+      "unverifiedError": "Dieser Trace konnte nicht geprüft werden.",
+      "noTraceId": "Kein {label} bei diesem Exemplar, daher gibt es keinen Trace zum Öffnen.",
+      "markersAria": "Exemplar-Markierungen",
+      "markerAria": "Exemplar {value} um {time}"
+    },
+    "showExemplarsLabel": "Exemplare anzeigen",
+    "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "Details der fehlgeschlagenen Aktualisierung für {name} kopieren",
         "stalePreamble": "Aktualisierung fehlgeschlagen — zeige das letzte erfolgreiche Ergebnis.",
         "staleClickToCopy": "Klicken Sie, um die Details zu kopieren.",
-        "lastRefreshedPrefix": "Zuletzt aktualisiert um: "
+        "lastRefreshedPrefix": "Zuletzt aktualisiert um: ",
+        "exemplarsShowHeatmap": "Exemplare anzeigen (Trace-Stichproben). Schaltet diese Karte währenddessen auf Perzentile um.",
+        "exemplarsHideHeatmap": "Exemplare ausblenden · {count} angezeigt. Setzt diese Karte auf die Heatmap zurück."
       },
       "fn": {
         "subtitle": "Wählen Sie, wie diese Metrik aggregiert wird",
@@ -15356,6 +15387,9 @@
       "multiSelect": "Mehrfachauswahl",
       "singleSelect": "Einzelauswahl"
     },
+    "templateInput": {
+      "suggestions": "Variablenvorschläge"
+    },
     "time": {
       "openTimePicker": "Zeitauswahl öffnen",
       "clear": "Löschen",
@@ -17065,17 +17099,17 @@
       "alertMe": "Benachrichtige mich",
       "columnHints": {
         "qps": "Aufrufe pro Sekunde — die Aufrufe dieses Zeitfensters geteilt durch dessen Länge, damit eine 15-Minuten-Ansicht und eine 4-Stunden-Ansicht vergleichbar bleiben.",
-        "p50": "Die Hälfte aller Aufrufe war schneller als dieser Wert. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
-        "p95": "Das langsame Ende — 1 von 20 Aufrufen dauerte mindestens so lange. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
-        "p99": "Die langsamsten 1 % der Aufrufe dauerten mindestens so lange. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
-        "load": "Gesamtzeit, die Ihre Anwendungen auf diese Datenbank gewartet haben. Vom Client aus gemessen, spiegelt sie also wider, wie viel Verkehr diese Datenbank bedient hat — nicht, wie stark der Server ausgelastet ist.",
+        "p50": "Die Hälfte aller Aufrufe war schneller als dies. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
+        "p95": "Der langsame Ausläufer – 1 von 20 Aufrufen dauerte mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
+        "p99": "Die schlechtesten 1 % der Aufrufe dauerten mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
+        "load": "Gesamtzeit, die Ihre Apps für Aufrufe an diese Datenbank aufgewendet haben, gemessen an den Traces Ihrer Anwendung. Sie zeigt, wie viel Verkehr diese Datenbank für Ihre Apps abgewickelt hat.",
         "attention": "Wie nah diese Instanz an einem Limit ist, das ihre eigene Engine veröffentlicht — heute Verbindungen gegen max_connections. Das schlechteste Verhältnis, kein Mischwert. Absteigend sortiert, wobei Instanzen, deren Zustand nicht lesbar ist, oben stehen, denn eine, die man nicht sehen kann, ist keine, von der man weiß, dass sie gesund ist. Auf dem Datenbankserver gemessen, daher nicht vergleichbar mit der Datenbankzeit daneben."
       },
       "failedChip": "{count} fehlgeschlagen",
       "columnSubLabels": {
-        "attention": "Server",
-        "load": "Client",
-        "calls": "Client"
+        "attention": "aus der Datenbank",
+        "load": "aus Ihren Apps",
+        "calls": "aus Ihren Apps"
       },
       "attention": {
         "connections": "Verbindungen",
@@ -17137,14 +17171,14 @@
         "failed": "Fehlgeschlagen"
       },
       "columnHints": {
-        "calls": "Wie oft diese Abfrage ausgeführt wurde. Die eigene Zählung Ihrer Datenbank, sofern sie eine meldet – das umfasst jeden Client, nicht nur die Teile Ihres Systems, die Traces senden. Zeilen, die als clientbeobachtet markiert sind, werden stattdessen aus Traces gezählt, da Ihre Datenbank sie nicht gemeldet hat.",
-        "p50": "Die Hälfte aller Aufrufe war schneller als dieser Wert. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
-        "p95": "Der langsame Schwanz — 1 von 20 Aufrufen dauerte mindestens so lange. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
-        "p99": "Die schlechtesten 1% der Aufrufe dauerten mindestens so lange. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
+        "calls": "Wie oft diese Abfrage ausgeführt wurde, gezählt von Ihrer Datenbank – jede App, die sich verbindet, ist enthalten. Wo Ihre Datenbank keine Zählung für eine Abfrage hat, kennzeichnet das Traces-Symbol eine anhand der Traces Ihrer Anwendung gemessene Zählung.",
+        "p50": "Die Hälfte aller Aufrufe war schneller als dies. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
+        "p95": "Der langsame Ausläufer – 1 von 20 Aufrufen dauerte mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
+        "p99": "Die schlechtesten 1 % der Aufrufe dauerten mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
         "max": "Der langsamste einzelne Aufruf in diesem Zeitraum — ein echter Aufruf, kein Durchschnitt.",
         "errors": "Wie viele dieser Aufrufe mit einem Fehler zurückkamen.",
         "perTrace": "Wie oft dies innerhalb einer einzelnen Anfrage ausgeführt wird. Eine hohe Zahl bedeutet normalerweise eine Schleife.",
-        "load": "Gesamtzeit, die diese Abfrage in der Datenbank verbracht hat. Die eigene Angabe Ihrer Datenbank, sofern sie eine meldet: Ausführungszeit bei Postgres, aber WARTEZEIT bei MySQL und MariaDB – jede Zeile gibt an, welches. Zeilen, die als clientbeobachtet markiert sind, werden aus Traces gemessen und umfassen daher den Netzwerk-Roundtrip."
+        "load": "Gesamtzeit, die diese Abfrage in der Datenbank verbracht hat, gemäß den Angaben Ihrer Datenbank: Ausführungszeit auf Postgres, Wartezeit auf MySQL und MariaDB – jede Zeile gibt an, was gilt. Zeilen mit dem Traces-Symbol werden anhand der Traces Ihrer Anwendung gemessen und enthalten daher auch den Hin- und Rückweg zur Datenbank."
       },
       "errorsNone": "keine",
       "errorsAll": "alle",
@@ -17408,8 +17442,7 @@
       "overlap": {
         "serverExecution": "Zeit, die {engine} für die Ausführung aufgewendet hat",
         "serverWait": "Zeit, die {engine} darauf gewartet hat — Wartezeit, nicht Ausführungszeit",
-        "serverCounted": "Gezählt von {engine}, über alle Clients hinweg",
-        "clientObserved": "Beobachtet von instrumentierten Aufrufern — Ihre Datenbank hat diese nicht gemeldet."
+        "serverCounted": "Gezählt von {engine}, über alle Clients hinweg"
       },
       "endpointsConcentrated": "Ein Endpunkt macht {percent} der Zeit dieser Abfrage aus. Beheben Sie {endpoint}, und Sie haben diese Abfrage behoben.",
       "typicalMarker": "Langsame Aufrufe {value}",
@@ -17436,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "Was die Datenbank selbst aufgezeichnet hat",
-        "subtitle": "Serverseitig — alle Clients",
-        "clientSubtitle": "Clientseitig beobachtet — nur instrumentierte Aufrufer, nur abgeschlossene Aufrufe. Eine noch laufende oder hängende Abfrage ist in diesen Zahlen nicht enthalten.",
+        "subtitle": "Aus Ihrer Datenbank – jede App, die sich verbindet",
+        "clientSubtitle": "Markierte Werte werden anhand der Traces Ihrer Anwendung gemessen – die Aufrufe, die Ihre Apps in diesem Zeitfenster abgeschlossen haben",
         "instance": "Gemeldet von {instance}",
         "instanceWide": "Alle Datenbanken auf dieser Instanz",
         "calls": "Ausführungen",
@@ -17483,9 +17516,13 @@
         "serverExecution": "Ausführungszeit",
         "serverWait": "Wartezeit",
         "serverCounted": "Serveranzahl",
-        "clientObserved": "clientseitig beobachtet",
         "serverReported": "von Ihren Datenbanken gemeldet"
       }
+    },
+    "appSource": {
+      "marker": "Anhand der Traces Ihrer Anwendung gemessen",
+      "markerHint": "Anhand der Traces Ihrer Anwendung gemessen; ergänzt die Sicht Ihrer Apps zu den Angaben Ihrer Datenbank.",
+      "legend": "Aus den Traces Ihrer App"
     },
     "page": {
       "tabs": {
@@ -17494,7 +17531,7 @@
         "metricsHint": "Datenbanklast nach Warteereignis und jede Metrik, die Ihre Datenbank-Receiver erfassen.",
         "queries": "Top-Abfragen",
         "samples": "Langsamste Aufrufe",
-        "samplesHintClient": "Abgeschlossene Aufrufe, die Ihre instrumentierten Dienste in diesem Fenster beobachtet haben – Aufrufer ohne Tracing werden nicht gezählt, dies ist also eine Untergrenze, nicht die Gesamtzahl. Die Tabelle zeigt die langsamsten davon.",
+        "samplesHintClient": "Aufrufe, die in diesem Zeitfenster anhand der Traces Ihrer Anwendung gemessen wurden; ergänzt die Sicht Ihrer Apps zu den Angaben Ihrer Datenbank. Die Tabelle zeigt die langsamsten davon.",
         "samplesHintServer": "Anweisungen, die Ihre Datenbanken als abgeschlossen in diesem Fenster gemeldet haben, innerhalb der Datenbank gezählt. Die Tabelle zeigt die langsamsten davon.",
         "samplesHintUnknown": "Die langsamsten einzelnen Datenbankaufrufe in diesem Fenster.",
         "deadlocks": "Deadlocks",
@@ -17531,6 +17568,11 @@
       "explore": "Im Metriken-Explorer öffnen",
       "railLabel": "Metriken-Bereiche",
       "noAccess": "Sie haben keine Berechtigung, {stream} zu lesen. Bitten Sie einen Administrator um Lesezugriff auf diesen Stream.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "nach Abfrage",
         "database": "nach Datenbank",
@@ -17645,7 +17687,7 @@
         "status": "Status"
       },
       "columnHints": {
-        "duration": "Wie lange dieser eine Aufruf gedauert hat, gemessen vom Aufrufer. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückgekehrt ist, wird hier nicht gemessen."
+        "duration": "Wie lange dieser eine Aufruf gedauert hat, gemessen von Ihrer Anwendung von Anfang bis Ende."
       },
       "failed": "Fehlgeschlagen",
       "failedWithCode": "Fehlgeschlagen · {code}",
@@ -19154,6 +19196,8 @@
     "rotationNobody": "Niemand in Bereitschaft",
     "edit": "Bearbeiten",
     "timelineLoadFailed": "Der Dienstplan für dieses Zeitfenster konnte nicht ermittelt werden.",
+    "editorReadFailed": "Die neueste Version zum Bearbeiten konnte nicht geladen werden. Versuchen Sie es erneut.",
+    "refreshFailed": "Die Aktualisierung ist fehlgeschlagen. Die Anzeige ist möglicherweise veraltet.",
     "scheduleDoneEditing": "Zurück zum Dienstplan",
     "coverWhoRequired": "Wählen Sie aus, wer die Vertretung übernimmt",
     "timelineCoverAria": "{who} übernimmt {rotation} von {from} bis {to}",

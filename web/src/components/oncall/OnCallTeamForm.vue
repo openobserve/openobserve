@@ -174,7 +174,15 @@ import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import oncallService from "@/services/oncall";
-import usersService from "@/services/users";
+import {
+  createTeamMutation,
+  staffNewTeamMembersMutation,
+  staffNewTeamScheduleMutation,
+  updateTeamMutation,
+} from "@/services/oncall.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgUsersQuery } from "@/services/users.queries";
 import type { OnCallTeam, Rotation } from "@/ts/interfaces/oncall";
 import {
   BASE_SHIFT_RULE_NAME,
@@ -208,6 +216,13 @@ const loadingUsers = ref(false);
 const isEdit = computed(() => !!props.team);
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const schema = computed(() => makeOnCallTeamSchema(t));
+
+const createTeamWrite = useMutation(() => createTeamMutation(orgId.value));
+// The empty id is only ever bound on the create path, which never calls this.
+const updateTeamWrite = useMutation(() => updateTeamMutation(orgId.value, props.team?.id ?? ""));
+// The id lands in the variables: it does not exist until the create resolves.
+const staffMembersWrite = useMutation(() => staffNewTeamMembersMutation(orgId.value));
+const staffScheduleWrite = useMutation(() => staffNewTeamScheduleMutation(orgId.value));
 
 /**
  * Offered timezones come from the browser rather than a bundled list, so the
@@ -276,8 +291,7 @@ function addEveryone() {
 async function fetchOrgUsers() {
   loadingUsers.value = true;
   try {
-    const res = await usersService.orgUsers(orgId.value);
-    orgUsers.value = res.data?.data ?? [];
+    orgUsers.value = await queryClient.fetchQuery(orgUsersQuery(orgId.value));
   } catch {
     // The picker degrades to empty and the team is still creatable; people can
     // be added on the Members tab straight afterwards.
@@ -323,13 +337,9 @@ async function onSubmit(values: OnCallTeamFormValues) {
   };
   try {
     if (props.team) {
-      await oncallService.updateTeam({
-        org_identifier: orgId.value,
-        team_id: props.team.id,
-        data,
-      });
+      await updateTeamWrite.mutateAsync(data);
     } else {
-      const created = await oncallService.createTeam({ org_identifier: orgId.value, data });
+      const created = await createTeamWrite.mutateAsync(data);
       await staffNewTeam(created.data.id, values);
     }
     toast({
@@ -358,11 +368,7 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
   if (!emails.length) return;
 
   try {
-    await oncallService.addMembers({
-      org_identifier: orgId.value,
-      team_id: teamId,
-      data: { user_emails: emails },
-    });
+    await staffMembersWrite.mutateAsync({ teamId, userEmails: emails });
   } catch (err: any) {
     toast({
       variant: "warning",
@@ -382,9 +388,8 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
   if (anchor === null || shift <= 0) return;
 
   try {
-    await oncallService.setSchedule({
-      org_identifier: orgId.value,
-      team_id: teamId,
+    await staffScheduleWrite.mutateAsync({
+      teamId,
       data: {
         timezone: values.timezone,
         rotations: await amendStaffedRotations(
@@ -459,6 +464,7 @@ async function amendStaffedRotations(
       : []),
   ];
   try {
+    // Uncached: it seeds the rotations this call rewrites, so a stale read would be written back.
     const res = await oncallService.getSchedule({
       org_identifier: orgId.value,
       team_id: teamId,

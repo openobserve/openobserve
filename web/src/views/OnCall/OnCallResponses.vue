@@ -281,16 +281,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #toolbar-trailing>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="lastUpdatedAt"
           :loading="loading"
+          shortcut-id="oncallRefresh"
           data-test="oncall-responses-refresh"
           @click="refreshAll"
-        >
-          <OTooltip side="bottom" :content="t('oncall.refresh')" shortcut-id="oncallRefresh" />
-        </OButton>
+        />
       </template>
 
       <!-- What each run of rows IS, in the words somebody would use out loud, so
@@ -794,6 +793,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -805,6 +805,24 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  acknowledgeResponseMutation,
+  addResponseNoteMutation,
+  coverageGapsQuery,
+  handoffResponseMutation,
+  oncallTeamsQuery,
+  ownershipRulesQuery,
+  pagedResponsesQuery,
+  resolveResponseMutation,
+  responseProgressQuery,
+  responseQuery,
+  snoozeResponseMutation,
+  teamPolicyQuery,
+  teamScheduleQuery,
+  whoIsOnCallQuery,
+} from "@/services/oncall.queries";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -813,9 +831,9 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import destinationService from "@/services/alert_destination";
-import incidentsService from "@/services/incidents";
-import oncallService, { RESPONSE_PAGE_LIMIT } from "@/services/oncall";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import type { IncidentWithAlerts } from "@/services/incidents";
+import { incidentQuery } from "@/services/incidents.queries";
 import type {
   Channel,
   CoverageGaps,
@@ -827,6 +845,7 @@ import type {
   OnCallSchedule,
   OnCallPosition,
   OnCallTeam,
+  OwnershipRule,
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
@@ -854,11 +873,6 @@ const { canConfigure } = useOnCallPermissions();
 /// A table row. Grouped or not, every row carries the same shape so the
 /// columns and the actions never have to branch on the mode.
 type PageRow = OnCallResponseGroup & { rowKey: string };
-
-/// A busy org has more open records than one request may return, and the
-/// facets have to count what the table can show. Three pages of the server's
-/// cap is where "honest counts" stops being worth another round trip.
-const MAX_PAGES = 3;
 
 /**
  * How many open pages get their escalation ladder loaded.
@@ -914,6 +928,7 @@ const expandedSystemActivityCount = computed(
 const teamsAvailable = ref(true);
 const truncated = ref(false);
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 /// Set only while a tab switch is quietly fetching resolved pages the reader
 /// cannot see are missing. Drives `OTable`'s `streaming` bar rather than
 /// `loading` so the rows already on screen never disappear behind a skeleton
@@ -1418,20 +1433,21 @@ function menuActions(row: PageRow): RowAction[] {
   return actions;
 }
 
+/// One list writes to many rows, so the id rides in the variables, not the setup.
+const ackWrite = useMutation(() => acknowledgeResponseMutation(orgId.value));
+const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
+const resolveWrite = useMutation(() => resolveResponseMutation(orgId.value));
+const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
+const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
+
 /// Acts on every firing the row stands for. Acknowledging the latest of
 /// ninety-five and leaving ninety-four escalating would be a worse lie than
 /// showing all ninety-five rows.
 async function acknowledgeRow(row: PageRow) {
   busyId.value = row.rowKey;
   try {
-    await Promise.allSettled(
-      row.escalating.map((r) =>
-        oncallService.acknowledgeResponse({
-          org_identifier: orgId.value,
-          response_id: r.id,
-        }),
-      ),
-    );
+    await Promise.allSettled(row.escalating.map((r) => ackWrite.mutateAsync(r.id)));
+    // Once per batch, and unforced: the write already expired what it moved.
     await fetchResponses();
   } finally {
     busyId.value = "";
@@ -1443,13 +1459,7 @@ async function snoozeRow(row: PageRow, minutes: number) {
   busyId.value = row.rowKey;
   try {
     await Promise.allSettled(
-      row.escalating.map((r) =>
-        oncallService.snoozeResponse({
-          org_identifier: orgId.value,
-          response_id: r.id,
-          minutes,
-        }),
-      ),
+      row.escalating.map((r) => snoozeWrite.mutateAsync({ responseId: r.id, minutes })),
     );
     await fetchResponses();
   } finally {
@@ -1463,12 +1473,7 @@ async function resolveRow(row: PageRow) {
     await Promise.allSettled(
       row.firings
         .filter((r) => r.state !== "resolved")
-        .map((r) =>
-          oncallService.resolveResponse({
-            org_identifier: orgId.value,
-            response_id: r.id,
-          }),
-        ),
+        .map((r) => resolveWrite.mutateAsync({ responseId: r.id })),
     );
     await fetchResponses();
   } finally {
@@ -1485,13 +1490,7 @@ async function assignTeamToRow(row: PageRow, teamId: string, teamName: string) {
     const results = await Promise.allSettled(
       row.firings
         .filter((r) => r.state !== "resolved")
-        .map((r) =>
-          oncallService.handoffResponse({
-            org_identifier: orgId.value,
-            response_id: r.id,
-            to_team_id: teamId,
-          }),
-        ),
+        .map((r) => handoffWrite.mutateAsync({ responseId: r.id, toTeamId: teamId })),
     );
     const failed = results.filter((r) => r.status === "rejected").length;
     if (failed) {
@@ -1543,7 +1542,7 @@ async function runBulk(
 async function bulkAcknowledge() {
   await runBulk(
     selectedRecords((r) => r.escalating),
-    (id) => oncallService.acknowledgeResponse({ org_identifier: orgId.value, response_id: id }),
+    (id) => ackWrite.mutateAsync(id),
     "bulkAckDone",
     "bulkAckPartial",
   );
@@ -1554,7 +1553,7 @@ async function bulkAcknowledge() {
 async function bulkSnooze(minutes: number) {
   await runBulk(
     selectedRecords((r) => r.escalating),
-    (id) => oncallService.snoozeResponse({ org_identifier: orgId.value, response_id: id, minutes }),
+    (id) => snoozeWrite.mutateAsync({ responseId: id, minutes }),
     "bulkSnoozeDone",
     "bulkSnoozePartial",
   );
@@ -1572,13 +1571,7 @@ async function bulkResolve() {
   closeBulkResolveDialog();
   await runBulk(
     selectedRecords((r) => r.firings.filter((f) => f.state !== "resolved")),
-    (id) =>
-      oncallService.resolveResponse({
-        org_identifier: orgId.value,
-        response_id: id,
-        cause,
-        cause_note,
-      }),
+    (id) => resolveWrite.mutateAsync({ responseId: id, cause, causeNote: cause_note }),
     "bulkResolveDone",
     "bulkResolvePartial",
   );
@@ -1652,34 +1645,28 @@ function errorMessage(err: unknown): string {
   return body?.message ?? (err instanceof Error ? err.message : "");
 }
 
-/// Walks the server's pages until a short one arrives or the cap is hit. The
-/// alternative — one page plus client-side facets over it — would put a number
-/// on the stat strip that silently described a fraction of the org.
-async function fetchAllPages(): Promise<OnCallResponse[]> {
-  const out: OnCallResponse[] = [];
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const res = await oncallService.listResponses({
-      org_identifier: orgId.value,
-      include_resolved: includeResolved.value,
-      // Filtered by the SERVER once a team is chosen. Filtering client-side
-      // narrowed the rows this fetch happened to have walked — capped at
-      // MAX_PAGES × RESPONSE_PAGE_LIMIT — so on a busy org the team's older
-      // pages were simply not in the list, and the screen said so by showing
-      // nothing rather than by saying it was truncated.
-      ...(teamFilter.value === "all" ? {} : { team_id: teamFilter.value }),
-      ...(causeFilter.value ? { cause: causeFilter.value } : {}),
-      limit: RESPONSE_PAGE_LIMIT,
-      offset: page * RESPONSE_PAGE_LIMIT,
+/// Cache-first; a force expires the entry before fetching, so it costs one request, not two.
+async function read<T>(
+  options: { queryKey: readonly unknown[]; [k: string]: any },
+  force: boolean,
+): Promise<T> {
+  if (force) {
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
     });
-    const batch = res.data ?? [];
-    out.push(...batch);
-    if (batch.length < RESPONSE_PAGE_LIMIT) {
-      truncated.value = false;
-      return out;
-    }
   }
-  truncated.value = true;
-  return out;
+  return queryClient.fetchQuery(options as any) as Promise<T>;
+}
+
+/// Team and cause go to the SERVER: narrowing client-side hid a team's older pages past the cap.
+function responseFilters() {
+  return {
+    include_resolved: includeResolved.value,
+    ...(teamFilter.value === "all" ? {} : { team_id: teamFilter.value }),
+    ...(causeFilter.value ? { cause: causeFilter.value } : {}),
+  };
 }
 
 /// Every fetch is now a deliberate one — first load, an explicit refresh, or a
@@ -1690,11 +1677,21 @@ async function fetchAllPages(): Promise<OnCallResponse[]> {
 /// already showing rows. `loading` would swap those rows for a skeleton over
 /// something that, from the reader's side, was not loading at all; `streaming`
 /// leaves them on screen with a quiet bottom bar instead.
-async function fetchResponses(opts: { background?: boolean } = {}) {
+// The newest read: a slower answer for a filter the reader has already left must not overwrite the rows.
+let latestResponsesRead = 0;
+
+async function fetchResponses(opts: { background?: boolean; force?: boolean } = {}) {
   const busy = opts.background ? backgroundLoading : loading;
   busy.value = true;
+  const readId = ++latestResponsesRead;
   try {
-    responses.value = await fetchAllPages();
+    const options = pagedResponsesQuery(orgId.value, responseFilters());
+    const walk = await read<{ rows: OnCallResponse[]; truncated: boolean }>(options, !!opts.force);
+    if (readId !== latestResponsesRead) return;
+    responses.value = walk.rows;
+    lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
+    // From the payload, cache hit included: the cap describes these rows, not this request.
+    truncated.value = walk.truncated;
     loadError.value = null;
     // Only on SUCCESS. Setting this in `finally` would let a transient API
     // error render the first-run checklist, telling a configured org that
@@ -1702,8 +1699,9 @@ async function fetchResponses(opts: { background?: boolean } = {}) {
     loaded.value = true;
     // Fire-and-forget: the list is already usable with ids as the fallback,
     // so titles fill in behind it rather than holding up the table.
-    void fetchIncidentTitles();
+    void fetchIncidentTitles(!!opts.force);
   } catch (err) {
+    if (readId !== latestResponsesRead) return;
     // §G.8.1: the probe said "not here". Leaving `loaded` false keeps the
     // setup checklist away too — a build that cannot page must not be told
     // to create teams.
@@ -1713,29 +1711,31 @@ async function fetchResponses(opts: { background?: boolean } = {}) {
     }
     loadError.value = errorMessage(err) || String(t("oncall.loadResponsesFailed"));
   } finally {
-    busy.value = false;
+    if (readId === latestResponsesRead) busy.value = false;
   }
 }
 
 /// One request per incident id — there is no bulk "get these incidents"
 /// endpoint (see `fetchTeamContext` for the same constraint on team data).
-/// Already-resolved ids are skipped so a background refresh doesn't re-fetch
-/// titles the list already has.
-async function fetchIncidentTitles() {
+/// Already-resolved ids are skipped so a background fetch doesn't re-read
+/// titles the list already has; only the reader's Refresh re-reads them all.
+async function fetchIncidentTitles(force = false) {
   const ids = [
     ...new Set(
       responses.value
         .map((response) => response.incident_id)
-        .filter((id): id is string => !!id && !(id in incidentTitleById.value)),
+        .filter((id): id is string => !!id && (force || !(id in incidentTitleById.value))),
     ),
   ];
   if (!ids.length) return;
-  const results = await Promise.allSettled(ids.map((id) => incidentsService.get(orgId.value, id)));
+  const results = await Promise.allSettled(
+    ids.map((id) => read<IncidentWithAlerts>(incidentQuery(orgId.value, id), force)),
+  );
   const next = { ...incidentTitleById.value };
   ids.forEach((id, index) => {
     const result = results[index];
-    if (result.status === "fulfilled" && result.value.data?.title) {
-      next[id] = result.value.data.title;
+    if (result.status === "fulfilled" && result.value?.title) {
+      next[id] = result.value.title;
     }
   });
   incidentTitleById.value = next;
@@ -1743,32 +1743,25 @@ async function fetchIncidentTitles() {
 
 /// Teams, coverage and ownership answer the checklist, not the list. A failure
 /// on any one of them degrades a single control rather than the page.
-async function fetchContext() {
+async function fetchContext(force = false) {
   const [teamRes, gapRes, ruleRes, destRes] = await Promise.allSettled([
-    oncallService.listTeams({ org_identifier: orgId.value }),
-    oncallService.coverageGaps({ org_identifier: orgId.value }),
-    oncallService.listOwnershipRules({ org_identifier: orgId.value }),
-    destinationService.list({
-      org_identifier: orgId.value,
-      page_num: 1,
-      page_size: 1,
-      sort_by: "name",
-      desc: false,
-      module: "alert",
-    }),
+    read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force),
+    read<CoverageGaps | null>(coverageGapsQuery(orgId.value), force),
+    read<OwnershipRule[]>(ownershipRulesQuery(orgId.value), force),
+    read<any[]>(destinationsQuery(orgId.value, "alert"), force),
   ]);
 
   teamsAvailable.value = teamRes.status === "fulfilled";
-  teams.value = teamRes.status === "fulfilled" ? (teamRes.value.data ?? []) : [];
+  teams.value = teamRes.status === "fulfilled" ? teamRes.value : [];
 
-  const rules = ruleRes.status === "fulfilled" ? (ruleRes.value.data ?? []) : [];
+  const rules = ruleRes.status === "fulfilled" ? ruleRes.value : [];
 
   setup.value = {
     hasTeam: teams.value.length > 0,
-    hasStaffedRotation: await someTeamWouldPage(gapRes),
+    hasStaffedRotation: await someTeamWouldPage(gapRes, force),
     // An alert bound straight to a team counts: it is routing without a rule.
     hasRouting: rules.length > 0 || responses.value.some((r) => !!r.team_id),
-    hasDestinations: destRes.status === "fulfilled" && (destRes.value.data ?? []).length > 0,
+    hasDestinations: destRes.status === "fulfilled" && destRes.value.length > 0,
   };
   // Set even when a call failed: the screen has to stop waiting either way.
   // Whether the answer is trustworthy is `teamsAvailable`, checked separately.
@@ -1781,34 +1774,35 @@ async function fetchContext() {
 /// as zero marked the rotation staffed on an org that had no rotation at all,
 /// and that tick also hides the checklist that would have said so.
 async function someTeamWouldPage(
-  gapRes: PromiseSettledResult<{ data?: CoverageGaps | null }>,
+  gapRes: PromiseSettledResult<CoverageGaps | null>,
+  force: boolean,
 ): Promise<boolean> {
   if (!teams.value.length) return false;
   if (gapRes.status === "fulfilled") {
-    return (gapRes.value.data?.total ?? 0) < teams.value.length;
+    return (gapRes.value?.total ?? 0) < teams.value.length;
   }
   const slots = await Promise.allSettled(
     teams.value.map((team) =>
-      oncallService.whoIsOnCall({ org_identifier: orgId.value, team_id: team.id }),
+      read<OnCallPosition[]>(whoIsOnCallQuery(orgId.value, team.id), force),
     ),
   );
-  return slots.some((s) => s.status === "fulfilled" && (s.value.data ?? []).length > 0);
+  return slots.some((s) => s.status === "fulfilled" && s.value.length > 0);
 }
 
 /// Policy and rotation per team. Both are one request per team — there is no
 /// bulk endpoint for either — but team counts are small and the answers change
 /// far more slowly than the pages do.
-async function fetchTeamContext() {
+async function fetchTeamContext(force = false) {
   const ids = teams.value.map((team) => team.id);
   const [policies, slots, schedules] = await Promise.all([
     Promise.allSettled(
-      ids.map((id) => oncallService.getPolicy({ org_identifier: orgId.value, team_id: id })),
+      ids.map((id) => read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, id), force)),
     ),
     Promise.allSettled(
-      ids.map((id) => oncallService.whoIsOnCall({ org_identifier: orgId.value, team_id: id })),
+      ids.map((id) => read<OnCallPosition[]>(whoIsOnCallQuery(orgId.value, id), force)),
     ),
     Promise.allSettled(
-      ids.map((id) => oncallService.getSchedule({ org_identifier: orgId.value, team_id: id })),
+      ids.map((id) => read<OnCallSchedule | null>(teamScheduleQuery(orgId.value, id), force)),
     ),
   ]);
 
@@ -1817,15 +1811,15 @@ async function fetchTeamContext() {
   const nextSchedules: Record<string, OnCallSchedule> = {};
   ids.forEach((id, index) => {
     const policy = policies[index];
-    if (policy.status === "fulfilled" && policy.value.data) nextPolicies[id] = policy.value.data;
+    if (policy.status === "fulfilled" && policy.value) nextPolicies[id] = policy.value;
     const slot = slots[index];
     // A team whose rotation could not be read is left OUT rather than recorded
     // as empty: an unreadable schedule is not the same fact as a coverage gap,
     // and the card would otherwise accuse a staffed team of having none.
-    if (slot.status === "fulfilled") nextSlots[id] = slot.value.data ?? [];
+    if (slot.status === "fulfilled") nextSlots[id] = slot.value;
     const schedule = schedules[index];
-    if (schedule.status === "fulfilled" && schedule.value.data) {
-      nextSchedules[id] = schedule.value.data;
+    if (schedule.status === "fulfilled" && schedule.value) {
+      nextSchedules[id] = schedule.value;
     }
   });
   policyByTeam.value = nextPolicies;
@@ -1835,7 +1829,7 @@ async function fetchTeamContext() {
 
 /// Ladder position for the oldest open pages. Bounded by
 /// ESCALATION_DETAIL_LIMIT because each one is its own request.
-async function fetchEscalationProgress() {
+async function fetchEscalationProgress(force = false) {
   const open = responses.value
     .filter((r) => isEscalating(r.state))
     .sort((a, b) => a.opened_at - b.opened_at);
@@ -1845,14 +1839,14 @@ async function fetchEscalationProgress() {
 
   const results = await Promise.allSettled(
     wanted.map((r) =>
-      oncallService.escalationProgress({ org_identifier: orgId.value, response_id: r.id }),
+      read<EscalationProgress | null>(responseProgressQuery(orgId.value, r.id), force),
     ),
   );
 
   const next: Record<string, EscalationProgress> = {};
   wanted.forEach((record, index) => {
     const result = results[index];
-    if (result.status === "fulfilled" && result.value.data) next[record.id] = result.value.data;
+    if (result.status === "fulfilled" && result.value) next[record.id] = result.value;
   });
   // Replaced wholesale so a record that resolved since the last poll drops its
   // stale ladder instead of keeping a countdown that will never fire.
@@ -1861,15 +1855,15 @@ async function fetchEscalationProgress() {
 }
 
 /// The expanded row's timeline.
-async function fetchExpandedEvents(responseId: string) {
+async function fetchExpandedEvents(responseId: string, force = false) {
   expandedLoading.value = true;
   expandedEvents.value = [];
   try {
-    const res = await oncallService.getResponse({
-      org_identifier: orgId.value,
-      response_id: responseId,
-    });
-    expandedEvents.value = res.data?.events ?? [];
+    const record = await read<{ events?: OnCallResponseEvent[] } | null>(
+      responseQuery(orgId.value, responseId),
+      force,
+    );
+    expandedEvents.value = record?.events ?? [];
   } catch {
     // A failed fetch leaves this row's timeline empty rather than erroring the whole list.
   } finally {
@@ -1882,9 +1876,10 @@ async function addExpandedNote(responseId: string) {
   if (!body) return;
   addingExpandedNote.value = true;
   try {
-    await oncallService.addNote({ org_identifier: orgId.value, response_id: responseId, body });
+    await noteWrite.mutateAsync({ responseId, body });
     expandedNoteBody.value = "";
     toast({ variant: "success", message: t("oncall.noteAdded") });
+    // Unforced: the write expired this response's entry, so it reaches the server once.
     await fetchExpandedEvents(responseId);
   } catch (err) {
     toast({ variant: "error", message: raw(errorMessage(err)) || t("oncall.addNoteFailed") });
@@ -1893,15 +1888,25 @@ async function addExpandedNote(responseId: string) {
   }
 }
 
-async function refreshAll() {
-  await fetchResponses();
+/// The response behind the one expanded row, if any.
+const expandedResponseId = () =>
+  rows.value.find((candidate) => candidate.rowKey === expandedIds.value[0])?.latest.id;
+
+async function loadAll(force = false) {
+  await fetchResponses({ force });
   // The probe answered "not here" — every further call would 404/403 the
   // same way, so stop asking.
   if (unavailable.value) return;
-  await fetchContext();
-  await fetchTeamContext();
-  await fetchEscalationProgress();
+  await fetchContext(force);
+  await fetchTeamContext(force);
+  await fetchEscalationProgress(force);
+  // The open timeline is part of what the reader sees, so a refresh reaches it too.
+  const open = expandedResponseId();
+  if (open) await fetchExpandedEvents(open, force);
 }
+
+// Named, not bound straight to the template: a click would pass `force` a MouseEvent.
+const refreshAll = () => loadAll(true);
 
 // Expansion is single-mode, so there is at most one id to resolve. The table
 // keys rows by `rowKey`, which is the group key when grouping is on.
@@ -1909,7 +1914,8 @@ watch(expandedIds, (ids) => {
   expandedNoteBody.value = "";
   expandedShowAllActivity.value = true;
   const row = rows.value.find((candidate) => candidate.rowKey === ids[0]);
-  if (row) void fetchExpandedEvents(row.latest.id);
+  // Fresh on every expand: the reader opened the timeline to see what has happened since.
+  if (row) void fetchExpandedEvents(row.latest.id, true);
   else expandedEvents.value = [];
 });
 
@@ -1955,6 +1961,6 @@ useShortcuts([
 
 onMounted(() => {
   mineOnly.value = route.query.mine === "1";
-  return refreshAll();
+  return loadAll();
 });
 </script>

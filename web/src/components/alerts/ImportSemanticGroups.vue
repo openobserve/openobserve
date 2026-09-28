@@ -353,6 +353,8 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
+import { queryClient } from "@/composables/query/queryClient";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -536,6 +538,8 @@ const applyChanges = async () => {
     // Save to backend
     const org = store.state.selectedOrganization.identifier;
     await alertsService.saveSemanticGroups(org, finalGroups);
+    // The groups are cached, and dimension analytics is computed from them.
+    void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(org) });
 
     toast({
       message: t("toastMessages.alerts.successfullyAppliedChanges", {

@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "Ya existe una variable con el mismo nombre",
     "pivotTotal": "Total",
     "pivotOthers": "Otros",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Mostrar ejemplares (muestras de trazas)",
+      "hide": "Ocultar ejemplares · {count} mostrados",
+      "empty": "No hay ejemplares en este rango de tiempo",
+      "emptyShort": "0 ejemplares",
+      "loadFailed": "No se pudieron cargar los ejemplares",
+      "loadFailedHint": "El gráfico no se ve afectado. Reintentar solo recupera los ejemplares.",
+      "retry": "Reintentar",
+      "cardTitle": "Ejemplar",
+      "query": "Consulta {name}",
+      "returnedBy": "Devuelto por {count} consulta | Devuelto por {count} consultas",
+      "series": "Series",
+      "aboveRange": "Por encima del rango del gráfico; se dibuja en el borde superior",
+      "belowRange": "Por debajo del rango del gráfico; se dibuja en el borde inferior",
+      "checkingTrace": "Comprobando la traza…",
+      "openTrace": "Abrir traza",
+      "openTraceHint": "O haz clic en el marcador. Atrás te devuelve aquí.",
+      "traceNotAvailable": "Traza no disponible: excluida por muestreo o fuera del periodo de retención",
+      "openTraceUnverified": "Abrir traza (sin verificar)",
+      "unverifiedTimeout": "La búsqueda de la traza agotó el tiempo de espera, por lo que esta traza podría faltar.",
+      "unverifiedForbidden": "No se pudo confirmar esta traza: es posible que no tengas acceso a las trazas.",
+      "unverifiedPartial": "Solo se buscó en parte del periodo de retención.",
+      "unverifiedError": "No se pudo comprobar esta traza.",
+      "noTraceId": "No hay {label} en este ejemplar, por lo que no hay ninguna traza que abrir.",
+      "markersAria": "Marcadores de ejemplares",
+      "markerAria": "Ejemplar {value} a las {time}"
+    },
+    "showExemplarsLabel": "Mostrar ejemplares",
+    "showExemplarsHelp": "Dibuja muestras de trazas en este gráfico para todos los que abran el dashboard. Los visores aún pueden ocultarlas desde el encabezado del panel."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7531,6 +7560,9 @@
       "lastError": "Último error",
       "lastTrained": "Último entrenamiento",
       "lookBackWindow": "Mirar hacia atrás",
+      "lookBackWindowFloor": "La ventana de retroceso debe ser de al menos {min}: Comprobar cada más una Resolución de detección. Una ventana más corta no puede contener un bucket completo en el momento en que se dispara una ejecución, por lo que se omitirían buckets.",
+      "lookBackWindowLegacy": "Esta ventana guardada está por debajo del mínimo de {min} (Comprobar cada más una Resolución de detección). Se guardará sin cambios, pero las ejecuciones pueden omitir buckets hasta que se aumente la ventana.",
+      "lookBackWindowMinimum": "Mínimo {min}. Se recomienda {recommended} o más —el doble de (Comprobar cada + Resolución de detección)— más 10 minutos donde esté habilitada la detección de ausencia.",
       "lookBackWindowTooltip": "La antigüedad de cada detección en la que se ejecutan las consultas. Tapa la ventana incluso después de una pausa larga. El valor predeterminado es Comprobar todos los intervalos.",
       "metricChart": "Métrica y anomalías",
       "metricChartHint": "Un punto por intervalo de detección",
@@ -7539,6 +7571,15 @@
       "nDays": "{days} día | {days} días",
       "noDestinationsFound": "No se encontraron destinos",
       "noFieldsFound": "No se encontró ningún campo",
+      "noticeHybridFallback": "Detección alternativa",
+      "noticeHybridFallbackTooltip": "El umbral híbrido no estuvo disponible en ejecuciones recientes, por lo que la detección recurrió al umbral congelado. La puntuación continúa con el umbral congelado hasta que se reentrene el modelo.",
+      "noticeRetrain": "Reentrenamiento automático",
+      "noticeRetrainTooltip": "El modelo guardado no se pudo leer tras una actualización, por lo que se descartó y la configuración se puso en cola para reentrenarse automáticamente. No se requiere ninguna acción; la detección se reanuda una vez que finaliza el entrenamiento.",
+      "noticeSkipAbsence": "La evaluación de ausencia quedó rezagada respecto a la ventana de retroceso; el span que ya no se pudo recuperar se omitió y se registró.",
+      "noticeSkipScored": "Las ejecuciones de detección llegaron más espaciadas de lo que abarca la ventana de retroceso, por lo que los buckets cerrados salieron de la ventana antes de que una ejecución pudiera evaluarlos.",
+      "noticeWindowFloor": "Ventana demasiado estrecha",
+      "noticeWindowFloorTooltip": "La ventana de retroceso está por debajo de Comprobar cada más una Resolución de detección, por lo que las ejecuciones no pueden evaluar ningún bucket. Aumente la ventana para restaurar la detección.",
+      "noticeWindowSkip": "Buckets omitidos",
       "notifications": "Notificaciones",
       "notificationsTooltip": "Cuando esté habilitado, se enviará una notificación al destino seleccionado cuando se detecte una anomalía.",
       "percentile": "Nivel",
@@ -8649,7 +8690,9 @@
         "staleCopyAria": "Copiar los detalles de actualización fallida para {name}",
         "stalePreamble": "Actualización fallida — mostrando el último resultado exitoso.",
         "staleClickToCopy": "Haga clic para copiar los detalles.",
-        "lastRefreshedPrefix": "Última actualización: "
+        "lastRefreshedPrefix": "Última actualización: ",
+        "exemplarsShowHeatmap": "Mostrar ejemplares (muestras de trazas). Cambia esta tarjeta a percentiles mientras está activado.",
+        "exemplarsHideHeatmap": "Ocultar ejemplares · {count} mostrados. Devuelve esta tarjeta al mapa de calor."
       },
       "fn": {
         "subtitle": "Elija cómo se agrega esta métrica",
@@ -15344,6 +15387,9 @@
       "multiSelect": "Selección múltiple",
       "singleSelect": "Selección única"
     },
+    "templateInput": {
+      "suggestions": "Sugerencias de variables"
+    },
     "time": {
       "openTimePicker": "Abrir selector de hora",
       "clear": "Limpiar",
@@ -17053,17 +17099,17 @@
       "alertMe": "Alertarme",
       "columnHints": {
         "qps": "Llamadas por segundo — las llamadas de esta ventana divididas por su duración, de modo que una vista de 15 minutos y una de 4 horas sigan siendo comparables.",
-        "p50": "La mitad de todas las llamadas finalizaron más rápido que esto. Solo cuenta llamadas finalizadas: una consulta aún en ejecución o que nunca regresó no se mide aquí.",
-        "p95": "La cola lenta — 1 de cada 20 llamadas tardó al menos este tiempo. Solo cuenta llamadas finalizadas: una consulta aún en ejecución o que nunca regresó no se mide aquí.",
-        "p99": "El 1% peor de las llamadas tardó al menos este tiempo. Solo cuenta llamadas finalizadas: una consulta aún en ejecución o que nunca regresó no se mide aquí.",
-        "load": "Tiempo total que sus aplicaciones pasaron esperando en esta base de datos. Medido desde el lado del cliente, por lo que refleja cuánto tráfico atendió esta base de datos — no cuán cargado está el servidor.",
+        "p50": "La mitad de todas las llamadas terminó antes que esto. Medido a partir de las llamadas completadas en las trazas de tu aplicación.",
+        "p95": "La cola lenta: 1 de cada 20 llamadas tardó al menos este tiempo. Medido a partir de las llamadas completadas en las trazas de tu aplicación.",
+        "p99": "El 1 % de llamadas más lento tardó al menos este tiempo. Medido a partir de las llamadas completadas en las trazas de tu aplicación.",
+        "load": "Tiempo total que tus aplicaciones dedicaron a llamadas a esta base de datos, medido a partir de las trazas de tu aplicación. Muestra cuánto tráfico atendió esta base de datos para tus aplicaciones.",
         "attention": "Qué tan cerca está esta instancia de un límite que publica su propio motor — hoy, conexiones frente a max_connections. La peor proporción, no una puntuación combinada. Ordenado de mayor a menor, con las instancias cuya salud no se puede leer al principio, porque una que no se puede ver no es una que se sepa saludable. Medido en el servidor de la base de datos, por lo que no es comparable con el Tiempo de base de datos que está al lado."
       },
       "failedChip": "{count} fallidas",
       "columnSubLabels": {
-        "attention": "servidor",
-        "load": "cliente",
-        "calls": "cliente"
+        "attention": "desde la base de datos",
+        "load": "desde tus aplicaciones",
+        "calls": "desde tus aplicaciones"
       },
       "attention": {
         "connections": "conexiones",
@@ -17125,14 +17171,14 @@
         "failed": "Fallidas"
       },
       "columnHints": {
-        "calls": "Cuántas veces se ejecutó esta consulta. El recuento propio de la base de datos cuando lo reporta — eso cubre todos los clientes, no solo las partes de tu sistema que envían trazas. Las filas marcadas como observadas por el cliente se cuentan a partir de las trazas, porque tu base de datos no las reportó.",
-        "p50": "La mitad de todas las llamadas terminaron más rápido que esto. Solo cuenta las llamadas finalizadas; una consulta que aún se está ejecutando o que nunca volvió no se mide aquí.",
-        "p95": "La cola lenta: 1 de cada 20 llamadas tardó al menos este tiempo. Solo cuenta las llamadas finalizadas; una consulta que aún se está ejecutando o que nunca volvió no se mide aquí.",
-        "p99": "El 1% peor de las llamadas tardó al menos este tiempo. Solo cuenta las llamadas finalizadas; una consulta que aún se está ejecutando o que nunca volvió no se mide aquí.",
+        "calls": "Cuántas veces se ejecutó esta consulta, según el recuento de tu base de datos: se incluye cada aplicación que se conecta. Cuando tu base de datos no tiene un recuento para una consulta, el icono de trazas marca una medida a partir de las trazas de tu aplicación.",
+        "p50": "La mitad de todas las llamadas terminó antes que esto. Medido a partir de las llamadas completadas en las trazas de tu aplicación.",
+        "p95": "La cola lenta: 1 de cada 20 llamadas tardó al menos este tiempo. Medido a partir de las llamadas completadas en las trazas de tu aplicación.",
+        "p99": "El 1 % de llamadas más lento tardó al menos este tiempo. Medido a partir de las llamadas completadas en las trazas de tu aplicación.",
         "max": "La única llamada más lenta en esta ventana: una llamada real, no un promedio.",
         "errors": "Cuántas de estas llamadas devolvieron un error.",
         "perTrace": "Cuántas veces se ejecuta esto dentro de una sola solicitud. Un número alto generalmente significa un bucle.",
-        "load": "Tiempo total que esta consulta pasó en la base de datos. La cifra propia de la base de datos cuando la reporta: tiempo de ejecución en Postgres, pero tiempo de espera en MySQL y MariaDB — cada fila indica cuál. Las filas marcadas como observadas por el cliente se miden a partir de las trazas, por lo que incluyen el viaje de ida y vuelta de la red."
+        "load": "Tiempo total que esta consulta pasó en la base de datos, según lo que reporta tu base de datos: tiempo de ejecución en Postgres, tiempo de espera en MySQL y MariaDB; cada fila indica cuál. Las filas con el icono de trazas se miden a partir de las trazas de tu aplicación, por lo que también incluyen el viaje de ida y vuelta a la base de datos."
       },
       "errorsNone": "ninguna",
       "errorsAll": "todas",
@@ -17396,8 +17442,7 @@
       "overlap": {
         "serverExecution": "Tiempo que {engine} dedicó a ejecutarla",
         "serverWait": "Tiempo que {engine} dedicó a esperarla — tiempo de espera, no de ejecución",
-        "serverCounted": "Contado por {engine}, en todos los clientes",
-        "clientObserved": "Observado por llamantes instrumentados — tu base de datos no informó de este"
+        "serverCounted": "Contado por {engine}, en todos los clientes"
       },
       "endpointsConcentrated": "Un endpoint representa el {percent} del tiempo de esta consulta. Corrige {endpoint} y habrás corregido esta consulta.",
       "typicalMarker": "llamadas lentas {value}",
@@ -17424,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "Lo que registró la propia base de datos",
-        "subtitle": "Del lado del servidor — todos los clientes",
-        "clientSubtitle": "Observado por el cliente — solo llamadas instrumentadas y finalizadas. Una consulta aún en ejecución, o que se colgó, no está en estos números.",
+        "subtitle": "Desde tu base de datos: cada aplicación que se conecta",
+        "clientSubtitle": "Las cifras marcadas se miden a partir de las trazas de tu aplicación: las llamadas que tus aplicaciones completaron en esta ventana",
         "instance": "Reportado por {instance}",
         "instanceWide": "Todas las bases de datos en esta instancia",
         "calls": "Ejecuciones",
@@ -17471,9 +17516,13 @@
         "serverExecution": "tiempo de ejecución",
         "serverWait": "tiempo de espera",
         "serverCounted": "recuento del servidor",
-        "clientObserved": "observado por el cliente",
         "serverReported": "informado por sus bases de datos"
       }
+    },
+    "appSource": {
+      "marker": "Medido a partir de las trazas de tu aplicación",
+      "markerHint": "Medido a partir de las trazas de tu aplicación, añadiendo la visión de tus aplicaciones a lo que reporta tu base de datos.",
+      "legend": "Desde las trazas de tu aplicación"
     },
     "page": {
       "tabs": {
@@ -17482,7 +17531,7 @@
         "metricsHint": "Carga de la base de datos por evento de espera, y todas las métricas que recopilan tus receptores de base de datos.",
         "queries": "Consultas principales",
         "samples": "Llamadas más lentas",
-        "samplesHintClient": "Llamadas finalizadas que sus servicios instrumentados observaron en esta ventana — los llamadores sin rastreo no se cuentan, por lo que esto es un mínimo, no el total. La tabla muestra las más lentas de ellas.",
+        "samplesHintClient": "Llamadas medidas a partir de las trazas de tu aplicación en esta ventana, añadiendo la visión de tus aplicaciones a lo que reporta tu base de datos. La tabla muestra las más lentas.",
         "samplesHintServer": "Declaraciones que sus bases de datos informaron como completadas en esta ventana, contadas dentro de la base de datos. La tabla muestra las más lentas de ellas.",
         "samplesHintUnknown": "Las llamadas individuales más lentas a la base de datos en esta ventana.",
         "deadlocks": "Interbloqueos",
@@ -17519,6 +17568,11 @@
       "explore": "Abrir en el Explorador de métricas",
       "railLabel": "Secciones de métricas",
       "noAccess": "No tienes permiso para leer {stream}. Pide a un administrador acceso de lectura a este stream.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "por consulta",
         "database": "por base de datos",
@@ -17633,7 +17687,7 @@
         "status": "Estado"
       },
       "columnHints": {
-        "duration": "Cuánto tardó esta llamada, medido por el llamador. Solo cuenta llamadas finalizadas: una consulta que aún se ejecuta, o una que nunca regresó, no se mide aquí."
+        "duration": "Cuánto tardó esta llamada, según la medición de tu aplicación de principio a fin."
       },
       "failed": "Fallida",
       "failedWithCode": "Fallida · {code}",
@@ -19142,6 +19196,8 @@
     "rotationNobody": "Nadie de guardia",
     "edit": "Editar",
     "timelineLoadFailed": "No se pudo resolver el calendario para este período",
+    "editorReadFailed": "No se pudo cargar la última copia para editarla. Inténtelo de nuevo.",
+    "refreshFailed": "No se pudo actualizar. Lo que se muestra podría estar desactualizado.",
     "scheduleDoneEditing": "Volver al calendario",
     "coverWhoRequired": "Elige quién cubre",
     "timelineCoverAria": "{who} está cubriendo {rotation}, {from} a {to}",

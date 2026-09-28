@@ -13,12 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{body::Bytes, extract::Path, http::HeaderMap, response::Response};
+use axum::{
+    body::Bytes,
+    extract::Path,
+    http::{self, HeaderMap},
+    response::Response,
+};
 use config::{
     TIMESTAMP_COL_NAME,
     axum::middlewares::{get_process_time, insert_process_time_header},
     get_config,
     meta::{
+        otlp::OtlpRequestType,
         search::{
             PaginatedResponse, SearchPartitionRequest, StreamResponses, TimeOffset,
             default_use_cache,
@@ -45,7 +51,10 @@ use tracing::{Instrument, Span};
 
 use crate::{
     common::{
-        meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+        meta::{
+            http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+            otlp::{otlp_error_response, otlp_rejection_response},
+        },
         utils::http::{get_or_create_trace_id, get_use_cache_from_request},
     },
     search::error_utils::map_error_to_http_response,
@@ -97,10 +106,14 @@ pub(crate) async fn check_stream_permissions(
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
-    request_body(content = String, description = "ExportTraceServiceRequest", content_type = "application/x-protobuf"),
+    request_body(description = "ExportTraceServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
-        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+        (status = 200, description = "ExportTraceServiceResponse", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 206, description = "ExportTraceServiceResponse with a partial success (JSON requests only)", content((Object = "application/json"))),
+        (status = 400, description = "google.rpc.Status: invalid body, unsupported Content-Type, or write rejected (e.g. columns limit)", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 429, description = "google.rpc.Status: trial period expired", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 500, description = "google.rpc.Status: internal write error", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 503, description = "google.rpc.Status: ingester overloaded or unavailable, or ingestion not allowed (cloud)", content(("application/x-protobuf"), (Object = "application/json"))),
     )
 )]
 pub async fn traces_write(
@@ -114,19 +127,27 @@ pub async fn traces_write(
 
     let user = ingestion_common::IngestUser::from_user_email(&user_email.user_id);
 
-    #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return MetaHttpResponse::too_many_requests(e);
-        }
-    }
-
     let cfg = get_config();
     let content_type = headers
         .get("Content-Type")
         .and_then(|h| h.to_str().ok())
         .unwrap_or("application/json");
+    let req_type = if content_type.eq(CONTENT_TYPE_PROTO) {
+        OtlpRequestType::HttpProtobuf
+    } else {
+        OtlpRequestType::HttpJson
+    };
+
+    #[cfg(feature = "cloud")]
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
+        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            http::StatusCode::TOO_MANY_REQUESTS
+        } else {
+            http::StatusCode::SERVICE_UNAVAILABLE
+        };
+        return otlp_rejection_response(req_type, status, e.to_string());
+    }
+
     let org_id = if let Some(Some(v)) = headers
         .get(&cfg.grpc.org_header_key)
         .map(|header| header.to_str().ok())
@@ -144,7 +165,12 @@ pub async fn traces_write(
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
         traces::otlp_json(&org_id, body, in_stream_name, user).await
     } else {
-        return MetaHttpResponse::bad_request("Bad Request");
+        return otlp_error_response(
+            OtlpRequestType::HttpJson,
+            http::StatusCode::BAD_REQUEST,
+            3, // INVALID_ARGUMENT
+            "Bad Request: Content-Type must be application/json or application/x-protobuf",
+        );
     };
 
     match result {
@@ -152,7 +178,7 @@ pub async fn traces_write(
             insert_process_time_header(process_time, resp.headers_mut());
             resp
         }
-        Err(e) => MetaHttpResponse::internal_error(e),
+        Err(e) => otlp_rejection_response(req_type, http::StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
 
@@ -1986,5 +2012,56 @@ mod tests {
             json.get("service_type").and_then(|v| v.as_str()),
             Some("database")
         );
+    }
+
+    // cloud builds run check_ingestion_allowed first, which needs a live org
+    #[cfg(not(feature = "cloud"))]
+    async fn call_traces_write(
+        content_type: &str,
+        body: &'static [u8],
+    ) -> (http::StatusCode, HeaderMap, json::Value) {
+        let mut headers = HeaderMap::new();
+        headers.insert(http::header::CONTENT_TYPE, content_type.parse().unwrap());
+        let resp = traces_write(
+            Path("default".to_string()),
+            Headers(UserEmail {
+                user_id: "a@a.com".to_string(),
+            }),
+            headers,
+            Bytes::from_static(body),
+        )
+        .await;
+        let status = resp.status();
+        let resp_headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, resp_headers, json::from_slice(&body).unwrap())
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_traces_write_invalid_json_is_rpc_status() {
+        let (status, headers, body) = call_traces_write(CONTENT_TYPE_JSON, b"{not json").await;
+        assert_eq!(status, http::StatusCode::BAD_REQUEST);
+        assert_eq!(headers[http::header::CONTENT_TYPE], CONTENT_TYPE_JSON);
+        assert_eq!(body["code"], 3);
+        assert!(
+            body["message"]
+                .as_str()
+                .unwrap()
+                .starts_with("Invalid json:")
+        );
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_traces_write_unsupported_content_type_is_rpc_status() {
+        let (status, headers, body) = call_traces_write("text/plain", b"hello").await;
+        assert_eq!(status, http::StatusCode::BAD_REQUEST);
+        assert_eq!(headers[http::header::CONTENT_TYPE], CONTENT_TYPE_JSON);
+        assert_eq!(body["code"], 3);
+        let message = body["message"].as_str().unwrap();
+        assert!(message.contains(CONTENT_TYPE_JSON) && message.contains(CONTENT_TYPE_PROTO));
     }
 }
