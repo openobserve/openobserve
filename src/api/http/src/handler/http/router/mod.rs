@@ -548,7 +548,10 @@ pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
     {
         return (StatusCode::BAD_REQUEST, format!("URL blocked: {e}")).into_response();
     }
-    let client = match common::utils::ssrf_guard::build_safe_client(reqwest::Client::builder()) {
+    // Session replay loads the recorded page's fonts and images through here. Without a
+    // User-Agent, CDN firewalls such as the AWS managed `NoUserAgent_HEADER` rule answer 403.
+    let builder = reqwest::Client::builder().user_agent("OpenObserve");
+    let client = match common::utils::ssrf_guard::build_safe_client(builder) {
         Ok(c) => c,
         Err(e) => {
             return (
