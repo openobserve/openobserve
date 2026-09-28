@@ -423,4 +423,88 @@ describe("sessionReplayChangeFormat", () => {
       expect(out[2].data.node.childNodes[0].id).toBe(1);
     });
   });
+  describe("emitted records are copies", () => {
+    const snapshot = () =>
+      fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"], [1, "DIV", ["class", "a"]]]]);
+
+    function ids(node: any, out: number[] = []): number[] {
+      out.push(node.id);
+      for (const child of node.childNodes ?? []) ids(child, out);
+      return out;
+    }
+
+    it("leaves the emitted snapshot unchanged by later changes", () => {
+      const converter = createRecordConverter();
+      const [snap] = converter.convert(snapshot());
+      const before = JSON.stringify(snap);
+
+      converter.convert({
+        type: 12,
+        timestamp: 2000,
+        data: [
+          [ADD_NODE, [1, "SPAN"]],
+          [ATTRIBUTE, [2, ["class", "b"]]],
+          [REMOVE_NODE, 2],
+        ],
+      });
+
+      expect(JSON.stringify(snap)).toBe(before);
+    });
+
+    it("rebuilds at 0 without the ids later adds introduced, so a seek to 0 shows no duplicates", () => {
+      const converter = createRecordConverter();
+      const [snap] = converter.convert(snapshot());
+      const [mutation] = converter.convert({
+        type: 12,
+        timestamp: 2000,
+        data: [[ADD_NODE, [1, "SPAN"]]],
+      });
+
+      const snapshotIds = ids(snap.data.node);
+      expect(new Set(snapshotIds).size).toBe(snapshotIds.length);
+      expect(snapshotIds).not.toContain(mutation.data.adds[0].node.id);
+    });
+
+    it("keeps the earlier attribute state for a backward goto inside the run", () => {
+      const converter = createRecordConverter();
+      const [snap] = converter.convert(snapshot());
+      const [add] = converter.convert({
+        type: 12,
+        timestamp: 2000,
+        data: [[ADD_NODE, [1, "SPAN", ["title", "first"]]]],
+      });
+      converter.convert({
+        type: 12,
+        timestamp: 3000,
+        data: [[ATTRIBUTE, [3, ["title", "second"]], [2, ["class", "z"]]]],
+      });
+
+      expect(snap.data.node.childNodes[0].childNodes[0].attributes.class).toBe("a");
+      expect(add.data.adds[0].node.attributes.title).toBe("first");
+    });
+  });
+
+  describe("markStale", () => {
+    it("drops Change records until the next Change-format full snapshot", () => {
+      const converter = createRecordConverter();
+      converter.convert(fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"]]]));
+      converter.markStale();
+
+      const change = { type: 12, timestamp: 2000, data: [[TEXT, [1, "x"]]] };
+      expect(converter.convert(change)).toEqual([]);
+
+      const [snap] = converter.convert(
+        fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"]]]),
+      );
+      expect(snap.type).toBe(2);
+      expect(converter.convert(change)).toHaveLength(1);
+    });
+
+    it("passes classic records through while stale", () => {
+      const converter = createRecordConverter();
+      converter.markStale();
+      const meta = { type: 4, timestamp: 1, data: { width: 1, height: 1 } };
+      expect(converter.convert(meta)).toEqual([meta]);
+    });
+  });
 });

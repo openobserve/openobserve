@@ -13,52 +13,38 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export interface TimeRange {
-  start: number;
-  end: number;
+/** What the live browser player holds, all times in session ms. */
+export interface RunCoverage {
+  anchorIndex: number;
+  appendedThroughIndex: number;
+  lastIndex: number;
+  anchorStartMs: number;
+  playerEndMs: number | null;
 }
 
-export type SeekPlan =
-  | { status: "ready" }
-  | { status: "needs-fetch"; from: number; to: number }
-  | { status: "unplayable" };
-
-// Merge overlapping or touching ranges so coverage can be tested with a single forward scan.
-function mergeRanges(ranges: TimeRange[]): TimeRange[] {
-  const sorted = ranges
-    .filter((r) => Number.isFinite(r.start) && Number.isFinite(r.end) && r.end >= r.start)
-    .sort((a, b) => a.start - b.start);
-
-  const merged: TimeRange[] = [];
-  for (const range of sorted) {
-    const last = merged[merged.length - 1];
-    if (last && range.start <= last.end) {
-      last.end = Math.max(last.end, range.end);
-    } else {
-      merged.push({ start: range.start, end: range.end });
-    }
-  }
-  return merged;
+export interface CoverageRecord {
+  type: number;
+  timestamp: number;
 }
 
-function isCovered(from: number, to: number, merged: TimeRange[]): boolean {
-  return merged.some((r) => r.start <= from && r.end >= to);
+// The mobile SDKs mark a full screen with record type 10.
+const MOBILE_FULL_SNAPSHOT = 10;
+
+/** True when a target sits before the run's anchor, which the forward-only loader never reaches. */
+export function isBeforeRun(target: number, run: RunCoverage): boolean {
+  return target < run.anchorStartMs;
 }
 
-// A replay can only start at a full snapshot, so the answer depends on the nearest snapshot at or before the target.
-export function planSeek(
-  target: number,
-  loadedRanges: TimeRange[],
-  snapshotStarts: number[],
-): SeekPlan {
-  const anchor = snapshotStarts
-    .filter((start) => start <= target)
-    .reduce((best, start) => (best === null || start > best ? start : best), null as number | null);
+// rrweb cannot sit past its last event, so until the run reaches the last segment an idle gap after the edge is not covered.
+export function isCoveredBrowser(target: number, run: RunCoverage): boolean {
+  if (run.lastIndex < 0 || run.appendedThroughIndex < run.anchorIndex) return false;
+  if (run.playerEndMs === null || isBeforeRun(target, run)) return false;
+  if (run.appendedThroughIndex >= run.lastIndex) return true;
+  return target <= run.playerEndMs;
+}
 
-  if (anchor === null) return { status: "unplayable" };
-
-  const merged = mergeRanges(loadedRanges);
-  if (isCovered(anchor, target, merged)) return { status: "ready" };
-
-  return { status: "needs-fetch", from: anchor, to: target };
+// The wireframe player redraws from the latest full screen, so the target needs one at or before it.
+export function isCoveredMobile(targetAbs: number, records: CoverageRecord[]): boolean {
+  if (!records.length || records[records.length - 1].timestamp < targetAbs) return false;
+  return records.some((r) => r.type === MOBILE_FULL_SNAPSHOT && r.timestamp <= targetAbs);
 }

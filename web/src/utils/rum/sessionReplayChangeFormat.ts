@@ -109,6 +109,12 @@ function getValidTagName(tagName: string): string {
   return processedTagName;
 }
 
+// structuredClone is missing before Safari 15.4, and the emitted tree is plain JSON anyway.
+function cloneTree(node: any): any {
+  if (typeof structuredClone === "function") return structuredClone(node);
+  return JSON.parse(JSON.stringify(node));
+}
+
 // ---------------------------------------------------------------------------
 // Internal decoder state
 // ---------------------------------------------------------------------------
@@ -132,10 +138,13 @@ export interface RecordConverter {
    * Records that are already in the classic format are returned unchanged.
    */
   convert(record: any): any[];
+  /** A segment was skipped: drop Change records until the next Change-format full snapshot. */
+  markStale(): void;
 }
 
 export function createRecordConverter(): RecordConverter {
   let stringTable: string[] = [];
+  let stale = false;
   let nextNodeId = 0;
   let nodes = new Map<number, TrackedNode>();
   let styleSheets = new Map<number, StoredStyleSheet>();
@@ -399,13 +408,10 @@ export function createRecordConverter(): RecordConverter {
     const out: any = { ...record };
     delete out.format;
     out.type = RecordType.FullSnapshot;
+    // rrweb rebuilds from this event on every seek, so it must not see the live tree later changes keep editing.
     out.data = {
-      // Emit a copy. `documentNode` stays the converter's live tree: every later Change
-      // record in this view mutates it in place (children spliced in/out, attributes and
-      // text rewritten). The caller converts a whole session before playback starts, so
-      // handing out the live tree would replay each view in its final state.
       node: documentNode
-        ? structuredClone(documentNode)
+        ? cloneTree(documentNode)
         : { type: NodeType.Document, childNodes: [], id: 0 },
       initialOffset,
     };
@@ -449,9 +455,7 @@ export function createRecordConverter(): RecordConverter {
               }
             }
             nodes.set(id, { node, parentId });
-            // Emit the node with empty children; descendants arrive as their own adds.
-            // Copy `attributes` too: the tracked node keeps receiving Attribute changes,
-            // and a shared object would rewrite this add with attributes it only gets later.
+            // Descendants arrive as their own adds, and attributes are copied because later changes edit the tracked node.
             const emitted = node.attributes
               ? { ...node, attributes: { ...node.attributes }, childNodes: [] }
               : { ...node, childNodes: [] };
@@ -622,13 +626,18 @@ export function createRecordConverter(): RecordConverter {
         record.format === SnapshotFormatChange &&
         Array.isArray(record.data)
       ) {
+        stale = false;
         return [convertFullSnapshot(record)];
       }
       if (record && record.type === RecordType.Change) {
-        return convertChange(record);
+        // String table and node ids are out of step after a skipped segment, so the frame freezes instead of corrupting.
+        return stale ? [] : convertChange(record);
       }
       // Already classic (or a passthrough record like Meta/Focus/type-3/type-8).
       return [record];
+    },
+    markStale() {
+      stale = true;
     },
   };
 }

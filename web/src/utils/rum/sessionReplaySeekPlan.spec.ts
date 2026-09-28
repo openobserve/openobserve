@@ -14,72 +14,85 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { planSeek } from "./sessionReplaySeekPlan";
+import {
+  isBeforeRun,
+  isCoveredBrowser,
+  isCoveredMobile,
+  type RunCoverage,
+} from "./sessionReplaySeekPlan";
 
-describe("planSeek", () => {
-  it("is unplayable when no snapshot sits at or before the target", () => {
-    expect(planSeek(500, [{ start: 0, end: 5000 }], [1000, 2000])).toEqual({
-      status: "unplayable",
-    });
+// A run anchored at segment 2 (session ms 10 000), appended through segment 5 of 9, player holding events up to 30 000.
+const run: RunCoverage = {
+  anchorIndex: 2,
+  appendedThroughIndex: 5,
+  lastIndex: 9,
+  anchorStartMs: 10_000,
+  playerEndMs: 30_000,
+};
+
+describe("isCoveredBrowser", () => {
+  it("covers a target between the anchor and the player's last event", () => {
+    expect(isCoveredBrowser(20_000, run)).toBe(true);
+    expect(isCoveredBrowser(30_000, run)).toBe(true);
   });
 
-  it("is unplayable when there are no snapshots at all", () => {
-    expect(planSeek(500, [{ start: 0, end: 5000 }], [])).toEqual({ status: "unplayable" });
+  it("does not cover a target before the run's anchor segment", () => {
+    expect(isCoveredBrowser(9_999, run)).toBe(false);
+    expect(isBeforeRun(9_999, run)).toBe(true);
   });
 
-  it("is ready when one loaded range covers the anchor through the target", () => {
-    expect(planSeek(4000, [{ start: 1000, end: 5000 }], [1000, 3000])).toEqual({
-      status: "ready",
-    });
+  it("does not cover an idle gap after the last appended event while later segments are still to come", () => {
+    expect(isCoveredBrowser(30_001, run)).toBe(false);
   });
 
-  it("is ready when the target sits exactly on a snapshot", () => {
-    expect(planSeek(3000, [{ start: 3000, end: 5000 }], [1000, 3000])).toEqual({
-      status: "ready",
-    });
+  it("covers everything up to the session end once the last segment is appended", () => {
+    expect(isCoveredBrowser(90_000, { ...run, appendedThroughIndex: 9 })).toBe(true);
   });
 
-  it("merges touching ranges before testing coverage", () => {
-    const ranges = [
-      { start: 3000, end: 4000 },
-      { start: 4000, end: 6000 },
-    ];
-    expect(planSeek(5500, ranges, [3000])).toEqual({ status: "ready" });
+  it("covers nothing before the first append", () => {
+    expect(isCoveredBrowser(10_000, { ...run, appendedThroughIndex: 1 })).toBe(false);
   });
 
-  it("needs a fetch from the anchor when a gap splits the loaded ranges", () => {
-    const ranges = [
-      { start: 3000, end: 3500 },
-      { start: 5000, end: 6000 },
-    ];
-    expect(planSeek(5500, ranges, [3000])).toEqual({
-      status: "needs-fetch",
-      from: 3000,
-      to: 5500,
-    });
+  it("covers nothing for an empty manifest", () => {
+    expect(isCoveredBrowser(0, { ...run, lastIndex: -1, anchorIndex: 0, anchorStartMs: 0 })).toBe(
+      false,
+    );
   });
 
-  it("anchors on the latest snapshot at or before the target", () => {
-    expect(planSeek(9000, [], [1000, 4000, 8000, 12000])).toEqual({
-      status: "needs-fetch",
-      from: 8000,
-      to: 9000,
-    });
+  it("covers nothing until the player has reported what it holds", () => {
+    expect(isCoveredBrowser(20_000, { ...run, playerEndMs: null })).toBe(false);
+  });
+});
+
+describe("isCoveredMobile", () => {
+  const records = [
+    { type: 4, timestamp: 1000 },
+    { type: 10, timestamp: 1000 },
+    { type: 11, timestamp: 2000 },
+    { type: 10, timestamp: 5000 },
+    { type: 11, timestamp: 6000 },
+  ];
+
+  it("covers a target with a full screen at or before it and records past it", () => {
+    expect(isCoveredMobile(1500, records)).toBe(true);
+    expect(isCoveredMobile(6000, records)).toBe(true);
   });
 
-  it("ignores inverted ranges rather than treating them as coverage", () => {
-    expect(planSeek(5000, [{ start: 9000, end: 1000 }], [1000])).toEqual({
-      status: "needs-fetch",
-      from: 1000,
-      to: 5000,
-    });
+  it("does not cover a target past the last loaded record", () => {
+    expect(isCoveredMobile(6001, records)).toBe(false);
   });
 
-  it("merges overlapping ranges so their union counts as coverage", () => {
-    const ranges = [
-      { start: 1000, end: 3000 },
-      { start: 2500, end: 4000 },
-    ];
-    expect(planSeek(3800, ranges, [1000])).toEqual({ status: "ready" });
+  it("does not cover a target with no full screen before it", () => {
+    expect(isCoveredMobile(900, records)).toBe(false);
+    expect(
+      isCoveredMobile(1500, [
+        { type: 11, timestamp: 1000 },
+        { type: 11, timestamp: 2000 },
+      ]),
+    ).toBe(false);
+  });
+
+  it("does not cover anything before a record has loaded", () => {
+    expect(isCoveredMobile(0, [])).toBe(false);
   });
 });

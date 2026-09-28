@@ -15,7 +15,9 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  dedupManifest,
   findTargetIndex,
+  segmentId,
   selectInitialWindow,
   snapshotStarts,
   summarizeManifest,
@@ -92,6 +94,49 @@ describe("sessionReplayManifest", () => {
   describe("snapshotStarts", () => {
     it("lists only the segments that can anchor a cold player", () => {
       expect(snapshotStarts(manifest)).toEqual([1000, 4000]);
+    });
+  });
+
+  describe("segmentId", () => {
+    it("keys a row by view, index in view, span and record count", () => {
+      expect(
+        segmentId({ start: 1, end: 2, records_count: 3, view_id: "v1", index_in_view: 4 }),
+      ).toBe("v1|4|1|2|3");
+    });
+
+    it("falls back to span and record count when the schema has no view columns", () => {
+      expect(segmentId({ start: 1, end: 2, records_count: 3 })).toBe("1|2|3");
+    });
+
+    it("keeps two views that tie on start, end and record count apart", () => {
+      const a = { start: 1, end: 2, records_count: 3, view_id: "a", index_in_view: 0 };
+      const b = { ...a, view_id: "b" };
+      expect(segmentId(a)).not.toBe(segmentId(b));
+    });
+  });
+
+  describe("dedupManifest", () => {
+    it("drops an exact duplicate row stored twice by a retried upload", () => {
+      const row = { start: 1000, end: 1999, records_count: 5, view_id: "v", index_in_view: 0 };
+      const next = { start: 2000, end: 2999, records_count: 1, view_id: "v", index_in_view: 1 };
+      expect(dedupManifest([row, { ...row }, next])).toEqual([row, next]);
+    });
+
+    it("keeps rows that tie on start at a page edge but are different segments", () => {
+      const rows = [
+        { start: 1000, end: 1000, records_count: 1, view_id: "a", index_in_view: 3 },
+        { start: 1000, end: 1500, records_count: 2, view_id: "b", index_in_view: 0 },
+      ];
+      expect(dedupManifest(rows)).toHaveLength(2);
+    });
+
+    it("keeps the manifest order of the first occurrence", () => {
+      const rows = [
+        { start: 3, end: 4, records_count: 1 },
+        { start: 1, end: 2, records_count: 1 },
+        { start: 3, end: 4, records_count: 1 },
+      ];
+      expect(dedupManifest(rows).map((r) => r.start)).toEqual([3, 1]);
     });
   });
 

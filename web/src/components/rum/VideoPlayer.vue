@@ -25,14 +25,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="w-full text-center">
           {{ t("rum.loadingSessions") }}
         </div>
+        <div
+          v-if="retryAttempt > 1"
+          class="text-text-secondary w-full text-center text-xs"
+          data-test="video-player-retrying"
+        >
+          {{ t("rum.sessionReplayRetrying", { attempt: retryAttempt, total: MAX_ATTEMPTS }) }}
+        </div>
       </div>
     </div>
-    <div ref="playerContainerRef" class="flex min-h-0 flex-1 items-center justify-center">
+    <div ref="playerContainerRef" class="relative flex min-h-0 flex-1 items-center justify-center">
       <div
         ref="playerRef"
         id="player"
         class="player flex h-full cursor-pointer items-center"
         @click="togglePlay"
+      />
+      <ReplayPlaybackOverlay
+        :state="playbackState"
+        :pending-seek-ms="pendingSeekMs"
+        :loaded-end-ms="loadedEndSessionMs"
+        :failed-from-ms="failedFromMs"
+        :timeline-ms="timelineMs"
+        :single-snapshot="singleSnapshot"
+        :retry-attempt="retryAttempt"
+        @retry="emit('retry')"
       />
     </div>
     <div class="controls-container w-full p-2 pt-3">
@@ -41,9 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="video-player-playback-bar"
         class="bg-surface-subtle relative mt-2 mb-3 h-[0.3125rem] w-full cursor-pointer"
         @click="handlePlaybackBarClick"
+        @mousemove="handleBarHover"
+        @mouseleave="hoverMs = null"
       >
+        <ReplayLoadBand :ranges="loadedRanges" :timeline-ms="timelineMs" />
         <div
           class="bg-button-primary! absolute"
+          :class="{ 'opacity-50': pendingSeekMs !== null }"
+          data-test="video-player-progress"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -74,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               event.frustration_types && event.frustration_types.length > 0
                 ? '0.1875rem'
                 : '0.125rem',
-            left: (event.relativeTime / playerState.totalTime) * playerState.width + 'px',
+            left: markerLeft(event) + 'px',
             bottom: '-0.3125rem',
             height:
               event.frustration_types && event.frustration_types.length > 0
@@ -82,7 +104,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '0.9375rem',
           }"
           :title="getEventTooltip(event)"
+          @mouseenter="hoverEvent = event"
+          @mouseleave="hoverEvent = null"
         />
+        <div
+          v-if="hoverLabel"
+          class="bg-surface-overlay border-border-default text-text-body rounded-default pointer-events-none absolute bottom-4 z-10 -translate-x-1/2 border px-2 py-1 text-xs whitespace-nowrap shadow-md"
+          data-test="video-player-hover-tooltip"
+          :style="{ left: `${toPercent(hoverMs ?? 0, timelineMs)}%` }"
+        >
+          {{ hoverLabel }}
+        </div>
       </div>
       <div class="controls flex items-center justify-between">
         <div class="flex items-center">
@@ -107,20 +139,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="ms-4 flex items-center">
-            <div>{{ playerState.time }}</div>
+            <div data-test="video-player-time">{{ playerState.time }}</div>
             <div class="px-1">/</div>
-            <div>{{ playerState.duration }}</div>
+            <div data-test="video-player-duration">{{ playerState.duration }}</div>
           </div>
+          <ReplayStatusChip
+            class="ms-3"
+            :load-state="loadState"
+            :load-percent="loadPercent"
+            :skipped-parts="skippedCount(loadedRanges)"
+            @retry="emit('retry')"
+          />
         </div>
         <div class="flex items-center">
           <OSwitch
             class="me-3 whitespace-nowrap"
-            v-model="playerState.skipInactivity"
+            :model-value="skipInactivityValue"
             :label="t('rum.skipInactivity')"
-            @update:model-value="toggleSkipInactive"
+            @update:model-value="handleSkipInactivityChange"
           />
           <OSelect
-            v-model="playerState.speed"
+            :model-value="speedValue"
             :options="speedOptions"
             :searchable="false"
             @update:model-value="setSpeed"
@@ -133,11 +172,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import {
+  computed,
   markRaw,
   nextTick,
   ref,
   shallowRef,
   watch,
+  type PropType,
   type Ref,
   onBeforeUnmount,
   onMounted,
@@ -152,12 +193,37 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import type { SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
+import ReplayLoadBand from "@/components/rum/ReplayLoadBand.vue";
+import ReplayPlaybackOverlay from "@/components/rum/ReplayPlaybackOverlay.vue";
+import ReplayStatusChip from "@/components/rum/ReplayStatusChip.vue";
 import {
   createRecordConverter,
   dropChangesBeforeFirstSnapshot,
   type RecordConverter,
 } from "@/utils/rum/sessionReplayChangeFormat";
 import { resolveRelativeLinks } from "@/utils/rum/sessionReplayUrls";
+import { MAX_ATTEMPTS } from "@/utils/rum/sessionReplayLoader";
+import {
+  canResume,
+  formatReplayTime,
+  isLoadedAt,
+  isSkipMarker,
+  shouldBuffer,
+  skippedCount,
+  timelineLength,
+  toPercent,
+  type LoadState,
+  type LoadedRange,
+  type PlaybackState,
+  type ReplayIntent,
+} from "@/utils/rum/sessionReplayTimeline";
+
+type Mode = "paused" | "playing" | "buffering" | "waiting" | "failed" | "ended";
+
+const DEFAULT_SPEED = 4;
+const SKIP_SECONDS = 10;
+
 const props = defineProps({
   events: {
     type: Array,
@@ -171,7 +237,32 @@ const props = defineProps({
     type: Boolean,
     required: true,
   },
+  sessionStartMs: { type: Number, default: 0 },
+  sessionEndMs: { type: Number, default: 0 },
+  loadedRanges: { type: Array as PropType<LoadedRange[]>, default: () => [] },
+  loadState: { type: String as PropType<LoadState>, default: "complete" },
+  loadPercent: { type: Number, default: 0 },
+  failedFromMs: { type: Number as PropType<number | null>, default: null },
+  truncated: { type: Boolean, default: false },
+  pendingSeekMs: { type: Number as PropType<number | null>, default: null },
+  singleSnapshot: { type: Boolean, default: false },
+  retryAttempt: { type: Number, default: 0 },
+  speed: { type: Number as PropType<number | undefined>, default: undefined },
+  skipInactivity: { type: Boolean as PropType<boolean | undefined>, default: undefined },
+  intent: { type: String as PropType<ReplayIntent>, default: "pause" },
 });
+
+const emit = defineEmits<{
+  ready: [];
+  "time-update": [sessionMs: number];
+  "seek-request": [sessionMs: number];
+  retry: [];
+  "update:speed": [speed: number];
+  "update:skipInactivity": [skip: boolean];
+  "update:intent": [intent: ReplayIntent];
+  "playback-state": [state: PlaybackState];
+  "loaded-end-change": [sessionMs: number];
+}>();
 
 const { t } = useI18nTyped();
 
@@ -200,10 +291,22 @@ let runConverter: RecordConverter | null = null;
 let runPageHref: string | undefined;
 let convertedSegmentCount = 0;
 let segmentWork: Promise<unknown> = Promise.resolve();
+// rrweb's controller restarts at 0 on play() after a finish, so every resume after one must go through goto.
+let finished = false;
+let failedWasPlaying = false;
 
 const sessionWidth = ref(0);
 const sessionHeight = ref(0);
 const resizeObserver = ref<ResizeObserver | null>(null);
+
+const mode = ref<Mode>("paused");
+const playerBuilt = ref(false);
+const localSpeed = ref(DEFAULT_SPEED);
+const localSkipInactivity = ref(true);
+// Never shrinks: a batch whose records end before the metadata end must not pull the bar back.
+const timelineMs = ref(0);
+const hoverMs = ref<number | null>(null);
+const hoverEvent = ref<any>(null);
 
 const speedOptions = [
   {
@@ -232,18 +335,71 @@ const speedOptions = [
   },
 ];
 
+const speedValue = computed(() => props.speed ?? localSpeed.value);
+const skipInactivityValue = computed(() => props.skipInactivity ?? localSkipInactivity.value);
+
+const playbackState = computed<PlaybackState>(() => {
+  if (props.loadState === "error") return "error";
+  if (props.loadState === "empty") return "empty";
+  if (!playerBuilt.value) return "loading";
+  return mode.value;
+});
+
+const sessionStart = computed(() => props.sessionStartMs || playerState.value.startTime);
+
+// The player's time 0 is its first loaded event, which an event_time window puts after the session start.
+const originOffsetMs = computed(() =>
+  playerBuilt.value ? playerState.value.startTime - sessionStart.value : 0,
+);
+
+const sessionTimeMs = computed(() => originOffsetMs.value + playerState.value.actualTime);
+
+const displayMs = computed(() => props.pendingSeekMs ?? sessionTimeMs.value);
+
+const loadedEndSessionMs = computed(() =>
+  playerBuilt.value ? playerState.value.endTime - sessionStart.value : 0,
+);
+
+const hoverLabel = computed(() => {
+  if (hoverMs.value === null || !(timelineMs.value > 0)) return "";
+  const parts: string[] = [formatReplayTime(hoverMs.value)];
+  if (hoverEvent.value) {
+    parts.push(
+      hoverEvent.value.type === "error" ? t("rum.error") : getEventTooltip(hoverEvent.value),
+    );
+  }
+  if (props.loadedRanges.length && !isLoadedAt(hoverMs.value, props.loadedRanges)) {
+    parts.push(t("rum.sessionReplayNotLoadedYet"));
+  }
+  return parts.join(" · ");
+});
+
 const playerState = ref({
-  isPlaying: false,
-  time: "00.00",
-  duration: "00.00", // in ms
-  speed: 4,
-  progressWidth: 0,
+  get isPlaying() {
+    return mode.value === "playing" || mode.value === "buffering";
+  },
+  get time() {
+    return playerBuilt.value || props.pendingSeekMs !== null
+      ? formatReplayTime(displayMs.value)
+      : "00.00";
+  },
+  get duration() {
+    return timelineMs.value > 0 ? formatReplayTime(timelineMs.value) : "00.00";
+  },
+  get speed() {
+    return speedValue.value;
+  },
+  get skipInactivity() {
+    return skipInactivityValue.value;
+  },
+  get progressWidth() {
+    return (toPercent(displayMs.value, timelineMs.value) / 100) * this.width;
+  },
   playBackEvents: {
     views: true,
     actions: true,
     errors: true,
   },
-  skipInactivity: true,
   fullScreen: false,
   startTime: 0,
   endTime: 0,
@@ -351,6 +507,11 @@ const convertSegments = (segments: any[], converter: RecordConverter, cold: bool
   let skippedRecords = 0;
 
   segments.forEach((segment: any, segmentIndex: number) => {
+    // A skipped segment leaves the converter out of step until the next full snapshot.
+    if (isSkipMarker(segment)) {
+      converter.markStale();
+      return;
+    }
     const convertedRecords: any[] = [];
     // A cold converter has no string table, so Change records before the run's first snapshot decode to empty strings.
     const records =
@@ -440,21 +601,6 @@ const setupSession = async () => {
   const consumed = props.segments.length;
   session.value = convertSegments(props.segments.slice(0, consumed), converter, true);
 
-  // let lastEventTime = 1692884586897;
-  // const inactivityThreshold = 5000; // 5 seconds
-
-  // session.value.forEach((event) => {
-  //   const currentTime = event.timestamp;
-  //   if (currentTime - lastEventTime > inactivityThreshold) {
-  //     console.log(
-  //       `Inactivity detected between timestamps ${lastEventTime} and ${currentTime} is of ${formatTimeDifference(
-  //         currentTime - lastEventTime
-  //       )} ms.`
-  //     );
-  //   }
-  //   lastEventTime = currentTime;
-  // });
-
   session.value.every((segment: any) => {
     if (segment.data.height && segment.data.width) {
       sessionWidth.value = segment.data.width;
@@ -485,8 +631,8 @@ const setupSession = async () => {
         width: playerWidth,
         height: playerHeight,
         mutateChildNodes: true,
-        speed: playerState.value.speed,
-        skipInactive: playerState.value.skipInactivity,
+        speed: speedValue.value,
+        skipInactive: skipInactivityValue.value,
       },
     }),
   );
@@ -495,28 +641,18 @@ const setupSession = async () => {
   runConverter = converter;
   convertedSegmentCount = consumed;
 
-  // events.forEach((event) => {
-  //   if (event.type === 2 || event.type === 4) {
-  //     player.value?.addEvent(event);
-  //   }
-  // });
-
   player.value.addEventListener("ui-update-current-time", updateProgressBar);
-
-  player.value.addEventListener("finish", () => {
-    playerState.value.isPlaying = false;
-  });
-
+  player.value.addEventListener("finish", handleFinish);
   player.value.addEventListener("error", () => {
     console.error("Playback error:");
   });
 
-  // player.value.addEventListener("event-cast", (e) => {
-  //   // console.log("event casted:", e);
-  // });
-
   if (!player.value) return;
   updatePlayerState();
+  playerBuilt.value = true;
+  emit("ready");
+  // A Play pressed while the first window was still loading is honoured once there is something to play.
+  if (mode.value === "playing" || props.intent === "play") startPlayback();
 };
 
 // Re-running setupSession per batch would re-convert the whole session, which is the cost this path exists to avoid.
@@ -554,6 +690,7 @@ const appendSegments = async (newSegments: any[]) => {
   // addEvent and the controller's meta refresh both defer through a microtask.
   await nextTick();
   updatePlayerState();
+  tryResume();
 };
 
 const updatePlayerState = () => {
@@ -564,12 +701,20 @@ const updatePlayerState = () => {
   playerState.value.startTime = playerMeta?.startTime;
   playerState.value.endTime = playerMeta?.endTime;
   playerState.value.totalTime = playerMeta?.totalTime;
-  playerState.value.duration = formatTimeDifference(playerState.value.totalTime);
+  refreshTimeline();
 
   const playbackBarWidth = playbackBarRef.value?.clientWidth || 0;
-  // calculate width of progress bar
   playerState.value.width = playbackBarWidth;
   player.value.triggerResize();
+  emit("loaded-end-change", playerState.value.endTime - sessionStart.value);
+};
+
+const refreshTimeline = () => {
+  const loadedEnd = playerBuilt.value || player.value ? playerState.value.endTime : 0;
+  const start = sessionStart.value;
+  const end = props.sessionEndMs || loadedEnd;
+  if (!start) return;
+  timelineMs.value = Math.max(timelineMs.value, timelineLength(start, end, loadedEnd));
 };
 
 const getEventMarkerClass = (event: any) => {
@@ -597,43 +742,96 @@ const getEventTooltip = (event: any) => {
   return eventName;
 };
 
-function formatTimeDifference(milliSeconds: number) {
-  // Calculate hours, minutes, and seconds
-  let hours: string | number = Math.floor(milliSeconds / (1000 * 60 * 60));
-  let minutes: string | number = Math.floor((milliSeconds % (1000 * 60 * 60)) / (1000 * 60));
-  let seconds: string | number = Math.floor((milliSeconds % (1000 * 60)) / 1000);
+const markerLeft = (event: any) =>
+  (toPercent(Number(event.relativeTime) || 0, timelineMs.value) / 100) * playerState.value.width;
 
-  // Add leading zeros if needed
-  hours = hours < 10 ? "0" + hours : hours;
-  minutes = minutes < 10 ? "0" + minutes : minutes;
-  seconds = seconds < 10 ? "0" + seconds : seconds;
-
-  if (hours === "00") {
-    return `${minutes}:${seconds}`;
-  }
-
-  if (hours === "00" && minutes === "00") {
-    return `${seconds}`;
-  }
-
-  return `${hours}:${minutes}:${seconds}`;
-}
-
+// A pending seek is drawn by the parent's target, so a late tick from the old position must not overwrite it.
 const updateProgressBar = (time: { payload: number }) => {
-  playerState.value.progressWidth =
-    (time.payload / playerState.value.totalTime) * playerState.value.width;
+  if (props.pendingSeekMs !== null) return;
   playerState.value.actualTime = time.payload;
-  playerState.value.time = formatTimeDifference(time.payload);
+  emit("time-update", sessionTimeMs.value);
+  if (
+    mode.value === "playing" &&
+    props.loadState === "loading" &&
+    shouldBuffer(time.payload, playerState.value.totalTime, speedValue.value)
+  ) {
+    enterBuffering();
+  }
+};
+
+// Safety net for a skip that overshoots the margin: the load state decides what the end of the loaded data means.
+const handleFinish = () => {
+  finished = true;
+  if (mode.value !== "playing" && mode.value !== "buffering") return;
+  if (props.loadState === "loading") {
+    mode.value = "buffering";
+  } else if (props.loadState === "failed") {
+    mode.value = "failed";
+    failedWasPlaying = true;
+  } else {
+    mode.value = "ended";
+    emit("update:intent", "pause");
+  }
+};
+
+const enterBuffering = () => {
+  player.value?.pause();
+  mode.value = "buffering";
+};
+
+const resumeAt = (offset: number) => {
+  player.value?.goto(offset, true);
+  finished = false;
+  mode.value = "playing";
+};
+
+// Resumes where the clock held, never at 0, once enough has loaded past it or nothing more is coming.
+const tryResume = () => {
+  if (mode.value !== "buffering" || props.pendingSeekMs !== null || !player.value) return;
+  const now = playerState.value.actualTime;
+  if (
+    props.loadState === "complete" ||
+    canResume(now, playerState.value.totalTime, speedValue.value)
+  ) {
+    resumeAt(now);
+  }
+};
+
+const startPlayback = () => {
+  if (!player.value) {
+    mode.value = "playing";
+    return;
+  }
+  const now = playerState.value.actualTime;
+  if (
+    props.loadState === "loading" &&
+    shouldBuffer(now, playerState.value.totalTime, speedValue.value)
+  ) {
+    mode.value = "buffering";
+    return;
+  }
+  if (finished || props.loadState !== "complete") {
+    resumeAt(now);
+    return;
+  }
+  player.value.play();
+  mode.value = "playing";
 };
 
 const handlePlaybackBarClick = (event: any) => {
-  if (!playbackBarRef.value) return;
-  const playbackBarEl = playbackBarRef.value.getBoundingClientRect();
+  if (!playbackBarRef.value || !(timelineMs.value > 0)) return;
+  const rect = playbackBarRef.value.getBoundingClientRect();
+  if (!(rect.width > 0)) return;
+  const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  emit("seek-request", ratio * timelineMs.value);
+};
 
-  let time =
-    ((event.clientX - playbackBarEl.left) / playerState.value.width) * playerState.value.totalTime;
-
-  goto(time, playerState.value.isPlaying);
+const handleBarHover = (event: MouseEvent) => {
+  if (!playbackBarRef.value || !(timelineMs.value > 0)) return;
+  const rect = playbackBarRef.value.getBoundingClientRect();
+  if (!(rect.width > 0)) return;
+  const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  hoverMs.value = ratio * timelineMs.value;
 };
 
 // -------------- Player control methods ----------------
@@ -646,40 +844,69 @@ const togglePlay = () => {
 };
 
 const play = () => {
-  playerState.value.isPlaying = true;
-  player.value?.play();
+  emit("update:intent", "play");
+  if (mode.value === "ended") {
+    // goto(0) would restart at the run's origin, not the session start.
+    emit("seek-request", 0);
+    return;
+  }
+  if (mode.value === "failed") {
+    mode.value = "buffering";
+    emit("retry");
+    return;
+  }
+  if (mode.value === "waiting") {
+    mode.value = "buffering";
+    return;
+  }
+  startPlayback();
 };
 
+// Pausing while buffering cancels the auto-resume; a seek still waiting on data keeps waiting, paused.
 const pause = () => {
-  playerState.value.isPlaying = false;
+  emit("update:intent", "pause");
+  failedWasPlaying = false;
+  if (mode.value !== "playing" && mode.value !== "buffering") return;
   player.value?.pause();
+  mode.value = props.pendingSeekMs !== null ? "waiting" : "paused";
 };
 
 const setSpeed = (speed: SelectModelValue) => {
   // speedOptions are numeric; ignore any non-numeric emission.
-  if (typeof speed === "number") player.value?.setSpeed(speed);
+  if (typeof speed !== "number") return;
+  localSpeed.value = speed;
+  player.value?.setSpeed(speed);
+  emit("update:speed", speed);
 };
+
 const toggleSkipInactive = () => {
   player.value?.toggleSkipInactive();
+  localSkipInactivity.value = !skipInactivityValue.value;
+  emit("update:skipInactivity", localSkipInactivity.value);
+};
+
+const handleSkipInactivityChange = (value: SwitchValue) => {
+  if (!!value !== skipInactivityValue.value) toggleSkipInactive();
 };
 
 const goto = (timeOffset: number, play: boolean = false) => {
-  playerState.value.isPlaying = play;
   player.value?.goto(timeOffset, play);
+  finished = false;
+  mode.value = play ? "playing" : "paused";
 };
 
-const skipTo = (skipTo: string) => {
-  const seconds = 10;
-  if (skipTo === "forward") {
-    const newTime = Math.min(
-      playerState.value.actualTime + seconds * 1000,
-      playerState.value.totalTime,
-    );
-    goto(newTime, false);
-  } else {
-    const newTime = Math.max(playerState.value.actualTime - seconds * 1000, 0);
-    goto(newTime, false);
-  }
+/** The only seek entry point: session ms in, converted to this player's own origin. */
+const seekTo = (sessionMs: number, play: boolean = false) => {
+  const offset = Math.max(0, sessionMs - originOffsetMs.value);
+  playerState.value.actualTime = offset;
+  goto(offset, play);
+};
+
+// Seeks go to the parent, which knows what is loaded; the player never jumps into unloaded time itself.
+const skipTo = (direction: string) => {
+  if (!(timelineMs.value > 0)) return;
+  const delta = (direction === "forward" ? 1 : -1) * SKIP_SECONDS * 1000;
+  emit("seek-request", Math.max(0, Math.min(timelineMs.value, displayMs.value + delta)));
 };
 
 const initializeWorker = () => {
@@ -732,14 +959,74 @@ watch(
   { immediate: true },
 );
 
+// The metadata length is known before the first frame, so the total shows from the start.
+watch(
+  () => [props.sessionStartMs, props.sessionEndMs],
+  () => refreshTimeline(),
+  { immediate: true },
+);
+
+// The parent holds the target; the rrweb playhead stays put, because moving it into unloaded time drops every record up to it.
+watch(
+  () => props.pendingSeekMs,
+  (target, previous) => {
+    if (target !== null && (previous ?? null) === null) {
+      if (mode.value === "playing" || mode.value === "buffering") {
+        player.value?.pause();
+        mode.value = "buffering";
+      } else {
+        mode.value = "waiting";
+      }
+      return;
+    }
+    if (target !== null || (mode.value !== "buffering" && mode.value !== "waiting")) return;
+    if (props.loadState === "failed") {
+      failedWasPlaying = mode.value === "buffering";
+      mode.value = "failed";
+    } else if (mode.value === "waiting") {
+      mode.value = "paused";
+    } else {
+      tryResume();
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.loadState,
+  (state, previous) => {
+    if (state === "complete") {
+      // A last batch that ends inside the margin would otherwise buffer forever; finish then leads to Ended.
+      if (mode.value === "buffering" && props.pendingSeekMs === null && player.value) {
+        resumeAt(playerState.value.actualTime);
+      }
+      return;
+    }
+    if (state === "failed" && props.pendingSeekMs === null) {
+      if (mode.value === "buffering" || mode.value === "waiting") {
+        failedWasPlaying = mode.value === "buffering";
+        mode.value = "failed";
+      }
+      return;
+    }
+    if (state === "loading" && previous === "failed" && mode.value === "failed") {
+      mode.value = failedWasPlaying ? "buffering" : "paused";
+    }
+  },
+);
+
+watch(playbackState, (state) => emit("playback-state", state));
+
 defineExpose({
   goto,
+  seekTo,
   play,
   pause,
   togglePlay,
   setSpeed,
   toggleSkipInactive,
   playerState,
+  playbackState,
   updatePlayerState,
 });
 </script>

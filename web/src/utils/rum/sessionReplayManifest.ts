@@ -18,6 +18,8 @@ export interface ManifestEntry {
   end: number;
   has_full_snapshot?: boolean | string;
   records_count?: number;
+  view_id?: string | null;
+  index_in_view?: number | null;
 }
 
 export interface SegmentWindow {
@@ -34,8 +36,28 @@ export interface ManifestSummary {
 }
 
 // has_full_snapshot arrives as a boolean from the schema but as a string from older ingest paths.
-function hasFullSnapshot(entry: ManifestEntry): boolean {
+export function hasFullSnapshot(entry: ManifestEntry): boolean {
   return entry.has_full_snapshot === true || entry.has_full_snapshot === "true";
+}
+
+/** Identity of one stored segment; rows from a schema without the view columns fall back to span and record count. */
+export function segmentId(entry: ManifestEntry): string {
+  const base = `${entry.start}|${entry.end}|${Number(entry.records_count) || 0}`;
+  if (entry.view_id === undefined) return base;
+  return `${entry.view_id ?? ""}|${Number(entry.index_in_view) || 0}|${base}`;
+}
+
+// A retried upload or a tie at a page edge returns the same segment twice, and decoding it twice corrupts the converter.
+export function dedupManifest(rows: ManifestEntry[]): ManifestEntry[] {
+  const seen = new Set<string>();
+  const out: ManifestEntry[] = [];
+  for (const row of rows) {
+    const id = segmentId(row);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(row);
+  }
+  return out;
 }
 
 /** Index of the segment holding `target`, or the last one starting at or before it. */
