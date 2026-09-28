@@ -438,10 +438,10 @@ fn encode_path_parameters(
             continue;
         };
         match value {
-            Value::String(s) if s == "." || s == ".." => {
+            Value::String(s) if s.is_empty() || s == "." || s == ".." => {
                 return Err(anyhow!("Invalid path parameter '{name}'"));
             }
-            Value::String(s) => *s = urlencoding::encode(s).into_owned(),
+            Value::String(s) => *s = encode_path_segment(s),
             Value::Array(_) | Value::Object(_) => {
                 return Err(anyhow!("Path parameter '{name}' must be a scalar"));
             }
@@ -449,6 +449,20 @@ fn encode_path_parameters(
         }
     }
     Ok(())
+}
+
+/// Encode only what can move a request off its route; permission checks read the raw path.
+fn encode_path_segment(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for c in value.chars() {
+        // The URL parser drops tab/LF/CR and trailing spaces, which can leave a bare `..`.
+        if matches!(c, '%' | '/' | '\\' | '?' | '#' | ' ') || c.is_ascii_control() {
+            encoded.push_str(&format!("%{:02X}", c as u32));
+        } else {
+            encoded.push(c);
+        }
+    }
+    encoded
 }
 
 /// Execute a tool using the shared HTTP client
@@ -653,31 +667,7 @@ mod tests {
         }
     }
 
-    #[test]
-    fn path_parameter_is_encoded_as_one_segment() {
-        let mut arguments = json!({"org_id": "acme", "dashboard_id": "../../other/x?y#z%2e"});
-        encode_path_parameters(&dashboard_tool(), &mut arguments).unwrap();
-        assert_eq!(
-            arguments,
-            json!({"org_id": "acme", "dashboard_id": "..%2F..%2Fother%2Fx%3Fy%23z%252e"})
-        );
-    }
-
-    #[test]
-    fn dot_segment_and_non_scalar_path_parameters_are_rejected() {
-        for dashboard_id in [
-            json!("."),
-            json!(".."),
-            json!(["../x"]),
-            json!({"a": "../x"}),
-        ] {
-            let mut arguments = json!({"org_id": "acme", "dashboard_id": dashboard_id});
-            assert!(encode_path_parameters(&dashboard_tool(), &mut arguments).is_err());
-        }
-    }
-
-    #[tokio::test]
-    async fn traversal_argument_stays_on_its_route() {
+    async fn loopback_request_line(dashboard_id: &str) -> String {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -698,7 +688,7 @@ mod tests {
         });
 
         let metadata = dashboard_tool();
-        let mut arguments = json!({"org_id": "acme", "dashboard_id": "../../other/secret"});
+        let mut arguments = json!({"org_id": "acme", "dashboard_id": dashboard_id});
         encode_path_parameters(&metadata, &mut arguments).unwrap();
         rmcp_openapi::HttpClient::new()
             .with_base_url(base)
@@ -706,11 +696,68 @@ mod tests {
             .execute_tool_call(&metadata, &arguments)
             .await
             .unwrap();
+        server.await.unwrap()
+    }
 
-        assert_eq!(
-            server.await.unwrap(),
-            "GET /api/acme/dashboards/..%2F..%2Fother%2Fsecret HTTP/1.1"
-        );
+    #[test]
+    fn path_parameter_encodes_only_route_changing_characters() {
+        for (raw, expected) in [
+            ("job:http_requests:rate5m", "job:http_requests:rate5m"),
+            ("user@example.com", "user@example.com"),
+            ("../../other/x?y#z%2e", "..%2F..%2Fother%2Fx%3Fy%23z%252e"),
+            (".\t.", ".%09."),
+            ("\\..\\x", "%5C..%5Cx"),
+            (".. ", "..%20"),
+        ] {
+            let mut arguments = json!({"org_id": "acme", "dashboard_id": raw});
+            encode_path_parameters(&dashboard_tool(), &mut arguments).unwrap();
+            assert_eq!(
+                arguments,
+                json!({"org_id": "acme", "dashboard_id": expected}),
+                "{raw:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn empty_dot_segment_and_non_scalar_path_parameters_are_rejected() {
+        for dashboard_id in [
+            json!(""),
+            json!("."),
+            json!(".."),
+            json!(["../x"]),
+            json!({"a": "../x"}),
+        ] {
+            let mut arguments = json!({"org_id": "acme", "dashboard_id": dashboard_id});
+            assert!(
+                encode_path_parameters(&dashboard_tool(), &mut arguments).is_err(),
+                "{dashboard_id}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn traversal_argument_stays_on_its_route() {
+        for (raw, expected) in [
+            (
+                "../../other/secret",
+                "/api/acme/dashboards/..%2F..%2Fother%2Fsecret",
+            ),
+            (".\t.", "/api/acme/dashboards/.%09."),
+            ("\\..\\..\\other", "/api/acme/dashboards/%5C..%5C..%5Cother"),
+            (".. ", "/api/acme/dashboards/..%20"),
+            (
+                "job:http_requests:rate5m",
+                "/api/acme/dashboards/job:http_requests:rate5m",
+            ),
+            ("user@example.com", "/api/acme/dashboards/user@example.com"),
+        ] {
+            assert_eq!(
+                loopback_request_line(raw).await,
+                format!("GET {expected} HTTP/1.1"),
+                "{raw:?}"
+            );
+        }
     }
 
     #[tokio::test]

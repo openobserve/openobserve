@@ -8445,7 +8445,6 @@ dependencies = [
  "tantivy",
  "tokio",
  "url",
- "urlencoding",
  "utoipa",
 ]
 

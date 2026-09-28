@@ -19,5 +19,4 @@ serde_json.workspace = true
 tantivy.workspace = true
 tokio.workspace = true
 url.workspace = true
-urlencoding.workspace = true
 utoipa.workspace = true
