@@ -217,6 +217,7 @@ import { collapseViewDocuments } from "@/utils/rum/viewDocuments";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import {
   dedupManifest,
+  trimBeforeReplayStart,
   segmentId,
   selectInitialWindow,
   snapshotStarts,
@@ -391,6 +392,12 @@ const sessionStartMs = computed(
   () =>
     Number(sessionState.data.selectedSession?.start_time) || Number(manifest.value[0]?.start) || 0,
 );
+
+// Session ms of the first full snapshot; nothing before it can be drawn, so seeks there land on it.
+const replayStartOffsetMs = computed(() => {
+  const replayStart = Number(sessionState.data.selectedSession?.replay_start);
+  return replayStart > 0 ? Math.max(0, replayStart - sessionStartMs.value) : 0;
+});
 
 const sessionEndMs = computed(
   () =>
@@ -578,11 +585,18 @@ const getSession = async () => {
     geoFields += "min(geo_info_country) as country,";
   }
 
+  // Older streams (and mobile schemas) have no has_full_snapshot column, so ask for replay_start only when it exists.
+  const replayStartField = performanceState.data.streams["_sessionreplay"]["schema"][
+    "has_full_snapshot"
+  ]
+    ? "min(case when has_full_snapshot then start end) as replay_start,"
+    : "";
+
   const timestampColumn = store.state.zoConfig.timestamp_column;
   const range = routeRangeUs();
   const req = {
     query: {
-      sql: `select min(${timestampColumn}) as zo_sql_timestamp, max(${timestampColumn}) as max_ts, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where ${sqlEquals("session_id", getSessionId.value)} order by zo_sql_timestamp`,
+      sql: `select min(${timestampColumn}) as zo_sql_timestamp, max(${timestampColumn}) as max_ts, min(start) as start_time, max(end) as end_time, ${replayStartField} min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where ${sqlEquals("session_id", getSessionId.value)} order by zo_sql_timestamp`,
       start_time: range.start,
       end_time: range.end,
       from: 0,
@@ -891,7 +905,10 @@ const getSessionSegments = async () => {
     );
     if (cancelled) return;
     retryAttempt.value = 0;
-    const rows = dedupManifest(hits as ManifestEntry[]);
+    const rows = trimBeforeReplayStart(
+      dedupManifest(hits as ManifestEntry[]),
+      sessionState.data.selectedSession?.replay_start,
+    );
     adoptManifest(rows, complete);
     if (!rows.length) {
       loadState.value = "empty";
@@ -1240,7 +1257,7 @@ const isBehindBrowserWindow = (sessionMs: number) =>
 // Bar clicks, ±10 s and sidebar clicks all end here: seek now if the live player holds the target, else wait for it.
 const requestSeek = (sessionMs: number, play: boolean = replayIntent.value === "play") => {
   if (loadState.value === "error" || loadState.value === "empty") return;
-  const target = Math.max(0, sessionMs);
+  const target = Math.max(replayStartOffsetMs.value, sessionMs);
   unreachableSeek.value = isBehindBrowserWindow(target);
   if (unreachableSeek.value) {
     pendingSeekMs.value = null;

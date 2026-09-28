@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   dedupManifest,
+  trimBeforeReplayStart,
   findTargetIndex,
   segmentId,
   selectInitialWindow,
@@ -112,6 +113,23 @@ describe("sessionReplayManifest", () => {
       const a = { start: 1, end: 2, records_count: 3, view_id: "a", index_in_view: 0 };
       const b = { ...a, view_id: "b" };
       expect(segmentId(a)).not.toBe(segmentId(b));
+    });
+  });
+
+  describe("trimBeforeReplayStart", () => {
+    const rows = [
+      { start: 1000, end: 1999, records_count: 5 },
+      { start: 2000, end: 2999, records_count: 3, has_full_snapshot: true },
+      { start: 3000, end: 3999, records_count: 1 },
+    ];
+
+    it("drops leading rows that start before the first full snapshot", () => {
+      expect(trimBeforeReplayStart(rows, 2000)).toEqual(rows.slice(1));
+    });
+
+    it("keeps every row when replay_start is unknown", () => {
+      expect(trimBeforeReplayStart(rows, null)).toBe(rows);
+      expect(trimBeforeReplayStart(rows, undefined)).toBe(rows);
     });
   });
 

@@ -1595,6 +1595,55 @@ describe("SessionViewer.vue — seeks in session ms (G4, G7)", () => {
   });
 });
 
+describe("SessionViewer.vue — playback starts at the first full snapshot", () => {
+  // The first view lost its snapshot segment, so the row at S is an orphan mutation batch.
+  const orphanRows = [
+    { start: S, end: S + 999, has_full_snapshot: false, records_count: 1 },
+    ...fixtureRows.slice(1).map((row) => ({ ...row, has_full_snapshot: true })),
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    replaySchema.fields = { geo_info_country: true, geo_info_city: true, has_full_snapshot: true };
+    resetStreaming(rowsResponder(orphanRows));
+    vi.mocked(searchService.search).mockResolvedValueOnce({
+      data: { hits: [{ ...sessionLookupRow, replay_start: S + 1000 }] },
+    } as any);
+  });
+
+  it("asks getSession for replay_start when the stream has has_full_snapshot", async () => {
+    const wrapper = await mountLoaded();
+    const sql = (vi.mocked(searchService.search).mock.calls[0][0] as any).query.query.sql;
+    expect(sql).toContain("min(case when has_full_snapshot then start end) as replay_start");
+    wrapper.unmount();
+  });
+
+  it("drops manifest rows before replay_start, so the first window opens on a snapshot", async () => {
+    const wrapper = await mountLoaded();
+    const vm = wrapper.vm as any;
+
+    expect(vm.manifest.map((row: any) => row.start)).toEqual([S + 1000, S + 2000]);
+    expect(streaming.sqls[1]).toContain(`and start >= ${S + 1000}`);
+    wrapper.unmount();
+  });
+
+  it("lands a sidebar seek before replay_start on the first playable frame", async () => {
+    const wrapper = await mountLoaded();
+    const vm = wrapper.vm as any;
+    const seekTo = vi.fn();
+    playerStubs.videoSeek = seekTo;
+    vm.playerLoadedEndMs = 2999;
+    vm.playerTakenCount = vm.segments.length;
+    vm.handlePlayerReady();
+
+    vm.handleSidebarEvent("event-click", { event_id: "e1", relativeTime: 200 });
+
+    expect(seekTo).toHaveBeenCalledWith(1000, false);
+    expect(vm.unreachableSeek).toBe(false);
+    wrapper.unmount();
+  });
+});
+
 describe("SessionViewer.vue — mobile sessions (F0.2)", () => {
   const mobileBody = (row: any) => ({
     ...row,

@@ -60,6 +60,16 @@ export function dedupManifest(rows: ManifestEntry[]): ManifestEntry[] {
   return out;
 }
 
+// Rows before the first full snapshot are orphan mutations that decode against an empty id space, so playback starts at replayStart.
+export function trimBeforeReplayStart(
+  rows: ManifestEntry[],
+  replayStart: number | null | undefined,
+): ManifestEntry[] {
+  const floor = Number(replayStart);
+  if (!(floor > 0)) return rows;
+  return rows.filter((row) => Number(row.start) >= floor);
+}
+
 /** Index of the segment holding `target`, or the last one starting at or before it. */
 export function findTargetIndex(manifest: ManifestEntry[], target: number): number {
   let index = -1;
