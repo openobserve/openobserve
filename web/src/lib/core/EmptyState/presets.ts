@@ -340,6 +340,12 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noTraces.title",
     descriptionKey: "emptyState.noTraces.description",
   },
+  "no-profiles": {
+    illustration: "wave-bars",
+    variant: "no-results",
+    titleKey: "emptyState.noProfiles.title",
+    descriptionKey: "emptyState.noProfiles.description",
+  },
   "no-dataset-items": {
     illustration: "box",
     variant: "create",
@@ -993,6 +999,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-alerts": "emptyState.nouns.alerts",
   "no-incidents": "emptyState.nouns.incidents",
   "no-traces": "emptyState.nouns.traces",
+  "no-profiles": "emptyState.nouns.profiles",
   "no-discovery-items": "emptyState.nouns.discoveryItems",
   "no-dataset-items": "emptyState.nouns.datasetItems",
   "no-search-history": "emptyState.nouns.searches",
