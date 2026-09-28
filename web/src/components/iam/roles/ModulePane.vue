@@ -320,7 +320,7 @@ const coveredResources = computed(() => {
   return covered;
 });
 
-// The Granted filter and the count follow the checkboxes: a row locked by a wider scope is granted.
+// The Selected filter and the count follow the checkboxes: a row locked by a wider scope counts as selected.
 const hasEffectiveGrant = (row: any) =>
   hasOwnGrant(row) || coveredResources.value.has(row.resourceName);
 

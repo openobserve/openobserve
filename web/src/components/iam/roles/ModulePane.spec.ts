@@ -157,7 +157,9 @@ describe("ModulePane - resources", () => {
       [makeNode("cpu", ["AllowGet"]), makeNode("memory")],
     );
 
-    expect(wrapper.text()).toContain("1 Granted");
+    expect(wrapper.text()).toContain(
+      String(i18n.global.t("iam.editRole.moduleGrantedCount", { count: 1 })),
+    );
   });
 });
 
@@ -437,7 +439,7 @@ describe("ModulePane - filter matches nothing", () => {
     expect(entityBox(wrapper, "cpu", "AllowGet").exists()).toBe(true);
   });
 
-  it("clears the Granted filter too, so a granted-only view is not a dead end", async () => {
+  it("clears the Selected filter too, so a selected-only view is not a dead end", async () => {
     const wrapper = await mountPane([], [makeNode("cpu"), makeNode("mem")]);
     await wrapper.find('[data-test="edit-role-module-pane-filter-granted"]').trigger("click");
 

@@ -108,6 +108,15 @@ describe("buildRoleModules - grouping", () => {
     expect(modules[0].icon).toBe("schema");
   });
 
+  // Synthetic Environments arrived after the group map was written; unmapped, it would sit under Other.
+  it("groups synthetic environments with monitoring", () => {
+    const modules = buildRoleModules([
+      { key: "synthetic_environment", parent: "", has_entities: true },
+    ]);
+    expect(modules[0].group).toBe("monitoring");
+    expect(modules[0].icon).toBe("layers");
+  });
+
   // A folder type the org does not list must not strand its child under other.
   it("groups a child listed without its parent where the parent belongs", () => {
     const modules = buildRoleModules([{ key: "alert", parent: "afolder", has_entities: true }]);

@@ -124,7 +124,7 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         await expect(pm.rolesPage.paneTitle).toHaveText(before);
     });
 
-    test('U-04 · the rail Granted filter shows only modules the role holds', async ({ page }) => {
+    test('U-04 · the rail Selected filter shows only modules the role holds', async ({ page }) => {
         await pm.rolesPage.railScopeGranted.click();
         const granted = await pm.rolesPage.railItems().count();
 
