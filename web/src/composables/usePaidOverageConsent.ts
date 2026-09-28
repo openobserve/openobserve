@@ -42,9 +42,7 @@ const isSubmitting = ref(false);
 const errorMessage = ref("");
 const openChats = ref(0);
 
-const showInChat = computed(
-  () => activeRequest.value?.surface === "chat" && openChats.value > 0,
-);
+const showInChat = computed(() => activeRequest.value?.surface === "chat" && openChats.value > 0);
 const showInDialog = computed(() => !!activeRequest.value && !showInChat.value);
 
 /** Lets an open chat render chat-surface prompts inline while `isOpen()` holds. */
