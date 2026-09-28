@@ -928,7 +928,7 @@ const healthyChecks = computed<DbmLockCheck[]>(() => {
 
 /** `widen` is the only one `onEmptyAction` implements. */
 const healthyActions = computed<DbmLockEmptyAction[]>(() => [
-  { id: "widen", label: t("dbm.deadlocks.healthy.widen") },
+  { id: "widen", label: t("dbm.deadlocks.healthy.widen"), icon: "schedule" },
 ]);
 
 // The shared queries/enabled diagnostics in this page's namespace, plus the

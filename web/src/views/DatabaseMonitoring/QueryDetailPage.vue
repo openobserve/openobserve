@@ -1545,7 +1545,7 @@ const callersEmptyChecks = computed<DbmLockCheck[]>(() => [
  * routes to — rather than naming an env var here and stopping.
  */
 const callersEmptyActions = computed<DbmLockEmptyAction[]>(() => [
-  { id: "open-setup", label: t("dbm.detail.callersEmpty.setUp"), primary: true },
+  { id: "open-setup", label: t("dbm.detail.callersEmpty.setUp"), primary: true, icon: "settings" },
 ]);
 
 const onCallersEmptyAction = (id: string) => {
