@@ -230,7 +230,8 @@ impl Engine {
                     .eval_ctx
                     .timestamps()
                     .into_iter()
-                    .map(|ts| Sample::new(ts, ts.div_euclid(1_000_000) as f64))
+                    // Prometheus truncates toward zero (`enh.Ts/1000`): a step at -0.5 s reads as second 0
+                    .map(|ts| Sample::new(ts, (ts / 1_000_000) as f64))
                     .collect(),
                 exemplars: None,
                 time_window: None,
@@ -382,6 +383,27 @@ mod tests {
         assert_eq!(series.len(), 1);
         assert_eq!(series[0].samples[0].value, 5.0);
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_default_date_truncates_toward_zero() {
+        let eval_ctx = EvalContext::new(-500_000, -500_000, 0, "test".into());
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            eval_ctx,
+        );
+        for query in ["year()", "year(vector(time()))"] {
+            let expr = promql_parser::parser::parse(query).unwrap();
+            let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+                panic!("expected a matrix for {query}");
+            };
+            assert_eq!(series[0].samples[0].value, 1970.0, "{query}");
+        }
     }
 
     #[tokio::test]

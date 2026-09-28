@@ -261,8 +261,9 @@ impl fmt::Display for SampleValueDisplay {
             return write!(f, "{value}");
         }
         // Go signs the exponent and pads it to two digits: 1e+21, 1e-07
-        let text = format!("{value:e}");
-        let (mantissa, exponent) = text.split_once('e').ok_or(fmt::Error)?;
+        let mut text = FloatText::default();
+        fmt::Write::write_fmt(&mut text, format_args!("{value:e}"))?;
+        let (mantissa, exponent) = text.as_str()?.split_once('e').ok_or(fmt::Error)?;
         let (sign, digits) = match exponent.strip_prefix('-') {
             Some(digits) => ('-', digits),
             None => ('+', exponent),
@@ -277,6 +278,31 @@ impl Serialize for SampleValueDisplay {
         S: Serializer,
     {
         serializer.collect_str(self)
+    }
+}
+
+/// Stack space for one `{:e}` float; the longest, `-2.2250738585072014e-308`, is 24 bytes.
+#[derive(Default)]
+struct FloatText {
+    bytes: [u8; 32],
+    len: usize,
+}
+
+impl FloatText {
+    fn as_str(&self) -> Result<&str, fmt::Error> {
+        std::str::from_utf8(&self.bytes[..self.len]).map_err(|_| fmt::Error)
+    }
+}
+
+impl fmt::Write for FloatText {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let end = self.len + s.len();
+        self.bytes
+            .get_mut(self.len..end)
+            .ok_or(fmt::Error)?
+            .copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
     }
 }
 
