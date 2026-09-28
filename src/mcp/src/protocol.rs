@@ -422,6 +422,35 @@ fn bind_organization(http_path: &str, arguments: &mut Value, org_id: &str) {
     arguments.insert("org_id".to_string(), Value::String(org_id.to_string()));
 }
 
+/// Percent-encode path arguments as single segments; rmcp-openapi substitutes them raw.
+fn encode_path_parameters(
+    metadata: &rmcp_openapi::ToolMetadata,
+    arguments: &mut Value,
+) -> Result<()> {
+    let Some(arguments) = arguments.as_object_mut() else {
+        return Ok(());
+    };
+    for (name, mapping) in &metadata.parameter_mappings {
+        if mapping.location != "path" {
+            continue;
+        }
+        let Some(value) = arguments.get_mut(name) else {
+            continue;
+        };
+        match value {
+            Value::String(s) if s == "." || s == ".." => {
+                return Err(anyhow!("Invalid path parameter '{name}'"));
+            }
+            Value::String(s) => *s = urlencoding::encode(s).into_owned(),
+            Value::Array(_) | Value::Object(_) => {
+                return Err(anyhow!("Path parameter '{name}' must be a scalar"));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// Execute a tool using the shared HTTP client
 async fn execute_tool(
     org_id: &str,
@@ -438,6 +467,7 @@ async fn execute_tool(
     // so the underlying HTTP API contract stays untouched.
     normalize_request_body_fields(&metadata.parameters, &mut arguments);
     bind_organization(&metadata.path, &mut arguments, org_id);
+    encode_path_parameters(metadata, &mut arguments)?;
 
     // Get the shared HTTP client
     let shared_client = get_shared_http_client();
@@ -590,6 +620,97 @@ mod tests {
         let mut arguments = json!({"request_body": {"org_id": "body-org"}});
         bind_organization("/api/organizations", &mut arguments, "acme");
         assert_eq!(arguments, json!({"request_body": {"org_id": "body-org"}}));
+    }
+
+    fn dashboard_tool() -> rmcp_openapi::ToolMetadata {
+        let mapping = |name: &str| {
+            (
+                name.to_string(),
+                rmcp_openapi::tool::ParameterMapping {
+                    sanitized_name: name.to_string(),
+                    original_name: name.to_string(),
+                    location: "path".to_string(),
+                    explode: false,
+                },
+            )
+        };
+        rmcp_openapi::ToolMetadata {
+            name: "GetDashboard".to_string(),
+            title: None,
+            description: None,
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "org_id": {"type": "string"},
+                    "dashboard_id": {"type": "string"}
+                }
+            }),
+            output_schema: None,
+            method: "GET".to_string(),
+            path: "/api/{org_id}/dashboards/{dashboard_id}".to_string(),
+            security: None,
+            parameter_mappings: [mapping("org_id"), mapping("dashboard_id")].into(),
+        }
+    }
+
+    #[test]
+    fn path_parameter_is_encoded_as_one_segment() {
+        let mut arguments = json!({"org_id": "acme", "dashboard_id": "../../other/x?y#z%2e"});
+        encode_path_parameters(&dashboard_tool(), &mut arguments).unwrap();
+        assert_eq!(
+            arguments,
+            json!({"org_id": "acme", "dashboard_id": "..%2F..%2Fother%2Fx%3Fy%23z%252e"})
+        );
+    }
+
+    #[test]
+    fn dot_segment_and_non_scalar_path_parameters_are_rejected() {
+        for dashboard_id in [
+            json!("."),
+            json!(".."),
+            json!(["../x"]),
+            json!({"a": "../x"}),
+        ] {
+            let mut arguments = json!({"org_id": "acme", "dashboard_id": dashboard_id});
+            assert!(encode_path_parameters(&dashboard_tool(), &mut arguments).is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn traversal_argument_stays_on_its_route() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = url::Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let n = socket.read(&mut buf).await.unwrap();
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")
+                .await
+                .unwrap();
+            String::from_utf8_lossy(&buf[..n])
+                .lines()
+                .next()
+                .unwrap()
+                .to_string()
+        });
+
+        let metadata = dashboard_tool();
+        let mut arguments = json!({"org_id": "acme", "dashboard_id": "../../other/secret"});
+        encode_path_parameters(&metadata, &mut arguments).unwrap();
+        rmcp_openapi::HttpClient::new()
+            .with_base_url(base)
+            .unwrap()
+            .execute_tool_call(&metadata, &arguments)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            server.await.unwrap(),
+            "GET /api/acme/dashboards/..%2F..%2Fother%2Fsecret HTTP/1.1"
+        );
     }
 
     #[tokio::test]
