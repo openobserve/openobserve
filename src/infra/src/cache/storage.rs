@@ -153,36 +153,7 @@ impl ObjectStoreExt for CacheFS {
         location: &Path,
         ranges: &[Range<u64>],
     ) -> Result<Vec<Bytes>> {
-        if ranges.is_empty() {
-            return Ok(Vec::new());
-        }
-        let path = location.to_string();
-        let ordered = ranges.iter().all(|range| range.start < range.end)
-            && ranges.windows(2).all(|pair| pair[0].end <= pair[1].start);
-        let plan = if ranges.len() > 1 && ordered {
-            Some(
-                storage::range_plan::plan_coalesced_ranges(ranges).map_err(|error| {
-                    Error::Generic {
-                        store: "CacheFS",
-                        source: Box::new(std::io::Error::other(error.to_string())),
-                    }
-                })?,
-            )
-        } else {
-            None
-        };
-        let fetched_ranges = plan.as_ref().map_or(ranges, |plan| plan.ranges.as_slice());
-        let data = match file_data::get_ranges_opts(account, &path, fetched_ranges, false).await {
-            Ok(data) => data,
-            Err(_) => storage::get_ranges(account, &path, fetched_ranges).await?,
-        };
-        match plan {
-            Some(plan) => plan.into_payloads(data).map_err(|error| Error::Generic {
-                store: "CacheFS",
-                source: Box::new(std::io::Error::other(error.to_string())),
-            }),
-            None => Ok(data),
-        }
+        file_data::get_ranges_opts(account, location.as_ref(), ranges, true).await
     }
 
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta> {
