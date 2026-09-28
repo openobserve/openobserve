@@ -483,7 +483,14 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
-import remoteTasksService, { type RemoteTask } from "@/services/remote-tasks.service";
+import { type RemoteTask } from "@/services/remote-tasks.service";
+import { remoteTasksListQuery } from "@/services/llm-experiments.queries";
+import {
+  cloneExperimentMutation,
+  createExperimentMutation,
+} from "@/services/llm-experiments.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
 import llmExperimentsService, {
   type ExperimentCreatePayload,
   type ExperimentPreview,
@@ -625,7 +632,7 @@ async function loadRemoteTasks() {
   if (!orgId.value) return;
   loadingRemoteTasks.value = true;
   try {
-    remoteTasks.value = await remoteTasksService.list(orgId.value);
+    remoteTasks.value = await queryClient.fetchQuery(remoteTasksListQuery(orgId.value));
   } catch {
     remoteTasks.value = [];
   } finally {
@@ -786,14 +793,18 @@ function buildPayload(values: ExperimentForm): ExperimentCreatePayload {
   };
 }
 
+// Create and clone both add a row the browser this navigates to would otherwise miss.
+const createExperimentWrite = useMutation(() => createExperimentMutation(orgId.value));
+const cloneExperimentWrite = useMutation(() => cloneExperimentMutation(orgId.value));
+
 async function submitClone(payload: ExperimentCreatePayload): Promise<string> {
   // datasetId and datasetVersion are deliberately absent: an omitted field keeps
   // what the source pinned, which is the only pin a comparison stays valid over.
   const { datasetId: _datasetId, datasetVersion: _datasetVersion, ...overrides } = payload;
   return (
-    await llmExperimentsService.clone(orgId.value, cloneOfId.value, {
-      ...overrides,
-      idempotencyKey: overrides.idempotencyKey ?? undefined,
+    await cloneExperimentWrite.mutateAsync({
+      experimentId: cloneOfId.value,
+      overrides: { ...overrides, idempotencyKey: overrides.idempotencyKey ?? undefined },
     })
   ).id;
 }
@@ -806,7 +817,7 @@ async function onSubmit(values: ExperimentForm) {
     const body = preview.value ? withPreviewScorers(payload, preview.value) : payload;
     const createdId = cloning.value
       ? await submitClone(body)
-      : (await llmExperimentsService.create(orgId.value, body)).experiment.id;
+      : (await createExperimentWrite.mutateAsync(body)).experiment.id;
     idempotencyKey.value = nextIdempotencyKey();
     allowLeave = true;
     toast({

@@ -23,15 +23,18 @@ import i18nInstance from "@/locales";
 
 const t = (i18nInstance.global as any).t;
 
-vi.mock("@/services/workflows", () => ({
-  default: {
-    getWorkflowRun: vi.fn(),
-    testWorkflow: vi.fn(),
-    getWorkflowHistory: vi.fn(),
-    updateWorkflow: vi.fn(),
-    retryWorkflow: vi.fn(),
-  },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getWorkflowRun: vi.fn(),
+      testWorkflow: vi.fn(),
+      getWorkflowHistory: vi.fn(),
+      updateWorkflow: vi.fn(),
+      retryWorkflow: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: (p: string) => p,
@@ -146,6 +149,33 @@ describe("loadRunsHistory — shared runs list for the Runs page + NDV switcher"
     expect(r).toEqual({ ok: false, status: 500 });
     expect(workflowObj.runsHistory.list).toEqual([{ run_id: "old" }]); // untouched
     expect(workflowObj.runsHistory.loading).toBe(false);
+  });
+
+  const window = {
+    orgId: "o",
+    workflowId: "wf1",
+    start: 1_700_000_000_000_000,
+    end: 1_700_000_060_000_000,
+  };
+
+  it("serves the same window from the cache and re-reads it on a forced refresh", async () => {
+    mockHistory.mockResolvedValue({ data: [] });
+    await loadRunsHistory(window);
+    await loadRunsHistory(window);
+    expect(mockHistory).toHaveBeenCalledTimes(1);
+
+    await loadRunsHistory({ ...window, force: true });
+    expect(mockHistory).toHaveBeenCalledTimes(2);
+  });
+
+  // A retry is a new run, so no cached window can still be complete.
+  it("re-reads the runs after a retry", async () => {
+    mockHistory.mockResolvedValue({ data: [] });
+    (workflowService.retryWorkflow as any).mockResolvedValue({ data: {} });
+    await loadRunsHistory(window);
+    await retryWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r1" });
+    await loadRunsHistory(window);
+    expect(mockHistory).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -3357,6 +3387,16 @@ describe("useWorkflowCanvas — flushing test state to the server", () => {
       data: { errors: {}, inputs: { t: [{ x: 1 }], d: [{ x: 1 }] }, outputs: {} },
     });
     (workflowService.updateWorkflow as any).mockResolvedValue({ data: {} });
+  });
+
+  // A test run can land in the history, so the tested workflow's cached runs may be behind.
+  it("re-reads the runs of the tested workflow after a test run", async () => {
+    const window = { orgId: "org", workflowId: "wf-flush", start: 1, end: 2 };
+    mockHistory.mockResolvedValue({ data: [] });
+    await loadRunsHistory(window);
+    await executeTestRun({ orgId: "org", inputs: [{ x: 1 }] });
+    await loadRunsHistory(window);
+    expect(mockHistory).toHaveBeenCalledTimes(2);
   });
 
   it("persists the recorded state to the workflow document after a run", async () => {

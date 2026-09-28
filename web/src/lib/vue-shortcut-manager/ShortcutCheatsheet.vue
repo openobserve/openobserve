@@ -261,6 +261,7 @@ const capabilities = computed<ShortcutCapabilities>(() => ({
   incidentsEnabled: Boolean(store.state.zoConfig?.incidents_enabled),
   modelPricingEnabled: Boolean(store.state.zoConfig?.model_pricing_enabled),
   rbacEnabled: Boolean(store.state.zoConfig?.rbac_enabled),
+  aiEnabled: Boolean(store.state.zoConfig?.ai_enabled),
 }));
 
 const open = computed({
@@ -315,11 +316,14 @@ const allModules = computed<DisplayModule[]>(() => {
       return [
         {
           title: t(group.pageKey, PAGE_TITLE_PARAMS[group.pageKey] ?? {}),
-          entries: group.shortcuts.map((s) => ({
-            id: s.id,
-            display: entryDisplay(s),
-            label: t(s.descriptionKey),
-          })),
+          entries: group.shortcuts
+            // Entry-level gate mirrors the feature's real availability (e.g. the AI chat shortcut only works on enterprise with ai_enabled).
+            .filter((s) => !s.visible || s.visible(caps))
+            .map((s) => ({
+              id: s.id,
+              display: entryDisplay(s),
+              label: t(s.descriptionKey),
+            })),
         },
       ];
     }),

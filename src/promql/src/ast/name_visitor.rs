@@ -55,6 +55,7 @@ mod tests {
     use promql_parser::parser;
 
     use super::*;
+    use crate::ast::visitor::walk_expr;
 
     #[test]
     fn test_name_visitor() {
@@ -72,7 +73,7 @@ mod tests {
 
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricNameVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
 
         assert_eq!(visitor.name.len(), 2);
 
@@ -80,7 +81,7 @@ mod tests {
 
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricNameVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
         assert_eq!(visitor.name.len(), 1);
     }
 
@@ -95,7 +96,7 @@ mod tests {
         let promql = r#"sum(rate({__name__="http_requests_total"}[1m]))"#;
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricNameVisitor::new();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
         assert!(visitor.name.contains("http_requests_total"));
         assert_eq!(visitor.name.len(), 1);
     }
@@ -107,7 +108,7 @@ mod tests {
         let names = |promql| {
             let ast = parser::parse(promql).unwrap();
             let mut visitor = MetricNameVisitor::new();
-            promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+            walk_expr(&mut visitor, &ast).unwrap();
             visitor.into_names()
         };
         assert_eq!(names(bare), names(labelled));
@@ -125,7 +126,7 @@ mod tests {
             let ast = parser::parse(promql).unwrap();
             let mut visitor = MetricNameVisitor::new();
             assert!(
-                promql_parser::util::walk_expr(&mut visitor, &ast).is_err(),
+                walk_expr(&mut visitor, &ast).is_err(),
                 "{promql} should not resolve to a stream name"
             );
         }
@@ -136,7 +137,7 @@ mod tests {
         let promql = r#"{__name__="http_requests_total", __name__!="other"}"#;
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricNameVisitor::new();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
         assert!(visitor.name.contains("http_requests_total"));
         assert_eq!(visitor.name.len(), 1);
     }
@@ -147,7 +148,7 @@ mod tests {
         let promql = r#"{job="test"}"#;
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricNameVisitor::new();
-        assert!(promql_parser::util::walk_expr(&mut visitor, &ast).is_err());
+        assert!(walk_expr(&mut visitor, &ast).is_err());
         assert!(!visitor.name.contains(""));
     }
 
@@ -157,7 +158,40 @@ mod tests {
         let promql = "1 + 2";
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricNameVisitor::new();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        walk_expr(&mut visitor, &ast).unwrap();
         assert!(visitor.name.is_empty());
+    }
+
+    #[test]
+    fn test_name_visitor_collects_aggregation_param_names() {
+        // the parameter is authorized like the body: a selector hidden there must be collected
+        for (promql, expected) in [
+            (
+                r#"topk(scalar(secret{instance="a"}), m)"#,
+                vec!["m", "secret"],
+            ),
+            ("bottomk(scalar(secret), m)", vec!["m", "secret"]),
+            ("quantile(scalar(secret), m)", vec!["m", "secret"]),
+            (r#"count_values("v", m)"#, vec!["m"]),
+            ("topk(scalar(sum(x)), y)", vec!["x", "y"]),
+            (
+                "topk(scalar(secret), m) + other",
+                vec!["m", "other", "secret"],
+            ),
+        ] {
+            let ast = parser::parse(promql).unwrap();
+            let mut visitor = MetricNameVisitor::new();
+            walk_expr(&mut visitor, &ast).unwrap();
+            let mut names: Vec<_> = visitor.into_names().into_iter().collect();
+            names.sort();
+            assert_eq!(names, expected, "{promql}");
+        }
+    }
+
+    #[test]
+    fn test_name_visitor_nameless_selector_in_param_is_an_error() {
+        let ast = parser::parse(r#"topk(scalar({job="test"}), m)"#).unwrap();
+        let mut visitor = MetricNameVisitor::new();
+        assert!(walk_expr(&mut visitor, &ast).is_err());
     }
 }

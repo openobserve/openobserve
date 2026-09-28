@@ -35,6 +35,9 @@ export class CompositeAlertsPage {
       listExpression: (id) => `[data-test="alert-list-composite-expression-${id}"]`,
       listReferenceCount: (id) => `[data-test="alert-list-reference-count-${id}"]`,
       listEnableToggle: (name) => `[data-test="alert-list-${name}-pause-start-alert"]`,
+      listNameCell: (name) => `[data-test="alert-list-${name}-name-cell"]`,
+      listLastTriggeredCell: '[data-test="o2-table-cell-last_triggered_at"]',
+      listLastSatisfiedCell: '[data-test="o2-table-cell-last_satisfied_at"]',
 
       // ---- references drawer ------------------------------------------
       referenceChip: '[data-test="alerts-composite-reference-chip"]',
@@ -84,6 +87,17 @@ export class CompositeAlertsPage {
       previewStale: (id) => `[data-test="alerts-composite-preview-stale-${id}"]`,
       previewError: (code) => `[data-test="alerts-composite-preview-error-${code}"]`,
 
+      // ---- clone dialog (AlertList.vue clone flow) ------------------------
+      cloneButton: (name) => `[data-test="alert-list-${name}-clone-alert"]`,
+      cloneDialog: '[data-test="alert-list-form-dialog"]',
+      cloneNameInputField: '[data-test="to-be-clone-alert-name-field"]',
+      cloneStreamType: '[data-test="to-be-clone-stream-type"]',
+      cloneStreamName: '[data-test="to-be-clone-stream-name"]',
+      cloneSubmitButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-primary-btn"]',
+      cloneCancelButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-secondary-btn"]',
+      cloneFolderPicker: '[data-test="alert-list-form-dialog"] [data-test="alerts-index-dropdown-stream_type"]',
+      toastMessage: '[data-test="o-toast-message"]',
+
       // ---- detail --------------------------------------------------------
       detail: '[data-test="alerts-composite-detail"]',
       detailExpressionLive: '[data-test="alerts-composite-detail-expression-live"]',
@@ -93,6 +107,8 @@ export class CompositeAlertsPage {
       detailChild: (id) => `[data-test="alerts-composite-detail-child-${id}"]`,
       detailChildLink: (id) => `[data-test="alerts-composite-detail-child-link-${id}"]`,
       detailStaleReason: (id) => `[data-test="alerts-composite-detail-stale-reason-${id}"]`,
+      detailLevelAt: (id) => `[data-test="alerts-composite-detail-level-at-${id}"]`,
+      detailEvaluationTimestamp: '[data-test="alerts-composite-detail-evaluated-at"]',
       missingJob: '[data-test="alerts-composite-detail-missing-job"]',
 
       // ---- status timeline -------------------------------------------------
@@ -167,6 +183,23 @@ export class CompositeAlertsPage {
 
   listEnableToggle(name) {
     return this.page.locator(this.locators.listEnableToggle(name));
+  }
+
+  listNameCell(name) {
+    return this.page.locator(this.locators.listNameCell(name));
+  }
+
+  /** The whole table row a composite occupies, reached via its rendered name. */
+  listRowByName(name) {
+    return this.page.locator('tr', { has: this.page.locator(this.locators.listNameCell(name)) });
+  }
+
+  listLastTriggeredCell(name) {
+    return this.listRowByName(name).locator(this.locators.listLastTriggeredCell);
+  }
+
+  listLastSatisfiedCell(name) {
+    return this.listRowByName(name).locator(this.locators.listLastSatisfiedCell);
   }
 
   /** The whole table row a composite occupies, reached via its badge. */
@@ -386,13 +419,32 @@ export class CompositeAlertsPage {
    *
    * Only what the select has RENDERED: a searchable OSelect windows its list,
    * so treat this as "does not offer" evidence for a small fixture set, never
-   * as the complete option universe.
+   * as the complete option universe. `searchText` narrows the list first so the
+   * fixtures under test are inside the window; `settleOn` is the option value to
+   * wait for before reading, so the filtered list is not read mid-render.
    */
-  async optionIdsFor(id) {
+  async optionIdsFor(id, searchText, settleOn) {
     const base = this.locators.childSelectBase(id);
     const popover = this.page.locator(`[data-test="${base}-popover"]`);
     await this.page.locator(`[data-test="${base}-trigger"]`).click();
     await expect(popover).toBeVisible();
+
+    // The picker's list is WINDOWED, so a snapshot of the rendered options is only
+    // the truth about what is offered when every candidate fits the window. On an
+    // org holding more than a screenful of alerts — any parallel run, and every run
+    // on a shared cloud org — an alert that IS offered can be absent from the DOM
+    // until the search narrows to it. Narrow first, then read.
+    if (searchText) {
+      const search = this.page.locator(`[data-test="${base}-search"]`);
+      if (await search.count()) await search.fill(searchText);
+    }
+    // Settle on the filtered list having rendered, rather than reading mid-render.
+    if (settleOn) {
+      await expect(
+        this.page.locator(`[data-test="${base}-option"][data-test-value="${settleOn}"]`)
+      ).toBeVisible();
+    }
+
     const ids = await this.page
       .locator(`[data-test="${base}-option"]`)
       .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-test-value')));
@@ -555,6 +607,14 @@ export class CompositeAlertsPage {
     return this.page.locator(this.locators.detailStaleReason(id));
   }
 
+  detailLevelAt(id) {
+    return this.page.locator(this.locators.detailLevelAt(id));
+  }
+
+  detailEvaluationTimestamp() {
+    return this.page.locator(this.locators.detailEvaluationTimestamp);
+  }
+
   missingJob() {
     return this.page.locator(this.locators.missingJob);
   }
@@ -586,5 +646,93 @@ export class CompositeAlertsPage {
 
   bodyHasNoHorizontalOverflow() {
     return this.page.locator('body').evaluate((body) => body.scrollWidth <= body.clientWidth);
+  }
+
+  // ===================== clone dialog =====================
+
+  cloneButton(name) {
+    return this.page.locator(this.locators.cloneButton(name));
+  }
+
+  cloneDialog() {
+    return this.page.locator(this.locators.cloneDialog);
+  }
+
+  cloneNameInputField() {
+    return this.page.locator(this.locators.cloneNameInputField);
+  }
+
+  cloneStreamTypeSelect() {
+    return this.page.locator(this.locators.cloneStreamType);
+  }
+
+  cloneStreamNameSelect() {
+    return this.page.locator(this.locators.cloneStreamName);
+  }
+
+  cloneSubmitButton() {
+    return this.page.locator(this.locators.cloneSubmitButton);
+  }
+
+  cloneCancelButton() {
+    return this.page.locator(this.locators.cloneCancelButton);
+  }
+
+  cloneFolderPicker() {
+    return this.page.locator(this.locators.cloneFolderPicker);
+  }
+
+  successToast(message) {
+    return this.page.locator(this.locators.toastMessage).filter({ hasText: message }).first();
+  }
+
+  async openCompositeTab() {
+    await this.openListTab('composite');
+  }
+
+  async clickCloneButton(name) {
+    await this.cloneButton(name).click();
+  }
+
+  async fillCloneName(name) {
+    await this.cloneNameInputField().fill(name);
+  }
+
+  async submitClone() {
+    await this.cloneSubmitButton().click();
+  }
+
+  async cancelClone() {
+    await this.cloneCancelButton().click();
+  }
+
+  async selectCloneFolder(folderId) {
+    await this.cloneFolderPicker().locator('[data-test$="-trigger"]').first().click();
+    const option = this.page
+      .locator(`[data-test="alerts-index-dropdown-stream_type-option"][data-test-value="${folderId}"]`)
+      .first();
+    await expect(option).toBeVisible({ timeout: 10000 });
+    await option.click();
+  }
+
+  async expectCloneDialogVisible() {
+    await expect(this.cloneDialog()).toBeVisible({ timeout: 10000 });
+  }
+
+  async expectCloneDialogHidden() {
+    await expect(this.cloneDialog()).toBeHidden({ timeout: 10000 });
+  }
+
+  async expectCloneNamePrefilled(name) {
+    await expect(this.cloneNameInputField()).toHaveValue(name);
+  }
+
+  async expectStreamSelectsHidden() {
+    await expect(this.cloneStreamTypeSelect()).toHaveCount(0);
+    await expect(this.cloneStreamNameSelect()).toHaveCount(0);
+  }
+
+  async expectCloneSuccessToast() {
+    await expect(this.successToast('Alert Cloned Successfully')).toBeVisible({ timeout: 30000 });
   }
 }

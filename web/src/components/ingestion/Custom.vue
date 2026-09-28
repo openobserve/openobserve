@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('ingestion.metricsLabel')"
       />
       <ORouteTab
+        v-if="store.state.zoConfig?.profiling_enabled"
         name="ingestProfiles"
         data-test="ingestion-custom-tab-ingestProfiles"
         :to="{

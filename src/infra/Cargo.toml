@@ -41,11 +41,13 @@ sea-orm-migration.workspace = true
 reqwest.workspace = true
 url.workspace = true
 tonic.workspace = true
+tonic-tracing-opentelemetry.workspace = true
+tower.workspace = true
 opentelemetry.workspace = true
-tracing-opentelemetry.workspace = true
 proto.workspace = true
 
 [dev-dependencies]
 collapse.workspace = true
 sea-orm = { workspace = true, features = ["mock"] }
 tempfile.workspace = true
+tracing-subscriber.workspace = true

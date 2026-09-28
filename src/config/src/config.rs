@@ -79,7 +79,14 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // last_alert_fired_at, alert_budget_per_day, and last_recovery_notified_at —
 // one bump for the whole anomaly phase, same rationale as 79.
 // 82: add profiles_streams to service_streams.
-pub const DB_SCHEMA_VERSION: u64 = 82;
+// 83: add folder_id to workflows.
+// 84: add folder_id to workflow_drafts.
+// 85: create llm_experiment_slot_retries.
+// 86: create synthetics shared variables tables; add env to synthetics_jobs.
+// 87: add input_preview to llm_annotation_queue_items.
+// 88: add iam password policy tables.
+// 89: add level_half_width_seconds to anomaly_detection_config.
+pub const DB_SCHEMA_VERSION: u64 = 89;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -471,6 +478,10 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
         SyntheticsReloadClass::Hot,
     ),
+    (
+        "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
+        SyntheticsReloadClass::Hot,
+    ),
 ];
 
 /// The warning an operator sees when they change a key a reload cannot carry.
@@ -503,6 +514,7 @@ pub(crate) fn synthetics_restart_required_changes(
         max_check_budget_secs: _,
         job_lease_secs: _,
         max_net_timeout_ms: _,
+        browser_max_steps: _,
         browsers: _,
         devices: _,
         scheduler_jitter_enabled: _,
@@ -789,6 +801,40 @@ impl std::str::FromStr for VortexCompression {
     }
 }
 
+/// Where a single-file compaction builds its merged file, see `ZO_COMPACT_MERGE_OUTPUT`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CompactMergeOutput {
+    /// A temp file under `data_tmp_dir`, read back only for the upload.
+    #[default]
+    Disk,
+    /// The whole file in a `Vec<u8>`.
+    Memory,
+}
+
+impl std::fmt::Display for CompactMergeOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disk => write!(f, "disk"),
+            Self::Memory => write!(f, "memory"),
+        }
+    }
+}
+
+impl std::str::FromStr for CompactMergeOutput {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "disk" => Ok(Self::Disk),
+            "memory" => Ok(Self::Memory),
+            _ => Err(anyhow::anyhow!(
+                "Invalid compact merge output '{s}': expected disk or memory"
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FileFormatConfig {
     default: FileFormat,
@@ -937,6 +983,59 @@ pub struct Config {
     pub synthetics: Synthetics,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
+    pub self_profiles: SelfProfiles,
+}
+
+/// Background self CPU/memory profile ingest into `_meta.self_profiles`.
+/// Gated at runtime by `enabled`; sampling code is compile-gated on `profiling`.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct SelfProfiles {
+    #[env_config(
+        name = "ZO_SELF_PROFILES_ENABLED",
+        default = false,
+        help = "Enable background self CPU/memory profile sampling into _meta.self_profiles"
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_INTERVAL_SECS",
+        default = 30,
+        help = "Seconds between self-profile cycle starts; 0 disables the background loop"
+    )]
+    pub interval_secs: u64,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_CPU_SECS",
+        default = 5,
+        help = "CPU sample duration in seconds within each self-profile cycle"
+    )]
+    pub cpu_secs: u64,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_URL",
+        default = "",
+        help = "Empty = in-process ingest; set to POST OTLP Profiles protobuf to a remote URL"
+    )]
+    pub url: String,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_AUTH_HEADER",
+        default = "",
+        help = "Optional Authorization header value for remote ZO_SELF_PROFILES_URL"
+    )]
+    pub auth_header: String,
+}
+
+impl SelfProfiles {
+    /// Returns Ok when the background loop may run; Err with a reason otherwise.
+    pub fn validate_loop_timing(&self) -> Result<(), String> {
+        if !self.enabled || self.interval_secs == 0 {
+            return Ok(());
+        }
+        if self.interval_secs <= self.cpu_secs {
+            return Err(format!(
+                "ZO_SELF_PROFILES_INTERVAL_SECS ({}) must be greater than ZO_SELF_PROFILES_CPU_SECS ({})",
+                self.interval_secs, self.cpu_secs
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Database Monitoring (design: `db-monitoring/dbm-design-doc.md` §8) —
@@ -1106,6 +1205,14 @@ pub struct Synthetics {
         help = "Ceiling for one attempt of a non-browser check, in milliseconds."
     )]
     pub max_net_timeout_ms: u32,
+    /// How many steps one browser journey may hold. The 256KB `config` payload
+    /// cap still binds above roughly 200, whatever this says.
+    #[env_config(
+        name = "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
+        default = 50,
+        help = "How many steps one browser journey may hold."
+    )]
+    pub browser_max_steps: usize,
     /// Comma-separated list of enabled browser engine names.
     /// Probe must have the corresponding Lambda function deployed.
     /// firefox temporarily disabled by default — re-add once ready.
@@ -1842,7 +1949,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY",
         parse,
-        default = "file_num"
+        default = "file_hash"
     )]
     pub feature_query_partition_strategy: QueryPartitionStrategy,
     #[env_config(
@@ -1859,8 +1966,8 @@ pub struct Common {
     pub feature_shared_memtable_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_WAL_PACK_ENABLED",
-        default = false,
-        help = "Persist memtables into packed wal files (one file per rotation instead of one file per stream)"
+        default = true,
+        help = "Persist metrics memtables into packed wal files (one file per rotation instead of one file per stream)"
     )]
     pub feature_wal_pack_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
@@ -2153,6 +2260,18 @@ pub struct Common {
     )]
     pub regex_patterns_source_url: String,
     #[env_config(
+        name = "ZO_SDR_DETECT_POLICY_ENABLED",
+        default = false,
+        help = "Allow AUTHORING the Detect (count-only) redaction policy on this node. It gates writes made here only; it does NOT stop a Detect association authored elsewhere from replicating to this node, which honours it as count-only either way. On a build that predates Detect the association stops redacting instead of being applied as Redact, so the field is left unredacted until that build is upgraded."
+    )]
+    pub sdr_detect_policy_enabled: bool,
+    #[env_config(
+        name = "ZO_SDR_EVIDENCE_HEARTBEAT_INTERVAL",
+        default = 300,
+        help = "Seconds between redaction-evidence heartbeat rows per (org, stream). A heartbeat records that scanning was active even when nothing matched."
+    )]
+    pub sdr_evidence_heartbeat_interval: u64,
+    #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
         default = true,
         help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
@@ -2317,8 +2436,8 @@ pub struct Limit {
     #[env_config(
         name = "ZO_MEM_TABLE_BUCKET_NUM",
         default = 0,
-        help = "MemTable bucket num, default is 1"
-    )] // default is 1
+        help = "MemTable bucket num, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / ZO_MAX_FILE_SIZE_IN_MEMORY / 2, between 1 and the cpu num"
+    )]
     pub mem_table_bucket_num: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 2)] // seconds
     pub mem_persist_interval: u64,
@@ -2829,7 +2948,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_METRICS_INDEX_ENABLED",
         default = false,
-        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor writes the configured Parquet or Vortex format and merges the pending files of an open hour into size-split `hash-merged-v1-` files and a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+        help = "Enable experimental metrics indexing and sample blocks for newly written metrics data."
     )]
     pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
@@ -2837,7 +2956,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_DATA_RETENTION_INTERVAL",
         default = 3600,
-        help = "Interval in seconds for the data retention job, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL"
+        help = "Interval in seconds for generating data retention jobs, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL; pending delete jobs are executed every ZO_COMPACT_INTERVAL"
     )] // seconds
     pub data_retention_interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
@@ -2851,6 +2970,13 @@ pub struct Compact {
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 2048)] // MB
     pub max_file_size: usize,
+    #[env_config(
+        name = "ZO_COMPACT_MERGE_OUTPUT",
+        parse,
+        default = "disk",
+        help = "Where a logs/traces compaction builds its merged file (Parquet or Vortex): `disk` streams it to a temp file under ZO_DATA_TMP_DIR as it is encoded and reads it back only for the upload; `memory` buffers the whole file in a Vec<u8>, which costs the file size in RAM per running merge."
+    )]
+    pub merge_output: CompactMergeOutput,
     #[env_config(name = "ZO_COMPACT_EXTENDED_DATA_RETENTION_DAYS", default = 3650)] // days
     pub extended_data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
@@ -3188,9 +3314,11 @@ pub struct Prometheus {
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
-    /// Max `le` labels (buckets + gap markers + inf) a native histogram sample may
-    /// expand to; over-limit samples are downscaled (adjacent buckets merged).
-    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 16)]
+    /// Exponential histograms are stored at `min(producer schema, this)`, never count-driven.
+    #[env_config(name = "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA", default = 1)]
+    pub exp_histogram_target_schema: i32,
+    /// Safety valve, not a layout knob: past this many `le` labels a sample is downscaled.
+    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 512)]
     pub native_histogram_max_buckets: usize,
 }
 
@@ -3478,6 +3606,8 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
+    check_self_profiles_config(&mut cfg);
+
     // check grpc config
     if let Err(e) = check_grpc_config(&mut cfg) {
         panic!("common config error: {e}");
@@ -3739,6 +3869,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.metrics_max_points_per_series == 0 {
         cfg.limit.metrics_max_points_per_series = 30_000;
     }
+    if !(-4..=8).contains(&cfg.prom.exp_histogram_target_schema) {
+        return Err(anyhow::anyhow!(
+            "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA must be within -4..=8, got {}",
+            cfg.prom.exp_histogram_target_schema
+        ));
+    }
 
     // check search job retention
     if cfg.limit.search_job_retention == 0 {
@@ -3904,6 +4040,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.usage_publish_interval < 1 {
         cfg.common.usage_publish_interval = 60;
+    }
+
+    // A zero interval makes every batch overdue, so heartbeats overflow their own queue.
+    if cfg.common.sdr_evidence_heartbeat_interval == 0 {
+        cfg.common.sdr_evidence_heartbeat_interval = 300;
     }
 
     cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();
@@ -4105,7 +4246,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
     }
     if cfg.limit.mem_table_bucket_num == 0 {
-        cfg.limit.mem_table_bucket_num = 1;
+        cfg.limit.mem_table_bucket_num = default_mem_table_bucket_num(
+            cfg.limit.mem_table_max_size,
+            cfg.limit.max_file_size_in_memory,
+            cfg.limit.cpu_num,
+        );
     }
 
     // wal
@@ -4198,11 +4343,22 @@ pub fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
     path.to_string_lossy()
 }
 
+/// Half of what the budget holds, so full memtables can rotate out while the next ones fill.
+fn default_mem_table_bucket_num(
+    mem_table_max_size: usize,
+    max_file_size_in_memory: usize,
+    cpu_num: usize,
+) -> usize {
+    let by_memory = mem_table_max_size / max_file_size_in_memory.max(1) / 2;
+    by_memory.clamp(1, cpu_num.max(1))
+}
+
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
+    std::fs::create_dir_all(&cfg.common.data_cache_dir)
+        .map_err(|e| anyhow::anyhow!("create cache dir {}: {e}", cfg.common.data_cache_dir))?;
     let cache_dir_path = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("resolve cache dir {}: {e}", cfg.common.data_cache_dir))?;
     let cache_dir_owned = deverbatim(&cache_dir_path).into_owned();
     let cache_dir = cache_dir_owned.as_str();
 
@@ -4561,6 +4717,14 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Warns and disables the background loop when interval is not greater than CPU sample duration.
+fn check_self_profiles_config(cfg: &mut Config) {
+    if let Err(reason) = cfg.self_profiles.validate_loop_timing() {
+        log::warn!("[SELF-PROFILES] {reason}; disabling background self-profile loop");
+        cfg.self_profiles.enabled = false;
+    }
+}
+
 /// The env vars that exist in every build but are only ever read by
 /// enterprise-gated code. Setting one in an OSS-only build is configured-and-
 /// ignored, which is indistinguishable from configured-and-broken unless we say
@@ -4774,6 +4938,7 @@ mod tests {
         "ZO_SYNTHETICS_JOB_LEASE_SECS",
         "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
         "ZO_SYNTHETICS_BROWSERS",
+        "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
         "ZO_SYNTHETICS_DEVICES",
         "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
         "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
@@ -4796,8 +4961,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            14,
-            "Synthetics has 14 keys; every one needs a reload class"
+            15,
+            "Synthetics has 15 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -4823,6 +4988,7 @@ mod tests {
                 "ZO_SYNTHETICS_AGENT_STALE_SECS",
                 "ZO_SYNTHETICS_API_ENDPOINT",
                 "ZO_SYNTHETICS_BROWSERS",
+                "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
                 "ZO_SYNTHETICS_DEVICES",
                 "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
                 "ZO_SYNTHETICS_JOB_LEASE_SECS",
@@ -4884,6 +5050,7 @@ mod tests {
         cfg.max_check_budget_secs += 1;
         cfg.job_lease_secs += 1;
         cfg.max_net_timeout_ms += 1;
+        cfg.browser_max_steps += 1;
         cfg.browsers = "chromium,firefox".to_string();
         cfg.devices = "desktop:800:600".to_string();
         cfg.scheduler_jitter_enabled = !cfg.scheduler_jitter_enabled;
@@ -4957,6 +5124,37 @@ mod tests {
             cfg.limit.req_cols_per_record_limit,
             get_config().limit.req_cols_per_record_limit
         );
+    }
+
+    #[test]
+    fn self_profiles_validate_loop_timing_requires_interval_gt_cpu() {
+        let mut cfg = SelfProfiles {
+            enabled: true,
+            interval_secs: 30,
+            cpu_secs: 5,
+            ..Default::default()
+        };
+        assert!(cfg.validate_loop_timing().is_ok());
+
+        cfg.interval_secs = 5;
+        assert!(cfg.validate_loop_timing().is_err());
+
+        cfg.interval_secs = 0;
+        assert!(cfg.validate_loop_timing().is_ok());
+
+        cfg.enabled = false;
+        cfg.interval_secs = 5;
+        assert!(cfg.validate_loop_timing().is_ok());
+    }
+
+    #[test]
+    fn check_self_profiles_config_disables_on_invalid_timing() {
+        let mut cfg = Config::default();
+        cfg.self_profiles.enabled = true;
+        cfg.self_profiles.interval_secs = 5;
+        cfg.self_profiles.cpu_secs = 5;
+        check_self_profiles_config(&mut cfg);
+        assert!(!cfg.self_profiles.enabled);
     }
 
     #[test]
@@ -5140,6 +5338,22 @@ mod tests {
             );
         }
         assert!("true".parse::<VortexCompression>().is_err());
+    }
+
+    #[test]
+    fn test_compact_merge_output_from_str() {
+        assert_eq!(CompactMergeOutput::default(), CompactMergeOutput::Disk);
+        for (text, expected) in [
+            ("disk", CompactMergeOutput::Disk),
+            (" Memory ", CompactMergeOutput::Memory),
+        ] {
+            assert_eq!(text.parse::<CompactMergeOutput>().unwrap(), expected);
+            assert_eq!(
+                expected.to_string().parse::<CompactMergeOutput>().unwrap(),
+                expected
+            );
+        }
+        assert!("vec".parse::<CompactMergeOutput>().is_err());
     }
 
     #[test]
@@ -5505,6 +5719,61 @@ mod tests {
     }
 
     #[test]
+    fn test_default_mem_table_bucket_num() {
+        let mb = 1024 * 1024;
+        // 32 GB holds 64 memtables of 512 MB; half of that, then the core count caps it
+        assert_eq!(
+            default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 64),
+            32
+        );
+        assert_eq!(
+            default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 28),
+            28
+        );
+        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 512 * mb, 28), 4);
+        assert_eq!(
+            default_mem_table_bucket_num(4 * 1024 * mb, 128 * mb, 28),
+            16
+        );
+        // a budget of one memtable or less still gets one bucket
+        assert_eq!(default_mem_table_bucket_num(512 * mb, 512 * mb, 28), 1);
+        assert_eq!(default_mem_table_bucket_num(0, 512 * mb, 28), 1);
+        assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 0, 28), 28);
+        assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 0), 1);
+    }
+
+    #[test]
+    fn test_check_memory_config_derives_mem_table_bucket_num() {
+        let mut cfg = Config::default();
+        cfg.common.node_role = "all".to_string();
+        cfg.limit.cpu_num = 8;
+        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
+        cfg.limit.mem_table_max_size = 8 * 1024;
+        cfg.limit.mem_table_bucket_num = 0;
+        check_memory_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.mem_table_bucket_num, 8);
+
+        let mut cfg = Config::default();
+        cfg.common.node_role = "all".to_string();
+        cfg.limit.cpu_num = 8;
+        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
+        cfg.limit.mem_table_max_size = 2 * 1024;
+        cfg.limit.mem_table_bucket_num = 0;
+        check_memory_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.mem_table_bucket_num, 2);
+
+        // an explicit value is kept as is
+        let mut cfg = Config::default();
+        cfg.common.node_role = "all".to_string();
+        cfg.limit.cpu_num = 8;
+        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
+        cfg.limit.mem_table_max_size = 8 * 1024;
+        cfg.limit.mem_table_bucket_num = 3;
+        check_memory_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.mem_table_bucket_num, 3);
+    }
+
+    #[test]
     fn test_check_queue_store_config_smart_default() {
         // the check runs once per config load, so use a fresh config per case
         // (the MB-to-bytes conversion is not idempotent)
@@ -5769,6 +6038,30 @@ mod tests {
         cfg.common.feature_bloom_filter_extra_fields = "trace_id".to_string();
         check_common_config(&mut cfg).unwrap();
         assert_eq!(cfg.common.feature_bloom_filter_extra_fields, "trace_id");
+    }
+
+    #[test]
+    fn test_check_common_config_exp_histogram_target_schema_range() {
+        let cfg = Config::init().unwrap();
+        assert_eq!(cfg.prom.exp_histogram_target_schema, 1);
+        assert_eq!(cfg.prom.native_histogram_max_buckets, 512);
+        // check_common_config scales sizes in place, so each call gets a fresh config
+        for schema in [-4, 8] {
+            let mut cfg = Config::init().unwrap();
+            cfg.prom.exp_histogram_target_schema = schema;
+            check_common_config(&mut cfg).unwrap();
+        }
+        for schema in [-5, 9] {
+            let mut cfg = Config::init().unwrap();
+            cfg.prom.exp_histogram_target_schema = schema;
+            let err = check_common_config(&mut cfg).unwrap_err().to_string();
+            assert_eq!(
+                err,
+                format!(
+                    "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA must be within -4..=8, got {schema}"
+                )
+            );
+        }
     }
 
     #[test]

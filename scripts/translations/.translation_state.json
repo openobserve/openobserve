@@ -1971,7 +1971,15 @@
   "alert_dependencies": {
     "actionDelete": "e2d0a54968ead24e",
     "actionOpen": "ed077f3d8125d60d",
+    "countAnomalyDetection": "a1223bc8d82a5173",
+    "countCompositeAlert": "4502d18cb5dcc5d8",
     "countDestinations": "124a72586a12ab90",
+    "countIncidentIntegration": "7e70aef22e421de8",
+    "countOncallPolicy": "537bc7a755773028",
+    "countOncallTeamChannel": "fcce7a09b096a168",
+    "countPipeline": "2711b847e88f9687",
+    "countSyntheticCheck": "10a45405049bd628",
+    "countWorkflow": "be7140dc08a5bfb1",
     "deleteFailedToast": "d172362c8295a402",
     "deleteMessage": "0dc68f98bfa6395b",
     "deleteTitle": "a4b982a9e0bc2413",
@@ -1979,11 +1987,13 @@
     "directOverrides": "1299e135847dcebb",
     "enabled": "92c1cdfdf4cb9cf6",
     "failedToLoad": "d10293c8166b3e78",
-    "impactDestination": "2a09e962304324b1",
+    "impactDestination": "6abb848758f1a118",
     "impactTemplate": "4a51c0040fff2a72",
+    "impactUnused": "dccafe55abe3dd98",
     "laneEmpty": "5446c11fc4b72850",
     "loading": "8537869f61d9a1b0",
     "missingTag": "6be36ca49ee85210",
+    "noConsumers": "d4a8f8ebecaba574",
     "noDependencies": "1ff1ecdb124ef49f",
     "noMatches": "d6572bd2e77380ce",
     "orphanTag": "231aedffacea1049",
@@ -1991,6 +2001,7 @@
     "searchPlaceholder": "49c266baaaa70981",
     "sectionAlerts": "f62e9267d196c761",
     "sectionDestinations": "72eb63f032e47e34",
+    "sectionOtherConsumers": "f4e3c43926a4f50b",
     "usedBy": "42c0f3db6ef90f50",
     "usedByColumn": "681bf81aba87bd68"
   },
@@ -2666,6 +2677,7 @@
       "checkEveryTooltip": "1d060aeac4423111",
       "destinationRequired": "10d0b2a6b1b39964",
       "detectionCharts": "bff6c2f71314f27d",
+      "detectionFunctionTooltip": "5446cf66c0f39c24",
       "detectionResolution": "12d1318bffed4742",
       "detectionResolutionTooltip": "d5da8afe60842fa5",
       "deviationChart": "eff37edc81c0f1e4",
@@ -2679,7 +2691,10 @@
       "lastError": "5488d837f5f65d6f",
       "lastTrained": "29ec0c8f513617c7",
       "lookBackWindow": "0e531159fda4205c",
-      "lookBackWindowTooltip": "3eb4f09ed420617f",
+      "lookBackWindowFloor": "1cc8dec4a2d9c480",
+      "lookBackWindowLegacy": "b2da8549a10ffae6",
+      "lookBackWindowMinimum": "2de0d2e2ca3f0280",
+      "lookBackWindowTooltip": "2f7fad3ff8ce63d6",
       "metricChart": "92fb158ebb5f3562",
       "metricChartHint": "b842e762ae0386f7",
       "model": "5e2c614c23f02239",
@@ -2687,9 +2702,19 @@
       "nDays": "d6a71cc49d9bf906",
       "noDestinationsFound": "ebe606534a6c4958",
       "noFieldsFound": "06b05d1636030e56",
+      "noticeHybridFallback": "1cebb5e227b626cd",
+      "noticeHybridFallbackTooltip": "c92c20c60fd19c90",
+      "noticeRetrain": "81ed318c08fc3d04",
+      "noticeRetrainTooltip": "16c58ec266b813f8",
+      "noticeSkipAbsence": "73815b180d75d015",
+      "noticeSkipScored": "3328428f15113740",
+      "noticeWindowFloor": "8506d08d4f8cf996",
+      "noticeWindowFloorTooltip": "cfda13732ef10ce1",
+      "noticeWindowSkip": "ebf9c8b4fe59867f",
       "notifications": "788011833a5a0f22",
       "notificationsTooltip": "6be62e6d3cce3112",
-      "percentile": "bb13af3d0ba72ee2",
+      "percentile": "1709305c9fa966d1",
+      "previewCaption": "8c330d6626e8bc99",
       "queryMode": "f93202944f8f5b93",
       "retrainEvery": "f0207dc1b4d4c620",
       "retrainEveryTooltip": "58f3d7ff0d271b4a",
@@ -2706,7 +2731,8 @@
       "sensitivityBalanced": "5386ea5db81c8579",
       "sensitivityBudgetTooltip": "268d2ec2a9cf3927",
       "sensitivityConservative": "75e1783e4e517e54",
-      "sensitivityHintPercentile": "af18ccd63ba2748a",
+      "sensitivityHintPercentile": "99ff83f5381c312c",
+      "sensitivityNotDataPercentile": "983f3edcdb12e25a",
       "sensitivityRange": "8fdc44006812bb32",
       "sensitivityTooltip": "c7e2ec81613d9cf6",
       "seriesAnomaly": "79622828d2d8d988",
@@ -2735,7 +2761,7 @@
       "summaryRetrainEveryDays": "fe194d44b92571b4",
       "summarySchedule": "9ca338ab03aabdd4",
       "summaryThreshold": "1e4fada9d2ab1f32",
-      "summaryThresholdPercentile": "72ffbcff0f2533ee",
+      "summaryThresholdPercentile": "20ff1b9e29e00400",
       "summaryTraining": "e54a950976befa4b",
       "summaryTrainingDays": "a2246fbc2542d1dd",
       "timestampAliasBanned": "f5eabfdd326c0964",
@@ -3471,7 +3497,9 @@
       "discordWebhookUrlHelp": "97665643fae3fdb6",
       "discordWebhookUrlHint": "97665643fae3fdb6",
       "emailRecipients": "c95f76302df554e8",
-      "emailRecipientsHelp": "9969abbc0fc06984",
+      "emailRecipientsGroupServiceAccounts": "0839c59beb621638",
+      "emailRecipientsGroupUsers": "6b0cc904d081a8c1",
+      "emailRecipientsHelp": "84855c05ec8e5443",
       "invalidDiscordWebhookUrl": "fa33424ae3bcea69",
       "invalidEmailAddresses": "b5b557e82e504c3b",
       "invalidMsteamsWebhookUrl": "3aa19db9445c96b8",
@@ -5068,6 +5096,9 @@
     "tableLoading": {
       "ariaLabel": "ddede8e80ae8dca6"
     },
+    "templateInput": {
+      "suggestions": "18da869f06054081"
+    },
     "time": {
       "am": "c8f48a68649d1cae",
       "clear": "83b12c2216efb4fd",
@@ -5094,6 +5125,12 @@
     "loading": "47d2a515ef2f05b8",
     "ok": "565339bc4d33d728",
     "startFromNow": "b51cf273d8b6649a"
+  },
+  "connectDataSourcePopup": {
+    "connectButton": "6f9ce9f34879bb33",
+    "description": "e3bfcb60996b7b1d",
+    "slackLink": "3a37b5feb4984ec3",
+    "title": "9c5541789be6984d"
   },
   "correlation": {
     "addCustomGroup": "460770f6d1bdad26",
@@ -5690,7 +5727,7 @@
     "donutLabel": "cf27745b0afa6d34",
     "doubleClickToRename": "2836c1fad7764204",
     "drilldown": "dfdfc1a6dafac858",
-    "drilldownTooltip": "4aa7c5c4a33bbfb6",
+    "drilldownTooltip": "b1b759f3cbe29f4e",
     "drilldownUserGuide": {
       "and": "6201111b83a0cb5b",
       "edge": "0f82fe727756eb9a",
@@ -5754,6 +5791,33 @@
     "errorFetchingFunctions": "d0f9d72c75736325",
     "escapeSingleQuotes": "e4d63a6f74a32c83",
     "escapeSingleQuotesTooltip": "191d0f9d6f99be04",
+    "exemplars": {
+      "aboveRange": "cf605682721a5957",
+      "belowRange": "4ec7665f01ab55b1",
+      "cardTitle": "551e873b177b069b",
+      "checkingTrace": "e12fb9a6f1405261",
+      "empty": "7973e2d9be5567b0",
+      "emptyShort": "99ab2b26d5d0df75",
+      "hide": "e8c019e2240a7a76",
+      "loadFailed": "2f63306c78f41336",
+      "loadFailedHint": "9d3dc465d1efa5c2",
+      "markerAria": "2ec773bd3d046b11",
+      "markersAria": "01bf8b7b2be41d92",
+      "noTraceId": "2a54bb132fc3a7cf",
+      "openTrace": "c331a5916f7f017b",
+      "openTraceHint": "87eb6654596ff842",
+      "openTraceUnverified": "a1853bc6a86b7b29",
+      "query": "f3415e96693aaaf4",
+      "retry": "942087cc2d41e013",
+      "returnedBy": "ef9ace3b4fb66fed",
+      "series": "a8295e08ff7a961c",
+      "show": "c81626330a6796ca",
+      "traceNotAvailable": "cb9b7dd291a64856",
+      "unverifiedError": "315cf38c18876d3b",
+      "unverifiedForbidden": "19f6c63526fc8940",
+      "unverifiedPartial": "6f9fceed470b778e",
+      "unverifiedTimeout": "4b2b6acf7eb30a92"
+    },
     "exitAnnotationsMode": "f7926a15fd7336d3",
     "exitFullscreen": "5a164f4b6296ba9b",
     "expandAllSections": "1b891bf032f8b1f5",
@@ -6247,6 +6311,8 @@
     "showBorder": "52f4394555620ac5",
     "showDependencies": "7a967fa24703f354",
     "showDynamicFilters": "0d8e29e06c191e85",
+    "showExemplarsHelp": "f47f31ce0a5a7699",
+    "showExemplarsLabel": "fdf26440fc7718b0",
     "showGridlines": "795e288d575f9258",
     "showLegendsLabel": "c1954dafcf36b6b6",
     "showQueryResults": "97722f5293287bb7",
@@ -6546,11 +6612,13 @@
       "failedToLoadDashboard": "708b8b8e43c749f0",
       "failedToSaveChanges": "cd51b3228c7b5196",
       "failedToUpdateJson": "d562c825eabdca2e",
+      "moreRefreshOptions": "d1859c9c35018ebc",
       "panelDeleted": "e108e21b8ad710f4",
       "panelDeletionFailed": "733a3438177ab919",
       "panelMoveFailed": "91b7ce15ff1ea83f",
       "panelMoved": "fb36a2c2b83ff138",
       "refresh": "0e91610117029a62",
+      "refreshCacheReload": "d1ddf06136da9a72",
       "refreshToApplyVariables": "313f2c3169259c79"
     },
     "visibleColumns": "e61dac0a2e409d3f",
@@ -6670,6 +6738,11 @@
       "rowSuggestFix": "cfa33dcfad9451c3",
       "suggestFix": "cfa33dcfad9451c3",
       "suggestFixHint": "3ce2f69c807f1ac1"
+    },
+    "appSource": {
+      "legend": "a569b3a6cf6e8254",
+      "marker": "0396fafbabc6e399",
+      "markerHint": "12a5bb54e13f57b7"
     },
     "blocked": {
       "columns": {
@@ -6845,16 +6918,16 @@
       },
       "columnHints": {
         "attention": "f637acbed6494055",
-        "load": "d84e60b175a2d68e",
-        "p50": "b31ed3264efc0bd5",
-        "p95": "3504e3d0f6a5228b",
-        "p99": "bbc4787025054613",
+        "load": "90a2db52e5fcdd49",
+        "p50": "54050c2587036649",
+        "p95": "b98a294c679bd3ba",
+        "p99": "144d4b05cbe375da",
         "qps": "cbe3d3c993d70f3d"
       },
       "columnSubLabels": {
-        "attention": "b3eacd33433b31b5",
-        "calls": "948fe603f61dc036",
-        "load": "948fe603f61dc036"
+        "attention": "07f5bf0fd362aedf",
+        "calls": "c6954de01f69594e",
+        "load": "c6954de01f69594e"
       },
       "columns": {
         "attention": "c1ebc7817870e5be",
@@ -7119,7 +7192,6 @@
         "title": "7c559415db730763"
       },
       "overlap": {
-        "clientObserved": "0cc72e26cc95f9cc",
         "serverCounted": "74fa921eaf413c66",
         "serverExecution": "d1c16227348faea7",
         "serverWait": "34d15b733a982bad"
@@ -7155,7 +7227,7 @@
         "ambiguous": "3eb8f3a485f54e5f",
         "ambiguousHint": "f3e2349cc41d54d9",
         "calls": "93af2616998cbe78",
-        "clientSubtitle": "c7e39a517339c215",
+        "clientSubtitle": "a2cd4b2f9b40bf3c",
         "instance": "b5bc8412584b3b6e",
         "instanceWide": "945b53947fd3e993",
         "meanExecution": "2dc2642f39323e96",
@@ -7170,7 +7242,7 @@
         "setUp": "4da10f1fbb17cac2",
         "sharedBlksHit": "f79e09b32a821d5b",
         "sharedBlksRead": "ebb4dc265f55437f",
-        "subtitle": "265dc2471fb456fa",
+        "subtitle": "dd76a8d4430c4703",
         "tempBlksWritten": "86a5de795a11c350",
         "title": "e533788253352fef"
       },
@@ -7386,7 +7458,6 @@
     },
     "list": {
       "overlap": {
-        "clientObserved": "9aba3344ab7d978d",
         "serverCounted": "d595c799a59f677d",
         "serverExecution": "7137c70d983e5c12",
         "serverReported": "c5f2115901ab4a41",
@@ -7512,6 +7583,11 @@
         "mysql": "cbe68c834f358536",
         "postgresql": "61c2c3758d95d6e0"
       },
+      "serverStreamMissing": {
+        "action": "59e869c26fb67329",
+        "description": "d7e092dcf5d8c5c1",
+        "title": "8f8cac6f8d36e215"
+      },
       "subtitle": "e461832b126875e3",
       "title": "a58da793c7250f1b",
       "triageOrder": "05030bd3c311c609"
@@ -7531,7 +7607,7 @@
         "overview": "d4b1ea5708dd5329",
         "queries": "6fbe590f4fe13e19",
         "samples": "7e38c4258cbb11a2",
-        "samplesHintClient": "c72466ca18192c9d",
+        "samplesHintClient": "e97dd4914db6fd62",
         "samplesHintServer": "778e07fb24756bb8",
         "samplesHintUnknown": "4b9b9cf87f20a602",
         "tableHealth": "e25af56211da67f1",
@@ -7549,13 +7625,13 @@
         "traces": "9a299ceee07b5508"
       },
       "columnHints": {
-        "calls": "6ab05749596bd833",
+        "calls": "eed528a3ea89a98a",
         "errors": "aca82f21e2e1e5bf",
-        "load": "23b1330bd44aa929",
+        "load": "4cca08d6260f2c0c",
         "max": "3d474f4b4273a348",
-        "p50": "b31ed3264efc0bd5",
-        "p95": "3504e3d0f6a5228b",
-        "p99": "bbc4787025054613",
+        "p50": "54050c2587036649",
+        "p95": "b98a294c679bd3ba",
+        "p99": "144d4b05cbe375da",
         "perTrace": "b28571e6673fdb9b"
       },
       "columnSubLabels": {
@@ -7660,7 +7736,7 @@
     },
     "samples": {
       "columnHints": {
-        "duration": "66e4b67ba0acbb77"
+        "duration": "e2b6a3104736bf92"
       },
       "columns": {
         "duration": "168d36c2d331807e",
@@ -8600,6 +8676,13 @@
     "groups": "ec2b699f100bfc7d",
     "groupsDesc": "a4ce21bd285c93ae",
     "groupsPage": {
+      "assignBannerDone": "11a6767d5674c7e4",
+      "assignBannerText": "78d60ce8f360a2fc",
+      "assignBtn": "9fd728c66c9a256b",
+      "assignColumn": "8ece895c9b32c643",
+      "assignError": "d9abd7faa2aa61e2",
+      "assignSuccess": "75010fb7f4d00e54",
+      "assignedBadge": "8191888dd97cae12",
       "bulkDelete": {
         "impact": "3a552d5988d131f1"
       },
@@ -8737,6 +8820,13 @@
     "roles": "c25337055464f8d3",
     "rolesDesc": "19de2cc80fa9d166",
     "rolesPage": {
+      "assignBannerDone": "11a6767d5674c7e4",
+      "assignBannerText": "0b4016a09c6694c3",
+      "assignBtn": "9fd728c66c9a256b",
+      "assignColumn": "8ece895c9b32c643",
+      "assignError": "bfb3ce0ba72524f2",
+      "assignSuccess": "810779be07674982",
+      "assignedBadge": "8191888dd97cae12",
       "bulkDelete": {
         "impact": "fbd802f7bae4c946"
       },
@@ -8830,6 +8920,7 @@
       }
     },
     "hosts": {
+      "columnCores": "7bff6181add2231b",
       "columnCpu": "fe858be36df341a8",
       "columnDisk": "8739c0da5fbabb17",
       "columnHost": "4a823118b9ba8baa",
@@ -8847,14 +8938,10 @@
         "hostMetricsCap": "1edb000e9d946c58",
         "hostMetricsHint": "83cfa9518d95cce9"
       },
-      "importConfirmCancel": "19766ed6ccb2f4a3",
-      "importConfirmMessage": "eb8d9fe902645051",
-      "importConfirmOk": "b37158e750c360ef",
-      "importConfirmTitle": "4b4341287db1c84c",
       "lastSeenBanner": "1af912a3e3a19bdc",
       "livenessBanner": "40a4687718a50c59",
+      "loadPerCore": "4eb5405259fc817c",
       "memoryAbsolute": "d77a43cd175edfef",
-      "openDashboard": "6963894ac86971e3",
       "osFacet": "343d012d58b2e98f",
       "pageError": "1bdf7b1b1497073b",
       "panel": {
@@ -9309,6 +9396,7 @@
     "otlpGrpc": "6e039a65134b7f7b",
     "otlpHttp": "c7fcbcefe82c2d5a",
     "parametersToEnterInAwsWizard": "3559f49af02df001",
+    "passcodeForbiddenMessage": "ba830edab66a4df9",
     "profilesLabel": "535e52e4a2616ebe",
     "prometheusDocLinkText": "a454c921984f8a3b",
     "python": "18885f27b5af9012",
@@ -9834,7 +9922,9 @@
       "tlsTitle": "0029bc25af318a4f",
       "tokenPageName": "759b4b3e31901744",
       "tokenWhere": "d6f5666b805c2e36",
-      "tokenWhereSuffix": "7fb346521d5bfb41"
+      "tokenWhereSuffix": "7fb346521d5bfb41",
+      "windowBody": "38d66efc5808226e",
+      "windowTitle": "309255973d9f0279"
     },
     "splunkHecTab": "d31533a68927505f",
     "splunkHecUrlHelp": "22d5a113a0b4745e",
@@ -10080,6 +10170,7 @@
     "getStartedHeading": "1b5da3f87ac69571",
     "hearAboutUsLabel": "9e19a4c422a4a3e8",
     "hearAboutUsPlaceholder": "c469844a403f50e8",
+    "lockedOut": "1060caa91c04760a",
     "login": "9d6322c1f4d9d3f3",
     "loginAsInternalUser": "3d7f06d8cac9fdbf",
     "loginWithSso": "b31e8d76180ffb20",
@@ -10126,6 +10217,7 @@
       "errorsFixAndTryAgain": "e0fa7e73ce02634d",
       "histogramUnavailableCtesDistinctLimit": "793245c990e58618",
       "nameOfPanelRequired": "f6e881161cdf0296",
+      "patternsUnavailableForMultiStream": "20fbfaa16e107fb8",
       "queryEmptySelectFieldsToBuild": "4ef9689c6ed0fa4d",
       "searchHistoryNotEnabled": "691a7305a130697b",
       "selectStarNotSupportedForVisualization": "bed69cc7f618c5ad",
@@ -10259,6 +10351,7 @@
       "rangeExceedsLimit": "2767534fb8dcdf97",
       "runQueryBeforeDownload": "8aa79db0bbf15bb3",
       "selectStreamBeforeSchedule": "64c726ea7d3eb0f6",
+      "streamNotFoundInQuery": "abed146d42e0ebc2",
       "transformTypeFunction": "c803710302d5769d",
       "updatingSavedView": "343e7786d740bcab",
       "viewAddedFavorites": "e12c9fbf6d185268",
@@ -10459,6 +10552,8 @@
         "copyDetails": "ec7ee2826c849564",
         "copyErrorAria": "c09080090101a5a7",
         "errorCopied": "420639d093bff52b",
+        "exemplarsHideHeatmap": "06763fcba720427d",
+        "exemplarsShowHeatmap": "862b82cb7870c84a",
         "favoriteAddAria": "454283b7656596ff",
         "favoriteAddTooltip": "0dc726e43c62ac57",
         "favoriteRemoveAria": "062d54f6f0eb5e35",
@@ -10924,6 +11019,7 @@
     "addOwnershipRule": "99cd24efe9831454",
     "addPeople": "6e5e1e137765681a",
     "addPeopleCta": "a909987ae2f4e6e3",
+    "addPeopleDisabledHint": "3d27bfef7d5b8603",
     "addRotation": "6268b4390af63ce7",
     "addRule": "a27cff51a2e03e61",
     "addShiftRule": "4aa5f42c80e539a0",
@@ -10938,6 +11034,7 @@
     "allTeams": "bf65fc89ca83d073",
     "assignTeam": "eba8821df6277100",
     "assignTeamDone": "207eb731c1125e3d",
+    "assignTeamFailed": "3865aa6649756c3b",
     "assignTeamShort": "bfb6c81810a7a005",
     "atRung": "9bcda7213955bf70",
     "attentionAddFinalRung": "7fe1c192ddc93d8d",
@@ -11119,6 +11216,7 @@
     "coverageGapShort": "6cac1f2492db043f",
     "coverageHint": "9b0a94fc2f79cf69",
     "coverageMore": "ecccea94c62457a7",
+    "coverageMoreChanges": "9e636ad1cb2870fd",
     "coverageNoGap": "8e1b1c36b6557b39",
     "coveragePrimaryOnly": "2a4238906061a335",
     "coverageSecondaryOnly": "9c38d53ccc5c4ac5",
@@ -11138,6 +11236,7 @@
     "declareIncident": "1c3a402ebbd90044",
     "declareIncidentHint": "a25c627aaffbc575",
     "defaultRotationName": "57b5e2fc1bba18bb",
+    "defaultTeamBadge": "21b111cbfe6e8fca",
     "defaultTeamCleared": "95a1490670845a21",
     "defaultTeamHint": "793d9bcc76aa8474",
     "defaultTeamNone": "cafac453f2c111ec",
@@ -11198,8 +11297,9 @@
     "dryRunWouldNotLand": "a143d7b4748ee5b1",
     "durationDays": "963e4ad5da392686",
     "edit": "464c4ffd019e1e96",
-    "editOwnershipRule": "5dc380a68f6f6792",
+    "editOwnershipRule": "29d23cbfd9429815",
     "editTeam": "ced8519d92a6d4f7",
+    "editorReadFailed": "7209cd7d92f55080",
     "escalate": "d563aaf7079b2715",
     "escalateExhausted": "ec6bcfbc2847ae7a",
     "escalateFailed": "a3eb36ca8edcbc9c",
@@ -11399,7 +11499,8 @@
     "manageTeamCta": "528d8fb8c3838da7",
     "memberEmailFallbackHint": "8cad2fa9d1283c36",
     "memberEmailPlaceholder": "00d8ab5daae35a55",
-    "memberPickPlaceholder": "4d4e52a060c1ae19",
+    "memberPickPlaceholder": "3d27bfef7d5b8603",
+    "memberSearchPlaceholder": "6497fc6f84000b29",
     "members": "1044a4c056d0d685",
     "membersHint": "de02877507dd45d0",
     "membersNextStep": "a02683894cb2b32e",
@@ -11443,6 +11544,7 @@
     "noOwnershipRules": "cb9c3e9dfc59d3db",
     "noOwnershipRulesOrg": "6e7640bcb23f1793",
     "noRotations": "2e0ae44dd4ddf990",
+    "noTeamsToAssign": "63987d6418b2f215",
     "noUnrouted": "1d1779b69268304f",
     "nobodyOnCall": "eee5cc9142948ce8",
     "nobodyWasOnCall": "764b1c664fef08b1",
@@ -11636,6 +11738,7 @@
     "rebalanceInSchedule": "797a36e0f8702784",
     "recoveryConfirmed": "6f34dba452bd025f",
     "refresh": "0e91610117029a62",
+    "refreshFailed": "4b0528de9695d025",
     "related": "3c7630ed99154962",
     "relatedEmpty": "ced313c7461034d9",
     "relatedHint": "b843ef19eec79da3",
@@ -11804,7 +11907,7 @@
     "routingNamesAnd": "6201111b83a0cb5b",
     "routingNamesMore": "1a2612705dd79784",
     "routingNav": "bcba696f3eb10053",
-    "routingNoLadder": "c0f607f62c9c06d7",
+    "routingNoLadder": "10376c68bff65061",
     "routingNotOurs": "a25d961a4f851a31",
     "routingNothingLanded": "ee3d45007e6eadec",
     "routingPagesTeam": "144cef75c93d4cb8",
@@ -11933,6 +12036,7 @@
     "section_ringing": "426a858eacbbfb5a",
     "section_snoozed": "88096584e4a882be",
     "selectedCount": "529aacfdfd2b17bf",
+    "setDefaultTeam": "1b1793fa1ceb0eab",
     "setupCta": "54693f1432b43501",
     "setupDismiss": "16789232faef1c44",
     "setupFinish": "bc01ae77f37cf304",
@@ -12024,7 +12128,7 @@
     "statSnoozed": "88096584e4a882be",
     "statTeams": "1e1a1c078af2887a",
     "statUnacked": "b4658cb6c0a278fb",
-    "statUnackedFor": "a4df2ad23d4ae7fc",
+    "statUnackedFor": "419ba5334a0d910a",
     "statUncoveredHours": "c8ae17362fd9ce64",
     "statUnreachableRungs": "e4cd46bbe3745467",
     "statUnrouted": "c8e7249311a3409b",
@@ -12067,6 +12171,7 @@
     "target_rotation_everyone": "dafdb710c5de874e",
     "target_rotation_legacy": "76bd2aa23090f2bb",
     "target_rotation_on_call": "8a61c67a8ea27cf5",
+    "target_unrecognized": "66e648461a86c5d9",
     "target_user": "232709417a644e56",
     "target_whole_team": "f73315fde5db9e11",
     "team": "5985039f106df054",
@@ -12378,10 +12483,12 @@
           "title": "5a6743f87ca1085c",
           "variables": {
             "input": {
-              "trace": "b6bec50de2750e82"
+              "session": "4a9571b392344252",
+              "trace": "1989045c93127363"
             },
             "output": {
-              "trace": "078f80923419eb8e"
+              "session": "b3b25c889e3814e2",
+              "trace": "c4ae6bff9a4cc3d1"
             },
             "spans": {
               "trace": "c3d361441ab0db75"
@@ -12393,6 +12500,10 @@
             "steps": {
               "session": "6d11de0abbce4788",
               "trace": "d59a422557bbb94c"
+            },
+            "tool_calls": {
+              "session": "cd0eae8459084422",
+              "trace": "88b26a078466ba1e"
             }
           }
         },
@@ -13250,6 +13361,7 @@
     "leftJoin": "94452c5556275890",
     "logExplorer": {
       "detail": {
+        "back": "c7ef0e278b1e08c0",
         "copy": "e21f935f11d7e966",
         "copyLink": "dbf362d4f210c780",
         "copyValue": "c019c0f81132cb82",
@@ -13257,7 +13369,9 @@
         "drawerTitle": "949c28bfe0bb5b04",
         "insights": "2a932f90172e99ea",
         "insightsHint": "50b6f5f008290f78",
-        "json": "db1a21a0bc2ef8fb"
+        "json": "db1a21a0bc2ef8fb",
+        "nextEvent": "880dbf6cdade586c",
+        "prevEvent": "c025f0e0e895f5bb"
       },
       "event": "b8e1f80bd70ae078",
       "events": "862417b9e7c3720b",
@@ -13339,6 +13453,104 @@
     "xAxisShort": "5dff361d210ed230",
     "yAxisShort": "ce423a87ba8e56c8",
     "zAxis": "34f0456880f88136"
+  },
+  "passwordPolicy": {
+    "applyToRoot": "0a27adcf897429e8",
+    "applyToRootDesc": "c8d83acd97724e5d",
+    "backoffExponential": "a58da51adb22134a",
+    "backoffLinear": "e6950b45d25c2027",
+    "complexity": "2dcf78dcabca38ef",
+    "confirmMessage": "ca65c9b4a2336f8e",
+    "confirmTitle": "67a730b70ad0da95",
+    "cookieMaxAge": "da126ac3f32196d3",
+    "cookieMaxAgeDesc": "b4a7944c62ff3ff0",
+    "historyCount": "eab8fd303add5d3f",
+    "historyCountDesc": "6611b5bbd9dadcc9",
+    "historyMaxRetained": "783cc24a04edcadb",
+    "historyMaxRetainedDesc": "27f0506d99c7e75f",
+    "historyRetainedTooSmall": "5d7c01fed5a6937b",
+    "loadFailed": "12c65dde7f781c7d",
+    "loadFailedTitle": "952d2eb4da269774",
+    "lockout": "227f0a54feea5a1d",
+    "lockoutBackoff": "35615b824542ec09",
+    "lockoutBackoffDesc": "adf08d10f48d9bd0",
+    "lockoutBucketSize": "22b77578c0185c28",
+    "lockoutBucketSizeDesc": "5411ea069ecdcd84",
+    "lockoutMaxSecs": "bf0f723587aac403",
+    "lockoutMaxSecsDesc": "21341a74edabdadc",
+    "lockoutPreview": "0e8839cf25f3930e",
+    "lockoutStartSecs": "ea8e1c531279ce42",
+    "lockoutStartSecsDesc": "381a8e9699052f3a",
+    "lockoutStartTooLong": "bcac86bc0bc7a296",
+    "lockoutThreshold": "913a3fde70150265",
+    "lockoutThresholdDesc": "f7c1f5889f89349a",
+    "maxLength": "ee29a87ba3bcc885",
+    "maxLengthDesc": "6bc01631f9d2919e",
+    "maxLengthTooSmall": "452e190a1b903c5f",
+    "minLength": "54fda5553dbf64a5",
+    "minLengthDesc": "915b3233195489a8",
+    "notAdmin": "b0f0b825ed9434b4",
+    "notAdminTitle": "031cc7a3ec828ec6",
+    "requireDigit": "9197281f4fc025f5",
+    "requireDigitDesc": "2bffa7b2368ae230",
+    "requireLowercase": "55c8caf4480ba611",
+    "requireLowercaseDesc": "3b958c6978e94656",
+    "requireSpecial": "eb4f44a8a521ddcf",
+    "requireSpecialDesc": "a6310c0ffee47fa8",
+    "requireUppercase": "a37bc863b0f0ceab",
+    "requireUppercaseDesc": "c0fbb97ca200e291",
+    "reuse": "daa3bf3e0114e60d",
+    "reuseExplainer": "38cf28a18b4317d2",
+    "rootDialogAck": "440a002568e585e5",
+    "rootDialogConfirm": "818cd4edb7bc578e",
+    "rootDialogMessage": "332cc78439926bfe",
+    "rootDialogTitle": "5d625660815e8c46",
+    "rootWarning": "9d7a0d2463eaa59a",
+    "rotation": "57b5e2fc1bba18bb",
+    "rotationDays": "34e836a3ef8674ed",
+    "rotationDaysDesc": "cb8e6a261f8bf40a",
+    "rotationPreview": "2217f92fc05d1b0c",
+    "rotationPreviewNoWarning": "fa428702b60e2519",
+    "rotationWarningDays": "b4053bcd33c82776",
+    "rotationWarningDaysDesc": "2724c970274ec68d",
+    "saveFailed": "236183f574bf30da",
+    "saved": "58d1f34e50b808ed",
+    "sessionEnforcement": "da37ca7035052020",
+    "specialCharSet": "369a52ccc06c2441",
+    "specialCharSetDesc": "4a18a809de2e773e",
+    "warningDaysTooLong": "c1bc355067a8f170"
+  },
+  "passwordReset": {
+    "confirmPassword": "bf000421aeb39493",
+    "confirmPasswordRequired": "3923eddc70463c0d",
+    "currentPassword": "72ed2bd767cef627",
+    "currentPasswordRequired": "5000b74e76ec8b67",
+    "expiryBanner": "2b22707578ee98bd",
+    "expiryBannerAction": "63bf045213cebbaf",
+    "expiryBannerDismiss": "48845bff334a50a5",
+    "mismatch": "6c6e178ad2a856ca",
+    "newPassword": "3dd9df4441fb348f",
+    "newPasswordRequired": "1e1a49c16c534200",
+    "reasonPolicyTightened": "85fb2f2924b00fad",
+    "reasonRotationExpired": "c2c002c87236d686",
+    "reasonRotationWarning": "99bb2721ab40ac67",
+    "req": {
+      "digit": "c0fd6b3daf2da4bf",
+      "lowercase": "8ec64ccbfdaa27bb",
+      "maxLength": "f03a2d1060168e17",
+      "minLength": "aac08e05efe4d0f8",
+      "special": "de9e9fe904b1b6eb",
+      "specialFromSet": "79a200ab53243d88",
+      "unmet": "7d67e0ecc8c7d318",
+      "uppercase": "ef5dd11c37f98d21"
+    },
+    "reused": "02e39b827a0f71e5",
+    "signOut": "48f0d3d397d49f13",
+    "signedInAs": "7d271b6b1f2c6f78",
+    "submit": "fe45b4014135b70f",
+    "title": "badc2317da60bf68",
+    "updateFailed": "f62efd27ccdd3734",
+    "updated": "494401fd94d27fd3"
   },
   "pipeline": {
     "actionCannotBeUndone": "a44f66e8e66488ae",
@@ -14184,6 +14396,7 @@
     "loginCallback": "abc3ccb8b27e3974",
     "modelPricingEditor": "bcb792875fefde91",
     "notFound": "2d857a3660e0240b",
+    "passwordPolicy": "11831de5b6d62b7c",
     "pipelineBackfillJobs": "54a8767a761a58e0",
     "regexPatterns": "83a58bf362610444",
     "searchScheduler": "ff78cae7d0ccaa32",
@@ -14338,6 +14551,8 @@
     "noCorrelatedTraces": "e4e73d4f296f896b",
     "noErrorsInWindow": "38acc7913f59dc7e",
     "noMatchingSessions": "0a351a7cccc1397c",
+    "noReplayRecordedMessage": "87d6635ebe531ad0",
+    "noReplayRecordedTitle": "f89a778ebefa2ed3",
     "noSessionReplay": "a9378d6297019298",
     "ofActiveUsers": "11eca08aa22daa55",
     "ofTotal": "de344ba2ec6092cb",
@@ -14835,6 +15050,9 @@
       "groups": {
         "label": "03043c4e63de4410"
       },
+      "identifier": {
+        "label": "9b10587f84a2c374"
+      },
       "name": {
         "help": "ef9e1907c333c185",
         "label": "ab6640361e028a46",
@@ -14853,6 +15071,7 @@
       "col": {
         "created": "d70b9e24bca26b40",
         "identifier": "9b10587f84a2c374",
+        "roles": "c25337055464f8d3",
         "token": "d2089be672953d11"
       }
     },
@@ -14881,18 +15100,18 @@
       "addToGroup": "32d5c8e3f80061b5",
       "addToRole": "ef0757ff778b37eb",
       "applying": "b6c3437d5fd07dae",
-      "copyHint": "c54578b69d3428ce",
+      "copyHint": "d97c796050dfd9dc",
       "curl": "addc90cfd45b0f45",
       "done": "11a6767d5674c7e4",
       "env": "0a32650ed9b934f0",
       "failedGroups": "f6148910eb8a24ea",
       "failedHint": "1166b694d70a0439",
       "failedRoles": "c3389ccb851986ed",
-      "grantedGroups": "a0370b2301130a5f",
-      "grantedRoles": "a31cf1cc5857e277",
+      "groupsAssignedLabel": "2708cbb7b8cd8d34",
       "header": "ba5caa4285a84d88",
       "nextStepGrant": "5237ce64f551db37",
       "nextStepOss": "5a59a60cfddafe6f",
+      "rolesAssignedLabel": "f07357c606117bda",
       "step1Title": "b4c3f8e22a846bda"
     },
     "update": "a4a7598d4e753d1d",
@@ -15098,6 +15317,27 @@
     "domainManagementDesc": "88398e3ac40ce4d7",
     "domainNeedsBlockedEmails": "53170f72948b23a8",
     "domainNeedsEmails": "c68d07b51aa28f5a",
+    "domainOrgMappings": {
+      "addMapping": "160cc87a108cd97f",
+      "baseRole": "33551d66efcd283e",
+      "baseRoleHelp": "50482be96fa489a0",
+      "confirmRemove": "f10b126b0e82cab8",
+      "deleteTitle": "06380e0419eca2ef",
+      "domain": "f865f1ee55b26840",
+      "domainHelp": "c927b335c093577b",
+      "duplicateDomain": "197ff12f947386be",
+      "editMapping": "d5ef1883268e1264",
+      "empty": "df0e529517206088",
+      "organization": "d764d42592fc9687",
+      "organizationHelp": "783574eea65c82ad",
+      "organizationPlaceholder": "d7f6cb5385e83aca",
+      "organizationRequired": "7d12b1ae42d8cc36",
+      "subtitle": "031a53b7414811e0",
+      "title": "ac852cfa9baf6fa9",
+      "userGroup": "ccd983e3c5253d45",
+      "userGroupHelp": "30b9ca455711411b",
+      "userGroupPlaceholder": "762ebb70ef0ea2e8"
+    },
     "domainPlaceholder": "cc921aaa05754257",
     "domainRemoved": "2984d48362fadf0b",
     "domainRequired": "025f3d105c5c8f7c",
@@ -15367,6 +15607,8 @@
       "settingsUpdated": "7e077bab54d72f3b"
     },
     "organizationSettingsUpdated": "71623dbd4398b6a3",
+    "passwordPolicy": "11831de5b6d62b7c",
+    "passwordPolicyDesc": "30bbc73af19cf402",
     "pickCustomColor": "01cdff89f6bfcc46",
     "pipelineDestinationsDesc": "98402418a1408ae2",
     "platformSettings": "b18b122ea1b3815a",
@@ -15496,7 +15738,6 @@
     "actions": {
       "actionsRefresh": "3cf8d66227384dc2",
       "aiChatClose": "a619ab8971872dcf",
-      "aiChatExpand": "cb569c3ed515eb89",
       "aiChatToggle": "e5000da4d3f67a4c",
       "aiToolsetsRefresh": "3cf8d66227384dc2",
       "alertDestinationsAdd": "d0eb0b5fd8a15847",
@@ -16367,8 +16608,8 @@
       "poweredBy": "fdc5d2e9410c2d88",
       "publicNote": "ad07ab0d30b6e000",
       "sampleBadge": "d04815cd381cbd2e",
-      "subtitle": "9eba6b4d12a25b9e",
-      "title": "f65ddc1ff37bb18e",
+      "subtitle": "4e58a9193a3471a4",
+      "title": "324b134f57c70c72",
       "untitled": "8dbc9c0df7a334df",
       "uptime90": "fafdfa770492a786"
     },
@@ -16577,9 +16818,64 @@
       "deleteSingleTitle": "f3396b63fc6b18e4",
       "duplicateTitle": "521288199a56bfcb"
     },
+    "duplicate": {
+      "action": "02cdaabfca805d6a",
+      "body": "4cef9ff8a06b3ffc",
+      "bodyWithSecrets": "3b71c7bdf98aa52a",
+      "confirm": "02cdaabfca805d6a",
+      "done": "62fd2c95e0d20b05",
+      "failed": "22be727e9c375e9a",
+      "nameLabel": "c3ff859bcabdda28",
+      "title": "fe06d16b1f19e50c"
+    },
+    "duplicateVariable": {
+      "body": "4fd9f030625b7cd2",
+      "done": "d35506d639be9c09",
+      "failed": "01c2084d1a88cc3d",
+      "nameLabel": "fa73c0772ca2f8d4"
+    },
     "empty": {
       "browserTests": "a451e19b542ae9e3",
       "checks": "f0be2c240d7379f2"
+    },
+    "environments": {
+      "backToList": "f19ac5a6af557f79",
+      "capReached": "cdd877f8f891632a",
+      "cardEmpty": "e79c0770973e59c8",
+      "cardLocked": "c54d870a9319f297",
+      "cardTitle": "07437cd651bed86e",
+      "checks": "de07d07209556c79",
+      "checksCount": "b4bc8bc133f7c8a6",
+      "createTitle": "9ea8d7eee0b13c0f",
+      "created": "3455fc85b03dbfeb",
+      "deleteBlockedChecks": "f7d0268b13802981",
+      "deleteBlockedSecrets": "61952ff80ceb055d",
+      "deleteConfirm": "a4b982a9e0bc2413",
+      "deleteFailed": "223c983d75ea63cc",
+      "deleteTitle": "a7470854bb34a1cc",
+      "deleteWithVariables": "81de2018991ad4b3",
+      "deleted": "0b3759e1ffd2f764",
+      "description": "526e0087cc3f254d",
+      "detailSubtitle": "1d259398aa4b02ec",
+      "editTitle": "c7b7e03505b22684",
+      "emptyBody": "858e00a95f0b211c",
+      "emptyTitle": "8c63cac4d1833b24",
+      "lastUpdated": "382ac5f308f76c24",
+      "loadFailed": "d2003700657911fd",
+      "name": "dcd1d5223f73b3a9",
+      "nameInvalid": "58bfde43757d78ed",
+      "namePlaceholder": "ab8e18ef4ebebedd",
+      "nameRequired": "604fd1b2e29c688a",
+      "nameTooLong": "504ff963a61aa2dd",
+      "newButton": "eaab526404296f3a",
+      "renameBlocked": "078ed417d6f401e1",
+      "saveFailed": "26e1bdcba067b8db",
+      "searchPlaceholder": "58b59caa844ecf16",
+      "subtitle": "e8aa204dc5267aa1",
+      "title": "07437cd651bed86e",
+      "updated": "465743a33e9473f3",
+      "usedByChecks": "bc5cd7d5f3e65c3e",
+      "variables": "02db55bac5e3f7ce"
     },
     "evidence": {
       "allSteps": "ed4cfb57d876b0a2",
@@ -16659,6 +16955,20 @@
     },
     "histogramQueryFailed": "0068521c409fb6ad",
     "hoursAgo": "520c737ea62430c4",
+    "inherited": {
+      "emptyIn": "fbb0eb74f2023cc7",
+      "emptyNone": "27850a0473711ca0",
+      "filterAll": "a52ace420f2175d0",
+      "filterLabel": "e150d205164c213c",
+      "notIn": "ef6ec70526075eb1",
+      "notInMany": "747e7f92e341114f",
+      "overriddenByCheck": "b2f239bbb01f5d3d",
+      "overridesGlobal": "efd1fc009df76149",
+      "title": "e3c4b39d6d501347",
+      "titleTooltip": "621e6b930b0e80d6",
+      "valueNotSet": "4895f73177ab5d67",
+      "valueSet": "b6f6f3ad07b3c05f"
+    },
     "journey": {
       "actionChangedNotice": "30d6c7ce5132e616",
       "actionLabel": "64cff1319d2fd2cb",
@@ -16843,6 +17153,7 @@
       "timeoutHelpInteraction": "a27af7c8113953c3",
       "timeoutHelpNavAssert": "fb8d4c37d9cf5970",
       "timeoutLabel": "3b453bc8bd286be4",
+      "unboundVariables": "bfb765613019f1a0",
       "valueFallback": "8e37953d23daca5f",
       "valueLabels": {
         "navigate": "e7a241debad56609",
@@ -17078,6 +17389,25 @@
         "locationRequired": "3335200d18a21df8"
       }
     },
+    "promote": {
+      "done": "855a39026c3bd23b",
+      "doneShadowed": "c8a1ab44f3b476de",
+      "failed": "eb6be2db856f82d0",
+      "secretBlocked": "b056279d42274fee",
+      "toGlobal": "3216a6097946f55f"
+    },
+    "promoteCheck": {
+      "action": "2d3c925f1e0c3efc",
+      "confirm": "6ecc3df6bffdd06c",
+      "description": "eb3edeaa135527fc",
+      "destination": "293d404a500f5f9a",
+      "done": "7bd06785f0ec0aaf",
+      "failed": "f5d5fe945fd05300",
+      "global": "a258b30f88c30650",
+      "secretHint": "97e885402912f007",
+      "title": "2d3c925f1e0c3efc",
+      "tooltip": "2ed44d029fab337a"
+    },
     "protocolConfig": {
       "http": {
         "addAssertion": "c23b291f94a76b46",
@@ -17171,11 +17501,14 @@
     "queryFailed": "222d8657e6ce5036",
     "relationNotContaining": "b1ded2b4bacbda8d",
     "results": {
+      "allEnvironments": "f19ac5a6af557f79",
       "clearFilters": "7179ea0035fca783",
       "clearFiltersDesc": "c60af2131326a36a",
       "device": "6ba0bdeccb426d7b",
       "duration": "4fc52a3c4c558b51",
       "editCheck": "aec0f141abde8bd1",
+      "environment": "9e471951a1b4106e",
+      "environmentScope": "e3a0da8a79a76ffd",
       "error": "54a0e8c17ebb21a1",
       "errorRuns": "3e8610eb0f96dfa8",
       "failed": "031a8f0f659df890",
@@ -17300,6 +17633,7 @@
       "passRate": "5a05aeca043d70ec",
       "passRateByBrowser": "dead8c6d604f5a66",
       "passRateByDevice": "b547c0cc20f10bf2",
+      "passRateByEnvironment": "53a4470da18abd11",
       "passRateByLocation": "c5e4aaa133ec0470",
       "retryRate": "16a88b4b4ae2823c",
       "statusTimeline": "e147ccc3376bd639",
@@ -17380,6 +17714,20 @@
       "thisFolder": "ab7db04c96526507"
     },
     "secondsAgo": "244073ecb2be8fe8",
+    "split": {
+      "action": "dd4eccf429fc7a02",
+      "alreadyOwn": "765e8544abf4691d",
+      "confirm": "dd4eccf429fc7a02",
+      "description": "ec9e64bfc02cce19",
+      "done": "549d2029a3a846a4",
+      "failed": "47a3c114910d9d10",
+      "overrideHint": "85526b36ac52f2f3",
+      "title": "eae592f89b54f8a6",
+      "unselectedWarning": "6995e4e18ca0ee5b",
+      "usedBy": "447010a360ab3e10",
+      "usedByHint": "8ab7fefd0d4a41ee",
+      "valuePlaceholder": "600dcea71deaa040"
+    },
     "status": {
       "critical": "427dd2969bd140be",
       "degraded": "a8494c12f2243903",
@@ -17458,7 +17806,8 @@
       "private": "7e411e6d1fb73865",
       "ssh": "01c4d3c21642b217",
       "tcp": "2e9430507b92dee1",
-      "tls": "d1c18ec0b1092683"
+      "tls": "d1c18ec0b1092683",
+      "variables": "f31c977a1979e892"
     },
     "timeline": {
       "failed": "031a8f0f659df890",
@@ -17539,37 +17888,99 @@
       "locationsRequired": "4a570dd72884bf09",
       "locatorRequired": "f36495f2734aa60c",
       "nameRequired": "604fd1b2e29c688a",
+      "navigateUrlInvalid": "bbee7d47e0c05005",
       "retiredAction": "01d7cf4d82c18533",
       "runBudgetExceeded": "470a8689f42ff51f",
       "runBudgetRetriesHint": "4ce3d551c5592ecc",
       "selectorRequired": "06f956cd08539ade",
       "stepNameRequired": "b17db646239541c2",
       "typeTextRequired": "a54687c5ed47fd66",
-      "urlInvalid": "6477e3cc2ffbc22e",
+      "urlInvalid": "bbee7d47e0c05005",
       "urlRequired": "677d0a8e72df23d5"
+    },
+    "variables": {
+      "createTitle": "f95fcf61a86350ab",
+      "created": "0ee2e55aa6ec4c9f",
+      "deleteConfirm": "a4b982a9e0bc2413",
+      "deleteEnvFallback": "9d48bc1bc0310e9d",
+      "deleteFailed": "864a6c9c1f344827",
+      "deleteGlobalFallback": "7a815fa4cb704341",
+      "deleteTitle": "7159eea8d3dbd077",
+      "deleteUsed": "370b4372cbbac727",
+      "deleted": "8c9d5a1a2a26fee4",
+      "description": "526e0087cc3f254d",
+      "editTitle": "f55f82a7dbdde9f9",
+      "emptyBody": "af552c9be131a91c",
+      "emptyFiltered": "92611428ee2589c0",
+      "emptyTitle": "5699e3a83585bdc8",
+      "example": "d029f87e3d80f8fd",
+      "exampleHint": "fb6052986c00d84c",
+      "examplePlaceholder": "b4981fa592968d8b",
+      "global": "a258b30f88c30650",
+      "globalReachesProduction": "367e7bdb03d6b617",
+      "globalSubtitle": "ef3877e0675b8e9e",
+      "kind": "f5387f9bb6ed7031",
+      "kindPlain": "8b854ade2cd01bdc",
+      "kindSecret": "7e32a729b1226ed1",
+      "lastUpdated": "382ac5f308f76c24",
+      "loadFailed": "a9e02580a180bc1a",
+      "name": "dcd1d5223f73b3a9",
+      "nameInvalid": "3747f84c533cd11e",
+      "namePlaceholder": "4eb016cef328e5d1",
+      "nameRequired": "604fd1b2e29c688a",
+      "nameReserved": "60d97db326e2606a",
+      "nameTooLong": "2e85cd299a01c95a",
+      "newButton": "bc42e8a43e455ee7",
+      "notSet": "4895f73177ab5d67",
+      "overriddenInNote": "85171622531dff45",
+      "overridesGlobalNote": "75062e9ebee20e04",
+      "replace": "95e154398a4bc009",
+      "saveFailed": "db118114e48f54ad",
+      "scope": "07437cd651bed86e",
+      "scopeEnvironment": "27daf5ba61372a1f",
+      "scopeGlobal": "920daf766b3e91a5",
+      "searchPlaceholder": "413b60a7e9206900",
+      "secretNeedsEnvironment": "e0513c3b44288f72",
+      "secretWriteOnly": "2bc62a80dd49e8a0",
+      "shadowGlobalMessage": "fc1ee538620aacb5",
+      "shadowGlobalTitle": "beed90de5a36716c",
+      "shadowedGlobalMessage": "bd28b2a02cf3e7f6",
+      "shadowedGlobalTitle": "3af5937164c6de61",
+      "title": "02db55bac5e3f7ce",
+      "updated": "21c9479996130600",
+      "usedBy": "681bf81aba87bd68",
+      "usedByChecks": "15d60240360bb054",
+      "value": "8e37953d23daca5f",
+      "valueEmpty": "c6c094bc0054f9cb",
+      "valuePlaceholder": "8e37953d23daca5f",
+      "valueRequired": "1fbf278b53995ff3",
+      "valueSet": "e34cc41ba2783181"
     },
     "variablesPanel": {
       "collapsePanel": "0af9e52705c87a44",
+      "countOfCap": "3e5da6f56d9a2762",
       "editVariable": "a35d0c846603ddea",
       "emptyBody": "1ed126dd34ade0e3",
       "emptyTitle": "5699e3a83585bdc8",
+      "local": "8c31e6e7223097e2",
       "nameDuplicate": "a93435b6ae69f275",
       "nameInvalid": "685de1e36f238815",
       "namePlaceholder": "cc54608356753a4e",
       "nameRequired": "f83a4bc1f3f469ca",
       "newVariable": "77149ab877c4a241",
-      "notReferenced": "78fd79748eb93a8d",
       "openPanel": "d7eda88b8b74b39c",
-      "referenceHint": "620223dbfce41b99",
+      "overridesInherited": "f220699b829b2880",
       "removeBody": "807a3e9cf0e11f6f",
+      "removeOverrideNote": "8d0e00e4d234bdaf",
       "removeTitle": "f8d85495664c9814",
       "removeVariable": "0d3f6322b481a6dc",
       "removeWarning": "0899b0727e76a642",
       "removed": "ad6173859d5ebf8c",
+      "resolutionOrder": "239834536f052d35",
       "secretTooltip": "39982a37ce8a36ad",
       "title": "02db55bac5e3f7ce",
       "undo": "a8283ade31856f71",
-      "usedInSteps": "0e39a9da4d2869a8"
+      "valueTooltipEmpty": "d66c7a049b983db6"
     },
     "versionPrefix": "4c94485e0c21ae6c"
   },
@@ -17736,6 +18147,7 @@
         "functions": "75e942e5b366227e",
         "llmModelPricing": "9067acc52aa483f2",
         "organizations": "2730183d6b776b40",
+        "passcode": "1b3dbe134ffb942b",
         "pipelines": "d1a8fffeb935847e",
         "reports": "dacca3cba3f346a4",
         "roles": "c25337055464f8d3",
@@ -17782,6 +18194,9 @@
       "streamDeletedSuccessfully": "52c8a50474c879a9",
       "successfullyDeletedEnrichmentTables": "27033a8179732aa4",
       "view": "dcc839a4015c4b7d"
+    },
+    "iam": {
+      "userSaveFailed": "8e7e4de89efdf90a"
     },
     "layouts": {
       "ingestionNotStarted": "06854b793335768c"
@@ -18635,8 +19050,18 @@
     "firstName": "96ce6e6193a04726",
     "id": "7967e089a7b94464",
     "inviteByEmail": "ca87b80e768f55bf",
+    "inviteByEmailPlaceholder": "f728553b59c5d29d",
     "inviteEmailInvalid": "e16dabef04db970d",
     "lastName": "f55563b386a39dc3",
+    "lockout": {
+      "autoUnlock": "274abcca94693921",
+      "confirmMessage": "c2245482165d19a1",
+      "confirmTitle": "85d8814ccbd655d2",
+      "locked": "6f7f4e56672cd3ab",
+      "staged": "26bf1357f873133f",
+      "undo": "6d4af35fe1199479",
+      "unlock": "4ac709aa58bcfe5d"
+    },
     "name": "b82e11da3bc16786",
     "newPassword": "7c451e0f436d04a6",
     "newPasswordRequired": "1e1a49c16c534200",
@@ -18708,6 +19133,7 @@
     "edit": "464c4ffd019e1e96",
     "editMode": "e7945ee25eb63c57",
     "finishStepsBeforePublish": "a5fc67e0214af8f6",
+    "folder": "74ccd43303847f26",
     "header": "e2073645cb0dbbdd",
     "history": {
       "button": "848f54e89660cea4",
@@ -18759,6 +19185,8 @@
       "title": "089c03463a1425d3"
     },
     "loadError": "0369fba2135ee9dc",
+    "modeInFolder": "d6720d82a0d1d94c",
+    "moveToFolder": "91d631e150a39784",
     "name": "43d40c5c912ac933",
     "namePlaceholder": "942ce282b041e034",
     "nameRequired": "604fd1b2e29c688a",
@@ -18936,12 +19364,17 @@
     "saveDraft": "6c462142d3681836",
     "saveError": "dcd1c0b44e7e420d",
     "search": "a5b9f624c06b9981",
+    "searchAllFolders": "226fd0e51f770b0b",
+    "searchAllFoldersTooltip": "0d0ce170f89122a2",
+    "searchThisFolder": "ab7db04c96526507",
+    "searchThisFolderTooltip": "adb0c3857eea4b10",
     "start": {
       "actionHint": "3ebd524d3730efcc",
       "chooseAction": "f3009e224e14fc87",
       "triggerHint": "b7cc692397818e23"
     },
     "subtitle": "42349f7319e8d8fe",
+    "tabAll": "a52ace420f2175d0",
     "test": {
       "button": "532eaabd9574880d",
       "dirtySelf": "548f87ca62ee4357",
@@ -19010,13 +19443,15 @@
         "desc": "bc5a598b7e8469b4",
         "intro": "a4827ff008e634fb",
         "label": "58ac3a0377867548",
-        "node": "3a187f50000132fe"
+        "node": "3a187f50000132fe",
+        "tab": "f62e9267d196c761"
       },
       "incidentEvent": {
         "desc": "7aff51af193679b7",
         "intro": "2a34d4a2a6466302",
         "label": "c1f3512f947eb9f7",
-        "node": "24e205fc0fb0d4e0"
+        "node": "24e205fc0fb0d4e0",
+        "tab": "bfe868931580fb3b"
       }
     },
     "triggerMeta": {

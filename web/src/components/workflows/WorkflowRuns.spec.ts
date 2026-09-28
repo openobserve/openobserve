@@ -19,7 +19,7 @@
 // inspect separate (Edit Workflow -> editor route; back -> list). The canvas /
 // panel / result drawer are stubbed.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
 const {
   mockRouter,
@@ -58,9 +58,12 @@ vi.mock("vue-router", () => ({ useRouter: () => mockRouter }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...a: any[]) => mockToast(...a),
 }));
-vi.mock("@/services/workflows", () => ({
-  default: { listWorkflows: (...a: any[]) => listWorkflows(...a) },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { listWorkflows: (...a: any[]) => listWorkflows(...a) },
+  });
+});
 vi.mock("@/plugins/workflows/useWorkflowCanvas", () => ({
   default: () => ({ resetWorkflowData: mockReset }),
   workflowObj,
@@ -71,7 +74,6 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", () => ({
     !!run && !!run.error && run.event_type !== "Test" && run.event_type !== "Retry",
 }));
 
-import { describe, it, expect, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -230,7 +232,7 @@ describe("WorkflowRuns", () => {
     await wrapper.find('[data-test="workflow-runs-edit"]').trigger("click");
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
-      query: { id: "wf-1", name: "my flow", org_identifier: "default" },
+      query: { id: "wf-1", name: "my flow", org_identifier: "default", folder: "default" },
     });
   });
 
@@ -260,7 +262,13 @@ describe("WorkflowRuns", () => {
 
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
-      query: { id: "wf-1", name: "my flow", org_identifier: "default", run_id: "run-5" },
+      query: {
+        id: "wf-1",
+        name: "my flow",
+        org_identifier: "default",
+        run_id: "run-5",
+        folder: "default",
+      },
     });
   });
 
@@ -275,7 +283,7 @@ describe("WorkflowRuns", () => {
 
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
-      query: { id: "wf-1", name: "my flow", org_identifier: "default" },
+      query: { id: "wf-1", name: "my flow", org_identifier: "default", folder: "default" },
     });
   });
 
@@ -300,7 +308,7 @@ describe("WorkflowRuns", () => {
     await wrapper.find(".back-btn").trigger("click");
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflows",
-      query: { org_identifier: "default" },
+      query: { org_identifier: "default", folder: "default" },
     });
   });
 });

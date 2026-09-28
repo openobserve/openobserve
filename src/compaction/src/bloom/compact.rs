@@ -106,9 +106,11 @@ pub(crate) async fn build_for_stream(
         infra::schema::get_stream_setting_index_fields(&stream_settings)
             .into_iter()
             .collect();
+    // Global default bloom fields apply to every stream, so drop the ones this stream never had.
+    let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
     let target_fields: Vec<String> = bloom_filter_fields
         .into_iter()
-        .filter(|f| index_fields.contains(f))
+        .filter(|f| index_fields.contains(f) && schema.contains_field(f))
         .collect();
     if target_fields.is_empty() {
         return Ok(false);
@@ -145,6 +147,7 @@ pub(crate) async fn build_for_stream(
         let bloom_ver = base_ver + chunk_idx as i64;
         let bloom_path = bloom_path(org_id, stream_type, stream_name, date_key, bloom_ver);
         match build_for_chunk(org_id, bloom_ver, &bloom_path, chunk, &target_fields, fpp).await {
+            Ok((_, _, 0)) => {}
             Ok((took, num_blocks, contributing_ids)) => {
                 log::info!(
                     "[BLOOM_BUILD] {bloom_path}: wrote chunk {}/{chunk_total}, num_blocks={num_blocks} covering {contributing_ids} files in {took} ms",

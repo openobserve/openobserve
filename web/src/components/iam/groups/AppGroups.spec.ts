@@ -13,23 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { queryClient } from "@/composables/query/queryClient";
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import AppGroups from "@/components/iam/groups/AppGroups.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-vi.mock("@/services/iam", () => ({
-  getGroups: vi.fn(),
-  deleteGroup: vi.fn(),
-  bulkDeleteGroups: vi.fn(async () => ({
-    data: { successful: [], unsuccessful: [] },
-  })),
-  getGroup: vi.fn(async () => ({
-    data: { name: "dev", users: ["u1@o2.ai", "u2@o2.ai"], roles: ["admin"] },
-  })),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const getGroups = vi.fn();
+  return overlayServiceMock(await importOriginal(), {
+    getGroups,
+    deleteGroup: vi.fn(),
+    bulkDeleteGroups: vi.fn(async () => ({
+      data: { successful: [], unsuccessful: [] },
+    })),
+    getGroup: vi.fn(async () => ({
+      data: { name: "dev", users: ["u1@o2.ai", "u2@o2.ai"], roles: ["admin"] },
+    })),
+    updateGroup: vi.fn(async () => ({ data: {} })),
+  });
+});
+
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock((await importOriginal()) as any, {
+    default: { getUserGroups: vi.fn(async () => ({ data: [] })) },
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({
@@ -110,6 +123,8 @@ describe("AppGroups Component", () => {
     vi.mocked(getGroups).mockResolvedValue(
       createMockAxiosResponse(["admin", "developers", "users"]) as any,
     );
+    // Drop the cached read so this override is the one that runs.
+    queryClient.clear();
 
     // Update the mock groups state
     mockGroupsState.groups = [
@@ -176,8 +191,11 @@ describe("AppGroups Component", () => {
       vi.mocked(getGroups).mockResolvedValue(
         createMockAxiosResponse(["admin", "developers", "users"]) as any,
       );
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
-      await wrapper.vm.setupGroups();
+      // Explicit read: mount-path reads now come from the query itself.
+      await wrapper.vm.setupGroups(true);
       await flushPromises();
 
       expect(wrapper.vm.rows).toHaveLength(3);
@@ -267,6 +285,8 @@ describe("AppGroups Component", () => {
       vi.mocked(getGroups).mockResolvedValue(
         createMockAxiosResponse(["admin", "developers", "users"]) as any,
       );
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
       mockGroupsState.groups = [
         { group_name: "admin" },
         { group_name: "developers" },
@@ -337,6 +357,8 @@ describe("AppGroups Component", () => {
       routerPushSpy.mockClear();
       vi.mocked(getGroups).mockClear();
       vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse([]) as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
       await wrapper.vm.onGroupAdded({});
       expect(routerPushSpy).not.toHaveBeenCalled();
       expect(getGroups).toHaveBeenCalled();
@@ -459,6 +481,8 @@ describe("AppGroups Component", () => {
     it("loads groups on component mount", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse(["group1", "group2"]) as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       mount(AppGroups, {
         global: {
@@ -476,8 +500,11 @@ describe("AppGroups Component", () => {
       const { getGroups } = await import("@/services/iam");
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       vi.mocked(getGroups).mockRejectedValue(new Error("Network error"));
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
-      await wrapper.vm.setupGroups();
+      // Explicit read: mount-path reads now come from the query itself.
+      await wrapper.vm.setupGroups(true);
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
@@ -525,8 +552,11 @@ describe("AppGroups Component", () => {
     it("handles empty groups list", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse([]) as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
-      await wrapper.vm.setupGroups();
+      // Explicit read: mount-path reads now come from the query itself.
+      await wrapper.vm.setupGroups(true);
       await flushPromises();
 
       expect(wrapper.vm.rows).toHaveLength(0);
@@ -545,6 +575,115 @@ describe("AppGroups Component", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.filterQuery).toBe("nonexistent");
+    });
+  });
+});
+
+// Quick-assign: arriving via the service-account token popup's
+// "Add to a user group" link (?member=<email>), which used to just redirect
+// here with no way to actually add the account to a group.
+//
+// `useRoute()` is mocked to a plain controllable object rather than driven
+// through the real shared router instance: that router is installed once per
+// test file and its own async initial navigation can still be settling when
+// a later test mutates `currentRoute.value.query` directly, racing it back to
+// an empty query. `useRouter()` (used by clearAssignTarget's router.replace)
+// is untouched, so it stays the same real, spy-able instance every other test
+// in this file relies on.
+const mockAssignRoute = vi.hoisted(() => ({ query: {} as Record<string, any> }));
+vi.mock("vue-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("vue-router")>();
+  return { ...actual, useRoute: () => mockAssignRoute };
+});
+
+describe("AppGroups - quick-assign via ?member=", () => {
+  afterEach(() => {
+    mockAssignRoute.query = {};
+  });
+
+  const mountWithMember = async (member?: string) => {
+    const { getGroups } = await import("@/services/iam");
+    vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse(["admin", "developers"]) as any);
+    queryClient.clear();
+    mockGroupsState.groups = [{ group_name: "admin" }, { group_name: "developers" }] as any;
+    mockAssignRoute.query = member ? { member } : {};
+
+    const w = mount(AppGroups, {
+      global: {
+        provide: { store },
+        plugins: [i18n, router],
+      },
+    });
+    await flushPromises();
+    return w;
+  };
+
+  it("shows the assign banner and passes assignTarget through when ?member= is present", async () => {
+    const w = await mountWithMember("svc.o2.ai@sa.internal");
+    expect(w.find('[data-test="iam-groups-assign-banner"]').exists()).toBe(true);
+    expect((w.vm as any).assignTarget).toBe("svc.o2.ai@sa.internal");
+  });
+
+  it("does not show the assign banner without ?member=", async () => {
+    const w = await mountWithMember();
+    expect(w.find('[data-test="iam-groups-assign-banner"]').exists()).toBe(false);
+  });
+
+  it("assignMemberToGroup calls updateGroup with the member as add_users", async () => {
+    const { updateGroup } = await import("@/services/iam");
+    const w = await mountWithMember("svc.o2.ai@sa.internal");
+
+    await (w.vm as any).assignMemberToGroup({ group_name: "admin" });
+    await flushPromises();
+
+    expect(updateGroup).toHaveBeenCalledWith({
+      group_name: "admin",
+      org_identifier: store.state.selectedOrganization.identifier,
+      payload: {
+        add_roles: [],
+        remove_roles: [],
+        add_users: ["svc.o2.ai@sa.internal"],
+        remove_users: [],
+      },
+    });
+  });
+
+  it("marks a group Assigned after a successful assign, and pre-loads existing memberships", async () => {
+    const users = (await import("@/services/users")).default;
+    vi.mocked(users.getUserGroups).mockResolvedValueOnce({ data: ["developers"] } as any);
+    const w = await mountWithMember("svc.o2.ai@sa.internal");
+    await flushPromises();
+
+    expect((w.vm as any).assignedGroupNames).toContain("developers");
+
+    await (w.vm as any).assignMemberToGroup({ group_name: "admin" });
+    await flushPromises();
+
+    expect((w.vm as any).assignedGroupNames).toContain("admin");
+  });
+
+  it("dismissing the banner clears ?member= from the route", async () => {
+    const { getGroups } = await import("@/services/iam");
+    vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse(["admin", "developers"]) as any);
+    queryClient.clear();
+    mockGroupsState.groups = [{ group_name: "admin" }, { group_name: "developers" }] as any;
+    mockAssignRoute.query = {
+      org_identifier: store.state.selectedOrganization.identifier,
+      member: "svc.o2.ai@sa.internal",
+    };
+
+    const w = mount(AppGroups, {
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await flushPromises();
+    const spy = vi.spyOn(router, "replace");
+
+    await w.find('[data-test="iam-groups-assign-banner-dismiss"]').trigger("click");
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledWith({
+      name: "groups",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
     });
   });
 });

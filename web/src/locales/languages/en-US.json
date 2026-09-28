@@ -1474,6 +1474,8 @@
     "sessionReplay": "Session Replay",
     "viewSessionReplay": "View Session Replay",
     "playSessionReplay": "Play Session Replay",
+    "noReplayRecordedTitle": "No replay was recorded for this session",
+    "noReplayRecordedMessage": "Session {id} has no replay segments to play.",
     "discoverSessionTitle": "Discover Session Replay to Understand User Interactions in Detail",
     "discoverSessionMessage": "Session Replay captures and replays user interactions on your website or application. This allows you to visually review how users navigate, where they click, what they type, and how they engage with your content",
     "loadingErrorDetails": "Hold on tight, we're fetching error details.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "Start free trial"
   },
   "login": {
+    "lockedOut": "Too many failed sign-in attempts. Try again in {duration}, or contact your administrator.",
     "redirectingToSsoMessage": "Redirecting to SSO login page. If you are not redirected, please",
     "clickHere": "click here",
     "loginWithSso": "Login with SSO",
@@ -1954,6 +1957,7 @@
     "ok": "OK",
     "sendInvite": "Send Invite",
     "inviteByEmail": "Invite by email. Multiple emails separated by semicolons (;) or commas (,).",
+    "inviteByEmailPlaceholder": "Invite by email",
     "changePassword": "Change Password",
     "oldPassword": "Old Password",
     "newPassword": "New Password",
@@ -1962,6 +1966,15 @@
     "fieldRequired": "Field is required",
     "passwordRequired": "Password is required.",
     "passwordPolicyHint": "Password must be 8-128 characters and contain at least one lowercase letter, one uppercase letter, one digit, and one special character.",
+    "lockout": {
+      "locked": "Account locked",
+      "autoUnlock": "Unlocks automatically in {duration}.",
+      "staged": "Will be unlocked when you save.",
+      "unlock": "Unlock",
+      "undo": "Keep locked",
+      "confirmTitle": "Unlock {email}?",
+      "confirmMessage": "This clears their failed attempt count and lets them sign in again immediately. It does not change their password."
+    },
     "currentPasswordRequired": "Current password is required.",
     "newPasswordRequired": "New password is required.",
     "otherOrgInvalid": "Organization name must start with a letter and be alphanumeric, _ or -.",
@@ -2028,11 +2041,11 @@
       "addToGroup": "Add to a user group",
       "addToRole": "Assign a role",
       "step1Title": "Copy your token",
-      "copyHint": "Copy this token now — you won't be able to see it again.",
+      "copyHint": "This is the only time you'll see this token. Copy or download it now, it can't be retrieved again.",
       "done": "Done",
       "applying": "Applying access grants…",
-      "grantedRoles": "Roles assigned: {roles}",
-      "grantedGroups": "Added to user groups: {groups}",
+      "rolesAssignedLabel": "Roles assigned",
+      "groupsAssignedLabel": "Added to user groups",
       "failedRoles": "Could not assign roles: {roles}",
       "failedGroups": "Could not add to user groups: {groups}",
       "failedHint": "You can grant these later from the Roles and User Groups pages."
@@ -2042,6 +2055,9 @@
         "label": "Service account name",
         "placeholder": "e.g. ingest-bot",
         "help": "Lowercase letters, numbers and hyphens. Saved as name{suffix}"
+      },
+      "identifier": {
+        "label": "Identifier"
       },
       "roles": {
         "label": "Assign roles",
@@ -2056,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Identifier",
+        "roles": "Roles",
         "token": "Token",
         "created": "Created"
       }
@@ -2183,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Any users and service accounts bound to these roles will lose access."
-      }
+      },
+      "assignColumn": "Assign",
+      "assignBtn": "Add",
+      "assignedBadge": "Assigned",
+      "assignBannerText": "Add {member} to a role — click Add next to a role below.",
+      "assignBannerDone": "Done",
+      "assignSuccess": "Added {member} to role \"{role}\".",
+      "assignError": "Could not add the account to that role. Please try again."
     },
     "group": {
       "name": {
@@ -2214,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Members of these groups will lose the roles granted by them."
-      }
+      },
+      "assignColumn": "Assign",
+      "assignBtn": "Add",
+      "assignedBadge": "Assigned",
+      "assignBannerText": "Add {member} to a user group — click Add next to a group below.",
+      "assignBannerDone": "Done",
+      "assignSuccess": "Added {member} to group \"{group}\".",
+      "assignError": "Could not add the account to that group. Please try again."
     },
     "appGroups": {
       "deleteGroupTitle": "Delete Group",
@@ -2687,6 +2718,14 @@
     "edit": "Edit",
     "view": "View",
     "delete": "Delete",
+    "moveToFolder": "Move to folder",
+    "tabAll": "All",
+    "searchThisFolder": "This folder",
+    "searchAllFolders": "All folders",
+    "searchThisFolderTooltip": "Search only this folder",
+    "searchAllFoldersTooltip": "Search across all folders",
+    "folder": "Folder",
+    "modeInFolder": "{mode} in",
     "deleteTitle": "Delete Workflow",
     "deleteMessage": "Are you sure you want to delete this workflow?",
     "deleteSuccess": "Workflow deleted successfully",
@@ -2721,12 +2760,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Alert Fired",
+        "tab": "Alerts",
         "node": "Alert Trigger",
         "desc": "Run when an alert fires",
         "intro": "When a linked alert fires, every downstream step receives this payload."
       },
       "incidentEvent": {
         "label": "Incident Event",
+        "tab": "Incidents",
         "node": "Incident Trigger",
         "desc": "Run on an incident lifecycle event",
         "intro": "When an incident event occurs, every downstream step receives this payload."
@@ -3558,6 +3599,12 @@
     "joinSlack": "Join the Slack",
     "maybeLater": "Maybe later"
   },
+  "connectDataSourcePopup": {
+    "title": "To get started, let's connect your first data source.",
+    "description": "We've got lots to show you, but we'll need to get your data connected first. Most teams see their first logs in about a minute.",
+    "connectButton": "Connect a data source",
+    "slackLink": "Also join our Slack community"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Continue from where it paused",
     "startFromNow": "Start from now.",
@@ -3568,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Error while copy content.",
+    "passcodeForbiddenMessage": "Admin or Root role required to view the ingestion token. Ask an administrator for the setup command, or for the role needed to see it here.",
     "updateRUMTokenMessage": "Are you sure you want to update rum token for this organization?",
     "completeAwsIntegration": "Complete AWS Integration",
     "deployAwsServicesOneClick": "Deploy all selected AWS services in one click using a single CloudFormation stack.",
@@ -4474,6 +4522,8 @@
       "payloadTitle": "Event payload",
       "payloadIndex": "The {field} field selects the stream. Events without it go to the {stream} stream.",
       "payloadTime": "The {field} field is epoch seconds, and a fractional value is accepted. When it is missing or not positive, the receipt time is used.",
+      "windowTitle": "Timestamps outside the ingestion window are discarded",
+      "windowBody": "Events older than {past} (5 hours by default) or further ahead than {future} (24 hours by default) are dropped, and the request still answers code 0 because a Splunk client does not retry an error. A hardcoded or stale timestamp therefore looks like a successful send that stores nothing.",
       "payloadMetadata": "The {fields} fields are stored as columns on the event.",
       "healthTitle": "Health check",
       "healthBody": "A GET request needs no authentication and answers {response}.",
@@ -4947,7 +4997,7 @@
     "colorLightToDarkBlue": "Light To Dark Blue (By Value)",
     "colorPaletteClassicBySeries": "Palette-Classic (By Series)",
     "drilldown": "Drilldown",
-    "drilldownTooltip": "Navigate to a another dashboard or specified URL, carrying over all current variables for seamless data exploration.",
+    "drilldownTooltip": "Navigate to another dashboard or specified URL, carrying over all current variables for seamless data exploration.",
     "colorBySeriesTitle": "Color by series",
     "colorBySeriesTooltip": "Apply colors to series for better visual distinction in charts. Customize colors for each series to enhance data visualization.",
     "editColorBySeries": " Edit color by series",
@@ -5370,6 +5420,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Refresh to apply latest variable changes",
       "refresh": "Refresh",
+      "refreshCacheReload": "Refresh cache & reload",
+      "moreRefreshOptions": "More refresh options",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard not found or has been deleted. Redirecting to dashboard list.",
       "failedToLoadDashboard": "Failed to load dashboard. Redirecting to dashboard list.",
@@ -5804,7 +5856,36 @@
     "variableNameAlreadyExists": "Variable with same name already exists",
     "pivotTotal": "Total",
     "pivotOthers": "Others",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Show exemplars (trace samples)",
+      "hide": "Hide exemplars · {count} shown",
+      "empty": "No exemplars in this time range",
+      "emptyShort": "0 exemplars",
+      "loadFailed": "Couldn't load exemplars",
+      "loadFailedHint": "The chart is unaffected. Retry fetches exemplars only.",
+      "retry": "Retry",
+      "cardTitle": "Exemplar",
+      "query": "Query {name}",
+      "returnedBy": "Returned by {count} query | Returned by {count} queries",
+      "series": "Series",
+      "aboveRange": "Above the chart range; drawn at the top edge",
+      "belowRange": "Below the chart range; drawn at the bottom edge",
+      "checkingTrace": "Checking trace…",
+      "openTrace": "Open trace",
+      "openTraceHint": "Or click the marker. Back returns here.",
+      "traceNotAvailable": "Trace not available — sampled out or past retention",
+      "openTraceUnverified": "Open trace (unverified)",
+      "unverifiedTimeout": "The trace lookup timed out, so this trace may be missing.",
+      "unverifiedForbidden": "Couldn't confirm this trace — you may not have access to traces.",
+      "unverifiedPartial": "Only part of the retention window was searched.",
+      "unverifiedError": "Couldn't check this trace.",
+      "noTraceId": "No {label} on this exemplar, so there is no trace to open.",
+      "markersAria": "Exemplar markers",
+      "markerAria": "Exemplar {value} at {time}"
+    },
+    "showExemplarsLabel": "Show exemplars",
+    "showExemplarsHelp": "Draws trace samples on this chart for everyone who opens the dashboard. Viewers can still hide them from the panel header."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5892,6 +5973,9 @@
         "details": "Details",
         "json": "JSON",
         "insights": "Insights",
+        "back": "Back to results",
+        "prevEvent": "Previous event",
+        "nextEvent": "Next event",
         "copyLink": "Copy link",
         "copy": "Copy",
         "copyValue": "Copy value",
@@ -7462,6 +7546,7 @@
       "checkEveryTooltip": "How often the detection job runs. Can be larger than the sample period (e.g. sample every 5m, run detection every 1h).",
       "destinationRequired": "At least one destination is required!",
       "detectionCharts": "Detection results",
+      "detectionFunctionTooltip": "What to measure in each time bucket. count watches how many records arrive; avg, min, max and sum watch a numeric field. p50, p95 and p99 watch that field's distribution — e.g. p95 of response_time_ms catches latency getting worse for the slowest requests even when traffic stays flat.",
       "detectionResolution": "Detection Resolution",
       "detectionResolutionTooltip": "How granular each data point is. E.g. \"5m\" means anomalies are detected at 5-minute resolution.",
       "deviationChart": "Deviation by kind",
@@ -7475,7 +7560,10 @@
       "lastError": "Last error",
       "lastTrained": "Last trained",
       "lookBackWindow": "Look Back Window",
-      "lookBackWindowTooltip": "How far back each detection run queries. Caps the window even after a long pause. Defaults to Check Every interval.",
+      "lookBackWindowFloor": "Look Back Window must be at least {min} — Check Every plus one Detection Resolution. A shorter window cannot hold a complete bucket by the time a run fires, so buckets would be skipped.",
+      "lookBackWindowLegacy": "This saved window is below the {min} minimum (Check Every plus one Detection Resolution). It will save unchanged, but runs can skip buckets until the window is raised.",
+      "lookBackWindowMinimum": "Minimum {min}. Recommended {recommended} or more — twice (Check Every + Detection Resolution) — plus 10 minutes where absence detection is enabled.",
+      "lookBackWindowTooltip": "How far back each detection run queries. Caps the window even after a long pause. It must cover at least Check Every plus one Detection Resolution, or complete buckets fall out of the window before a run can judge them.",
       "metricChart": "Metric and anomalies",
       "metricChartHint": "One point per detection bucket",
       "model": "Model",
@@ -7483,9 +7571,19 @@
       "nDays": "{days} day | {days} days",
       "noDestinationsFound": "No destinations found",
       "noFieldsFound": "No fields found",
+      "noticeHybridFallback": "Fallback detection",
+      "noticeHybridFallbackTooltip": "The hybrid threshold was unavailable on recent runs, so detection fell back to the frozen threshold. Scoring continues on the frozen threshold until the model is retrained.",
+      "noticeRetrain": "Auto-retraining",
+      "noticeRetrainTooltip": "The saved model could not be read after an upgrade, so it was discarded and the config was queued for retraining automatically. No action is required; detection resumes once training completes.",
+      "noticeSkipAbsence": "Absence grading fell behind the Look Back Window; the span that could no longer be fetched was skipped and recorded.",
+      "noticeSkipScored": "Detection runs arrived further apart than the Look Back Window covers, so closed buckets left the window before a run could judge them.",
+      "noticeWindowFloor": "Window too narrow",
+      "noticeWindowFloorTooltip": "The Look Back Window is below Check Every plus one Detection Resolution, so runs cannot judge any bucket. Raise the window to restore detection.",
+      "noticeWindowSkip": "Buckets skipped",
       "notifications": "Notifications",
       "notificationsTooltip": "When enabled, a notification will be sent to the selected destination whenever an anomaly is detected.",
-      "percentile": "Percentile",
+      "percentile": "Level",
+      "previewCaption": "A sample of the data this alert will watch, so you can check the query looks right before saving. Anomalies are marked once the model finishes training — see Detection results.",
       "queryMode": "Query mode",
       "retrainEvery": "Retrain Every",
       "retrainEveryTooltip": "How often to automatically retrain the model. \"Never\" means train once and keep the model until manually retrained.",
@@ -7502,7 +7600,8 @@
       "sensitivityBalanced": "Balanced",
       "sensitivityBudgetTooltip": "The maximum number of alerts this configuration may deliver, enforced at delivery. Detection still scores every bucket; once the budget is spent, further alerts are suppressed until it refills.",
       "sensitivityConservative": "Conservative",
-      "sensitivityHintPercentile": "Buckets are judged against the p{percentile} mark of the model's training scores — how many alerts that yields depends on your data.",
+      "sensitivityHintPercentile": "A bucket alerts when it looks more unusual than {percentile}% of what the model saw in training. How many alerts that means depends on your data.",
+      "sensitivityNotDataPercentile": "How unusual a bucket must be before it alerts. Higher means fewer, more extreme alerts. This level scores the model's confidence, not your data's values, so it is unrelated to choosing p95 as the Detection Function.",
       "sensitivityRange": "Enter a whole number between 50 and 99",
       "sensitivityTooltip": "Sets the score bar from the model's training scores at this percentile — 97 puts the bar at the top 3% of training scores. Live scores can differ from training, so this is not a share of future buckets and not an alert rate. A lower value lowers the bar and generally sends more alerts; a cooldown spaces out repeats.",
       "seriesAnomaly": "Anomaly",
@@ -7531,7 +7630,7 @@
       "summaryRetrainEveryDays": "every {days}d",
       "summarySchedule": "✓ Schedule: every {schedule}",
       "summaryThreshold": "✓ Threshold: {threshold}",
-      "summaryThresholdPercentile": "score bar at p{percentile}",
+      "summaryThresholdPercentile": "level {percentile} of 99",
       "summaryTraining": "✓ Training: {days} ({seasonality})",
       "summaryTrainingDays": "{days} days",
       "timestampAliasBanned": "{column} cannot be used as a column alias. Use {timeBucket} instead.",
@@ -7577,7 +7676,9 @@
       "usernameRequired": "Username is required",
       "passwordRequired": "Password is required",
       "emailRecipients": "Recipient Email Addresses",
-      "emailRecipientsHelp": "Comma-separated email addresses",
+      "emailRecipientsHelp": "Select the organization users or service accounts that should receive alert emails",
+      "emailRecipientsGroupUsers": "Users",
+      "emailRecipientsGroupServiceAccounts": "Service Accounts",
       "invalidEmailAddresses": "Invalid email addresses: {emails}",
       "opsgenieApiKey": "Opsgenie API Key",
       "opsgenieApiKeyHelp": "Get your API key from Opsgenie integration settings",
@@ -7894,7 +7995,18 @@
     "enabled": "Enabled",
     "paused": "Paused",
     "impactTemplate": "Used by {destinations} · {alerts}",
-    "impactDestination": "Used by {alerts}"
+    "impactDestination": "Used by {consumers}",
+    "impactUnused": "Not used",
+    "noConsumers": "No consumers.",
+    "countCompositeAlert": "{count} composite alert | {count} composite alerts",
+    "countPipeline": "{count} pipeline | {count} pipelines",
+    "countSyntheticCheck": "{count} synthetic check | {count} synthetic checks",
+    "countOncallPolicy": "{count} escalation policy | {count} escalation policies",
+    "countOncallTeamChannel": "{count} team channel | {count} team channels",
+    "countWorkflow": "{count} workflow | {count} workflows",
+    "countAnomalyDetection": "{count} anomaly detector | {count} anomaly detectors",
+    "countIncidentIntegration": "{count} incident integration | {count} incident integrations",
+    "sectionOtherConsumers": "Also used by"
   },
   "alert_library": {
     "header": "Alert Library",
@@ -8578,7 +8690,9 @@
         "staleCopyAria": "Copy the failed-refresh details for {name}",
         "stalePreamble": "Refresh failed — showing the last successful result.",
         "staleClickToCopy": "Click to copy the details.",
-        "lastRefreshedPrefix": "Last Refreshed At: "
+        "lastRefreshedPrefix": "Last Refreshed At: ",
+        "exemplarsShowHeatmap": "Show exemplars (trace samples). Switches this card to percentiles while on.",
+        "exemplarsHideHeatmap": "Hide exemplars · {count} shown. Returns this card to heatmap."
       },
       "fn": {
         "subtitle": "Choose how this metric is aggregated",
@@ -8762,6 +8876,8 @@
     "cipherKeysDesc": "Encryption keys for sensitive fields",
     "regexPatternsDesc": "Reusable regex patterns for redaction",
     "domainManagementDesc": "Restrict sign-in to allowed SSO domains",
+    "passwordPolicy": "Password Policy",
+    "passwordPolicyDesc": "Authentication policies for native email/password accounts, applied instance-wide.",
     "pipelineDestinationsDesc": "External targets for pipeline output",
     "templatesDesc": "Reusable alert message templates",
     "storageSettingsDesc": "Per-organization storage configuration",
@@ -9338,7 +9454,28 @@
     "listConjunctionAnd": "{list}, and {last}",
     "runsIn": "Runs in",
     "recommendedByFieldCoverage": "Recommended based on field coverage in your streams.",
-    "listConjunctionAndTwo": "{first} and {last}"
+    "listConjunctionAndTwo": "{first} and {last}",
+    "domainOrgMappings": {
+      "title": "Domain to organization mappings",
+      "subtitle": "New users signing in with a matching email domain are added to the organization automatically.",
+      "addMapping": "Add mapping",
+      "editMapping": "Edit mapping",
+      "empty": "No mappings yet. Use “{addLabel}” to add one.",
+      "domain": "Email domain",
+      "domainHelp": "The part after {at_sign} in the user's email address.",
+      "organization": "Organization",
+      "organizationPlaceholder": "Organization identifier",
+      "organizationHelp": "The identifier of the organization matching users are added to.",
+      "organizationRequired": "Organization is required",
+      "baseRole": "Base role",
+      "baseRoleHelp": "The role matching users are given in that organization.",
+      "userGroup": "User group",
+      "userGroupPlaceholder": "Group name",
+      "userGroupHelp": "Optional. Matching users also join this group in that organization.",
+      "duplicateDomain": "A mapping for this domain already exists",
+      "confirmRemove": "Are you sure you want to delete the mapping for {domain}?",
+      "deleteTitle": "Delete Mapping"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -12993,10 +13130,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Input from the trace's root span."
+              "trace": "Input from the trace's root chat span.",
+              "session": "The opening question: input from the first trace's root chat span."
             },
             "output": {
-              "trace": "Output from the trace's root span."
+              "trace": "Output from the trace's root chat span.",
+              "session": "The final answer: output from the last trace's root chat span."
             },
             "statistics": {
               "trace": "Trace metrics: span count, duration, LLM and tool calls, errors, tokens, and cost.",
@@ -13008,6 +13147,10 @@
             "steps": {
               "trace": "Spans in time order; the middle is folded when the trace is very long.",
               "session": "Traces in time order, represented as conversation turns."
+            },
+            "tool_calls": {
+              "trace": "Every tool call in the trace, in time order, with its name, input, output, and status.",
+              "session": "Every tool call across the session's traces, in time order, with its name, input, output, and status."
             }
           }
         }
@@ -13319,6 +13462,7 @@
       "viewAddedFavorites": "View added to favorites.",
       "viewRemovedFavorites": "View removed from favorites.",
       "selectStreamBeforeSchedule": "Please select a stream before scheduling a job",
+      "streamNotFoundInQuery": "Stream \"{stream}\" does not exist",
       "confirmUpdateFunction": "Are you sure you want to update the function?",
       "confirmUpdateSavedViewMsg": "Are you sure you want to update the saved view?"
     },
@@ -13326,6 +13470,7 @@
       "searchHistoryNotEnabled": "Search history is not enabled.",
       "enableUsageReporting": "Set ZO_USAGE_REPORTING_ENABLED to true to enable usage reporting.",
       "selectStreamToExtractPatterns": "Please select a stream to extract patterns",
+      "patternsUnavailableForMultiStream": "Patterns are not available when multiple streams are selected. Please select a single stream.",
       "errorExtractingPatterns": "Error extracting patterns. Please try again.",
       "nameOfPanelRequired": "Name of Panel is required",
       "errorsFixAndTryAgain": "There are some errors, please fix them and try again",
@@ -13457,6 +13602,166 @@
     "lastRefreshed": "Last refreshed: {time}"
   },
   "synthetics": {
+    "variables": {
+      "newButton": "New Variable",
+      "createTitle": "Add Variable",
+      "created": "Variable {name} created",
+      "deleteConfirm": "Delete {name}?",
+      "deleteFailed": "Could not delete the variable",
+      "deleteTitle": "Delete variable",
+      "deleteEnvFallback": "{env} will then use the global value.",
+      "deleteGlobalFallback": "{envs} keep their own values; other environments stop resolving {name}.",
+      "overriddenInNote": "Overridden in {envs}",
+      "overridesGlobalNote": "Overrides global",
+      "shadowGlobalTitle": "Override the global value?",
+      "shadowGlobalMessage": "{name} will override the global value in {env}. Other environments keep using the global.",
+      "shadowedGlobalTitle": "Some environments keep their own values",
+      "shadowedGlobalMessage": "{name} already has its own value in: {envs}. Those environments keep theirs; everywhere else uses this one.",
+      "deleteUsed": "{name} is referenced by {n} check. It will resolve it as literal text until you update it. Delete anyway? | {name} is referenced by {n} checks. They will resolve it as literal text until you update them. Delete anyway?",
+      "deleted": "Variable deleted",
+      "description": "Description",
+      "editTitle": "Edit Variable",
+      "emptyBody": "Share a value across checks instead of copying it into each one.",
+      "emptyFiltered": "No variables match your search.",
+      "emptyTitle": "No variables yet",
+      "example": "Example",
+      "exampleHint": "Shown wherever the value is withheld. Never put a real secret here.",
+      "examplePlaceholder": "https://shop.example.com",
+      "global": "Global",
+      "globalSubtitle": "Applies in every environment.",
+      "globalReachesProduction": "Global values apply in every environment, including production. A change here reaches every check that uses this name without its own value.",
+      "kind": "Kind",
+      "kindPlain": "Plain",
+      "kindSecret": "Secret",
+      "lastUpdated": "Last updated",
+      "loadFailed": "Could not load variables",
+      "name": "Name",
+      "nameInvalid": "Use letters, digits and underscores, starting with a letter or underscore",
+      "namePlaceholder": "BASE_URL",
+      "nameRequired": "Name is required",
+      "nameReserved": "_AUTH_ is reserved for credentials the probe injects itself",
+      "nameTooLong": "Name is too long (max 128 characters)",
+      "notSet": "Not set",
+      "replace": "Replace",
+      "saveFailed": "Could not save the variable",
+      "scope": "Environments",
+      "scopeEnvironment": "This variable applies in {env} only.",
+      "scopeGlobal": "This variable applies in every environment.",
+      "searchPlaceholder": "Search variables",
+      "secretNeedsEnvironment": "Global holds no secrets. Create the secret in the environment that should guard it.",
+      "secretWriteOnly": "The value is write-only. Nothing shows it again after it is saved.",
+      "title": "Variables",
+      "updated": "Variable updated",
+      "usedBy": "Used by",
+      "usedByChecks": "Unused | {n} check | {n} checks",
+      "value": "Value",
+      "valueEmpty": "Empty",
+      "valuePlaceholder": "Value",
+      "valueRequired": "Value is required",
+      "valueSet": "Set · updated {when}"
+    },
+    "environments": {
+      "newButton": "New Environment",
+      "backToList": "All environments",
+      "capReached": "A check can target at most {cap} environments.",
+      "cardEmpty": "No environments yet. Create them under Synthetics → Variables.",
+      "cardLocked": "Selected by a user with access. You can't change it — the check keeps running there.",
+      "cardTitle": "Environments",
+      "checks": "Checks",
+      "checksCount": "Unused | {count} check | {count} checks",
+      "createTitle": "Add Environment",
+      "created": "Environment created",
+      "deleteBlockedChecks": "Still used by {n} checks. Remove it from them first.",
+      "deleteBlockedSecrets": "This environment still holds secrets. Delete them individually first — a secret cannot be recovered.",
+      "deleteConfirm": "Delete {name}?",
+      "deleteFailed": "Could not delete the environment",
+      "deleteTitle": "Delete environment",
+      "deleteWithVariables": "Delete {name} and its {n} variables?",
+      "deleted": "Environment deleted",
+      "description": "Description",
+      "detailSubtitle": "Variables scoped to this environment.",
+      "editTitle": "Edit Environment",
+      "emptyBody": "Create one to scope variables and secrets, such as staging and production.",
+      "emptyTitle": "No environments yet",
+      "lastUpdated": "Last updated",
+      "loadFailed": "Could not load environments",
+      "name": "Name",
+      "nameInvalid": "Use letters, digits, hyphens and underscores, not starting with an underscore",
+      "namePlaceholder": "production",
+      "nameRequired": "Name is required",
+      "nameTooLong": "Name is too long (max 64 characters)",
+      "renameBlocked": "An environment cannot be renamed — the name is what permissions are granted against.",
+      "saveFailed": "Could not save the environment",
+      "searchPlaceholder": "Search environments",
+      "subtitle": "Scope variables and secrets, and control who may manage them.",
+      "title": "Environments",
+      "updated": "Environment updated",
+      "usedByChecks": "Unused | Used by {n} check | Used by {n} checks",
+      "variables": "Variables"
+    },
+    "duplicateVariable": {
+      "body": "Creates a copy of {name}, including its value, in the same scope.",
+      "done": "Variable duplicated",
+      "failed": "Could not duplicate the variable",
+      "nameLabel": "New variable name"
+    },
+    "duplicate": {
+      "action": "Duplicate",
+      "body": "Copies all {n} variables from {name} into a new environment. Checks are not copied.",
+      "bodyWithSecrets": "Copies {n} variables from {name}. {secrets} secret(s) are copied without their values and must be set again. Checks are not copied.",
+      "confirm": "Duplicate",
+      "done": "Environment duplicated",
+      "failed": "Could not duplicate the environment",
+      "nameLabel": "New environment name",
+      "title": "Duplicate {name}"
+    },
+    "inherited": {
+      "notIn": "Not in {envs}",
+      "overridesGlobal": "overrides global",
+      "notInMany": "Not in {count} environments",
+      "overriddenByCheck": "Overridden by local variable",
+      "title": "Shared",
+      "filterAll": "All",
+      "filterLabel": "Filter by source",
+      "emptyIn": "No shared variables in {env}.",
+      "titleTooltip": "Values shared with every check, managed on the Environments & Variables tab: this check's environments plus globals. Local variables above win over these.",
+      "valueSet": "Set",
+      "valueNotSet": "Not set",
+      "emptyNone": "No shared variables."
+    },
+    "promote": {
+      "done": "Variable is now global",
+      "doneShadowed": "Variable is now global. {envs} still override it with their own values.",
+      "failed": "Could not make the variable global",
+      "secretBlocked": "Secrets can't be moved across environments",
+      "toGlobal": "Make global"
+    },
+    "promoteCheck": {
+      "action": "Share {name}",
+      "confirm": "Move",
+      "description": "Moves this variable out of the check into a shared environment, where other checks can use it too.",
+      "destination": "Destination",
+      "done": "Variable moved",
+      "failed": "Could not move the variable",
+      "global": "Global",
+      "secretHint": "This value is marked secure, so it becomes a secret and cannot go to global.",
+      "title": "Share {name}",
+      "tooltip": "Move to a shared environment"
+    },
+    "split": {
+      "action": "Scope to environments",
+      "alreadyOwn": "Already has its own value — kept as is.",
+      "overrideHint": "To override in just one environment, create the variable there instead.",
+      "confirm": "Scope to environments",
+      "description": "Each environment gets its own value. The global variable is replaced.",
+      "done": "Variable scoped to environments",
+      "failed": "Could not scope the variable",
+      "title": "Scope {name} to environments",
+      "unselectedWarning": "Not selected: {envs}. Checks running against them will stop resolving this variable.",
+      "valuePlaceholder": "Value for this environment",
+      "usedBy": "Used by {n} checks: {names}",
+      "usedByHint": "The split is refused while any of these checks would lose the value: a check with no environments, or one that runs in an environment not given a value here."
+    },
     "versionPrefix": "v",
     "tokens": {
       "title": "Synthetics Tokens",
@@ -13526,7 +13831,6 @@
     },
     "variablesPanel": {
       "title": "Variables",
-      "referenceHint": "Reference in any step value or URL as {token}.",
       "emptyTitle": "No variables yet",
       "emptyBody": "Reuse values across steps — like a base URL or a username — and keep secrets out of step values.",
       "newVariable": "New variable",
@@ -13534,8 +13838,6 @@
       "nameRequired": "Name is required.",
       "nameInvalid": "Names start with a letter or underscore and use only letters, digits, and underscores.",
       "nameDuplicate": "A variable with this name already exists.",
-      "usedInSteps": "Used in {count} step | Used in {count} steps",
-      "notReferenced": "Not referenced by any step yet",
       "removed": "Removed {name}",
       "undo": "Undo",
       "editVariable": "Edit variable {name}",
@@ -13545,7 +13847,13 @@
       "openPanel": "Show variables",
       "removeTitle": "Remove variable?",
       "removeBody": "{name} will be removed from this check.",
-      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve."
+      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve.",
+      "removeOverrideNote": "Steps using {name} will now get the {scope} value.",
+      "countOfCap": "{count} of {cap}",
+      "local": "Local",
+      "resolutionOrder": "Resolution order: check, then environment, then global.",
+      "overridesInherited": "Overrides a shared variable — this value wins.",
+      "valueTooltipEmpty": "{name}: no value yet"
     },
     "browserDevices": {
       "desktop": "Desktop",
@@ -13873,7 +14181,8 @@
       "timeoutLabel": "Timeout (ms)",
       "valueFallback": "Value",
       "showSetupSteps": "Show setup steps",
-      "waitingForActions": "Waiting for actions in the browser…"
+      "waitingForActions": "Waiting for actions in the browser…",
+      "unboundVariables": "{names} is not defined in this check, its environments or global, so it is typed as written. | {names} are not defined in this check, its environments or global, so they are typed as written."
     },
     "labels": {
       "copyOf": "Copy of {name}",
@@ -14105,10 +14414,13 @@
     },
     "results": {
       "p95Label": "p95",
+      "allEnvironments": "All environments",
       "clearFilters": "Clear filters",
       "clearFiltersDesc": "Remove all active filters",
       "device": "Device",
       "duration": "Duration",
+      "environment": "Environment",
+      "environmentScope": "Environment scope",
       "editCheck": "Edit Check",
       "error": "Error",
       "failed": "Failed",
@@ -14277,6 +14589,7 @@
       "passRate": "Pass Rate",
       "passRateByBrowser": "Pass Rate by Browser",
       "passRateByDevice": "Pass Rate by Device",
+      "passRateByEnvironment": "Pass Rate by Environment",
       "passRateByLocation": "Pass Rate by Location",
       "durationByLocation": "Duration by Location (Avg)",
       "flakyRate": "Flaky Rate",
@@ -14436,7 +14749,8 @@
       "ssh": "SSH",
       "tcp": "TCP",
       "tls": "TLS",
-      "private": "Private Locations"
+      "private": "Private Locations",
+      "variables": "Environments & Variables"
     },
     "timeline": {
       "failed": "Failed",
@@ -14480,7 +14794,8 @@
       "stepNameRequired": "Give this step a name — it is what run results show",
       "typeTextRequired": "Enter the text this step should type",
       "expectedRequired": "Enter the value this assertion should expect",
-      "urlInvalid": "Enter a valid URL starting with http:// or https://",
+      "urlInvalid": "Enter a URL starting with http://, https:// or a variable placeholder",
+      "navigateUrlInvalid": "Enter a URL starting with http://, https:// or a variable placeholder",
       "urlRequired": "Starting URL is required",
       "fixHighlightedFields": "Fix the highlighted fields before saving",
       "retiredAction": "\"{action}\" is no longer supported — remove or replace \"{step}\"",
@@ -14748,8 +15063,8 @@
       "serving": "Verified. This domain now serves your status page, as long as its CNAME points at this app's host."
     },
     "preview": {
-      "title": "Live preview",
-      "subtitle": "How your public page looks as you edit",
+      "title": "Preview",
+      "subtitle": "Updates as you edit. Uptime shown is sample data.",
       "sampleBadge": "Sample data",
       "eyebrow": "Service status",
       "untitled": "Your status page",
@@ -14945,7 +15260,6 @@
       "syntheticsTokensRefresh": "Refresh token list",
       "aiChatToggle": "Toggle AI chat",
       "aiChatClose": "Close AI chat",
-      "aiChatExpand": "Expand/collapse AI chat",
       "logsSaveView": "Save as saved view",
       "logsExport": "Export results as CSV",
       "tracesCopyUrl": "Copy trace share URL",
@@ -15072,6 +15386,9 @@
       "noOptionsFound": "No options found",
       "multiSelect": "Multi select",
       "singleSelect": "Single select"
+    },
+    "templateInput": {
+      "suggestions": "Variable suggestions"
     },
     "time": {
       "openTimePicker": "Open time picker",
@@ -15558,7 +15875,8 @@
         "destinations": "Destinations",
         "templates": "Templates",
         "reports": "Reports",
-        "llmModelPricing": "LLM Model Pricing"
+        "llmModelPricing": "LLM Model Pricing",
+        "passcode": "Ingestion Token"
       },
       "noPermissionToChangeFavorites": "You don't have permission to change favorites",
       "couldNotUpdateFavoriteDashboards": "Couldn't update favorite dashboards"
@@ -15796,6 +16114,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion."
+    },
+    "iam": {
+      "userSaveFailed": "Could not save the user"
     }
   },
   "cipherKeys": {
@@ -16213,7 +16534,106 @@
       "exponentName": "Exponent"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Complexity",
+    "minLength": "Minimum length",
+    "minLengthDesc": "Shortest password accepted",
+    "maxLength": "Maximum length",
+    "maxLengthDesc": "0 = unbounded",
+    "requireUppercase": "Require uppercase letter",
+    "requireUppercaseDesc": "At least one A–Z",
+    "requireLowercase": "Require lowercase letter",
+    "requireLowercaseDesc": "At least one a–z",
+    "requireDigit": "Require digit",
+    "requireDigitDesc": "At least one 0–9",
+    "requireSpecial": "Require special character",
+    "requireSpecialDesc": "At least one from the allowed set",
+    "specialCharSet": "Allowed special characters",
+    "specialCharSetDesc": "Leave empty to accept any non-alphanumeric character",
+    "maxLengthTooSmall": "Maximum length must be at least the minimum length, or 0 for unbounded.",
+    "confirmTitle": "Save password policy?",
+    "confirmMessage": "Saving may force every native user to set a new password before they can continue. Root, external users and service accounts are exempt — this includes you unless you are the root account. It cannot be undone.",
+    "saved": "Password policy saved. | Password policy saved. {count} user must reset their password. | Password policy saved. {count} users must reset their password.",
+    "saveFailed": "Could not save the password policy.",
+    "notAdminTitle": "Administrator access required",
+    "notAdmin": "Configuring the password policy requires an administrator of the meta organization.",
+    "loadFailedTitle": "Could not load the password policy",
+    "loadFailed": "Something went wrong while reading the current policy.",
+    "rotation": "Rotation",
+    "rotationDays": "Rotation period",
+    "rotationDaysDesc": "Days before a password expires. 0 = never expires",
+    "rotationWarningDays": "Warn before expiry",
+    "rotationWarningDaysDesc": "Days of notice at sign-in. 0 = no warning",
+    "warningDaysTooLong": "The warning window cannot be longer than the rotation period.",
+    "rotationPreview": "A password set today expires {expires}. The sign-in warning starts {warns}.",
+    "rotationPreviewNoWarning": "A password set today expires {expires}. No warning is shown before then.",
+    "reuse": "Reuse prevention",
+    "historyCount": "Passwords remembered",
+    "historyCountDesc": "A new password may not match this many previous ones. 0 = no check",
+    "historyMaxRetained": "History retained",
+    "historyMaxRetainedDesc": "How many past passwords are kept per user",
+    "historyRetainedTooSmall": "History retained must be at least the number of passwords remembered.",
+    "reuseExplainer": "The current password counts as one of the remembered set — reusing it is refused by this rule, not by a separate check.",
+    "lockout": "Account lockout",
+    "lockoutThreshold": "Failed attempts before lockout",
+    "lockoutThresholdDesc": "0 = lockout disabled",
+    "lockoutBucketSize": "Attempts before each further lockout",
+    "lockoutBucketSizeDesc": "0 = reuse the value above",
+    "lockoutStartSecs": "First lockout duration",
+    "lockoutStartSecsDesc": "Seconds",
+    "lockoutMaxSecs": "Maximum lockout duration",
+    "lockoutMaxSecsDesc": "Seconds — the ceiling escalation clamps to",
+    "lockoutStartTooLong": "The first lockout cannot be longer than the maximum lockout.",
+    "lockoutBackoff": "Escalation",
+    "lockoutBackoffDesc": "How each lockout grows from the one before",
+    "backoffExponential": "Exponential",
+    "backoffLinear": "Linear",
+    "lockoutPreview": "{threshold} failures → {first} · every {bucket} more → {rest} · capped at {max}. A successful sign-in resets everything.",
+    "sessionEnforcement": "Session & enforcement",
+    "cookieMaxAge": "Session lifetime",
+    "cookieMaxAgeDesc": "Seconds a signed-in session stays valid. 0 = use the instance default from {envVar}",
+    "applyToRoot": "Apply to the root account",
+    "applyToRootDesc": "Root is exempt from every rule above unless this is on",
+    "rootWarning": "Locking root might cause the system to go into an unrecoverable state.",
+    "rootDialogTitle": "Apply the policy to root?",
+    "rootDialogMessage": "Root will be subject to lockout, rotation and forced resets like any other native account. If root is your only administrative account, a lockout or an expiry it cannot satisfy will leave no way back into this instance.",
+    "rootDialogAck": "I understand root can be locked out of this instance permanently.",
+    "rootDialogConfirm": "Apply to root"
+  },
+  "passwordReset": {
+    "title": "Update your password",
+    "signedInAs": "Signed in as {email}",
+    "reasonPolicyTightened": "The password policy has changed. Update your password to continue using OpenObserve.",
+    "reasonRotationExpired": "Your password has expired. Set a new one to continue using OpenObserve.",
+    "reasonRotationWarning": "Your password expires soon. Set a new one now to avoid being locked out of your work.",
+    "reused": "This password was used recently. Choose one you have not used in your last {count} passwords.",
+    "expiryBanner": "Your password expires in {count} day. Update it now to avoid being locked out of your work. | Your password expires in {count} days. Update it now to avoid being locked out of your work.",
+    "expiryBannerAction": "Update now",
+    "expiryBannerDismiss": "Dismiss",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "currentPasswordRequired": "Current password is required.",
+    "newPasswordRequired": "New password is required.",
+    "confirmPasswordRequired": "Please re-enter the new password.",
+    "mismatch": "Passwords do not match.",
+    "signOut": "Sign out",
+    "submit": "Update password",
+    "updated": "Your password has been updated. Please sign in again.",
+    "updateFailed": "Could not update your password.",
+    "req": {
+      "minLength": "At least {count} characters",
+      "maxLength": "No more than {count} characters",
+      "uppercase": "One uppercase letter",
+      "lowercase": "One lowercase letter",
+      "digit": "One digit",
+      "special": "One special character",
+      "specialFromSet": "One special character from {set}",
+      "unmet": "Password must have: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Password Policy",
     "loginCallback": "Login Callback",
     "slackOAuthCallback": "Connecting Slack",
     "emptyStateDemo": "Empty State Demo",
@@ -16451,13 +16871,10 @@
       "columnMemory": "Memory (current)",
       "columnDisk": "Disk % (current)",
       "columnLoad": "Load 15m (current)",
+      "columnCores": "Cores",
       "columnLastSeen": "Last seen",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Host Metrics dashboard",
-      "importConfirmTitle": "Add the Host Metrics dashboard?",
-      "importConfirmMessage": "You don't have this dashboard yet. Adding it creates a dashboard named 'Host Metrics' in your Default folder, then opens it for this host.",
-      "importConfirmOk": "Add and open",
-      "importConfirmCancel": "Cancel",
+      "loadPerCore": "({value}/core)",
       "windowsLivenessNote": "Windows hosts appear in this list only when the agent reports the load metric (system_cpu_load_average_15m) — if your Windows agents are running but missing here, enable the load scraper in the collector config or update the agent.",
       "panel": {
         "cpuBusy": "CPU busy",
@@ -16682,17 +17099,17 @@
       "alertMe": "Alert me",
       "columnHints": {
         "qps": "Calls per second — this window's calls divided by its length, so a 15-minute view and a 4-hour view stay comparable.",
-        "p50": "Half of all calls finished faster than this. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p95": "The slow tail — 1 call in 20 took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p99": "The worst 1% of calls took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "load": "Total time your applications spent waiting on this database. Measured from the client side, so it reflects how much traffic this database served — not how loaded the server is.",
+        "p50": "Half of all calls finished faster than this. Measured from completed calls in your application's traces.",
+        "p95": "The slow tail — 1 call in 20 took at least this long. Measured from completed calls in your application's traces.",
+        "p99": "The worst 1% of calls took at least this long. Measured from completed calls in your application's traces.",
+        "load": "Total time your apps spent on calls to this database, measured from your application's traces. It shows how much traffic this database served for your apps.",
         "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it."
       },
       "failedChip": "{count} failed",
       "columnSubLabels": {
-        "attention": "server",
-        "load": "client",
-        "calls": "client"
+        "attention": "from the database",
+        "load": "from your apps",
+        "calls": "from your apps"
       },
       "attention": {
         "connections": "connections",
@@ -16754,14 +17171,14 @@
         "failed": "Failed"
       },
       "columnHints": {
-        "calls": "How many times this query ran. Your database's own count where it reports one — that covers every client, not just the parts of your system sending traces. Rows marked client-observed are counted from traces instead, because your database didn't report them.",
-        "p50": "Half of all calls finished faster than this. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p95": "The slow tail — 1 call in 20 took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p99": "The worst 1% of calls took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
+        "calls": "How many times this query ran, as counted by your database — every app that connects is included. Where your database has no count for a query, the traces icon marks one measured from your application's traces.",
+        "p50": "Half of all calls finished faster than this. Measured from completed calls in your application's traces.",
+        "p95": "The slow tail — 1 call in 20 took at least this long. Measured from completed calls in your application's traces.",
+        "p99": "The worst 1% of calls took at least this long. Measured from completed calls in your application's traces.",
         "max": "The single slowest call in this window — one real call, not an average.",
         "errors": "How many of these calls came back with an error.",
         "perTrace": "How many times this runs inside a single request. A high number usually means a loop.",
-        "load": "Total time this query spent in the database. Your database's own figure where it reports one: execution time on Postgres, but WAIT time on MySQL and MariaDB — each row says which. Rows marked client-observed are measured from traces, so they include network round-trip."
+        "load": "Total time this query spent in the database, as your database reports it: execution time on Postgres, wait time on MySQL and MariaDB — each row says which. Rows with the traces icon are measured from your application's traces, so they also include the trip to the database and back."
       },
       "errorsNone": "none",
       "errorsAll": "all",
@@ -17025,8 +17442,7 @@
       "overlap": {
         "serverExecution": "Time {engine} spent executing it",
         "serverWait": "Time {engine} spent waiting on it — wait time, not execution time",
-        "serverCounted": "Counted by {engine}, across every client",
-        "clientObserved": "Observed by instrumented callers — your database didn't report this one"
+        "serverCounted": "Counted by {engine}, across every client"
       },
       "endpointsConcentrated": "One endpoint accounts for {percent} of this query's time. Fix {endpoint} and you've fixed this query.",
       "typicalMarker": "slow calls {value}",
@@ -17053,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "What the database itself recorded",
-        "subtitle": "Server-side — all clients",
-        "clientSubtitle": "Client-observed — instrumented callers only, finished calls only. A query still running, or one that hung, isn't in these numbers.",
+        "subtitle": "From your database — every app that connects",
+        "clientSubtitle": "Marked figures are measured from your application's traces — the calls your apps completed in this window",
         "instance": "Reported by {instance}",
         "instanceWide": "All databases on this instance",
         "calls": "Executions",
@@ -17100,9 +17516,13 @@
         "serverExecution": "exec time",
         "serverWait": "wait time",
         "serverCounted": "server count",
-        "clientObserved": "client-observed",
         "serverReported": "reported by your databases"
       }
+    },
+    "appSource": {
+      "marker": "Measured from your application's traces",
+      "markerHint": "Measured from your application's traces, adding your apps' view to what your database reports.",
+      "legend": "From your app's traces"
     },
     "page": {
       "tabs": {
@@ -17111,7 +17531,7 @@
         "metricsHint": "Database load by wait event, and every metric your database receivers collect.",
         "queries": "Top queries",
         "samples": "Slowest calls",
-        "samplesHintClient": "Finished calls your instrumented services observed in this window — callers without tracing are not counted, so this is a floor, not the total. The table shows the slowest of them.",
+        "samplesHintClient": "Calls measured from your application's traces in this window, adding your apps' view to what your database reports. The table shows the slowest of them.",
         "samplesHintServer": "Statements your databases reported completing in this window, counted inside the database. The table shows the slowest of them.",
         "samplesHintUnknown": "The slowest individual database calls in this window.",
         "deadlocks": "Deadlocks",
@@ -17148,6 +17568,11 @@
       "explore": "Open in Metrics Explorer",
       "railLabel": "Metrics sections",
       "noAccess": "You don't have permission to read {stream}. Ask an admin for read access to this stream.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "by query",
         "database": "by database",
@@ -17262,7 +17687,7 @@
         "status": "Status"
       },
       "columnHints": {
-        "duration": "How long this one call took, measured by the caller. Counts finished calls only — a query still running, or one that never came back, isn't measured here."
+        "duration": "How long this one call took, as your application timed it from start to finish."
       },
       "failed": "Failed",
       "failedWithCode": "Failed · {code}",
@@ -17795,7 +18220,7 @@
     "tabPriorCauses": "Prior causes",
     "statEscalatesIn": "Escalates in",
     "statNobodyLeft": "Nobody left",
-    "statUnackedFor": "Unacked for",
+    "statUnackedFor": "Unacknowledged for",
     "statOpenFor": "Open for",
     "openSchedule": "Open schedule",
     "calendarDay": "Day",
@@ -17827,6 +18252,8 @@
     "notifiedAge": "Notified · Age",
     "channelUndeliverable": "{channel} has no provider behind it — nothing is sent",
     "assignTeamShort": "Assign a team",
+    "assignTeamFailed": "Could not assign the team",
+    "noTeamsToAssign": "No teams to assign yet",
     "contextTitle": "Context worth having before you ack",
     "contextFired": "Fired",
     "contextFiredCount": "{count}× in {days} days",
@@ -17865,6 +18292,7 @@
     "target_rotation_all": "Everyone on {rotation}",
     "target_rotation_deleted": "A rotation this team no longer has",
     "target_rotation_legacy": "Whoever is on call",
+    "target_unrecognized": "A target this screen doesn't recognise",
     "ladderPoolEveryone": "everyone on {rotation}",
     "target_user": "A specific person",
     "target_whole_team": "The whole team",
@@ -18008,6 +18436,8 @@
     "addTeam": "Add team",
     "newTeam": "New team",
     "editTeam": "Edit team",
+    "defaultTeamBadge": "Default",
+    "setDefaultTeam": "Set as default team",
     "manageTeamCta": "Manage members, schedule & escalation",
     "teamName": "Name",
     "teamNameHint": "How this team is referred to on a page",
@@ -18262,7 +18692,7 @@
     "ownershipHint": "This team is paged for anything matching these identity paths. The most specific matching rule wins, so a namespace rule overrides a cluster rule.",
     "noOwnershipRules": "No ownership rules. This team is only paged by alerts that name it directly.",
     "noOwnershipRulesOrg": "No ownership rules. Signals are only routed to a team when an alert names it directly.",
-    "editOwnershipRule": "Edit ownership rule",
+    "editOwnershipRule": "Edit rule",
     "ruleUpdated": "Rule updated",
     "addOwnershipRule": "New rule",
     "saveRule": "Save",
@@ -18304,10 +18734,12 @@
     "setupStep4Title": "Configure a notification destination",
     "setupStep4Body": "Without a destination, nobody's phone or inbox is actually reachable — every step above can be finished and a page still lands nowhere.",
     "setupCta": "Create your first team",
-    "memberPickPlaceholder": "Search people in this organization",
+    "memberPickPlaceholder": "Select a team member to add",
+    "memberSearchPlaceholder": "Search members",
     "memberEmailFallbackHint": "Could not load the user list. Enter one or more emails of existing organization users, separated by commas.",
     "addPeople": "Add people",
     "addPeopleCta": "Add | Add {count} | Add {count}",
+    "addPeopleDisabledHint": "Select a team member to add",
     "addEveryoneCta": "Add everyone in the org ({count})",
     "teamCreateSecondary": "Also create a Secondary rotation",
     "teamCreateSecondaryHint": "Same people, one shift behind, so the secondary is never the person already on call. It is an ordinary rotation — nothing links the two, so editing one roster and not the other lets them drift, and you get a warning rather than a silent fix.",
@@ -18664,6 +19096,7 @@
     "coverageGapNowOpen": "Nobody is on call, and nobody is scheduled in the next {days} days",
     "coveragePrimaryOnly": "Primary: {primary}",
     "coverageSecondaryOnly": "Secondary: {secondary}",
+    "coverageMoreChanges": "+{count} more change | +{count} more changes",
     "reachTeamTitle": "Reach the team",
     "reachTeamHint": "during an incident",
     "contactSendTest": "Send test page",
@@ -18763,6 +19196,8 @@
     "rotationNobody": "Nobody on call",
     "edit": "Edit",
     "timelineLoadFailed": "Could not resolve the schedule for this window",
+    "editorReadFailed": "Could not load the latest copy to edit. Try again.",
+    "refreshFailed": "Could not refresh. What is shown may be out of date.",
     "scheduleDoneEditing": "Back to schedule",
     "coverWhoRequired": "Choose who is covering",
     "timelineCoverAria": "{who} is covering {rotation}, {from} to {to}",
@@ -18873,7 +19308,7 @@
     "routingSaysPlace": "All alerts and incidents from the {value} {noun}",
     "routingSaysPlaces": "All alerts and incidents from {scope}",
     "routingSaysAnything": "All alerts and incidents",
-    "routingNoLadder": "no escalation ladder yet",
+    "routingNoLadder": "No escalation ladder yet",
     "routingPagesTeam": "pages {team}",
     "routingCaughtLast": "{count} page · last {when} | {count} pages · last {when}",
     "routingEmptyBodyNamed": "{team} won't be paged until a rule matches an incoming alert.",

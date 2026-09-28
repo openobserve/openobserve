@@ -49,21 +49,23 @@ const config = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("generateAnomalySummary — sensitivity line", () => {
-  it("states the training-score percentile, never a live anomaly rate", () => {
-    // The percentile indexes TRAINING scores and promises nothing about live buckets.
+  it("states the stored level, never a live anomaly rate", () => {
+    // The stored number indexes TRAINING scores and promises nothing about live buckets.
     const summary = generateAnomalySummary(config(), [], t);
-    expect(summary).toContain("score bar at p97");
+    expect(summary).toContain("level 97");
     expect(summary).not.toContain("anomaly rate");
+    // A bare "97" beside "Threshold" would read as a count or a percentage of alerts.
+    expect(summary).not.toMatch(/Threshold:[^<]*<[^>]*>\s*97\s*</);
   });
 
-  it("reports the conservative tier as its percentile", () => {
-    expect(generateAnomalySummary(config({ threshold: 99 }), [], t)).toContain("score bar at p99");
+  it("reports the conservative tier as its level", () => {
+    expect(generateAnomalySummary(config({ threshold: 99 }), [], t)).toContain("level 99");
   });
 
-  it("a stored budget replaces the percentile with the enforced cap", () => {
+  it("a stored budget replaces the level with the enforced cap", () => {
     const summary = generateAnomalySummary(config({ alert_budget_per_day: 2 }), [], t);
     expect(summary).toContain("at most 2 alerts/day");
-    expect(summary).not.toContain("score bar");
+    expect(summary).not.toMatch(/\blevel \d/);
   });
 
   it("a sub-daily budget reads as alerts per week, singular at one", () => {
@@ -76,7 +78,7 @@ describe("generateAnomalySummary — sensitivity line", () => {
     expect(summary).toContain("at most 0.35 alerts/week");
   });
 
-  // The percentile input can be emptied, and the write-back passes "" through
+  // The level input can be emptied, and the write-back passes "" through
   // unchanged; a blank must not be numberified into a claim.
   it.each([
     ["", "empty string"],
@@ -85,7 +87,8 @@ describe("generateAnomalySummary — sensitivity line", () => {
     ["abc", "non-numeric"],
   ])("omits the sensitivity line entirely for %s (%s)", (threshold) => {
     const summary = generateAnomalySummary(config({ threshold }), [], t);
-    expect(summary).not.toContain("score bar");
+    expect(summary).not.toContain("Threshold:");
+    expect(summary).not.toMatch(/\blevel \d/);
     expect(summary).not.toContain("anomaly rate");
     // The rest of the summary still renders.
     expect(summary).toContain("14 days");

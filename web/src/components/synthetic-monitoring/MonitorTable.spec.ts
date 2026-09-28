@@ -361,9 +361,9 @@ describe("MonitorTable", () => {
       expect(wrapper.emitted("delete")![0]).toEqual([mockMonitorList[0]]);
     });
 
-    it("should emit move with row data when move menu item is clicked", async () => {
+    it("should emit move with row data when the move action button is clicked", async () => {
       wrapper = mountMonitorTable();
-      const moveItem = wrapper.find('[data-test="monitor-table-move-item"]');
+      const moveItem = wrapper.find('[data-test="monitor-table-move-btn"]');
       expect(moveItem.exists()).toBe(true);
       await moveItem.trigger("click");
       expect(wrapper.emitted("move")).toHaveLength(1);
@@ -642,7 +642,7 @@ describe("MonitorTable", () => {
     describe("name cell", () => {
       it("renders OTooltip wrapping the name with cursor-pointer when name is present", () => {
         wrapper = mountMonitorTable();
-        // Per row: name=idx+0, url=idx+1, locations=idx+2, then 4 action OTooltips.
+        // Per row: name=idx+0, url=idx+1, locations=idx+2, then 5 action OTooltips.
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
         expect(tooltips.length).toBeGreaterThanOrEqual(3);
         const nameTooltip = tooltips[0];
@@ -655,8 +655,8 @@ describe("MonitorTable", () => {
           data: [{ ...mockMonitorList[0], name: undefined as any, id: "test-no-name" }],
         });
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        // Only URL + locations + 4 actions = 6 OTooltips (name cell skipped)
-        expect(tooltips.length).toBe(6);
+        // Only URL + locations + 5 actions = 7 OTooltips (name cell skipped)
+        expect(tooltips.length).toBe(7);
         // The em-dash fallback should appear in the DOM
         expect(wrapper.text()).toContain("—");
       });
@@ -678,8 +678,8 @@ describe("MonitorTable", () => {
           data: [{ ...mockMonitorList[0], url: undefined as any, id: "test-no-url" }],
         });
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        // Name + locations + 4 actions = 6 OTooltips (URL cell skipped)
-        expect(tooltips.length).toBe(6);
+        // Name + locations + 5 actions = 7 OTooltips (URL cell skipped)
+        expect(tooltips.length).toBe(7);
         // URL tooltip at index 1 is now the locations tooltip (shifted)
         expect(tooltips[1].props("content")).toContain("us-east-1");
         expect(wrapper.text()).toContain("—");
@@ -739,8 +739,8 @@ describe("MonitorTable", () => {
       it("does not show count badge when only one location", () => {
         wrapper = mountMonitorTable();
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        // Row 1 (mockMonitorTcp) has 1 location. Its locations OTooltip is at index 9.
-        const row1LocTooltip = tooltips[9];
+        // Row 1 (mockMonitorTcp) has 1 location. Its locations OTooltip is at index 10.
+        const row1LocTooltip = tooltips[10];
         const row1LocText = row1LocTooltip.text();
         expect(row1LocText).toContain("us-east-1");
         expect(row1LocText).not.toContain("+");
@@ -751,8 +751,8 @@ describe("MonitorTable", () => {
           data: [{ ...mockMonitorList[0], locations: [] as any, id: "test-no-loc" }],
         });
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        // Name + URL + 4 actions = 6 OTooltips (locations cell skipped)
-        expect(tooltips.length).toBe(6);
+        // Name + URL + 5 actions = 7 OTooltips (locations cell skipped)
+        expect(tooltips.length).toBe(7);
         expect(wrapper.text()).toContain("—");
       });
 
@@ -776,8 +776,8 @@ describe("MonitorTable", () => {
           },
         });
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        // Row 2 (mockMonitorBrowser) has 3 locations, its loc OTooltip is at index 16
-        const row2LocTooltip = tooltips[16];
+        // Row 2 (mockMonitorBrowser) has 3 locations, its loc OTooltip is at index 18
+        const row2LocTooltip = tooltips[18];
         expect(row2LocTooltip.props("content")).toBe(
           "US East (N. Virginia)\nEU (Ireland)\nAsia Pacific (Singapore)",
         );
@@ -790,7 +790,7 @@ describe("MonitorTable", () => {
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
         // Row 2 has ["us-east-1", "eu-west-1", "ap-southeast-1"]
         // Only us-east-1 is mapped; eu-west-1 and ap-southeast-1 fall back to raw IDs
-        const row2LocTooltip = tooltips[16];
+        const row2LocTooltip = tooltips[18];
         expect(row2LocTooltip.props("content")).toBe("US East\neu-west-1\nap-southeast-1");
       });
     });

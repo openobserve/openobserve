@@ -149,6 +149,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import alertsService from "@/services/alerts";
+import { saveAlertMutation } from "@/services/alerts.queries";
+import { useMutation } from "@tanstack/vue-query";
 
 const props = defineProps<{ workflowId: string; workflowName: string }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "linked"): void }>();
@@ -268,6 +270,8 @@ const clearAll = () => {
 // Link = for each selected alert: GET the full alert, add this workflow id to
 // its `workflows`, PUT it back (v2 GET returns the Alert model; the v2 update
 // body flattens that same model, so it round-trips cleanly).
+const linkAlert = useMutation(() => saveAlertMutation(orgId(), () => true));
+
 const linkSelected = async () => {
   if (!selected.value.length || linking.value) return;
   linking.value = true;
@@ -282,7 +286,7 @@ const linkSelected = async () => {
       const wfs: string[] = Array.isArray(alert.workflows) ? alert.workflows : [];
       if (!wfs.includes(props.workflowId)) wfs.push(props.workflowId);
       alert.workflows = wfs;
-      await alertsService.update_by_alert_id(org, alert, byId.get(alertId)?.folder_id);
+      await linkAlert.mutateAsync({ payload: alert, folderId: byId.get(alertId)?.folder_id });
       ok += 1;
     } catch (e) {
       failed += 1;

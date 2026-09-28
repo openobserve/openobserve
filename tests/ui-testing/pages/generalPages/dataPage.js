@@ -52,6 +52,38 @@ export class DataPage {
         return this.page.getByText('Select an integration to view details.');
     }
 
+    // ---- AI datasource categories (#11534) ----------------------------
+    // Keyed on the category SLUG from components/ingestion/ai/data.ts, not the
+    // tab label: the label goes through i18n and would break under a non-English
+    // locale while the slug is part of the route.
+    getAiCategoryTab(slug) {
+        return this.page.locator(`[data-test="ai-integrations-category-${slug}"]`).first();
+    }
+    getAiIntegrationItems() {
+        return this.page.locator('[data-test^="ai-integrations-item-"]');
+    }
+
+    async expectAiCategoryVisible(slug) {
+        await expect(this.getAiCategoryTab(slug),
+            `AI category tab "${slug}" must be present`).toBeVisible({ timeout: 15000 });
+    }
+
+    async openAiCategory(slug) {
+        await this.getAiCategoryTab(slug).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
+    /** Number of integrations listed in the open category. */
+    async expectAiIntegrationsListed(minimum = 1) {
+        const items = this.getAiIntegrationItems();
+        await expect(items.first(),
+            'The open AI category must list integrations').toBeVisible({ timeout: 15000 });
+        const count = await items.count();
+        expect(count,
+            `The open AI category must list more than ${minimum} integration(s)`).toBeGreaterThan(minimum);
+        return count;
+    }
+
     async navigateToAIIntegrations(baseUrl, orgName) {
         const aiUrl = `${baseUrl || 'http://localhost:5080'}/web/ingestion/ai-integrations?org_identifier=${orgName || 'default'}`;
         await this.page.goto(aiUrl, { timeout: 15000 });

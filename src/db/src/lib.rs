@@ -21,6 +21,7 @@ use {
     infra::errors::Error, o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
+pub mod agent_signals;
 pub mod alerts;
 pub mod authz;
 pub mod backfill;
@@ -46,6 +47,7 @@ pub mod org_ingestion_tokens;
 pub mod org_status;
 pub mod org_users;
 pub mod organization;
+pub mod password_policy;
 pub mod pipeline_errors;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;

@@ -1366,9 +1366,9 @@ export interface TestPageResult {
 /**
  * What `POST .../escalate` answers with.
  *
- * **Not the bare record.** The verb reports what it did — who it woke, who it
- * chased a second time, and who it skipped because a page had already landed
- * on them — and `response` carries the record alongside. A screen that patches
+ * **Not the bare record.** The verb reports what it did — who it woke, whether
+ * the rung was chased a second time, and whether its page was skipped because
+ * one had already landed — and `response` carries the record alongside. A screen that patches
  * a row from `res.data` rather than `res.data.response` writes the envelope
  * into the row.
  *
@@ -1384,10 +1384,10 @@ export type EscalateResult =
       rung_micros: number;
       /** Who the rung was dispatched to. */
       recipients: string[];
-      /** Reached again although they had already been paged on this run. */
-      chased: string[];
-      /** Skipped: a page for this run had already landed on them. */
-      deduplicated: string[];
+      /** Whether the rung had already been paged on this run and was reached again. */
+      chased: boolean;
+      /** Whether the rung's page was skipped: it had already landed on this run. */
+      deduplicated: boolean;
       response: OnCallResponse;
     };
 

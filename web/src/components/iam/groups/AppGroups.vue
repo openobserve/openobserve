@@ -26,6 +26,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("iam.addGroup") }}
       </OButton>
     </template>
+    <!-- ?member=<email> (from the token popup's "Add to a user group" link) drives the Assign column below. -->
+    <OBanner
+      v-if="assignTarget"
+      variant="info"
+      icon="group"
+      inline-actions
+      dense
+      data-test="iam-groups-assign-banner"
+      class="mb-3"
+    >
+      {{ t("iam.groupsPage.assignBannerText", { member: assignTarget }) }}
+      <template #actions>
+        <OButton
+          data-test="iam-groups-assign-banner-dismiss"
+          variant="ghost"
+          size="sm"
+          @click="clearAssignTarget"
+        >
+          {{ t("iam.groupsPage.assignBannerDone") }}
+        </OButton>
+      </template>
+    </OBanner>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
@@ -51,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('iam.searchGroup')"
@@ -61,20 +83,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="iamGroupsRefresh"
               data-test="iam-groups-refresh-btn"
-              @click="setupGroups"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamGroupsRefresh"
-              />
-            </OButton>
+              @click="refreshGroups"
+            />
+          </template>
+          <template #cell-assign="{ row }">
+            <div class="flex items-center justify-center">
+              <OBadge v-if="isAssigned(row)" variant="success" icon="check" size="sm">
+                {{ t("iam.groupsPage.assignedBadge") }}
+              </OBadge>
+              <OButton
+                v-else
+                :data-test="`iam-groups-assign-${row.group_name}-btn`"
+                variant="outline"
+                size="sm"
+                :loading="assigningGroupName === row.group_name"
+                @click="assignMemberToGroup(row)"
+              >
+                {{ t("iam.groupsPage.assignBtn") }}
+              </OButton>
+            </div>
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center">
@@ -185,10 +219,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount, computed } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { deleteGroupMutation, bulkDeleteGroupsMutation } from "@/services/iam.queries";
+import { groupsQuery } from "@/services/iam.queries";
+import { ref, onBeforeMount, computed, watch } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -197,9 +238,10 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { getGroups, deleteGroup, bulkDeleteGroups, getGroup } from "@/services/iam";
+import { getGroup, updateGroup } from "@/services/iam";
+import users from "@/services/users";
 import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -219,10 +261,80 @@ const { track } = useReo();
 const rows: any = ref([]);
 
 const router = useRouter();
+const route = useRoute();
 
 const store = useStore();
 
 const { groupsState } = usePermissions();
+
+// ── Quick-assign (arrived via ?member=<email>) ────────────────────────────
+// The service-account token popup's "Add to a user group" link lands here
+// with the account's email in the query. Previously nothing read it — this
+// now drives the Assign column below.
+const assignTarget = computed(() => (route.query.member as string) || "");
+const assigningGroupName = ref<string | null>(null);
+const assignedGroupNames = ref<string[]>([]);
+
+const loadAssignedGroupNames = async () => {
+  if (!assignTarget.value) {
+    assignedGroupNames.value = [];
+    return;
+  }
+  try {
+    const res = await users.getUserGroups(
+      store.state.selectedOrganization.identifier,
+      assignTarget.value,
+    );
+    assignedGroupNames.value = Array.isArray(res.data) ? res.data : [];
+  } catch {
+    // Silent: worst case a group the member already belongs to still shows an
+    // actionable "Add" button — a redundant add_users is a harmless no-op.
+    assignedGroupNames.value = [];
+  }
+};
+
+watch(assignTarget, loadAssignedGroupNames, { immediate: true });
+
+const isAssigned = (row: any): boolean => assignedGroupNames.value.includes(row?.group_name);
+
+const clearAssignTarget = () => {
+  const { member: _member, ...rest } = route.query;
+  router.replace({ name: "groups", query: rest });
+};
+
+const assignMemberToGroup = async (group: any) => {
+  if (!assignTarget.value || assigningGroupName.value) return;
+  assigningGroupName.value = group.group_name;
+  try {
+    await updateGroup({
+      group_name: group.group_name,
+      org_identifier: store.state.selectedOrganization.identifier,
+      payload: {
+        add_roles: [],
+        remove_roles: [],
+        add_users: [assignTarget.value],
+        remove_users: [],
+      },
+    });
+    assignedGroupNames.value = [...assignedGroupNames.value, group.group_name];
+    toast({
+      message: t("iam.groupsPage.assignSuccess", {
+        member: assignTarget.value,
+        group: group.group_name,
+      }),
+      variant: "success",
+    });
+  } catch (err: any) {
+    if (err?.response?.status != 403) {
+      toast({
+        message: err?.response?.data?.message || t("iam.groupsPage.assignError"),
+        variant: "error",
+      });
+    }
+  } finally {
+    assigningGroupName.value = null;
+  }
+};
 
 const filterQuery = ref("");
 
@@ -242,15 +354,29 @@ const handleSelectedIdsUpdate = (ids: string[]) => {
 const confirmBulkDelete = ref(false);
 const bulkDeleteLoading = ref(false);
 
-const columns: OTableColumnDef[] = [
-  {
-    id: "group_name",
-    header: t("iam.groupName"),
-    accessorKey: "group_name",
-    sortable: true,
-    meta: { align: "left", autoWidth: true, isName: true },
-  },
-  {
+const columns = computed<OTableColumnDef[]>(() => {
+  const cols: OTableColumnDef[] = [
+    {
+      id: "group_name",
+      header: t("iam.groupName"),
+      accessorKey: "group_name",
+      sortable: true,
+      meta: { align: "left", autoWidth: true, isName: true },
+    },
+  ];
+
+  if (assignTarget.value) {
+    cols.push({
+      id: "assign",
+      header: t("iam.groupsPage.assignColumn"),
+      sortable: false,
+      resizable: false,
+      size: 130,
+      meta: { align: "center" },
+    });
+  }
+
+  cols.push({
     id: "actions",
     header: t("alerts.actions"),
     isAction: true,
@@ -259,8 +385,10 @@ const columns: OTableColumnDef[] = [
     minSize: 64,
     maxSize: 100,
     meta: { align: "center", actionCount: 2 },
-  },
-];
+  });
+
+  return cols;
+});
 
 onBeforeMount(() => {
   setupGroups();
@@ -283,7 +411,7 @@ const addGroup = () => {
 // with an empty group.
 const onGroupAdded = (payload: { group_name: string; data?: any }) => {
   if (!payload?.group_name) {
-    setupGroups();
+    setupGroups(true);
     return;
   }
 
@@ -311,35 +439,70 @@ const editGroup = (group: any) => {
   });
 };
 
-const loading = ref(false);
-const forbidden = ref(false);
-const setupGroups = async () => {
-  loading.value = true;
-  forbidden.value = false;
-  await getGroups(store.state.selectedOrganization.identifier)
-    .then((res) => {
-      groupsState.groups = res.data.map((group: string) => ({
-        group_name: group,
-      }));
-      updateTable();
-    })
-    .catch((err: any) => {
-      console.log(err);
-      forbidden.value = err?.response?.status === 403;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
+const orgIdForList = useOrgId();
+const groupsList = useQuery(() =>
+  Object.assign(groupsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+
+// Bound to the query rather than hand-managed: `isPending` is the cold read,
+// `isFetching` is any request in flight.
+const loading = groupsList.isPending;
+// A request in flight while rows stay on screen — the refresh button's spinner.
+// `loading` is the skeleton, which only a cold read wants.
+const fetching = groupsList.isFetching;
+const lastUpdatedAt = groupsList.dataUpdatedAt;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = groupsList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+// `force` for every reload that follows a write or an explicit refresh —
+// an "added" event means the server has something new to show.
+// Named handler: binding setupGroups straight to @click puts the MouseEvent
+// in `force`.
+const refreshGroups = () => setupGroups(true);
+
+const applyGroups = (res: any) => {
+  groupsState.groups = res.map((group: string) => ({
+    group_name: group,
+  }));
+  updateTable();
 };
 
+// The list is the query now: anything that invalidates the scope repaints these
+// rows without this component asking.
+watch(
+  groupsList.data,
+  (rows: any) => {
+    if (rows) applyGroups(rows);
+  },
+  { immediate: true },
+);
+watch(groupsList.error, (err: any) => {
+  if (err) console.log(err);
+});
+
+// Only an explicit call reads: refresh, post-write reload, search. Mount and
+// invalidation-driven repaints come from the query itself.
+const setupGroups = async (force = false) => {
+  if (force) await groupsList.refetch();
+};
+
+const orgId = useOrgId();
+const deleteGroupOne = useMutation(() => deleteGroupMutation(orgId.value));
+const bulkDeleteGroupsAll = useMutation(() => bulkDeleteGroupsMutation(orgId.value));
+
 const deleteUserGroup = (group: any) => {
-  deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
+  // Was: invalidate, then delete — the refetch raced the write. The mutation
+  // invalidates on success, so the order is now correct by construction.
+  deleteGroupOne
+    .mutateAsync(group.group_name)
     .then(() => {
       toast({
         message: t("iam.appGroups.groupDeletedSuccess"),
         variant: "success",
       });
-      setupGroups();
+      setupGroups(true);
     })
     .catch((error: any) => {
       if (error.response.status != 403) {
@@ -410,9 +573,7 @@ const bulkDeleteUserGroups = async () => {
   const groupNames = selectedGroups.value.map((group: any) => group.group_name);
 
   try {
-    const response = await bulkDeleteGroups(store.state.selectedOrganization.identifier, {
-      ids: groupNames,
-    });
+    const response = await bulkDeleteGroupsAll.mutateAsync(groupNames);
 
     const { successful = [], unsuccessful = [], err } = response.data || {};
 
@@ -440,7 +601,7 @@ const bulkDeleteUserGroups = async () => {
       });
     }
 
-    await setupGroups();
+    await setupGroups(true);
     selectedGroups.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
@@ -468,7 +629,7 @@ useShortcuts([
   {
     id: "iamGroupsRefresh",
     handler: () => {
-      if (!isInputFocused()) setupGroups();
+      if (!isInputFocused()) setupGroups(true);
     },
   },
   {

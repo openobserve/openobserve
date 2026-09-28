@@ -144,7 +144,7 @@ pub async fn search(
 
                         ret_val
                             .as_array()
-                            .ok_or(Error::Message("Expected array".to_string()))?
+                            .ok_or_else(|| Error::Message("Expected array".to_string()))?
                             .iter()
                             .filter_map(|v| {
                                 if !v.is_null() && v.is_object() {

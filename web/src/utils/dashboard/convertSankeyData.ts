@@ -25,6 +25,7 @@ import { getDataValue } from "./aliasUtils";
  */
 
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { escapeHtml } from "@/utils/html";
 
 export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   // Validate that at least one query has all required fields
@@ -97,7 +98,7 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
           );
         }
 
-        return `${params.name} : ${value}`;
+        return `${escapeHtml(params.name)} : ${escapeHtml(value)}`;
       },
     },
     backgroundColor: "transparent",

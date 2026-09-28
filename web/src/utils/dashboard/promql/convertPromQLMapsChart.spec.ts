@@ -612,6 +612,28 @@ describe("MapsConverter", () => {
       expect(formatted).toBe("United States: 100");
     });
 
+    it("should escape HTML in the region name", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [{ metric: { name: "US" }, name: "US", data: [], values: [[1234567890, "100"]] }],
+          timestamps: [],
+        },
+      ];
+      const result = converter.convert(
+        processedData,
+        { type: "maps", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      const formatted = result.tooltip.formatter({
+        name: "<img src=x onerror=alert(1)>",
+        value: 1,
+      });
+
+      expect(formatted).toBe("&lt;img src=x onerror=alert(1)&gt;: 1");
+    });
+
     it("should format tooltip with dash for invalid value", () => {
       const processedData: ProcessedPromQLData[] = [
         {

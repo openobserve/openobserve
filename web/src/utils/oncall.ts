@@ -386,11 +386,18 @@ export function describeTarget(
 ): string {
   if (target.kind === "user") return target.email;
   if (target.kind === "whole_team") return t("oncall.target_whole_team");
+  // A mixed-version deployment or an unmigrated policy can still carry one of
+  // the six retired kinds this build no longer types. That is not a deleted
+  // rotation — it is a kind this screen was never taught to read.
+  if (target.kind !== "rotation") return t("oncall.target_unrecognized");
   if (!rotationName) return t("oncall.target_rotation_deleted");
   return target.mode === "all"
     ? t("oncall.target_rotation_all", { rotation: rotationName })
     : t("oncall.target_rotation_on_call", { rotation: rotationName });
 }
+
+// Zones IANA renamed; `Intl.supportedValuesOf` still only surfaces the pre-rename id.
+const RENAMED_TIMEZONES = ["Asia/Kolkata", "Asia/Ho_Chi_Minh", "Europe/Kyiv", "America/Nuuk"];
 
 /**
  * The zones this runtime can actually resolve, UTC first.
@@ -408,7 +415,7 @@ export function describeTarget(
 export function resolvableTimezones(preferred?: string): string[] {
   const canonical =
     typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
-  const wanted = ["UTC", ...canonical, ...(preferred ? [preferred] : [])];
+  const wanted = ["UTC", ...canonical, ...RENAMED_TIMEZONES, ...(preferred ? [preferred] : [])];
   const seen = new Set<string>();
   return wanted.filter((zone) => {
     if (!zone || seen.has(zone)) return false;
@@ -1401,15 +1408,14 @@ function zoneOffsetMs(utcMs: number, timezone: string): number {
 
   const at = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
   // `hour12: false` reports midnight as 24 in some engines.
-  const asIfUtc = Date.UTC(
-    at("year"),
-    at("month") - 1,
-    at("day"),
-    at("hour") % 24,
-    at("minute"),
-    at("second"),
-  );
-  return asIfUtc - utcMs;
+  // Built via setUTCFullYear rather than passed straight into Date.UTC's
+  // (year, month, ...) args — see the comment in fromZonedInputValue for why
+  // that form is unsafe for a year in 0-99 (as this one is while a date
+  // field's year segment is still being typed).
+  const asIfUtcDate = new Date(0);
+  asIfUtcDate.setUTCFullYear(at("year"), at("month") - 1, at("day"));
+  asIfUtcDate.setUTCHours(at("hour") % 24, at("minute"), at("second"), 0);
+  return asIfUtcDate.getTime() - utcMs;
 }
 
 /** An instant as the `YYYY-MM-DDTHH:mm` a `datetime-local` shows, in `timezone`. */
@@ -1440,7 +1446,17 @@ export function fromZonedInputValue(value: string, timezone: string): number | n
   const parsed = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
   if (!parsed) return null;
   const [, y, mo, d, h, mi] = parsed.map(Number);
-  const asIfUtc = Date.UTC(y, mo - 1, d, h, mi);
+  // Built via setUTCFullYear rather than passed straight into Date.UTC's
+  // (year, month, ...) args: that form silently folds a 0-99 year to
+  // 1900-1999 (legacy two-digit-year behavior). A date field mid-edit passes
+  // through exactly that range — @internationalized/date zero-pads a
+  // partially typed year to 4 characters (e.g. "19" -> "0019"), which still
+  // matches the regex above, so Date.UTC(19, ...) would silently commit 1919
+  // instead of leaving the in-progress edit alone.
+  const utcDate = new Date(0);
+  utcDate.setUTCFullYear(y, mo - 1, d);
+  utcDate.setUTCHours(h, mi, 0, 0);
+  const asIfUtc = utcDate.getTime();
   if (Number.isNaN(asIfUtc)) return null;
   try {
     const first = asIfUtc - zoneOffsetMs(asIfUtc, timezone);

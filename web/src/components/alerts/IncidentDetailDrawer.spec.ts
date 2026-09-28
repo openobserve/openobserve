@@ -42,16 +42,19 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 }));
 
 // Mock incidents service
-vi.mock("@/services/incidents", () => ({
-  default: {
-    get: vi.fn(),
-    updateStatus: vi.fn(),
-    triggerRca: vi.fn(),
-    getCorrelatedStreams: vi.fn(),
-    getEvents: vi.fn(),
-    updateIncident: vi.fn(),
-  },
-}));
+vi.mock("@/services/incidents", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn(),
+      updateStatus: vi.fn(),
+      triggerRca: vi.fn(),
+      getCorrelatedStreams: vi.fn(),
+      getEvents: vi.fn(),
+      updateIncident: vi.fn(),
+    },
+  });
+});
 
 // The panel is absent unless on-call answers, which is also the OSS and
 // feature-off case — so the default here is a rejection, and only the tests
@@ -342,7 +345,10 @@ describe("IncidentDetailDrawer.vue", () => {
       // Resolve the promise
       resolvePromise!({ data: createIncidentWithAlerts({ id: "test-123" }) });
       await flushPromises();
-      await nextTick(); // Give Vue time to update reactive state
+      // The query layer defers its fetch a microtask, so the loader settles a
+      // tick after the service promise does.
+      await flushPromises();
+      await nextTick();
 
       // Now loading should be false
       expect(incidentsService.get).toHaveBeenCalled();
@@ -1589,6 +1595,22 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
       return w;
     };
+
+    /// The drawer is opened and closed over the same incident all day, and the
+    /// team catalogue behind it is read by nine other screens.
+    it("serves a reopened drawer's on-call panel from the cache", async () => {
+      wrapper = await withRecords([record()]);
+      expect(oncallService.listResponsesForIncident).toHaveBeenCalledTimes(1);
+      expect(oncallService.listTeams).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      expect(oncallService.listResponsesForIncident).toHaveBeenCalledTimes(1);
+      expect(oncallService.listTeams).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="incident-oncall-panel"]').text()).toContain("Payments");
+    });
 
     it("names the paged team rather than its id", async () => {
       wrapper = await withRecords([record()]);

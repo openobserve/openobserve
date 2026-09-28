@@ -37,6 +37,8 @@ use config::{
 /// alert nobody can identify belongs in the unrouted queue, not on the pager of
 /// whichever team happens to own this string.
 const UNKNOWN_SERVICE: &str = "unknown";
+/// Window behind the alert in which a service-graph edge counts as a dependency.
+const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -1913,8 +1915,6 @@ pub async fn enrich_with_topology(
     use AlertNode;
     use EdgeType;
 
-    use crate::traces::service_graph;
-
     // Get current topology or create new
     let mut topology = infra::table::alert_incidents::get_topology(org_id, incident_id)
         .await?
@@ -1990,40 +1990,13 @@ pub async fn enrich_with_topology(
             let edge_type = if is_same_service {
                 EdgeType::Temporal
             } else {
-                // Query service graph to check for a known dependency
-                let raw_sg_edges = match service_graph::query_edges_from_stream_internal(
-                    org_id, None, None, None, None,
+                dependency_edge_type(
+                    org_id,
+                    &topology.nodes[prev_idx].service_name,
+                    &topology.nodes[current_node_index].service_name,
+                    alert_fired_at,
                 )
                 .await
-                {
-                    Ok(e) => e,
-                    Err(e) => {
-                        log::debug!(
-                            "[incidents] Service graph query failed: {e}, defaulting to temporal edge"
-                        );
-                        vec![]
-                    }
-                };
-
-                let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
-                    o2_enterprise::enterprise::service_graph::build_topology(
-                        raw_sg_edges,
-                        std::collections::HashMap::new(),
-                    )
-                } else {
-                    (vec![], vec![])
-                };
-
-                let has_sg_edge = sg_topo_edges.iter().any(|e| {
-                    e.from.as_deref() == Some(&*topology.nodes[prev_idx].service_name)
-                        && e.to == topology.nodes[current_node_index].service_name
-                });
-
-                if has_sg_edge {
-                    EdgeType::ServiceDependency
-                } else {
-                    EdgeType::Temporal
-                }
             };
 
             topology.edges.push(AlertEdge {
@@ -2050,6 +2023,67 @@ pub async fn enrich_with_topology(
     );
 
     Ok(())
+}
+
+/// Whether the service graph knows the `from -> to` dependency around `at`.
+async fn dependency_edge_type(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
+    if crate::traces::service_graph::use_v4_source(org_id).await {
+        dependency_edge_type_v4(org_id, from, to, at).await
+    } else {
+        dependency_edge_type_v1(org_id, from, to).await
+    }
+}
+
+/// One forward instant query at the alert time; a name the escaper refuses is not a dependency.
+async fn dependency_edge_type_v4(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
+    use crate::traces::service_graph::v4::read::{
+        edge_type_from, instant, q_edge_exists, scalar_sum,
+    };
+
+    let Ok(forward) = q_edge_exists(from, to, INCIDENT_EDGE_RANGE_SECS) else {
+        return EdgeType::Temporal;
+    };
+    match instant(org_id, &forward, at).await {
+        Ok(rows) => edge_type_from(scalar_sum(&rows)),
+        Err(e) => {
+            log::debug!("[incidents] Service graph query failed: {e}, defaulting to temporal edge");
+            EdgeType::Temporal
+        }
+    }
+}
+
+async fn dependency_edge_type_v1(org_id: &str, from: &str, to: &str) -> EdgeType {
+    // Query service graph to check for a known dependency
+    let raw_sg_edges = match crate::traces::service_graph::query_edges_from_stream_internal(
+        org_id, None, None, None, None,
+    )
+    .await
+    {
+        Ok(e) => e,
+        Err(e) => {
+            log::debug!("[incidents] Service graph query failed: {e}, defaulting to temporal edge");
+            vec![]
+        }
+    };
+
+    let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
+        o2_enterprise::enterprise::service_graph::build_topology(
+            raw_sg_edges,
+            std::collections::HashMap::new(),
+        )
+    } else {
+        (vec![], vec![])
+    };
+
+    let has_sg_edge = sg_topo_edges
+        .iter()
+        .any(|e| e.from.as_deref() == Some(from) && e.to == to);
+
+    if has_sg_edge {
+        EdgeType::ServiceDependency
+    } else {
+        EdgeType::Temporal
+    }
 }
 
 /// Trigger RCA for a single incident immediately after creation

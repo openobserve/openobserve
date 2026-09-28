@@ -29,8 +29,13 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
   guaranteed to exist and compiles to the **identical** CSS — the arbitrary value
   is just noisier. The utility name is the token minus the `--color-` prefix:
   ```html
-  <!-- avoid --> <div class="bg-[var(--color-surface-base)] text-[var(--color-text-heading)] border-[var(--color-border-default)]">
-  <!-- prefer --> <div class="bg-surface-base text-text-heading border-border-default">
+  <!-- avoid -->
+  <div
+    class="bg-[var(--color-surface-base)] text-[var(--color-text-heading)] border-[var(--color-border-default)]"
+  ></div>
+
+  <!-- prefer -->
+  <div class="bg-surface-base text-text-heading border-border-default"></div>
   ```
   (`--color-text-heading` → `text-text-heading`, `--color-surface-base` →
   `bg-surface-base`, `--color-border-default` → `border-border-default`.) This also
@@ -65,10 +70,10 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
   Two other shapes are banned for the same reason, because each is provably
   replaceable:
 
-  | banned | write instead |
-  |---|---|
-  | `bg-[var(--color-x)]` · `bg-(--color-x)` | `bg-x` |
-  | `bg-[color-mix(in_srgb,var(--color-x)_12%,transparent)]` | `bg-x/12` — byte-identical |
+  | banned                                                      | write instead                               |
+  | ----------------------------------------------------------- | ------------------------------------------- |
+  | `bg-[var(--color-x)]` · `bg-(--color-x)`                    | `bg-x`                                      |
+  | `bg-[color-mix(in_srgb,var(--color-x)_12%,transparent)]`    | `bg-x/12` — byte-identical                  |
   | `bg-[color-mix(in_srgb,var(--color-x)_12%,var(--color-y))]` | name the blend as a token, then `bg-<name>` |
 
   A mix with `transparent` is only an alpha change, which is exactly what Tailwind's
@@ -79,6 +84,7 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
   form at all: a gradient stop, a mask stop, a drop-shadow colour, a `calc()`
   percentage, or a mix whose input is `currentColor` or a runtime-set custom
   property.
+
 - **Raw `var(--color-*)` in a `.vue` file is a counted bypass** (`rawVarInComponent`,
   zero tolerance). It is allowed **only** in the sanctioned residue where no
   utility can reach: inside `:deep()`, `@keyframes`, `color-mix()`, `calc()`, SVG
@@ -106,11 +112,11 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
 Radius is a token too, and it has exactly **three** app-facing values. Pick by role;
 never eyeball an arbitrary radius.
 
-| Utility | Token | Value | Use for |
-|---|---|---|---|
-| `rounded-default` | `--radius-default` | 4px | controls — buttons, inputs, chips, small icon buttons |
-| `rounded-surface` | `--radius-surface` | 12px | surfaces — dialogs, drawers, cards, panels, the app-shell content area |
-| `rounded-full` | `--radius-full` | ∞ | pills, avatars, status dots |
+| Utility           | Token              | Value | Use for                                                                |
+| ----------------- | ------------------ | ----- | ---------------------------------------------------------------------- |
+| `rounded-default` | `--radius-default` | 4px   | controls — buttons, inputs, chips, small icon buttons                  |
+| `rounded-surface` | `--radius-surface` | 12px  | surfaces — dialogs, drawers, cards, panels, the app-shell content area |
+| `rounded-full`    | `--radius-full`    | ∞     | pills, avatars, status dots                                            |
 
 Per-corner variants use the same names (`rounded-t-surface`, `rounded-s-default`).
 **Banned (all CI-enforced):** bare `rounded`, arbitrary `rounded-[10px]`, and the
@@ -163,7 +169,7 @@ cd web && node scripts/check-design-consistency.mjs --list
 - the arbitrary-property form `[background:color-mix(…)]` has no utility prefix, so
   no category matches it
 - a `var()` fallback (`var(--color-accent,#3F7994)`) hides the read from the
-  `color-mix` rules *and* the hex rule
+  `color-mix` rules _and_ the hex rule
 
 A clean run means "no bypasses of the kinds it looks for, in the two file types it
 walks" — review still matters.
@@ -173,12 +179,12 @@ walks" — review still matters.
 Plain CSS, Tailwind v4, **no SCSS**. They live in
 `web/src/lib/styles/tokens/` and load in order via `web/src/styles/tailwind.css`:
 
-| File | Holds |
-| --- | --- |
-| `base.css` | raw palette primitives (`--color-grey-*`, `--color-primary-*`, radius, shadow) + `@font-face` — the only place literal hex lives |
-| `semantic.css` | semantic/intent `--color-*` tokens, light `:root` (e.g. `--color-text-heading`, `--color-surface-base`, `--color-border-default`) |
-| `component.css` | per-component `--color-*` tokens (e.g. `--color-button-primary`) |
-| `dark.css` | **all** dark-mode overrides, under `.dark` |
+| File            | Holds                                                                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `base.css`      | raw palette primitives (`--color-grey-*`, `--color-primary-*`, radius, shadow) + `@font-face` — the only place literal hex lives  |
+| `semantic.css`  | semantic/intent `--color-*` tokens, light `:root` (e.g. `--color-text-heading`, `--color-surface-base`, `--color-border-default`) |
+| `component.css` | per-component `--color-*` tokens (e.g. `--color-button-primary`)                                                                  |
+| `dark.css`      | **all** dark-mode overrides, under `.dark`                                                                                        |
 
 Dark mode binds to the `.dark` class (set by `utils/theme.ts`), via
 `@custom-variant dark` in `tailwind.css` — **not** the OS media query.
@@ -193,20 +199,28 @@ utilities silently break. The new token **must** be a `--color-*` name.
    base/semantic token, never a raw literal:
    ```css
    /* semantic.css */
-   :root { --color-surface-raised: var(--color-grey-50); }
+   :root {
+     --color-surface-raised: var(--color-grey-50);
+   }
    ```
 2. **Register for Tailwind** — re-declare it self-referentially in that same
    file's `@theme inline { … }` block so Tailwind emits utilities for it. The
    `inline` keyword is what lets the runtime dark override still win:
    ```css
-   @theme inline { --color-surface-raised: var(--color-surface-raised); }
+   @theme inline {
+     --color-surface-raised: var(--color-surface-raised);
+   }
    ```
 3. **Dark override** — add the dark value in `dark.css` under the modern selector
    **only**. A token that already points at a semantic token inherits dark for
    free and needs no override; add one only for base-palette values that must flip:
    ```css
    /* dark.css — real selector; NO .dark-theme, NO .body--dark */
-   :root.dark, .dark :root, .dark { --color-surface-raised: var(--color-grey-800); }
+   :root.dark,
+   .dark :root,
+   .dark {
+     --color-surface-raised: var(--color-grey-800);
+   }
    ```
 
 Then use it as a utility (`bg-surface-raised`) or `var(--color-surface-raised)`.
@@ -235,31 +249,31 @@ forbidden:
 Most legacy tokens map to a same-meaning modern token — the heuristic is simply
 **`--o2-<meaning>` → `--color-<meaning>`**. Common cases:
 
-| Legacy `--o2-*` | Modern `--color-*` |
-| --- | --- |
-| `--o2-text-heading` | `--color-text-heading` |
-| `--o2-text-primary` / `--o2-text-4` | `--color-text-heading` |
-| `--o2-text-body` | `--color-text-body` |
-| `--o2-text-secondary` / `--o2-text-2` | `--color-text-secondary` |
-| `--o2-text-caption` / `--o2-text-1` | `--color-text-secondary` |
-| `--o2-text-label` / `--o2-text-3` | `--color-text-label` |
-| `--o2-text-muted` | `--color-text-muted` |
-| `--o2-text-placeholder` | `--color-text-placeholder` |
-| `--o2-text-link` / `--o2-text-link-hover` | `--color-text-link` / `-hover` |
-| `--o2-text-inverse` | `--color-text-inverse` |
-| `--o2-border` / `--o2-border-color` | `--color-border-default` |
-| `--o2-border-2` | `--color-border-subtle` |
-| `--o2-border-input` | `--color-input-border` |
-| `--o2-primary-background` | `--color-surface-base` |
-| `--o2-secondary-background` | `--color-surface-panel` |
-| `--o2-muted-background` | `--color-surface-subtle` |
-| `--o2-card-background` / `--o2-card-bg` | `--color-surface-base` |
-| `--o2-popover-background` | `--color-surface-overlay` |
-| `--o2-code-bg` | `--color-code-bg` |
-| `--o2-primary-btn-bg` | `--color-button-primary` |
-| `--o2-primary-btn-text` | `--color-button-primary-foreground` |
-| `--o2-secondary-btn-bg` / `-text` / `-border` | `--color-button-secondary` / `-foreground` / `-border` |
-| `--o2-hover-accent` / `--o2-interactive-hover` | `--color-interactive-hover-bg` |
+| Legacy `--o2-*`                                | Modern `--color-*`                                     |
+| ---------------------------------------------- | ------------------------------------------------------ |
+| `--o2-text-heading`                            | `--color-text-heading`                                 |
+| `--o2-text-primary` / `--o2-text-4`            | `--color-text-heading`                                 |
+| `--o2-text-body`                               | `--color-text-body`                                    |
+| `--o2-text-secondary` / `--o2-text-2`          | `--color-text-secondary`                               |
+| `--o2-text-caption` / `--o2-text-1`            | `--color-text-secondary`                               |
+| `--o2-text-label` / `--o2-text-3`              | `--color-text-label`                                   |
+| `--o2-text-muted`                              | `--color-text-muted`                                   |
+| `--o2-text-placeholder`                        | `--color-text-placeholder`                             |
+| `--o2-text-link` / `--o2-text-link-hover`      | `--color-text-link` / `-hover`                         |
+| `--o2-text-inverse`                            | `--color-text-inverse`                                 |
+| `--o2-border` / `--o2-border-color`            | `--color-border-default`                               |
+| `--o2-border-2`                                | `--color-border-subtle`                                |
+| `--o2-border-input`                            | `--color-input-border`                                 |
+| `--o2-primary-background`                      | `--color-surface-base`                                 |
+| `--o2-secondary-background`                    | `--color-surface-panel`                                |
+| `--o2-muted-background`                        | `--color-surface-subtle`                               |
+| `--o2-card-background` / `--o2-card-bg`        | `--color-surface-base`                                 |
+| `--o2-popover-background`                      | `--color-surface-overlay`                              |
+| `--o2-code-bg`                                 | `--color-code-bg`                                      |
+| `--o2-primary-btn-bg`                          | `--color-button-primary`                               |
+| `--o2-primary-btn-text`                        | `--color-button-primary-foreground`                    |
+| `--o2-secondary-btn-bg` / `-text` / `-border`  | `--color-button-secondary` / `-foreground` / `-border` |
+| `--o2-hover-accent` / `--o2-interactive-hover` | `--color-interactive-hover-bg`                         |
 
 **Authoritative source (always in-tree):** the codemod's machine map is
 `web/scripts/o2-token-map.json` (`migrate` key — this is what the CI failure message

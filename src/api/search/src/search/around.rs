@@ -146,8 +146,8 @@ pub(crate) async fn around(
             .unwrap();
 
     // search forward
-    let fw_sql =
-        check_or_add_order_by_timestamp(&around_sql, false).unwrap_or(around_sql.to_string());
+    let fw_sql = check_or_add_order_by_timestamp(&around_sql, false)
+        .unwrap_or_else(|_| around_sql.to_string());
     let fw_sql =
         config::utils::query_select_utils::replace_o2_custom_patterns(&fw_sql).unwrap_or(fw_sql);
 
@@ -187,8 +187,8 @@ pub(crate) async fn around(
         .await?;
 
     // search backward
-    let bw_sql =
-        check_or_add_order_by_timestamp(&around_sql, true).unwrap_or(around_sql.to_string());
+    let bw_sql = check_or_add_order_by_timestamp(&around_sql, true)
+        .unwrap_or_else(|_| around_sql.to_string());
     let bw_sql =
         config::utils::query_select_utils::replace_o2_custom_patterns(&bw_sql).unwrap_or(bw_sql);
     let req = config::meta::search::Request {

@@ -28,6 +28,7 @@ import {
   humanizeDbmMetricName,
   injectPromqlSelector,
   panelErrorIsForbidden,
+  panelErrorIsStreamMissing,
 } from "./metricsPanels";
 
 /** Key-echoing stub — the assertions read the KEY, not real copy. */
@@ -142,6 +143,23 @@ describe("panelErrorIsForbidden", () => {
     expect(panelErrorIsForbidden({ code: 500 })).toBe(false);
     expect(panelErrorIsForbidden({ code: "" })).toBe(false);
     expect(panelErrorIsForbidden(null)).toBe(false);
+  });
+});
+
+describe("panelErrorIsStreamMissing", () => {
+  it("recognizes the engine's missing-stream error by code or message", () => {
+    expect(panelErrorIsStreamMissing({ code: 20002 })).toBe(true);
+    expect(panelErrorIsStreamMissing({ code: "20002" })).toBe(true);
+    expect(
+      panelErrorIsStreamMissing({ code: 500, message: "Search stream not found: _o2_dbm_server" }),
+    ).toBe(true);
+  });
+
+  it("rejects every other failure", () => {
+    expect(panelErrorIsStreamMissing({ code: 403, message: "Unauthorized Access" })).toBe(false);
+    expect(panelErrorIsStreamMissing({ code: 500, message: "Search SQL not valid" })).toBe(false);
+    expect(panelErrorIsStreamMissing({ message: "" })).toBe(false);
+    expect(panelErrorIsStreamMissing(null)).toBe(false);
   });
 });
 
@@ -336,6 +354,18 @@ describe("buildDbmLoadPanelSchema", () => {
     expect(buildDbmLoadPanelSchema({}, {}, "user").queries[0].query).toContain(
       "o2_dbm_session_user",
     );
+  });
+
+  it("groups the base scan by expressions, never by a SELECT alias a stream column can shadow", () => {
+    // The shipped log recipes write a `ts` attribute; `GROUP BY ts` then binds
+    // that column instead of the histogram alias and the planner rejects the query.
+    for (const breakdown of ["waitEvent", "query", "database", "user"] as const) {
+      const q = buildDbmLoadPanelSchema({}, {}, breakdown).queries[0].query;
+      const base = /FROM "_o2_dbm_server" WHERE [\s\S]*? GROUP BY ([\s\S]*?)\) AS b\)/.exec(q);
+      expect(base).not.toBeNull();
+      expect(base![1]).toMatch(/^histogram\(_timestamp\), /);
+      expect(base![1]).not.toMatch(/(^|,\s*)(ts|segment|poll|cnt)(\s*,|$)/);
+    }
   });
 
   it("splices the scope with single quotes escaped into the one base scan", () => {

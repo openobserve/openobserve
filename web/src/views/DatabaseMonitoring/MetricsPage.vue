@@ -42,12 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :range="range"
     @date-change="onDateChange"
   >
-    <div class="flex min-h-0 flex-1">
+    <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- The metrics-explorer geometry: a slim jump rail beside the page's own
            scroll column, so any section is one click away instead of a scroll. -->
       <aside
         v-if="railItems.length >= 3"
-        class="border-border-default w-44 shrink-0 overflow-y-auto border-e"
+        class="border-border-default w-44 shrink-0 overflow-y-auto border-e max-md:w-full max-md:overflow-visible max-md:border-e-0 max-md:border-b"
       >
         <DbmMetricsRail
           :items="railItems"
@@ -129,6 +129,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("dbm.metrics.noAccess", { stream: raw("_o2_dbm_server") }) }}
                 </span>
               </div>
+              <div
+                v-else-if="loadNotCollecting"
+                class="bg-surface-base absolute inset-0 flex items-center justify-center"
+                data-test="dbm-metrics-load-not-collecting"
+              >
+                <OEmptyState
+                  size="inline"
+                  icon="database"
+                  :title="t('dbm.metrics.serverStreamMissing.title')"
+                  :description="
+                    t('dbm.metrics.serverStreamMissing.description', {
+                      stream: raw('_o2_dbm_server'),
+                    })
+                  "
+                  :action-label="t('dbm.metrics.serverStreamMissing.action')"
+                  data-test="dbm-metrics-load-setup"
+                  @action="openSetup"
+                />
+              </div>
             </div>
           </DbmSection>
 
@@ -166,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-else
-              class="grid gap-2.5 p-3 pt-1"
+              class="grid grid-cols-1 gap-2.5 p-3 pt-1"
               :class="sectionGridClass((catalogPanelsBySection[section.key] ?? []).length)"
             >
               <DbmMetricPanel
@@ -184,13 +203,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :explore-url="p.exploreUrl"
                 @update:by="catalogBy[p.entry.key] = $event"
                 @zoom="onChartZoom"
+                @setup="openSetup"
               />
             </div>
           </DbmSection>
 
           <template v-if="loading && !hasMetricStreams">
             <div
-              class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
+              class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
               data-test="dbm-metrics-skeleton"
             >
               <OSkeleton v-for="n in 6" :key="n" type="rect" class="rounded-surface h-55 w-full" />
@@ -242,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :start-time="current.startTime"
                   :end-time="current.endTime"
                   @zoom="onChartZoom"
+                  @setup="openSetup"
                 />
               </div>
             </DbmSection>
@@ -278,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :start-time="current.startTime"
                   :end-time="current.endTime"
                   @zoom="onChartZoom"
+                  @setup="openSetup"
                 />
               </div>
             </DbmSection>
@@ -330,9 +352,11 @@ import {
   filterDbmMetricPanels,
   filterDbmMetricStreams,
   panelErrorIsForbidden,
+  panelErrorIsStreamMissing,
   type DbmLoadBreakdown,
   type DbmMetricsScope,
 } from "@/utils/dbm/metricsPanels";
+import { DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { buildMetricsUrl } from "@/utils/metrics/buildMetricsUrl";
 import type { MetricStream } from "@/utils/metrics/metricFamily";
 
@@ -414,8 +438,14 @@ const catalogSections = computed<DbmSectionDef[]>(() =>
 /** The honesty hint about the hostname join the host section rides on. */
 /** The load chart's stream-permission state — see panelErrorIsForbidden. */
 const loadNoAccess = ref(false);
+const loadNotCollecting = ref(false);
 const onLoadError = (event: { message?: string; code?: unknown }) => {
   loadNoAccess.value = panelErrorIsForbidden(event);
+  loadNotCollecting.value = panelErrorIsStreamMissing(event);
+};
+
+const openSetup = () => {
+  router.push({ name: DBM_SETUP_ROUTE, query: { org_identifier: org.value } }).catch(() => {});
 };
 
 const hostScopeState = computed(() => dbmHostScopeState(scope.value));

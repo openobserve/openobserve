@@ -19,8 +19,6 @@ use std::{
 };
 
 use axum::body::Bytes;
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     BLOCKED_STREAMS, TIMESTAMP_COL_NAME, get_config,
     meta::{self_reporting::usage::is_internal_rollup_stream, stream::StreamType},
@@ -143,37 +141,6 @@ pub async fn ingest(
 
             if !cfg.common.skip_formatting_stream_name {
                 stream_name = format_stream_name(stream_name);
-            }
-
-            // Reject reserved self-reporting streams (usage/stats/triggers/...).
-            // Bulk is always a user path (internal self-reporting uses the
-            // non-bulk `IngestionRequest::Usage` channel), so this is safe.
-            // Cloud-only: OSS / self-hosted may legitimately use these names.
-            #[cfg(feature = "cloud")]
-            if is_reserved_internal_stream(&stream_name) {
-                let err_msg =
-                    format!("stream '{stream_name}' is reserved and cannot be ingested into");
-                log::warn!("[LOGS:BULK] {err_msg}");
-                bulk_res.errors = true;
-                let err = BulkResponseError::new(
-                    err_msg.clone(),
-                    stream_name.to_string(),
-                    err_msg,
-                    "0".to_string(),
-                );
-                let mut item = HashMap::new();
-                item.insert(
-                    action.to_string(),
-                    BulkResponseItem::new_failed(
-                        stream_name.to_string(),
-                        doc_id.clone().unwrap_or_default(),
-                        err,
-                        Some(value),
-                        stream_name.to_string(),
-                    ),
-                );
-                bulk_res.items.push(item);
-                continue; // skip
             }
 
             // Reject internal rollup streams (_o2_*, _agent_signals) in ALL

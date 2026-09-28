@@ -1474,6 +1474,8 @@
     "sessionReplay": "会话重放",
     "viewSessionReplay": "查看会话重放",
     "playSessionReplay": "播放会话重放",
+    "noReplayRecordedTitle": "此会话未录制回放",
+    "noReplayRecordedMessage": "会话 {id} 没有可播放的回放片段。",
     "discoverSessionTitle": "探索会话回放以详细了解用户互动",
     "discoverSessionMessage": "Session Replay 捕获并重放您的网站或应用程序上的用户互动。这使您可以直观地查看用户的导航方式、点击的位置、键入的内容以及他们如何与您的内容互动",
     "loadingErrorDetails": "等一下，我们正在获取错误细节。",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "开始免费试用"
   },
   "login": {
+    "lockedOut": "登录失败次数过多。请在 {duration} 后重试，或联系管理员。",
     "redirectingToSsoMessage": "正在重定向到 SSO 登录页面。如果未自动重定向，请",
     "clickHere": "点击此处",
     "loginWithSso": "使用 SSO 登录",
@@ -1954,6 +1957,7 @@
     "ok": "确定",
     "sendInvite": "发送邀请",
     "inviteByEmail": "通过电子邮件邀请。以分号 (;) 或逗号 (,) 分隔的多封电子邮件",
+    "inviteByEmailPlaceholder": "通过邮箱邀请",
     "changePassword": "更改密码",
     "oldPassword": "旧密码",
     "newPassword": "新密码",
@@ -1962,6 +1966,15 @@
     "fieldRequired": "字段为必填字段",
     "passwordRequired": "密码为必填项。",
     "passwordPolicyHint": "密码必须为 8-128 个字符，并且至少包含一个小写字母、一个大写字母、一个数字和一个特殊字符。",
+    "lockout": {
+      "locked": "账户已锁定",
+      "autoUnlock": "将在 {duration} 后自动解锁。",
+      "staged": "保存后将自动解锁。",
+      "unlock": "解锁",
+      "undo": "保持锁定",
+      "confirmTitle": "解锁 {email}？",
+      "confirmMessage": "这会清除其失败尝试次数，使其可立即重新登录。不会更改其密码。"
+    },
     "currentPasswordRequired": "当前密码为必填项。",
     "newPasswordRequired": "需要新密码。",
     "otherOrgInvalid": "组织名称必须以字母开头，并且必须是字母数字、_ 或-。",
@@ -2028,11 +2041,11 @@
       "addToGroup": "添加到用户组",
       "addToRole": "分配角色",
       "step1Title": "复制令牌",
-      "copyHint": "立即复制此令牌——您将无法再次看到它。",
+      "copyHint": "这是您唯一一次能看到此令牌的机会。请立即复制或下载，之后将无法再次获取。",
       "done": "完成了",
       "applying": "正在应用访问授权…",
-      "grantedRoles": "已分配角色：{roles}",
-      "grantedGroups": "已添加到用户组：{groups}",
+      "rolesAssignedLabel": "已分配角色",
+      "groupsAssignedLabel": "已添加到用户组",
       "failedRoles": "无法分配角色：{roles}",
       "failedGroups": "无法添加到用户组：{groups}",
       "failedHint": "您可以稍后从角色和用户组页面授予这些权限。"
@@ -2042,6 +2055,9 @@
         "label": "服务账户名称",
         "placeholder": "例如 ingest-bot",
         "help": "小写字母、数字和连字符。保存为 name{suffix}"
+      },
+      "identifier": {
+        "label": "标识符"
       },
       "roles": {
         "label": "分配角色",
@@ -2056,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "标识符",
+        "roles": "角色",
         "token": "令牌",
         "created": "已创建"
       }
@@ -2183,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "绑定到这些角色的任何用户和服务帐户都将失去访问权限。"
-      }
+      },
+      "assignColumn": "分配",
+      "assignBtn": "添加",
+      "assignedBadge": "已分配",
+      "assignBannerText": "将 {member} 添加到角色 — 点击下方角色旁的“添加”。",
+      "assignBannerDone": "完成",
+      "assignSuccess": "已将 {member} 添加到角色“{role}”。",
+      "assignError": "无法将该账户添加到该角色。请重试。"
     },
     "group": {
       "name": {
@@ -2214,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "这些群组的成员将失去他们授予的角色。"
-      }
+      },
+      "assignColumn": "分配",
+      "assignBtn": "添加",
+      "assignedBadge": "已分配",
+      "assignBannerText": "将 {member} 添加到用户组 — 点击下方用户组旁的“添加”。",
+      "assignBannerDone": "完成",
+      "assignSuccess": "已将 {member} 添加到用户组“{group}”。",
+      "assignError": "无法将该账户添加到该用户组。请重试。"
     },
     "appGroups": {
       "deleteGroupTitle": "删除群组",
@@ -2687,6 +2718,14 @@
     "edit": "编辑",
     "view": "查看",
     "delete": "删除",
+    "moveToFolder": "Move to folder",
+    "tabAll": "All",
+    "searchThisFolder": "This folder",
+    "searchAllFolders": "所有文件夹",
+    "searchThisFolderTooltip": "仅搜索此文件夹",
+    "searchAllFoldersTooltip": "搜索所有文件夹",
+    "folder": "文件夹",
+    "modeInFolder": "{mode} 中",
     "deleteTitle": "删除工作流",
     "deleteMessage": "确定要删除此工作流吗？",
     "deleteSuccess": "工作流删除成功",
@@ -2721,12 +2760,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "告警触发",
+        "tab": "告警",
         "node": "告警触发器",
         "desc": "当告警触发时运行",
         "intro": "当关联的告警触发时，每个下游步骤都会收到此载荷。"
       },
       "incidentEvent": {
         "label": "故障事件",
+        "tab": "事件",
         "node": "故障触发器",
         "desc": "在故障生命周期事件发生时运行",
         "intro": "当故障事件发生时，每个下游步骤都会收到此载荷。"
@@ -3558,6 +3599,12 @@
     "joinSlack": "加入 Slack",
     "maybeLater": "也许以后再说"
   },
+  "connectDataSourcePopup": {
+    "title": "首先，让我们连接您的第一个数据源。",
+    "description": "我们有很多内容想向您展示，但首先需要连接您的数据。大多数团队大约一分钟内就能看到第一批日志。",
+    "connectButton": "连接数据源",
+    "slackLink": "也欢迎加入我们的 Slack 社区"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "从暂停处继续",
     "startFromNow": "从现在开始",
@@ -3568,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "复制内容时出错",
+    "passcodeForbiddenMessage": "查看数据摄取令牌需要管理员或 Root 角色。请向管理员索取设置命令，或获取在此处查看它所需的角色。",
     "updateRUMTokenMessage": "确定要更新此组织的 RUM 令牌吗？",
     "completeAwsIntegration": "完成 AWS 集成",
     "deployAwsServicesOneClick": "使用单个 CloudFormation 堆栈一键部署所有选定的 AWS 服务。",
@@ -4474,6 +4522,8 @@
       "payloadTitle": "事件负载",
       "payloadIndex": "{field} 字段选择数据流。没有该字段的事件将进入 {stream} 数据流。",
       "payloadTime": "{field} 字段是 epoch 秒，并且接受小数值。当该字段缺失或不为正数时，将使用接收时间。",
+      "windowTitle": "超出摄取窗口的时间戳将被丢弃",
+      "windowBody": "早于 {past}（默认 5 小时）或晚于 {future}（默认 24 小时）的事件将被丢弃，而请求仍会返回 代码 0，因为 Splunk 客户端不会重试错误。因此，硬编码或过期的时间戳看起来像是发送成功，实际却没有存储任何数据。",
       "payloadMetadata": "{fields} 字段作为事件上的列存储。",
       "healthTitle": "健康检查",
       "healthBody": "GET 请求无需身份验证，并返回 {response}。",
@@ -5370,6 +5420,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "刷新以应用最新的变量更改",
       "refresh": "刷新",
+      "refreshCacheReload": "刷新缓存并重新加载",
+      "moreRefreshOptions": "更多刷新选项",
       "dashboard": "仪表盘",
       "dashboardNotFound": "未找到仪表盘或已被删除。正在重定向到仪表盘列表。",
       "failedToLoadDashboard": "加载仪表盘失败。正在重定向到仪表盘列表。",
@@ -5804,7 +5856,36 @@
     "variableNameAlreadyExists": "已存在同名变量",
     "pivotTotal": "总计",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "显示示例（追踪样本）",
+      "hide": "隐藏示例 · 已显示 {count} 个",
+      "empty": "此时间范围内没有示例",
+      "emptyShort": "0 个示例",
+      "loadFailed": "无法加载示例",
+      "loadFailedHint": "图表不受影响。重试仅重新获取示例。",
+      "retry": "重试",
+      "cardTitle": "示例",
+      "query": "查询 {name}",
+      "returnedBy": "由 {count} 个查询返回 | 由 {count} 个查询返回",
+      "series": "序列",
+      "aboveRange": "超出图表范围；绘制在顶部边缘",
+      "belowRange": "低于图表范围；绘制在底部边缘",
+      "checkingTrace": "正在检查追踪…",
+      "openTrace": "打开追踪",
+      "openTraceHint": "或点击标记。返回后回到此处。",
+      "traceNotAvailable": "追踪不可用 — 已被采样丢弃或超出保留期",
+      "openTraceUnverified": "打开追踪（未验证）",
+      "unverifiedTimeout": "追踪查找超时，因此该追踪可能不存在。",
+      "unverifiedForbidden": "无法确认该追踪 — 您可能没有追踪的访问权限。",
+      "unverifiedPartial": "仅搜索了部分保留期窗口。",
+      "unverifiedError": "无法检查该追踪。",
+      "noTraceId": "该示例上没有 {label}，因此没有可打开的追踪。",
+      "markersAria": "示例标记",
+      "markerAria": "示例 {value}，时间 {time}"
+    },
+    "showExemplarsLabel": "显示示例",
+    "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5892,6 +5973,9 @@
         "details": "详情",
         "json": "JSON",
         "insights": "洞察",
+        "back": "返回结果",
+        "prevEvent": "上一个事件",
+        "nextEvent": "下一个事件",
         "copyLink": "复制链接",
         "copy": "复制",
         "copyValue": "复制值",
@@ -7462,6 +7546,7 @@
       "checkEveryTooltip": "检测任务的运行频率。可以大于采样周期（例如，每 5 分钟采样一次，每 1 小时运行一次检测）。",
       "destinationRequired": "至少需要一个目标！",
       "detectionCharts": "检测结果",
+      "detectionFunctionTooltip": "每个时间桶中要衡量的内容。count 统计到达的记录数；avg、min、max 和 sum 衡量某个数值字段。p50、p95 和 p99 衡量该字段的分布——例如，response_time_ms 的 p95 能发现最慢请求的延迟在恶化，即使流量保持平稳。",
       "detectionResolution": "探测分辨率",
       "detectionResolutionTooltip": "每个数据点的粒度如何。例如，“5m” 表示以 5 分钟的分辨率检测到异常。",
       "deviationChart": "按类型划分的偏差",
@@ -7475,7 +7560,10 @@
       "lastError": "最近错误",
       "lastTrained": "上次训练",
       "lookBackWindow": "向后看窗口",
-      "lookBackWindowTooltip": "每次检测运行查询的时间可以追溯到多久以前。即使停顿了很长时间，也要关闭窗口。默认为 “每隔一段时间都检查”。",
+      "lookBackWindowFloor": "回看窗口必须至少为 {min} — 即检查间隔加一个检测分辨率。窗口更短时，在一次运行触发之际无法容纳一个完整的桶，因此会跳过部分桶。",
+      "lookBackWindowLegacy": "此已保存的窗口低于最小值 {min}（检查间隔加一个检测分辨率）。它仍会原样保存，但除非调大窗口，运行可能会跳过部分桶。",
+      "lookBackWindowMinimum": "最小值 {min}。建议 {recommended} 或更大 — 即两倍（检查间隔 + 检测分辨率）— 并在启用缺失检测时再加 10 分钟。",
+      "lookBackWindowTooltip": "每次检测运行向前查询的时间范围。即使长时间暂停，窗口也以此为上限。它必须至少覆盖检查间隔加一个检测分辨率，否则完整的桶会在运行能判断它们之前就滑出窗口。",
       "metricChart": "指标与异常",
       "metricChartHint": "每个检测时间桶一个点",
       "model": "模型",
@@ -7483,9 +7571,19 @@
       "nDays": "{days} 天 | {days} 天",
       "noDestinationsFound": "未找到目标",
       "noFieldsFound": "未找到字段",
+      "noticeHybridFallback": "回退检测",
+      "noticeHybridFallbackTooltip": "近期运行中混合阈值不可用，因此检测回退到冻结阈值。在模型重新训练之前，评分将继续使用冻结阈值。",
+      "noticeRetrain": "自动重新训练",
+      "noticeRetrainTooltip": "升级后无法读取已保存的模型，因此该模型已被丢弃，配置已自动排队等待重新训练。无需任何操作；训练完成后检测即会恢复。",
+      "noticeSkipAbsence": "缺失评分落后于回看窗口；已无法再获取的时间区间被跳过并记录。",
+      "noticeSkipScored": "检测运行的间隔超出了回看窗口覆盖的范围，因此已关闭的桶在运行能够判断它们之前就离开了窗口。",
+      "noticeWindowFloor": "窗口过窄",
+      "noticeWindowFloorTooltip": "回看窗口低于检查间隔加一个检测分辨率，因此运行无法判断任何桶。请调大窗口以恢复检测。",
+      "noticeWindowSkip": "已跳过桶",
       "notifications": "通知",
       "notificationsTooltip": "启用后，只要检测到异常，就会向所选目标发送通知。",
-      "percentile": "百分位",
+      "percentile": "级别",
+      "previewCaption": "此告警将要监视的数据样本，方便你在保存前确认查询是否正确。模型训练完成后会标记异常——请参阅检测结果。",
       "queryMode": "查询模式",
       "retrainEvery": "对所有人进行重新训练",
       "retrainEveryTooltip": "自动重新训练模型的频率。“从不” 表示训练一次并保留模型直到手动重新训练。",
@@ -7502,7 +7600,8 @@
       "sensitivityBalanced": "平衡",
       "sensitivityBudgetTooltip": "此配置可投递告警的上限，在投递时强制执行。检测仍会为每个数据桶评分；预算用尽后，多余的告警将被抑制，直到预算恢复。",
       "sensitivityConservative": "保守",
-      "sensitivityHintPercentile": "数据桶按模型训练分数的 p{percentile} 标记来判定——产生多少告警取决于你的数据。",
+      "sensitivityHintPercentile": "当某个时间桶看起来比模型在训练中见到的 {percentile}% 更异常时，就会触发告警。具体会产生多少条告警取决于你的数据。",
+      "sensitivityNotDataPercentile": "时间桶必须有多异常才会触发告警。数值越高，告警越少、越极端。此级别评分的是模型的置信度，而非数据的值，因此与选择 p95 作为检测函数无关。",
       "sensitivityRange": "请输入 50 到 99 之间的整数",
       "sensitivityTooltip": "根据模型训练分数在该百分位处设定分数门槛——97 将门槛设在训练分数最高的 3% 处。实际分数可能与训练不同，因此这既不是未来数据桶的占比，也不是告警频率。取值越低门槛越低，通常发送的告警越多；冷却时间会拉开重复告警的间隔。",
       "seriesAnomaly": "异常",
@@ -7531,7 +7630,7 @@
       "summaryRetrainEveryDays": "每 {days}天",
       "summarySchedule": "✓ 调度：每 {schedule}",
       "summaryThreshold": "✓ 阈值：{threshold}",
-      "summaryThresholdPercentile": "分数门槛位于 p{percentile}",
+      "summaryThresholdPercentile": "级别 {percentile} / 99",
       "summaryTraining": "✓ 训练：{days}（{seasonality}）",
       "summaryTrainingDays": "{days} 天",
       "timestampAliasBanned": "{column} 不能用作列别名。请改用 {timeBucket}。",
@@ -7577,7 +7676,9 @@
       "usernameRequired": "用户名是必填项",
       "passwordRequired": "密码是必填项",
       "emailRecipients": "收件人电子邮件地址",
-      "emailRecipientsHelp": "逗号分隔的电子邮件地址",
+      "emailRecipientsHelp": "选择应接收告警电子邮件的组织用户或服务账号",
+      "emailRecipientsGroupUsers": "用户",
+      "emailRecipientsGroupServiceAccounts": "服务账号",
       "invalidEmailAddresses": "无效的电子邮件地址：{emails}",
       "opsgenieApiKey": "Opsgenie API 密钥",
       "opsgenieApiKeyHelp": "从 Opsgenie 集成设置获取您的 API 密钥",
@@ -7894,7 +7995,18 @@
     "enabled": "已启用",
     "paused": "已暂停",
     "impactTemplate": "被 {destinations} · {alerts} 使用",
-    "impactDestination": "被 {alerts} 使用"
+    "impactDestination": "被 {consumers} 使用",
+    "impactUnused": "未使用",
+    "noConsumers": "无使用方。",
+    "countCompositeAlert": "{count} 个复合告警 | {count} 个复合告警",
+    "countPipeline": "{count} 条流水线 | {count} 条流水线",
+    "countSyntheticCheck": "{count} 个合成检查 | {count} 个合成检查",
+    "countOncallPolicy": "{count} 个升级策略 | {count} 个升级策略",
+    "countOncallTeamChannel": "{count} 个团队频道 | {count} 个团队频道",
+    "countWorkflow": "{count} 个工作流 | {count} 个工作流",
+    "countAnomalyDetection": "{count} 个异常检测器 | {count} 个异常检测器",
+    "countIncidentIntegration": "{count} 个事件集成 | {count} 个事件集成",
+    "sectionOtherConsumers": "还被以下使用"
   },
   "alert_library": {
     "header": "告警库",
@@ -8578,7 +8690,9 @@
         "staleCopyAria": "复制{name}刷新失败的详情",
         "stalePreamble": "刷新失败——显示上次成功的结果。",
         "staleClickToCopy": "点击复制详情。",
-        "lastRefreshedPrefix": "上次刷新时间："
+        "lastRefreshedPrefix": "上次刷新时间：",
+        "exemplarsShowHeatmap": "显示示例（追踪样本）。开启时将此卡片切换为百分位数。",
+        "exemplarsHideHeatmap": "隐藏示例 · 已显示 {count} 个。将此卡片恢复为热力图。"
       },
       "fn": {
         "subtitle": "选择此指标的聚合方式",
@@ -8762,6 +8876,8 @@
     "cipherKeysDesc": "用于敏感字段的加密密钥",
     "regexPatternsDesc": "用于脱敏的可重用 regex 模式",
     "domainManagementDesc": "限制仅允许的 SSO 域登录",
+    "passwordPolicy": "密码策略",
+    "passwordPolicyDesc": "适用于原生邮箱/密码账户的认证策略，在整个实例范围内生效。",
     "pipelineDestinationsDesc": "流水线输出的外部目标",
     "templatesDesc": "可重用的告警消息模板",
     "storageSettingsDesc": "按组织划分的存储配置",
@@ -9338,7 +9454,28 @@
     "listConjunctionAnd": "{list} 和 {last}",
     "runsIn": "运行于",
     "recommendedByFieldCoverage": "根据您的数据流中的字段覆盖率推荐。",
-    "listConjunctionAndTwo": "{first} 和 {last}"
+    "listConjunctionAndTwo": "{first} 和 {last}",
+    "domainOrgMappings": {
+      "title": "域名到组织映射",
+      "subtitle": "使用匹配邮箱域名登录的新用户将自动加入该组织。",
+      "addMapping": "添加映射",
+      "editMapping": "编辑映射",
+      "empty": "暂无映射。使用“{addLabel}”添加一个。",
+      "domain": "邮箱域名",
+      "domainHelp": "用户邮箱地址中 {at_sign} 之后的部分。",
+      "organization": "组织",
+      "organizationPlaceholder": "组织标识符",
+      "organizationHelp": "匹配用户所加入组织的标识符。",
+      "organizationRequired": "组织为必填项",
+      "baseRole": "基础角色",
+      "baseRoleHelp": "匹配用户在该组织中被赋予的角色。",
+      "userGroup": "用户组",
+      "userGroupPlaceholder": "组名称",
+      "userGroupHelp": "可选。匹配用户还会加入该组织中的此组。",
+      "duplicateDomain": "该域名的映射已存在",
+      "confirmRemove": "确定要删除 {domain} 的映射吗？",
+      "deleteTitle": "删除映射"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -12993,10 +13130,12 @@
           },
           "variables": {
             "input": {
-              "trace": "来自追踪根 Span 的输入。"
+              "trace": "来自追踪根聊天 Span 的输入。",
+              "session": "开场问题：来自第一个追踪根聊天 Span 的输入。"
             },
             "output": {
-              "trace": "来自追踪根 Span 的输出。"
+              "trace": "来自追踪根聊天 Span 的输出。",
+              "session": "最终答案：来自最后一个追踪根聊天 Span 的输出。"
             },
             "statistics": {
               "trace": "追踪指标：Span 数量、时长、LLM 与工具调用、错误、Token 数和成本。",
@@ -13008,6 +13147,10 @@
             "steps": {
               "trace": "按时间顺序排列的 Span；当追踪很长时，中间部分会被折叠。",
               "session": "按时间顺序排列的追踪，以对话轮次表示。"
+            },
+            "tool_calls": {
+              "trace": "追踪中的每个工具调用，按时间顺序排列，包含其名称、输入、输出和状态。",
+              "session": "会话的所有追踪中的每个工具调用，按时间顺序排列，包含其名称、输入、输出和状态。"
             }
           }
         }
@@ -13319,6 +13462,7 @@
       "viewAddedFavorites": "视图已添加到收藏夹。",
       "viewRemovedFavorites": "视图已从收藏夹中移除。",
       "selectStreamBeforeSchedule": "请在安排作业前选择流",
+      "streamNotFoundInQuery": "数据流 \"{stream}\" 不存在",
       "confirmUpdateFunction": "您确定要更新该函数吗？",
       "confirmUpdateSavedViewMsg": "您确定要更新保存的视图吗？"
     },
@@ -13326,6 +13470,7 @@
       "searchHistoryNotEnabled": "搜索历史未启用。",
       "enableUsageReporting": "将 ZO_USAGE_REPORTING_ENABLED 设置为 true 以启用使用报告。",
       "selectStreamToExtractPatterns": "请选择要提取模式的流",
+      "patternsUnavailableForMultiStream": "选择多个数据流时无法使用模式。请选择单个数据流。",
       "errorExtractingPatterns": "提取模式时出错。请重试。",
       "nameOfPanelRequired": "面板名称是必需的",
       "errorsFixAndTryAgain": "存在一些错误，请修复后重试",
@@ -13457,6 +13602,166 @@
     "lastRefreshed": "上次刷新时间：{time}"
   },
   "synthetics": {
+    "variables": {
+      "newButton": "新建变量",
+      "createTitle": "添加变量",
+      "created": "变量 {name} 已创建",
+      "deleteConfirm": "删除 {name}？",
+      "deleteFailed": "无法删除变量",
+      "deleteTitle": "删除变量",
+      "deleteEnvFallback": "{env} 将转而使用全局值。",
+      "deleteGlobalFallback": "{envs} 保留各自的值；其他环境将不再解析 {name}。",
+      "overriddenInNote": "在 {envs} 中被覆盖",
+      "overridesGlobalNote": "覆盖全局值",
+      "shadowGlobalTitle": "覆盖全局值？",
+      "shadowGlobalMessage": "{name} 将覆盖 {env} 中的全局值。其他环境继续使用全局值。",
+      "shadowedGlobalTitle": "某些环境保留各自的值",
+      "shadowedGlobalMessage": "{name} 在以下环境中已有自己的值：{envs}。这些环境保留各自的值，其他环境使用此值。",
+      "deleteUsed": "{name} 被 {n} 个检查项引用。在你更新它之前，它将解析为字面文本。仍要删除？ | {name} 被 {n} 个检查项引用。在你更新它们之前，它们将解析为字面文本。仍要删除？",
+      "deleted": "变量已删除",
+      "description": "描述",
+      "editTitle": "编辑变量",
+      "emptyBody": "在检查之间共享一个值，而不是复制到每个检查中。",
+      "emptyFiltered": "没有与搜索匹配的变量。",
+      "emptyTitle": "暂无变量",
+      "example": "示例",
+      "exampleHint": "当实际值被隐藏时显示此示例。切勿在此处输入真实的机密信息。",
+      "examplePlaceholder": "https://shop.example.com",
+      "global": "全局",
+      "globalSubtitle": "适用于所有环境。",
+      "globalReachesProduction": "全局值适用于所有环境，包括生产环境。在此处修改后，会影响到所有使用该名称且自身未设置值的检查项。",
+      "kind": "类型",
+      "kindPlain": "明文",
+      "kindSecret": "机密",
+      "lastUpdated": "上次更新",
+      "loadFailed": "无法加载变量",
+      "name": "名称",
+      "nameInvalid": "只能包含字母、数字和下划线，且以字母或下划线开头",
+      "namePlaceholder": "BASE_URL",
+      "nameRequired": "名称为必填项",
+      "nameReserved": "_AUTH_ 为保留变量，仅供探针自行注入的凭据使用。",
+      "nameTooLong": "名称过长（最多 128 个字符）",
+      "notSet": "未设置",
+      "replace": "替换",
+      "saveFailed": "无法保存变量",
+      "scope": "环境",
+      "scopeEnvironment": "此变量仅适用于 {env}。",
+      "scopeGlobal": "此变量适用于所有环境。",
+      "searchPlaceholder": "搜索变量",
+      "secretNeedsEnvironment": "全局不存储密钥。请在应保护该密钥的环境中创建密钥。",
+      "secretWriteOnly": "该值仅可写入。保存后将不再显示。",
+      "title": "变量",
+      "updated": "变量已更新",
+      "usedBy": "使用方",
+      "usedByChecks": "未使用 | {n} 个检查项 | {n} 个检查项",
+      "value": "值",
+      "valueEmpty": "空",
+      "valuePlaceholder": "值",
+      "valueRequired": "值为必填项",
+      "valueSet": "已设置 · 更新于 {when}"
+    },
+    "environments": {
+      "newButton": "新建环境",
+      "backToList": "全部环境",
+      "capReached": "一个检查最多可作用于 {cap} 个环境。",
+      "cardEmpty": "暂无环境。请在“合成监控 → 变量”中创建。",
+      "cardLocked": "由有权限的用户选定。您无法更改——检查会继续在该环境中运行。",
+      "cardTitle": "环境",
+      "checks": "检查",
+      "checksCount": "未使用 | {count} 个检查 | {count} 个检查",
+      "createTitle": "添加环境",
+      "created": "环境已创建",
+      "deleteBlockedChecks": "仍被 {n} 个检查使用。请先从这些检查中移除该环境。",
+      "deleteBlockedSecrets": "此环境仍包含机密。请先逐一删除——机密删除后无法恢复。",
+      "deleteConfirm": "删除 {name}？",
+      "deleteFailed": "无法删除环境",
+      "deleteTitle": "删除环境",
+      "deleteWithVariables": "删除 {name} 及其 {n} 个变量？",
+      "deleted": "环境已删除",
+      "description": "描述",
+      "detailSubtitle": "此环境专用的变量。",
+      "editTitle": "编辑环境",
+      "emptyBody": "创建一个环境，将变量和机密限定于其中，例如 staging 和 production。",
+      "emptyTitle": "暂无环境",
+      "lastUpdated": "最后更新",
+      "loadFailed": "无法加载环境",
+      "name": "名称",
+      "nameInvalid": "请使用字母、数字、连字符和下划线，不能以下划线开头",
+      "namePlaceholder": "production",
+      "nameRequired": "名称为必填项",
+      "nameTooLong": "名称过长（最多 64 个字符）",
+      "renameBlocked": "环境无法重命名——权限基于名称授予。",
+      "saveFailed": "无法保存环境",
+      "searchPlaceholder": "搜索环境",
+      "subtitle": "限定变量和机密的作用域，并控制谁可以管理它们。",
+      "title": "环境",
+      "updated": "环境已更新",
+      "usedByChecks": "未使用 | 被 {n} 个检查项使用 | 被 {n} 个检查项使用",
+      "variables": "变量"
+    },
+    "duplicateVariable": {
+      "body": "在同一作用域中创建 {name} 的副本（包括其值）。",
+      "done": "变量已复制",
+      "failed": "无法复制变量",
+      "nameLabel": "新变量名称"
+    },
+    "duplicate": {
+      "action": "复制",
+      "body": "复制全部 {n} 个变量到新环境，这些变量来自 {name}。不复制检查。",
+      "bodyWithSecrets": "复制 {n} 个变量，这些变量来自 {name}。{secrets} 个机密会被复制，但不包含其值，必须重新设置。不复制检查。",
+      "confirm": "复制",
+      "done": "环境已复制",
+      "failed": "无法复制环境",
+      "nameLabel": "新环境名称",
+      "title": "复制 {name}"
+    },
+    "inherited": {
+      "notIn": "不在 {envs} 中",
+      "overridesGlobal": "覆盖全局变量",
+      "notInMany": "不在 {count} 个环境中",
+      "overriddenByCheck": "被局部变量覆盖",
+      "title": "共享",
+      "filterAll": "全部",
+      "filterLabel": "按来源筛选",
+      "emptyIn": "{env} 中没有共享变量。",
+      "titleTooltip": "与每个检查共享的值在“环境与变量”标签页中管理：此检查所属的环境以及全局变量。上方的局部变量优先于这些值。",
+      "valueSet": "已设置",
+      "valueNotSet": "未设置",
+      "emptyNone": "没有共享变量。"
+    },
+    "promote": {
+      "done": "变量现在已是全局变量。",
+      "doneShadowed": "变量现在已是全局变量。{envs} 仍会用自己的值覆盖它。",
+      "failed": "无法将该变量设为全局变量",
+      "secretBlocked": "机密无法跨环境移动",
+      "toGlobal": "设为全局变量"
+    },
+    "promoteCheck": {
+      "action": "共享 {name}",
+      "confirm": "移动",
+      "description": "将此变量从该检查项移出，放入共享环境，其他检查项也可以使用它。",
+      "destination": "目标",
+      "done": "变量已移动",
+      "failed": "无法移动该变量",
+      "global": "全局",
+      "secretHint": "该值被标记为安全，因此会成为密钥，无法设为全局。",
+      "title": "共享 {name}",
+      "tooltip": "移动到共享环境"
+    },
+    "split": {
+      "action": "限定到环境",
+      "alreadyOwn": "已有自己的值 — 保持原样。",
+      "overrideHint": "若只想在单个环境覆盖，请直接在该环境创建变量。",
+      "confirm": "限定到环境",
+      "description": "每个环境都会有自己的值。全局变量将被替换。",
+      "done": "变量已限定到各环境",
+      "failed": "无法将该变量限定到环境",
+      "title": "将 {name} 限定到环境",
+      "unselectedWarning": "未选择：{envs}。在这些环境上运行的检查将停止解析此变量。",
+      "valuePlaceholder": "此环境的值",
+      "usedBy": "被 {n} 个检查项使用：{names}",
+      "usedByHint": "当其中任何一个检查项会丢失该值时，将拒绝拆分：没有环境的检查项，或在未在此处设置值的环境中运行的检查项。"
+    },
     "versionPrefix": "v",
     "tokens": {
       "title": "合成令牌",
@@ -13526,7 +13831,6 @@
     },
     "variablesPanel": {
       "title": "变量",
-      "referenceHint": "在任意步骤值或 URL 中引用为 {token}。",
       "emptyTitle": "暂无变量",
       "emptyBody": "跨步骤复用值——例如基础 URL 或用户名——并将机密信息排除在步骤值之外。",
       "newVariable": "新建变量",
@@ -13534,8 +13838,6 @@
       "nameRequired": "名称为必填项。",
       "nameInvalid": "名称必须以字母或下划线开头，且只能包含字母、数字和下划线。",
       "nameDuplicate": "已存在同名的变量。",
-      "usedInSteps": "用于 {count} 个步骤 | 用于 {count} 个步骤",
-      "notReferenced": "尚未被任何步骤引用",
       "removed": "已移除 {name}",
       "undo": "撤销",
       "editVariable": "编辑变量 {name}",
@@ -13545,7 +13847,13 @@
       "openPanel": "显示变量",
       "removeTitle": "移除变量？",
       "removeBody": "{name} 将从此检查中移除。",
-      "removeWarning": "它被 {count} 个步骤引用，这些步骤将无法解析。 | 它被 {count} 个步骤引用，这些步骤将无法解析。"
+      "removeWarning": "它被 {count} 个步骤引用，这些步骤将无法解析。 | 它被 {count} 个步骤引用，这些步骤将无法解析。",
+      "removeOverrideNote": "使用 {name} 的步骤现在将获取 {scope} 的值。",
+      "countOfCap": "{count} / {cap}",
+      "local": "本地",
+      "resolutionOrder": "解析顺序：检查、环境、全局。",
+      "overridesInherited": "覆盖共享变量——此值优先。",
+      "valueTooltipEmpty": "{name}：暂无值"
     },
     "browserDevices": {
       "desktop": "桌面",
@@ -13873,7 +14181,8 @@
       "timeoutLabel": "超时（毫秒）",
       "valueFallback": "值",
       "showSetupSteps": "显示设置步骤",
-      "waitingForActions": "等待浏览器中的操作…"
+      "waitingForActions": "等待浏览器中的操作…",
+      "unboundVariables": "{names} 未在此检查项、其环境或全局中定义，因此按原样输入。 | {names} 未在此检查项、其环境或全局中定义，因此按原样输入。"
     },
     "labels": {
       "copyOf": "{name} 的副本",
@@ -14105,10 +14414,13 @@
     },
     "results": {
       "p95Label": "p95",
+      "allEnvironments": "所有环境",
       "clearFilters": "清除过滤器",
       "clearFiltersDesc": "移除所有活动过滤器",
       "device": "设备",
       "duration": "持续时间",
+      "environment": "环境",
+      "environmentScope": "环境范围",
       "editCheck": "编辑检查",
       "error": "错误",
       "failed": "失败",
@@ -14277,6 +14589,7 @@
       "passRate": "通过率",
       "passRateByBrowser": "按浏览器的通过率",
       "passRateByDevice": "按设备的通过率",
+      "passRateByEnvironment": "各环境的通过率",
       "passRateByLocation": "按位置的通过率",
       "durationByLocation": "按位置的平均持续时间",
       "flakyRate": "Flaky Rate",
@@ -14436,7 +14749,8 @@
       "ssh": "SSH",
       "tcp": "TCP",
       "tls": "TLS",
-      "private": "私有位置"
+      "private": "私有位置",
+      "variables": "环境与变量"
     },
     "timeline": {
       "failed": "失败",
@@ -14480,7 +14794,8 @@
       "stepNameRequired": "为此步骤命名 — 运行结果将显示该名称。",
       "typeTextRequired": "输入此步骤应输入的文本。",
       "expectedRequired": "输入此断言应期望的值。",
-      "urlInvalid": "输入以 http:// 或 https:// 开头的有效 URL",
+      "urlInvalid": "请输入以 http://、https:// 或变量占位符开头的 URL",
+      "navigateUrlInvalid": "请输入以 http://、https:// 或变量占位符开头的 URL",
       "urlRequired": "起始 URL 是必填项",
       "fixHighlightedFields": "保存前请修正高亮字段",
       "retiredAction": "\"{action}\" 不再受支持 — 请移除或替换 \"{step}\"。",
@@ -14945,7 +15260,6 @@
       "syntheticsTokensRefresh": "刷新令牌列表",
       "aiChatToggle": "切换 AI 聊天",
       "aiChatClose": "关闭 AI 聊天",
-      "aiChatExpand": "展开/折叠 AI 聊天",
       "logsSaveView": "另存为已保存视图",
       "logsExport": "将结果导出为 CSV",
       "tracesCopyUrl": "复制追踪分享链接",
@@ -15072,6 +15386,9 @@
       "noOptionsFound": "未找到选项",
       "multiSelect": "多选",
       "singleSelect": "单选"
+    },
+    "templateInput": {
+      "suggestions": "变量建议"
     },
     "time": {
       "openTimePicker": "打开时间选择器",
@@ -15558,7 +15875,8 @@
         "destinations": "目标",
         "templates": "模板",
         "reports": "报表",
-        "llmModelPricing": "LLM 模型定价"
+        "llmModelPricing": "LLM 模型定价",
+        "passcode": "数据摄取令牌"
       },
       "noPermissionToChangeFavorites": "您没有权限更改收藏",
       "couldNotUpdateFavoriteDashboards": "无法更新收藏的仪表盘"
@@ -15796,6 +16114,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "您尚未开始数据接入流程。要浏览其他页面，请先开始数据接入。"
+    },
+    "iam": {
+      "userSaveFailed": "无法保存用户"
     }
   },
   "cipherKeys": {
@@ -16213,7 +16534,106 @@
       "exponentName": "指数"
     }
   },
+  "passwordPolicy": {
+    "complexity": "复杂度",
+    "minLength": "最小长度",
+    "minLengthDesc": "可接受的最短密码长度",
+    "maxLength": "最大长度",
+    "maxLengthDesc": "0 = 不限制",
+    "requireUppercase": "要求包含大写字母",
+    "requireUppercaseDesc": "至少包含一个大写字母 A–Z",
+    "requireLowercase": "要求包含小写字母",
+    "requireLowercaseDesc": "至少包含一个小写字母 a–z",
+    "requireDigit": "要求包含数字",
+    "requireDigitDesc": "至少包含一个数字 0–9",
+    "requireSpecial": "要求包含特殊字符",
+    "requireSpecialDesc": "至少包含一个允许的特殊字符",
+    "specialCharSet": "允许的特殊字符",
+    "specialCharSetDesc": "留空则接受任意非字母数字字符",
+    "maxLengthTooSmall": "最大长度必须不小于最小长度，或设为 0 表示不限制。",
+    "confirmTitle": "保存密码策略？",
+    "confirmMessage": "保存后可能强制所有原生用户在继续使用前设置新密码。Root、外部用户和服务账户除外——这包括你本人，除非你是 root 账户。此操作无法撤销。",
+    "saved": "密码策略已保存。 | 密码策略已保存。{count} 个用户必须重置密码。 | 密码策略已保存。{count} 个用户必须重置密码。",
+    "saveFailed": "无法保存密码策略。",
+    "notAdminTitle": "需要管理员权限",
+    "notAdmin": "配置密码策略需要 meta 组织的管理员权限。",
+    "loadFailedTitle": "无法加载密码策略",
+    "loadFailed": "读取当前策略时出错。",
+    "rotation": "轮换",
+    "rotationDays": "轮换周期",
+    "rotationDaysDesc": "密码过期前的天数。0 = 永不过期",
+    "rotationWarningDays": "过期前提醒",
+    "rotationWarningDaysDesc": "登录时提前提醒的天数。0 = 不提醒",
+    "warningDaysTooLong": "提醒窗口不能长于轮换周期。",
+    "rotationPreview": "今天设置的密码将于 {expires} 过期。登录提醒将于 {warns} 开始。",
+    "rotationPreviewNoWarning": "今天设置的密码将于 {expires} 过期。在此之前不会显示任何提醒。",
+    "reuse": "防止重复使用",
+    "historyCount": "记住的密码数",
+    "historyCountDesc": "新密码不得与此数量的历史密码相同。0 = 不检查",
+    "historyMaxRetained": "保留的历史密码数",
+    "historyMaxRetainedDesc": "每个用户保留的历史密码数量",
+    "historyRetainedTooSmall": "保留的历史密码数必须不小于记住的密码数量。",
+    "reuseExplainer": "当前密码属于已记住的密码之一——重复使用它会被此规则拒绝，而不是通过单独的检查。",
+    "lockout": "账户锁定",
+    "lockoutThreshold": "锁定前的失败尝试次数",
+    "lockoutThresholdDesc": "0 = 禁用锁定",
+    "lockoutBucketSize": "每次后续锁定前的尝试次数",
+    "lockoutBucketSizeDesc": "0 = 重用上面的值",
+    "lockoutStartSecs": "首次锁定时长",
+    "lockoutStartSecsDesc": "秒",
+    "lockoutMaxSecs": "最大锁定时长",
+    "lockoutMaxSecsDesc": "秒 — 递增锁定时长封顶于此值",
+    "lockoutStartTooLong": "首次锁定时长不能超过最大锁定时长。",
+    "lockoutBackoff": "递增",
+    "lockoutBackoffDesc": "每次锁定时长相对于上一次的增长方式",
+    "backoffExponential": "指数",
+    "backoffLinear": "线性",
+    "lockoutPreview": "{threshold} 次失败 → {first} · 每再失败 {bucket} 次 → {rest} · 上限为 {max}。成功登录会重置一切。",
+    "sessionEnforcement": "会话与强制执行",
+    "cookieMaxAge": "会话有效期",
+    "cookieMaxAgeDesc": "已登录会话保持有效的秒数。0 = 使用来自 {envVar} 的实例默认值",
+    "applyToRoot": "应用到 root 账户",
+    "applyToRootDesc": "除非启用此项，否则 root 不受上述所有规则的约束",
+    "rootWarning": "锁定 root 可能导致系统进入不可恢复状态。",
+    "rootDialogTitle": "将策略应用到 root？",
+    "rootDialogMessage": "root 将像任何其他原生账户一样受到锁定、轮换和强制重置的约束。如果 root 是您唯一的管理账户，一次锁定或无法满足的到期要求将使您无法再回到此实例。",
+    "rootDialogAck": "我明白 root 可能会被永久锁定在此实例之外。",
+    "rootDialogConfirm": "应用到 root"
+  },
+  "passwordReset": {
+    "title": "更新您的密码",
+    "signedInAs": "已登录为 {email}",
+    "reasonPolicyTightened": "密码策略已更改。请更新您的密码以继续使用 OpenObserve。",
+    "reasonRotationExpired": "您的密码已过期。请设置新密码以继续使用 OpenObserve。",
+    "reasonRotationWarning": "您的密码即将过期。请立即设置新密码，以免无法继续您的工作。",
+    "reused": "此密码最近使用过。请选择一个未在您最近 {count} 个密码中使用过的密码。",
+    "expiryBanner": "您的密码将在 {count} 天后过期。请立即更新，以免无法继续您的工作。 | 您的密码将在 {count} 天后过期。请立即更新，以免无法继续您的工作。",
+    "expiryBannerAction": "立即更新",
+    "expiryBannerDismiss": "忽略",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认新密码",
+    "currentPasswordRequired": "当前密码为必填项。",
+    "newPasswordRequired": "新密码为必填项。",
+    "confirmPasswordRequired": "请重新输入新密码。",
+    "mismatch": "密码不匹配。",
+    "signOut": "退出",
+    "submit": "更新密码",
+    "updated": "您的密码已更新。请重新登录。",
+    "updateFailed": "无法更新您的密码。",
+    "req": {
+      "minLength": "至少 {count} 个字符",
+      "maxLength": "不超过 {count} 个字符",
+      "uppercase": "一个大写字母",
+      "lowercase": "一个小写字母",
+      "digit": "一个数字",
+      "special": "一个特殊字符",
+      "specialFromSet": "来自 {set} 的一个特殊字符",
+      "unmet": "密码必须包含：{requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "密码策略",
     "loginCallback": "登录回调",
     "slackOAuthCallback": "正在连接 Slack",
     "emptyStateDemo": "空状态演示",
@@ -16451,13 +16871,10 @@
       "columnMemory": "内存(当前)",
       "columnDisk": "磁盘 %(当前)",
       "columnLoad": "15 分钟负载（当前）",
+      "columnCores": "核心数",
       "columnLastSeen": "上次出现",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "主机指标仪表盘",
-      "importConfirmTitle": "添加主机指标仪表盘？",
-      "importConfirmMessage": "你还没有此仪表盘。添加后会在你的 Default 文件夹中创建一个名为 \"Host Metrics\" 的仪表盘，然后针对此主机打开它。",
-      "importConfirmOk": "添加并打开",
-      "importConfirmCancel": "取消",
+      "loadPerCore": "({value}/核心)",
       "windowsLivenessNote": "仅当代理上报负载指标（system_cpu_load_average_15m）时，Windows 主机才会出现在此列表中——如果你的 Windows 代理正在运行但此处未显示，请在收集器配置中启用负载抓取器，或更新代理。",
       "panel": {
         "cpuBusy": "CPU 繁忙",
@@ -16682,17 +17099,17 @@
       "alertMe": "提醒我",
       "columnHints": {
         "qps": "每秒调用次数——此窗口内的调用数除以其时长，因此 15 分钟视图和 4 小时视图具有可比性。",
-        "p50": "所有调用中有一半完成速度快于该值。仅统计已完成的调用——仍在运行的查询或从未返回的查询不计入此列。",
-        "p95": "慢尾——每 20 个调用中有 1 个耗时至少这么长。仅统计已完成的调用——仍在运行的查询或从未返回的查询不计入此列。",
-        "p99": "最差的 1% 调用耗时至少这么长。仅统计已完成的调用——仍在运行的查询或从未返回的查询不计入此列。",
-        "load": "您的应用程序等待此数据库所花费的总时间。从客户端测量，因此反映的是此数据库所服务的流量大小——而非服务器负载。",
+        "p50": "一半的调用比此更快完成。根据应用程序追踪中已完成的调用测得。",
+        "p95": "慢速尾部——每 20 次调用中就有 1 次至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
+        "p99": "最慢的 1% 调用至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
+        "load": "你的应用调用此数据库所花费的总时间，根据应用程序的追踪测得。它反映了此数据库为你的应用承载了多少流量。",
         "attention": "该实例与其自身引擎发布的上限之间的接近程度——目前为连接数与 max_connections 的比值。取最差值而非综合得分。按从高到低排序，健康状况无法读取的实例排在顶部，因为看不见的实例无法确认是健康的。在数据库服务器上测量，因此与旁边的数据库耗时不可比。"
       },
       "failedChip": "{count} 次失败",
       "columnSubLabels": {
-        "attention": "服务端",
-        "load": "客户端",
-        "calls": "客户端"
+        "attention": "来自数据库",
+        "load": "来自你的应用",
+        "calls": "来自你的应用"
       },
       "attention": {
         "connections": "连接数",
@@ -16754,14 +17171,14 @@
         "failed": "失败"
       },
       "columnHints": {
-        "calls": "此查询运行了多少次。您的数据库在报告时使用其自身的计数——该计数涵盖所有客户端，而不仅仅是发送追踪的系统部分。标记为“客户端观测”的行改为从追踪中计数，因为您的数据库未报告它们。",
-        "p50": "一半的调用完成时间快于此值。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。",
-        "p95": "慢尾——每 20 次调用中有 1 次耗时至少这么长。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。",
-        "p99": "最差的 1% 的调用耗时至少这么长。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。",
+        "calls": "此查询运行了多少次，由你的数据库统计——包含所有连接的应用程序。当你的数据库没有某个查询的计数时，追踪图标会标记该计数是根据应用程序的追踪测得的。",
+        "p50": "一半的调用比此更快完成。根据应用程序追踪中已完成的调用测得。",
+        "p95": "慢速尾部——每 20 次调用中就有 1 次至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
+        "p99": "最慢的 1% 调用至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
         "max": "此时间窗口中最慢的一次真实调用——不是平均值。",
         "errors": "这些调用中有多少返回错误。",
         "perTrace": "在单个请求中运行了多少次。较高的数字通常意味着循环。",
-        "load": "此查询在数据库中花费的总时间。您的数据库在报告时使用其自身的数据：Postgres 上为执行时间，而 MySQL 和 MariaDB 上为等待时间——每行会标明。标记为“客户端观测”的行从追踪中测量，因此包含网络往返时间。"
+        "load": "此查询在数据库中花费的总时间，由你的数据库报告：Postgres 上为执行时间，MySQL 和 MariaDB 上为等待时间——每一行都会标明是哪种。带追踪图标的行是根据应用程序的追踪测得的，因此还包含往返数据库的时间。"
       },
       "errorsNone": "无",
       "errorsAll": "全部",
@@ -17025,8 +17442,7 @@
       "overlap": {
         "serverExecution": "{engine} 执行它所花费的时间",
         "serverWait": "{engine} 等待它所花费的时间——等待时间，而非执行时间",
-        "serverCounted": "由{engine}统计，涵盖每个客户端",
-        "clientObserved": "由已埋点的调用方观察到——您的数据库未报告此项"
+        "serverCounted": "由{engine}统计，涵盖每个客户端"
       },
       "endpointsConcentrated": "一个端点占用此查询时间的{percent}。修复{endpoint}即可修复此查询。",
       "typicalMarker": "慢调用 {value}",
@@ -17053,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "数据库自身记录的内容",
-        "subtitle": "服务端 — 所有客户端",
-        "clientSubtitle": "客户端观测 — 仅限已埋点的调用方，且仅限已完成的调用。仍在运行或挂起的查询不包含在这些数字中。",
+        "subtitle": "来自你的数据库——所有连接的应用程序",
+        "clientSubtitle": "标记的数字是根据应用程序的追踪测得的——你的应用在此时间窗口内完成的调用",
         "instance": "由 {instance} 上报",
         "instanceWide": "此实例上的所有数据库",
         "calls": "执行次数",
@@ -17100,9 +17516,13 @@
         "serverExecution": "执行时间",
         "serverWait": "等待时间",
         "serverCounted": "服务器数量",
-        "clientObserved": "客户端观测",
         "serverReported": "由您的数据库报告"
       }
+    },
+    "appSource": {
+      "marker": "根据应用程序的追踪测得",
+      "markerHint": "根据应用程序的追踪测得，在数据库报告的基础上补充了应用的视角。",
+      "legend": "来自应用的追踪"
     },
     "page": {
       "tabs": {
@@ -17111,7 +17531,7 @@
         "metricsHint": "按等待事件划分的数据库负载，以及数据库接收器收集的所有指标。",
         "queries": "Top 查询",
         "samples": "最慢的调用",
-        "samplesHintClient": "您的已埋点服务在此时间窗口内观测到的已完成调用 — 未追踪的调用方不计入，因此这是下限而非总数。表格显示了其中最慢的调用。",
+        "samplesHintClient": "在此时间窗口内根据应用程序的追踪测得的调用，在数据库报告的基础上补充了应用的视角。表格显示其中最慢的。",
         "samplesHintServer": "您的数据库报告在此时间窗口内完成的语句，由数据库内部统计。表格显示了其中最慢的语句。",
         "samplesHintUnknown": "此时间窗口内最慢的单次数据库调用。",
         "deadlocks": "死锁",
@@ -17148,6 +17568,11 @@
       "explore": "在指标浏览器中打开",
       "railLabel": "指标分区",
       "noAccess": "你没有权限读取 {stream}。请联系管理员获取此数据流的读取权限。",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "按查询",
         "database": "按数据库",
@@ -17262,7 +17687,7 @@
         "status": "状态"
       },
       "columnHints": {
-        "duration": "这次调用的耗时，由调用方测量。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。"
+        "duration": "此次调用耗时多久，由你的应用程序从头到尾计时。"
       },
       "failed": "失败",
       "failedWithCode": "失败 · {code}",
@@ -17827,6 +18252,8 @@
     "notifiedAge": "已通知 · 时长",
     "channelUndeliverable": "{channel} 没有对应的提供方 — 不会发送任何通知。",
     "assignTeamShort": "分配团队",
+    "assignTeamFailed": "无法分配团队",
+    "noTeamsToAssign": "暂无可分配的团队",
     "contextTitle": "确认前值得查看的上下文",
     "contextFired": "已触发",
     "contextFiredCount": "{days} 天内 {count} 次",
@@ -17865,6 +18292,7 @@
     "target_rotation_all": "{rotation} 中的所有人员",
     "target_rotation_deleted": "该团队已不再拥有的轮班",
     "target_rotation_legacy": "当前值班的人",
+    "target_unrecognized": "此界面无法识别的目标",
     "ladderPoolEveryone": "{rotation} 中的所有人员",
     "target_user": "特定人员",
     "target_whole_team": "整个团队",
@@ -18008,6 +18436,8 @@
     "addTeam": "添加团队",
     "newTeam": "新建团队",
     "editTeam": "编辑团队",
+    "defaultTeamBadge": "默认",
+    "setDefaultTeam": "设为默认团队",
     "manageTeamCta": "管理成员、排班与升级",
     "teamName": "名称",
     "teamNameHint": "此团队在页面上的显示名称",
@@ -18262,7 +18692,7 @@
     "ownershipHint": "匹配这些身份路径的任何内容都会呼叫此团队。最具体的匹配规则生效，因此命名空间规则会覆盖集群规则。",
     "noOwnershipRules": "没有归属规则。此团队只会被直接指定其名称的告警呼叫。",
     "noOwnershipRulesOrg": "没有归属规则。只有当告警直接指定团队时，信号才会路由到该团队。",
-    "editOwnershipRule": "编辑归属规则",
+    "editOwnershipRule": "编辑规则",
     "ruleUpdated": "规则已更新",
     "addOwnershipRule": "新建规则",
     "saveRule": "保存",
@@ -18304,10 +18734,12 @@
     "setupStep4Title": "配置通知目标",
     "setupStep4Body": "没有目标，任何人的电话或收件箱实际上都无法被触达——即使上面所有步骤都完成，呼叫依然会无处送达。",
     "setupCta": "创建您的第一个团队",
-    "memberPickPlaceholder": "在此组织中搜索人员",
+    "memberPickPlaceholder": "选择要添加的团队成员",
+    "memberSearchPlaceholder": "搜索成员",
     "memberEmailFallbackHint": "无法加载用户列表。请输入组织中一个或多个现有用户的邮箱地址，用逗号分隔。",
     "addPeople": "添加人员",
     "addPeopleCta": "添加 | 添加 {count} | 添加 {count}",
+    "addPeopleDisabledHint": "选择要添加的团队成员",
     "addEveryoneCta": "添加组织中的所有成员 ({count})",
     "teamCreateSecondary": "同时创建一个次要轮班",
     "teamCreateSecondaryHint": "人员相同，只是班次错开一位，因此次要值班者绝不会是当前正在值班的人。它是一个普通轮班——两者之间没有任何关联，所以如果只编辑其中一个名单而不编辑另一个，它们会逐渐偏离；你会收到警告，而不是被悄无声息地修复。",
@@ -18664,6 +19096,7 @@
     "coverageGapNowOpen": "当前无人值班，且接下来 {days} 天也没有安排值班。",
     "coveragePrimaryOnly": "主值班：{primary}",
     "coverageSecondaryOnly": "副值班：{secondary}",
+    "coverageMoreChanges": "+{count} 项变更 | +{count} 项变更",
     "reachTeamTitle": "联系团队",
     "reachTeamHint": "事件期间",
     "contactSendTest": "发送测试呼叫",
@@ -18763,6 +19196,8 @@
     "rotationNobody": "无人值班",
     "edit": "编辑",
     "timelineLoadFailed": "无法解析此时间范围的值班安排",
+    "editorReadFailed": "无法加载最新副本进行编辑。请重试。",
+    "refreshFailed": "无法刷新。显示的内容可能已过期。",
     "scheduleDoneEditing": "返回值班安排",
     "coverWhoRequired": "选择谁来代班",
     "timelineCoverAria": "{who} 在 {from} 至 {to} 期间为 {rotation} 代班",

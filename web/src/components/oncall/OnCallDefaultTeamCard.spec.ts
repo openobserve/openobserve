@@ -23,7 +23,7 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 
 vi.mock("@/services/oncall", () => ({
-  default: { getRoutingConfig: vi.fn(), setRoutingConfig: vi.fn() },
+  default: { getRoutingConfig: vi.fn(), setRoutingConfig: vi.fn(), coverageGaps: vi.fn() },
 }));
 
 const service = vi.mocked(oncallService);
@@ -32,7 +32,11 @@ const TEAMS = [{ id: "team_1", name: "Platform" }];
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OButton: { name: "OButton", props: ["variant"], template: "<button><slot /></button>" },
+  OButton: {
+    name: "OButton",
+    props: ["variant", "loading"],
+    template: "<button><slot /></button>",
+  },
   OSelect: {
     name: "OSelect",
     props: ["modelValue", "options"],
@@ -64,6 +68,7 @@ describe("OnCallDefaultTeamCard", () => {
     vi.clearAllMocks();
     service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: null } } as any);
     service.setRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_1" } } as any);
+    service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
   });
 
   /// The one-time act is behind a click; the standing fact is not. An org with
@@ -84,6 +89,27 @@ describe("OnCallDefaultTeamCard", () => {
     expect(set.find('[data-test="oncall-default-team-open"]').text()).toContain(
       "Default team: Platform",
     );
+  });
+
+  /// The unset warning is a claim about the org; the trigger must not make it
+  /// before the read that would justify it has come back.
+  it("shows the trigger as loading, not as unset, while the read is in flight", async () => {
+    let resolveRead!: (value: { data: { default_team_id: string | null } }) => void;
+    service.getRoutingConfig.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRead = resolve;
+      }) as any,
+    );
+
+    const wrapper = render({ dialog: true });
+    const trigger = wrapper.findComponent({ name: "OButton" });
+    expect(trigger.props("loading")).toBe(true);
+    expect(trigger.props("variant")).not.toBe("warning");
+
+    resolveRead({ data: { default_team_id: null } });
+    await flushPromises();
+    expect(trigger.props("loading")).toBe(false);
+    expect(trigger.props("variant")).toBe("warning");
   });
 
   it("saves the nomination from the modal and closes it", async () => {
@@ -117,7 +143,41 @@ describe("OnCallDefaultTeamCard", () => {
     await flushPromises();
 
     await wrapper.find('[data-test="oncall-default-team-open"]').trigger("click");
-    expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBe("");
+    expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBeNull();
+  });
+
+  /// A cached coverage answer would let somebody nominate a team that stopped being covered.
+  it("re-checks coverage on each save while the catch-all comes from the cache", async () => {
+    const teams = [
+      { id: "team_1", name: "Platform" },
+      { id: "team_2", name: "Payments" },
+    ];
+
+    const first = render({ teams });
+    await flushPromises();
+    expect(service.getRoutingConfig).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const wrapper = render({ teams });
+    await flushPromises();
+    expect(service.getRoutingConfig).toHaveBeenCalledTimes(1);
+
+    const save = async (teamId: string) => {
+      service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: teamId } } as any);
+      wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", teamId);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-default-team-save"]').trigger("click");
+      await flushPromises();
+    };
+
+    await save("team_1");
+    expect(service.coverageGaps).toHaveBeenCalledTimes(1);
+
+    await save("team_2");
+    expect(service.coverageGaps).toHaveBeenCalledTimes(2);
+
+    expect(service.setRoutingConfig).toHaveBeenCalledTimes(2);
+    expect(service.getRoutingConfig).toHaveBeenCalledTimes(3);
   });
 
   /// The card is still the team-less default: hosts that have room for it are

@@ -29,6 +29,7 @@ function normalizeValue(value: any, minValue: any, maxValue: any) {
 }
 
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { escapeHtml } from "@/utils/html";
 
 export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   //if no latitude and longitude than return it
@@ -108,7 +109,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
           );
         }
 
-        return `${params.seriesName}: ${formattedValue}`;
+        return `${escapeHtml(params.seriesName)}: ${escapeHtml(formattedValue)}`;
       },
     },
     visualMap: {

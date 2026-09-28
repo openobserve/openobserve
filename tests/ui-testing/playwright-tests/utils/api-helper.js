@@ -189,6 +189,9 @@ async function waitForStream(page, streamName, timeoutMs = 60000) {
  * creation path; this is ~1s and lets them run in parallel, each owning its own
  * record instead of sharing one through a serial chain.
  *
+ * Pass `alert_budget_per_day` (a positive number) to seed a budget-mode config;
+ * omit it (or pass null) to seed the default percentile config (`threshold`).
+ *
  * @returns {Promise<string>} the new anomaly_id
  */
 async function createAnomalyViaApi(page, name, opts = {}) {
@@ -198,6 +201,7 @@ async function createAnomalyViaApi(page, name, opts = {}) {
     destinations = [],
     threshold = 97,
     histogramInterval = '5m',
+    alert_budget_per_day = null,
   } = opts;
   const res = await apiCall(page, 'POST', `/api/v2/${org}/alerts?folder=default`, {
     alert_type: 'anomaly_detection',
@@ -218,7 +222,10 @@ async function createAnomalyViaApi(page, name, opts = {}) {
       detection_window_seconds: 3600,
       training_window_days: 1,
       retrain_interval_days: 0,
-      threshold,
+      // Mutually exclusive on the wire: a budget config sends the per-day cap,
+      // a percentile config sends the threshold. Budget mode has no UI entry,
+      // so seeding it through the API is the only way a test reaches it.
+      ...(alert_budget_per_day != null ? { alert_budget_per_day } : { threshold }),
       alert_enabled: destinations.length > 0,
     },
   });

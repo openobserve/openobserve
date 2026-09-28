@@ -113,3 +113,19 @@ or `break glass`.
 - The App installation's granted permissions bound the token; keep the install at the minimum
   above so a mis-scoped install can't hand the reviewer a write-capable credential.
 - OSS (`openobserve`) and ENT (`o2-enterprise`) run identical engine files — keep them in sync.
+
+## Trace content and GenAI attributes
+
+The review exports model instructions, input, and output to the configured OpenObserve trace
+stream. These values can contain repository source and PR context, so access to that stream must
+be restricted accordingly.
+
+Model spans use the OpenTelemetry GenAI content attributes:
+
+- `gen_ai.system_instructions`
+- `gen_ai.input.messages`
+- `gen_ai.output.messages`
+
+Token counts, cost, model, response ID, and finish reasons come from the Opencode assistant
+response. Do not put content-length metadata below `gen_ai.prompt.*`: OpenObserve recognizes that
+prefix as legacy TraceLoop prompt content and would tokenize the metadata instead of the prompt.

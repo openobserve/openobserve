@@ -104,12 +104,13 @@ pub async fn reset_stream_stats(stream: &str) -> Result<(), anyhow::Error> {
         stats.merge(&range_stats);
     }
     println!(
-        "reset stream stats for {org_id}/{stream_type}/{stream_name}: file_num={}, doc_num={}, storage_size={}, compressed_size={}, index_size={}, doc_time_min={}, doc_time_max={}",
+        "reset stream stats for {org_id}/{stream_type}/{stream_name}: file_num={}, doc_num={}, storage_size={}, compressed_size={}, index_size={}, mindex_size={}, doc_time_min={}, doc_time_max={}",
         stats.file_num,
         stats.doc_num,
         stats.storage_size,
         stats.compressed_size,
         stats.index_size,
+        stats.mindex_size,
         stats.doc_time_min,
         stats.doc_time_max
     );

@@ -25,7 +25,8 @@ import { CUSTOM_QUERY_CHART_TYPES } from "@/utils/dashboard/constants";
 import useStreams from "../useStreams";
 import useValuesWebSocket from "./useValuesWebSocket";
 import queryService from "@/services/search";
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
 import logsUtils from "../useLogs/logsUtils";
 import {
@@ -1494,12 +1495,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
     dashboardPanelData.meta.promql.loadingLabels = true;
     try {
-      const response: any = await streamService.schema(
-        store.state.selectedOrganization.identifier,
-        metric,
-        "metrics",
+      const response: any = await queryClient.fetchQuery(
+        streamSchemaQuery(store.state.selectedOrganization.identifier, metric, "metrics"),
       );
-      const columns = response?.data?.schema ?? response?.data?.uds_schema ?? [];
+      const columns = response?.schema ?? response?.uds_schema ?? [];
       dashboardPanelData.meta.promql.availableLabels = columns
         .map((column: any) => column?.name)
         .filter((name: string) => name && !NON_LABEL_COLUMNS.has(name))

@@ -23,15 +23,12 @@ use common::meta::{
     http::HttpResponse as MetaHttpResponse,
     stream::{FieldUpdate, Stream, StreamCreate},
 };
-// Reserved self-reporting stream guards are a Cloud-only concern (Cloud manages
-// these streams for billing); OSS / self-hosted must not block user streams.
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
-    SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
+    META_ORG_ID, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
         promql,
         promql::get_metadata_from_schema as get_prom_metadata_from_schema,
+        self_reporting::usage::AUDIT_STREAM,
         stream::{
             DistinctField, PartitionTimeLevel, StreamField, StreamSettings, StreamStats,
             StreamType, TimeRange, UpdateStreamSettings,
@@ -180,7 +177,7 @@ pub fn stream_res(
     stats.created_at = unwrap_stream_created_at(&schema).unwrap_or_default();
 
     let metrics_meta = if stream_type == StreamType::Metrics {
-        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(promql::Metadata {
+        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or_else(|| promql::Metadata {
             metric_type: promql::MetricType::Empty,
             metric_family_name: stream_name.to_string(),
             help: stream_name.to_string(),
@@ -238,19 +235,6 @@ pub async fn create_stream(
     stream_type: StreamType,
     mut stream: StreamCreate,
 ) -> Result<HttpResponse, Error> {
-    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
-    // managed internally by Cloud and must not be user-created — doing so would
-    // corrupt billing/usage accounting. The internal self-reporting job creates
-    // its schema directly (not via create_stream), so blocking here is safe.
-    // Cloud-only: OSS / self-hosted may legitimately use these stream names.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream_name) {
-        return Ok(MetaHttpResponse::error_with_header(
-            http::StatusCode::BAD_REQUEST,
-            format!("stream name '{stream_name}' is reserved and cannot be created"),
-        ));
-    }
-
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
@@ -757,15 +741,10 @@ where
     E: FnOnce(String, String, StreamType) -> EFut,
     EFut: Future<Output = ()>,
 {
-    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
-    // managed internally by Cloud and must not be user-deleted — retention/
-    // compaction uses a separate internal path, so blocking this user-facing
-    // delete is safe and preserves billing/usage accounting. Cloud-only.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream_name) {
-        return Ok(MetaHttpResponse::error_with_header(
-            http::StatusCode::BAD_REQUEST,
-            format!("stream '{stream_name}' is reserved and cannot be deleted"),
+    // The audit trail must not be destroyable through the same API it records.
+    if org_id == META_ORG_ID && stream_name == AUDIT_STREAM && stream_type == StreamType::Logs {
+        return Ok(MetaHttpResponse::bad_request(
+            "Cannot delete the audit stream",
         ));
     }
 
@@ -939,6 +918,12 @@ pub async fn delete_stream_data_by_time_range(
     stream_name: &str,
     time_range: TimeRange,
 ) -> Result<String, infra::errors::Error> {
+    if org_id == META_ORG_ID && stream_name == AUDIT_STREAM && stream_type == StreamType::Logs {
+        return Err(infra::errors::Error::Message(
+            "Cannot delete the audit stream".to_string(),
+        ));
+    }
+
     if time_range.start > time_range.end {
         return Err(infra::errors::Error::Message(
             "Start time must be less than end time".to_string(),
@@ -1017,6 +1002,7 @@ async fn transform_stats(
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
+    stats.mindex_size /= SIZE_IN_MB;
     if stream_type == StreamType::EnrichmentTables
         && let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await
     {
@@ -1328,6 +1314,7 @@ mod tests {
             storage_size: 10.0 * 1024.0 * 1024.0,   // 10MB in bytes
             compressed_size: 5.0 * 1024.0 * 1024.0, // 5MB in bytes
             index_size: 2.0 * 1024.0 * 1024.0,      // 2MB in bytes
+            mindex_size: 3.0 * 1024.0 * 1024.0,
             ..Default::default()
         };
 
@@ -1337,6 +1324,7 @@ mod tests {
         assert_eq!(stats.storage_size, 10.0);
         assert_eq!(stats.compressed_size, 5.0);
         assert_eq!(stats.index_size, 2.0);
+        assert_eq!(stats.mindex_size, 3.0);
     }
 
     #[tokio::test]
@@ -1664,5 +1652,59 @@ mod tests {
         assert_eq!(parse_data_type("text"), None);
         assert_eq!(parse_data_type(""), None);
         assert_eq!(parse_data_type("int32"), None);
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_with_cleanup_refuses_audit_stream() {
+        let res = delete_stream_with_cleanup(
+            META_ORG_ID,
+            AUDIT_STREAM,
+            StreamType::Logs,
+            false,
+            |_, _, _| async { Ok(()) },
+            |_, _, _| async {},
+        )
+        .await
+        .expect("the guard returns a response, not an error");
+        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_refuses_audit_stream() {
+        let err = delete_stream_data_by_time_range(
+            META_ORG_ID,
+            StreamType::Logs,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("the audit stream must not be time-range deletable");
+        assert!(err.to_string().contains("Cannot delete the audit stream"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_allows_customer_audit_stream() {
+        let err = delete_stream_data_by_time_range(
+            "customer_org",
+            StreamType::Logs,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("start after end is rejected by the later validation");
+        assert!(err.to_string().contains("Start time must be less than end"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_allows_meta_org_non_logs_audit() {
+        let err = delete_stream_data_by_time_range(
+            META_ORG_ID,
+            StreamType::Traces,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("start after end is rejected by the later validation");
+        assert!(err.to_string().contains("Start time must be less than end"));
     }
 }

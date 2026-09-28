@@ -606,58 +606,62 @@ watch(
       }}</OText>
     </div>
 
-    <div
-      v-else-if="face === 'undetected'"
-      class="mx-auto flex max-w-3xl flex-col gap-3 py-6"
-      data-test="curated-setup-state"
-    >
-      <OText tag="h2" class="text-xl font-semibold">{{ t("infra.workload.setupHeadline") }}</OText>
-      <OText v-if="showPartialTelemetry" variant="meta" data-test="curated-partial-telemetry">{{
-        t(partialTelemetryKey)
-      }}</OText>
-      <DataSourceSetupCard
-        v-if="setupDoor?.kind === 'card'"
-        :slug="setupDoor.slug"
-        @detected="runRefresh(true)"
-      />
-      <div v-else-if="setupDoor?.kind === 'route'">
-        <OButton
-          variant="primary"
-          size="sm-action"
-          icon-left="cloud"
-          data-test="curated-setup-route-cta"
-          @click="openSetupRoute"
-        >
-          {{ t("infra.workload.awsSetupCta") }}
-        </OButton>
+    <div v-else-if="face === 'undetected'" class="min-h-0 flex-1 overflow-y-auto">
+      <div
+        class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
+        data-test="curated-setup-state"
+      >
+        <OText tag="h2" class="text-xl font-semibold">{{
+          t("infra.workload.setupHeadline")
+        }}</OText>
+        <OText v-if="showPartialTelemetry" variant="meta" data-test="curated-partial-telemetry">{{
+          t(partialTelemetryKey)
+        }}</OText>
+        <DataSourceSetupCard
+          v-if="setupDoor?.kind === 'card'"
+          :slug="setupDoor.slug"
+          @detected="runRefresh(true)"
+        />
+        <div v-else-if="setupDoor?.kind === 'route'">
+          <OButton
+            variant="primary"
+            size="sm-action"
+            icon-left="cloud"
+            data-test="curated-setup-route-cta"
+            @click="openSetupRoute"
+          >
+            {{ t("infra.workload.awsSetupCta") }}
+          </OButton>
+        </div>
       </div>
     </div>
 
     <!-- The streams exist and merely stopped reporting. Rendering the SETUP face
          here would tell an org to install a collector it already has, so this
          face names the outage instead and offers no setup CTA. -->
-    <div
-      v-else-if="face === 'dormant'"
-      class="mx-auto flex max-w-3xl flex-col gap-3 py-6"
-      data-test="curated-dormant-state"
-    >
-      <OText tag="h2" class="text-xl font-semibold">{{
-        t("infra.curated.dormantHeadline", { workload: t(manifest.titleKey) })
-      }}</OText>
-      <OText variant="meta">{{ t("infra.curated.dormantBody") }}</OText>
-      <OBanner
-        v-for="hidden in dormantGroups"
-        :key="hidden.group.id"
-        variant="warning"
-        dense
-        data-test="curated-dormant-stream"
-        :content="
-          t('infra.curated.streamsStale', {
-            list: hidden.streams,
-            date: hidden.date,
-          })
-        "
-      />
+    <div v-else-if="face === 'dormant'" class="min-h-0 flex-1 overflow-y-auto">
+      <div
+        class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
+        data-test="curated-dormant-state"
+      >
+        <OText tag="h2" class="text-xl font-semibold">{{
+          t("infra.curated.dormantHeadline", { workload: t(manifest.titleKey) })
+        }}</OText>
+        <OText variant="meta">{{ t("infra.curated.dormantBody") }}</OText>
+        <OBanner
+          v-for="hidden in dormantGroups"
+          :key="hidden.group.id"
+          variant="warning"
+          dense
+          data-test="curated-dormant-stream"
+          :content="
+            t('infra.curated.streamsStale', {
+              list: hidden.streams,
+              date: hidden.date,
+            })
+          "
+        />
+      </div>
     </div>
 
     <div v-else-if="dashboard" class="flex min-h-0 flex-1 flex-col">

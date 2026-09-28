@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { ref, computed, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
@@ -164,6 +166,13 @@ export function usePrebuiltDestinations() {
 
   // Computed properties
   const organizationIdentifier = computed(() => store.state.selectedOrganization.identifier);
+
+  const createDestinationWrite = useMutation(() =>
+    saveDestinationMutation(organizationIdentifier.value, () => false),
+  );
+  const updateDestinationWrite = useMutation(() =>
+    saveDestinationMutation(organizationIdentifier.value, () => true),
+  );
 
   /**
    * Get all available prebuilt destination types
@@ -602,11 +611,7 @@ export function usePrebuiltDestinations() {
       }
 
       // Create the destination
-      await alertDestinationService.create({
-        org_identifier: organizationIdentifier.value,
-        destination_name: name,
-        data: destinationData,
-      });
+      await createDestinationWrite.mutateAsync({ destination_name: name, data: destinationData });
 
       toast({
         variant: "success",
@@ -709,9 +714,9 @@ export function usePrebuiltDestinations() {
       }
 
       // Update the destination
-      await alertDestinationService.update({
-        org_identifier: organizationIdentifier.value,
-        destination_name: originalName, // Use original name for lookup
+      // Original name for lookup: a rename must still address the old row.
+      await updateDestinationWrite.mutateAsync({
+        destination_name: originalName,
         data: destinationData,
       });
 
@@ -802,8 +807,7 @@ export function usePrebuiltDestinations() {
         },
       };
 
-      await alertDestinationService.update({
-        org_identifier: organizationIdentifier.value,
+      await updateDestinationWrite.mutateAsync({
         destination_name: destinationName,
         data: updatedData,
       });

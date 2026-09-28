@@ -24,7 +24,7 @@ use utoipa::ToSchema;
 
 use crate::{
     config::get_config,
-    meta::{search, sql::OrderBy, stream::StreamType},
+    meta::{search, slo::Slo, sql::OrderBy, stream::StreamType},
     utils::{base64, json},
 };
 
@@ -1139,15 +1139,19 @@ pub struct SearchEventContext {
     pub alert_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub derived_stream_key: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "report_id")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "report_id", default)]
     pub report_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_id")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_id", default)]
     pub dashboard_folder_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_name")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "folder_name",
+        default
+    )]
     pub dashboard_folder_name: Option<String>,
 }
 
@@ -1169,6 +1173,13 @@ impl SearchEventContext {
     pub fn with_report(report_key: Option<String>) -> Self {
         Self {
             report_key,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_slo(slo: &Slo) -> Self {
+        Self {
+            derived_stream_key: Some(format!("slo/{}/{}/{}", slo.org, slo.name, slo.id)),
             ..Default::default()
         }
     }

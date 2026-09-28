@@ -83,6 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-else>{{ formatCellValue(value, column, row) }}</span>
       </template>
 
+      <!-- Forward parent-provided cell slots (e.g. a caller's trailing action column). -->
+      <template v-for="name in forwardedCellSlots" :key="name" #[name]="scope">
+        <slot :name="name" v-bind="scope" />
+      </template>
+
       <template #cell-hover-actions="{ row, column, value }">
         <OButton
           v-if="isCopyableCellValue(value)"
@@ -237,7 +242,7 @@ export default defineComponent({
     },
   },
   emits: ["row-click", "format-column", "explore-cell"],
-  setup(props, { emit }) {
+  setup(props, { emit, slots }) {
     const store = useStore();
     const { t } = useI18nTyped();
     const tableRef = ref<any>(null);
@@ -596,7 +601,13 @@ export default defineComponent({
       emit("format-column", col?.alias ?? columnId);
     };
 
+    // Forward any parent-provided `#cell-<id>` slots to OTable so callers can add custom cells.
+    const forwardedCellSlots = computed(() =>
+      Object.keys(slots).filter((n) => n.startsWith("cell-")),
+    );
+
     return {
+      forwardedCellSlots,
       t,
       tableRef,
       tableColumns,

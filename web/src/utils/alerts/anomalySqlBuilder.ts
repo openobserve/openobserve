@@ -18,19 +18,19 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 
+// Exactly the backend DetectionFunction percentile variants; p75/p90 would be rejected on save.
 const percentileMap: Record<string, number> = {
   p50: 0.5,
-  p75: 0.75,
-  p90: 0.9,
   p95: 0.95,
   p99: 0.99,
 };
 
 /**
  * Converts a detection function name + field to the SQL expression for the
- * histogram query. Percentile short-names (p50, p95, etc.) are expanded to
- * `approx_percentile_cont(field, percentile)` matching the regular alert
- * query builder behaviour.
+ * histogram query. The percentile short-names the backend accepts (p50, p95,
+ * p99) are expanded to `approx_percentile_cont(field, percentile)`; any other
+ * name is wrapped verbatim. Regular alerts accept a wider percentile set and
+ * build their own SQL in alertQueryBuilder.ts.
  */
 export const toDetectionFunctionSql = (rawFn: string, field: string): string => {
   // API may return already-wrapped forms like "p90(duration)" or "avg(size)"

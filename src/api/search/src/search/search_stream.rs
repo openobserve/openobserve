@@ -49,7 +49,9 @@ use tokio::sync::mpsc;
 use tracing::Span;
 
 #[cfg(feature = "enterprise")]
-use crate::search::utils::{StreamPermissionResourceType, check_stream_permissions};
+use crate::search::utils::{
+    StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
+};
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -517,6 +519,27 @@ pub async fn search_http2_stream(
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access to key".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_search_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes,
+        )
+        .await;
+        return res;
+    }
+
     // 0 means size 0 with no positive SQL LIMIT, so use the default; negative stays unlimited.
     match sql.limit {
         0 => req.query.size = cfg.limit.query_default_limit,
@@ -874,6 +897,28 @@ pub async fn values_http2_stream(
             }
             return res;
         }
+    }
+
+    // the generated SQL embeds the caller's WHERE, so cipher keys it names need the same check
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access to key".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_values_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes.clone(),
+        )
+        .await;
+        return res;
     }
 
     // Create a channel for streaming results

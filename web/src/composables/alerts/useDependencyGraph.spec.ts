@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   useDependencyGraph,
   buildFocusChain,
@@ -21,8 +21,38 @@ import {
   removeNodeFromGraph,
   depKindIcon,
   depKindColor,
+  consumerBadges,
+  joinWithAnd,
+  invalidateDependencyGraphCache,
 } from "@/composables/alerts/useDependencyGraph";
 import type { DepNode } from "@/composables/alerts/useDependencyGraph";
+
+const graphInputs = vi.hoisted(() => ({
+  alerts: vi.fn(async () => ({ data: { list: [] } })),
+  destinations: vi.fn(async () => ({ data: [] })),
+  templates: vi.fn(async () => ({ data: [] })),
+}));
+
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { listByFolderId: (...a: any[]) => graphInputs.alerts(...a) },
+  });
+});
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: (...a: any[]) => graphInputs.destinations(...a),
+    },
+  });
+});
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: (...a: any[]) => graphInputs.templates(...a) },
+  });
+});
 
 const { buildGraph } = useDependencyGraph();
 
@@ -130,6 +160,52 @@ describe("useDependencyGraph.buildGraph", () => {
     );
 
     expect(byName(nodes, "slack", "destination").usageCount).toBe(2);
+  });
+
+  it("a destination used only by a synthetic check is not an orphan", () => {
+    const { nodes } = buildGraph(
+      [],
+      [
+        {
+          name: "pager",
+          type: "http",
+          uses: [{ consumer: "synthetic_check", id: "c1", name: "checkout-journey" }],
+        },
+      ],
+      [],
+    );
+
+    const pager = byName(nodes, "pager", "destination");
+    expect(pager.orphan).toBe(false);
+    expect(pager.usageCount).toBe(1);
+    expect(pager.consumerCounts).toEqual({ synthetic_check: 1 });
+  });
+
+  it("sums usageCount across alert AND non-alert consumers", () => {
+    const { nodes } = buildGraph(
+      [{ alert_id: "a1", name: "cpu", destinations: ["pager"], enabled: true }],
+      [
+        {
+          name: "pager",
+          type: "http",
+          uses: [{ consumer: "pipeline", id: "p1", name: "ingest-pipe" }],
+        },
+      ],
+      [],
+    );
+
+    expect(byName(nodes, "pager", "destination").usageCount).toBe(2);
+  });
+
+  it("skips 'alert' entries in `uses` — the alerts list already counts them", () => {
+    const { nodes } = buildGraph(
+      [{ alert_id: "a1", name: "cpu", destinations: ["pager"], enabled: true }],
+      [{ name: "pager", type: "http", uses: [{ consumer: "alert", id: "a1", name: "cpu" }] }],
+      [],
+    );
+
+    // Would be 2 if the alert entry were double-counted alongside the alerts-list edge.
+    expect(byName(nodes, "pager", "destination").usageCount).toBe(1);
   });
 });
 
@@ -242,6 +318,49 @@ describe("dependency kind helpers", () => {
   });
 });
 
+describe("consumerBadges", () => {
+  it("orders non-alert consumers and skips kinds with no uses", () => {
+    const node = {
+      id: "destination:pager",
+      kind: "destination" as const,
+      name: "pager",
+      usageCount: 3,
+      orphan: false,
+      missing: false,
+      consumerCounts: { incident_integration: 1, synthetic_check: 2 },
+    };
+
+    expect(consumerBadges(node).map((b) => [b.kind, b.count])).toEqual([
+      ["synthetic_check", 2],
+      ["incident_integration", 1],
+    ]);
+  });
+
+  it("returns nothing for a node with no consumerCounts", () => {
+    expect(consumerBadges(null)).toEqual([]);
+  });
+});
+
+describe("joinWithAnd", () => {
+  it("returns a single part unchanged", () => {
+    expect(joinWithAnd(["1 alert"])).toBe("1 alert");
+  });
+
+  it("joins two parts with 'and'", () => {
+    expect(joinWithAnd(["1 alert", "1 synthetic check"])).toBe("1 alert and 1 synthetic check");
+  });
+
+  it("joins three or more parts with commas and a trailing 'and'", () => {
+    expect(joinWithAnd(["1 alert", "1 pipeline", "1 synthetic check"])).toBe(
+      "1 alert, 1 pipeline and 1 synthetic check",
+    );
+  });
+
+  it("returns an empty string for no parts", () => {
+    expect(joinWithAnd([])).toBe("");
+  });
+});
+
 describe("useDependencyGraph.removeNodeFromGraph", () => {
   const graph = () =>
     buildGraph(
@@ -311,5 +430,57 @@ describe("useDependencyGraph.removeNodeFromGraph", () => {
   it("leaves the graph alone when the node is already gone", () => {
     const before = graph();
     expect(removeNodeFromGraph(before, "alert:nope")).toBe(before);
+  });
+
+  it("keeps a deleted destination dangling when only a non-alert consumer still names it", () => {
+    const withPipeline = buildGraph(
+      [],
+      [
+        {
+          name: "pager",
+          type: "http",
+          uses: [{ consumer: "pipeline", id: "p1", name: "ingest-pipe" }],
+        },
+      ],
+      [],
+    );
+
+    const next = removeNodeFromGraph(withPipeline, "destination:pager");
+
+    const pager = byName(next.nodes, "pager", "destination");
+    expect(pager.missing).toBe(true);
+    expect(pager.usageCount).toBe(1);
+  });
+});
+
+describe("useDependencyGraph.loadGraph", () => {
+  const calls = () => [
+    graphInputs.alerts.mock.calls.length,
+    graphInputs.destinations.mock.calls.length,
+    graphInputs.templates.mock.calls.length,
+  ];
+
+  beforeEach(() => {
+    invalidateDependencyGraphCache();
+    Object.values(graphInputs).forEach((fn) => fn.mockClear());
+  });
+
+  it("builds each input once and serves a reopen from the shared graph", async () => {
+    const { loadGraph } = useDependencyGraph();
+    await loadGraph("org-a");
+    await loadGraph("org-a");
+
+    expect(calls()).toEqual([1, 1, 1]);
+  });
+
+  // A refresh re-reads the inputs it names; the caller's own list is already fresh.
+  it("re-reads only the named inputs on a refresh", async () => {
+    const { loadGraph } = useDependencyGraph();
+    await loadGraph("org-a");
+    invalidateDependencyGraphCache();
+
+    await loadGraph("org-a", ["alerts", "templates"]);
+
+    expect(calls()).toEqual([2, 1, 2]);
   });
 });

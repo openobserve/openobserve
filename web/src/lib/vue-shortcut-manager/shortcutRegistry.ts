@@ -42,6 +42,8 @@ export interface ShortcutEntry {
   display?: string;
   /** Fire even while a text input has focus (see `Shortcut.allowInInput`). */
   allowInInput?: boolean;
+  /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
+  visible?: (caps: ShortcutCapabilities) => boolean;
 }
 
 export interface ShortcutGroup {
@@ -63,6 +65,7 @@ export interface ShortcutCapabilities {
   incidentsEnabled: boolean;
   modelPricingEnabled: boolean;
   rbacEnabled: boolean;
+  aiEnabled: boolean;
 }
 
 export interface ShortcutModule {
@@ -86,6 +89,7 @@ const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.inciden
 const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
 const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
 const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
+const aiChat = (c: ShortcutCapabilities) => c.isEnterprise && c.aiEnabled;
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
@@ -207,6 +211,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForWindows: "ctrl+b",
         keyForMac: "meta+b",
         descriptionKey: "shortcuts.actions.aiChatToggle",
+        visible: aiChat,
       },
     ],
   },

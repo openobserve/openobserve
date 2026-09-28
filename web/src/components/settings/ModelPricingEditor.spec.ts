@@ -23,14 +23,17 @@ import i18n from "@/locales";
 import { makeModelPricingSchema } from "./ModelPricingEditor.schema";
 
 // Service mocks
-vi.mock("@/services/model_pricing", () => ({
-  default: {
-    list: vi.fn(),
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-  },
-}));
+vi.mock("@/services/model_pricing", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+  });
+});
 
 // Toast mock
 const mockToastFn = vi.fn();

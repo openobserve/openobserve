@@ -16,7 +16,7 @@
 //! Profile query helpers: fold stacked samples into a call tree for
 //! Flame Graph / Call Tree / Top Table views.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -270,18 +270,56 @@ fn collapse_children_into_self(node: &mut TreeNode) {
     node.children.clear();
 }
 
-/// Aggregate all nodes with the same function name for the Top Table.
-pub fn flatten_top_functions(root: &TreeNode) -> Vec<TopFunction> {
-    let mut agg: HashMap<&str, (i64, i64)> = HashMap::new();
-    flatten_into(root, &mut agg);
-    // Synthetic nodes are not real functions.
-    agg.remove(ROOT_NODE_NAME);
-    agg.remove(OTHER_NODE_NAME);
-    agg.remove(TRUNCATED_ANCESTORS_NAME);
+/// Aggregate Top Table rows from leaf→root stacks (pprof flat/cum semantics).
+///
+/// Each sample adds `value` to a function's `total` at most once even if that
+/// name appears multiple times on the stack; `self` is only the leaf frame.
+pub fn aggregate_top_functions<'a, I>(stacks: I) -> Vec<TopFunction>
+where
+    I: IntoIterator<Item = (&'a str, i64)>,
+{
+    let mut agg: HashMap<String, (i64, i64)> = HashMap::new();
+    for (stack, value) in stacks {
+        if value == 0 {
+            continue;
+        }
+        let mut frames: Vec<&str> = stack
+            .split(';')
+            .map(str::trim)
+            .filter(|f| !f.is_empty())
+            .rev()
+            .collect();
+        limit_root_to_leaf_depth(&mut frames);
+        if frames.is_empty() {
+            continue;
+        }
+        if let Some(&leaf) = frames.last()
+            && !is_synthetic_top_name(leaf)
+        {
+            let entry = agg.entry(leaf.to_string()).or_insert((0, 0));
+            entry.0 = entry.0.saturating_add(value);
+        }
+        let mut seen = HashSet::with_capacity(frames.len());
+        for &name in &frames {
+            if is_synthetic_top_name(name) || !seen.insert(name) {
+                continue;
+            }
+            let entry = agg.entry(name.to_string()).or_insert((0, 0));
+            entry.1 = entry.1.saturating_add(value);
+        }
+    }
+    sort_top_functions(agg)
+}
+
+fn is_synthetic_top_name(name: &str) -> bool {
+    name == ROOT_NODE_NAME || name == OTHER_NODE_NAME || name == TRUNCATED_ANCESTORS_NAME
+}
+
+fn sort_top_functions(agg: HashMap<String, (i64, i64)>) -> Vec<TopFunction> {
     let mut top: Vec<TopFunction> = agg
         .into_iter()
         .map(|(name, (self_value, total))| TopFunction {
-            name: name.to_string(),
+            name,
             self_value,
             total,
         })
@@ -295,18 +333,6 @@ pub fn flatten_top_functions(root: &TreeNode) -> Vec<TopFunction> {
     top
 }
 
-fn flatten_into<'a>(node: &'a TreeNode, agg: &mut HashMap<&'a str, (i64, i64)>) {
-    let mut stack = vec![node];
-    while let Some(node) = stack.pop() {
-        let entry = agg.entry(node.name.as_str()).or_insert((0, 0));
-        entry.0 = entry.0.saturating_add(node.self_value);
-        entry.1 = entry.1.saturating_add(node.total);
-        for child in &node.children {
-            stack.push(child);
-        }
-    }
-}
-
 pub fn resolve_max_nodes(requested: Option<usize>) -> usize {
     requested
         .unwrap_or(DEFAULT_MAX_NODES)
@@ -316,9 +342,9 @@ pub fn resolve_max_nodes(requested: Option<usize>) -> usize {
 pub fn build_merge_result(stacks: &[(String, i64)], max_nodes: usize) -> MergeResult {
     let mut root = fold_stacks(stacks.iter().map(|(s, v)| (s.as_str(), *v)));
     let total = root.total;
-    // Top Table must use exclusive weights from the full tree. Truncation folds
-    // inclusive mass into `self` / `other` and would corrupt Top Table numbers.
-    let top = flatten_top_functions(&root);
+    // Top Table from raw stacks so recursive/same-name frames are not double-counted.
+    // Truncation would corrupt Top numbers if derived from the truncated tree.
+    let top = aggregate_top_functions(stacks.iter().map(|(s, v)| (s.as_str(), *v)));
     if max_nodes > 0 {
         truncate_tree(&mut root, max_nodes);
     }
@@ -404,14 +430,50 @@ mod tests {
     }
 
     #[test]
-    fn flatten_top_sums_self_by_function_name() {
-        let root = fold_stacks([("a;shared", 3), ("b;shared", 4)]);
-        let top = flatten_top_functions(&root);
+    fn aggregate_top_sums_self_by_function_name() {
+        let top = aggregate_top_functions([("a;shared", 3), ("b;shared", 4)]);
         let shared = top.iter().find(|t| t.name == "shared").unwrap();
         assert_eq!(shared.self_value, 0);
         assert_eq!(shared.total, 7);
         let a = top.iter().find(|t| t.name == "a").unwrap();
         assert_eq!(a.self_value, 3);
+        assert_eq!(a.total, 3);
+    }
+
+    #[test]
+    fn aggregate_top_counts_repeated_frame_name_once_per_sample() {
+        // leaf→root with the same name at leaf and ancestor (recursion).
+        let top = aggregate_top_functions([("foo;bar;foo", 100)]);
+        let foo = top.iter().find(|t| t.name == "foo").unwrap();
+        assert_eq!(foo.self_value, 100);
+        assert_eq!(foo.total, 100);
+        let bar = top.iter().find(|t| t.name == "bar").unwrap();
+        assert_eq!(bar.self_value, 0);
+        assert_eq!(bar.total, 100);
+        assert!(top.iter().all(|t| t.total <= 100));
+    }
+
+    #[test]
+    fn build_merge_result_top_total_never_exceeds_sample_total() {
+        let stacks = vec![
+            ("foo;bar;foo".to_string(), 50),
+            ("foo;baz;foo".to_string(), 50),
+            ("leaf;mid;root".to_string(), 89),
+        ];
+        let result = build_merge_result(&stacks, DEFAULT_MAX_NODES);
+        assert_eq!(result.total, 189);
+        for row in &result.top {
+            assert!(
+                row.total <= result.total,
+                "{} total {} > merge total {}",
+                row.name,
+                row.total,
+                result.total
+            );
+        }
+        let foo = result.top.iter().find(|t| t.name == "foo").unwrap();
+        assert_eq!(foo.total, 100);
+        assert_eq!(foo.self_value, 100);
     }
 
     #[test]

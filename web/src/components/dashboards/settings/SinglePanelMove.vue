@@ -70,9 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { getDashboard } from "@/utils/commons";
-import { reactive } from "vue";
-import { onMounted } from "vue";
-import { defineComponent, ref, computed } from "vue";
+import { reactive, onMounted, defineComponent, ref, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";

@@ -178,14 +178,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Detection Function + Detection Resolution (filters mode) -->
-        <div v-if="queryMode === 'filters'" class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
+        <div
+          v-if="queryMode === 'filters'"
+          class="mb-4! grid grid-cols-2 items-start gap-3 pb-0! @max-2xl/page:grid-cols-1"
+        >
           <!-- Detection Function -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.detectionFunction") }}
               <span class="text-status-error-text ms-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+                <OTooltip
+                  side="right"
+                  align="center"
+                  max-width="18.75rem"
+                  :content="t('alerts.anomaly.detectionFunctionTooltip')"
+                />
+              </OIcon>
             </div>
             <!-- items-start, not items-center: the field select renders its
                  validation message inside its own column (OSelect's root is
@@ -225,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Detection Resolution -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -324,9 +335,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Check Every + Look Back Window -->
-        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
+        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0! @max-2xl/page:grid-cols-1">
           <!-- Check Every -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -375,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Look Back Window -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -422,14 +433,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ detectionWindowError }}
               </div>
+              <span
+                v-if="lookBackWindowHint"
+                class="text-text-secondary pt-1 text-xs"
+                data-test="anomaly-detection-window-hint"
+              >
+                {{ lookBackWindowHint }}
+              </span>
+              <span
+                v-if="legacyWindowWarning"
+                class="text-status-warning-text pt-1 text-xs"
+                data-test="anomaly-detection-window-legacy-warning"
+              >
+                {{ legacyWindowWarning }}
+              </span>
             </div>
           </div>
         </div>
 
         <!-- Row: Training Window + Retrain Every -->
-        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
+        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0! @max-2xl/page:grid-cols-1">
           <!-- Training Window -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -469,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Retrain Every -->
-          <div class="flex flex-row items-start gap-2">
+          <div class="flex flex-row flex-wrap items-start gap-2">
             <div
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
@@ -496,7 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Sensitivity -->
-        <div class="mb-4! flex flex-row items-start gap-2 pb-0!">
+        <div class="mb-4! flex flex-row flex-wrap items-start gap-2 pb-0!">
           <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.sensitivity") }}
             <span class="text-status-error-text ms-1">*</span>
@@ -511,7 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex flex-1 flex-col gap-1">
             <!-- In budget mode the budget IS the contract, so the control is the delivered-alert cap. -->
-            <div v-if="budgetMode" class="flex items-start gap-3">
+            <div v-if="budgetMode" class="flex flex-wrap items-start gap-3">
               <OToggleGroup
                 :model-value="budgetTier"
                 :aria-label="t('alerts.sensitivity')"
@@ -550,7 +575,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div v-else class="flex items-start gap-3">
+            <div v-else class="flex flex-wrap items-center gap-3">
               <OFormToggleGroup
                 name="threshold"
                 :aria-label="t('alerts.sensitivity')"
@@ -568,16 +593,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ tier.label }}
                 </OToggleGroupItem>
               </OFormToggleGroup>
-              <OFormInput
-                name="threshold"
-                type="number"
-                :model-modifiers="{ number: true }"
-                :label="t('alerts.anomaly.percentile')"
-                class="max-w-21.75 min-w-21.75"
-                data-test="anomaly-sensitivity-percentile"
-              >
-                <template #error />
-              </OFormInput>
+              <!-- Inline, not OFormInput's `label` prop: a stacked label would push the
+                   whole control row a label-height below the Sensitivity heading. -->
+              <div class="flex items-center gap-2">
+                <span
+                  class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium whitespace-nowrap"
+                >
+                  {{ t("alerts.anomaly.percentile") }}
+                  <OIcon
+                    name="info-outline"
+                    size="sm"
+                    class="cursor-help"
+                    data-test="anomaly-sensitivity-percentile-info"
+                  >
+                    <OTooltip
+                      side="right"
+                      align="center"
+                      max-width="18.75rem"
+                      :content="t('alerts.anomaly.sensitivityNotDataPercentile')"
+                    />
+                  </OIcon>
+                </span>
+                <OFormInput
+                  name="threshold"
+                  type="number"
+                  :model-modifiers="{ number: true }"
+                  :aria-label="t('alerts.anomaly.percentile')"
+                  class="max-w-21.75 min-w-21.75"
+                  data-test="anomaly-sensitivity-percentile"
+                >
+                  <template #error />
+                </OFormInput>
+              </div>
             </div>
             <div
               v-if="sensitivityError"
@@ -598,7 +645,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- SQL preview — in custom_sql mode the user's own editor is already on this form -->
-        <div v-if="queryMode !== 'custom_sql'" class="mb-4! flex flex-row items-start gap-2 pb-0!">
+        <div
+          v-if="queryMode !== 'custom_sql'"
+          class="mb-4! flex flex-row flex-wrap items-start gap-2 pb-0!"
+        >
           <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.sqlPreview") }}
           </div>
@@ -624,7 +674,8 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   ANOMALY_FILTER_OPERATORS,
   operatorNeedsValue,
@@ -644,10 +695,14 @@ import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
+  anomalyIntervalSeconds,
+  formatAnomalySeconds,
   hasTimestampAliasInSql,
+  lookBackWindowFloorSeconds,
   makeAnomalyFilterRow,
   type AnomalyDetectionConfigForm,
   type AnomalyFilterRow,
+  type AnomalyStoredIntervals,
 } from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
@@ -674,6 +729,11 @@ export default defineComponent({
     previewSql: {
       type: String,
       default: "",
+    },
+    // From the edit fetch (useAlertForm.anomalyStoredIntervals), never derived from `config` (D4).
+    storedIntervals: {
+      type: Object as PropType<AnomalyStoredIntervals | null>,
+      default: null,
     },
   },
 
@@ -709,9 +769,12 @@ export default defineComponent({
       }),
     );
     const detectionFunctions = ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
+    // One s/m/h/d grammar shared with the server's parse_interval (§4.5) — "90s" and "1d" must render.
     const intervalUnits = computed(() => [
+      { label: t("common.seconds"), value: "s" },
       { label: t("common.minutes"), value: "m" },
       { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
     ]);
     // Fixed enum labels, not dynamic counts — plain keys, no pluralization.
     const retrainIntervalOptions = computed(() => [
@@ -747,7 +810,11 @@ export default defineComponent({
     // The parent (useAlertForm.saveAnomalyDetection) owns the save + payload;
     // this step's submit exists purely to run the schema (the exposed
     // validate() drives form.handleSubmit()), so onSubmit is a no-op.
-    const anomalyDetectionConfigSchema = createAnomalyDetectionConfigSchema(t, getTimestampColumn);
+    const anomalyDetectionConfigSchema = createAnomalyDetectionConfigSchema(
+      t,
+      getTimestampColumn,
+      () => props.storedIntervals,
+    );
 
     const form = useOForm<AnomalyDetectionConfigForm>({
       defaultValues: anomalyDetectionConfigDefaults(props.config),
@@ -763,7 +830,10 @@ export default defineComponent({
     const detectionFunctionField = form.useStore((s: any) => s.values.detection_function_field);
     const histogramIntervalValue = form.useStore((s: any) => s.values.histogram_interval_value);
     const histogramIntervalUnit = form.useStore((s: any) => s.values.histogram_interval_unit);
+    const scheduleIntervalValue = form.useStore((s: any) => s.values.schedule_interval_value);
+    const scheduleIntervalUnit = form.useStore((s: any) => s.values.schedule_interval_unit);
     const detectionWindowValue = form.useStore((s: any) => s.values.detection_window_value);
+    const detectionWindowUnit = form.useStore((s: any) => s.values.detection_window_unit);
     const trainingWindowDays = form.useStore((s: any) => s.values.training_window_days);
     const threshold = form.useStore((s: any) => s.values.threshold);
     const sensitivityMode = form.useStore((s: any) => s.values.sensitivity_mode);
@@ -826,6 +896,59 @@ export default defineComponent({
       const pct = Number(threshold.value);
       if (!Number.isInteger(pct) || pct < 50 || pct > 99) return raw("");
       return t("alerts.anomaly.sensitivityHintPercentile", { percentile: pct });
+    });
+
+    // §4.6: the floor is computed locally from the form's own values — no server dependency.
+    const currentWindowFloor = computed(() =>
+      lookBackWindowFloorSeconds(
+        Number(scheduleIntervalValue.value),
+        String(scheduleIntervalUnit.value),
+        Number(histogramIntervalValue.value),
+        String(histogramIntervalUnit.value),
+      ),
+    );
+
+    // Suppressed while the field is in error, so the floor is stated once, not twice.
+    const lookBackWindowHint = computed(() => {
+      if (detectionWindowError.value) return raw("");
+      const floor = currentWindowFloor.value;
+      if (floor === null) return raw("");
+      return t("alerts.anomaly.lookBackWindowMinimum", {
+        min: formatAnomalySeconds(floor),
+        recommended: formatAnomalySeconds(2 * floor),
+      });
+    });
+
+    const storedTripleUntouched = computed(() => {
+      const stored = props.storedIntervals;
+      return (
+        stored !== null &&
+        Number(histogramIntervalValue.value) === stored.histogram.value &&
+        String(histogramIntervalUnit.value) === stored.histogram.unit &&
+        Number(scheduleIntervalValue.value) === stored.schedule.value &&
+        String(scheduleIntervalUnit.value) === stored.schedule.unit &&
+        Number(detectionWindowValue.value) === stored.window.value &&
+        String(detectionWindowUnit.value) === stored.window.unit
+      );
+    });
+
+    // §4.5: a grandfathered below-floor row saves verbatim but is warned; unparsable stored values stay warning-free.
+    const legacyWindowWarning = computed(() => {
+      const stored = props.storedIntervals;
+      if (!stored || !stored.schedule.parsed || !stored.histogram.parsed) return raw("");
+      if (!storedTripleUntouched.value) return raw("");
+      const floor = lookBackWindowFloorSeconds(
+        stored.schedule.value,
+        stored.schedule.unit,
+        stored.histogram.value,
+        stored.histogram.unit,
+      );
+      const windowSecs =
+        typeof stored.window.raw === "number"
+          ? stored.window.raw
+          : anomalyIntervalSeconds(stored.window.value, stored.window.unit);
+      if (floor === null || windowSecs === null || windowSecs >= floor) return raw("");
+      return t("alerts.anomaly.lookBackWindowLegacy", { min: formatAnomalySeconds(floor) });
     });
 
     // The save payload, the SQL preview and the chart all read props.config, so the form writes back into it
@@ -963,12 +1086,9 @@ export default defineComponent({
       }
       loadingFields.value = true;
       try {
-        const res = await streamService.schema(
-          store.state.selectedOrganization.identifier,
-          streamName,
-          streamType,
+        const schema = await queryClient.fetchQuery(
+          streamSchemaQuery(store.state.selectedOrganization.identifier, streamName, streamType),
         );
-        const schema = res.data;
         const fieldsArray =
           schema.uds_schema && schema.uds_schema.length > 0
             ? schema.uds_schema
@@ -1119,6 +1239,8 @@ export default defineComponent({
       histogramIntervalError,
       scheduleIntervalError,
       detectionWindowError,
+      lookBackWindowHint,
+      legacyWindowWarning,
       thresholdError,
       sensitivityTiers,
       sensitivityHint,

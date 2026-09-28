@@ -43,14 +43,13 @@ pub mod retention;
 pub mod stats;
 pub mod worker;
 
-/// compactor retention run steps:
-pub async fn run_retention() -> Result<(), anyhow::Error> {
-    // generate retention jobs first
-    if let Err(e) = retention::generate_jobs().await {
-        log::error!("[COMPACTOR] generate retention job error: {e}");
-    }
+/// Generate day-granularity retention delete jobs from the stream retention settings.
+pub async fn run_generate_retention_job() -> Result<(), anyhow::Error> {
+    retention::generate_jobs().await
+}
 
-    // then run the jobs to delete the data
+/// Execute the pending delete jobs, both retention jobs and whole-stream deletions.
+pub async fn run_retention() -> Result<(), anyhow::Error> {
     let jobs = db::compact::retention::list().await?;
     for job in jobs {
         let columns = job.split('/').collect::<Vec<&str>>();

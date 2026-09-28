@@ -841,6 +841,15 @@ pub(crate) fn has_reserved_dbm_key(rec: &Map<String, Value>) -> bool {
         .any(|k| k.starts_with(RESERVED_DBM_PREFIX) || k == O2_EVENT_NAME)
 }
 
+/// Whether a record carrying `key` could be touched by `canonicalize_dbm_record` at all.
+pub(crate) fn may_canonicalize_key(key: &str) -> bool {
+    key.starts_with("o2_")
+        || matches!(
+            key,
+            "postgresql_calls" | "postgresql_state" | "postgresql_query_id"
+        )
+}
+
 // ─── Read-path pruning: the `o2_dbm_kind` secondary index ────────────────────
 //
 // Every DBM read over the server-vantage stream is `WHERE _timestamp BETWEEN …
@@ -1132,23 +1141,13 @@ pub fn needs_kind_index_field(settings: &mut config::meta::stream::StreamSetting
     added_any
 }
 
-/// Does this batch contain at least one canonicalized DBM record?
-///
-/// The seed trigger is DATA-driven, not name-driven. The read API defaults to
-/// the `_o2_dbm_server` stream but every endpoint accepts a `stream` override, so a
-/// deployment may export the recipes anywhere; keying the seed on the literal
-/// name would miss those and would also fire on a user's own stream that merely
-/// happened to be called `_o2_dbm_server`. "Did canonicalization stamp a kind onto
-/// anything in this batch" is the question that matters — this stream carries
-/// DBM data, so DBM reads will filter it by kind.
-///
-/// Cheap by construction: it stops at the first hit, and on the overwhelmingly
-/// common case (a stream carrying no DBM data at all) it is one `get` per
-/// record over a map the ingest loop has already built.
-pub fn batch_has_dbm_records(records: &[(i64, Map<String, Value>)]) -> bool {
+/// Whether any record in the batch was canonicalized; called only for [`DBM_SERVER_STREAMS`].
+pub fn batch_has_dbm_records<'a>(
+    records: impl IntoIterator<Item = &'a Map<String, Value>>,
+) -> bool {
     records
-        .iter()
-        .any(|(_, rec)| rec.get(O2_DBM_KIND).and_then(Value::as_str).is_some())
+        .into_iter()
+        .any(|rec| rec.get(O2_DBM_KIND).and_then(Value::as_str).is_some())
 }
 
 /// Seed [`server_stream_index_fields`] as secondary indexes on a stream that is
@@ -1220,10 +1219,16 @@ pub async fn ensure_server_stream_index_field(org_id: &str, stream_name: &str) {
     }
 }
 
+/// Does not check the stream name; ingest paths gate on `is_dbm_server_stream` themselves.
 pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     if !config::get_config().db_monitoring.enabled {
         return;
     }
+    canonicalize_dbm_record(local_val);
+}
+
+/// `apply_to_record` without the config read, for callers that already hold the DBM flag.
+pub(crate) fn canonicalize_dbm_record(local_val: &mut Map<String, Value>) {
     // The strip is gated on a fast pre-scan: this function runs on EVERY log
     // record every customer ships, and essentially all of them carry no
     // reserved key at all — for those, one O(record keys) scan replaces 83

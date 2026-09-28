@@ -26,6 +26,7 @@ import {
   heatmapLargeGridDefaults,
   heatmapValueLabel,
 } from "@/utils/dashboard/heatmapDefaults";
+import { escapeHtml } from "@/utils/html";
 
 /**
  * Applies chart-specific options for: heatmap
@@ -161,9 +162,8 @@ export function applyHeatmapChart(ctx: SQLContext): void {
           return "";
         // we have value[1] which return yaxis index
         // it is used to get y axis data
-        return `${
-          options?.yAxis?.data[params?.value[1]] || params?.seriesName
-        } <br/> ${params?.marker} ${params?.name} : ${
+        const yLabel = options?.yAxis?.data[params?.value[1]] || params?.seriesName;
+        const value =
           formatUnitValue(
             getUnitValue(
               params?.value?.[2],
@@ -171,8 +171,8 @@ export function applyHeatmapChart(ctx: SQLContext): void {
               panelSchema?.config?.unit_custom,
               panelSchema?.config?.decimals,
             ),
-          ) || params?.value?.[2]
-        }`;
+          ) || params?.value?.[2];
+        return `${escapeHtml(yLabel)} <br/> ${params?.marker} ${escapeHtml(params?.name)} : ${escapeHtml(value)}`;
       } catch (error) {
         return "";
       }

@@ -27,9 +27,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The reserved stream name. Registered in
-/// [`crate::meta::self_reporting::usage::RESERVED_INTERNAL_STREAMS`], which is
-/// what stops a user creating, ingesting into, or deleting it.
+/// The stream the SLO job writes its slices to.
 pub const SLO_SLICES_STREAM: &str = "slo_slices";
 
 /// One measured slice.

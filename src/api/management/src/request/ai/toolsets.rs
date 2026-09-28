@@ -245,7 +245,7 @@ pub async fn update(
         .data
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap())
-        .or(existing.data.clone());
+        .or_else(|| existing.data.clone());
 
     let updated = OrgToolset {
         id: existing.id.clone(),

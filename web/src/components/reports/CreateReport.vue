@@ -638,6 +638,10 @@ import dashboardService from "@/services/dashboards";
 import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import reports from "@/services/reports";
+import { saveReportMutation } from "@/services/reports.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
+
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -1186,6 +1190,9 @@ const getDashboaordFolders = () => {
   });
 };
 
+const reportOrgId = useOrgId();
+const reportSave = useMutation(() => saveReportMutation(reportOrgId.value));
+
 // @submit handler — OForm calls this only once the whole schema passes (incl. the
 // conditional superRefine rules), so the schema (not a manual validate) gates the
 // save. `value` is the validated, form-owned payload (name/title/frequency/
@@ -1300,17 +1307,13 @@ const saveReport = async (value: CreateReportForm) => {
   const reportId = routeQuery?.report_id as string | undefined;
   const folderId = selectedReportFolderId.value || "default";
 
-  let savePromise: Promise<any>;
-  if (isEditingReport.value && reportId) {
-    // v2 update by ID
-    savePromise = reports.updateReportById(org, reportId, reportPayload);
-  } else if (isEditingReport.value) {
-    // legacy v1 update by name
-    savePromise = reports.updateReport(org, reportPayload);
-  } else {
-    // v2 create with folder
-    savePromise = reports.createReportV2(org, reportPayload, folderId);
-  }
+  // Which of the three shapes runs is this form's decision; the scope it drops is not.
+  const savePromise: Promise<any> = reportSave.mutateAsync({
+    payload: reportPayload,
+    reportId,
+    folderId,
+    isEdit: isEditingReport.value,
+  });
 
   const dismiss = toast({
     variant: "loading",
@@ -1324,7 +1327,7 @@ const saveReport = async (value: CreateReportForm) => {
   });
 
   return savePromise
-    .then(() => {
+    .then(async () => {
       // Invalidate the folder cache so ReportList fetches fresh data on mount
       const fId = selectedReportFolderId.value || "default";
       const updated = {

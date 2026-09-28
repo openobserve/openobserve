@@ -1474,6 +1474,8 @@
     "sessionReplay": "إعادة تشغيل الجلسة",
     "viewSessionReplay": "عرض إعادة تشغيل الجلسة",
     "playSessionReplay": "إعادة تشغيل جلسة اللعب",
+    "noReplayRecordedTitle": "لم يتم تسجيل إعادة تشغيل لهذه الجلسة",
+    "noReplayRecordedMessage": "لا تحتوي الجلسة {id} على مقاطع إعادة تشغيل لتشغيلها.",
     "discoverSessionTitle": "اكتشف إعادة تشغيل الجلسة لفهم تفاعلات المستخدمين بالتفصيل",
     "discoverSessionMessage": "يقوم Session Replay بالتقاط وإعادة تشغيل تفاعلات المستخدمين على موقعك الإلكتروني أو تطبيقك. يتيح لك ذلك مراجعة بصرية لكيفية التنقل بين المستخدمين، وأين ينقرون، وما يكتبون، وكيف يتفاعلون مع محتواك",
     "loadingErrorDetails": "تمسك جيدا، نحن نحصل على تفاصيل خطأ.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "ابدأ التجربة المجانية"
   },
   "login": {
+    "lockedOut": "محاولات تسجيل دخول فاشلة كثيرة جدًا. حاول مرة أخرى خلال {duration}، أو تواصل مع المسؤول لديك.",
     "redirectingToSsoMessage": "إعادة التوجيه إلى صفحة تسجيل الدخول إلى SSO. إذا لم يتم إعادة توجيهك، يرجى",
     "clickHere": "اضغط هنا",
     "loginWithSso": "تسجيل الدخول باستخدام SSO",
@@ -1954,6 +1957,7 @@
     "ok": "حسنا",
     "sendInvite": "أرسل الدعوة",
     "inviteByEmail": "دعوة عبر البريد الإلكتروني. عدة رسائل إلكترونية مفصولة بفواصل منقوطة (;) أو فواصل (,).",
+    "inviteByEmailPlaceholder": "دعوة عبر البريد الإلكتروني",
     "changePassword": "تغيير كلمة المرور",
     "oldPassword": "كلمة المرور القديمة",
     "newPassword": "كلمة المرور الجديدة",
@@ -1962,6 +1966,15 @@
     "fieldRequired": "الحقل مطلوب",
     "passwordRequired": "كلمة المرور مطلوبة.",
     "passwordPolicyHint": "يجب أن تكون كلمة المرور من 8 إلى 128 حرفًا وتحتوي على حرف صغير واحد على الأقل، وحرف كبير واحد على الأقل، ورقم واحد على الأقل، وحرف خاص واحد على الأقل.",
+    "lockout": {
+      "locked": "الحساب مقفل",
+      "autoUnlock": "يُفتح تلقائيًا خلال {duration}.",
+      "staged": "سيُفتح عند الحفظ.",
+      "unlock": "فتح",
+      "undo": "إبقاء مقفلًا",
+      "confirmTitle": "فتح {email}؟",
+      "confirmMessage": "يؤدي هذا إلى مسح عدد محاولاتهم الفاشلة والسماح لهم بتسجيل الدخول مجددًا فورًا. لا يغيّر هذا كلمة مرورهم."
+    },
     "currentPasswordRequired": "كلمة المرور الحالية مطلوبة.",
     "newPasswordRequired": "كلمة المرور الجديدة مطلوبة.",
     "otherOrgInvalid": "يجب أن يبدأ اسم المنظمة بحرف وأن يكون أبجدي رقمي، أو _ أو -.",
@@ -2028,11 +2041,11 @@
       "addToGroup": "أضف إلى مجموعة المستخدمين",
       "addToRole": "تعيين دور",
       "step1Title": "انسخ رمزك",
-      "copyHint": "انسخ هذا الرمز الآن — لن تتمكن من رؤيته مرة أخرى.",
+      "copyHint": "هذه هي المرة الوحيدة التي سترى فيها هذا الرمز. انسخه أو نزّله الآن، فلا يمكن استرداده مرة أخرى.",
       "done": "تم",
       "applying": "التقديم على منح الوصول...",
-      "grantedRoles": "الأدوار المخصصة: {roles}",
-      "grantedGroups": "تمت إضافة مجموعات المستخدمين: {groups}",
+      "rolesAssignedLabel": "الأدوار المعيّنة",
+      "groupsAssignedLabel": "أُضيف إلى مجموعات المستخدمين",
       "failedRoles": "لم أتمكن من تعيين الأدوار: {roles}",
       "failedGroups": "لم أتمكن من الإضافة إلى مجموعات المستخدمين: {groups}",
       "failedHint": "يمكنك منحها لاحقا من صفحات الأدوار ومجموعات المستخدمين."
@@ -2042,6 +2055,9 @@
         "label": "اسم حساب الخدمة",
         "placeholder": "مثلا: ingest-bot",
         "help": "حروف صغيرة، أرقام، وشرطات. محفوظ name{suffix}"
+      },
+      "identifier": {
+        "label": "المُعرّف"
       },
       "roles": {
         "label": "تعيين الأدوار",
@@ -2056,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "المعرف",
+        "roles": "الأدوار",
         "token": "الرمز",
         "created": "تأسيس"
       }
@@ -2183,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "أي مستخدم وحسابات خدمة مرتبطة بهذه الأدوار سيفقد الوصول."
-      }
+      },
+      "assignColumn": "تعيين",
+      "assignBtn": "إضافة",
+      "assignedBadge": "مُعيَّن",
+      "assignBannerText": "أضف {member} إلى دور — انقر فوق إضافة بجانب أحد الأدوار أدناه.",
+      "assignBannerDone": "تم",
+      "assignSuccess": "تمت إضافة {member} إلى الدور \"{role}\".",
+      "assignError": "تعذّر إضافة الحساب إلى هذا الدور. يُرجى المحاولة مرة أخرى."
     },
     "group": {
       "name": {
@@ -2214,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "أعضاء هذه المجموعات سيفقدون الأدوار التي يمنحونها لهم."
-      }
+      },
+      "assignColumn": "تعيين",
+      "assignBtn": "إضافة",
+      "assignedBadge": "مُعيَّن",
+      "assignBannerText": "أضف {member} إلى مجموعة مستخدمين — انقر فوق إضافة بجانب إحدى المجموعات أدناه.",
+      "assignBannerDone": "تم",
+      "assignSuccess": "تمت إضافة {member} إلى المجموعة \"{group}\".",
+      "assignError": "تعذّر إضافة الحساب إلى هذه المجموعة. يُرجى المحاولة مرة أخرى."
     },
     "appGroups": {
       "deleteGroupTitle": "حذف المجموعة",
@@ -2687,6 +2718,14 @@
     "edit": "تعديل",
     "view": "منظر",
     "delete": "حذف",
+    "moveToFolder": "Move to folder",
+    "tabAll": "All",
+    "searchThisFolder": "This folder",
+    "searchAllFolders": "All folders",
+    "searchThisFolderTooltip": "Search only this folder",
+    "searchAllFoldersTooltip": "Search across all folders",
+    "folder": "Folder",
+    "modeInFolder": "{mode}",
     "deleteTitle": "حذف سير العمل",
     "deleteMessage": "هل أنت متأكد أنك تريد حذف سير العمل هذا؟",
     "deleteSuccess": "تم حذف سير العمل بنجاح",
@@ -2721,12 +2760,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "تم إطلاق الإنذار",
+        "tab": "Alerts",
         "node": "تفعيل التنبيه",
         "desc": "اهرب عندما يطلق تنبيه",
         "intro": "عندما يطلق تنبيه مرتبط، تستقبل كل خطوة لاحقة هذه الحمولة."
       },
       "incidentEvent": {
         "label": "حدث الحادث",
+        "tab": "Incidents",
         "node": "محفز الحادث",
         "desc": "تشغيل حدث دورة حياة الحادث",
         "intro": "عندما يحدث حدث حادث، تستقبل كل خطوة انتقالية هذه الحمولة."
@@ -3558,6 +3599,12 @@
     "joinSlack": "انضم إلى السلاك",
     "maybeLater": "ربما لاحقا"
   },
+  "connectDataSourcePopup": {
+    "title": "للبدء، لنقم بتوصيل مصدر البيانات الأول الخاص بك.",
+    "description": "لدينا الكثير لنعرضه لك، لكننا نحتاج أولاً إلى توصيل بياناتك. تشاهد معظم الفرق أول سجلاتها خلال حوالي دقيقة واحدة.",
+    "connectButton": "توصيل مصدر بيانات",
+    "slackLink": "انضم أيضًا إلى مجتمعنا على Slack"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "تابع من حيث توقف",
     "startFromNow": "ابدأ من الآن.",
@@ -3568,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "حدث خطأ أثناء نسخ المحتوى.",
+    "passcodeForbiddenMessage": "يلزم امتلاك دور المسؤول أو الجذر لعرض رمز الابتلاع. اطلب من المسؤول أمر الإعداد، أو الدور اللازم لرؤيته هنا.",
     "updateRUMTokenMessage": "هل أنت متأكد من أنك تريد تحديث رمز RUM لهذه المؤسسة؟",
     "completeAwsIntegration": "إكمال تكامل AWS",
     "deployAwsServicesOneClick": "نشر جميع خدمات AWS المحددة بنقرة واحدة باستخدام كومة CloudFormation واحدة.",
@@ -4474,6 +4522,8 @@
       "payloadTitle": "حمولة الحدث",
       "payloadIndex": "يحدد الحقل {field} الجدول. الأحداث التي لا تحتويه تذهب إلى جدول {stream}.",
       "payloadTime": "الحقل {field} هو ثوانٍ من حقبة Unix، وتُقبل القيمة الكسرية. عندما يكون مفقودًا أو غير موجب، يُستخدم وقت الاستلام.",
+      "windowTitle": "يتم تجاهل الطوابع الزمنية خارج نافذة الاستيعاب",
+      "windowBody": "يتم إسقاط الأحداث الأقدم من {past} (5 ساعات افتراضيًا) أو الأبعد في المستقبل من {future} (24 ساعة افتراضيًا)، ومع ذلك يستجيب الطلب بالرمز 0 لأن عميل Splunk لا يعيد المحاولة بعد الخطأ. لذلك يبدو الطابع الزمني الثابت أو القديم وكأنه إرسال ناجح لا يخزن أي شيء.",
       "payloadMetadata": "تُخزَّن الحقول {fields} كأعمدة في الحدث.",
       "healthTitle": "فحص الحالة",
       "healthBody": "لا يتطلب طلب GET مصادقة ويجيب بـ {response}.",
@@ -5370,6 +5420,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "تحديث لتطبيق أحدث تغييرات المتغيرات",
       "refresh": "تحديث",
+      "refreshCacheReload": "تحديث ذاكرة التخزين المؤقت وإعادة التحميل",
+      "moreRefreshOptions": "خيارات تحديث إضافية",
       "dashboard": "لوحة المعلومات",
       "dashboardNotFound": "لم يتم العثور على لوحة المعلومات أو تم حذفها. إعادة التوجيه إلى قائمة لوحة التحكم.",
       "failedToLoadDashboard": "فشل تحميل لوحة التحكم. إعادة التوجيه إلى قائمة لوحة التحكم.",
@@ -5804,7 +5856,36 @@
     "variableNameAlreadyExists": "متغير يحمل نفس الاسم موجود بالفعل",
     "pivotTotal": "المجموع",
     "pivotOthers": "آخرون",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "إظهار النماذج (عينات الآثار)",
+      "hide": "إخفاء النماذج · {count} معروض",
+      "empty": "لا توجد نماذج في هذا النطاق الزمني",
+      "emptyShort": "0 نماذج",
+      "loadFailed": "تعذّر تحميل النماذج",
+      "loadFailedHint": "المخطط غير متأثر. إعادة المحاولة تجلب النماذج فقط.",
+      "retry": "إعادة المحاولة",
+      "cardTitle": "نموذج",
+      "query": "الاستعلام {name}",
+      "returnedBy": "مُسترجَع بواسطة {count} استعلام | مُسترجَع بواسطة {count} استعلامات",
+      "series": "السلسلة",
+      "aboveRange": "أعلى نطاق المخطط؛ يُرسم عند الحافة العلوية",
+      "belowRange": "أسفل نطاق المخطط؛ يُرسم عند الحافة السفلية",
+      "checkingTrace": "جارٍ التحقق من الأثر…",
+      "openTrace": "فتح الأثر",
+      "openTraceHint": "أو انقر على العلامة. زر الرجوع يعيدك إلى هنا.",
+      "traceNotAvailable": "الأثر غير متاح — مستبعد بالمعاينة أو خارج مدة الاحتفاظ",
+      "openTraceUnverified": "فتح الأثر (غير مُتحقق منه)",
+      "unverifiedTimeout": "انتهت مهلة البحث عن الأثر، لذا قد يكون هذا الأثر مفقودًا.",
+      "unverifiedForbidden": "تعذّر تأكيد هذا الأثر — قد لا تملك صلاحية الوصول إلى الآثار.",
+      "unverifiedPartial": "تم البحث في جزء فقط من نافذة الاحتفاظ.",
+      "unverifiedError": "تعذّر التحقق من هذا الأثر.",
+      "noTraceId": "لا يوجد {label} في هذا النموذج، لذا لا يوجد أثر لفتحه.",
+      "markersAria": "علامات النماذج",
+      "markerAria": "النموذج {value} عند {time}"
+    },
+    "showExemplarsLabel": "إظهار النماذج",
+    "showExemplarsHelp": "يرسم عينات الآثار على هذا المخطط لكل من يفتح لوحة المعلومات. لا يزال بإمكان المشاهدين إخفاؤها من رأس اللوحة."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5892,6 +5973,9 @@
         "details": "تفاصيل",
         "json": "JSON",
         "insights": "رؤى",
+        "back": "العودة إلى النتائج",
+        "prevEvent": "الحدث السابق",
+        "nextEvent": "الحدث التالي",
         "copyLink": "رابط النسخ",
         "copy": "نسخة",
         "copyValue": "قيمة النسخ",
@@ -7462,6 +7546,7 @@
       "checkEveryTooltip": "كم مرة يتم تشغيل مهمة الكشف. يمكن أن تكون أكبر من فترة العينة (مثلا عينة كل 5 أمتار، وتشغيل الكشف كل ساعة).",
       "destinationRequired": "هناك وجهة واحدة على الأقل مطلوبة!",
       "detectionCharts": "نتائج الكشف",
+      "detectionFunctionTooltip": "ما يجب قياسه في كل نافذة زمنية. يراقب count عدد السجلات الواردة؛ وتراقب avg وmin وmax وsum حقلًا رقميًا. أما p50 وp95 وp99 فتراقب توزيع ذلك الحقل — فعلى سبيل المثال، يكشف p95 الخاص بـ response_time_ms عن تدهور زمن الاستجابة في أبطأ الطلبات حتى عندما يبقى حجم الحركة ثابتًا.",
       "detectionResolution": "دقة الكشف",
       "detectionResolutionTooltip": "مدى دقة كل نقطة بيانة. مثلا، \"5m\" تعني أن الشذوذات تكتشف بدقة 5 دقائق.",
       "deviationChart": "التجاوز فوق العتبة",
@@ -7475,6 +7560,9 @@
       "lastError": "آخر خطأ",
       "lastTrained": "آخر تدريب",
       "lookBackWindow": "نافذة النظر إلى الوراء",
+      "lookBackWindowFloor": "Look Back Window must be at least {min} — Check Every plus one Detection Resolution. A shorter window cannot hold a complete bucket by the time a run fires, so buckets would be skipped.",
+      "lookBackWindowLegacy": "This saved window is below the {min} minimum (Check Every plus one Detection Resolution). It will save unchanged, but runs can skip buckets until the window is raised.",
+      "lookBackWindowMinimum": "Minimum {min}. Recommended {recommended} or more — twice (Check Every + Detection Resolution) — plus 10 minutes where absence detection is enabled.",
       "lookBackWindowTooltip": "إلى أي مدى تراجع كل استعلامات كشف تشغيلية. يحدد النافذة حتى بعد توقف طويل. يحدد الافتراضي فحص كل فترة.",
       "metricChart": "المقياس والشذوذات",
       "metricChartHint": "نقطة واحدة لكل مجموعة كشف",
@@ -7483,9 +7571,19 @@
       "nDays": "{days} يوم | {days} أيام",
       "noDestinationsFound": "لم يتم العثور على وجهات",
       "noFieldsFound": "لم يتم العثور على حقول",
+      "noticeHybridFallback": "Fallback detection",
+      "noticeHybridFallbackTooltip": "The hybrid threshold was unavailable on recent runs, so detection fell back to the frozen threshold. Scoring continues on the frozen threshold until the model is retrained.",
+      "noticeRetrain": "Auto-retraining",
+      "noticeRetrainTooltip": "The saved model could not be read after an upgrade, so it was discarded and the config was queued for retraining automatically. No action is required; detection resumes once training completes.",
+      "noticeSkipAbsence": "Absence grading fell behind the Look Back Window; the span that could no longer be fetched was skipped and recorded.",
+      "noticeSkipScored": "وصلت عمليات تشغيل الكشف على فترات متباعدة أكثر مما تغطيه نافذة النظر للخلف، لذا خرجت الحاويات المغلقة من النافذة قبل أن تتمكن أي عملية تشغيل من تقييمها.",
+      "noticeWindowFloor": "النافذة ضيقة جدًا",
+      "noticeWindowFloorTooltip": "نافذة الرجوع أقل من التحقق كل زائد دقة كشف واحدة، لذا لا يمكن للتشغيلات تقييم أي دلو. ارفع النافذة لاستعادة الكشف.",
+      "noticeWindowSkip": "الدلاء المتخطاة",
       "notifications": "الإشعارات",
       "notificationsTooltip": "عند تفعيلها، سيتم إرسال إشعار إلى الوجهة المحددة كلما تم اكتشاف شذوذ.",
-      "percentile": "المئين",
+      "percentile": "المستوى",
+      "previewCaption": "عينة من البيانات التي سيراقبها هذا التنبيه، لتتحقق من صحة الاستعلام قبل الحفظ. تُعلَّم الحالات الشاذة بعد انتهاء تدريب النموذج — راجع نتائج الكشف.",
       "queryMode": "وضع الاستعلام",
       "retrainEvery": "أعد تدريب كل",
       "retrainEveryTooltip": "كم مرة يجب إعادة تدريب النموذج تلقائيا. \"أبدا\" تعني تدريب مرة واحدة والاحتفاظ بالنموذج حتى يتم إعادة تدريبه يدويا.",
@@ -7502,7 +7600,8 @@
       "sensitivityBalanced": "متوازنة",
       "sensitivityBudgetTooltip": "الحد الأقصى لعدد التنبيهات التي يمكن لهذا الإعداد إرسالها، ويُفرض عند الإرسال. يستمر الكشف في تقييم كل فترة؛ وعند استنفاد الميزانية تُمنع التنبيهات الإضافية حتى تتجدد.",
       "sensitivityConservative": "متحفظة",
-      "sensitivityHintPercentile": "تُقيَّم الفترات مقابل علامة المئين {percentile} من درجات تدريب النموذج — وعدد التنبيهات الناتج يعتمد على بياناتك.",
+      "sensitivityHintPercentile": "تُطلق النافذة تنبيهًا عندما تبدو أكثر غرابة من {percentile}% مما رآه النموذج أثناء التدريب. ويعتمد عدد التنبيهات الناتجة على بياناتك.",
+      "sensitivityNotDataPercentile": "مدى غرابة النافذة اللازم لإطلاق التنبيه. كلما ارتفع، قلّت التنبيهات وزادت تطرفًا. يقيّم هذا المستوى ثقة النموذج لا قيم بياناتك، لذا لا علاقة له باختيار p95 كدالة الكشف.",
       "sensitivityRange": "أدخل عددا صحيحا بين 50 و99",
       "sensitivityTooltip": "يحدد حد الدرجات من درجات تدريب النموذج عند هذا المئين — القيمة 97 تضع الحد عند أعلى 3٪ من درجات التدريب. قد تختلف الدرجات الفعلية عن درجات التدريب، لذا فهذه ليست نسبة من الفترات القادمة وليست معدل تنبيهات. القيمة الأقل تخفض الحد وترسل عادة تنبيهات أكثر؛ وتباعد فترة التهدئة التنبيهات المتكررة.",
       "seriesAnomaly": "شذوذ",
@@ -7531,7 +7630,7 @@
       "summaryRetrainEveryDays": "كل {days}d",
       "summarySchedule": "✓ الجدول: كل {schedule}",
       "summaryThreshold": "✓ العتبة: {threshold}",
-      "summaryThresholdPercentile": "شريط الدرجة عند p{percentile}",
+      "summaryThresholdPercentile": "المستوى {percentile} من 99",
       "summaryTraining": "✓ التدريب: {days} ({seasonality})",
       "summaryTrainingDays": "{days} أيام",
       "timestampAliasBanned": "لا يمكن استخدام {column} كاسم مستعار للعمود. استخدم {timeBucket} بدلا من ذلك.",
@@ -7577,7 +7676,9 @@
       "usernameRequired": "اسم المستخدم مطلوب",
       "passwordRequired": "كلمة المرور مطلوبة",
       "emailRecipients": "عناوين البريد الإلكتروني للمستلمين",
-      "emailRecipientsHelp": "عناوين البريد الإلكتروني المفصولة بالفواصل",
+      "emailRecipientsHelp": "حدد مستخدمي المؤسسة أو حسابات الخدمة الذين يجب أن يتلقوا رسائل البريد الإلكتروني للتنبيهات",
+      "emailRecipientsGroupUsers": "المستخدمون",
+      "emailRecipientsGroupServiceAccounts": "حسابات الخدمة",
       "invalidEmailAddresses": "عناوين البريد الإلكتروني غير صالحة: {emails}",
       "opsgenieApiKey": "مفتاح أوبسجيني API",
       "opsgenieApiKeyHelp": "احصل على مفتاح API من إعدادات التكامل في Opsgenie",
@@ -7894,7 +7995,18 @@
     "enabled": "مفعل",
     "paused": "توقف",
     "impactTemplate": "مستخدم من قبل {destinations} · {alerts}",
-    "impactDestination": "استخدمها {alerts}"
+    "impactDestination": "يُستخدم بواسطة {consumers}",
+    "impactUnused": "غير مستخدم",
+    "noConsumers": "لا يوجد مستهلكون.",
+    "countCompositeAlert": "{count} تنبيه مركّب | {count} تنبيهات مركّبة",
+    "countPipeline": "{count} مسار معالجة | {count} مسارات معالجة",
+    "countSyntheticCheck": "{count} فحص اصطناعي | {count} فحوصات اصطناعية",
+    "countOncallPolicy": "{count} سياسة تصعيد | {count} سياسات تصعيد",
+    "countOncallTeamChannel": "{count} قناة فريق | {count} قنوات فريق",
+    "countWorkflow": "{count} سير عمل | {count} سير عمل",
+    "countAnomalyDetection": "{count} كاشف شذوذ | {count} كواشف شذوذ",
+    "countIncidentIntegration": "{count} تكامل حوادث | {count} تكاملات حوادث",
+    "sectionOtherConsumers": "يُستخدم أيضًا بواسطة"
   },
   "alert_library": {
     "header": "مكتبة التنبيه",
@@ -8578,7 +8690,9 @@
         "staleCopyAria": "انسخ تفاصيل التحديث الفاشلة ل {name}",
         "stalePreamble": "فشل تحديث — وأظهر آخر نتيجة ناجحة.",
         "staleClickToCopy": "انقر لنسخ التفاصيل.",
-        "lastRefreshedPrefix": "آخر تحديث في: "
+        "lastRefreshedPrefix": "آخر تحديث في: ",
+        "exemplarsShowHeatmap": "إظهار النماذج (عينات الآثار). يبدّل هذه البطاقة إلى المئينات أثناء التفعيل.",
+        "exemplarsHideHeatmap": "إخفاء النماذج · {count} معروض. يعيد هذه البطاقة إلى الخريطة الحرارية."
       },
       "fn": {
         "subtitle": "اختر كيف يتم تجميع هذا المقياس",
@@ -8762,6 +8876,8 @@
     "cipherKeysDesc": "مفاتيح التشفير للحقول الحساسة",
     "regexPatternsDesc": "أنماط regex القابلة لإعادة الاستخدام للحذف",
     "domainManagementDesc": "قيد تسجيل الدخول على نطاقات SSO المسموح بها",
+    "passwordPolicy": "سياسة كلمة المرور",
+    "passwordPolicyDesc": "سياسات المصادقة لحسابات البريد الإلكتروني/كلمة المرور الأصلية، مطبَّقة على مستوى النسخة بالكامل.",
     "pipelineDestinationsDesc": "الأهداف الخارجية لمخرجات مسارات المعالجة",
     "templatesDesc": "قوالب رسائل تنبيه قابلة لإعادة الاستخدام",
     "storageSettingsDesc": "تكوين التخزين لكل منظمة",
@@ -9338,7 +9454,28 @@
     "listConjunctionAnd": "{list}، و {last}",
     "runsIn": "تشغيل في",
     "recommendedByFieldCoverage": "موصى به بناءً على تغطية الحقول في التدفقات الخاصة بك.",
-    "listConjunctionAndTwo": "{first} و {last}"
+    "listConjunctionAndTwo": "{first} و {last}",
+    "domainOrgMappings": {
+      "title": "تعيينات النطاق إلى المؤسسة",
+      "subtitle": "يُضاف المستخدمون الجدد الذين يسجّلون الدخول بنطاق بريد إلكتروني مطابق إلى المؤسسة تلقائيًا.",
+      "addMapping": "إضافة تعيين",
+      "editMapping": "تعديل التعيين",
+      "empty": "لا توجد تعيينات بعد. استخدم «{addLabel}» لإضافة تعيين.",
+      "domain": "نطاق البريد الإلكتروني",
+      "domainHelp": "الجزء الذي يلي {at_sign} في عنوان البريد الإلكتروني للمستخدم.",
+      "organization": "المؤسسة",
+      "organizationPlaceholder": "معرّف المؤسسة",
+      "organizationHelp": "معرّف المؤسسة التي يُضاف إليها المستخدمون المطابقون.",
+      "organizationRequired": "المؤسسة مطلوبة",
+      "baseRole": "الدور الأساسي",
+      "baseRoleHelp": "الدور الذي يُمنح للمستخدمين المطابقين في تلك المؤسسة.",
+      "userGroup": "مجموعة المستخدمين",
+      "userGroupPlaceholder": "اسم المجموعة",
+      "userGroupHelp": "اختياري. ينضم المستخدمون المطابقون أيضًا إلى هذه المجموعة في تلك المؤسسة.",
+      "duplicateDomain": "يوجد تعيين لهذا النطاق بالفعل",
+      "confirmRemove": "هل أنت متأكد من حذف التعيين الخاص بـ {domain}؟",
+      "deleteTitle": "حذف التعيين"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -12993,10 +13130,12 @@
           },
           "variables": {
             "input": {
-              "trace": "إدخال من امتداد جذر الأثر."
+              "trace": "الإدخال من Span الجذر للمحادثة في الأثر.",
+              "session": "السؤال الافتتاحي: الإدخال من Span الجذر للمحادثة في الأثر الأول."
             },
             "output": {
-              "trace": "خرج من امتداد جذر الأثر."
+              "trace": "الإخراج من Span الجذر للمحادثة في الأثر.",
+              "session": "الإجابة النهائية: الإخراج من Span الجذر للمحادثة في الأثر الأخير."
             },
             "statistics": {
               "trace": "مقاييس التتبع: عدد الامتدادات، المدة، استدعاءات LLM والأدوات، الأخطاء، الرموز، والتكلفة.",
@@ -13008,6 +13147,10 @@
             "steps": {
               "trace": "الامتداد حسب الترتيب الزمني؛ يطوي الوسط عندما يكون المسار طويلا جدا.",
               "session": "آثار في ترتيب زمني، ممثلة كتحولات محادثة."
+            },
+            "tool_calls": {
+              "trace": "كل استدعاء أداة في الأثر، بترتيب زمني، مع اسمه وإدخاله وإخراجه وحالته.",
+              "session": "كل استدعاء أداة عبر آثار الجلسة، بترتيب زمني، مع اسمه وإدخاله وإخراجه وحالته."
             }
           }
         }
@@ -13319,6 +13462,7 @@
       "viewAddedFavorites": "عرض أضيف إلى المفضلات.",
       "viewRemovedFavorites": "تم إزالة العرض من المفضلات.",
       "selectStreamBeforeSchedule": "يرجى اختيار بث قبل تحديد موعد للوظيفة",
+      "streamNotFoundInQuery": "الجدول \"{stream}\" غير موجود",
       "confirmUpdateFunction": "هل أنت متأكد أنك تريد تحديث الوظيفة؟",
       "confirmUpdateSavedViewMsg": "هل أنت متأكد من رغبتك في تحديث العرض المحفوظ؟"
     },
@@ -13326,6 +13470,7 @@
       "searchHistoryNotEnabled": "سجل البحث غير مفعل.",
       "enableUsageReporting": "قم بضبط ZO_USAGE_REPORTING_ENABLED على true لتفعيل تقارير الاستخدام.",
       "selectStreamToExtractPatterns": "يرجى اختيار تدفق لاستخراج الأنماط",
+      "patternsUnavailableForMultiStream": "الأنماط غير متاحة عند تحديد عدة جداول. يرجى تحديد جدول واحد.",
       "errorExtractingPatterns": "خطأ في استخراج الأنماط. يرجى المحاولة مرة أخرى.",
       "nameOfPanelRequired": "اسم اللجنة مطلوب",
       "errorsFixAndTryAgain": "هناك بعض الأخطاء، يرجى تصحيحها والمحاولة مرة أخرى",
@@ -13457,6 +13602,166 @@
     "lastRefreshed": "آخر تحديث: {time}"
   },
   "synthetics": {
+    "variables": {
+      "newButton": "متغير جديد",
+      "createTitle": "إضافة متغير",
+      "created": "تم إنشاء المتغير {name}",
+      "deleteConfirm": "حذف {name}؟",
+      "deleteFailed": "تعذّر حذف المتغير",
+      "deleteTitle": "حذف المتغير",
+      "deleteEnvFallback": "عندها سيستخدم {env} القيمة العامة.",
+      "deleteGlobalFallback": "{envs} تحتفظ بقيمها الخاصة، أما البيئات الأخرى فتتوقف عن إيجاد قيمة {name}.",
+      "overriddenInNote": "مُتجاوز في {envs}",
+      "overridesGlobalNote": "يتجاوز القيمة العامة",
+      "shadowGlobalTitle": "هل تريد تجاوز القيمة العامة؟",
+      "shadowGlobalMessage": "سيقوم {name} بتجاوز القيمة العامة في {env}. وستواصل البيئات الأخرى استخدام القيمة العامة.",
+      "shadowedGlobalTitle": "بعض البيئات تحتفظ بقيمها الخاصة",
+      "shadowedGlobalMessage": "{name} له قيمة خاصة بالفعل في: {envs}. تحتفظ تلك البيئات بقيمها، بينما تستخدم بقية البيئات هذه القيمة.",
+      "deleteUsed": "{name} مُشار إليه بواسطة {n} فحص. سيُحل كنص حرفي حتى تحدّثه. هل تريد الحذف على أي حال؟ | {name} مُشار إليه بواسطة {n} فحوصات. ستُحل كنص حرفي حتى تحدّثها. هل تريد الحذف على أي حال؟",
+      "deleted": "تم حذف المتغير",
+      "description": "الوصف",
+      "editTitle": "تعديل المتغير",
+      "emptyBody": "شارك قيمة بين الفحوصات بدلاً من نسخها في كل فحص.",
+      "emptyFiltered": "لا توجد متغيرات تطابق بحثك.",
+      "emptyTitle": "لا توجد متغيرات بعد",
+      "example": "مثال",
+      "exampleHint": "يُعرض في أي مكان تُخفى فيه القيمة. لا تضع أبدًا سرًا حقيقيًا هنا.",
+      "examplePlaceholder": "https://shop.example.com",
+      "global": "عالمي",
+      "globalSubtitle": "ينطبق على جميع البيئات.",
+      "globalReachesProduction": "تنطبق القيم العامة في كل بيئة، بما في ذلك بيئة الإنتاج. أي تغيير هنا يصل إلى كل فحص يستخدم هذا الاسم دون قيمة خاصة به.",
+      "kind": "النوع",
+      "kindPlain": "عادي",
+      "kindSecret": "سري",
+      "lastUpdated": "آخر تحديث",
+      "loadFailed": "تعذّر تحميل المتغيرات",
+      "name": "الاسم",
+      "nameInvalid": "استخدم الأحرف والأرقام والشرطات السفلية، ويجب أن يبدأ الاسم بحرف أو شرطة سفلية",
+      "namePlaceholder": "BASE_URL",
+      "nameRequired": "الاسم مطلوب",
+      "nameReserved": "_AUTH_ محجوز لبيانات الاعتماد التي يقوم المسبار بحقنها بنفسه",
+      "nameTooLong": "الاسم طويل جدًا (الحد الأقصى 128 حرفًا)",
+      "notSet": "غير معيّن",
+      "replace": "استبدال",
+      "saveFailed": "تعذّر حفظ المتغير",
+      "scope": "البيئات",
+      "scopeEnvironment": "ينطبق هذا المتغير على {env} فقط.",
+      "scopeGlobal": "ينطبق هذا المتغير على جميع البيئات.",
+      "searchPlaceholder": "ابحث في المتغيرات",
+      "secretNeedsEnvironment": "لا يحتوي النطاق العام على أي أسرار. أنشئ السر في البيئة التي ينبغي أن تحميه.",
+      "secretWriteOnly": "القيمة للكتابة فقط. لا يُظهرها أي شيء مرة أخرى بعد حفظها.",
+      "title": "المتغيرات",
+      "updated": "تم تحديث المتغير",
+      "usedBy": "مُستخدَم بواسطة",
+      "usedByChecks": "غير مستخدم | {n} فحص | {n} فحوصات",
+      "value": "القيمة",
+      "valueEmpty": "فارغ",
+      "valuePlaceholder": "القيمة",
+      "valueRequired": "القيمة مطلوبة",
+      "valueSet": "محددة · آخر تحديث {when}"
+    },
+    "environments": {
+      "newButton": "بيئة جديدة",
+      "backToList": "جميع البيئات",
+      "capReached": "الحد الأقصى لعدد البيئات التي يستهدفها الفحص هو {cap}.",
+      "cardEmpty": "لا توجد بيئات بعد. أنشئها من «الصناعات الاصطناعية ← المتغيرات».",
+      "cardLocked": "تم اختيارها من قبل مستخدم لديه صلاحية وصول. لا يمكنك تغييرها — يستمر الفحص في العمل هناك.",
+      "cardTitle": "البيئات",
+      "checks": "الفحوصات",
+      "checksCount": "غير مستخدمة | {count} فحص | {count} فحوصات",
+      "createTitle": "إضافة بيئة",
+      "created": "تم إنشاء البيئة",
+      "deleteBlockedChecks": "ما زالت مستخدمة بواسطة {n} فحوصات. أزلها منها أولاً.",
+      "deleteBlockedSecrets": "ما زالت هذه البيئة تحتوي على أسرار. احذفها كلًا على حدة أولاً — لا يمكن استرجاع السر.",
+      "deleteConfirm": "حذف {name}؟",
+      "deleteFailed": "تعذّر حذف البيئة",
+      "deleteTitle": "حذف البيئة",
+      "deleteWithVariables": "حذف {name} و{n} من متغيراتها؟",
+      "deleted": "تم حذف البيئة",
+      "description": "الوصف",
+      "detailSubtitle": "المتغيرات المقتصرة على هذه البيئة.",
+      "editTitle": "تعديل البيئة",
+      "emptyBody": "أنشئ واحدةً لتحديد نطاق المتغيرات والأسرار، مثل التدريج والإنتاج.",
+      "emptyTitle": "لا توجد بيئات بعد",
+      "lastUpdated": "آخر تحديث",
+      "loadFailed": "تعذّر تحميل البيئات",
+      "name": "الاسم",
+      "nameInvalid": "استخدم الحروف والأرقام والواصلات وشرطات السفلية، ولا تبدأ بشرطة سفلية",
+      "namePlaceholder": "الإنتاج",
+      "nameRequired": "الاسم مطلوب",
+      "nameTooLong": "الاسم طويل جدًا (الحد الأقصى 64 حرفًا)",
+      "renameBlocked": "لا يمكن إعادة تسمية البيئة؛ فالاسم هو الأساس الذي تُمنح على أساسه الأذونات.",
+      "saveFailed": "تعذّر حفظ البيئة",
+      "searchPlaceholder": "البحث في البيئات",
+      "subtitle": "حدّد نطاق المتغيرات والأسرار، وتحكّم فيمن يمكنه إدارتها.",
+      "title": "البيئات",
+      "updated": "تم تحديث البيئة",
+      "usedByChecks": "غير مستخدم | مستخدم بواسطة {n} فحص | مستخدم بواسطة {n} فحوصات",
+      "variables": "المتغيرات"
+    },
+    "duplicateVariable": {
+      "body": "ينشئ نسخة من {name}، بما في ذلك قيمته، في النطاق نفسه.",
+      "done": "تم تكرار المتغير",
+      "failed": "تعذّر تكرار المتغير",
+      "nameLabel": "اسم المتغير الجديد"
+    },
+    "duplicate": {
+      "action": "تكرار",
+      "body": "ينسخ جميع المتغيرات ({n}) من {name} إلى بيئة جديدة. لا يتم نسخ الفحوصات.",
+      "bodyWithSecrets": "ينسخ {n} من المتغيرات من {name}. يتم نسخ {secrets} من الأسرار بدون قيمها ويجب تعيينها مرة أخرى. لا يتم نسخ الفحوصات.",
+      "confirm": "تكرار",
+      "done": "تم تكرار البيئة",
+      "failed": "تعذّر تكرار البيئة",
+      "nameLabel": "اسم البيئة الجديد",
+      "title": "تكرار {name}"
+    },
+    "inherited": {
+      "notIn": "غير موجود في {envs}",
+      "overridesGlobal": "يتجاوز القيمة العامة",
+      "notInMany": "غير موجود في {count} من البيئات",
+      "overriddenByCheck": "تم تجاوزه بواسطة متغير محلي",
+      "title": "مشترك",
+      "filterAll": "الكل",
+      "filterLabel": "تصفية حسب المصدر",
+      "emptyIn": "لا توجد متغيرات مشتركة في {env}.",
+      "titleTooltip": "قيم مشتركة مع كل فحص، تُدار من علامة تبويب البيئات والمتغيرات: بيئات هذا الفحص بالإضافة إلى العالمية. المتغيرات المحلية أعلاه تغلب على هذه.",
+      "valueSet": "معيّنة",
+      "valueNotSet": "غير معيّنة",
+      "emptyNone": "لا توجد متغيرات مشتركة."
+    },
+    "promote": {
+      "done": "أصبح المتغير عامًا الآن",
+      "doneShadowed": "أصبح المتغير عامًا الآن. لا تزال {envs} تتجاوزه بقيمها الخاصة.",
+      "failed": "تعذّر جعل المتغير عامًا",
+      "secretBlocked": "لا يمكن نقل الأسرار بين البيئات",
+      "toGlobal": "تعميم"
+    },
+    "promoteCheck": {
+      "action": "مشاركة {name}",
+      "confirm": "نقل",
+      "description": "ينقل هذا المتغير من الفحص إلى بيئة مشتركة، حيث يمكن لفحوصات أخرى استخدامه أيضًا.",
+      "destination": "الوجهة",
+      "done": "تم نقل المتغير",
+      "failed": "تعذّر نقل المتغير",
+      "global": "عام",
+      "secretHint": "هذه القيمة مُعلّمة كآمنة، لذا تصبح سرًّا ولا يمكن نقلها إلى النطاق العام.",
+      "title": "مشاركة {name}",
+      "tooltip": "النقل إلى بيئة مشتركة"
+    },
+    "split": {
+      "action": "تحديد نطاق للبيئات",
+      "alreadyOwn": "تمتلك بالفعل قيمة خاصة بها — تُترك كما هي.",
+      "overrideHint": "للتجاوز في بيئة واحدة فقط، أنشئ المتغير هناك بدلاً من ذلك.",
+      "confirm": "تحديد نطاق للبيئات",
+      "description": "كل بيئة لها قيمتها الخاصة. يتم استبدال المتغير العام.",
+      "done": "تم تحديد نطاق المتغير للبيئات",
+      "failed": "تعذر تحديد نطاق المتغير",
+      "title": "تحديد نطاق {name} للبيئات",
+      "unselectedWarning": "غير محددة: {envs}. ستتوقف الفحوصات التي تعمل في هذه البيئات عن استخدام هذا المتغير.",
+      "valuePlaceholder": "قيمة هذه البيئة",
+      "usedBy": "مستخدم بواسطة {n} فحوصات: {names}",
+      "usedByHint": "يُرفض التقسيم طالما أن أيًّا من هذه الفحوصات سيفقد القيمة: فحص بلا بيئات، أو فحص يعمل في بيئة لم تُمنح قيمة هنا."
+    },
     "versionPrefix": "v",
     "tokens": {
       "title": "رموز الاصطناع",
@@ -13526,7 +13831,6 @@
     },
     "variablesPanel": {
       "title": "المتغيرات",
-      "referenceHint": "الإشارة في أي قيمة خطوة أو عنوان URL ك {token}.",
       "emptyTitle": "لا توجد متغيرات حتى الآن",
       "emptyBody": "أعد استخدام القيم عبر الخطوات — مثل عنوان URL الأساسي أو اسم مستخدم — واحتفظ بالأسرار خارج قيم الخطوات.",
       "newVariable": "متغير جديد",
@@ -13534,8 +13838,6 @@
       "nameRequired": "الاسم مطلوب.",
       "nameInvalid": "تبدأ الأسماء بحرف أو خط خط وتستخدم فقط الحروف والأرقام والخطوط السفلية.",
       "nameDuplicate": "هناك متغير يحمل هذا الاسم موجودا بالفعل.",
-      "usedInSteps": "يستخدم في {count} خطوة | يستخدم في {count} الخطوات",
-      "notReferenced": "لم يتم الإشارة إليها بأي خطوة بعد",
       "removed": "تمت إزالة {name}",
       "undo": "التراجع",
       "editVariable": "تعديل المتغير {name}",
@@ -13545,7 +13847,13 @@
       "openPanel": "عرض المتغيرات",
       "removeTitle": "هل يمكن إزالة المتغير؟",
       "removeBody": "سيتم إزالة {name} من هذا الشيك.",
-      "removeWarning": "يتم الإشارة إليه بخطوة {count}، والتي لن تحل بعد الآن. | يتم الإشارة إليها بخطوات {count} لن تحل بعد الآن."
+      "removeWarning": "يتم الإشارة إليه بخطوة {count}، والتي لن تحل بعد الآن. | يتم الإشارة إليها بخطوات {count} لن تحل بعد الآن.",
+      "removeOverrideNote": "الخطوات التي تستخدم {name} ستحصل الآن على قيمة {scope}.",
+      "countOfCap": "{count} من {cap}",
+      "local": "محلي",
+      "resolutionOrder": "ترتيب الأولوية: الفحص ثم البيئة ثم العام.",
+      "overridesInherited": "يستبدل متغيرًا مشتركًا — هذه القيمة هي المعتمدة.",
+      "valueTooltipEmpty": "{name}: لا توجد قيمة بعد"
     },
     "browserDevices": {
       "desktop": "سطح المكتب",
@@ -13873,7 +14181,8 @@
       "timeoutLabel": "وقت الاستراحة (ms)",
       "valueFallback": "القيمة",
       "showSetupSteps": "خطوات إعداد العرض",
-      "waitingForActions": "ننتظر الإجراءات في المتصفح..."
+      "waitingForActions": "ننتظر الإجراءات في المتصفح...",
+      "unboundVariables": "{names} غير معرّف في هذا الفحص أو بيئاته أو النطاق العام، لذا يُكتب كما هو. | {names} غير معرّفة في هذا الفحص أو بيئاته أو النطاق العام، لذا تُكتب كما هي."
     },
     "labels": {
       "copyOf": "نسخة من {name}",
@@ -14105,10 +14414,13 @@
     },
     "results": {
       "p95Label": "ص 95",
+      "allEnvironments": "جميع البيئات",
       "clearFilters": "مسح الفلاتر",
       "clearFiltersDesc": "إزالة جميع المرشحات النشطة",
       "device": "الجهاز",
       "duration": "المدة",
+      "environment": "البيئة",
+      "environmentScope": "نطاق البيئة",
       "editCheck": "تعديل التحقق",
       "error": "خطأ",
       "failed": "فشل",
@@ -14277,6 +14589,7 @@
       "passRate": "نسبة النجاح",
       "passRateByBrowser": "معدل النجاح حسب المتصفح",
       "passRateByDevice": "معدل النجاح حسب الجهاز",
+      "passRateByEnvironment": "معدل النجاح حسب البيئة",
       "passRateByLocation": "معدل النجاح حسب الموقع",
       "durationByLocation": "المدة حسب الموقع (المتوسط)",
       "flakyRate": "معدل التقشر",
@@ -14436,7 +14749,8 @@
       "ssh": "SSH",
       "tcp": "TCP",
       "tls": "TLS",
-      "private": "المواقع الخاصة"
+      "private": "المواقع الخاصة",
+      "variables": "البيئات والمتغيرات"
     },
     "timeline": {
       "failed": "فشل",
@@ -14480,7 +14794,8 @@
       "stepNameRequired": "أعط هذه الخطوة اسما — فهي ما تظهره نتائج الجولة",
       "typeTextRequired": "أدخل النص الذي يجب أن تكتبه هذه الخطوة",
       "expectedRequired": "أدخل القيمة التي يجب أن يتوقعها هذا الادعاء",
-      "urlInvalid": "أدخل عنوان URL صالح يبدأ ب http:// أو https://",
+      "urlInvalid": "أدخل عنوان URL يبدأ بـ http:// أو https:// أو عنصر نائب لمتغير",
+      "navigateUrlInvalid": "أدخل عنوان URL يبدأ بـ http:// أو https:// أو عنصر نائب لمتغير",
       "urlRequired": "الرابط الابتدائي مطلوب",
       "fixHighlightedFields": "قم بإصلاح الحقول المميزة قبل الحفظ",
       "retiredAction": "لم يعد \"{action}\" مدعوما — إزالة أو استبدال \"{step}\"",
@@ -14945,7 +15260,6 @@
       "syntheticsTokensRefresh": "تحديث قائمة الرموز",
       "aiChatToggle": "تبديل دردشة الذكاء الاصطناعي",
       "aiChatClose": "إغلاق دردشة الذكاء الاصطناعي",
-      "aiChatExpand": "توسيع/تقويم دردشة الذكاء الاصطناعي",
       "logsSaveView": "عرض حفظ كملف محفوظ",
       "logsExport": "نتائج التصدير CSV",
       "tracesCopyUrl": "رابط مشاركة التتبع للنسخ",
@@ -15072,6 +15386,9 @@
       "noOptionsFound": "لم يتم العثور على خيارات",
       "multiSelect": "الاختيار المتعدد",
       "singleSelect": "اختيار فردي"
+    },
+    "templateInput": {
+      "suggestions": "اقتراحات المتغيرات"
     },
     "time": {
       "openTimePicker": "أداة اختيار الوقت المفتوح",
@@ -15558,7 +15875,8 @@
         "destinations": "الوجهات",
         "templates": "القوالب",
         "reports": "التقارير",
-        "llmModelPricing": "تسعير نماذج LLM"
+        "llmModelPricing": "تسعير نماذج LLM",
+        "passcode": "رمز الابتلاع"
       },
       "noPermissionToChangeFavorites": "ليس لديك إذن لتغيير المفضلات",
       "couldNotUpdateFavoriteDashboards": "تعذر تحديث لوحات القيادة المفضلة"
@@ -15796,6 +16114,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "لم تبدأ بعد عملية استيراد البيانات. لاستكشاف صفحات أخرى، يرجى بدء استيراد البيانات."
+    },
+    "iam": {
+      "userSaveFailed": "تعذّر حفظ المستخدم"
     }
   },
   "cipherKeys": {
@@ -16213,7 +16534,106 @@
       "exponentName": "الموس"
     }
   },
+  "passwordPolicy": {
+    "complexity": "التعقيد",
+    "minLength": "الحد الأدنى للطول",
+    "minLengthDesc": "أقصر كلمة مرور مقبولة",
+    "maxLength": "الحد الأقصى للطول",
+    "maxLengthDesc": "0 = بلا حد",
+    "requireUppercase": "اشتراط حرف كبير",
+    "requireUppercaseDesc": "حرف واحد على الأقل من A–Z",
+    "requireLowercase": "اشتراط حرف صغير",
+    "requireLowercaseDesc": "حرف واحد على الأقل من a–z",
+    "requireDigit": "اشتراط رقم",
+    "requireDigitDesc": "رقم واحد على الأقل من 0–9",
+    "requireSpecial": "اشتراط حرف خاص",
+    "requireSpecialDesc": "حرف واحد على الأقل من المجموعة المسموح بها",
+    "specialCharSet": "الأحرف الخاصة المسموح بها",
+    "specialCharSetDesc": "اتركه فارغًا لقبول أي حرف غير أبجدي رقمي",
+    "maxLengthTooSmall": "يجب أن يكون الحد الأقصى للطول على الأقل مساويًا للحد الأدنى، أو 0 بلا حد.",
+    "confirmTitle": "حفظ سياسة كلمة المرور؟",
+    "confirmMessage": "قد يؤدي الحفظ إلى إلزام كل مستخدم أصلي بتعيين كلمة مرور جديدة قبل أن يتمكن من المتابعة. يُستثنى حساب Root والمستخدمون الخارجيون وحسابات الخدمة — وهذا يشملك ما لم تكن حساب Root. لا يمكن التراجع عن هذا الإجراء.",
+    "saved": "تم حفظ سياسة كلمة المرور. | تم حفظ سياسة كلمة المرور. يجب على {count} مستخدم إعادة تعيين كلمة المرور. | تم حفظ سياسة كلمة المرور. يجب على {count} مستخدم إعادة تعيين كلمة المرور.",
+    "saveFailed": "تعذّر حفظ سياسة كلمة المرور.",
+    "notAdminTitle": "مطلوب صلاحية مسؤول",
+    "notAdmin": "يتطلب تكوين سياسة كلمة المرور صلاحية مسؤول في المؤسسة meta.",
+    "loadFailedTitle": "تعذّر تحميل سياسة كلمة المرور",
+    "loadFailed": "حدث خطأ أثناء قراءة السياسة الحالية.",
+    "rotation": "التدوير",
+    "rotationDays": "فترة التدوير",
+    "rotationDaysDesc": "عدد الأيام قبل انتهاء صلاحية كلمة المرور. 0 = لا تنتهي أبدًا",
+    "rotationWarningDays": "التنبيه قبل الانتهاء",
+    "rotationWarningDaysDesc": "عدد أيام الإشعار عند تسجيل الدخول. 0 = بلا تنبيه",
+    "warningDaysTooLong": "لا يمكن أن تكون فترة التنبيه أطول من فترة التدوير.",
+    "rotationPreview": "تنتهي صلاحية كلمة مرور معيّنة اليوم في {expires}. يبدأ تنبيه تسجيل الدخول في {warns}.",
+    "rotationPreviewNoWarning": "تنتهي صلاحية كلمة مرور معيّنة اليوم في {expires}. لا يظهر أي تنبيه قبل ذلك.",
+    "reuse": "منع إعادة الاستخدام",
+    "historyCount": "كلمات المرور المتذكَّرة",
+    "historyCountDesc": "لا يجوز أن تطابق كلمة المرور الجديدة هذا العدد من كلمات المرور السابقة. 0 = بلا فحص",
+    "historyMaxRetained": "السجل المحفوظ",
+    "historyMaxRetainedDesc": "عدد كلمات المرور السابقة المحفوظة لكل مستخدم",
+    "historyRetainedTooSmall": "يجب أن يكون السجل المحفوظ على الأقل مساويًا لعدد كلمات المرور المتذكَّرة.",
+    "reuseExplainer": "تُحتسب كلمة المرور الحالية ضمن المجموعة المتذكَّرة — رفض إعادة استخدامها يتم بواسطة هذه القاعدة، وليس بفحص منفصل.",
+    "lockout": "قفل الحساب",
+    "lockoutThreshold": "المحاولات الفاشلة قبل القفل",
+    "lockoutThresholdDesc": "0 = القفل معطّل",
+    "lockoutBucketSize": "المحاولات قبل كل قفل لاحق",
+    "lockoutBucketSizeDesc": "0 = إعادة استخدام القيمة أعلاه",
+    "lockoutStartSecs": "مدة القفل الأول",
+    "lockoutStartSecsDesc": "ثوانٍ",
+    "lockoutMaxSecs": "الحد الأقصى لمدة القفل",
+    "lockoutMaxSecsDesc": "ثوانٍ — الحد الأقصى الذي يتوقف عنده تصعيد المدة",
+    "lockoutStartTooLong": "لا يمكن أن تكون مدة القفل الأول أطول من الحد الأقصى للقفل.",
+    "lockoutBackoff": "التصعيد",
+    "lockoutBackoffDesc": "كيف تتزايد مدة كل قفل عن القفل السابق",
+    "backoffExponential": "أُسّي",
+    "backoffLinear": "خطي",
+    "lockoutPreview": "{threshold} محاولة فاشلة → {first} · كل {bucket} محاولة إضافية → {rest} · بحد أقصى {max}. تؤدي عملية تسجيل الدخول الناجحة إلى إعادة تعيين كل شيء.",
+    "sessionEnforcement": "الجلسة والإنفاذ",
+    "cookieMaxAge": "عمر الجلسة",
+    "cookieMaxAgeDesc": "عدد الثواني التي تظل فيها الجلسة المسجّلة صالحة. 0 = استخدام القيمة الافتراضية للمثيل من {envVar}",
+    "applyToRoot": "تطبيق على حساب الجذر",
+    "applyToRootDesc": "حساب الجذر معفى من كل قاعدة أعلاه ما لم يتم تشغيل هذا الخيار.",
+    "rootWarning": "قد يؤدي قفل حساب الجذر إلى دخول النظام في حالة يتعذر استردادها.",
+    "rootDialogTitle": "تطبيق السياسة على حساب الجذر؟",
+    "rootDialogMessage": "سيخضع حساب الجذر للقفل والتدوير وإعادة التعيين الإجبارية مثل أي حساب محلي آخر. إذا كان حساب الجذر هو حسابك الإداري الوحيد، فإن قفله أو انتهاء صلاحيته دون إمكانية تلبيتها لن يترك أي طريقة للعودة إلى هذا المثيل.",
+    "rootDialogAck": "أفهم أنه يمكن قفل حساب الجذر من هذا المثيل بشكل دائم.",
+    "rootDialogConfirm": "تطبيق على الجذر"
+  },
+  "passwordReset": {
+    "title": "تحديث كلمة المرور",
+    "signedInAs": "مسجّل الدخول باسم {email}",
+    "reasonPolicyTightened": "تم تغيير سياسة كلمة المرور. حدّث كلمة المرور لمتابعة استخدام OpenObserve.",
+    "reasonRotationExpired": "انتهت صلاحية كلمة المرور. عيّن كلمة مرور جديدة لمتابعة استخدام OpenObserve.",
+    "reasonRotationWarning": "تنتهي صلاحية كلمة المرور قريبًا. عيّن كلمة مرور جديدة الآن لتجنب فقدان الوصول إلى عملك.",
+    "reused": "تم استخدام كلمة المرور هذه مؤخرًا. اختر كلمة مرور لم تستخدمها في آخر {count} كلمات مرور.",
+    "expiryBanner": "تنتهي صلاحية كلمة المرور خلال {count} يوم. حدّثها الآن لتجنب فقدان الوصول إلى عملك. | تنتهي صلاحية كلمة المرور خلال {count} أيام. حدّثها الآن لتجنب فقدان الوصول إلى عملك.",
+    "expiryBannerAction": "حدّث الآن",
+    "expiryBannerDismiss": "تجاهل",
+    "currentPassword": "كلمة المرور الحالية",
+    "newPassword": "كلمة المرور الجديدة",
+    "confirmPassword": "تأكيد كلمة المرور الجديدة",
+    "currentPasswordRequired": "كلمة المرور الحالية مطلوبة.",
+    "newPasswordRequired": "كلمة المرور الجديدة مطلوبة.",
+    "confirmPasswordRequired": "يرجى إعادة إدخال كلمة المرور الجديدة.",
+    "mismatch": "كلمتا المرور غير متطابقتين.",
+    "signOut": "تسجيل الخروج",
+    "submit": "تحديث كلمة المرور",
+    "updated": "تم تحديث كلمة المرور. يرجى تسجيل الدخول مرة أخرى.",
+    "updateFailed": "تعذّر تحديث كلمة المرور.",
+    "req": {
+      "minLength": "{count} أحرف على الأقل",
+      "maxLength": "{count} حرفًا كحد أقصى",
+      "uppercase": "حرف كبير واحد",
+      "lowercase": "حرف صغير واحد",
+      "digit": "رقم واحد",
+      "special": "حرف خاص واحد",
+      "specialFromSet": "حرف خاص واحد من {set}",
+      "unmet": "يجب أن تحتوي كلمة المرور على: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "سياسة كلمة المرور",
     "loginCallback": "إعادة الاتصال بتسجيل الدخول",
     "slackOAuthCallback": "جارٍ ربط Slack",
     "emptyStateDemo": "عرض الحالة الفارغة",
@@ -16451,13 +16871,10 @@
       "columnMemory": "الذاكرة (الحالي)",
       "columnDisk": "القرص % (الحالي)",
       "columnLoad": "الحمل خلال 15 دقيقة (الحالي)",
+      "columnCores": "الأنوية",
       "columnLastSeen": "آخر ظهور",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "لوحة معلومات مقاييس المضيف",
-      "importConfirmTitle": "هل تريد إضافة لوحة معلومات مقاييس المضيف؟",
-      "importConfirmMessage": "لا تملك لوحة المعلومات هذه بعد. تؤدي إضافتها إلى إنشاء لوحة معلومات باسم 'Host Metrics' في مجلدك الافتراضي، ثم تفتحها لهذا المضيف.",
-      "importConfirmOk": "إضافة وفتح",
-      "importConfirmCancel": "إلغاء",
+      "loadPerCore": "({value}/نواة)",
       "windowsLivenessNote": "لا تظهر مضيفات Windows في هذه القائمة إلا عندما يبلّغ الوكيل عن مقياس الحمل (system_cpu_load_average_15m) — إذا كانت وكلاء Windows لديك تعمل لكنها مفقودة هنا، ففعّل جامع الحمل في إعدادات المجمّع أو حدّث الوكيل.",
       "panel": {
         "cpuBusy": "انشغال المعالج",
@@ -16682,17 +17099,17 @@
       "alertMe": "أبلغني",
       "columnHints": {
         "qps": "المكالمات في الثانية — هذه النافذة مقسمة على طولها، لذا تظل الرؤية لمدة 15 دقيقة ورؤية 4 ساعات متقاربة.",
-        "p50": "نصف جميع المكالمات تنتهي أسرع من ذلك. عدد المكالمات المنتهية فقط — الاستعلام الذي لا يزال جاريا، أو الذي لم يعد أبدا، لا يقاس هنا.",
-        "p95": "الذيل البطيء — مكالمة واحدة من كل عشرين استغرقت على الأقل هذا الوقت. العد فقط من المكالمات المنتهية — الاستعلام الذي لا يزال جاريا، أو الذي لم يعد، لا يقاس هنا.",
-        "p99": "أسوأ 1٪ من المكالمات استغرقت على الأقل هذا الوقت. يعد المكالمات المنتهية فقط — الاستعلام الذي لا يزال جاريا، أو الذي لم يعد أبدا، لا يقاس هنا.",
-        "load": "إجمالي الوقت الذي تقضيه تطبيقاتك في الانتظار على هذه القاعدة. يقاس من جانب العميل، بحيث يعكس مقدار الحركة التي قدمها هذا القاعدة — وليس مدى تحميل الخادم.",
+        "p50": "نصف جميع الاستدعاءات انتهت بشكل أسرع من هذا. مُقاس من الاستدعاءات المكتملة في آثار تطبيقك.",
+        "p95": "الذيل البطيء — استدعاء واحد من كل 20 استغرق على الأقل هذه المدة. مُقاس من الاستدعاءات المكتملة في آثار تطبيقك.",
+        "p99": "أسوأ 1% من الاستدعاءات استغرقت على الأقل هذه المدة. مُقاس من الاستدعاءات المكتملة في آثار تطبيقك.",
+        "load": "إجمالي الوقت الذي قضته تطبيقاتك في الاستدعاءات إلى قاعدة البيانات هذه، مُقاس من آثار تطبيقك. يوضح مقدار حركة المرور التي خدمتها قاعدة البيانات هذه لتطبيقاتك.",
         "attention": "مدى اقتراب هذه الحالة من الحد الذي ينشره محركها الخاص — اليوم، الاتصالات مقابل max_connections. أسوأ نسبة من هذا النوع، ليست درجة مركبة. مرتبة من الأعلى أولاً، مع الحالات التي لا يمكن قراءة صحتها في الأعلى، لأنه لا يمكن رؤية الحالة التي لا تعرف أنها صحية. تم القياس على خادم قاعدة البيانات، لذا لا يمكن مقارنتها بوقت قاعدة البيانات بجانبه."
       },
       "failedChip": "فشل {count}",
       "columnSubLabels": {
-        "attention": "الخادم",
-        "load": "العميل",
-        "calls": "العميل"
+        "attention": "من قاعدة البيانات",
+        "load": "من تطبيقاتك",
+        "calls": "من تطبيقاتك"
       },
       "attention": {
         "connections": "الاتصالات",
@@ -16754,14 +17171,14 @@
         "failed": "فشل"
       },
       "columnHints": {
-        "calls": "كم مرة تم تشغيل هذا الاستعلام. عدد قاعدة بياناتك حيث تبلغ عن واحد — يغطي كل عميل، وليس فقط أجزاء نظامك التي ترسل التتبعات. الصفوف التي تم تمييزها كمراقبة من قبل العميل يتم عدها من التتبع بدلا من ذلك، لأن قاعدة بياناتك لم تبلغ عنها.",
-        "p50": "نصف جميع المكالمات تنتهي أسرع من ذلك. عدد المكالمات المنتهية فقط — الاستعلام الذي لا يزال جاريا، أو الذي لم يعد أبدا، لا يقاس هنا.",
-        "p95": "الذيل البطيء — مكالمة واحدة من كل عشرين استغرقت على الأقل هذا الوقت. العد فقط من المكالمات المنتهية — الاستعلام الذي لا يزال جاريا، أو الذي لم يعد، لا يقاس هنا.",
-        "p99": "أسوأ 1٪ من المكالمات استغرقت على الأقل هذا الوقت. يعد المكالمات المنتهية فقط — الاستعلام الذي لا يزال جاريا، أو الذي لم يعد أبدا، لا يقاس هنا.",
+        "calls": "كم مرة نُفذ هذا الاستعلام، وفقًا لما تعدّه قاعدة بياناتك — يتم تضمين كل تطبيق يتصل. حيث لا يتوفر لدى قاعدة بياناتك عدّ لاستعلام ما، تشير أيقونة الآثار إلى عدّ مُقاس من آثار تطبيقك.",
+        "p50": "نصف جميع الاستدعاءات انتهت بشكل أسرع من هذا. مُقاس من الاستدعاءات المكتملة في آثار تطبيقك.",
+        "p95": "الذيل البطيء — استدعاء واحد من كل 20 استغرق على الأقل هذه المدة. مُقاس من الاستدعاءات المكتملة في آثار تطبيقك.",
+        "p99": "أسوأ 1% من الاستدعاءات استغرقت على الأقل هذه المدة. مُقاس من الاستدعاءات المكتملة في آثار تطبيقك.",
         "max": "أبطأ مكالمة واحدة في هذه النافذة — مكالمة حقيقية واحدة، ليست متوسطا.",
         "errors": "كم عدد هذه المكالمات التي جاءت بخطأ.",
         "perTrace": "كم مرة يتم تشغيل هذا داخل طلب واحد. الرقم العالي عادة يعني حلقة.",
-        "load": "إجمالي الوقت الذي قضاه هذا الاستعلام في قاعدة البيانات. رقم قاعدة بياناتك حيث يبلغ عن واحد: وقت التنفيذ على Postgres، لكن وقت الانتظار على MySQL وMariaDB — كل صف يوضح أي. الصفوف التي تم تمييزها كمراقبة من قبل العميل تقاس من خلال المسارات، لذا فهي تشمل الرحلة ذهابا وإيابا عبر الشبكة."
+        "load": "إجمالي الوقت الذي قضاه هذا الاستعلام في قاعدة البيانات، وفقًا لما تُبلغ عنه قاعدة بياناتك: وقت التنفيذ على Postgres، ووقت الانتظار على MySQL وMariaDB — كل صف يوضح أيّهما. الصفوف التي تحمل أيقونة الآثار مُقاسة من آثار تطبيقك، لذا تتضمن أيضًا الرحلة إلى قاعدة البيانات والعودة."
       },
       "errorsNone": "لا شيء",
       "errorsAll": "الجميع",
@@ -17025,8 +17442,7 @@
       "overlap": {
         "serverExecution": "وقت {engine} يقضى في تنفيذه",
         "serverWait": "الوقت {engine} يقضى في انتظاره — وقت انتظار، وليس وقت تنفيذ",
-        "serverCounted": "حسب {engine}، عبر كل عميل",
-        "clientObserved": "تمت ملاحظة ذلك من قبل المتصلين المسلحين — قاعدة بياناتك لم تبلغ عن هذا الحدث"
+        "serverCounted": "حسب {engine}، عبر كل عميل"
       },
       "endpointsConcentrated": "نقطة نهاية واحدة تمثل {percent} وقت هذا الاستعلام. إذا صححت {endpoint} فستكون قد أصلحت هذا الاستعلام.",
       "typicalMarker": "نداءات بطيئة {value}",
@@ -17053,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "ما سجله النظام نفسه",
-        "subtitle": "على جانب الخادم — جميع العملاء",
-        "clientSubtitle": "تمت ملاحظته من العميل — فقط المكالمات المزودة بالأدوات، والمكالمات المكتملة فقط. الاستعلام الذي لا يزال جاريًا، أو الذي علق، غير موجود في هذه الأرقام.",
+        "subtitle": "من قاعدة بياناتك — كل تطبيق يتصل",
+        "clientSubtitle": "الأرقام المعلَّمة مُقاسة من آثار تطبيقك — الاستدعاءات التي أكملتها تطبيقاتك في هذه النافذة",
         "instance": "تم الإبلاغ عنه بواسطة {instance}",
         "instanceWide": "جميع قواعد البيانات في هذه النسخة",
         "calls": "عمليات التنفيذ",
@@ -17100,9 +17516,13 @@
         "serverExecution": "زمن التنفيذ",
         "serverWait": "زمن الانتظار",
         "serverCounted": "عدد الخوادم",
-        "clientObserved": "تمت ملاحظته من العميل",
         "serverReported": "أبلغت عنه قواعد البيانات الخاصة بك"
       }
+    },
+    "appSource": {
+      "marker": "مُقاس من آثار تطبيقك",
+      "markerHint": "مُقاس من آثار تطبيقك، مما يضيف منظور تطبيقاتك إلى ما تُبلغ عنه قاعدة بياناتك.",
+      "legend": "من آثار تطبيقك"
     },
     "page": {
       "tabs": {
@@ -17111,7 +17531,7 @@
         "metricsHint": "حمل قاعدة البيانات حسب حدث الانتظار، وكل مقياس تجمعه مستقبلات قاعدة البيانات لديك.",
         "queries": "أعلى الاستعلامات",
         "samples": "أبطأ الاستدعاءات",
-        "samplesHintClient": "الاستدعاءات المنتهية التي لاحظتها خدماتك المعدة لهذا الغرض في هذه النافذة — المستدعين بدون تتبع لا يُحتسبون، لذا هذا الحد الأدنى، وليس الإجمالي. تُظهر الجدول الأبطأ منها.",
+        "samplesHintClient": "استدعاءات مُقاسة من آثار تطبيقك في هذه النافذة، مما يضيف منظور تطبيقاتك إلى ما تُبلغ عنه قاعدة بياناتك. يعرض الجدول أبطأها.",
         "samplesHintServer": "البيانات التي أبلغت عنها قواعد البيانات الخاصة بك بأنها مكتملة في هذه النافذة، محسوبة داخل قاعدة البيانات. تُظهر الجدول الأبطأ منها.",
         "samplesHintUnknown": "أبطأ استدعاءات قاعدة البيانات الفردية في هذه النافذة.",
         "deadlocks": "الاختناقات",
@@ -17148,6 +17568,11 @@
       "explore": "فتح في مستكشف المقاييس",
       "railLabel": "أقسام المقاييس",
       "noAccess": "ليس لديك إذن لقراءة {stream}. اطلب من مسؤول صلاحية قراءة هذا الجدول.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "حسب الاستعلام",
         "database": "حسب قاعدة البيانات",
@@ -17262,7 +17687,7 @@
         "status": "الحالة"
       },
       "columnHints": {
-        "duration": "كم استغرق هذا الاتصال الواحد، يقاس بحسب المتصل. يعد المكالمات المنتهية فقط — الاستعلام الذي لا يزال جاريا، أو الذي لم يعد أبدا، لا يقاس هنا."
+        "duration": "المدة التي استغرقها هذا الاستدعاء الواحد، وفقًا لقياس تطبيقك له من البداية إلى النهاية."
       },
       "failed": "فشل",
       "failedWithCode": "فشل · {code}",
@@ -17795,7 +18220,7 @@
     "tabPriorCauses": "الأسباب السابقة",
     "statEscalatesIn": "التصعيد خلال",
     "statNobodyLeft": "لا أحد متبقٍ",
-    "statUnackedFor": "غير مُقر لمدة",
+    "statUnackedFor": "غير مُقَرّ به لمدة",
     "statOpenFor": "مفتوح لمدة",
     "openSchedule": "فتح الجدول",
     "calendarDay": "يوم",
@@ -17827,6 +18252,8 @@
     "notifiedAge": "تم الإخطار · العمر",
     "channelUndeliverable": "{channel} ليس له مزوّد وراءه — لن يُرسَل شيء.",
     "assignTeamShort": "تعيين فريق",
+    "assignTeamFailed": "تعذّر تعيين الفريق",
+    "noTeamsToAssign": "لا توجد فرق لتعيينها بعد",
     "contextTitle": "سياق يستحق الاطلاع قبل التأكيد",
     "contextFired": "انطلق",
     "contextFiredCount": "{count}× خلال {days} أيام",
@@ -17865,6 +18292,7 @@
     "target_rotation_all": "جميع أعضاء {rotation}",
     "target_rotation_deleted": "تناوب لم يعد الفريق يمتلكه",
     "target_rotation_legacy": "المناوب",
+    "target_unrecognized": "هدف لا تتعرف عليه هذه الشاشة",
     "ladderPoolEveryone": "جميع أعضاء {rotation}",
     "target_user": "شخص محدد",
     "target_whole_team": "الفريق بأكمله",
@@ -18008,6 +18436,8 @@
     "addTeam": "إضافة فريق",
     "newTeam": "فريق جديد",
     "editTeam": "تعديل الفريق",
+    "defaultTeamBadge": "افتراضي",
+    "setDefaultTeam": "تعيين كفريق افتراضي",
     "manageTeamCta": "إدارة الأعضاء والجدولة والتصعيد",
     "teamName": "الاسم",
     "teamNameHint": "كيف يُشار إلى هذا الفريق على الصفحة",
@@ -18262,7 +18692,7 @@
     "ownershipHint": "يتم استدعاء هذا الفريق لأي شيء يطابق مسارات الهوية هذه. القاعدة الأكثر تحديدًا المطابقة هي التي تفوز، لذلك قاعدة مساحة الاسم تتجاوز قاعدة العنقود.",
     "noOwnershipRules": "لا توجد قواعد ملكية. يتم استدعاء هذا الفريق فقط بواسطة تنبيهات تسميه مباشرة.",
     "noOwnershipRulesOrg": "لا توجد قواعد ملكية. يتم توجيه الإشارات إلى الفريق فقط عندما يسميه تنبيه مباشرة.",
-    "editOwnershipRule": "تعديل قاعدة الملكية",
+    "editOwnershipRule": "تحرير القاعدة",
     "ruleUpdated": "تم تحديث القاعدة",
     "addOwnershipRule": "قاعدة جديدة",
     "saveRule": "حفظ",
@@ -18304,10 +18734,12 @@
     "setupStep4Title": "تكوين وجهة الإشعار",
     "setupStep4Body": "بدون وجهة، لا يمكن الوصول فعليًا إلى هاتف أحد أو بريده الوارد — يمكن إتمام كل الخطوات أعلاه ورغم ذلك لا تصل النداءات إلى أي مكان.",
     "setupCta": "أنشئ فريقك الأول",
-    "memberPickPlaceholder": "ابحث عن أشخاص في هذه المؤسسة",
+    "memberPickPlaceholder": "اختر عضو فريق لإضافته",
+    "memberSearchPlaceholder": "بحث عن الأعضاء",
     "memberEmailFallbackHint": "تعذر تحميل قائمة المستخدمين. أدخل بريدًا إلكترونيًا واحدًا أو أكثر لمستخدمي المؤسسة الحاليين، مفصولة بفواصل.",
     "addPeople": "إضافة أشخاص",
     "addPeopleCta": "إضافة | إضافة {count} | إضافة {count}",
+    "addPeopleDisabledHint": "اختر عضو فريق لإضافته",
     "addEveryoneCta": "إضافة الجميع في المؤسسة ({count})",
     "teamCreateSecondary": "إنشاء تناوب ثانوي أيضًا",
     "teamCreateSecondaryHint": "نفس الأشخاص، متأخرين بوردية واحدة، بحيث لا يكون الشخص الثانوي هو المناوب حاليًا. إنه تناوب عادي — لا شيء يربط بين الاثنين، لذا تعديل جدول أحدهما دون الآخر يؤدي إلى انحرافهما، وستحصل على تحذير بدلاً من إصلاح صامت.",
@@ -18664,6 +19096,7 @@
     "coverageGapNowOpen": "لا أحد في الخدمة، ولا أحد مجدول في الأيام الـ {days} القادمة",
     "coveragePrimaryOnly": "الأساسي: {primary}",
     "coverageSecondaryOnly": "الثانوي: {secondary}",
+    "coverageMoreChanges": "+{count} تغيير آخر | +{count} تغييرات أخرى",
     "reachTeamTitle": "تواصل مع الفريق",
     "reachTeamHint": "أثناء حادث",
     "contactSendTest": "إرسال استدعاء اختباري",
@@ -18763,6 +19196,8 @@
     "rotationNobody": "لا أحد في المناوبة",
     "edit": "تعديل",
     "timelineLoadFailed": "تعذر حل الجدول لهذه الفترة",
+    "editorReadFailed": "تعذر تحميل أحدث نسخة للتحرير. حاول مرة أخرى.",
+    "refreshFailed": "تعذر التحديث. قد يكون ما يظهر قديمًا.",
     "scheduleDoneEditing": "العودة إلى الجدول",
     "coverWhoRequired": "اختر من يقوم بالتغطية",
     "timelineCoverAria": "{who} يغطي {rotation}، من {from} إلى {to}",

@@ -163,12 +163,13 @@ describe("OnCallAboutPage", () => {
     });
   });
 
-  /// A subject that is not an alert has no editor to open, and a chip that
-  /// looks like a link and goes nowhere is worse than no link.
-  it("leaves a non-alert subject unlinked", () => {
+  /// A subject that is itself the incident has no separate alert id to show —
+  /// the row would just repeat the Incident row above under a misleading
+  /// "Alert" label, so it is left out rather than shown unlinked.
+  it("omits the subject row when the subject is the incident itself", () => {
     const wrapper = render({ subjectType: "incident" as SubjectType, sourceId: "sig_1" });
     expect(wrapper.find('[data-test="oncall-about-subject-link"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-about-subject-id"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-about-subject-id"]').exists()).toBe(false);
   });
 
   it("links an incident once the page has been promoted into one, with its own copy control", () => {

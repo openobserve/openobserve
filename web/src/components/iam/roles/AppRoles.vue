@@ -26,6 +26,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("iam.addRole") }}
       </OButton>
     </template>
+    <!-- ?member=<email> (from the token popup's "Assign a role" link) drives the Assign column below. -->
+    <OBanner
+      v-if="assignTarget"
+      variant="info"
+      icon="shield"
+      inline-actions
+      dense
+      data-test="iam-roles-assign-banner"
+      class="mb-3"
+    >
+      {{ t("iam.rolesPage.assignBannerText", { member: assignTarget }) }}
+      <template #actions>
+        <OButton
+          data-test="iam-roles-assign-banner-dismiss"
+          variant="ghost"
+          size="sm"
+          @click="clearAssignTarget"
+        >
+          {{ t("iam.rolesPage.assignBannerDone") }}
+        </OButton>
+      </template>
+    </OBanner>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <RoleTable
@@ -36,27 +58,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
           :selected-ids="selectedRoleNames"
+          :assign-target="assignTarget"
+          :assigning-role-name="assigningRoleName"
+          :assigned-role-names="assignedRoleNames"
           @update:selected-ids="onSelectionChange"
           @edit="editRole"
           @delete="showConfirmDialog"
           @bulk-delete="openBulkDeleteDialog"
           @create="addRole"
+          @assign="assignMemberToRole"
         >
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="iamRolesRefresh"
               data-test="iam-roles-refresh-btn"
-              @click="setupRoles"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamRolesRefresh"
-              />
-            </OButton>
+              @click="refreshRoles"
+            />
           </template>
         </RoleTable>
       </div>
@@ -82,16 +103,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, ref } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { deleteRoleMutation, bulkDeleteRolesMutation } from "@/services/iam.queries";
+import { rolesQuery } from "@/services/iam.queries";
+import { allUserRolesQuery } from "@/services/users.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { computed, onBeforeMount, ref, watch } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import RoleTable from "./RoleTable.vue";
-import { useRouter } from "vue-router";
-import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
-import usersService from "@/services/users";
+import { useRoute, useRouter } from "vue-router";
+import { getRoleUsers, updateRole } from "@/services/iam";
+import users from "@/services/users";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
@@ -112,8 +141,69 @@ const showAddGroup = ref(false);
 const rows: any = ref([]);
 
 const router = useRouter();
+const route = useRoute();
 
 const store = useStore();
+
+// ?member=<email> from the token popup's "Assign a role" link; drives the Assign column in RoleTable.
+const assignTarget = computed(() => (route.query.member as string) || "");
+const assigningRoleName = ref<string | null>(null);
+const assignedRoleNames = ref<string[]>([]);
+
+const loadAssignedRoleNames = async () => {
+  if (!assignTarget.value) {
+    assignedRoleNames.value = [];
+    return;
+  }
+  try {
+    const res = await users.getUserRoles(
+      store.state.selectedOrganization.identifier,
+      assignTarget.value,
+    );
+    assignedRoleNames.value = Array.isArray(res.data) ? res.data : [];
+  } catch {
+    // Silent: worst case a role the member already holds still shows an
+    // actionable "Assign" button — a redundant add_users is a harmless no-op.
+    assignedRoleNames.value = [];
+  }
+};
+
+watch(assignTarget, loadAssignedRoleNames, { immediate: true });
+
+const clearAssignTarget = () => {
+  const { member: _member, ...rest } = route.query;
+  router.replace({ name: "roles", query: rest });
+};
+
+const assignMemberToRole = async (role: any) => {
+  if (!assignTarget.value || assigningRoleName.value) return;
+  assigningRoleName.value = role.role_name;
+  try {
+    await updateRole({
+      role_id: role.role_name,
+      org_identifier: store.state.selectedOrganization.identifier,
+      payload: { add: [], remove: [], add_users: [assignTarget.value], remove_users: [] },
+    });
+    assignedRoleNames.value = [...assignedRoleNames.value, role.role_name];
+    toast({
+      message: t("iam.rolesPage.assignSuccess", {
+        member: assignTarget.value,
+        role: role.role_name,
+      }),
+      variant: "success",
+    });
+    loadRoleUserCounts(true).then(applyRoleUserCounts);
+  } catch (err: any) {
+    if (err?.response?.status != 403) {
+      toast({
+        message: err?.response?.data?.message || t("iam.rolesPage.assignError"),
+        variant: "error",
+      });
+    }
+  } finally {
+    assigningRoleName.value = null;
+  }
+};
 
 const deleteConformDialog = ref({
   show: false,
@@ -151,7 +241,7 @@ const addRole = () => {
 // through so EditRole can seed the starting permissions.
 const onRoleAdded = (payload: { role_name: string; startFrom?: string }) => {
   if (!payload?.role_name) {
-    setupRoles();
+    setupRoles(true);
     return;
   }
 
@@ -180,8 +270,23 @@ const editRole = (role: any) => {
   });
 };
 
-const loading = ref(false);
-const forbidden = ref(false);
+const orgIdForList = useOrgId();
+const rolesList = useQuery(() =>
+  Object.assign(rolesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+
+// Bound to the query rather than hand-managed: `isPending` is the cold read,
+// `isFetching` is any request in flight.
+const loading = rolesList.isPending;
+// A request in flight while rows stay on screen — the refresh button's spinner.
+// `loading` is the skeleton, which only a cold read wants.
+const fetching = rolesList.isFetching;
+const lastUpdatedAt = rolesList.dataUpdatedAt;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = rolesList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 
 // `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
 // its name. The one fact worth surfacing — is anyone actually in this role — comes
@@ -190,13 +295,21 @@ const forbidden = ref(false);
 // we simply render no member counts.
 const roleUserCounts = ref<Record<string, number> | null>(null);
 
-const loadRoleUserCounts = async () => {
+const loadRoleUserCounts = async (force = false) => {
   if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
   try {
-    const res = await usersService.getAllUserRoles(store.state.selectedOrganization.identifier);
+    const options = allUserRolesQuery(store.state.selectedOrganization.identifier);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res = await queryClient.fetchQuery(options);
     const counts: Record<string, number> = {};
     // Response is a map of user email -> role list.
-    Object.values(res.data ?? {}).forEach((roles: any) => {
+    Object.values(res ?? {}).forEach((roles: any) => {
       (Array.isArray(roles) ? roles : []).forEach((role: any) => {
         const key = String(role ?? "").trim();
         if (!key) return;
@@ -221,38 +334,61 @@ const applyRoleUserCounts = () => {
   updateTable();
 };
 
-const setupRoles = async () => {
-  loading.value = true;
-  forbidden.value = false;
-  await getRoles(store.state.selectedOrganization.identifier)
-    .then((res) => {
-      rolesState.roles = res.data.map((role: string) => ({
-        role_name: role,
-        user_count: null,
-      }));
-      updateTable();
-      // Fire-and-forget: the roles list renders immediately and the member counts
-      // (a second request) fill in when they land. Awaiting here would hold the
-      // whole table hostage to a secondary, enterprise-only endpoint.
-      void loadRoleUserCounts().then(applyRoleUserCounts);
-    })
-    .catch((err: any) => {
-      console.log(err);
-      forbidden.value = err?.response?.status === 403;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
+// `force` for every reload that follows a write or an explicit refresh —
+// an "added" event means the server has something new to show.
+// Named handler: binding setupRoles straight to @click puts the MouseEvent
+// in `force`.
+const refreshRoles = () => setupRoles(true);
+
+const applyRoles = (res: any) => {
+  rolesState.roles = res.map((role: string) => ({
+    role_name: role,
+    user_count: null,
+  }));
+  updateTable();
+  // Fire-and-forget: the roles list renders immediately and the member counts
+  // (a second request) fill in when they land. Awaiting here would hold the
+  // whole table hostage to a secondary, enterprise-only endpoint.
+  void loadRoleUserCounts().then(applyRoleUserCounts);
 };
 
+// The list is the query now: anything that invalidates the scope repaints these
+// rows without this component asking.
+watch(
+  rolesList.data,
+  (rows: any) => {
+    if (rows) applyRoles(rows);
+  },
+  { immediate: true },
+);
+watch(rolesList.error, (err: any) => {
+  if (err) console.log(err);
+});
+
+// Only an explicit call reads: refresh, post-write reload, search. Mount and
+// invalidation-driven repaints come from the query itself.
+const setupRoles = async (force = false) => {
+  if (!force) return;
+  await rolesList.refetch();
+  // Members are assigned from the Users page, and an unchanged roles list never re-fires the watcher.
+  await loadRoleUserCounts(true);
+  applyRoleUserCounts();
+};
+
+const orgId = useOrgId();
+const deleteRoleOne = useMutation(() => deleteRoleMutation(orgId.value));
+const bulkDeleteRolesAll = useMutation(() => bulkDeleteRolesMutation(orgId.value));
+
 const deleteUserRole = (role: any) => {
-  deleteRole(role.role_name, store.state.selectedOrganization.identifier)
+  // Was: invalidate, then delete — the refetch raced the write.
+  deleteRoleOne
+    .mutateAsync(role.role_name)
     .then(() => {
       toast({
         message: t("iam.appRoles.roleDeletedSuccess"),
         variant: "success",
       });
-      setupRoles();
+      setupRoles(true);
     })
     .catch((error: any) => {
       if (error.response.status != 403) {
@@ -327,9 +463,7 @@ const bulkDeleteUserRoles = async () => {
   bulkDeleteLoading.value = true;
 
   try {
-    const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
-      ids: roleNames,
-    });
+    const response = await bulkDeleteRolesAll.mutateAsync(roleNames);
 
     const { successful = [], unsuccessful = [], err } = response.data || {};
 
@@ -357,7 +491,7 @@ const bulkDeleteUserRoles = async () => {
       });
     }
 
-    await setupRoles();
+    await setupRoles(true);
     selectedRoleNames.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
@@ -385,7 +519,7 @@ useShortcuts([
   {
     id: "iamRolesRefresh",
     handler: () => {
-      if (!isInputFocused()) setupRoles();
+      if (!isInputFocused()) setupRoles(true);
     },
   },
   {

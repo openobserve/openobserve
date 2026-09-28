@@ -20,9 +20,11 @@ import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
 import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
+import DashboardPrintPage from "./dashboardPages/dashboard-print";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
 import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
+import DashboardZoomDrag from "./dashboardPages/dashboard-zoom-drag";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDrawer.js";
@@ -31,6 +33,7 @@ import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
+import { IncidentsPage } from "./alertsPages/incidentsPage.js";
 import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
@@ -48,6 +51,8 @@ import { IngestionPage } from "./generalPages/ingestionPage.js";
 import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
 import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
+import { RouteGuardPage } from "./generalPages/routeGuardPage.js";
+import { SplunkHecPage } from "./generalPages/splunkHecPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
@@ -91,16 +96,19 @@ import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
+import { ConnectDataSourcePopupPage } from "./generalPages/connectDataSourcePopupPage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
 import { SharedComponentsFormValidationPage } from "./generalPages/sharedComponentsFormValidationPage.js";
 import { SettingsFormValidationPage } from "./generalPages/settingsFormValidationPage.js";
+import { PasswordPolicyPage } from "./generalPages/passwordPolicyPage.js";
 import { AiToolsetsFormValidationPage } from "./generalPages/aiToolsetsFormValidationPage.js";
 import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
 const WorkflowsPage = require("./workflowsPages/workflowsPage.js");
+const WorkflowFoldersPage = require("./workflowsPages/workflowFoldersPage.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
@@ -121,6 +129,9 @@ const FunctionsFormValidationPage = require("./functionsPages/functionsFormValid
 
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
+
+// ===== ONLINE EVALS PAGE OBJECTS =====
+import { LlmProvidersPage } from "./onlineEvalsPages/llmProvidersPage.js";
 
 class PageManager {
   /**
@@ -151,9 +162,11 @@ class PageManager {
     this.dashboardFilter = new DashboardFilter(page);
     this.dashboardImport = new DashboardImport(page);
     this.dashboardShareExport = new DashboardShareExportPage(page);
+    this.dashboardPrint = new DashboardPrintPage(page);
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
     this.dateTimeHelper = new DateTimeHelper(page);
     this.dashboardPanelTime = new DashboardPanelTime(page);
+    this.dashboardZoomDrag = new DashboardZoomDrag(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
     this.scheduledReportsDrawer = new ScheduledReportsDrawerPage(page);
@@ -164,6 +177,7 @@ class PageManager {
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
+    this.incidentsPage = new IncidentsPage(page);
 
     // ===== SLO PAGE OBJECTS =====
     this.sloListPage = new SloListPage(page);
@@ -176,6 +190,7 @@ class PageManager {
 
     // ===== WORKFLOWS (v1) PAGE OBJECT =====
     this.workflowsPage = new WorkflowsPage(page);
+    this.workflowFoldersPage = new WorkflowFoldersPage(page);
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
@@ -187,7 +202,9 @@ class PageManager {
     this.pipelinesFormValidation = new PipelinesFormValidationPage(page);
     this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
+    this.routeGuardPage = new RouteGuardPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);
+    this.splunkHecPage = new SplunkHecPage(page);
 
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
@@ -227,6 +244,7 @@ class PageManager {
     this.modelPricingPage = new ModelPricingPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);
     this.statusPagesPage = new StatusPagesPage(page);
+    this.connectDataSourcePopupPage = new ConnectDataSourcePopupPage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);
     this.schemaPage = new SchemaPage(page);
@@ -251,10 +269,14 @@ class PageManager {
     // ===== CIPHER KEYS PAGE OBJECTS =====
     this.cipherKeysFormValidation = new CipherKeysFormValidationPage(page);
     this.settingsFormValidation = new SettingsFormValidationPage(page);
+    this.passwordPolicyPage = new PasswordPolicyPage(page);
 
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
+
+    // ===== ONLINE EVALS PAGE OBJECTS =====
+    this.llmProvidersPage = new LlmProvidersPage(page);
 
     // ===== RUM PAGE OBJECTS =====
     this.rumFormValidation = new RumFormValidationPage(page);

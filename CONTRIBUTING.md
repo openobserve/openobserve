@@ -84,6 +84,15 @@ There are 2 areas of development.
 
 ### Server
 
+Create a `.env` file in the root `openobserve` directory (if not already present) with the following content to allow the local Vite UI server to communicate with the backend without CORS errors:
+
+```env
+ZO_WEB_URL="http://localhost:8081"
+ZO_CORS_ALLOWED_ORIGINS="http://localhost:3000, http://localhost:5173, http://localhost:8081"
+```
+
+Start the backend server:
+
 ```shell
 ZO_ROOT_USER_EMAIL="root@example.com" ZO_ROOT_USER_PASSWORD="Complexpass#123" cargo run
 ```

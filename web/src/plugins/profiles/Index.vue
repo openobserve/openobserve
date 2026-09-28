@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="border-border-default flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b p-1.5"
     >
-      <div class="w-40 shrink-0">
+      <div class="w-60 shrink-0">
         <OSelect
           v-model="selectedStream"
           :label="t('profiles.stream')"
@@ -30,17 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-stream-select"
         />
       </div>
-      <div class="w-48 shrink-0">
-        <OSelect
-          v-model="selectedDataSource"
-          :label="t('profiles.dataSource')"
-          label-position="inside"
-          :options="dataSourceOptions"
-          class="w-full"
-          data-test="profiles-data-source-select"
-        />
-      </div>
-      <div class="w-40 shrink-0">
+      <div class="w-60 shrink-0">
         <OSelect
           v-model="selectedService"
           :label="t('profiles.service')"
@@ -50,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-service-select"
         />
       </div>
-      <div class="w-48 shrink-0">
+      <div class="w-72 shrink-0">
         <OSelect
           v-model="selectedProfileType"
           :label="t('profiles.profileType')"
@@ -292,14 +282,12 @@ const dateState = ref({
 });
 const streamOptions = ref<SelectOption[]>([]);
 const selectedStream = ref<string | null>(null);
-const selectedDataSource = ref<string | null>(null);
 const selectedService = ref<string | null>(null);
 const selectedProfileType = ref<string | null>(null);
 const activeView = ref<ProfileView>("top");
 const expandedStackNodeIds = ref<Set<string>>(new Set());
 
 const metaResponse = ref<{
-  data_sources: string[];
   services: string[];
   profile_types: Array<{ type: string; unit: string }>;
   label_names: string[];
@@ -316,9 +304,6 @@ const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier as string | undefined,
 );
 
-const dataSourceOptions = computed<SelectOption[]>(() =>
-  (metaResponse.value?.data_sources ?? []).map((value) => ({ label: raw(value), value })),
-);
 const serviceOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.services ?? []).map((value) => ({ label: raw(value), value })),
 );
@@ -538,7 +523,6 @@ const queryPayload = (range = resolveTimeRange()): ProfilesQueryBody | null => {
   return {
     start_time: range.startTime,
     end_time: range.endTime,
-    data_source: selectedDataSource.value || undefined,
     service_name: selectedService.value || undefined,
     profile_type: profileType.type,
     profile_unit: profileType.unit,
@@ -560,7 +544,6 @@ const buildErrorMessage = (error: unknown): string => {
 };
 
 const resetProfilesState = () => {
-  selectedDataSource.value = null;
   selectedService.value = null;
   selectedProfileType.value = null;
   seriesResponse.value = null;
@@ -604,16 +587,9 @@ const loadMeta = async () => {
     });
     if (requestSeq !== metaRequestSeq) return;
     metaResponse.value = response.data;
-    const firstDataSource = dataSourceOptions.value[0]?.value ?? null;
     const firstService = serviceOptions.value[0]?.value ?? null;
     const firstProfileType = profileTypeOptions.value[0]?.value ?? null;
 
-    if (
-      !selectedDataSource.value ||
-      !dataSourceOptions.value.some((item) => item.value === selectedDataSource.value)
-    ) {
-      selectedDataSource.value = firstDataSource;
-    }
     if (
       !selectedService.value ||
       !serviceOptions.value.some((item) => item.value === selectedService.value)
@@ -670,7 +646,6 @@ const initPage = async () => {
 
 watch(selectedStream, async (stream, previousStream) => {
   if (!stream || stream === previousStream) return;
-  selectedDataSource.value = null;
   selectedService.value = null;
   await loadMeta();
   await runQuery();

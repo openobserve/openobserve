@@ -609,6 +609,8 @@ import { useRouter, useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
+import { saveModelPricingMutation } from "@/services/model_pricing.queries";
+import { useMutation } from "@tanstack/vue-query";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -661,6 +663,7 @@ const patternExamples = [
 ];
 
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
+const saveModelPricing = useMutation(() => saveModelPricingMutation(orgIdentifier.value));
 
 // Scalar validation is schema-driven (name + match_pattern).
 const modelPricingSchema = makeModelPricingSchema(t);
@@ -1145,11 +1148,7 @@ async function save(value?: ModelPricingForm) {
   // Loading is form-driven: OForm awaits this handler, so the Save button's
   // spinner (isSubmitting) spans the POST — no manual flag needed.
   try {
-    if (m.id) {
-      await modelPricingService.update(orgIdentifier.value, m.id, m);
-    } else {
-      await modelPricingService.create(orgIdentifier.value, m);
-    }
+    await saveModelPricing.mutateAsync({ id: m.id, data: m });
     if (patternConflicts.length > 0) {
       const winner = patternConflicts[0].name;
       toast({

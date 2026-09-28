@@ -13,12 +13,15 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `/mock/${path}`),
 }));
 
-vi.mock("@/services/regex_pattern", () => ({
-  default: {
-    list: vi.fn(),
-    test: vi.fn(),
-  },
-}));
+vi.mock("@/services/regex_pattern", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      test: vi.fn(),
+    },
+  });
+});
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({

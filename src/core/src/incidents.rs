@@ -29,7 +29,7 @@ async fn get_event_metadata(
 ) -> Result<HashMap<String, Value>, anyhow::Error> {
     let incident = get_incident_with_alerts(org_id, incident_id)
         .await?
-        .ok_or(anyhow::anyhow!("incident with given id not found"))?;
+        .ok_or_else(|| anyhow::anyhow!("incident with given id not found"))?;
 
     let mut metadata: Vec<(&str, Value)> = Vec::new();
 
@@ -97,7 +97,10 @@ async fn get_event_metadata(
 
         IncidentEventType::Resolved { user_id } => {
             metadata.push(("event_type", "resolved".into()));
-            metadata.push(("user_id", user_id.unwrap_or("system".to_string()).into()));
+            metadata.push((
+                "user_id",
+                user_id.unwrap_or_else(|| "system".to_string()).into(),
+            ));
         }
 
         IncidentEventType::Reopened { user_id, reason } => {
@@ -120,8 +123,14 @@ async fn get_event_metadata(
         }
         IncidentEventType::AssignmentChanged { from, to } => {
             metadata.push(("event_type", "assignment_changed".into()));
-            metadata.push(("from_user", from.unwrap_or("unknown".to_string()).into()));
-            metadata.push(("to_user", to.unwrap_or("unknown".to_string()).into()));
+            metadata.push((
+                "from_user",
+                from.unwrap_or_else(|| "unknown".to_string()).into(),
+            ));
+            metadata.push((
+                "to_user",
+                to.unwrap_or_else(|| "unknown".to_string()).into(),
+            ));
         }
 
         IncidentEventType::Comment { user_id, comment } => {

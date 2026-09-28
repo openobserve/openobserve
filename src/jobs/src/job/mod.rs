@@ -27,6 +27,8 @@ use {
 
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
+#[cfg(feature = "enterprise")]
+mod agent_signals;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
@@ -361,6 +363,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
+        // Deliberately the static rule, not the configured policy: this branch only runs when no
+        // root user exists, so no policy can exist either and the effective one would be the
+        // permissive default. Using it here would weaken the bootstrap credential, not align it.
         if let Err(msg) =
             config::utils::password::validate_password_strength(&cfg.auth.root_user_password)
         {
@@ -422,6 +427,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // watch org users
     tokio::task::spawn(db::user::watch());
+    // Only the policy-tightening sweep publishes to this key, so without the feature the watcher
+    // would hold a coordinator watch open forever for an event that cannot happen.
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(db::user::watch_bulk_refresh());
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::org_ingestion_tokens::watch());
     tokio::task::spawn(db::org_ingestion_tokens::run_splunk_token_reload());
@@ -521,6 +530,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
     }
+
+    #[cfg(feature = "profiling")]
+    tokio::task::spawn(openobserve_core::self_profiles::run());
 
     // telemetry run
     if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
@@ -719,6 +731,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(compactor::run());
     tokio::task::spawn(flatten_compactor::run());
     #[cfg(feature = "enterprise")]
+    tokio::task::spawn(agent_signals::run());
+    #[cfg(feature = "enterprise")]
     tokio::task::spawn(service_graph::run());
     // No cfg, unlike service_graph above: parts of DBM's read API are
     // enterprise-only, but this rollup works on ordinary database spans and is
@@ -731,6 +745,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // so callbacks must be available everywhere before consumers start.
     #[cfg(feature = "enterprise")]
     {
+        o2_enterprise::enterprise::llm_evaluations::llm_scores_search::register_schema_initializer(
+            |org_id| {
+                Box::pin(async move {
+                    openobserve_core::self_reporting::llm_scores_schema::ensure_llm_scores_stream_initialized(
+                        &org_id,
+                    )
+                    .await
+                })
+            },
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_score_writer(
             |org_id, records| {
                 Box::pin(async move {
@@ -1074,6 +1099,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         tokio::task::spawn(anomaly_claim_supervisor());
     }
+    // Every node that serves writes publishes them, not only the scheduler.
+    openobserve_synthetics::service::start_publish_queue();
     if LOCAL_NODE.is_scheduler() {
         // Ungated: synthetics is OSS, and without this an OSS build accepts a
         // check, stores it, and never runs it — the routes would be registered

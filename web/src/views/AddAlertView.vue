@@ -23,18 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :destinations="destinations"
       @update:list="handleUpdateList"
       @cancel:hideform="handleCancel"
-      @refresh:destinations="getDestinations"
+      @refresh:destinations="refreshDestinations"
     />
   </div>
 </template>
 
 <script lang="ts">
+import { alertDetailQuery } from "@/services/alerts.queries";
+import { alertKeys } from "@/services/alerts.querykeys";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import AddAlert from "@/components/alerts/AddAlert.vue";
-import destinationService from "@/services/alert_destination";
-import alertsService from "@/services/alerts";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { clearAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
@@ -91,11 +94,9 @@ export default defineComponent({
 
       isLoadingAlert.value = true;
       try {
-        const res = await alertsService.get_by_alert_id(
-          store.state.selectedOrganization.identifier,
-          alertId,
+        editedAlert.value = await queryClient.fetchQuery(
+          alertDetailQuery(store.state.selectedOrganization.identifier, alertId),
         );
-        editedAlert.value = res.data;
         isUpdated.value = true;
       } catch (error) {
         toast({
@@ -120,17 +121,24 @@ export default defineComponent({
 
     const getDestinations = async () => {
       try {
-        const res = await destinationService.list({
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "alert",
-        });
-        destinations.value = res.data;
+        destinations.value = (await queryClient.fetchQuery(
+          destinationsQuery(store.state.selectedOrganization.identifier, "alert"),
+        )) as any;
       } catch (error) {
         toast({
           variant: "error",
           message: t("toastMessages.views.errorWhilePullingDestinations"),
         });
       }
+    };
+
+    // Explicit refresh from the alert form (a destination was just created or
+    // edited) — drop the cached list so this is a real refetch.
+    const refreshDestinations = async () => {
+      await queryClient.invalidateQueries({
+        queryKey: destinationKeys.all(store.state.selectedOrganization.identifier),
+      });
+      await getDestinations();
     };
 
     const handleUpdateList = (folderId?: string) => {
@@ -140,8 +148,14 @@ export default defineComponent({
       // stops a later visit to this page inheriting a stale query.
       clearAlertPrefill();
 
-      // Invalidate cached alerts for this folder so the AlertList
-      // component fetches fresh data when it mounts.
+      // Drop the cached alerts (list and any search) so AlertList refetches on
+      // mount instead of rendering the pre-save rows.
+      queryClient.invalidateQueries({
+        queryKey: alertKeys.all(store.state.selectedOrganization.identifier),
+      });
+
+      // AlertList still renders this folder from Vuex, so the query invalidation
+      // above does not reach it — drop the folder's entry as well.
       const cached = store.state.organizationData.allAlertsListByFolderId;
       if (cached && cached[resolvedFolder]) {
         const { [resolvedFolder]: _, ...rest } = cached;
@@ -213,6 +227,7 @@ export default defineComponent({
       editedAlert,
       isLoadingAlert,
       getDestinations,
+      refreshDestinations,
       handleUpdateList,
       handleCancel,
     };

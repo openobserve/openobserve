@@ -35,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true' || isRealTime === 'composite'">
           <!-- Silence Notification (Cooldown) -->
-          <div class="mb-4 flex items-start justify-start pb-3">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
@@ -77,8 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                scheduled version, intentionally no visual distinction — the
                backend stores and evaluates it for composite alerts too
                (handle_composite_alert_trigger). -->
-          <div v-if="isRealTime === 'composite'" class="mb-4 flex items-start justify-start pb-3">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div
+            v-if="isRealTime === 'composite'"
+            class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.queryConfig.pendingPeriod") }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
@@ -136,8 +139,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div ref="periodFieldRef" class="me-2 mb-4! flex items-start">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div
+            ref="periodFieldRef"
+            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.period") + " *" }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
@@ -175,8 +181,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div ref="silenceFieldRef" class="me-2 mb-4! flex items-start">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div
+            ref="silenceFieldRef"
+            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
@@ -217,8 +226,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                tooltip as the composite version above, plus the
                not-a-multiple-of-Check-every warning (composite has no
                frequency to compare against, so it skips that row). -->
-          <div ref="pendingPeriodFieldRef" class="me-2 mb-4! flex items-start">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div
+            ref="pendingPeriodFieldRef"
+            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.queryConfig.pendingPeriod") }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
@@ -284,8 +296,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="mb-4! flex items-start">
-          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+        <div class="mb-4! flex items-start max-md:gap-3">
+          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
             {{ t("alerts.alertSettings.createsIncident") }}
             <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
             <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />

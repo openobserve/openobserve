@@ -111,24 +111,19 @@ impl Ingest for Ingester {
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
                     // internal ingestion does not require email id
-                    openobserve_core::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, internal_user)
-                        .await
-                        .map(|_| ()) // we don't care about success response
-                        .map_err(|e| Error::IngestionError(format!("error in ingesting traces {e}")))
+                    match openobserve_core::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, internal_user).await {
+                        Err(e) => Err(Error::IngestionError(format!("error in ingesting traces {e}"))),
+                        // overload and write failures come back as an error status, not as Err
+                        Ok(res) if !res.status().is_success() => Err(Error::IngestionError(format!(
+                            "error in ingesting traces: http code {}",
+                            res.status()
+                        ))),
+                        Ok(_) => Ok(()),
+                    }
                 }
             }
             StreamType::EnrichmentTables => {
-                let json_records: Vec<json::Map<String, json::Value>> =
-                    json::from_slice(&in_data.data).unwrap_or({
-                        let vec_value: Vec<json::Value> = json::from_slice(&in_data.data).unwrap();
-                        vec_value
-                            .into_iter()
-                            .filter_map(|v| match v {
-                                json::Value::Object(map) => Some(map),
-                                _ => None,
-                            })
-                            .collect()
-                    });
+                let json_records = parse_enrichment_records(&in_data.data);
                 let append_data = match req.metadata {
                     Some(metadata) => metadata
                         .data
@@ -170,6 +165,7 @@ impl Ingest for Ingester {
                 let data = bytes::Bytes::from(in_data.data);
                 match create_log_ingestion_req(log_ingestion_type, data) {
                     Err(e) => Err(e),
+                    // Only the DBM rollup reads this reply; the other ServiceGraph senders ignore it.
                     Ok(ingestion_req) => openobserve_core::logs::ingest::ingest(
                         0,
                         &org_id,
@@ -180,7 +176,7 @@ impl Ingest for Ingester {
                         is_derived,
                     )
                     .await
-                    .map_or_else(Err, |_| Ok(())),
+                    .map(|resp| metrics_reply = Some(encode_logs_reply(&resp))),
                 }
             }
             _ => Err(Error::IngestionError(
@@ -217,6 +213,19 @@ fn ok_reply() -> IngestionResponse {
     }
 }
 
+fn parse_enrichment_records(data: &[u8]) -> Vec<json::Map<String, json::Value>> {
+    json::from_slice(data).unwrap_or_else(|_| {
+        let vec_value: Vec<json::Value> = json::from_slice(data).unwrap();
+        vec_value
+            .into_iter()
+            .filter_map(|v| match v {
+                json::Value::Object(map) => Some(map),
+                _ => None,
+            })
+            .collect()
+    })
+}
+
 /// The proto has only `status_code` + `message`, so `207` carries the partial-failure JSON.
 fn encode_metrics_reply(resp: &ingestion_common::IngestionResponse) -> IngestionResponse {
     if resp.code != 200 {
@@ -232,6 +241,17 @@ fn encode_metrics_reply(resp: &ingestion_common::IngestionResponse) -> Ingestion
         };
     }
     ok_reply()
+}
+
+/// A logs write reports a failed WAL write as `write_failed` under a 200, so map it to 500.
+fn encode_logs_reply(resp: &ingestion_common::IngestionResponse) -> IngestionResponse {
+    if resp.write_failed {
+        return IngestionResponse {
+            status_code: 500,
+            message: "write to storage failed".to_string(),
+        };
+    }
+    encode_metrics_reply(resp)
 }
 
 #[cfg(test)]
@@ -265,6 +285,36 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_enrichment_records_object_array() {
+        let records =
+            parse_enrichment_records(br#"[{"id": 1}, {"id": 2, "nested": {"ok": true}}]"#);
+        assert_eq!(
+            json::to_value(records).unwrap(),
+            json::json!([
+                {"id": 1}, {"id": 2, "nested": {"ok": true}}
+            ])
+        );
+        assert!(parse_enrichment_records(b"[]").is_empty());
+    }
+
+    #[test]
+    fn test_parse_enrichment_records_mixed_array() {
+        let records =
+            parse_enrichment_records(br#"[null, {"id": 1}, 2, "text", false, [], {"id": 2}]"#);
+        assert_eq!(
+            json::to_value(records).unwrap(),
+            json::json!([{"id": 1}, {"id": 2}])
+        );
+        assert!(parse_enrichment_records(b"[null, 1, false]").is_empty());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_parse_enrichment_records_rejects_non_array() {
+        parse_enrichment_records(br#"{"id": 1}"#);
+    }
+
+    #[test]
     fn test_encode_metrics_reply_rejection_keeps_code() {
         let reply = encode_metrics_reply(&metrics_resp(503, 0, Some("blocked")));
         assert_eq!(reply.status_code, 503);
@@ -280,6 +330,44 @@ mod tests {
         assert_eq!(reply.status_code, 207);
         let body: ingestion_common::IngestionResponse = json::from_str(&reply.message).unwrap();
         assert_eq!(body.status[0].status.failed, 2);
+    }
+
+    // The rollup holds its offset on this reply; a bare `Ok(())` would report every failure as 200.
+    #[test]
+    fn test_service_graph_arm_returns_the_logs_reply() {
+        let src = include_str!("ingest.rs");
+        let arm = &src[src
+            .find("StreamType::ServiceGraph =>")
+            .expect("ServiceGraph arm")..];
+        let arm = &arm[..arm.find("\n            _ =>").expect("arm end")];
+        assert!(
+            arm.contains(".map(|resp| metrics_reply = Some(encode_logs_reply(&resp)))"),
+            "{arm}"
+        );
+    }
+
+    #[test]
+    fn test_encode_logs_reply_write_failed_is_500() {
+        let resp = metrics_resp(200, 0, None).with_write_failed(true);
+        assert_eq!(encode_logs_reply(&resp).status_code, 500);
+    }
+
+    #[test]
+    fn test_encode_logs_reply_rejected_records_are_207() {
+        let reply = encode_logs_reply(&metrics_resp(200, 3, None));
+        assert_eq!(reply.status_code, 207);
+        let body: ingestion_common::IngestionResponse = json::from_str(&reply.message).unwrap();
+        assert_eq!(body.status[0].status.failed, 3);
+    }
+
+    #[test]
+    fn test_encode_logs_reply_clean_and_skipped_are_200() {
+        assert_eq!(
+            encode_logs_reply(&metrics_resp(200, 0, None)).status_code,
+            200
+        );
+        let skipped = metrics_resp(200, 0, None).with_stream_skipped(true);
+        assert_eq!(encode_logs_reply(&skipped).status_code, 200);
     }
 
     #[test]

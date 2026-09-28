@@ -37,8 +37,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 
-vi.mock("@/services/search", () => ({ default: { get_promql_series: vi.fn() } }));
-vi.mock("@/services/stream", () => ({ default: { schema: vi.fn() } }));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { get_promql_series: vi.fn() } });
+});
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { schema: vi.fn() } });
+});
 vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
   requestFieldValues: vi.fn().mockResolvedValue([]),
@@ -60,10 +66,9 @@ import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/f
 /**
  * A fresh copy of the composable module per test.
  *
- * Anything cached per METRIC belongs at module scope — one schema fetch per
- * metric per page, not per editor — and that state would otherwise leak between
- * tests: the first test to read a schema warms the cache and every later test
- * sees zero calls, passing or failing by position in the file.
+ * The schema is cached by the query client, keyed per org and metric, so the
+ * first test to read one warms it for the rest of the file — every later test
+ * would see zero calls and pass or fail by its position.
  */
 const freshComposable = async () => {
   vi.resetModules();
@@ -199,7 +204,8 @@ describe("label NAMES come from the stream schema", () => {
     expect(labels, "re-offered a label the query already filters on").not.toContain("service");
   });
 
-  it("asks the schema once per metric, not once per keystroke", async () => {
+  /// The query is asked every pass; it answers from cache while it is fresh.
+  it("hits the network once per metric, not once per keystroke", async () => {
     const c = await freshComposable();
     for (const q of [
       "cpu_utilization_percent{",

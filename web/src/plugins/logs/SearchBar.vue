@@ -1938,6 +1938,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
+import { saveFunctionMutation } from "@/services/jstransform.queries";
+import {
+  createSavedViewMutation,
+  updateSavedViewMutation,
+  deleteSavedViewMutation,
+} from "@/services/saved_views.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import {
   defineComponent,
   ref,
@@ -1950,6 +1958,9 @@ import {
   onDeactivated,
   defineAsyncComponent,
   onBeforeUnmount,
+  inject,
+  toRef,
+  computed,
 } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
@@ -1967,7 +1978,6 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
-import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
 
 import segment from "@/services/segment_analytics";
@@ -1998,7 +2008,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDashboardPanelData, {
   getPanelDataForPageKey,
 } from "@/composables/dashboard/useDashboardPanel";
-import { inject, toRef, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
@@ -2264,6 +2273,16 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const store = useStore();
+    const orgIdForWrites = useOrgId();
+    const createSavedView = useMutation(() => createSavedViewMutation(orgIdForWrites.value));
+    const updateSavedView = useMutation(() => updateSavedViewMutation(orgIdForWrites.value));
+    const deleteSavedView = useMutation(() => deleteSavedViewMutation(orgIdForWrites.value));
+    const createFunctionWrite = useMutation(() =>
+      saveFunctionMutation(orgIdForWrites.value, () => false),
+    );
+    const updateFunctionWrite = useMutation(() =>
+      saveFunctionMutation(orgIdForWrites.value, () => true),
+    );
     const { isDark } = useTheme();
     const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
@@ -2864,6 +2883,7 @@ export default defineComponent({
       // Turn off SQL mode when query is completely cleared
       if (value.trim() === "" && searchObj.meta.sqlMode === true) {
         searchObj.meta.sqlMode = false;
+        searchObj.data.filterErrMsg = "";
       }
 
       // Turn off SQL mode when the query is no longer a SQL statement (user
@@ -2873,6 +2893,7 @@ export default defineComponent({
       if (value.trim() !== "" && searchObj.meta.sqlMode === true && !isSqlQuery(value)) {
         searchObj.meta.sqlModeEditTransition = true;
         searchObj.meta.sqlMode = false;
+        searchObj.data.filterErrMsg = "";
       }
 
       if (searchObj.meta.quickMode === true) {
@@ -2984,6 +3005,7 @@ export default defineComponent({
             ) {
               let streamFound = false;
               searchObj.data.stream.selectedStream = [];
+              searchObj.data.filterErrMsg = "";
 
               streamName = tableName;
               searchObj.data.streamResults.list.forEach((stream) => {
@@ -3000,16 +3022,19 @@ export default defineComponent({
                 }
               });
 
+              // Distinct from "no stream picked yet" (LogsNoStreamState): the
+              // query names a specific stream, and the frontend already has the
+              // full stream list, so it can tell the user which name is wrong
+              // instead of falling back to the generic "select a stream" empty
+              // state (which reads as if nothing was ever typed).
               if (streamFound == false) {
-                // searchObj.data.stream.selectedStream = { label: "", value: "" };
                 searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
-                // toast({
-                //   message: "Stream not found",
-                //   color: "info",
-                //   position: "bottom-right",
-                //   timeout: 2000,
-                // });
+                if (tableName) {
+                  searchObj.data.filterErrMsg = t("logs.searchBar.streamNotFoundInQuery", {
+                    stream: tableName,
+                  });
+                }
               }
             }
           }
@@ -3333,10 +3358,7 @@ export default defineComponent({
 
       if (value.isSavedFunctionAction == "create") {
         try {
-          const res: { data: any } = await jsTransformService.create(
-            store.state.selectedOrganization.identifier,
-            formData.value,
-          );
+          const res: { data: any } = await createFunctionWrite.mutateAsync(formData.value);
           toast({
             variant: "success",
             message: res.data.message,
@@ -3371,10 +3393,7 @@ export default defineComponent({
     }
 
     const executeFunctionUpdate = () => {
-      const callTransform = jsTransformService.update(
-        store.state.selectedOrganization.identifier,
-        formData.value,
-      );
+      const callTransform = updateFunctionWrite.mutateAsync(formData.value);
 
       callTransform
         .then(() => {
@@ -4028,9 +4047,9 @@ export default defineComponent({
 
     const deleteSavedViews = async () => {
       try {
-        savedviewsService
-          .delete(store.state.selectedOrganization.identifier, deleteViewID.value)
-          .then((res) => {
+        deleteSavedView
+          .mutateAsync(deleteViewID.value)
+          .then((res: any) => {
             //remove it from localstorage as well
             const localStoredSavedViews = JSON.parse(localStorage.getItem("savedViews") || "[]");
             delete localStoredSavedViews[deleteViewID.value];
@@ -4147,9 +4166,9 @@ export default defineComponent({
           view_name: viewName,
         };
 
-        return savedviewsService
-          .post(store.state.selectedOrganization.identifier, viewObj)
-          .then((res) => {
+        return createSavedView
+          .mutateAsync(viewObj)
+          .then((res: any) => {
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               if (Object.prototype.hasOwnProperty.call(searchObj.data, "savedViews") === false) {
@@ -4206,9 +4225,9 @@ export default defineComponent({
           timeout: 0,
         });
 
-        savedviewsService
-          .put(store.state.selectedOrganization.identifier, viewID, viewObj)
-          .then((res) => {
+        updateSavedView
+          .mutateAsync({ viewId: viewID, view: viewObj })
+          .then((res: any) => {
             dismiss();
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);

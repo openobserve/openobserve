@@ -25,18 +25,30 @@ import mockOverview from "@/test/unit/mockData/overview";
 // Data payloads are wired up per-test in beforeEach so each `it()` owns its
 // own state; the factories below stay data-free to survive vi.mock hoisting.
 
-vi.mock("@/services/alerts", () => ({
-  default: { getHistory: vi.fn() },
-}));
-vi.mock("@/services/anomaly_detection", () => ({
-  default: { list: vi.fn(), getAllHistory: vi.fn(), getHistory: vi.fn() },
-}));
-vi.mock("@/services/incidents", () => ({
-  default: { list: vi.fn() },
-}));
-vi.mock("@/services/service_graph", () => ({
-  default: { getCurrentTopology: vi.fn() },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { getHistory: vi.fn() },
+  });
+});
+vi.mock("@/services/anomaly_detection", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(), getAllHistory: vi.fn(), getHistory: vi.fn() },
+  });
+});
+vi.mock("@/services/incidents", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn() },
+  });
+});
+vi.mock("@/services/service_graph", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { getCurrentTopology: vi.fn() },
+  });
+});
 
 // Heavy children — stubbed to keep the suite focused on OverviewTab's own
 // render gating. OverviewSkeleton and OEmptyState are deliberately left REAL
@@ -237,6 +249,33 @@ describe("OverviewTab", () => {
     it("should not render any content section when there is no data", () => {
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(false);
       expect(wrapper.find(ANOMALIES).exists()).toBe(false);
+    });
+  });
+
+  describe("the recent-events request", () => {
+    // Off every minute and 5-minute mark, so a rounded bound cannot pass for the exact one.
+    const NOW = Date.UTC(2026, 8, 23, 11, 44, 30);
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should ask the server for the exact window, so the newest alerts are not cut off", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(alertsService.getHistory).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          start_time: (NOW - 15 * 60 * 1000) * 1000,
+          end_time: NOW * 1000,
+        }),
+      );
     });
   });
 

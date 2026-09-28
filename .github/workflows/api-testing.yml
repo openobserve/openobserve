@@ -512,15 +512,18 @@ jobs:
         # backend bugs, not spec-conformance nits). `-n 20` bounds runtime;
         # `--mode positive` keeps inputs realistic (negative inputs are a
         # separate exercise once the noise floor here is understood).
+        # run_fuzz.py prevents Hypothesis' auto-loaded CI profile from
+        # overriding --suppress-health-check. Keep CI's too_slow suppression
+        # alongside filter_too_much; the 5xx response check is unchanged.
         run: |
-          rye run schemathesis run \
+          rye run python run_fuzz.py run \
             -u http://localhost:5080 \
             --auth "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
             --checks not_a_server_error \
             -n 20 \
             --request-timeout 5 \
             -m positive \
-            --suppress-health-check=filter_too_much \
+            --suppress-health-check=filter_too_much,too_slow \
             --exclude-path "/api/{org_id}/v1/logs" \
             --exclude-path "/api/{org_id}/v1/metrics" \
             --exclude-path "/api/{org_id}/v1/traces" \
@@ -542,7 +545,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: openobserve-fuzz-log
-          path: tests/api-testing/o2_fuzz.log
+          path: o2_fuzz.log
           if-no-files-found: warn
           retention-days: 14
 

@@ -2303,6 +2303,10 @@ export class PipelinesPage {
         };
 
         testLogger.info('Metrics ingestion response', { streamName, status: response.status, data: response.data });
+        // Ingestion is only usable once the READ path lists the stream, so wait for that rather than for a fixed delay.
+        if (!(await this.waitForStreamListed(streamName, 'metrics'))) {
+            testLogger.warn('Metrics stream not listed by the streams API before the timeout', { streamName });
+        }
         return response;
     }
 
@@ -2415,7 +2419,32 @@ export class PipelinesPage {
         };
 
         testLogger.info('Traces ingestion response', { serviceName, streamName: streamName || 'default', status: response.status, data: response.data });
+        // Ingestion is only usable once the READ path lists the stream, so wait for that rather than for a fixed delay.
+        if (streamName && !(await this.waitForStreamListed(streamName, 'traces'))) {
+            testLogger.warn('Traces stream not listed by the streams API before the timeout', { streamName });
+        }
         return response;
+    }
+
+    /**
+     * Resolve once the streams API lists `streamName` for `streamType`.
+     * @returns {Promise<boolean>} whether the stream was listed before the timeout
+     */
+    async waitForStreamListed(streamName, streamType, { timeoutMs = 60000, pollMs = 1000 } = {}) {
+        // The node form reads its options from a cached query of this same list, so a stream the list has not got can never appear.
+        const orgId = process.env["ORGNAME"];
+        const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
+        const url = `${baseUrl}/api/${orgId}/streams?type=${streamType}`;
+        const deadline = Date.now() + timeoutMs;
+        for (;;) {
+            const listed = await fetchWithRetry(url, { method: 'GET', headers: getAuthHeaders() })
+                .then((res) => (res.ok ? res.json() : { list: [] }))
+                .then((body) => (body.list || []).some((stream) => stream.name === streamName))
+                .catch(() => false);
+            if (listed) return true;
+            if (Date.now() >= deadline) return false;
+            await this.page.waitForTimeout(pollMs);
+        }
     }
 
     /**
@@ -3018,6 +3047,35 @@ export class PipelinesPage {
     }
 
     /**
+     * Expand a field in the Associate Query sidebar and tick its first value.
+     * @param {string} fieldName
+     * @returns {Promise<string>} the value that was ticked
+     */
+    async addQueryFieldValueFilter(fieldName) {
+        const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+        await expandBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await expandBtn.click();
+
+        const firstValue = this.page
+            .locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`)
+            .first();
+        // Field values arrive from their own request after the panel opens.
+        await firstValue.waitFor({ state: 'visible', timeout: 30000 });
+        const dataTest = await firstValue.getAttribute('data-test');
+        await firstValue.locator('button[role="checkbox"], input[type="checkbox"]').first().click();
+        await this.page.waitForTimeout(1000);
+        return (dataTest ?? '').replace(`logs-search-subfield-add-${fieldName}-`, '');
+    }
+
+    /** Untick every selected value for the open field, which removes its query condition. */
+    async clearQueryFieldValueFilter() {
+        const clearBtn = this.page.locator('[data-test="field-values-panel-clear-selection-btn"]');
+        await clearBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await clearBtn.click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
      * Wait for watcher to process stream change
      * Deterministic wait that checks for query state to stabilize
      * Replaces: await page.waitForTimeout(2000) after stream change
@@ -3300,6 +3358,52 @@ export class PipelinesPage {
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Pipeline row locator
      */
+    // ---- row View preview (#12647) and bulk export (#7030) ------------
+    // The preview bubble is OTooltip's own content node, not a pipeline-owned
+    // element, so it is matched by the library's data-test rather than by a
+    // loose class pattern.
+    getPipelineViewButton(pipelineName) {
+        return this.page.locator(`[data-test="pipeline-list-${pipelineName}-view-pipeline"]`);
+    }
+    getPipelinePreviewTooltip() {
+        return this.page.locator('[data-test="o-tooltip-content"]').first();
+    }
+    getPipelineEditButton(pipelineName) {
+        return this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
+    }
+    getBulkExportButton() {
+        return this.page.locator('[data-test="pipeline-list-export-pipelines-btn"]');
+    }
+    getSelectAllRowsCheckbox() {
+        return this.page.locator('[data-test="o2-table-select-all"]');
+    }
+
+    /** Hover the row's View action and return the preview bubble's box. */
+    async hoverViewAndGetPreviewBox(pipelineName) {
+        const btn = this.getPipelineViewButton(pipelineName);
+        await expect(btn, 'Row View action must be present').toBeVisible({ timeout: 20000 });
+        await btn.hover();
+        const tooltip = this.getPipelinePreviewTooltip();
+        await expect(tooltip, 'Hovering View must open the graph preview').toBeVisible({ timeout: 10000 });
+        return await tooltip.boundingBox();
+    }
+
+    async expectPipelineInList(pipelineName) {
+        await expect(this.getPipelineEditButton(pipelineName),
+            `Pipeline ${pipelineName} must be in the filtered list`).toBeVisible({ timeout: 20000 });
+    }
+
+    async expectBulkExportHidden() {
+        await expect(this.getBulkExportButton(),
+            'Bulk export must stay hidden while nothing is selected').toBeHidden();
+    }
+
+    async selectAllRowsAndExpectBulkExport() {
+        await this.getSelectAllRowsCheckbox().click();
+        await expect(this.getBulkExportButton(),
+            'Selecting pipelines must reveal a bulk export action').toBeVisible({ timeout: 10000 });
+    }
+
     getPipelineRowByName(pipelineName) {
         return this.page
             .locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`)

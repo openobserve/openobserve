@@ -25,7 +25,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         MessageType::PipelinePut => {
             let bytes = msg
                 .value
-                .ok_or(Error::Message("Message missing value".to_string()))?;
+                .ok_or_else(|| Error::Message("Message missing value".to_string()))?;
             let pipeline: Pipeline = json::from_slice(&bytes).inspect_err(|e| {
                 log::error!(
                     "[SUPER_CLUSTER:PIPELINE] Failed to deserialize message value to pipeline: {e}"
@@ -42,7 +42,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         MessageType::EnrichmentUrlPut => {
             let bytes = msg
                 .value
-                .ok_or(Error::Message("Message missing value".to_string()))?;
+                .ok_or_else(|| Error::Message("Message missing value".to_string()))?;
             let mut enrichment_url_job: enrichment_table_urls::EnrichmentTableUrlRecord = json::from_slice(&bytes).inspect_err(|e| {
                 log::error!(
                     "[SUPER_CLUSTER:PIPELINE] Failed to deserialize message value to pipeline: {e}"
@@ -64,7 +64,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             // format is /{BACKFILL_JOBS_KEY}/org/job_id
             let bytes = msg
                 .value
-                .ok_or(Error::Message("Message missing value".to_string()))?;
+                .ok_or_else(|| Error::Message("Message missing value".to_string()))?;
             let backfill_job: backfill_jobs::BackfillJob = json::from_slice(&bytes).inspect_err(|e| {
                 log::error!(
                     "[SUPER_CLUSTER:BACKFILL] Failed to deserialize message value to backfill job: {e}"
@@ -76,7 +76,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             // format is /{BACKFILL_JOBS_KEY}/org/job_id
             let bytes = msg
                 .value
-                .ok_or(Error::Message("Message missing value".to_string()))?;
+                .ok_or_else(|| Error::Message("Message missing value".to_string()))?;
             let backfill_job: backfill_jobs::BackfillJob = json::from_slice(&bytes).inspect_err(|e| {
                 log::error!(
                     "[SUPER_CLUSTER:BACKFILL] Failed to deserialize message value to backfill job: {e}"

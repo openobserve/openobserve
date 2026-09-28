@@ -1210,6 +1210,7 @@ pub struct ExperimentResultScoreBody {
 #[serde(rename_all = "snake_case")]
 pub enum ExperimentResultTaskStatusBody {
     Pending,
+    Queued,
     InProgress,
     Ok,
     Skipped,
@@ -1348,6 +1349,7 @@ impl From<ExperimentResultTaskStatus> for ExperimentResultTaskStatusBody {
     fn from(value: ExperimentResultTaskStatus) -> Self {
         match value {
             ExperimentResultTaskStatus::Pending => Self::Pending,
+            ExperimentResultTaskStatus::Queued => Self::Queued,
             ExperimentResultTaskStatus::InProgress => Self::InProgress,
             ExperimentResultTaskStatus::Ok => Self::Ok,
             ExperimentResultTaskStatus::Skipped => Self::Skipped,

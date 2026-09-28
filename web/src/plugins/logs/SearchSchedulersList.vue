@@ -204,7 +204,7 @@
                 </div>
                 <div class="flex items-start justify-center">
                   <div
-                    class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
+                    class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                   >
                     <!-- Monaco-colorized SQL (sanitized in colorizeRow). Falls
                            back to plain text before colorize resolves / if it throws. -->
@@ -247,7 +247,7 @@
 
                 <div class="flex items-start justify-center">
                   <div
-                    class="border-border-default border-s-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
+                    class="border-border-default border-s-function-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                   >
                     <pre
                       v-if="colorizedFunction[row.trace_id]"
@@ -319,11 +319,18 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import {
+  ref,
+  onMounted,
+  onUnmounted,
+  computed,
+  defineAsyncComponent,
+  defineComponent,
+  reactive,
+} from "vue";
 import { b64EncodeUnicode, b64DecodeUnicode } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { defineAsyncComponent, defineComponent, reactive } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import searchService from "@/services/search";
 import DOMPurify from "dompurify";
@@ -938,14 +945,5 @@ export default defineComponent({
    detail panel; keep it on the normal cell surface like the rest of the list. */
 .search-scheduler-otable :deep([data-test^="o2-table-expanded-row-"]) {
   background-color: var(--color-table-cell-bg);
-}
-
-/* keep(generated-content): Monaco's colorize() injects .mtkN token spans via
-   v-html, so these can't be template utilities. Every colour but .mtk1 comes
-   from Monaco's own global stylesheet; .mtk1 is its default-text token, which
-   we point back at the block's own colour so the query inherits our theme
-   instead of Monaco's. Mirrors dashboards/QueryInspector.vue. */
-.o2-colorized-query :deep(.mtk1) {
-  color: inherit;
 }
 </style>

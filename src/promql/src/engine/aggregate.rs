@@ -27,7 +27,10 @@ use promql_parser::parser::{
 use super::Engine;
 use crate::{
     aggregations::{self, AggOp},
-    functions, series_stream, streaming_eval,
+    ast::at_modifier::{Pin, pin},
+    functions,
+    scalar_param::ScalarParam,
+    series_stream, streaming_eval,
 };
 
 /// A recognized fused shape: `agg(range_func(...))`, or `agg(instant_selector)` read as
@@ -57,13 +60,14 @@ impl Engine {
         let eval_ctx = self.eval_ctx.clone();
         match op.id() {
             token::T_QUANTILE => {
-                let Some(Value::Float(value)) = param else {
+                let Some(phi) = param.and_then(|param| ScalarParam::from_value(param, &eval_ctx))
+                else {
                     return Err(DataFusionError::Plan(
                         "[quantile] param must be a number".to_string(),
                     ));
                 };
                 let input = self.exec_expr(expr).await?;
-                aggregations::quantile(value, input, &eval_ctx)
+                aggregations::quantile(phi, input, &eval_ctx)
             }
             token::T_COUNT_VALUES => {
                 let Some(Value::String(label_name)) = param else {
@@ -75,8 +79,9 @@ impl Engine {
                 aggregations::count_values(&label_name, modifier, input, &eval_ctx)
             }
             _ => {
-                let agg_op = AggOp::new(op, param)?;
-                if let Some(value) = self.fused_agg(agg_op, expr, modifier).await? {
+                let k = param.and_then(|param| ScalarParam::from_value(param, &eval_ctx));
+                let agg_op = AggOp::new(op, k)?;
+                if let Some(value) = self.fused_agg(agg_op.clone(), expr, modifier).await? {
                     return Ok(value);
                 }
                 log::info!(
@@ -131,7 +136,13 @@ impl Engine {
         if let Some((selector, range)) = shape.selector {
             let range = range.unwrap_or_else(|| self.ctx.lookback());
             if let Some(value) = self
-                .try_streaming_fused_agg(selector, range, modifier, shape.func.clone(), agg_op)
+                .try_streaming_fused_agg(
+                    selector,
+                    range,
+                    modifier,
+                    shape.func.clone(),
+                    agg_op.clone(),
+                )
                 .await?
             {
                 return Ok(Some(value));
@@ -158,6 +169,10 @@ fn fused_agg_shape(expr: &PromExpr) -> Option<FusedAggShape<'_>> {
         .search
         .feature_metrics_fused_agg_enabled
     {
+        return None;
+    }
+    // the shape reads the selector under the call, which would skip a pin `exec_expr` evaluates
+    if !matches!(pin(expr), Ok(Pin::Varies)) {
         return None;
     }
     match expr {
@@ -283,6 +298,18 @@ mod tests {
             Some(("last_over_time".to_string(), false, Some(None)))
         );
         assert_eq!(shape("sum(abs(m))"), None);
+    }
+
+    #[test]
+    fn test_fused_agg_shape_leaves_a_pinned_child_to_exec_expr() {
+        assert_eq!(shape("topk(time(), rate(m[5m] @ 1100))"), None);
+        assert_eq!(shape("topk(time(), m @ 1100 offset 1m)"), None);
+        assert_eq!(shape("sum(rate(m[5m] @ end()))"), None);
+        // a pin inside a subquery is reached through `exec_expr` on the range argument
+        assert_eq!(
+            shape("sum(rate((m @ 1100)[5m:1m]))"),
+            Some(("rate".to_string(), true, None))
+        );
     }
 
     #[test]

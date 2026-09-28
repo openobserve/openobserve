@@ -32,13 +32,16 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 const mockTestWorkflow = vi.fn();
 const mockHistory = vi.fn().mockResolvedValue({ data: [] });
 const mockGetRun = vi.fn().mockResolvedValue({ data: {} });
-vi.mock("@/services/workflows", () => ({
-  default: {
-    testWorkflow: (...a: any[]) => mockTestWorkflow(...a),
-    getWorkflowHistory: (...a: any[]) => mockHistory(...a),
-    getWorkflowRun: (...a: any[]) => mockGetRun(...a),
-  },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      testWorkflow: (...a: any[]) => mockTestWorkflow(...a),
+      getWorkflowHistory: (...a: any[]) => mockHistory(...a),
+      getWorkflowRun: (...a: any[]) => mockGetRun(...a),
+    },
+  });
+});
 
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import { workflowObj, LAST_TEST_RUN } from "@/plugins/workflows/useWorkflowCanvas";

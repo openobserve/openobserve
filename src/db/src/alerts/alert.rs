@@ -582,7 +582,7 @@ pub fn cache_alert_key(org: &str, alert_id: &str) -> String {
 
 /// Returns the key used to schedule a trigger for the alert.
 pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
-    alert_id.map_or(DEFAULT_FOLDER.to_string(), |id| id.to_string())
+    alert_id.map_or_else(|| DEFAULT_FOLDER.to_string(), |id| id.to_string())
 }
 
 #[cfg(test)]

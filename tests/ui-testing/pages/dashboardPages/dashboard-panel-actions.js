@@ -308,6 +308,35 @@ export default class DashboardactionPage {
   }
 
   /**
+   * Open a dashboard's view page directly by id.
+   */
+  async openDashboardById(dashboardId, { folderId = 'default', tabId = 'default' } = {}) {
+    const url =
+      `${process.env["ZO_BASE_URL"]}/web/dashboards/view` +
+      `?org_identifier=${process.env["ORGNAME"]}` +
+      `&dashboard=${dashboardId}&folder=${folderId}&tab=${tabId}`;
+    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await this.page
+      .locator('[data-test="dashboard-panel-container"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 30000 });
+  }
+
+  // A single-query, single-stream panel hands straight to the alert form; only a lossy prefill asks first.
+  /** Open the panel menu and pick "Create Alert". */
+  async openCreateAlertFromPanel(panelName) {
+    const dropdown = this.getEditPanelDropdown(panelName);
+    await dropdown.waitFor({ state: "visible", timeout: 30000 });
+    await dropdown.click();
+    const createAlert = this.page.locator(
+      '[data-test="dashboard-create-alert-from-panel"]'
+    );
+    await createAlert.waitFor({ state: "visible", timeout: 10000 });
+    await createAlert.click();
+  }
+
+  /**
    * Click the add panel button to add a new panel after saving the previous one
    * Waits for UI to stabilize before clicking
    */

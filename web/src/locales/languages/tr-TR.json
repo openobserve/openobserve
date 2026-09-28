@@ -1474,6 +1474,8 @@
     "sessionReplay": "Oturum Tekrar Oynatma",
     "viewSessionReplay": "Oturum Tekrarını Görüntüle",
     "playSessionReplay": "Oturum Oynatma Oynatma",
+    "noReplayRecordedTitle": "Bu oturum için kayıt oynatımı yapılmadı",
+    "noReplayRecordedMessage": "{id} oturumunun oynatılacak kayıt oynatım bölümü yok.",
     "discoverSessionTitle": "Kullanıcı Etkileşimlerini Ayrıntılı Anlamak için Oturum Tekrarını Keşfedin",
     "discoverSessionMessage": "Session Replay, web sitenizdeki veya uygulamanızdaki kullanıcı etkileşimlerini yakalar ve tekrarlar. Bu, kullanıcıların nasıl gezindiklerini, nereye tıkladıklarını, ne yazdıklarını ve içeriğinizle nasıl etkileşim kurduklarını görsel olarak incelemenizi sağlar.",
     "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "Ücretsiz denemeye başla"
   },
   "login": {
+    "lockedOut": "Çok fazla başarısız oturum açma denemesi. {duration} sonra tekrar deneyin veya yöneticinizle iletişime geçin.",
     "redirectingToSsoMessage": "SSO giriş sayfasına yönlendiriliyorsunuz. Yönlendirilmezseniz, lütfen",
     "clickHere": "buraya tıklayın",
     "loginWithSso": "SSO ile giriş yap",
@@ -1954,6 +1957,7 @@
     "ok": "Tamam.",
     "sendInvite": "Davet Gönder",
     "inviteByEmail": "E-posta ile davet edin. Noktalı virgül (;) veya virgül (,) ile ayrılmış birden çok e-posta",
+    "inviteByEmailPlaceholder": "E-posta ile davet et",
     "changePassword": "Şifreyi Değiştir",
     "oldPassword": "Eski Şifre",
     "newPassword": "Yeni Şifre",
@@ -1962,6 +1966,15 @@
     "fieldRequired": "Alan zorunludur",
     "passwordRequired": "Şifre gereklidir.",
     "passwordPolicyHint": "Şifre 8-128 karakter olmalı ve en az bir küçük harf, bir büyük harf, bir basamak ve bir özel karakter içermelidir.",
+    "lockout": {
+      "locked": "Hesap kilitlendi",
+      "autoUnlock": "{duration} sonra otomatik olarak kilidi açılır.",
+      "staged": "Kaydettiğinizde kilidi açılacak.",
+      "unlock": "Kilidi aç",
+      "undo": "Kilitli tut",
+      "confirmTitle": "{email} kullanıcısının kilidi açılsın mı?",
+      "confirmMessage": "Bu işlem, başarısız deneme sayısını sıfırlar ve hemen tekrar oturum açmalarını sağlar. Parolalarını değiştirmez."
+    },
     "currentPasswordRequired": "Geçerli şifre gereklidir.",
     "newPasswordRequired": "Yeni şifre gereklidir.",
     "otherOrgInvalid": "Kuruluş adı bir harfle başlamalı ve alfasayısal, _ veya - olmalıdır.",
@@ -2028,11 +2041,11 @@
       "addToGroup": "Kullanıcı grubuna ekleme",
       "addToRole": "Bir rol atama",
       "step1Title": "Jetonunuzu kopyalayın",
-      "copyHint": "Bu belirteci şimdi kopyalayın - bir daha göremezsiniz.",
+      "copyHint": "Bu token'ı yalnızca bu kez göreceksiniz. Şimdi kopyalayın veya indirin, tekrar erişilemez.",
       "done": "Bitti",
       "applying": "Erişim izinleri uygulanıyor…",
-      "grantedRoles": "Atanan roller: {roles}",
-      "grantedGroups": "Kullanıcı gruplarına eklendi: {groups}",
+      "rolesAssignedLabel": "Atanan roller",
+      "groupsAssignedLabel": "Kullanıcı gruplarına eklendi",
       "failedRoles": "Roller atanamadı: {roles}",
       "failedGroups": "Kullanıcı gruplarına eklenemedi: {groups}",
       "failedHint": "Bunları daha sonra Roller ve Kullanıcı Grupları sayfalarından verebilirsiniz."
@@ -2042,6 +2055,9 @@
         "label": "Hizmet hesabı adı",
         "placeholder": "ör. ingest-bot",
         "help": "Küçük harfler, rakamlar ve tireler. name{suffix} olarak kaydedilir"
+      },
+      "identifier": {
+        "label": "Tanımlayıcı"
       },
       "roles": {
         "label": "Rolleri ata",
@@ -2056,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Tanımlayıcı",
+        "roles": "Roller",
         "token": "Simge",
         "created": "Oluşturuldu"
       }
@@ -2183,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Bu rollere bağlı tüm kullanıcılar ve hizmet hesapları erişimini kaybedecektir."
-      }
+      },
+      "assignColumn": "Ata",
+      "assignBtn": "Ekle",
+      "assignedBadge": "Atandı",
+      "assignBannerText": "{member} kullanıcısını bir role ekleyin — aşağıdaki rolün yanındaki Ekle'ye tıklayın.",
+      "assignBannerDone": "Tamam",
+      "assignSuccess": "{member}, \"{role}\" rolüne eklendi.",
+      "assignError": "Hesap bu role eklenemedi. Lütfen tekrar deneyin."
     },
     "group": {
       "name": {
@@ -2214,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Bu grupların üyeleri kendileri tarafından verilen rolleri kaybedeceklerdir."
-      }
+      },
+      "assignColumn": "Ata",
+      "assignBtn": "Ekle",
+      "assignedBadge": "Atandı",
+      "assignBannerText": "{member} kullanıcısını bir kullanıcı grubuna ekleyin — aşağıdaki grubun yanındaki Ekle'ye tıklayın.",
+      "assignBannerDone": "Tamam",
+      "assignSuccess": "{member}, \"{group}\" grubuna eklendi.",
+      "assignError": "Hesap bu gruba eklenemedi. Lütfen tekrar deneyin."
     },
     "appGroups": {
       "deleteGroupTitle": "Grubu Sil",
@@ -2687,6 +2718,14 @@
     "edit": "Düzenle",
     "view": "Görüntüle",
     "delete": "Sil",
+    "moveToFolder": "Move to folder",
+    "tabAll": "All",
+    "searchThisFolder": "This folder",
+    "searchAllFolders": "All folders",
+    "searchThisFolderTooltip": "Search only this folder",
+    "searchAllFoldersTooltip": "Search across all folders",
+    "folder": "Folder",
+    "modeInFolder": "{mode} içinde",
     "deleteTitle": "İş Akışını Sil",
     "deleteMessage": "Bu iş akışını silmek istediğinizden emin misiniz?",
     "deleteSuccess": "İş akışı başarıyla silindi",
@@ -2721,12 +2760,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Uyarı tetiklendi",
+        "tab": "Alerts",
         "node": "Uyarı tetikleyicisi",
         "desc": "Bir uyarı tetiklendiğinde çalıştır",
         "intro": "Bağlı bir uyarı tetiklendiğinde, aşağı akıştaki her adım bu veri yükünü alır."
       },
       "incidentEvent": {
         "label": "Olay etkinliği",
+        "tab": "Incidents",
         "node": "Olay tetikleyicisi",
         "desc": "Bir olay yaşam döngüsü etkinliğinde çalıştır",
         "intro": "Bir olay etkinliği oluştuğunda, aşağı akıştaki her adım bu veri yükünü alır."
@@ -3558,6 +3599,12 @@
     "joinSlack": "Slack'e Katılın",
     "maybeLater": "Belki daha sonra"
   },
+  "connectDataSourcePopup": {
+    "title": "Başlamak için ilk veri kaynağınızı bağlayalım.",
+    "description": "Size gösterecek çok şeyimiz var, ancak önce verilerinizi bağlamamız gerekiyor. Çoğu ekip ilk günlüklerini yaklaşık bir dakika içinde görür.",
+    "connectButton": "Bir veri kaynağı bağla",
+    "slackLink": "Ayrıca Slack topluluğumuza katılın"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Kaldığı yerden devam et",
     "startFromNow": "Şu andan itibaren başlat.",
@@ -3568,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "İçerik kopyalanırken hata oluştu.",
+    "passcodeForbiddenMessage": "Veri alımı tokenını görüntülemek için Yönetici veya Root rolü gerekir. Kurulum komutunu ya da burada görmek için gereken rolü bir yöneticiden isteyin.",
     "updateRUMTokenMessage": "Bu kuruluş için RUM token'ını güncellemek istediğinize emin misiniz?",
     "completeAwsIntegration": "AWS Entegrasyonunu Tamamla",
     "deployAwsServicesOneClick": "Seçilen tüm AWS hizmetlerini tek bir CloudFormation yığını kullanarak tek tıkla dağıtın.",
@@ -4474,6 +4522,8 @@
       "payloadTitle": "Olay yükü",
       "payloadIndex": "{field} alanı akışı seçer. Bu alan olmayan olaylar {stream} akışına gider.",
       "payloadTime": "{field} alanı epoch saniyesidir ve kesirli bir değer kabul edilir. Eksik olduğunda veya pozitif olmadığında, alınma zamanı kullanılır.",
+      "windowTitle": "Alım penceresinin dışındaki zaman damgaları atılır",
+      "windowBody": "{past} değerinden (varsayılan 5 saat) daha eski veya {future} değerinden (varsayılan 24 saat) daha ileri olan olaylar atılır ve Splunk istemcisi bir hatayı yeniden denemediği için istek yine de kod 0 yanıtı verir. Bu nedenle sabit kodlanmış veya eski bir zaman damgası, hiçbir şey kaydetmeyen başarılı bir gönderim gibi görünür.",
       "payloadMetadata": "{fields} alanları, olay üzerinde sütunlar olarak saklanır.",
       "healthTitle": "Sağlık kontrolü",
       "healthBody": "Bir GET isteği kimlik doğrulaması gerektirmez ve {response} yanıtını verir.",
@@ -4947,7 +4997,7 @@
     "colorLightToDarkBlue": "Açık - Koyu Mavi (Değere Göre)",
     "colorPaletteClassicBySeries": "Palette-Classic (Serilere Göre)",
     "drilldown": "Detaya inme",
-    "drilldownTooltip": "Sorunsuz veri araştırması için geçerli tüm değişkenleri taşıyan başka bir panoya veya belirtilen URL'ye gidin.",
+    "drilldownTooltip": "Tüm geçerli değişkenleri taşıyarak başka bir gösterge panosuna veya belirtilen URL'ye gidin, kesintisiz veri keşfi için.",
     "colorBySeriesTitle": "Serilere göre renk",
     "colorBySeriesTooltip": "Grafiklerde daha iyi görsel ayrım için serilere renk uygulayın. Veri görselleştirmesini geliştirmek için her seri için renkleri özelleştirin.",
     "editColorBySeries": " Rengi seriye göre düzenle",
@@ -5370,6 +5420,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "En son değişken değişikliklerini uygulamak için yenileyin",
       "refresh": "Yenile",
+      "refreshCacheReload": "Önbelleği yenile ve yeniden yükle",
+      "moreRefreshOptions": "Daha fazla yenileme seçeneği",
       "dashboard": "Pano",
       "dashboardNotFound": "Pano bulunamadı veya silinmiş. Pano listesine yönlendiriliyor.",
       "failedToLoadDashboard": "Pano yüklenemedi. Pano listesine yönlendiriliyor.",
@@ -5804,7 +5856,36 @@
     "variableNameAlreadyExists": "Aynı isimde değişken zaten mevcut",
     "pivotTotal": "Toplam",
     "pivotOthers": "Diğerleri",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Örnekleri göster (iz örnekleri)",
+      "hide": "Örnekleri gizle · {count} gösteriliyor",
+      "empty": "Bu zaman aralığında örnek yok",
+      "emptyShort": "0 örnek",
+      "loadFailed": "Örnekler yüklenemedi",
+      "loadFailedHint": "Grafik etkilenmez. Yeniden dene yalnızca örnekleri getirir.",
+      "retry": "Yeniden dene",
+      "cardTitle": "Örnek",
+      "query": "Sorgu {name}",
+      "returnedBy": "{count} sorgu tarafından döndürüldü | {count} sorgu tarafından döndürüldü",
+      "series": "Seri",
+      "aboveRange": "Grafik aralığının üstünde; üst kenarda çizilir",
+      "belowRange": "Grafik aralığının altında; alt kenarda çizilir",
+      "checkingTrace": "İz kontrol ediliyor…",
+      "openTrace": "İzi aç",
+      "openTraceHint": "Veya işaretleyiciye tıklayın. Geri düğmesi buraya döndürür.",
+      "traceNotAvailable": "İz kullanılamıyor — örnekleme dışı bırakılmış veya saklama süresi geçmiş",
+      "openTraceUnverified": "İzi aç (doğrulanmamış)",
+      "unverifiedTimeout": "İz araması zaman aşımına uğradı, bu nedenle bu iz eksik olabilir.",
+      "unverifiedForbidden": "Bu iz doğrulanamadı — izlere erişiminiz olmayabilir.",
+      "unverifiedPartial": "Saklama penceresinin yalnızca bir kısmı arandı.",
+      "unverifiedError": "Bu iz kontrol edilemedi.",
+      "noTraceId": "Bu örnekte {label} yok, bu nedenle açılacak bir iz yok.",
+      "markersAria": "Örnek işaretleyicileri",
+      "markerAria": "{time} zamanındaki örnek {value}"
+    },
+    "showExemplarsLabel": "Örnekleri göster",
+    "showExemplarsHelp": "Bu grafikte, gösterge panosunu açan herkes için iz örneklerini çizer. Görüntüleyenler bunları yine de panel başlığından gizleyebilir."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5892,6 +5973,9 @@
         "details": "Ayrıntılar",
         "json": "JSON",
         "insights": "İçgörüler",
+        "back": "Sonuçlara dön",
+        "prevEvent": "Önceki olay",
+        "nextEvent": "Sonraki olay",
         "copyLink": "Bağlantıyı Kopyala",
         "copy": "Kopyala",
         "copyValue": "Değeri Kopyala",
@@ -7462,6 +7546,7 @@
       "checkEveryTooltip": "Algılama işinin ne sıklıkta çalıştığı. Numune periyodundan daha büyük olabilir (örn. her 5m'de bir numune, her 1 saatte bir algılama çalıştırın).",
       "destinationRequired": "En az bir hedef gereklidir!",
       "detectionCharts": "Algılama sonuçları",
+      "detectionFunctionTooltip": "Her zaman aralığında neyin ölçüleceği. count kaç kaydın geldiğini izler; avg, min, max ve sum sayısal bir alanı izler. p50, p95 ve p99 o alanın dağılımını izler — örn. response_time_ms için p95, trafik sabit kalsa bile en yavaş isteklerde gecikmenin kötüleşmesini yakalar.",
       "detectionResolution": "Algılama Çözünürlüğü",
       "detectionResolutionTooltip": "Her veri noktası ne kadar ayrıntılı. Örneğin “5m”, anormalliklerin 5 dakikalık çözünürlükte tespit edildiği anlamına gelir.",
       "deviationChart": "Eşik üzerindeki sapma",
@@ -7475,7 +7560,10 @@
       "lastError": "Son hata",
       "lastTrained": "Son eğitim",
       "lookBackWindow": "Pencereye Bakın",
-      "lookBackWindowTooltip": "Her algılamanın ne kadar geriye dönük çalıştırma sorguları. Uzun bir duraklamadan sonra bile pencereyi kapatır. Varsayılan olarak Her Aralığı Kontrol Et.",
+      "lookBackWindowFloor": "Geriye Bakış Penceresi en az {min} olmalıdır — Kontrol Aralığı artı bir Algılama Çözünürlüğü. Daha kısa bir pencere, bir çalıştırma tetiklendiğinde tam bir bucket'ı tutamaz, bu nedenle bucket'lar atlanır.",
+      "lookBackWindowLegacy": "Kaydedilen bu pencere {min} minimumunun altında (Kontrol Aralığı artı bir Algılama Çözünürlüğü). Değişmeden kaydedilir, ancak pencere yükseltilene kadar çalıştırmalar bucket'ları atlayabilir.",
+      "lookBackWindowMinimum": "Minimum {min}. Önerilen {recommended} veya daha fazlası — iki katı (Kontrol Aralığı + Algılama Çözünürlüğü) — ayrıca yokluk algılamasının etkin olduğu durumlarda 10 dakika daha.",
+      "lookBackWindowTooltip": "Her algılama çalıştırmasının ne kadar geriye sorgu yaptığı. Uzun bir duraklamadan sonra bile pencereyi sınırlar. En az Kontrol Aralığı artı bir Algılama Çözünürlüğünü kapsamalıdır; aksi halde tam bucket'lar, bir çalıştırma onları değerlendiremeden pencereden düşer.",
       "metricChart": "Metrik ve anomaliler",
       "metricChartHint": "Her algılama aralığı için bir nokta",
       "model": "Model",
@@ -7483,9 +7571,19 @@
       "nDays": "{days} gün | {days} gün",
       "noDestinationsFound": "Hedef bulunamadı",
       "noFieldsFound": "Alan bulunamadı",
+      "noticeHybridFallback": "Yedek algılama",
+      "noticeHybridFallbackTooltip": "Karma eşik son çalıştırmalarda kullanılamadı, bu nedenle algılama dondurulmuş eşiğe geri döndü. Model yeniden eğitilene kadar puanlama dondurulmuş eşik üzerinde devam eder.",
+      "noticeRetrain": "Otomatik yeniden eğitme",
+      "noticeRetrainTooltip": "Kaydedilen model bir yükseltmeden sonra okunamadı, bu nedenle atıldı ve yapılandırma otomatik olarak yeniden eğitim için kuyruğa alındı. Herhangi bir işlem gerekmez; eğitim tamamlandığında algılama devam eder.",
+      "noticeSkipAbsence": "Yokluk değerlendirmesi Geriye Bakış Penceresinin gerisinde kaldı; artık getirilemeyen span atlandı ve kaydedildi.",
+      "noticeSkipScored": "Algılama çalıştırmaları, Geriye Bakış Penceresinin kapsadığından daha uzun aralıklarla geldi, bu nedenle kapanan bucket'lar bir çalıştırma onları değerlendiremeden pencereden çıktı.",
+      "noticeWindowFloor": "Pencere çok dar",
+      "noticeWindowFloorTooltip": "Geriye Bakış Penceresi Kontrol Aralığı artı bir Algılama Çözünürlüğünün altında, bu nedenle çalıştırmalar hiçbir bucket'ı değerlendiremez. Algılamayı geri getirmek için pencereyi yükseltin.",
+      "noticeWindowSkip": "Bucket'lar atlandı",
       "notifications": "Bildirimler",
       "notificationsTooltip": "Etkinleştirildiğinde, bir anormallik algılandığında seçilen hedefe bir bildirim gönderilir.",
-      "percentile": "Yüzdelik",
+      "percentile": "Seviye",
+      "previewCaption": "Bu uyarının izleyeceği verilerden bir örnek; böylece kaydetmeden önce sorgunun doğru göründüğünü kontrol edebilirsiniz. Model eğitimini tamamladıktan sonra anomaliler işaretlenir — bkz. Algılama sonuçları.",
       "queryMode": "Sorgu modu",
       "retrainEvery": "Her Şeyi Yeniden Eğitin",
       "retrainEveryTooltip": "Modelin otomatik olarak ne sıklıkta yeniden eğitileceği. “Asla”, bir kez antrenman yapmak ve manuel olarak yeniden eğitilene kadar modeli tutmak anlamına gelir.",
@@ -7502,7 +7600,8 @@
       "sensitivityBalanced": "Dengeli",
       "sensitivityBudgetTooltip": "Bu yapılandırmanın teslim edebileceği en fazla uyarı sayısı; teslimde uygulanır. Algılama her aralığı puanlamaya devam eder; bütçe tükenince, yenilenene kadar ek uyarılar bastırılır.",
       "sensitivityConservative": "Muhafazakâr",
-      "sensitivityHintPercentile": "Aralıklar, modelin eğitim puanlarının p{percentile} işaretine göre değerlendirilir — kaç uyarı çıkacağı verilerinize bağlıdır.",
+      "sensitivityHintPercentile": "Bir zaman aralığı, modelin eğitimde gördüklerinin %{percentile}'inden daha sıra dışı göründüğünde uyarı verir. Bunun kaç uyarıya karşılık geldiği verinize bağlıdır.",
+      "sensitivityNotDataPercentile": "Bir zaman aralığının uyarı vermeden önce ne kadar sıra dışı olması gerektiği. Daha yüksek değer, daha az sayıda ve daha uç uyarı anlamına gelir. Bu seviye modelin güvenini puanlar, verinizin değerlerini değil; dolayısıyla Algılama Fonksiyonu olarak p95 seçmekle ilgisi yoktur.",
       "sensitivityRange": "50 ile 99 arasında bir tam sayı girin",
       "sensitivityTooltip": "Puan çıtasını, modelin eğitim puanlarının bu yüzdelik dilimine göre belirler — 97, çıtayı eğitim puanlarının en üst %3'üne yerleştirir. Canlı puanlar eğitimden farklı olabilir; bu nedenle bu, gelecekteki aralıkların bir payı ya da bir uyarı oranı değildir. Daha düşük bir değer çıtayı düşürür ve genellikle daha fazla uyarı gönderir; bekleme süresi tekrarları seyrekleştirir.",
       "seriesAnomaly": "Anomali",
@@ -7531,7 +7630,7 @@
       "summaryRetrainEveryDays": "her {days}g",
       "summarySchedule": "✓ Zamanlama: her {schedule}",
       "summaryThreshold": "✓ Eşik: {threshold}",
-      "summaryThresholdPercentile": "puan çubuğu p{percentile} düzeyinde",
+      "summaryThresholdPercentile": "99 üzerinden {percentile} seviyesi",
       "summaryTraining": "✓ Eğitim: {days} ({seasonality})",
       "summaryTrainingDays": "{days} gün",
       "timestampAliasBanned": "{column} sütun takma adı olarak kullanılamaz. Bunun yerine {timeBucket} kullanın.",
@@ -7577,7 +7676,9 @@
       "usernameRequired": "Kullanıcı adı gereklidir",
       "passwordRequired": "Şifre gereklidir",
       "emailRecipients": "Alıcı E-posta Adresleri",
-      "emailRecipientsHelp": "Virgülle ayrılmış e-posta adresleri",
+      "emailRecipientsHelp": "Uyarı e-postalarını alması gereken organizasyon kullanıcılarını veya hizmet hesaplarını seçin",
+      "emailRecipientsGroupUsers": "Kullanıcılar",
+      "emailRecipientsGroupServiceAccounts": "Hizmet Hesapları",
       "invalidEmailAddresses": "Geçersiz e-posta adresleri: {emails}",
       "opsgenieApiKey": "Opsgenie API Anahtarı",
       "opsgenieApiKeyHelp": "API anahtarınızı Opsgenie entegrasyon ayarlarından alın",
@@ -7894,7 +7995,18 @@
     "enabled": "Etkin",
     "paused": "Duraklatıldı",
     "impactTemplate": "{destinations} · {alerts} tarafından kullanılıyor",
-    "impactDestination": "Kullanan: {alerts}"
+    "impactDestination": "{consumers} tarafından kullanılıyor",
+    "impactUnused": "Kullanılmıyor",
+    "noConsumers": "Kullanan yok.",
+    "countCompositeAlert": "{count} bileşik uyarı | {count} bileşik uyarı",
+    "countPipeline": "{count} boru hattı | {count} boru hattı",
+    "countSyntheticCheck": "{count} sentetik kontrol | {count} sentetik kontrol",
+    "countOncallPolicy": "{count} eskalasyon politikası | {count} eskalasyon politikası",
+    "countOncallTeamChannel": "{count} ekip kanalı | {count} ekip kanalı",
+    "countWorkflow": "{count} iş akışı | {count} iş akışı",
+    "countAnomalyDetection": "{count} anomali dedektörü | {count} anomali dedektörü",
+    "countIncidentIntegration": "{count} olay entegrasyonu | {count} olay entegrasyonu",
+    "sectionOtherConsumers": "Ayrıca kullananlar"
   },
   "alert_library": {
     "header": "Uyarı Kitaplığı",
@@ -8578,7 +8690,9 @@
         "staleCopyAria": "{name} için başarısız yenileme ayrıntılarını kopyala",
         "stalePreamble": "Yenileme başarısız — son başarılı sonuç gösteriliyor.",
         "staleClickToCopy": "Ayrıntıları kopyalamak için tıklayın.",
-        "lastRefreshedPrefix": "Son Yenilenme: "
+        "lastRefreshedPrefix": "Son Yenilenme: ",
+        "exemplarsShowHeatmap": "Örnekleri göster (iz örnekleri). Açıkken bu kartı yüzdeliklere geçirir.",
+        "exemplarsHideHeatmap": "Örnekleri gizle · {count} gösteriliyor. Bu kartı ısı haritasına döndürür."
       },
       "fn": {
         "subtitle": "Bu metriğin nasıl toplanacağını seçin",
@@ -8762,6 +8876,8 @@
     "cipherKeysDesc": "Hassas alanlar için şifreleme anahtarları",
     "regexPatternsDesc": "Maskeleme için yeniden kullanılabilir regex desenleri",
     "domainManagementDesc": "Oturum açmayı izin verilen SSO alan adlarıyla kısıtlayın",
+    "passwordPolicy": "Parola İlkesi",
+    "passwordPolicyDesc": "Yerel e-posta/parola hesapları için kimlik doğrulama ilkeleri, örnek genelinde uygulanır.",
     "pipelineDestinationsDesc": "Pipeline çıktısı için harici hedefler",
     "templatesDesc": "Yeniden kullanılabilir uyarı mesajı şablonları",
     "storageSettingsDesc": "Organizasyon bazında depolama yapılandırması",
@@ -9338,7 +9454,28 @@
     "listConjunctionAnd": "{list} ve {last}",
     "runsIn": "Çalışır",
     "recommendedByFieldCoverage": "Akışlarınızdaki alan kapsamına göre önerilir.",
-    "listConjunctionAndTwo": "{first} ve {last}"
+    "listConjunctionAndTwo": "{first} ve {last}",
+    "domainOrgMappings": {
+      "title": "Alan adı - organizasyon eşlemeleri",
+      "subtitle": "Eşleşen e-posta alan adıyla oturum açan yeni kullanıcılar organizasyona otomatik olarak eklenir.",
+      "addMapping": "Eşleme ekle",
+      "editMapping": "Eşlemeyi düzenle",
+      "empty": "Henüz eşleme yok. Eklemek için \"{addLabel}\" kullanın.",
+      "domain": "E-posta alan adı",
+      "domainHelp": "Kullanıcının e-posta adresinde {at_sign} sonrasındaki kısım.",
+      "organization": "Organizasyon",
+      "organizationPlaceholder": "Organizasyon tanımlayıcısı",
+      "organizationHelp": "Eşleşen kullanıcıların ekleneceği organizasyonun tanımlayıcısı.",
+      "organizationRequired": "Organizasyon gereklidir",
+      "baseRole": "Temel rol",
+      "baseRoleHelp": "Eşleşen kullanıcılara bu organizasyonda verilen rol.",
+      "userGroup": "Kullanıcı grubu",
+      "userGroupPlaceholder": "Grup adı",
+      "userGroupHelp": "İsteğe bağlı. Eşleşen kullanıcılar bu organizasyondaki bu gruba da katılır.",
+      "duplicateDomain": "Bu alan adı için bir eşleme zaten mevcut",
+      "confirmRemove": "{domain} için eşlemeyi silmek istediğinizden emin misiniz?",
+      "deleteTitle": "Eşlemeyi Sil"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -12993,10 +13130,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Trace'in kök span'inden girdi."
+              "trace": "İz'in kök sohbet span'inden gelen girdi.",
+              "session": "Açılış sorusu: ilk iz'in kök sohbet span'inden gelen girdi."
             },
             "output": {
-              "trace": "Trace'in kök span'inden çıktı."
+              "trace": "İz'in kök sohbet span'inden gelen çıktı.",
+              "session": "Nihai yanıt: son iz'in kök sohbet span'inden gelen çıktı."
             },
             "statistics": {
               "trace": "Trace metrikleri: span sayısı, süre, LLM ve araç çağrıları, hatalar, token'lar ve maliyet.",
@@ -13008,6 +13147,10 @@
             "steps": {
               "trace": "Zaman sırasına göre span'ler; trace çok uzun olduğunda orta kısım katlanır.",
               "session": "Zaman sırasına göre trace'ler, konuşma turları olarak temsil edilir."
+            },
+            "tool_calls": {
+              "trace": "İz'deki her araç çağrısı, zaman sırasına göre adı, girdisi, çıktısı ve durumuyla birlikte.",
+              "session": "Oturumun izleri genelindeki her araç çağrısı, zaman sırasına göre adı, girdisi, çıktısı ve durumuyla birlikte."
             }
           }
         }
@@ -13319,6 +13462,7 @@
       "viewAddedFavorites": "Görünüm favorilere eklendi.",
       "viewRemovedFavorites": "Görünüm favorilerden kaldırıldı.",
       "selectStreamBeforeSchedule": "Bir iş zamanlamadan önce lütfen bir akış seçin",
+      "streamNotFoundInQuery": "\"{stream}\" akışı mevcut değil",
       "confirmUpdateFunction": "İşlevi güncellemek istediğinize emin misiniz?",
       "confirmUpdateSavedViewMsg": "Kaydedilmiş görünümü güncellemek istediğinize emin misiniz?"
     },
@@ -13326,6 +13470,7 @@
       "searchHistoryNotEnabled": "Arama geçmişi etkin değil.",
       "enableUsageReporting": "Kullanım raporlamasını etkinleştirmek için ZO_USAGE_REPORTING_ENABLED'ı true olarak ayarlayın.",
       "selectStreamToExtractPatterns": "Desenleri çıkarmak için lütfen bir akış seçin",
+      "patternsUnavailableForMultiStream": "Birden fazla akış seçildiğinde desenler kullanılamaz. Lütfen tek bir akış seçin.",
       "errorExtractingPatterns": "Desenler çıkarılırken hata. Lütfen tekrar deneyin.",
       "nameOfPanelRequired": "Panel adı gerekli",
       "errorsFixAndTryAgain": "Bazı hatalar var, lütfen düzeltin ve tekrar deneyin",
@@ -13457,6 +13602,166 @@
     "lastRefreshed": "Son yenileme: {time}"
   },
   "synthetics": {
+    "variables": {
+      "newButton": "Yeni Değişken",
+      "createTitle": "Değişken Ekle",
+      "created": "{name} değişkeni oluşturuldu",
+      "deleteConfirm": "{name} silinsin mi?",
+      "deleteFailed": "Değişken silinemedi",
+      "deleteTitle": "Değişkeni Sil",
+      "deleteEnvFallback": "{env} bundan sonra genel değeri kullanacak.",
+      "deleteGlobalFallback": "{envs} kendi değerlerini korur; diğer ortamlar {name} değişkenini çözmeyi bırakır.",
+      "overriddenInNote": "{envs} içinde geçersiz kılındı",
+      "overridesGlobalNote": "Genel değeri geçersiz kılar",
+      "shadowGlobalTitle": "Genel değer geçersiz kılınsın mı?",
+      "shadowGlobalMessage": "{name}, {env} içinde genel değeri geçersiz kılacak. Diğer ortamlar genel değeri kullanmaya devam edecek.",
+      "shadowedGlobalTitle": "Bazı ortamlar kendi değerlerini korur",
+      "shadowedGlobalMessage": "{name} zaten şu ortamlarda kendi değerine sahip: {envs}. Bu ortamlar kendi değerlerini korur; diğer her yer bu değeri kullanır.",
+      "deleteUsed": "{name}, {n} kontrol tarafından referans alınıyor. Güncelleyene kadar bunu düz metin olarak çözer. Yine de silinsin mi? | {name}, {n} kontrol tarafından referans alınıyor. Güncelleyene kadar bunları düz metin olarak çözerler. Yine de silinsin mi?",
+      "deleted": "Değişken silindi",
+      "description": "Açıklama",
+      "editTitle": "Değişkeni Düzenle",
+      "emptyBody": "Bir değeri her kontrole kopyalamak yerine tüm kontroller arasında paylaşın.",
+      "emptyFiltered": "Aramanızla eşleşen değişken yok.",
+      "emptyTitle": "Henüz değişken yok",
+      "example": "Örnek",
+      "exampleHint": "Değerin gizlendiği her yerde gösterilir. Buraya asla gerçek bir gizli değer koymayın.",
+      "examplePlaceholder": "https://shop.example.com",
+      "global": "Genel",
+      "globalSubtitle": "Her ortamda geçerlidir.",
+      "globalReachesProduction": "Genel değerler, üretim dahil her ortamda geçerlidir. Buradaki bir değişiklik, bu adı kendi değeri olmadan kullanan her kontrole ulaşır.",
+      "kind": "Tür",
+      "kindPlain": "Normal",
+      "kindSecret": "Gizli",
+      "lastUpdated": "Son güncelleme",
+      "loadFailed": "Değişkenler yüklenemedi",
+      "name": "Ad",
+      "nameInvalid": "Harf, rakam ve alt çizgi kullanın; harf veya alt çizgi ile başlamalıdır.",
+      "namePlaceholder": "BASE_URL",
+      "nameRequired": "Ad zorunludur.",
+      "nameReserved": "_AUTH_ sonda tarafından enjekte edilen kimlik bilgileri için ayrılmıştır.",
+      "nameTooLong": "Ad çok uzun (en fazla 128 karakter)",
+      "notSet": "Ayarlanmamış",
+      "replace": "Değiştir",
+      "saveFailed": "Değişken kaydedilemedi",
+      "scope": "Ortamlar",
+      "scopeEnvironment": "Bu değişken yalnızca {env} ortamında geçerlidir.",
+      "scopeGlobal": "Bu değişken her ortamda geçerlidir.",
+      "searchPlaceholder": "Değişken ara",
+      "secretNeedsEnvironment": "Global hiçbir gizli bilgi tutmaz. Gizli bilgiyi, onu koruması gereken ortamda oluşturun.",
+      "secretWriteOnly": "Değer yalnızca yazılabilir. Kaydedildikten sonra hiçbir şey onu tekrar göstermez.",
+      "title": "Değişkenler",
+      "updated": "Değişken güncellendi",
+      "usedBy": "Kullananlar",
+      "usedByChecks": "Kullanılmıyor | {n} kontrol | {n} kontrol",
+      "value": "Değer",
+      "valueEmpty": "Boş",
+      "valuePlaceholder": "Değer",
+      "valueRequired": "Değer zorunludur",
+      "valueSet": "Ayarlandı · {when} güncellendi"
+    },
+    "environments": {
+      "newButton": "Yeni Ortam",
+      "backToList": "Tüm ortamlar",
+      "capReached": "Bir kontrol en fazla {cap} ortam hedefleyebilir.",
+      "cardEmpty": "Henüz ortam yok. Bunları Sentetikler → Değişkenler altında oluşturun.",
+      "cardLocked": "Erişimi olan bir kullanıcı tarafından seçildi. Bunu değiştiremezsiniz — kontrol orada çalışmaya devam eder.",
+      "cardTitle": "Ortamlar",
+      "checks": "Kontroller",
+      "checksCount": "Kullanılmıyor | {count} kontrol | {count} kontrol",
+      "createTitle": "Ortam Ekle",
+      "created": "Ortam oluşturuldu",
+      "deleteBlockedChecks": "Hâlâ {n} kontrol tarafından kullanılıyor. Önce onu bunlardan kaldırın.",
+      "deleteBlockedSecrets": "Bu ortam hâlâ gizli değişkenler barındırıyor. Önce bunları tek tek silin — gizli bir değişken kurtarılamaz.",
+      "deleteConfirm": "{name} silinsin mi?",
+      "deleteFailed": "Ortam silinemedi",
+      "deleteTitle": "Ortamı Sil",
+      "deleteWithVariables": "{name} ve ona ait {n} değişken silinsin mi?",
+      "deleted": "Ortam silindi",
+      "description": "Açıklama",
+      "detailSubtitle": "Bu ortama özgü değişkenler.",
+      "editTitle": "Ortamı Düzenle",
+      "emptyBody": "Değişkenlerin ve sırların kapsamını belirlemek için bir tane oluşturun; örneğin staging ve production.",
+      "emptyTitle": "Henüz ortam yok",
+      "lastUpdated": "Son güncelleme",
+      "loadFailed": "Ortamlar yüklenemedi",
+      "name": "Ad",
+      "nameInvalid": "Harf, rakam, tire ve alt çizgi kullanın; alt çizgi ile başlamamalıdır",
+      "namePlaceholder": "production",
+      "nameRequired": "Ad zorunludur",
+      "nameTooLong": "Ad çok uzun (en fazla 64 karakter)",
+      "renameBlocked": "Bir ortam yeniden adlandırılamaz — izinler ad üzerinden verilir.",
+      "saveFailed": "Ortam kaydedilemedi",
+      "searchPlaceholder": "Ortamları ara",
+      "subtitle": "Değişkenlerin ve sırların kapsamını belirleyin ve bunları kimlerin yönetebileceğini denetleyin.",
+      "title": "Ortamlar",
+      "updated": "Ortam güncellendi",
+      "usedByChecks": "Kullanılmıyor | {n} kontrol tarafından kullanılıyor | {n} kontrol tarafından kullanılıyor",
+      "variables": "Değişkenler"
+    },
+    "duplicateVariable": {
+      "body": "{name} değişkeninin değeri dahil olmak üzere aynı kapsamda bir kopyasını oluşturur.",
+      "done": "Değişken kopyalandı",
+      "failed": "Değişken kopyalanamadı",
+      "nameLabel": "Yeni değişken adı"
+    },
+    "duplicate": {
+      "action": "Kopyala",
+      "body": "{name} ortamındaki {n} değişkenin tümü yeni bir ortama kopyalanır. Kontroller kopyalanmaz.",
+      "bodyWithSecrets": "{name} ortamındaki {n} değişken kopyalanır. Bunlardan {secrets} tanesi sır olduğundan, değerleri olmadan kopyalanır ve yeniden ayarlanması gerekir. Kontroller kopyalanmaz.",
+      "confirm": "Kopyala",
+      "done": "Ortam kopyalandı",
+      "failed": "Ortam kopyalanamadı",
+      "nameLabel": "Yeni ortam adı",
+      "title": "Kopyala: {name}"
+    },
+    "inherited": {
+      "notIn": "{envs} içinde değil",
+      "overridesGlobal": "genel değeri geçersiz kılar",
+      "notInMany": "{count} ortamda bulunmuyor",
+      "overriddenByCheck": "Yerel değişken tarafından geçersiz kılınır",
+      "title": "Paylaşılan",
+      "filterAll": "Tümü",
+      "filterLabel": "Kaynağa göre filtrele",
+      "emptyIn": "{env} ortamında paylaşılan değişken yok.",
+      "titleTooltip": "Her kontrolle paylaşılan değerler; Ortamlar ve Değişkenler sekmesinde yönetilir: bu kontrolün ortamları ve genel değişkenler. Yukarıdaki yerel değişkenler bunlara göre önceliklidir.",
+      "valueSet": "Tanımlı",
+      "valueNotSet": "Tanımlı değil",
+      "emptyNone": "Paylaşılan değişken yok."
+    },
+    "promote": {
+      "done": "Değişken artık genel",
+      "doneShadowed": "Değişken artık genel. {envs} hâlâ onu kendi değerleriyle geçersiz kılıyor.",
+      "failed": "Değişken genel yapılamadı",
+      "secretBlocked": "Sırlar ortamlar arasında taşınamaz",
+      "toGlobal": "Genel yap"
+    },
+    "promoteCheck": {
+      "action": "{name} paylaş",
+      "confirm": "Taşı",
+      "description": "Bu değişkeni kontrolden çıkarıp diğer kontrollerin de kullanabileceği paylaşılan bir ortama taşır.",
+      "destination": "Hedef",
+      "done": "Değişken taşındı",
+      "failed": "Değişken taşınamadı",
+      "global": "Genel",
+      "secretHint": "Bu değer güvenli olarak işaretlenmiş, bu nedenle bir gizli değere dönüşür ve genele gidemez.",
+      "title": "{name} paylaş",
+      "tooltip": "Paylaşılan bir ortama taşı"
+    },
+    "split": {
+      "action": "Ortam kapsamına al",
+      "alreadyOwn": "Zaten kendi değeri var — olduğu gibi korunur.",
+      "overrideHint": "Yalnızca bir ortamda geçersiz kılmak için değişkeni o ortamda oluşturun.",
+      "confirm": "Ortam kapsamına al",
+      "description": "Her ortam kendi değerini alır. Global değişken değiştirilir.",
+      "done": "Değişken ortam kapsamına alındı.",
+      "failed": "Değişken ortam kapsamına alınamadı.",
+      "title": "{name} değişkenini ortam kapsamına al",
+      "unselectedWarning": "Seçilmedi: {envs}. Bu ortamlarda çalışan kontroller bu değişkeni çözümlemeyi bırakacak.",
+      "valuePlaceholder": "Bu ortam için değer",
+      "usedBy": "{n} kontrol tarafından kullanılıyor: {names}",
+      "usedByHint": "Bu kontrollerden herhangi biri değeri kaybedecekse bölme reddedilir: ortamı olmayan bir kontrol ya da burada değer verilmeyen bir ortamda çalışan bir kontrol."
+    },
     "versionPrefix": "v",
     "tokens": {
       "title": "Sentetik Tokenler",
@@ -13526,7 +13831,6 @@
     },
     "variablesPanel": {
       "title": "Değişkenler",
-      "referenceHint": "Herhangi bir adım değerinde veya URL'de {token} olarak başvurun.",
       "emptyTitle": "Henüz değişken yok",
       "emptyBody": "Adımlar arasında değerleri yeniden kullanın — örneğin temel URL veya kullanıcı adı — ve sırları adım değerlerinden uzak tutun.",
       "newVariable": "Yeni Değişken",
@@ -13534,8 +13838,6 @@
       "nameRequired": "Ad gereklidir.",
       "nameInvalid": "Adlar bir harf veya alt çizgiyle başlamalı ve yalnızca harf, rakam ve alt çizgi içermelidir.",
       "nameDuplicate": "Bu ada sahip bir değişken zaten var.",
-      "usedInSteps": "{count} adımda kullanıldı | {count} adımda kullanıldı",
-      "notReferenced": "Henüz hiçbir adımda kullanılmadı",
       "removed": "{name} kaldırıldı",
       "undo": "Geri al",
       "editVariable": "{name} değişkenini düzenle",
@@ -13545,7 +13847,13 @@
       "openPanel": "Değişkenleri göster",
       "removeTitle": "Değişken kaldırılsın mı?",
       "removeBody": "{name} bu kontrol noktasından kaldırılacak.",
-      "removeWarning": "Bu, artık çözümlenemeyecek olan {count} adım tarafından başvuruluyor. | Bu, artık çözümlenemeyecek olan {count} adım tarafından başvuruluyor."
+      "removeWarning": "Bu, artık çözümlenemeyecek olan {count} adım tarafından başvuruluyor. | Bu, artık çözümlenemeyecek olan {count} adım tarafından başvuruluyor.",
+      "removeOverrideNote": "{name} kullanan adımlar artık {scope} değerini alacak.",
+      "countOfCap": "{count} / {cap}",
+      "local": "Yerel",
+      "resolutionOrder": "Çözümleme sırası: kontrol, sonra ortam, sonra global.",
+      "overridesInherited": "Paylaşılan bir değişkeni geçersiz kılar — bu değer önceliklidir.",
+      "valueTooltipEmpty": "{name}: henüz değer yok"
     },
     "browserDevices": {
       "desktop": "Masaüstü",
@@ -13873,7 +14181,8 @@
       "timeoutLabel": "Zaman aşımı (ms)",
       "valueFallback": "Değer",
       "showSetupSteps": "Kurulum adımlarını göster",
-      "waitingForActions": "Tarayıcıda eylemler bekleniyor…"
+      "waitingForActions": "Tarayıcıda eylemler bekleniyor…",
+      "unboundVariables": "{names}, bu kontrolde, ortamlarında veya genel değerlerde tanımlı değil, bu nedenle yazıldığı gibi düz metin olarak işlenir. | {names}, bu kontrolde, ortamlarında veya genel değerlerde tanımlı değil, bu nedenle yazıldıkları gibi düz metin olarak işlenir."
     },
     "labels": {
       "copyOf": "{name} kopyası",
@@ -14105,10 +14414,13 @@
     },
     "results": {
       "p95Label": "p95",
+      "allEnvironments": "Tüm ortamlar",
       "clearFilters": "Filtreleri temizle",
       "clearFiltersDesc": "Tüm etkin filtreleri kaldır",
       "device": "Cihaz",
       "duration": "Süre",
+      "environment": "Ortam",
+      "environmentScope": "Ortam kapsamı",
       "editCheck": "Kontrolü Düzenle",
       "error": "Hata",
       "failed": "Başarısız",
@@ -14277,6 +14589,7 @@
       "passRate": "Geçme Oranı",
       "passRateByBrowser": "Tarayıcıya Göre Geçme Oranı",
       "passRateByDevice": "Cihaza Göre Geçme Oranı",
+      "passRateByEnvironment": "Ortama Göre Başarı Oranı",
       "passRateByLocation": "Konuma Göre Geçme Oranı",
       "durationByLocation": "Konuma Göre Süre (Ort)",
       "flakyRate": "Flaky Rate",
@@ -14436,7 +14749,8 @@
       "ssh": "SSH",
       "tcp": "TCP",
       "tls": "TLS",
-      "private": "Özel Konumlar"
+      "private": "Özel Konumlar",
+      "variables": "Ortamlar ve Değişkenler"
     },
     "timeline": {
       "failed": "Başarısız",
@@ -14480,7 +14794,8 @@
       "stepNameRequired": "Bu adıma bir ad verin — çalıştırma sonuçlarında gösterilen budur",
       "typeTextRequired": "Bu adımın yazması gereken metni girin",
       "expectedRequired": "Bu iddianın beklediği değeri girin",
-      "urlInvalid": "http:// veya https:// ile başlayan geçerli bir URL girin",
+      "urlInvalid": "http://, https:// veya bir değişken yer tutucusu ile başlayan bir URL girin",
+      "navigateUrlInvalid": "http://, https:// veya bir değişken yer tutucusu ile başlayan bir URL girin.",
       "urlRequired": "Başlangıç URL'si gereklidir",
       "fixHighlightedFields": "Kaydetmeden önce vurgulanan alanları düzeltin",
       "retiredAction": "\"{action}\" artık desteklenmiyor — \"{step}\" adımını kaldırın veya değiştirin",
@@ -14945,7 +15260,6 @@
       "syntheticsTokensRefresh": "Belirteç listesini yenile",
       "aiChatToggle": "AI sohbetini aç/kapat",
       "aiChatClose": "AI sohbetini kapat",
-      "aiChatExpand": "AI sohbetini genişlet/daralt",
       "logsSaveView": "Kayıtlı görünüm olarak kaydet",
       "logsExport": "Sonuçları CSV olarak dışa aktarın",
       "tracesCopyUrl": "İz paylaşım URL'sini kopyala",
@@ -15072,6 +15386,9 @@
       "noOptionsFound": "Seçenek bulunamadı",
       "multiSelect": "Çoklu seçim",
       "singleSelect": "Tekli seçim"
+    },
+    "templateInput": {
+      "suggestions": "Değişken önerileri"
     },
     "time": {
       "openTimePicker": "Zaman seçiciyi aç",
@@ -15558,7 +15875,8 @@
         "destinations": "Hedefler",
         "templates": "Şablonlar",
         "reports": "Raporlar",
-        "llmModelPricing": "LLM Model Fiyatlandırması"
+        "llmModelPricing": "LLM Model Fiyatlandırması",
+        "passcode": "Veri Alımı Tokenı"
       },
       "noPermissionToChangeFavorites": "Favorileri değiştirme izniniz yok",
       "couldNotUpdateFavoriteDashboards": "Favori panolar güncellenemedi"
@@ -15796,6 +16114,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "Veri alım sürecini henüz başlatmadınız. Diğer sayfaları keşfetmek için lütfen veri alımını başlatın."
+    },
+    "iam": {
+      "userSaveFailed": "Kullanıcı kaydedilemedi"
     }
   },
   "cipherKeys": {
@@ -16213,7 +16534,106 @@
       "exponentName": "Üs"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Karmaşıklık",
+    "minLength": "Minimum uzunluk",
+    "minLengthDesc": "Kabul edilen en kısa parola",
+    "maxLength": "Maksimum uzunluk",
+    "maxLengthDesc": "0 = sınırsız",
+    "requireUppercase": "Büyük harf zorunlu",
+    "requireUppercaseDesc": "En az bir A–Z",
+    "requireLowercase": "Küçük harf zorunlu",
+    "requireLowercaseDesc": "En az bir a–z",
+    "requireDigit": "Rakam zorunlu",
+    "requireDigitDesc": "En az bir 0–9",
+    "requireSpecial": "Özel karakter zorunlu",
+    "requireSpecialDesc": "İzin verilen kümeden en az bir karakter",
+    "specialCharSet": "İzin verilen özel karakterler",
+    "specialCharSetDesc": "Herhangi bir alfanümerik olmayan karakteri kabul etmek için boş bırakın",
+    "maxLengthTooSmall": "Maksimum uzunluk en az minimum uzunluk kadar olmalı veya sınırsız için 0 olmalıdır.",
+    "confirmTitle": "Parola ilkesi kaydedilsin mi?",
+    "confirmMessage": "Kaydetmek, her yerel kullanıcıyı devam edebilmesi için yeni bir parola belirlemeye zorlayabilir. Root, harici kullanıcılar ve hizmet hesapları muaftır — root hesabı değilseniz bu sizi de kapsar. Bu işlem geri alınamaz.",
+    "saved": "Parola ilkesi kaydedildi. | Parola ilkesi kaydedildi. {count} kullanıcının parolasını sıfırlaması gerekiyor. | Parola ilkesi kaydedildi. {count} kullanıcının parolasını sıfırlaması gerekiyor.",
+    "saveFailed": "Parola ilkesi kaydedilemedi.",
+    "notAdminTitle": "Yönetici erişimi gerekli",
+    "notAdmin": "Parola ilkesini yapılandırmak için meta organizasyonun bir yöneticisi gerekir.",
+    "loadFailedTitle": "Parola ilkesi yüklenemedi",
+    "loadFailed": "Geçerli ilke okunurken bir şeyler ters gitti.",
+    "rotation": "Rotasyon",
+    "rotationDays": "Rotasyon süresi",
+    "rotationDaysDesc": "Parolanın süresi dolmadan önceki gün sayısı. 0 = hiç süresi dolmaz",
+    "rotationWarningDays": "Süresi dolmadan önce uyar",
+    "rotationWarningDaysDesc": "Oturum açma sırasında bildirim gün sayısı. 0 = uyarı yok",
+    "warningDaysTooLong": "Uyarı penceresi rotasyon süresinden uzun olamaz.",
+    "rotationPreview": "Bugün belirlenen bir parolanın süresi {expires} tarihinde dolar. Oturum açma uyarısı {warns} tarihinde başlar.",
+    "rotationPreviewNoWarning": "Bugün belirlenen bir parolanın süresi {expires} tarihinde dolar. O zamana kadar uyarı gösterilmez.",
+    "reuse": "Yeniden kullanımı önleme",
+    "historyCount": "Hatırlanan parolalar",
+    "historyCountDesc": "Yeni bir parola bu sayıdaki önceki parolayla eşleşemez. 0 = kontrol yok",
+    "historyMaxRetained": "Saklanan geçmiş",
+    "historyMaxRetainedDesc": "Kullanıcı başına kaç geçmiş parolanın saklandığı",
+    "historyRetainedTooSmall": "Saklanan geçmiş, hatırlanan parola sayısından az olamaz.",
+    "reuseExplainer": "Geçerli parola, hatırlanan kümenin bir parçası sayılır — onu yeniden kullanmak ayrı bir kontrolle değil, bu kuralla reddedilir.",
+    "lockout": "Hesap kilitleme",
+    "lockoutThreshold": "Kilitleme öncesi başarısız deneme sayısı",
+    "lockoutThresholdDesc": "0 = kilitleme devre dışı",
+    "lockoutBucketSize": "Her ek kilitleme öncesi deneme sayısı",
+    "lockoutBucketSizeDesc": "0 = yukarıdaki değeri kullan",
+    "lockoutStartSecs": "İlk kilitleme süresi",
+    "lockoutStartSecsDesc": "Saniye",
+    "lockoutMaxSecs": "Maksimum kilitleme süresi",
+    "lockoutMaxSecsDesc": "Saniye — artışın sınırlandığı üst değer",
+    "lockoutStartTooLong": "İlk kilitleme süresi maksimum kilitleme süresinden uzun olamaz.",
+    "lockoutBackoff": "Artış",
+    "lockoutBackoffDesc": "Her kilitlemenin bir öncekine göre nasıl arttığı",
+    "backoffExponential": "Üstel",
+    "backoffLinear": "Doğrusal",
+    "lockoutPreview": "{threshold} başarısız deneme → {first} · her {bucket} denemede bir → {rest} · üst sınır {max}. Başarılı bir oturum açma her şeyi sıfırlar.",
+    "sessionEnforcement": "Oturum ve zorlama",
+    "cookieMaxAge": "Oturum ömrü",
+    "cookieMaxAgeDesc": "Oturum açmış bir oturumun geçerli kaldığı saniye sayısı. 0 = {envVar} içindeki örnek varsayılanını kullan",
+    "applyToRoot": "Root hesabına uygula",
+    "applyToRootDesc": "Bu açık olmadıkça Root, yukarıdaki tüm kurallardan muaftır",
+    "rootWarning": "Root'un kilitlenmesi sistemin kurtarılamaz bir duruma girmesine neden olabilir.",
+    "rootDialogTitle": "Politika Root'a uygulansın mı?",
+    "rootDialogMessage": "Root, diğer tüm yerel hesaplar gibi kilitleme, rotasyon ve zorunlu sıfırlamalara tabi olacaktır. Root tek yönetici hesabınızsa, karşılayamayacağı bir kilitleme veya süre sonu bu örneğe geri dönüş yolunu tamamen kapatabilir.",
+    "rootDialogAck": "Root'un bu örnekten kalıcı olarak kilitlenebileceğini anlıyorum.",
+    "rootDialogConfirm": "Root'a uygula"
+  },
+  "passwordReset": {
+    "title": "Parolanızı güncelleyin",
+    "signedInAs": "{email} olarak oturum açıldı",
+    "reasonPolicyTightened": "Parola politikası değişti. OpenObserve'u kullanmaya devam etmek için parolanızı güncelleyin.",
+    "reasonRotationExpired": "Parolanızın süresi doldu. OpenObserve'u kullanmaya devam etmek için yeni bir parola belirleyin.",
+    "reasonRotationWarning": "Parolanızın süresi yakında doluyor. Çalışmalarınıza erişimi kaybetmemek için şimdi yeni bir parola belirleyin.",
+    "reused": "Bu parola yakın zamanda kullanıldı. Son {count} parolanızda kullanmadığınız birini seçin.",
+    "expiryBanner": "Parolanızın süresi {count} gün içinde doluyor. Çalışmalarınıza erişimi kaybetmemek için şimdi güncelleyin. | Parolanızın süresi {count} gün içinde doluyor. Çalışmalarınıza erişimi kaybetmemek için şimdi güncelleyin.",
+    "expiryBannerAction": "Şimdi güncelle",
+    "expiryBannerDismiss": "Yoksay",
+    "currentPassword": "Mevcut parola",
+    "newPassword": "Yeni parola",
+    "confirmPassword": "Yeni parolayı doğrula",
+    "currentPasswordRequired": "Mevcut parola gereklidir.",
+    "newPasswordRequired": "Yeni parola gereklidir.",
+    "confirmPasswordRequired": "Lütfen yeni parolayı yeniden girin.",
+    "mismatch": "Parolalar eşleşmiyor.",
+    "signOut": "Oturumu kapat",
+    "submit": "Parolayı güncelle",
+    "updated": "Parolanız güncellendi. Lütfen tekrar oturum açın.",
+    "updateFailed": "Parolanız güncellenemedi.",
+    "req": {
+      "minLength": "En az {count} karakter",
+      "maxLength": "En fazla {count} karakter",
+      "uppercase": "Bir büyük harf",
+      "lowercase": "Bir küçük harf",
+      "digit": "Bir rakam",
+      "special": "Bir özel karakter",
+      "specialFromSet": "{set} kümesinden bir özel karakter",
+      "unmet": "Parola şunu içermelidir: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Parola Politikası",
     "loginCallback": "Giriş Geri Çağrısı",
     "slackOAuthCallback": "Slack'e bağlanılıyor",
     "emptyStateDemo": "Boş Durum Demosu",
@@ -16451,13 +16871,10 @@
       "columnMemory": "Bellek (güncel)",
       "columnDisk": "Disk % (güncel)",
       "columnLoad": "Yük 15 dk (güncel)",
+      "columnCores": "Çekirdekler",
       "columnLastSeen": "Son görülme",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Ana Makine Metrikleri gösterge panosu",
-      "importConfirmTitle": "Ana Makine Metrikleri gösterge panosu eklensin mi?",
-      "importConfirmMessage": "Bu gösterge panosuna henüz sahip değilsiniz. Eklediğinizde Varsayılan klasörünüzde 'Ana Makine Metrikleri' adlı bir gösterge panosu oluşturulur ve ardından bu ana makine için açılır.",
-      "importConfirmOk": "Ekle ve aç",
-      "importConfirmCancel": "İptal",
+      "loadPerCore": "({value}/çekirdek)",
       "windowsLivenessNote": "Windows ana makineleri bu listede yalnızca aracı yük metriğini (system_cpu_load_average_15m) bildirdiğinde görünür — Windows aracılarınız çalışıyor ancak burada görünmüyorsa, toplayıcı yapılandırmasında yük scraper'ını etkinleştirin veya aracıyı güncelleyin.",
       "panel": {
         "cpuBusy": "CPU meşgul",
@@ -16682,17 +17099,17 @@
       "alertMe": "Beni uyar",
       "columnHints": {
         "qps": "Saniye başına çağrı — bu penceredeki çağrıların pencere uzunluğuna bölünmesiyle hesaplanır, böylece 15 dakikalık bir görünüm ile 4 saatlik bir görünüm karşılaştırılabilir kalır.",
-        "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Yalnızca tamamlanmış çağrılar sayılır — hâlâ çalışan veya hiç dönmeyen bir sorgu burada ölçülmez.",
-        "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Yalnızca tamamlanmış çağrılar sayılır — hâlâ çalışan veya hiç dönmeyen bir sorgu burada ölçülmez.",
-        "p99": "Çağrıların en kötü %1'i en az bu kadar sürdü. Yalnızca tamamlanmış çağrılar sayılır — hâlâ çalışan veya hiç dönmeyen bir sorgu burada ölçülmez.",
-        "load": "Uygulamalarınızın bu veritabanını bekleyerek geçirdiği toplam süre. İstemci tarafından ölçülür, bu nedenle veritabanının ne kadar trafik hizmet verdiğini yansıtır — sunucunun ne kadar yüklü olduğunu değil.",
+        "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
+        "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
+        "p99": "Çağrıların en kötü %1'i en az bu kadar sürdü. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
+        "load": "Uygulamalarınızın bu veritabanına yaptığı çağrılarda harcadığı toplam süre, uygulamanızın izlerinden ölçülmüştür. Bu veritabanının uygulamalarınıza ne kadar trafik sunduğunu gösterir.",
         "attention": "Bu örneğin kendi motorunun yayınladığı bir limite ne kadar yakın olduğu — bugün, max_connections'a karşı bağlantılar. En kötü oran, harmanlanmış bir puan değil. En yüksekten başlayarak sıralanır; sağlığı okunamayan örnekler en üsttedir, çünkü göremediğiniz bir şeyin sağlıklı olduğunu bilemezsiniz. Veritabanı sunucusunda ölçülür, bu nedenle yanındaki Veritabanı süresiyle karşılaştırılamaz."
       },
       "failedChip": "{count} başarısız",
       "columnSubLabels": {
-        "attention": "sunucu",
-        "load": "istemci",
-        "calls": "istemci"
+        "attention": "veritabanından",
+        "load": "uygulamalarınızdan",
+        "calls": "uygulamalarınızdan"
       },
       "attention": {
         "connections": "bağlantılar",
@@ -16754,14 +17171,14 @@
         "failed": "Başarısız"
       },
       "columnHints": {
-        "calls": "Bu sorgunun kaç kez çalıştığı. Veritabanınızın raporladığı durumlarda kendi sayısı — bu, tüm istemcileri kapsar, yalnızca sisteminizin iz gönderen bölümlerini değil. İstemci tarafından gözlemlenen olarak işaretlenen satırlar, veritabanınız bunları raporlamadığı için izlerden sayılır.",
-        "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç yanıt vermeyen bir sorgu burada ölçülmez.",
-        "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç yanıt vermeyen bir sorgu burada ölçülmez.",
-        "p99": "En kötü %1'lik çağrılar en az bu kadar sürdü. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç yanıt vermeyen bir sorgu burada ölçülmez.",
+        "calls": "Bu sorgunun kaç kez çalıştığı, veritabanınız tarafından sayıldığı şekliyle — bağlanan her uygulama dahildir. Veritabanınızın bir sorgu için sayımı yoksa, izler simgesi uygulamanızın izlerinden ölçüleni işaretler.",
+        "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
+        "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
+        "p99": "Çağrıların en kötü %1'i en az bu kadar sürdü. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
         "max": "Bu zaman aralığındaki en yavaş tek çağrı — gerçek bir çağrı, ortalama değil.",
         "errors": "Bu çağrıların kaçı hata ile geri döndü.",
         "perTrace": "Bu, tek bir istek içinde kaç kez çalışır. Yüksek bir sayı genellikle bir döngü anlamına gelir.",
-        "load": "Bu sorgunun veritabanında geçirdiği toplam süre. Veritabanınızın raporladığı durumlarda kendi değeri: Postgres'te yürütme süresi, ancak MySQL ve MariaDB'de bekleme süresi — her satır hangisi olduğunu belirtir. İstemci tarafından gözlemlenen olarak işaretlenen satırlar izlerden ölçülür, bu nedenle ağ gidiş-dönüşünü içerir."
+        "load": "Bu sorgunun veritabanında harcadığı toplam süre, veritabanınızın bildirdiği şekliyle: Postgres'te yürütme süresi, MySQL ve MariaDB'de bekleme süresi — her satır hangisi olduğunu belirtir. İzler simgesi bulunan satırlar uygulamanızın izlerinden ölçülmüştür, dolayısıyla veritabanına gidiş ve dönüşü de içerir."
       },
       "errorsNone": "yok",
       "errorsAll": "tümü",
@@ -17025,8 +17442,7 @@
       "overlap": {
         "serverExecution": "{engine} onu çalıştırmak için harcadığı süre",
         "serverWait": "{engine} onu beklemek için harcadığı süre — bekleme süresi, yürütme süresi değil",
-        "serverCounted": "{engine} tarafından, tüm istemcilerde sayıldı",
-        "clientObserved": "İzlenen çağıranlar tarafından gözlemlendi — veritabanınız bunu bildirmedi"
+        "serverCounted": "{engine} tarafından, tüm istemcilerde sayıldı"
       },
       "endpointsConcentrated": "Bu sorgunun süresinin {percent}'i tek bir uç noktadan geliyor. {endpoint}'i düzeltirseniz bu sorguyu düzeltmiş olursunuz.",
       "typicalMarker": "yavaş çağrılar {value}",
@@ -17053,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "Veritabanının kendisinin kaydettiği",
-        "subtitle": "Sunucu tarafı — tüm istemciler",
-        "clientSubtitle": "İstemci tarafından gözlemlenen — yalnızca enstrümante edilmiş çağıranlar, yalnızca tamamlanmış çağrılar. Hâlâ çalışan veya takılıp kalan bir sorgu bu sayılarda yer almaz.",
+        "subtitle": "Veritabanınızdan — bağlanan her uygulama",
+        "clientSubtitle": "İşaretli değerler uygulamanızın izlerinden ölçülmüştür — uygulamalarınızın bu pencerede tamamladığı çağrılar",
         "instance": "{instance} tarafından bildirildi",
         "instanceWide": "Bu örnekteki tüm veritabanları",
         "calls": "Çalıştırmalar",
@@ -17100,9 +17516,13 @@
         "serverExecution": "çalıştırma süresi",
         "serverWait": "bekleme süresi",
         "serverCounted": "sunucu sayısı",
-        "clientObserved": "istemci tarafından gözlemlenen",
         "serverReported": "veritabanlarınız tarafından bildirildi"
       }
+    },
+    "appSource": {
+      "marker": "Uygulamanızın izlerinden ölçülmüştür",
+      "markerHint": "Uygulamanızın izlerinden ölçülmüştür; uygulamalarınızın görünümünü veritabanınızın bildirdiklerine ekler.",
+      "legend": "Uygulamanızın izlerinden"
     },
     "page": {
       "tabs": {
@@ -17111,7 +17531,7 @@
         "metricsHint": "Bekleme olayına göre veritabanı yükü ve veritabanı alıcılarınızın topladığı her metrik.",
         "queries": "En İyi Sorgular",
         "samples": "En Yavaş Çağrılar",
-        "samplesHintClient": "Bu pencerede enstrümante edilmiş hizmetlerinizin gözlemlediği tamamlanmış çağrılar — izleme olmayan çağıranlar sayılmaz, bu yüzden bu bir alt sınırdır, toplam değil. Tablo bunların en yavaşlarını gösterir.",
+        "samplesHintClient": "Bu pencerede uygulamanızın izlerinden ölçülen çağrılar; uygulamalarınızın görünümünü veritabanınızın bildirdiklerine ekler. Tablo bunların en yavaşlarını gösterir.",
         "samplesHintServer": "Veritabanlarınızın bu pencerede tamamlandığını bildirdiği ifadeler, veritabanının içinde sayılır. Tablo bunların en yavaşlarını gösterir.",
         "samplesHintUnknown": "Bu penceredeki en yavaş bireysel veritabanı çağrıları.",
         "deadlocks": "Kilitlenmeler",
@@ -17148,6 +17568,11 @@
       "explore": "Metrics Explorer'da aç",
       "railLabel": "Metrik bölümleri",
       "noAccess": "{stream} akışını okuma izniniz yok. Bu akışa okuma erişimi için bir yöneticiye başvurun.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "sorguya göre",
         "database": "veritabanına göre",
@@ -17262,7 +17687,7 @@
         "status": "Durum"
       },
       "columnHints": {
-        "duration": "Bu tek çağrının ne kadar sürdüğü, çağıran tarafından ölçülür. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç geri dönmeyen bir sorgu burada ölçülmez."
+        "duration": "Bu tek çağrının ne kadar sürdüğü, uygulamanızın baştan sona ölçtüğü şekliyle."
       },
       "failed": "Başarısız",
       "failedWithCode": "Başarısız · {code}",
@@ -17795,7 +18220,7 @@
     "tabPriorCauses": "Önceki nedenler",
     "statEscalatesIn": "Yükseltme süresi",
     "statNobodyLeft": "Kimse kalmadı",
-    "statUnackedFor": "Onaylanmama süresi",
+    "statUnackedFor": "Şu süredir onaylanmadı",
     "statOpenFor": "Açık kalma süresi",
     "openSchedule": "Zaman çizelgesini aç",
     "calendarDay": "Gün",
@@ -17827,6 +18252,8 @@
     "notifiedAge": "Bildirildi · Yaş",
     "channelUndeliverable": "{channel} arkasında sağlayıcı yok — hiçbir şey gönderilmiyor",
     "assignTeamShort": "Ekip ata",
+    "assignTeamFailed": "Ekip atanamadı",
+    "noTeamsToAssign": "Henüz atanacak ekip yok",
     "contextTitle": "Onaylamadan önce bilmeye değer bağlam",
     "contextFired": "Tetiklenmiş",
     "contextFiredCount": "{count}× {days} gün içinde",
@@ -17865,6 +18292,7 @@
     "target_rotation_all": "{rotation} rotasyonundaki herkes",
     "target_rotation_deleted": "Bu ekibin artık sahip olmadığı bir rotasyon",
     "target_rotation_legacy": "Nöbette olan kişi",
+    "target_unrecognized": "Bu ekranın tanımadığı bir hedef",
     "ladderPoolEveryone": "{rotation} rotasyonundaki herkes",
     "target_user": "Belirli bir kişi",
     "target_whole_team": "Tüm ekip",
@@ -18008,6 +18436,8 @@
     "addTeam": "Ekip ekle",
     "newTeam": "Yeni ekip",
     "editTeam": "Ekibi düzenle",
+    "defaultTeamBadge": "Varsayılan",
+    "setDefaultTeam": "Varsayılan ekip olarak ayarla",
     "manageTeamCta": "Üyeleri, nöbet programını ve eskalasyonu yönet",
     "teamName": "Ad",
     "teamNameHint": "Bu ekibin bir sayfada nasıl adlandırıldığı",
@@ -18262,7 +18692,7 @@
     "ownershipHint": "Bu ekip, bu kimlik yollarıyla eşleşen her şey için çağrılır. En spesifik eşleşen kural kazanır; bu nedenle bir ad alanı kuralı, bir küme kuralını geçersiz kılar.",
     "noOwnershipRules": "Sahiplik kuralı yok. Bu ekip yalnızca onu doğrudan adlandıran uyarılarla çağrılır.",
     "noOwnershipRulesOrg": "Sahiplik kuralı yok. Sinyaller, yalnızca bir uyarı bir ekibi doğrudan adlandırdığında o ekibe yönlendirilir.",
-    "editOwnershipRule": "Sahiplik kuralını düzenle",
+    "editOwnershipRule": "Kuralı düzenle",
     "ruleUpdated": "Kural güncellendi",
     "addOwnershipRule": "Yeni kural",
     "saveRule": "Kaydet",
@@ -18304,10 +18734,12 @@
     "setupStep4Title": "Bildirim hedefi yapılandırın",
     "setupStep4Body": "Bir hedef olmadan kimsenin telefonu veya gelen kutusu gerçekten erişilebilir değildir — yukarıdaki her adım tamamlanmış olsa bile bir çağrı yine de hiçbir yere ulaşmaz.",
     "setupCta": "İlk ekibinizi oluşturun",
-    "memberPickPlaceholder": "Bu kuruluştaki kişileri ara",
+    "memberPickPlaceholder": "Eklemek için bir ekip üyesi seçin",
+    "memberSearchPlaceholder": "Üye ara",
     "memberEmailFallbackHint": "Kullanıcı listesi yüklenemedi. Mevcut kuruluş kullanıcılarının bir veya daha fazla e-posta adresini virgülle ayırarak gir.",
     "addPeople": "Kişi ekle",
     "addPeopleCta": "Ekle | Ekle ({count}) | Ekle ({count})",
+    "addPeopleDisabledHint": "Eklemek için bir ekip üyesi seçin",
     "addEveryoneCta": "Kuruluştaki herkesi ekle ({count})",
     "teamCreateSecondary": "Ayrıca bir İkincil rotasyon oluştur",
     "teamCreateSecondaryHint": "Aynı kişiler bir vardiya kaydırılmıştır; böylece ikincil, zaten nöbette olan kişi asla olmaz. Bu normal bir rotasyondur — ikisini bağlayan hiçbir şey yoktur; bu yüzden bir listeyi düzenleyip diğerini düzenlemezsen, listeler birbirinden sapar ve sessiz bir düzeltme yerine bir uyarı alırsın.",
@@ -18664,6 +19096,7 @@
     "coverageGapNowOpen": "Şu anda nöbetçi kimse yok ve önümüzdeki {days} gün içinde de kimse planlanmamış.",
     "coveragePrimaryOnly": "Birincil: {primary}",
     "coverageSecondaryOnly": "İkincil: {secondary}",
+    "coverageMoreChanges": "+{count} değişiklik daha | +{count} değişiklik daha",
     "reachTeamTitle": "Ekibe ulaş",
     "reachTeamHint": "Olay sırasında",
     "contactSendTest": "Test çağrısı gönder",
@@ -18763,6 +19196,8 @@
     "rotationNobody": "Nöbette kimse yok",
     "edit": "Düzenle",
     "timelineLoadFailed": "Bu zaman aralığı için çizelge çözümlenemedi",
+    "editorReadFailed": "Düzenlemek için en son kopya yüklenemedi. Tekrar deneyin.",
+    "refreshFailed": "Yenilenemedi. Gösterilen bilgiler güncel olmayabilir.",
     "scheduleDoneEditing": "Çizelgeye Dön",
     "coverWhoRequired": "Yerine bakacak kişiyi seçin",
     "timelineCoverAria": "{who}, {rotation} rotasyonunda {from} ile {to} arasında nöbet tutuyor",
@@ -18873,7 +19308,7 @@
     "routingSaysPlace": "{value} {noun} kaynağından tüm uyarılar ve olaylar",
     "routingSaysPlaces": "{scope} kaynağından tüm uyarılar ve olaylar",
     "routingSaysAnything": "Tüm uyarılar ve olaylar",
-    "routingNoLadder": "henüz yükseltme merdiveni yok",
+    "routingNoLadder": "Henüz eskalasyon zinciri yok",
     "routingPagesTeam": "{team} ekibine çağrı gönderir",
     "routingCaughtLast": "{count} çağrı · son {when} | {count} çağrı · son {when}",
     "routingEmptyBodyNamed": "Bir kural gelen bir uyarıyla eşleşene kadar {team} ekibine çağrı gönderilmez.",

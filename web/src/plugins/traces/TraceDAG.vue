@@ -105,13 +105,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { traceDagQuery } from "@/services/search.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, computed, watch, nextTick } from "vue";
 import { VueFlow, Position, MarkerType, Handle, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import searchService from "@/services/search";
 
 // VueFlow CSS imports
 import "@vue-flow/core/dist/style.css";
@@ -404,14 +405,9 @@ export default defineComponent({
         error.value = null;
 
         const org = store.state.selectedOrganization.identifier;
-        const response = await searchService.getTraceDAG(
-          org,
-          props.streamName,
-          props.traceId,
-          props.startTime,
-          props.endTime,
+        dagData.value = await queryClient.fetchQuery(
+          traceDagQuery(org, props.streamName, props.traceId, props.startTime, props.endTime),
         );
-        dagData.value = response.data;
       } catch (err: any) {
         console.error("[TraceDAG] Failed to fetch DAG:", err);
         error.value =

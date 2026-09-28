@@ -180,7 +180,8 @@ pub async fn query_by_ids(
         db_files.extend(
             dumped_files
                 .iter()
-                .filter_map(|file| ids_set.contains(&file.id).then_some(file.into())),
+                .filter(|file| ids_set.contains(&file.id))
+                .map(|file| file.into()),
         );
     }
 

@@ -101,7 +101,7 @@ pub fn resolve_stream_names(sql: &str) -> Result<Vec<String>, anyhow::Error> {
     let dialect = &PostgreSqlDialect {};
     let statement = DFParser::parse_sql_with_dialect(sql, dialect)?
         .pop_back()
-        .ok_or(anyhow::anyhow!("Failed to parse sql"))?;
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse sql"))?;
     let (table_refs, _) = resolve_table_references(&statement, true)?;
     let mut tables = Vec::new();
     for table in table_refs {
@@ -114,7 +114,7 @@ pub fn resolve_stream_names_with_type(sql: &str) -> Result<Vec<TableReference>, 
     let dialect = &PostgreSqlDialect {};
     let statement = DFParser::parse_sql_with_dialect(sql, dialect)?
         .pop_back()
-        .ok_or(anyhow::anyhow!("Failed to parse sql"))?;
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse sql"))?;
     let (table_refs, _) = resolve_table_references(&statement, true)?;
     let mut tables = Vec::new();
     for table in table_refs {

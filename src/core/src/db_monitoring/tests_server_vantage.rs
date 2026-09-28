@@ -442,20 +442,132 @@ fn empty_statement_yields_no_fingerprint() {
 /// new logs ingest path must either call the helper or consciously update this list.
 #[test]
 fn every_logs_ingest_path_applies_canonicalization() {
-    // (file, number of record-assembly sites that must canonicalize)
+    // (file, record-assembly sites, gates the `canonicalize_dbm_record` calls may use)
     let paths = [
-        (include_str!("../logs/ingest.rs"), 1usize),
-        (include_str!("../logs/otlp.rs"), 3usize),
+        (
+            include_str!("../logs/ingest.rs"),
+            2usize,
+            &["ctx.dbm_enabled", "dest_dbm_gate"][..],
+        ),
+        (
+            include_str!("../logs/otlp.rs"),
+            3usize,
+            &["dbm_gate", "dest_dbm_gate"][..],
+        ),
     ];
-    for (src, expected) in paths {
-        let found = src.matches("server_vantage::apply_to_record").count();
+    for (src, expected, gates) in paths {
+        let direct: Vec<usize> = src
+            .match_indices("server_vantage::canonicalize_dbm_record")
+            .map(|(i, _)| i)
+            .collect();
         assert_eq!(
-            found, expected,
-            "logs ingest path must call server_vantage::apply_to_record at every \
-             record-assembly site (expected {expected}, found {found}); a path that \
+            direct.len(),
+            expected,
+            "logs ingest path must canonicalize at every record-assembly site; a path that \
              assembles records without it silently drops all o2_dbm_* columns"
         );
+        // An ungated call puts the DBM scan on every record of every stream.
+        for site in direct {
+            let cond = enclosing_if_condition(src, site);
+            assert!(
+                gates.contains(&cond),
+                "canonicalize_dbm_record must sit behind a per-stream DBM gate, found `if {cond}`"
+            );
+        }
     }
+}
+
+/// The condition of the `if` whose block directly contains `site`.
+fn enclosing_if_condition(src: &str, site: usize) -> &str {
+    let if_at = src[..site].rfind("if ").expect("an enclosing if");
+    let open = if_at + src[if_at..].find('{').expect("the if's block");
+    assert!(
+        open < site && !src[open + 1..site].contains('}'),
+        "the canonicalize call must be the first statement block of its `if`"
+    );
+    src[if_at + 3..open].trim()
+}
+
+/// The named gates must be computed from the formatted destination name, once per stream.
+#[test]
+fn ingest_dbm_gates_are_keyed_on_the_stream_name() {
+    let ingest = include_str!("../logs/ingest.rs");
+    assert!(
+        ingest.contains(
+            "let dbm_gate = cfg.db_monitoring.enabled && is_dbm_server_stream(&stream_name);"
+        ),
+        "the _json/_bulk gate must be computed on the formatted stream name"
+    );
+    assert_eq!(
+        ingest.matches("dbm_enabled: dbm_gate,").count(),
+        2,
+        "both FinalizeRecordContext literals (direct write and evaluation replay) must use the gate"
+    );
+    assert!(
+        !ingest.contains("dbm_enabled: cfg.db_monitoring.enabled"),
+        "an ungated FinalizeRecordContext canonicalizes every stream"
+    );
+    let ingest_flat = ingest.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        ingest_flat.contains(
+            "let destination_stream = stream_params.stream_name.to_string(); \
+             let dest_dbm_gate = cfg.db_monitoring.enabled && is_dbm_server_stream(&destination_stream);"
+        ),
+        "the _json pipeline output must canonicalize on the pipeline DESTINATION, gated once per \
+         destination"
+    );
+
+    // rustfmt may wrap a long `let`, so compare with whitespace collapsed
+    let otlp = include_str!("../logs/otlp.rs")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(otlp.contains("let dbm_gate = dbm_enabled && is_dbm_server_stream(&stream_name);"));
+    assert!(
+        otlp.contains(
+            "let dest_dbm_gate = dbm_enabled && is_dbm_server_stream(&destination_stream);"
+        )
+    );
+
+    let logs_mod = include_str!("../logs/mod.rs");
+    let seed = logs_mod
+        .find("server_vantage::batch_has_dbm_records(")
+        .expect("write_logs must still seed the kind index");
+    let cond_start = logs_mod[..seed].rfind("if ").expect("gated");
+    assert!(
+        logs_mod[cond_start..seed].contains("is_dbm_server_stream(stream_name)"),
+        "the per-batch DBM scan must only run for DBM streams"
+    );
+
+    let columnar = include_str!("../logs/columnar.rs");
+    assert!(
+        columnar
+            .contains("get_config().db_monitoring.enabled && is_dbm_server_stream(stream_name)"),
+        "the columnar fast path must only defer DBM-shaped records to JSON on DBM streams"
+    );
+}
+
+/// Collectors write `_o2_dbm_server` over OTLP, so an `_o2_` guard there would cut them all off.
+#[test]
+fn otlp_logs_path_has_no_internal_stream_guard() {
+    let otlp = include_str!("../logs/otlp.rs");
+    for guard in [
+        "is_internal_rollup_stream",
+        "is_blocked_internal_rollup_write",
+    ] {
+        assert!(
+            !otlp.contains(guard),
+            "otlp.rs must not guard _o2_* streams ({guard}); _o2_dbm_server is written by OTLP collectors"
+        );
+    }
+    let usage = include_str!("../../../config/src/meta/self_reporting/usage.rs");
+    let doc_end = usage
+        .find("pub fn is_internal_rollup_stream")
+        .expect("the guard predicate");
+    assert!(
+        usage[..doc_end].contains("_o2_dbm_server"),
+        "the _o2_dbm_server exception must be documented on is_internal_rollup_stream"
+    );
 }
 
 // ─── Storage shape: nested values kill the whole ingest batch ─────────────────
@@ -1354,7 +1466,7 @@ fn every_apply_site_restores_the_event_name() {
     let src = include_str!("../logs/otlp.rs");
 
     let sites: Vec<usize> = src
-        .match_indices("server_vantage::apply_to_record")
+        .match_indices("server_vantage::canonicalize_dbm_record")
         .map(|(i, _)| i)
         .collect();
     assert_eq!(
@@ -1480,7 +1592,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // insertion against an unrelated occurrence and assert nothing.
     for landmark in [
         "pipeline_inputs.push(rec)",
-        "let mut rec = json::json!({});",
+        "let mut rec = json::Value::Object(base.clone());",
     ] {
         assert_eq!(
             src.matches(landmark).count(),
@@ -1514,7 +1626,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // is created in the producer loop. This is what makes it the PRODUCER loop
     // rather than one of the three apply_to_record call sites.
     let rec_created = src
-        .find("let mut rec = json::json!({});")
+        .find("let mut rec = json::Value::Object(base.clone());")
         .expect("the producer loop must still build `rec`");
     assert!(
         insert_at > rec_created,
@@ -1525,7 +1637,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // The anti-spoof slot: AFTER the attribute copy, so a receiver attribute
     // literally named o2_event_name cannot beat the trusted value.
     let attrs_copied = src
-        .find("log_record.attributes.iter().for_each")
+        .find("for local_attr in &log_record.attributes")
         .expect("the producer loop must still copy log_record attributes onto rec");
     assert!(
         insert_at > attrs_copied,
@@ -1537,7 +1649,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // After the `_original` snapshot, so _original stays a verbatim copy of the
     // customer's payload.
     let snapshot_at = src
-        .find("let original_data = if rec.is_object()")
+        .find("let original_data = (need_original && rec.is_object())")
         .expect("the producer loop must still snapshot original_data");
     assert!(
         insert_at > snapshot_at,
@@ -1628,11 +1740,32 @@ fn every_event_name_write_is_guarded_on_non_empty() {
             && guard.len() < 300
         {
             assert!(
-                guard.contains("db_monitoring.enabled"),
-                "a producer-loop write of o2_event_name must be gated on \
-                 db_monitoring.enabled, matching apply_to_record's early return"
+                guard.contains("event_name_gate"),
+                "a producer-loop write of o2_event_name must be gated on event_name_gate, \
+                 which carries db_monitoring.enabled like apply_to_record's early return"
             );
         }
+    }
+}
+
+/// A non-DBM stream gains the column only as pipeline input, which may route to a DBM stream.
+#[test]
+fn event_name_write_is_gated_on_dbm_streams_or_pipelines() {
+    let src = include_str!("../logs/otlp.rs");
+    let flat = src.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(flat.contains(
+        "let event_name_gate = dbm_gate || (dbm_enabled && !executable_pipelines.is_empty());"
+    ));
+    let guards: Vec<&str> = src
+        .match_indices("if !log_record.event_name.is_empty()")
+        .map(|(i, _)| &src[i..i + src[i..].find('{').expect("guard block")])
+        .collect();
+    assert_eq!(guards.len(), 2, "the producer-loop write and its restore");
+    for guard in guards {
+        assert!(
+            guard.contains("&& event_name_gate") && !guard.contains("db_monitoring.enabled"),
+            "o2_event_name must be written only for DBM streams or pipeline input: {guard}"
+        );
     }
 }
 
@@ -5653,7 +5786,7 @@ fn table_stats_inherits_the_master_off_switch() {
         .find("if !config::get_config().db_monitoring.enabled {")
         .expect("apply_to_record must gate on the master switch");
     let dispatch = body
-        .find("canonicalize_record(")
+        .find("canonicalize_dbm_record(")
         .expect("apply_to_record must dispatch");
     assert!(
         guard < dispatch,
@@ -8011,7 +8144,7 @@ fn idx_seed_leaves_unrelated_read_paths_untouched() {
 /// false positive would index streams that have nothing to do with DBM.
 #[test]
 fn idx_seed_trigger_ignores_a_batch_with_no_dbm_records() {
-    let batch = vec![
+    let batch = [
         (
             1_786_612_398_267_000i64,
             obj(json!({"log": "ordinary line one"})),
@@ -8021,15 +8154,17 @@ fn idx_seed_trigger_ignores_a_batch_with_no_dbm_records() {
             obj(json!({"log": "ordinary line two", "level": "info"})),
         ),
     ];
-    assert!(!server_vantage::batch_has_dbm_records(&batch));
-    assert!(!server_vantage::batch_has_dbm_records(&[]));
+    assert!(!server_vantage::batch_has_dbm_records(
+        batch.iter().map(|(_, r)| r)
+    ));
+    assert!(!server_vantage::batch_has_dbm_records(std::iter::empty()));
 }
 
 /// …and fires on a batch where even one record carries a kind, which is what a
 /// mixed stream (DBM recipes plus the customer's own log lines) looks like.
 #[test]
 fn idx_seed_trigger_fires_on_a_mixed_batch() {
-    let batch = vec![
+    let batch = [
         (
             1_786_612_398_267_000i64,
             obj(json!({"log": "ordinary line"})),
@@ -8040,7 +8175,7 @@ fn idx_seed_trigger_fires_on_a_mixed_batch() {
         ),
     ];
     assert!(
-        server_vantage::batch_has_dbm_records(&batch),
+        server_vantage::batch_has_dbm_records(batch.iter().map(|(_, r)| r)),
         "one DBM record in the batch is enough — the stream carries DBM data"
     );
 }

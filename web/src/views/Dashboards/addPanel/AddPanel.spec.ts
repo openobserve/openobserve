@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import AddPanel from "./AddPanel.vue";
 import { createStore } from "vuex";
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory, onBeforeRouteLeave, useRoute } from "vue-router";
+import { isEqual } from "lodash-es";
+import { getDashboard, updatePanel } from "@/utils/commons";
+import useDashboardPanel from "@/composables/dashboard/useDashboardPanel";
 import { createI18n } from "vue-i18n";
 
 // Mock external dependencies
@@ -4552,6 +4555,91 @@ describe("AddPanel.vue", () => {
   // (OForm stubbed); here we FULLY mount so the real <OForm> runs the schema and
   // prove the title gate actually blocks save when empty — an unwired `:schema`
   // would be caught here.
+  describe("Unsaved-changes prompt", () => {
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+    let leaveGuard: (to: any, from: any, next: any) => void;
+    let confirmSpy: any;
+
+    const leaveEditor = () => {
+      const next = vi.fn();
+      leaveGuard({ path: "/dashboards/view" }, { path: "/dashboards/add_panel" }, next);
+      return next;
+    };
+
+    beforeEach(async () => {
+      const lodash = await vi.importActual<typeof import("lodash-es")>("lodash-es");
+      vi.mocked(isEqual).mockImplementation(lodash.isEqual);
+      vi.mocked(getDashboard).mockResolvedValue({
+        title: "d",
+        tabs: [{ tabId: "t1", panels: [] }],
+      });
+      vi.mocked(onBeforeRouteLeave).mockClear();
+      confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+      const baseImpl = vi.mocked(useDashboardPanel).getMockImplementation()!;
+      vi.mocked(useDashboardPanel).mockImplementationOnce((...args: any[]) => {
+        const panel: any = (baseImpl as any)(...args);
+        return { ...panel, dashboardPanelData: reactive(panel.dashboardPanelData) };
+      });
+
+      wrapper = shallowMount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { dashboard: "test-dashboard" }, params: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: { PanelEditor: true, DateTimePickerDashboard: true, QueryInspector: true },
+        },
+        props: { metaData: null },
+      });
+      await flush();
+      await flush();
+      leaveGuard = vi.mocked(onBeforeRouteLeave).mock.calls.at(-1)![0] as any;
+    });
+
+    afterEach(() => {
+      confirmSpy.mockRestore();
+      vi.mocked(isEqual).mockReset();
+      vi.mocked(getDashboard).mockReset();
+    });
+
+    it("does not prompt for changes the editor makes before the user's first input", async () => {
+      wrapper.vm.dashboardPanelData.data.queries[0].fields.stream = "auto_selected_stream";
+      await nextTick();
+      window.dispatchEvent(new Event("pointerdown"));
+
+      const next = leaveEditor();
+
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("prompts when the user edited the panel", async () => {
+      window.dispatchEvent(new Event("keydown"));
+      wrapper.vm.dashboardPanelData.data.title = "edited by the user";
+      await nextTick();
+
+      const next = leaveEditor();
+
+      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      expect(next).toHaveBeenCalledWith(false);
+    });
+
+    it("does not prompt when the user reverted their edit", async () => {
+      window.dispatchEvent(new Event("pointerdown"));
+      const original = wrapper.vm.dashboardPanelData.data.title;
+      wrapper.vm.dashboardPanelData.data.title = "temporary";
+      await nextTick();
+      wrapper.vm.dashboardPanelData.data.title = original;
+      await nextTick();
+
+      const next = leaveEditor();
+
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith();
+    });
+  });
+
   describe("Panel title OForm (real form)", () => {
     const OPageHeaderStub = {
       name: "OPageHeader",
@@ -4613,6 +4701,39 @@ describe("AddPanel.vue", () => {
       // Save is a submit button bound to the OForm id (Enter + click submit).
       expect(saveBtn.attributes("form")).toBe("add-panel-form");
       expect(wrapper.find("#add-panel-form").exists()).toBe(true);
+    });
+  });
+
+  describe("Exemplar override on save", () => {
+    it("clears this panel's view-mode override after a successful save", async () => {
+      const route = {
+        query: { dashboard: "d1", panelId: "p1", tab: "t1", folder: "f1" },
+        params: {},
+      };
+      vi.mocked(useRoute).mockReturnValue(route as any);
+      vi.mocked(getDashboard).mockResolvedValue({
+        title: "d",
+        tabs: [{ tabId: "t1", panels: [] }],
+      });
+      vi.mocked(updatePanel).mockResolvedValue(undefined as any);
+      const key = "o2.exemplars.test-org.d1.p1";
+      window.sessionStorage.setItem(key, "0");
+
+      wrapper = shallowMount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          stubs: { PanelEditor: true, DateTimePickerDashboard: true, QueryInspector: true },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      wrapper.vm.dashboardPanelData.data.id = "p1";
+      wrapper.vm.dashboardPanelData.data.title = "Latency";
+      await wrapper.vm.savePanelChangesToDashboard("d1");
+
+      expect(updatePanel).toHaveBeenCalled();
+      expect(window.sessionStorage.getItem(key)).toBeNull();
+      vi.mocked(useRoute).mockReset();
     });
   });
 

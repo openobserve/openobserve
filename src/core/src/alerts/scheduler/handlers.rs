@@ -1030,9 +1030,17 @@ async fn handle_composite_alert_trigger(
                 composite_incident_handled = incident_handled;
             }
 
-            let delivery_result = if incident_handled {
+            let delivery_result = if !should_dispatch_after_incident(
+                incident_handled,
+                !notification_alert.workflows.is_empty(),
+            ) {
                 Ok(crate::alerts::alert::NotificationOutcome::default())
             } else {
+                let skip_destinations = if incident_handled {
+                    &notification_alert.destinations
+                } else {
+                    &scheduled_data.notified_destinations
+                };
                 notification_alert
                     .send_notification(
                         trace_id,
@@ -1043,7 +1051,7 @@ async fn handle_composite_alert_trigger(
                         Some(evaluated.level),
                         Some(i32::from(evaluated.result) as f64),
                         None,
-                        &scheduled_data.notified_destinations,
+                        skip_destinations,
                     )
                     .await
             };
@@ -1180,6 +1188,13 @@ async fn handle_composite_alert_trigger(
     trigger.data = config::utils::json::to_string(&scheduled_data)?;
     let _ = infra::scheduler::complete_claim(trigger).await?;
     Ok(())
+}
+
+fn should_dispatch_after_incident(
+    incident_destinations_handled: bool,
+    has_workflows: bool,
+) -> bool {
+    !incident_destinations_handled || has_workflows
 }
 
 fn composite_notification_alert(
@@ -1416,14 +1431,29 @@ async fn handle_anomaly_detection_triggers(
     if matches!(trigger_status, RunOutcome::Firing | RunOutcome::Normal) && config.is_trained {
         use o2_enterprise::enterprise::anomaly_detection::types::Status as AnomalyStatus;
         if config.status != AnomalyStatus::Active.to_i32() {
-            use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+            use infra::table::entity::anomaly_detection_config as anomaly_entity;
+            use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+
             let mut active = config.into_active_model();
             active.status = Set(AnomalyStatus::Active.to_i32());
             active.updated_at = Set(run_end_us);
-            if let Err(e) = active.update(db).await {
-                log::warn!(
+            // Without this predicate a stale Active write spawns a second concurrent training.
+            match anomaly_entity::Entity::update_many()
+                .set(active)
+                .filter(anomaly_entity::Column::AnomalyId.eq(anomaly_id.as_str()))
+                .filter(anomaly_entity::Column::Status.ne(AnomalyStatus::Training.to_i32()))
+                .exec(db)
+                .await
+            {
+                // Losing the CAS means a training holds the row and writes the real status itself.
+                Ok(res) if res.rows_affected == 0 => log::debug!(
+                    "[anomaly_detection] status not reset to Active for {anomaly_id}: a training \
+                     claim holds the row"
+                ),
+                Ok(_) => {}
+                Err(e) => log::warn!(
                     "[anomaly_detection] failed to reset status to Active for {anomaly_id}: {e}"
-                );
+                ),
             }
         }
     }
@@ -1635,9 +1665,10 @@ pub(crate) async fn page_blast_radius(
     }
 }
 
-/// Shared by the scheduled-alert and composite producers so `creates_incident` cannot drift.
+/// Shared by the scheduled-alert, composite and manual-trigger producers so `creates_incident`
+/// cannot drift.
 #[cfg(feature = "enterprise")]
-async fn page_for_alert_firing(
+pub(crate) async fn page_for_alert_firing(
     trace_id: &str,
     alert: &config::meta::alerts::alert::Alert,
     rows: &[config::utils::json::Map<String, config::utils::json::Value>],
@@ -2495,6 +2526,16 @@ async fn handle_alert_triggers(
                         } else {
                             None
                         };
+                        // reset the next run time without silence, because this was never
+                        // delivered, simply pending
+                        new_trigger.next_run_at = alert.trigger_condition.get_next_trigger_time(
+                            true,
+                            alert.tz_offset,
+                            false,
+                            None,
+                        )?;
+                        new_trigger.is_silenced = false;
+                        trigger_data_stream.next_run_at = new_trigger.next_run_at;
                         new_trigger.data = json::to_string(&trigger_data).unwrap();
                         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                         // Condition matched; only the notification was
@@ -2523,6 +2564,13 @@ async fn handle_alert_triggers(
                             } else {
                                 None
                             };
+                            // reset the next run time without silence, because this was never
+                            // delivered, simply pending
+                            new_trigger.next_run_at = alert
+                                .trigger_condition
+                                .get_next_trigger_time(true, alert.tz_offset, false, None)?;
+                            new_trigger.is_silenced = false;
+                            trigger_data_stream.next_run_at = new_trigger.next_run_at;
                             new_trigger.data = json::to_string(&trigger_data).unwrap();
                             db::scheduler::update_trigger(new_trigger, true, &query_trace_id)
                                 .await?;
@@ -2553,6 +2601,16 @@ async fn handle_alert_triggers(
                 } else {
                     None
                 };
+                // reset the next run time without silence, because this was never delivered,
+                // simply pending
+                new_trigger.next_run_at = alert.trigger_condition.get_next_trigger_time(
+                    true,
+                    alert.tz_offset,
+                    false,
+                    None,
+                )?;
+                new_trigger.is_silenced = false;
+                trigger_data_stream.next_run_at = new_trigger.next_run_at;
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 // Condition matched; only the notification was
@@ -2803,7 +2861,6 @@ async fn handle_alert_triggers(
         //     );
         // }
 
-        // True when correlation sent or suppressed the notification itself; false sends below.
         #[cfg(feature = "enterprise")]
         let incident_handled_notification = if alert.creates_incident
             && o2_enterprise::enterprise::common::config::get_config()
@@ -2887,7 +2944,10 @@ async fn handle_alert_triggers(
             trigger_data_stream.dedup_suppressed = Some(false);
         }
 
-        if incident_handled_notification {
+        if !should_dispatch_after_incident(
+            incident_handled_notification,
+            !alert.workflows.is_empty(),
+        ) {
             // Notification was handled (sent or suppressed) inside correlate_alert_to_incident.
             // Still advance the trigger state so the scheduler moves forward normally.
             record_delivery(&mut trigger_data);
@@ -2898,17 +2958,18 @@ async fn handle_alert_triggers(
             };
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-        } else if let Some(dispatch) = dispatch_per_group(
-            &alert,
-            &scheduler_trace_id,
-            trigger_results.group_classification.as_ref(),
-            &data,
-            trigger_results.end_time,
-            eval_level,
-            Some(start_time),
-            triggered_at,
-        )
-        .await
+        } else if !incident_handled_notification
+            && let Some(dispatch) = dispatch_per_group(
+                &alert,
+                &scheduler_trace_id,
+                trigger_results.group_classification.as_ref(),
+                &data,
+                trigger_results.end_time,
+                eval_level,
+                Some(start_time),
+                triggered_at,
+            )
+            .await
         {
             // Per-group dispatch REPLACES the alert-level send (§5.5 MN-1):
             // sending both would page the worst group twice per incident.
@@ -3005,7 +3066,14 @@ async fn handle_alert_triggers(
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         } else {
-            // Direct notification — creates_incident=false, or incident correlation errored.
+            // Incident correlation owns destination delivery, but workflows are
+            // dispatched only here. Skip destinations already handled by the
+            // incident path so the same firing cannot page them twice.
+            let skip_destinations: &[String] = if incident_handled_notification {
+                &alert.destinations
+            } else {
+                &trigger_data.notified_destinations
+            };
             match alert
                 .send_notification(
                     &scheduler_trace_id,
@@ -3016,11 +3084,7 @@ async fn handle_alert_triggers(
                     eval_level,
                     trigger_results.actual_value,
                     None,
-                    // Retry ledger (§6.1): destinations that already landed on
-                    // a prior attempt of THIS notification cycle are skipped,
-                    // so a retry driven by one flaky destination cannot
-                    // double-page the ones that succeeded.
-                    &trigger_data.notified_destinations,
+                    skip_destinations,
                 )
                 .await
             {
@@ -5920,9 +5984,13 @@ mod tests {
 
     use super::*;
 
-    // ── On-call: one page per firing ────────────────────────────────────────
+    #[test]
+    fn incident_destination_delivery_does_not_suppress_attached_workflows() {
+        assert!(should_dispatch_after_incident(true, true));
+        assert!(!should_dispatch_after_incident(true, false));
+        assert!(should_dispatch_after_incident(false, false));
+    }
 
-    /// The record this evaluation's paging decision is taken against.
     #[cfg(feature = "enterprise")]
     fn oncall_record(
         state: config::meta::oncall::ResponseState,
@@ -5954,7 +6022,6 @@ mod tests {
         }
     }
 
-    /// While a record is open its ladder escalates, so `silence = 0` must not page every cycle.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_still_open_firing_does_not_page_again_on_the_next_cycle() {
@@ -5977,7 +6044,6 @@ mod tests {
         }
     }
 
-    /// A resolved firing that fires again later gets its own record, so its cause is history.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_resolved_firing_that_fires_again_gets_its_own_record() {
@@ -5999,7 +6065,6 @@ mod tests {
         );
     }
 
-    /// Both paths must agree, or ticking `creates_incident` changes how loudly an alert pages.
     #[test]
     fn test_both_entry_points_default_an_unset_priority_the_same_way() {
         assert_eq!(
