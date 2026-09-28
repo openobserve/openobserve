@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <OSelect
-        v-if="!isMobile && !isRUMPage && tokenOptions.length > 0"
+        v-if="lgUp && !isRUMPage && tokenOptions.length > 0"
         v-model="selectedTokenName"
         :options="tokenOptions"
         label-key="label"
@@ -85,7 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
       <div class="-ms-3 w-full">
-        <div v-if="isMobile && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
+        <!-- Below lg the token picker sits above the tabs so the title, search and token button share one row. -->
+        <div v-if="!lgUp && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
           <OSelect
             v-model="selectedTokenName"
             :options="tokenOptions"
@@ -263,7 +264,7 @@ export default defineComponent({
     OBanner,
   },
   setup() {
-    const { isMobile } = useBreakpoint();
+    const { isMobile, lgUp } = useBreakpoint();
     const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
@@ -709,6 +710,7 @@ export default defineComponent({
 
     return {
       isMobile,
+      lgUp,
       t,
       store,
       router,

@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="source-maps-container bg-card-glass-bg flex h-full flex-col overflow-hidden">
     <!-- Filters Section -->
     <div class="px-page-edge bg-surface-base py-3">
-      <!-- Phones wrap the filters two to a row, with the table actions on the row after. -->
-      <div class="flex items-end justify-between max-md:flex-wrap max-md:gap-2">
-        <div class="flex items-end gap-4 max-md:w-full max-md:flex-wrap max-md:gap-2">
+      <!-- Below lg the filters and actions share one wrapping row (filters two-up on phones) instead of running off the edge. -->
+      <div class="flex items-end justify-between max-lg:flex-wrap max-lg:gap-2">
+        <div class="flex items-end gap-4 max-lg:contents">
           <!-- Version Filter -->
           <OSelect
             v-model="filters.version"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Columns + Refresh + Upload Buttons -->
-        <div class="flex items-center gap-2 max-md:ms-auto">
+        <div class="flex items-center gap-2 max-lg:ms-auto">
           <OTableColumnToggle
             :columns="columns"
             :column-visibility="columnVisibility"
