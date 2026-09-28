@@ -72,8 +72,6 @@ class AnomalyDetectionPage {
             detectionWindowValue: '[data-test="anomaly-detection-window-value"]',
             detectionWindowUnit: '[data-test="anomaly-detection-window-unit"]',
             detectionWindowError: '[data-test="anomaly-detection-window-error"]',
-            detectionWindowHint: '[data-test="anomaly-detection-window-hint"]',
-            detectionWindowLegacyWarning: '[data-test="anomaly-detection-window-legacy-warning"]',
             trainingWindow: '[data-test="anomaly-training-window"]',
             retrainInterval: '[data-test="anomaly-retrain-interval"]',
             sensitivityTier: '[data-test="anomaly-sensitivity-tier"]',
@@ -399,16 +397,6 @@ class AnomalyDetectionPage {
     /** The below-floor validation message painted under the detection window. */
     getDetectionWindowErrorLocator() {
         return this.page.locator(this.selectors.detectionWindowError);
-    }
-
-    /** The floor hint (minimum + recommended), shown only while the window is valid. */
-    getDetectionWindowHintLocator() {
-        return this.page.locator(this.selectors.detectionWindowHint);
-    }
-
-    /** The grandfathered below-floor warning, shown only for an untouched stored triple. */
-    getDetectionWindowLegacyWarningLocator() {
-        return this.page.locator(this.selectors.detectionWindowLegacyWarning);
     }
 
     async getDetectionWindowValue() {
