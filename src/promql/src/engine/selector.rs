@@ -56,15 +56,11 @@ pub(super) enum SelectorOutput {
 }
 
 impl SelectorOutput {
-    pub(super) fn project(self, sample: &Sample) -> Option<f64> {
-        // A stale marker ends the series; selecting an older sample would resurrect it.
-        if sample.value.to_bits() == 0x7ff0_0000_0000_0002 {
-            return None;
-        }
-        Some(match self {
+    pub(super) fn project(self, sample: &Sample) -> f64 {
+        match self {
             Self::Value => sample.value,
             Self::SampleTimestamp => functions::timestamp_seconds(sample.timestamp),
-        })
+        }
     }
 
     pub(super) fn keep_metric_name(self) -> bool {
@@ -142,13 +138,13 @@ impl Engine {
     pub(super) async fn exec_vector_selector(
         &mut self,
         vs: &VectorSelector,
-        selected: SelectorOutput,
+        output: SelectorOutput,
     ) -> Result<Value> {
-        let data = match self.try_streaming_instant_selector(vs, selected).await? {
+        let data = match self.try_streaming_instant_selector(vs, output).await? {
             Some(data) => data,
             None => {
                 let vs = plain_selector(vs, "VectorSelector")?;
-                self.eval_vector_selector(&vs, None, selected).await?
+                self.eval_vector_selector(&vs, None, output).await?
             }
         };
         Ok(if data.is_empty() {
@@ -166,7 +162,7 @@ impl Engine {
         &mut self,
         selector: &VectorSelector,
         ctxs: Option<SelectorContexts>,
-        selected: SelectorOutput,
+        output: SelectorOutput,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
@@ -225,12 +221,12 @@ impl Engine {
                     None
                 };
 
-                if let Some(value) = match_sample.and_then(|sample| selected.project(sample)) {
-                    selected_samples.push(Sample::new(eval_ts, value));
+                if let Some(sample) = match_sample {
+                    selected_samples.push(Sample::new(eval_ts, output.project(sample)));
                 }
             }
 
-            let labels = selected.labels(metric.labels);
+            let labels = output.labels(metric.labels);
             (!selected_samples.is_empty()).then_some(RangeValue {
                 labels,
                 samples: selected_samples,

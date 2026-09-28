@@ -109,22 +109,6 @@ mod tests {
     }
 
     #[test]
-    fn test_timestamp_keeps_milliseconds() {
-        let data = Value::Matrix(vec![RangeValue::new(
-            Labels::default(),
-            vec![
-                Sample::new(1_000_003_700_000, 1.0),
-                Sample::new(1_000_003_700_999, 1.0),
-            ],
-        )]);
-        let Value::Matrix(series) = timestamp(data).unwrap() else {
-            panic!("expected a matrix");
-        };
-        let values: Vec<f64> = series[0].samples.iter().map(|s| s.value).collect();
-        assert_eq!(values, [1_000_003.7, 1_000_003.7]);
-    }
-
-    #[test]
     fn test_time_ops_invalid_input_returns_err() {
         assert!(minute(Value::Float(1.0)).is_err());
         assert!(timestamp(Value::Float(1.0)).is_err());

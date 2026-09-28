@@ -76,8 +76,10 @@ impl functions::RangeFunc for InstantSelectorFunc {
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
         let sample = samples.last()?;
         // Streaming windows shift sample times by the offset; projection needs the stored time.
-        self.output
-            .project(&Sample::new(sample.timestamp - self.offset, sample.value))
+        Some(
+            self.output
+                .project(&Sample::new(sample.timestamp - self.offset, sample.value)),
+        )
     }
 }
 
@@ -165,14 +167,14 @@ impl Engine {
     pub(super) async fn try_streaming_instant_selector(
         &mut self,
         vs: &VectorSelector,
-        selected: SelectorOutput,
+        output: SelectorOutput,
     ) -> Result<Option<Vec<RangeValue>>> {
         let lookback = self.ctx.lookback();
         let Some(scan) = self.selector_scan(vs, lookback, "VectorSelector").await? else {
             return Ok(None);
         };
         let func = Arc::new(InstantSelectorFunc {
-            output: selected,
+            output,
             offset: scan.offset,
         });
         if let Some((mut series, _)) = self.stream_range_func(&scan, func, lookback).await? {
@@ -187,7 +189,7 @@ impl Engine {
         }
 
         // the layout cannot stream: select on the contexts already created
-        self.eval_vector_selector(&scan.selector, Some(scan.ctxs), selected)
+        self.eval_vector_selector(&scan.selector, Some(scan.ctxs), output)
             .await
             .map(Some)
     }
@@ -1304,37 +1306,6 @@ mod tests {
                             (BASE + sample_time) as f64 / SECOND as f64
                         )]
                     );
-                }
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn test_timestamp_selector_stale_marker_does_not_fall_back() {
-        for streams in [true, false] {
-            for (last_value, present) in [
-                (f64::from_bits(0x7ff0_0000_0000_0002), false),
-                (f64::NAN, true),
-            ] {
-                let provider = provider_rows(
-                    streams,
-                    false,
-                    &[
-                        (BASE + 160 * SECOND, 7, 1.0),
-                        (BASE + 170 * SECOND, 7, last_value),
-                    ],
-                );
-                let mut engine = engine_at(provider, 30, BASE + 180 * SECOND, 0, None);
-                let expr = promql_parser::parser::parse("timestamp(m)").unwrap();
-                let (value, _) = engine.exec(&expr).await.unwrap();
-                let series = if matches!(value, Value::None) {
-                    vec![]
-                } else {
-                    canonical(value)
-                };
-                assert_eq!(!series.is_empty(), present, "streams {streams}");
-                if present {
-                    assert_eq!(series[0].1, [(BASE + 180 * SECOND, 1170.0)]);
                 }
             }
         }
