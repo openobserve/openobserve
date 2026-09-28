@@ -4803,5 +4803,19 @@ describe("AddPanel.vue", () => {
 
       expect(lastErrorMessage()).toBe("dashboard.addPanel.fixErrors");
     });
+
+    it("does not toast on Apply, where PanelEditor already reports the errors", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementationOnce((errors: string[]) => {
+        errors.push("Add one field for the X-Axis");
+      });
+      notificationMocks.showErrorNotification.mockClear();
+
+      wrapper.vm.runQuery();
+
+      expect(validatePanelMock).toHaveBeenCalled();
+      expect(notificationMocks.showErrorNotification).not.toHaveBeenCalled();
+      expect(wrapper.vm.errorData.errors).toEqual(["Add one field for the X-Axis"]);
+    });
   });
 });

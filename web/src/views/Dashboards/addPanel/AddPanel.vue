@@ -1074,10 +1074,8 @@ export default defineComponent({
 
     const runQuery = (withoutCache = false) => {
       try {
-        if (!isValid(true, true)) {
-          // do not return if query is not valid
-          // allow to fire query
-        }
+        // PanelEditor.runQuery shows the toast on Apply.
+        isValid(true, true, false);
 
         // should use cache flag
         shouldRefreshWithoutCache.value = withoutCache;
@@ -1239,7 +1237,7 @@ export default defineComponent({
     });
 
     //validate the data
-    const isValid = (onlyChart = false, isFieldsValidationRequired = true) => {
+    const isValid = (onlyChart = false, isFieldsValidationRequired = true, notify = true) => {
       const errors = errorData.errors;
       errors.splice(0);
       const dashboardData = dashboardPanelData;
@@ -1254,7 +1252,7 @@ export default defineComponent({
       // will push errors in errors array
       validatePanel(errors, isFieldsValidationRequired);
 
-      if (errors.length) {
+      if (errors.length && notify) {
         // This view's `errorData` is rendered nowhere, so the toast is all the user gets.
         showErrorNotification(raw(errors.join(", ")));
       }
