@@ -63,6 +63,9 @@ pub struct TimeRangePolicy {
 /// the values the author selected when generating the link.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PublicDashboardConfig {
+    /// Label that tells a dashboard's links apart; empty is allowed.
+    #[serde(default)]
+    pub name: String,
     #[serde(default)]
     pub visibility: Visibility,
     pub time_range: TimeRangePolicy,
@@ -71,6 +74,53 @@ pub struct PublicDashboardConfig {
     pub rebuild_secs: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<i64>,
+}
+
+/// A link's state as the admin UI shows it, derived from the stored row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PublicLinkStatus {
+    Live,
+    Paused,
+    Preparing,
+    NeedsAttention,
+    Expired,
+    DashboardDeleted,
+}
+
+impl PublicLinkStatus {
+    /// Precedence: deleted dashboard, expired, paused, never built, failed or stale, live.
+    pub fn derive(link: &PublicLinkState, now: i64) -> Self {
+        if !link.dashboard_exists {
+            return Self::DashboardDeleted;
+        }
+        if link.expires_at.is_some_and(|exp| exp <= now) {
+            return Self::Expired;
+        }
+        if !link.enabled {
+            return Self::Paused;
+        }
+        let Some(built) = link.last_rebuilt_at else {
+            return Self::Preparing;
+        };
+        // Three missed rebuilds means the viewer is looking at data the author didn't promise.
+        let stale_after = 3 * i64::from(link.rebuild_secs.max(1)) * 1_000_000;
+        if link.rebuild_failed || now - built > stale_after {
+            return Self::NeedsAttention;
+        }
+        Self::Live
+    }
+}
+
+/// The stored facts [`PublicLinkStatus::derive`] needs, independent of the DB row type.
+#[derive(Clone, Copy, Debug)]
+pub struct PublicLinkState {
+    pub dashboard_exists: bool,
+    pub enabled: bool,
+    pub expires_at: Option<i64>,
+    pub last_rebuilt_at: Option<i64>,
+    pub rebuild_failed: bool,
+    pub rebuild_secs: i32,
 }
 
 /// Whether a panel rendered, or was withheld (unreadable stream / unsupported).
@@ -184,5 +234,74 @@ mod tests {
         .unwrap();
         assert!(s.contains("resultMetaData"), "{s}");
         assert!(s.contains("\"panel-1\""), "{s}");
+    }
+
+    fn state() -> PublicLinkState {
+        PublicLinkState {
+            dashboard_exists: true,
+            enabled: true,
+            expires_at: None,
+            last_rebuilt_at: Some(1_000_000_000),
+            rebuild_failed: false,
+            rebuild_secs: 60,
+        }
+    }
+
+    #[test]
+    fn link_status_follows_its_precedence() {
+        let now = 1_000_000_000 + 30_000_000;
+        assert_eq!(
+            PublicLinkStatus::derive(&state(), now),
+            PublicLinkStatus::Live
+        );
+        let s = PublicLinkState {
+            dashboard_exists: false,
+            enabled: false,
+            ..state()
+        };
+        assert_eq!(
+            PublicLinkStatus::derive(&s, now),
+            PublicLinkStatus::DashboardDeleted
+        );
+        let s = PublicLinkState {
+            expires_at: Some(now),
+            enabled: false,
+            ..state()
+        };
+        assert_eq!(PublicLinkStatus::derive(&s, now), PublicLinkStatus::Expired);
+        let s = PublicLinkState {
+            enabled: false,
+            ..state()
+        };
+        assert_eq!(PublicLinkStatus::derive(&s, now), PublicLinkStatus::Paused);
+        let s = PublicLinkState {
+            last_rebuilt_at: None,
+            ..state()
+        };
+        assert_eq!(
+            PublicLinkStatus::derive(&s, now),
+            PublicLinkStatus::Preparing
+        );
+        let s = PublicLinkState {
+            rebuild_failed: true,
+            ..state()
+        };
+        assert_eq!(
+            PublicLinkStatus::derive(&s, now),
+            PublicLinkStatus::NeedsAttention
+        );
+    }
+
+    #[test]
+    fn link_goes_stale_after_three_missed_rebuilds() {
+        let built = 1_000_000_000;
+        assert_eq!(
+            PublicLinkStatus::derive(&state(), built + 180_000_000),
+            PublicLinkStatus::Live
+        );
+        assert_eq!(
+            PublicLinkStatus::derive(&state(), built + 180_000_001),
+            PublicLinkStatus::NeedsAttention
+        );
     }
 }

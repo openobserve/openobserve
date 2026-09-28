@@ -213,6 +213,8 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    /// Hides the publish button and the Public links view when the feature is off.
+    public_dashboards_enabled: bool,
     /// Floor for a public dashboard's "Refresh every" cadence; the share dialog enforces it.
     public_dashboard_min_rebuild_secs: u64,
     oncall_enabled: bool,
@@ -608,6 +610,7 @@ pub async fn zo_config(
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        public_dashboards_enabled: cfg.public_dashboards.enabled,
         public_dashboard_min_rebuild_secs: cfg.public_dashboards.min_rebuild_secs,
         oncall_enabled,
         synthetics_private_locations_enabled,

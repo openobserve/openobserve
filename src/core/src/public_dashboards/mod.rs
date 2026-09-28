@@ -24,7 +24,10 @@ use config::{
     ider,
     meta::{
         dashboards::Dashboard,
-        public_dashboards::{PanelSnapshot, PanelState, PublicDashboardConfig, SnapshotData},
+        public_dashboards::{
+            PanelSnapshot, PanelState, PublicDashboardConfig, PublicLinkState, PublicLinkStatus,
+            SnapshotData, TimeRangePolicy,
+        },
         search,
         stream::StreamType,
     },
@@ -518,6 +521,7 @@ pub async fn create(
         folder_id: folder.folder_id.clone(),
         dashboard_id: dashboard_id.to_string(),
         slug: slug.clone(),
+        name: cfg.name.trim().to_string(),
         visibility: cfg.visibility.to_i32(),
         time_range_editable: cfg.time_range.editable,
         default_range_secs: cfg.time_range.default_range_secs,
@@ -550,8 +554,154 @@ pub async fn list(org: &str) -> Result<Vec<PublicDashboard>, anyhow::Error> {
     Ok(pd_table::list(org).await?)
 }
 
-pub async fn get(org: &str, dashboard_id: &str) -> Result<Option<PublicDashboard>, anyhow::Error> {
-    Ok(pd_table::get_by_dashboard(org, dashboard_id).await?)
+pub async fn list_for_dashboard(
+    org: &str,
+    dashboard_id: &str,
+) -> Result<Vec<PublicDashboard>, anyhow::Error> {
+    Ok(pd_table::list_by_dashboard(org, dashboard_id).await?)
+}
+
+/// A link as the admin API returns it; the slug is a bearer secret, so only authenticated routes
+/// carry it.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct PublicLinkView {
+    pub id: String,
+    pub name: String,
+    pub slug: String,
+    pub dashboard_id: String,
+    pub dashboard_title: Option<String>,
+    pub folder_id: Option<String>,
+    pub folder_name: Option<String>,
+    pub status: PublicLinkStatus,
+    pub enabled: bool,
+    pub time_range: TimeRangePolicy,
+    pub frozen_variables: BTreeMap<String, serde_json::Value>,
+    pub rebuild_secs: i32,
+    pub last_rebuilt_at: Option<i64>,
+    pub rebuild_state: i32,
+    pub expires_at: Option<i64>,
+    pub published_by: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// Attach each link's dashboard title, current folder and derived status, with one dashboard
+/// lookup.
+pub async fn views(
+    org: &str,
+    links: Vec<PublicDashboard>,
+) -> Result<Vec<PublicLinkView>, anyhow::Error> {
+    let ids: Vec<String> = links
+        .iter()
+        .map(|l| l.dashboard_id.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let labels = dashboards::labels_by_ids(org, &ids).await?;
+    let now = now_micros();
+    Ok(links
+        .into_iter()
+        .map(|link| {
+            let label = labels.get(&link.dashboard_id);
+            let status = PublicLinkStatus::derive(
+                &PublicLinkState {
+                    dashboard_exists: label.is_some(),
+                    enabled: link.enabled,
+                    expires_at: link.expires_at,
+                    last_rebuilt_at: link.last_rebuilt_at,
+                    rebuild_failed: link.rebuild_state == REBUILD_STATE_ERROR,
+                    rebuild_secs: link.rebuild_secs,
+                },
+                now,
+            );
+            PublicLinkView {
+                dashboard_title: label.map(|l| l.title.clone()),
+                folder_id: label.map(|l| l.folder_id.clone()),
+                folder_name: label.map(|l| l.folder_name.clone()),
+                status,
+                enabled: link.enabled,
+                time_range: TimeRangePolicy {
+                    editable: link.time_range_editable,
+                    default_range_secs: link.default_range_secs,
+                    allowed_presets_secs: parse_i64_list(link.allowed_presets_secs.as_deref()),
+                },
+                frozen_variables: parse_frozen_vars(link.frozen_variables.as_deref()),
+                rebuild_secs: link.rebuild_secs,
+                last_rebuilt_at: link.last_rebuilt_at,
+                rebuild_state: link.rebuild_state,
+                expires_at: link.expires_at,
+                published_by: link.published_by,
+                created_at: link.created_at,
+                updated_at: link.updated_at,
+                id: link.id,
+                name: link.name,
+                slug: link.slug,
+                dashboard_id: link.dashboard_id,
+            }
+        })
+        .collect())
+}
+
+/// A link only when it belongs to both this org and this dashboard, so an id from
+/// another dashboard can't be reached by editing the URL.
+pub async fn get_link(
+    org: &str,
+    dashboard_id: &str,
+    id: &str,
+) -> Result<Option<PublicDashboard>, anyhow::Error> {
+    Ok(pd_table::get_on_dashboard(org, dashboard_id, id).await?)
+}
+
+/// Replace a link's settings in place; its slug never changes.
+pub async fn update_link(
+    mut link: PublicDashboard,
+    cfg: PublicDashboardConfig,
+) -> Result<PublicDashboard, anyhow::Error> {
+    link.name = cfg.name.trim().to_string();
+    link.time_range_editable = cfg.time_range.editable;
+    link.default_range_secs = cfg.time_range.default_range_secs;
+    link.allowed_presets_secs = Some(serde_json::to_string(&cfg.time_range.allowed_presets_secs)?);
+    link.frozen_variables = Some(serde_json::to_string(&cfg.frozen_variables)?);
+    link.rebuild_secs = cfg.rebuild_secs;
+    link.expires_at = cfg.expires_at;
+    link.updated_at = now_micros();
+    pd_table::update(&link).await?;
+
+    let mut keep = cfg.time_range.allowed_presets_secs.clone();
+    keep.extend(cfg.time_range.default_range_secs);
+    pd_table::prune_snapshots(infra::db::get_orm_client_rw().await, &link.id, &keep).await?;
+    if link.enabled {
+        restart_rebuilds(&link).await?;
+    }
+    Ok(link)
+}
+
+/// Stop serving and rebuilding; the slug, settings and snapshots are kept.
+pub async fn pause_link(mut link: PublicDashboard) -> Result<PublicDashboard, anyhow::Error> {
+    link.enabled = false;
+    link.updated_at = now_micros();
+    pd_table::update(&link).await?;
+    let _ = db::scheduler::delete(
+        &link.org_id,
+        db::scheduler::TriggerModule::PublicDashboard,
+        &link.id,
+    )
+    .await;
+    Ok(link)
+}
+
+/// Serve and rebuild again at the same address, with a fresh build straight away.
+pub async fn resume_link(mut link: PublicDashboard) -> Result<PublicDashboard, anyhow::Error> {
+    if link.expires_at.is_some_and(|exp| exp <= now_micros()) {
+        return Err(anyhow::anyhow!(
+            "this link has expired; extend its expiry date to bring it back"
+        ));
+    }
+    link.enabled = true;
+    link.updated_at = now_micros();
+    pd_table::update(&link).await?;
+    restart_rebuilds(&link).await?;
+    Ok(link)
 }
 
 /// Revoke: delete the share, its snapshots, and its rebuild trigger.
@@ -561,6 +711,26 @@ pub async fn delete(org: &str, id: &str) -> Result<bool, anyhow::Error> {
         let _ = db::scheduler::delete(org, db::scheduler::TriggerModule::PublicDashboard, id).await;
     }
     Ok(existed)
+}
+
+/// Replace the link's trigger with one due now and build synchronously, so edits and
+/// resumes show fresh data at once instead of after the next cadence tick.
+async fn restart_rebuilds(link: &PublicDashboard) -> Result<(), anyhow::Error> {
+    let _ = db::scheduler::delete(
+        &link.org_id,
+        db::scheduler::TriggerModule::PublicDashboard,
+        &link.id,
+    )
+    .await;
+    let now = now_micros();
+    register_trigger(&link.org_id, &link.id, now).await?;
+    if let Err(e) = rebuild_one(link).await {
+        log::warn!(
+            "public dashboard rebuild after change failed for {}: {e}",
+            link.id
+        );
+    }
+    Ok(())
 }
 
 async fn register_trigger(org: &str, id: &str, next_run_at: i64) -> Result<(), anyhow::Error> {
@@ -582,7 +752,12 @@ pub fn validate_config(cfg: &PublicDashboardConfig) -> Result<(), String> {
     check_rebuild_secs(
         cfg.rebuild_secs,
         config::get_config().public_dashboards.min_rebuild_secs,
-    )
+    )?;
+    check_expiry(cfg.expires_at, now_micros())?;
+    if cfg.name.trim().chars().count() > 256 {
+        return Err("name must be at most 256 characters".to_string());
+    }
+    Ok(())
 }
 
 fn check_rebuild_secs(secs: i32, floor: u64) -> Result<(), String> {
@@ -591,6 +766,13 @@ fn check_rebuild_secs(secs: i32, floor: u64) -> Result<(), String> {
             "rebuild_secs must be at least {} seconds",
             floor.max(1)
         ));
+    }
+    Ok(())
+}
+
+fn check_expiry(expires_at: Option<i64>, now: i64) -> Result<(), String> {
+    if expires_at.is_some_and(|exp| exp <= now) {
+        return Err("expiry must be in the future".to_string());
     }
     Ok(())
 }
@@ -635,6 +817,16 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.clone()))
             .collect()
+    }
+
+    #[test]
+    fn expiry_must_be_in_the_future() {
+        assert!(check_expiry(None, 100).is_ok());
+        assert!(check_expiry(Some(101), 100).is_ok());
+        assert_eq!(
+            check_expiry(Some(100), 100).unwrap_err(),
+            "expiry must be in the future"
+        );
     }
 
     #[test]

@@ -4671,9 +4671,11 @@
       "publishFailed": "Failed to publish",
       "revokedToast": "Public link revoked",
       "revokeFailed": "Failed to revoke",
+      "noPublishPermission": "You don't have permission to publish dashboards publicly. Ask an admin for the Public Dashboards permission.",
       "linkCopied": "Link copied",
       "copyLink": "Copy link",
-      "past": "Past {range}"
+      "past": "Past {range}",
+      "expired": "This link has expired."
     },
     "approximately": "Approximately",
     "tableRowsWillBeDisplayed": "table rows will be displayed",
@@ -6025,7 +6027,41 @@
       "markerAria": "Exemplar {value} at {time}"
     },
     "showExemplarsLabel": "Show exemplars",
-    "showExemplarsHelp": "Draws trace samples on this chart for everyone who opens the dashboard. Viewers can still hide them from the panel header."
+    "showExemplarsHelp": "Draws trace samples on this chart for everyone who opens the dashboard. Viewers can still hide them from the panel header.",
+    "publicLinks": {
+      "panelTitle": "Public links",
+      "panelTitleFor": "Public links — {name}",
+      "intro": "Anyone with a public link can view this dashboard without signing in.",
+      "editNote": "The link's address stays the same. Changes appear on the public page at its next update.",
+      "name": "Name",
+      "namePlaceholder": "e.g. Acme — customer view",
+      "nameTooLong": "Name must be at most 256 characters",
+      "untitled": "Untitled link",
+      "status": "Status",
+      "timeRanges": "Time ranges",
+      "refresh": "Refresh",
+      "updated": "Updated",
+      "newLink": "New public link",
+      "createLink": "Create link",
+      "saveChanges": "Save changes",
+      "backToLinks": "Back to all links",
+      "createdTitle": "Your public link is ready",
+      "openPublicPage": "Open public page",
+      "editSettings": "Edit settings",
+      "pause": "Pause",
+      "resume": "Resume",
+      "pausedToast": "Link paused",
+      "resumedToast": "Link resumed",
+      "savedToast": "Link settings saved",
+      "actionFailed": "Failed to update the link",
+      "revokeConfirm": "Revoke \"{name}\"? Anyone using this link loses access. This can't be undone.",
+      "expiresHelp": "The link stops at the end of this day. Leave empty to never expire.",
+      "expiresInPast": "Pick today or a later date",
+      "expiresToday": "Expires today",
+      "expiresInDays": "Expires in {n} day | Expires in {n} days",
+      "presetsRequired": "Pick at least one time range",
+      "defaultNotAvailable": "The default must be one of the available time ranges"
+    }
   },
   "panel": {
     "addPivotShort": "+P",
@@ -16324,6 +16360,14 @@
         "belowTopN": "below top-N",
         "truncated": "truncated",
         "gap": "gap"
+      },
+      "publicLinkStatus": {
+        "live": "Live",
+        "paused": "Paused",
+        "preparing": "Preparing",
+        "needsAttention": "Needs attention",
+        "expired": "Expired",
+        "dashboardDeleted": "Dashboard deleted"
       }
     }
   },

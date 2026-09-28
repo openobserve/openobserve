@@ -16,6 +16,7 @@ pub struct Model {
     pub folder_id: String,
     pub dashboard_id: String,
     pub slug: String,
+    pub name: String,
     // 0 draft, 1 public.
     pub visibility: i32,
     pub time_range_editable: bool,

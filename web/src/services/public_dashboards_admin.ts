@@ -15,15 +15,64 @@
 
 import http from "./http";
 
-// Authenticated admin surface for publishing a dashboard publicly. Requires the
-// caller's normal RBAC on the parent dashboard (enforced server-side).
+export type PublicLinkStatus =
+  "live" | "paused" | "preparing" | "needs_attention" | "expired" | "dashboard_deleted";
+
+export interface PublicLinkTimeRange {
+  editable: boolean;
+  default_range_secs?: number | null;
+  allowed_presets_secs: number[];
+}
+
+/** The settings a link is created or edited with. */
+export interface PublicLinkConfig {
+  name: string;
+  visibility: "public";
+  time_range: PublicLinkTimeRange;
+  frozen_variables: Record<string, unknown>;
+  rebuild_secs: number;
+  expires_at?: number | null;
+}
+
+/** One public link as the admin API returns it; `slug` is the link's bearer secret. */
+export interface PublicLink {
+  id: string;
+  name: string;
+  slug: string;
+  dashboard_id: string;
+  dashboard_title: string | null;
+  folder_id: string | null;
+  folder_name: string | null;
+  status: PublicLinkStatus;
+  enabled: boolean;
+  time_range: PublicLinkTimeRange;
+  frozen_variables: Record<string, unknown>;
+  rebuild_secs: number;
+  last_rebuilt_at: number | null;
+  rebuild_state: number;
+  expires_at: number | null;
+  published_by: string;
+  created_at: number;
+  updated_at: number;
+}
+
+const linksPath = (org: string, dashboardId: string) =>
+  `/api/${org}/dashboards/${dashboardId}/public_links`;
+
 const public_dashboards_admin = {
-  get: (org: string, dashboardId: string) =>
-    http().get(`/api/${org}/dashboards/${dashboardId}/public`),
-  publish: (org: string, dashboardId: string, config: any) =>
-    http().post(`/api/${org}/dashboards/${dashboardId}/public`, config),
-  revoke: (org: string, dashboardId: string) =>
-    http().delete(`/api/${org}/dashboards/${dashboardId}/public`),
+  listOrg: (org: string) => http().get<{ list: PublicLink[] }>(`/api/${org}/public_dashboards`),
+  list: (org: string, dashboardId: string) =>
+    http().get<{ list: PublicLink[] }>(linksPath(org, dashboardId)),
+  create: (org: string, dashboardId: string, config: PublicLinkConfig) =>
+    http().post<PublicLink>(linksPath(org, dashboardId), config),
+  update: (org: string, dashboardId: string, linkId: string, config: PublicLinkConfig) =>
+    http().put<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}`, config),
+  pause: (org: string, dashboardId: string, linkId: string) =>
+    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/pause`),
+  resume: (org: string, dashboardId: string, linkId: string) =>
+    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/resume`),
+  revoke: (org: string, dashboardId: string, linkId: string) =>
+    http().delete(`${linksPath(org, dashboardId)}/${linkId}`),
 };
 
 export default public_dashboards_admin;

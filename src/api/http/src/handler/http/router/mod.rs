@@ -1664,16 +1664,31 @@ pub fn service_routes() -> Router {
         }
     }
 
-    // Public dashboards — authenticated admin CRUD (publish / view / revoke).
-    // The public read plane lives in basic_routes, not here. Gated by the
-    // ZO_PUBLIC_DASHBOARD_ENABLED flag (checked in-handler). RBAC on the
-    // parent dashboard is enforced by the route-permission middleware.
-    router = router.route(
-        "/{org_id}/dashboards/{dashboard_id}/public",
-        get(public_dashboards::admin::get)
-            .post(public_dashboards::admin::create)
-            .delete(public_dashboards::admin::delete),
-    );
+    // Public dashboard links — authenticated admin CRUD; the anonymous read plane lives in
+    // basic_routes. The feature flag is checked in-handler so disabled routes 404.
+    router = router
+        .route(
+            "/{org_id}/public_dashboards",
+            get(public_dashboards::admin::list_org),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links",
+            get(public_dashboards::admin::list).post(public_dashboards::admin::create),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}",
+            get(public_dashboards::admin::get)
+                .put(public_dashboards::admin::update)
+                .delete(public_dashboards::admin::delete),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause",
+            post(public_dashboards::admin::pause),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume",
+            post(public_dashboards::admin::resume),
+        );
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {

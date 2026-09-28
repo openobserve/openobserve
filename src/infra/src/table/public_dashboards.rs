@@ -122,6 +122,18 @@ pub async fn upsert_snapshot<C: ConnectionTrait>(
     Ok(())
 }
 
+/// Drop every snapshot of a link (expiry), keeping the link row itself.
+pub async fn delete_snapshots<C: ConnectionTrait>(
+    conn: &C,
+    public_dashboard_id: &str,
+) -> Result<(), errors::Error> {
+    public_dashboard_snapshots::Entity::delete_many()
+        .filter(public_dashboard_snapshots::Column::PublicDashboardId.eq(public_dashboard_id))
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
 /// Drop snapshot rows for presets no longer offered (on config update).
 pub async fn prune_snapshots<C: ConnectionTrait>(
     conn: &C,
@@ -186,13 +198,29 @@ pub async fn get_by_slug_any(
         .await?)
 }
 
-/// The share for a dashboard (at most one), org-scoped.
-pub async fn get_by_dashboard(
+/// Every public link on one dashboard, newest first, org-scoped.
+pub async fn list_by_dashboard(
     org_id: &str,
     dashboard_id: &str,
+) -> Result<Vec<public_dashboards::Model>, errors::Error> {
+    let conn = get_orm_client_ro().await;
+    Ok(public_dashboards::Entity::find()
+        .filter(public_dashboards::Column::OrgId.eq(org_id))
+        .filter(public_dashboards::Column::DashboardId.eq(dashboard_id))
+        .order_by_desc(public_dashboards::Column::CreatedAt)
+        .all(conn)
+        .await?)
+}
+
+/// One link, only if it belongs to this org and this dashboard.
+pub async fn get_on_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    id: &str,
 ) -> Result<Option<public_dashboards::Model>, errors::Error> {
     let conn = get_orm_client_ro().await;
     Ok(public_dashboards::Entity::find()
+        .filter(public_dashboards::Column::Id.eq(id))
         .filter(public_dashboards::Column::OrgId.eq(org_id))
         .filter(public_dashboards::Column::DashboardId.eq(dashboard_id))
         .one(conn)

@@ -45,12 +45,12 @@ pub struct DataParams {
 enum Servable {
     NotFound,
     Unavailable,
+    Expired,
     Ok(Box<Model>),
 }
 
-/// Resolve a slug to a servable share record, or a reason it is not served.
-/// Unknown / draft / disabled → uniform 404 (no existence oracle); expired /
-/// org-suspended → neutral "unavailable".
+/// Resolve a slug to a servable link, or why it isn't served: unknown / draft → uniform 404
+/// (no existence oracle); paused → 503; expired → 410. Only a slug holder sees the latter two.
 async fn resolve(slug: &str) -> Servable {
     if !config::get_config().public_dashboards.enabled {
         return Servable::NotFound;
@@ -61,12 +61,13 @@ async fn resolve(slug: &str) -> Servable {
         _ => return Servable::NotFound,
     };
     // visibility: 0 draft, 1 public.
-    if pd.visibility != 1 || !pd.enabled {
+    if pd.visibility != 1 {
         return Servable::NotFound;
     }
-    if let Some(exp) = pd.expires_at
-        && exp <= now_micros()
-    {
+    if pd.expires_at.is_some_and(|exp| exp <= now_micros()) {
+        return Servable::Expired;
+    }
+    if !pd.enabled {
         return Servable::Unavailable;
     }
     // TODO(R14): the public plane carries no `blocked_orgs_middleware`, so a
@@ -79,6 +80,7 @@ pub async fn config(Path(slug): Path<String>) -> Response {
     let pd = match resolve(&slug).await {
         Servable::Ok(pd) => pd,
         Servable::Unavailable => return unavailable(),
+        Servable::Expired => return expired(),
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
     };
     let conn = get_orm_client_ro().await;
@@ -108,6 +110,7 @@ pub async fn data(Path(slug): Path<String>, Query(params): Query<DataParams>) ->
     let pd = match resolve(&slug).await {
         Servable::Ok(pd) => pd,
         Servable::Unavailable => return unavailable(),
+        Servable::Expired => return expired(),
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
     };
     let conn = get_orm_client_ro().await;
@@ -144,6 +147,10 @@ fn public_variables(dash: &Dashboard, frozen: Option<&str>) -> Vec<PublicVariabl
                 .unwrap_or(serde_json::Value::Null),
         })
         .collect()
+}
+
+fn expired() -> Response {
+    (StatusCode::GONE, "expired").into_response()
 }
 
 fn unavailable() -> Response {

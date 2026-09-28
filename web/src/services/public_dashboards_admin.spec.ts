@@ -14,40 +14,55 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { AxiosInstance } from "axios";
 
-vi.mock("./http", () => ({
-  default: vi.fn(() => ({ get: vi.fn(), post: vi.fn(), delete: vi.fn() })),
-}));
+vi.mock("./http", () => ({ default: vi.fn() }));
 
 import http from "./http";
-import service from "./public_dashboards_admin";
+import service, { type PublicLinkConfig } from "./public_dashboards_admin";
+
+const cfg: PublicLinkConfig = {
+  name: "NOC",
+  visibility: "public",
+  time_range: { editable: false, default_range_secs: 3600, allowed_presets_secs: [3600] },
+  frozen_variables: {},
+  rebuild_secs: 60,
+  expires_at: null,
+};
 
 describe("public_dashboards_admin service", () => {
-  let mockHttp: any;
+  const mockHttp = {
+    get: vi.fn().mockResolvedValue({ data: {} }),
+    post: vi.fn().mockResolvedValue({ data: {} }),
+    put: vi.fn().mockResolvedValue({ data: {} }),
+    delete: vi.fn().mockResolvedValue({ data: {} }),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockHttp = {
-      get: vi.fn().mockResolvedValue({ data: {} }),
-      post: vi.fn().mockResolvedValue({ data: {} }),
-      delete: vi.fn().mockResolvedValue({ data: {} }),
-    };
-    (http as any).mockReturnValue(mockHttp);
+    vi.mocked(http).mockReturnValue(mockHttp as unknown as AxiosInstance);
   });
 
-  it("get() reads the share for a dashboard", async () => {
-    await service.get("org1", "dash1");
-    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public");
+  it("lists the org's links and a dashboard's links", async () => {
+    await service.listOrg("org1");
+    await service.list("org1", "dash1");
+    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/public_dashboards");
+    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links");
   });
 
-  it("publish() posts the config to the dashboard's public route", async () => {
-    const cfg = { visibility: "public", rebuild_secs: 60 };
-    await service.publish("org1", "dash1", cfg);
-    expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public", cfg);
+  it("creates with POST and edits one link with PUT", async () => {
+    await service.create("org1", "dash1", cfg);
+    await service.update("org1", "dash1", "l1", cfg);
+    expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links", cfg);
+    expect(mockHttp.put).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1", cfg);
   });
 
-  it("revoke() deletes the share", async () => {
-    await service.revoke("org1", "dash1");
-    expect(mockHttp.delete).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public");
+  it("pauses, resumes and revokes one link", async () => {
+    await service.pause("org1", "dash1", "l1");
+    await service.resume("org1", "dash1", "l1");
+    await service.revoke("org1", "dash1", "l1");
+    expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1/pause");
+    expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1/resume");
+    expect(mockHttp.delete).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1");
   });
 });

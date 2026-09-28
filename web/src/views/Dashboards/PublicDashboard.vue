@@ -32,15 +32,17 @@
     </div>
 
     <div
-      v-else-if="state === 'notfound' || state === 'unavailable'"
+      v-else-if="state === 'notfound' || state === 'unavailable' || state === 'expired'"
       class="flex min-h-[60vh] flex-col items-center justify-center"
       data-test="dashboards-public-dashboard-error"
     >
       <div class="text-text-secondary text-sm">
         {{
-          state === "unavailable"
-            ? t("dashboard.publicDashboard.unavailable")
-            : t("dashboard.publicDashboard.notAvailable")
+          state === "expired"
+            ? t("dashboard.publicDashboard.expired")
+            : state === "unavailable"
+              ? t("dashboard.publicDashboard.unavailable")
+              : t("dashboard.publicDashboard.notAvailable")
         }}
       </div>
     </div>
@@ -182,7 +184,9 @@ const store = useStore();
 const { t } = useI18nTyped();
 const slug = String(route.params.slug || "");
 
-const state = ref<"loading" | "ready" | "preparing" | "notfound" | "unavailable">("loading");
+const state = ref<"loading" | "ready" | "preparing" | "notfound" | "unavailable" | "expired">(
+  "loading",
+);
 const config = ref<Record<string, any>>({});
 const snapshot = ref<Record<string, any>>({});
 const selectedPreset = ref<number | null>(null);
@@ -298,7 +302,7 @@ const pickDefaultPreset = (): number | null => {
 
 const mapError = (e: unknown) => {
   const status = (e as { response?: { status?: number } })?.response?.status;
-  state.value = status === 503 ? "unavailable" : "notfound";
+  state.value = status === 410 ? "expired" : status === 503 ? "unavailable" : "notfound";
 };
 
 const loadData = async () => {

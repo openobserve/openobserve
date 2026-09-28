@@ -73,6 +73,7 @@ struct PendingMigrations {
     workflow_folders: bool,
     synthetic_environments: bool,
     prompts: bool,
+    public_dashboards: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -518,6 +519,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.prompts {
         keys.extend(["prompts", "prompt_labels"]);
     }
+    if pending.public_dashboards {
+        keys.push("public_dashboards");
+    }
     keys
 }
 
@@ -556,6 +560,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_47 = version_compare::Version::from("0.0.47").unwrap();
     let v0_0_48 = version_compare::Version::from("0.0.48").unwrap();
     let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
+    let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -666,6 +671,26 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] prompt permissions migration needed");
         pending.prompts = true;
     }
+    if existing_model_version < v0_0_51 {
+        log::info!("[OFGA:Local] public dashboards permissions migration needed");
+        pending.public_dashboards = true;
+    }
 
     pending
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn public_dashboards_back_fill_runs_once_across_0_0_51() {
+        assert!(pending_migrations("0.0.51", "0.0.50").public_dashboards);
+        assert!(!pending_migrations("0.0.51", "0.0.51").public_dashboards);
+        let pending = PendingMigrations {
+            public_dashboards: true,
+            ..Default::default()
+        };
+        assert_eq!(all_org_ownership_keys(&pending), vec!["public_dashboards"]);
+    }
 }

@@ -138,7 +138,15 @@ describe("PublicDashboard viewer", () => {
     expect(w.text()).toContain("not available");
   });
 
-  it("shows unavailable on a 503 (expired / org suspended)", async () => {
+  it("shows the expired message on a 410", async () => {
+    vi.mocked(service.getConfig).mockRejectedValue({ response: { status: 410 } });
+    const w = buildWrapper();
+    await flushPromises();
+    expect(has(w, "dashboards-public-dashboard-error")).toBe(true);
+    expect(w.text()).toContain("This link has expired.");
+  });
+
+  it("shows unavailable on a 503 (paused / org suspended)", async () => {
     (service.getConfig as any).mockRejectedValue({ response: { status: 503 } });
     const w = buildWrapper();
     await flushPromises();

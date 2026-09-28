@@ -205,6 +205,7 @@ mod m20260922_000002_create_user_password_history_table;
 mod m20260922_000003_create_user_auth_state_table;
 mod m20260923_000001_create_llm_prompts;
 mod m20260924_000001_add_recovery_episode_columns;
+mod m20260925_000001_add_name_to_public_dashboards;
 mod m20260928_000001_add_alert_recovery_destinations;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
@@ -506,6 +507,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260918_000001_create_oncall_response_reports::Migration),
             Box::new(m20260908_000001_create_synthetics_refs::Migration),
             Box::new(m20260907_000001_create_public_dashboards_tables::Migration),
+            Box::new(m20260925_000001_add_name_to_public_dashboards::Migration),
         ]
     }
 }
@@ -559,6 +561,8 @@ mod tests {
         (92, "m20260928_000001_add_alert_recovery_destinations"),
         (93, "m20260918_000001_create_oncall_response_reports"),
         (94, "m20260908_000001_create_synthetics_refs"),
+        // Also covers m20260907 (public dashboards tables), which no earlier bump did.
+        (95, "m20260925_000001_add_name_to_public_dashboards"),
     ];
 
     #[test]

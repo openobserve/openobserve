@@ -3748,6 +3748,8 @@ async fn handle_public_dashboard_triggers(
     if let Some(exp) = pd.expires_at
         && exp <= now
     {
+        // Expired data is not kept at rest; the row stays so the link still lists as Expired.
+        infra::table::public_dashboards::delete_snapshots(conn, pd_id).await?;
         db::scheduler::delete(
             &trigger.org,
             db::scheduler::TriggerModule::PublicDashboard,

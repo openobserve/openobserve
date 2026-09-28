@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Authenticated admin surface for publishing a dashboard. Routes live in
-//! `service_routes()` under `auth_middleware`, so per-route RBAC (the caller
-//! must be able to manage the parent dashboard) is enforced declaratively. The
-//! publisher's own stream read-permissions are re-checked inside the core
-//! `create` (the publish-time authz gate), independent of the caller's rights.
+//! Admin API for public dashboard links; Enterprise also requires dashboard edit access.
 
 use axum::{
     Json,
@@ -27,9 +23,12 @@ use axum::{
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::public_dashboards::PublicDashboardConfig;
+use infra::table::entity::public_dashboards::Model as PublicDashboard;
 use openobserve_api_common::extractors::Headers;
 
 use crate::service::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use crate::service::auth::check_permissions;
 
 fn map_err(ctx: &str, e: anyhow::Error) -> Response {
     let msg = e.to_string();
@@ -53,31 +52,103 @@ fn feature_gate() -> Option<Response> {
     }
 }
 
-/// GET /{org_id}/dashboards/{dashboard_id}/public — the current share, or 404.
-pub async fn get(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
-    if let Some(r) = feature_gate() {
-        return r;
-    }
-    match openobserve_core::public_dashboards::get(&org_id, &dashboard_id).await {
-        Ok(Some(pd)) => MetaHttpResponse::json(serde_json::json!({
-            "id": pd.id,
-            "slug": pd.slug,
-            "visibility": pd.visibility,
-            "enabled": pd.enabled,
-            "expires_at": pd.expires_at,
-            "rebuild_secs": pd.rebuild_secs,
-            "time_range_editable": pd.time_range_editable,
-            "default_range_secs": pd.default_range_secs,
-            "last_rebuilt_at": pd.last_rebuilt_at,
-            "published_by": pd.published_by,
-            "created_at": pd.created_at,
-        })),
-        Ok(None) => MetaHttpResponse::not_found("not found"),
-        Err(e) => map_err("get", e),
+/// The route grant is org-wide, so managing a link also needs edit access to its dashboard;
+/// `allow_orphan` lets revoke clean up links whose dashboard was deleted.
+#[cfg(feature = "enterprise")]
+async fn edit_access_gate(
+    org_id: &str,
+    dashboard_id: &str,
+    user_id: &str,
+    allow_orphan: bool,
+) -> Option<Response> {
+    let folder_id = match infra::table::dashboards::get_by_id(org_id, dashboard_id).await {
+        Ok(Some((folder, _))) => folder.folder_id,
+        Ok(None) if allow_orphan => return None,
+        Ok(None) => return Some(MetaHttpResponse::not_found("dashboard not found")),
+        Err(e) => return Some(map_err("edit_access_gate", e.into())),
+    };
+    let allowed = check_permissions(
+        dashboard_id,
+        org_id,
+        user_id,
+        "dashboards",
+        "PUT",
+        Some(&folder_id),
+        false,
+        true,
+        false,
+    )
+    .await;
+    (!allowed).then(|| {
+        MetaHttpResponse::forbidden(
+            "you need edit access to this dashboard to manage its public links",
+        )
+    })
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn edit_access_gate(
+    _org_id: &str,
+    _dashboard_id: &str,
+    _user_id: &str,
+    _allow_orphan: bool,
+) -> Option<Response> {
+    None
+}
+
+/// The link only when it belongs to this org and dashboard, else the response to return.
+async fn load_link(
+    org_id: &str,
+    dashboard_id: &str,
+    link_id: &str,
+) -> Result<PublicDashboard, Response> {
+    match openobserve_core::public_dashboards::get_link(org_id, dashboard_id, link_id).await {
+        Ok(Some(link)) => Ok(link),
+        Ok(None) => Err(MetaHttpResponse::not_found("public link not found")),
+        Err(e) => Err(map_err("load_link", e)),
     }
 }
 
-/// POST /{org_id}/dashboards/{dashboard_id}/public — publish (one per dashboard).
+async fn view_response(ctx: &str, org_id: &str, link: PublicDashboard) -> Response {
+    match openobserve_core::public_dashboards::views(org_id, vec![link]).await {
+        Ok(mut v) => match v.pop() {
+            Some(view) => MetaHttpResponse::json(view),
+            None => MetaHttpResponse::not_found("public link not found"),
+        },
+        Err(e) => map_err(ctx, e),
+    }
+}
+
+async fn list_response(ctx: &str, org_id: &str, links: Vec<PublicDashboard>) -> Response {
+    match openobserve_core::public_dashboards::views(org_id, links).await {
+        Ok(list) => MetaHttpResponse::json(serde_json::json!({ "list": list })),
+        Err(e) => map_err(ctx, e),
+    }
+}
+
+/// GET /{org_id}/public_dashboards — every public link in the org.
+pub async fn list_org(Path(org_id): Path<String>) -> Response {
+    if let Some(r) = feature_gate() {
+        return r;
+    }
+    match openobserve_core::public_dashboards::list(&org_id).await {
+        Ok(links) => list_response("list_org", &org_id, links).await,
+        Err(e) => map_err("list_org", e),
+    }
+}
+
+/// GET /{org_id}/dashboards/{dashboard_id}/public_links — this dashboard's links, newest first.
+pub async fn list(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
+    if let Some(r) = feature_gate() {
+        return r;
+    }
+    match openobserve_core::public_dashboards::list_for_dashboard(&org_id, &dashboard_id).await {
+        Ok(links) => list_response("list", &org_id, links).await,
+        Err(e) => map_err("list", e),
+    }
+}
+
+/// POST /{org_id}/dashboards/{dashboard_id}/public_links — create another link.
 pub async fn create(
     Path((org_id, dashboard_id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -89,34 +160,124 @@ pub async fn create(
     if let Err(msg) = openobserve_core::public_dashboards::validate_config(&body) {
         return MetaHttpResponse::bad_request(msg);
     }
-    match openobserve_core::public_dashboards::get(&org_id, &dashboard_id).await {
-        Ok(Some(_)) => {
-            return MetaHttpResponse::bad_request(
-                "this dashboard is already published; revoke it before re-publishing",
-            );
-        }
-        Ok(None) => {}
-        Err(e) => return map_err("create.precheck", e),
+    if let Some(r) = edit_access_gate(&org_id, &dashboard_id, &user.user_id, false).await {
+        return r;
     }
-    match openobserve_core::public_dashboards::create(&org_id, &dashboard_id, body, &user.user_id)
-        .await
+    let created = match openobserve_core::public_dashboards::create(
+        &org_id,
+        &dashboard_id,
+        body,
+        &user.user_id,
+    )
+    .await
     {
-        Ok(r) => MetaHttpResponse::json(serde_json::json!({ "id": r.id, "slug": r.slug })),
-        Err(e) => map_err("create", e),
+        Ok(r) => r,
+        Err(e) => return map_err("create", e),
+    };
+    match load_link(&org_id, &dashboard_id, &created.id).await {
+        Ok(link) => view_response("create", &org_id, link).await,
+        Err(r) => r,
     }
 }
 
-/// DELETE /{org_id}/dashboards/{dashboard_id}/public — revoke the share.
-pub async fn delete(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
+/// GET /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}
+pub async fn get(
+    Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
+) -> Response {
     if let Some(r) = feature_gate() {
         return r;
     }
-    let share = match openobserve_core::public_dashboards::get(&org_id, &dashboard_id).await {
-        Ok(Some(pd)) => pd,
-        Ok(None) => return MetaHttpResponse::not_found("not found"),
-        Err(e) => return map_err("delete.lookup", e),
+    match load_link(&org_id, &dashboard_id, &link_id).await {
+        Ok(link) => view_response("get", &org_id, link).await,
+        Err(r) => r,
+    }
+}
+
+/// PUT /{org_id}/dashboards/{dashboard_id}/public_links/{link_id} — edit settings; the slug is
+/// kept.
+pub async fn update(
+    Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
+    Json(body): Json<PublicDashboardConfig>,
+) -> Response {
+    if let Some(r) = feature_gate() {
+        return r;
+    }
+    if let Err(msg) = openobserve_core::public_dashboards::validate_config(&body) {
+        return MetaHttpResponse::bad_request(msg);
+    }
+    if let Some(r) = edit_access_gate(&org_id, &dashboard_id, &user.user_id, false).await {
+        return r;
+    }
+    let link = match load_link(&org_id, &dashboard_id, &link_id).await {
+        Ok(link) => link,
+        Err(r) => return r,
     };
-    match openobserve_core::public_dashboards::delete(&org_id, &share.id).await {
+    match openobserve_core::public_dashboards::update_link(link, body).await {
+        Ok(link) => view_response("update", &org_id, link).await,
+        Err(e) => map_err("update", e),
+    }
+}
+
+/// POST /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause
+pub async fn pause(
+    Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Some(r) = feature_gate() {
+        return r;
+    }
+    if let Some(r) = edit_access_gate(&org_id, &dashboard_id, &user.user_id, false).await {
+        return r;
+    }
+    let link = match load_link(&org_id, &dashboard_id, &link_id).await {
+        Ok(link) => link,
+        Err(r) => return r,
+    };
+    match openobserve_core::public_dashboards::pause_link(link).await {
+        Ok(link) => view_response("pause", &org_id, link).await,
+        Err(e) => map_err("pause", e),
+    }
+}
+
+/// POST /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume
+pub async fn resume(
+    Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Some(r) = feature_gate() {
+        return r;
+    }
+    if let Some(r) = edit_access_gate(&org_id, &dashboard_id, &user.user_id, false).await {
+        return r;
+    }
+    let link = match load_link(&org_id, &dashboard_id, &link_id).await {
+        Ok(link) => link,
+        Err(r) => return r,
+    };
+    match openobserve_core::public_dashboards::resume_link(link).await {
+        Ok(link) => view_response("resume", &org_id, link).await,
+        Err(e) if e.to_string().contains("expired") => MetaHttpResponse::bad_request(e),
+        Err(e) => map_err("resume", e),
+    }
+}
+
+/// DELETE /{org_id}/dashboards/{dashboard_id}/public_links/{link_id} — revoke.
+pub async fn delete(
+    Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Some(r) = feature_gate() {
+        return r;
+    }
+    if let Some(r) = edit_access_gate(&org_id, &dashboard_id, &user.user_id, true).await {
+        return r;
+    }
+    let link = match load_link(&org_id, &dashboard_id, &link_id).await {
+        Ok(link) => link,
+        Err(r) => return r,
+    };
+    match openobserve_core::public_dashboards::delete(&org_id, &link.id).await {
         Ok(_) => MetaHttpResponse::json(serde_json::json!({ "deleted": true })),
         Err(e) => map_err("delete", e),
     }
