@@ -77,11 +77,15 @@ export interface DbmOverlapMetric {
    * - `serverExecution` / `serverWait` — the engine's own figure, saying WHICH
    *   measurement it is. The wait variant is what stops a MySQL reader taking a
    *   queueing figure for execution work.
-   * - `clientObserved` — the server had none and this is the traced-caller
-   *   number, which covers instrumented traffic only.
+   * - `clientObserved` ({@link APP_SOURCE_QUALIFIER}) — the server had none
+   *   and this is the traced number; it renders as the app-source marker, not
+   *   as text, so it has no key of its own.
    */
   qualifierKey: string | null;
 }
+
+/** The qualifier for a figure from the application's traces. */
+export const APP_SOURCE_QUALIFIER = "clientObserved";
 
 const num = (v: number | null | undefined): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -105,7 +109,7 @@ export const resolveDatabaseTime = (inputs: DbmOverlapInputs): DbmOverlapMetric 
 
   const client = num(inputs.clientTotalTimeNs);
   if (client !== null) {
-    return { value: client, source: "client", qualifierKey: "clientObserved" };
+    return { value: client, source: "client", qualifierKey: APP_SOURCE_QUALIFIER };
   }
 
   // Neither vantage measured it. Absent stays absent — a `0` here would read as
@@ -124,7 +128,7 @@ export const resolveCalls = (inputs: DbmOverlapInputs): DbmOverlapMetric => {
 
   const client = num(inputs.clientCalls);
   if (client !== null) {
-    return { value: client, source: "client", qualifierKey: "clientObserved" };
+    return { value: client, source: "client", qualifierKey: APP_SOURCE_QUALIFIER };
   }
 
   return { value: null, source: null, qualifierKey: null };

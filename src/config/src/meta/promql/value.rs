@@ -1019,10 +1019,19 @@ pub fn signature(labels: &Labels) -> u64 {
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
+    hash_labels(labels, |name| !exclude_names.contains(&name))
+}
+
+/// [`signature`] of only the labels named in `include_names`.
+pub fn signature_with_labels(labels: &Labels, include_names: &[&str]) -> u64 {
+    hash_labels(labels, |name| include_names.contains(&name))
+}
+
+fn hash_labels(labels: &Labels, include: impl Fn(&str) -> bool) -> u64 {
     let mut hasher = crate::utils::hash::gxhash::new_hasher();
     labels
         .iter()
-        .filter(|item| !exclude_names.contains(&item.name.as_str()))
+        .filter(|item| include(item.name.as_str()))
         .for_each(|item| {
             hasher.write(item.name.as_bytes());
             hasher.write(item.value.as_bytes());
@@ -1092,6 +1101,16 @@ mod tests {
         assert_eq!(
             sig_without_ac,
             signature_without_labels(&labels, &["a", "c"])
+        );
+
+        let kept: Labels = labels
+            .iter()
+            .filter(|label| label.name == "a" || label.name == "c")
+            .cloned()
+            .collect();
+        assert_eq!(
+            signature_with_labels(&labels, &["a", "c"]),
+            signature(&kept)
         );
     }
 

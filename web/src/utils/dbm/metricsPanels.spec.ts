@@ -356,6 +356,18 @@ describe("buildDbmLoadPanelSchema", () => {
     );
   });
 
+  it("groups the base scan by expressions, never by a SELECT alias a stream column can shadow", () => {
+    // The shipped log recipes write a `ts` attribute; `GROUP BY ts` then binds
+    // that column instead of the histogram alias and the planner rejects the query.
+    for (const breakdown of ["waitEvent", "query", "database", "user"] as const) {
+      const q = buildDbmLoadPanelSchema({}, {}, breakdown).queries[0].query;
+      const base = /FROM "_o2_dbm_server" WHERE [\s\S]*? GROUP BY ([\s\S]*?)\) AS b\)/.exec(q);
+      expect(base).not.toBeNull();
+      expect(base![1]).toMatch(/^histogram\(_timestamp\), /);
+      expect(base![1]).not.toMatch(/(^|,\s*)(ts|segment|poll|cnt)(\s*,|$)/);
+    }
+  });
+
   it("splices the scope with single quotes escaped into the one base scan", () => {
     const q = buildDbmLoadPanelSchema({
       system: "postgresql",

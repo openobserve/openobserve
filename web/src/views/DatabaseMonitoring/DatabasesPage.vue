@@ -222,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             source="client"
             :qualifier-key="CLIENT_OBSERVED"
             :engine="engineOf(row)"
+            :with-marker="false"
             data-test="dbm-databases-calls"
           />
         </template>
@@ -369,17 +370,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatPercent(row.share, 0) }}
               </span>
             </span>
-            <!-- The other overlap measure, and the one where an absent
-                 qualifier is most costly: a duration under "Load" with no
-                 vantage named reads as time the ENGINE spent, which on
-                 MySQL/MariaDB would be wait time. This is span time, and it
-                 includes network and pool wait the server never sees (T7). -->
-            <span class="text-text-secondary text-3xs" data-test="dbm-databases-load-qualifier">
-              <OTooltip
-                :content="t('dbm.detail.overlap.clientObserved', { engine: engineOf(row) ?? '' })"
-              />
-              {{ t("dbm.list.overlap.clientObserved") }}
-            </span>
           </span>
           <span v-else class="text-text-muted block text-right">{{ raw("—") }}</span>
         </template>
@@ -490,6 +480,7 @@ import { foldServerInstanceMetrics } from "@/utils/dbm/instanceMetricsRead";
 import type { DbmInstanceMetricSet, DbmRowMetrics } from "@/utils/dbm/instanceMetrics";
 import { unionFleetRows, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
 import { healthScalar, healthSortValue } from "@/utils/dbm/healthScalar";
+import { APP_SOURCE_QUALIFIER } from "@/utils/dbm/overlapMetrics";
 import { detectDrowningDatabases, isCriticalErrorRate, totalsKey } from "@/utils/dbm/insights";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
@@ -813,15 +804,7 @@ const sortOrder = ref<"asc" | "desc">("desc");
  */
 const attentionOf = (row: TableRow) => healthScalar(isBreakdownRow(row) ? undefined : row.metrics);
 
-/**
- * The engine that reported a row, for the client-observed attribution tooltip.
- *
- * Only a database row carries one: a breakdown row is a schema or service
- * *within* a database, so it has no engine of its own and must not borrow its
- * parent's — the tooltip would then attribute the figure to something the row
- * does not name. `undefined` is the honest answer and is what `DbmOverlapValue`
- * already defaults to.
- */
+/** The engine that reported a row; a breakdown row has none and must not borrow its parent's. */
 const engineOf = (row: TableRow): string | undefined =>
   isBreakdownRow(row) ? undefined : row.db_system;
 
@@ -1315,13 +1298,13 @@ const traceVantage = computed(() =>
  * labelling the one we have.
  *
  * So the resolver's server branch is unreachable at this grain and these
- * render as `clientObserved`. That is not a placeholder for a future server
+ * render with the app-source marker. That is not a placeholder for a future server
  * number: it is the true provenance, and it is exactly what D2 demands be
  * said out loud, because "Calls" with no qualifier reads as what the DATABASE
  * counted when it is what our instrumented callers counted — a number the
  * live fleet shows to be ~3.7x smaller.
  */
-const CLIENT_OBSERVED = "clientObserved";
+const CLIENT_OBSERVED = APP_SOURCE_QUALIFIER;
 
 /**
  * Calls-per-second for one row. Database rows carry the server-computed rate
@@ -1423,7 +1406,8 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     id: "calls",
     header: t("dbm.databases.columns.calls"),
     accessorKey: "calls",
-    size: 96,
+    // At 96 the "from your apps" sub-label ellipsised beside the sort chevron.
+    size: 124,
     sortable: true,
     meta: {
       align: "right",
