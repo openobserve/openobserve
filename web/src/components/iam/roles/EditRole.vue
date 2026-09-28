@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    class="pb-2.5"
     data-test="edit-role-page"
     :title="raw(editingRole)"
     :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
@@ -35,148 +34,155 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-hidden">
-      <GroupUsers
-        data-test="edit-role-users-section"
-        v-show="activeTab === 'users'"
-        :groupUsers="roleUsers"
-        :activeTab="activeTab"
-        :added-users="addedUsers"
-        :removed-users="removedUsers"
-        context="role"
+    <div class="flex min-h-0 flex-1">
+      <ModuleRail
+        v-show="activeTab === 'permissions' && permissionsUiType === 'table'"
+        v-model="activeModule"
+        :modules="railModules"
       />
-      <GroupServiceAccounts
-        v-if="store.state.zoConfig.service_account_enabled"
-        data-test="edit-role-users-section"
-        v-show="activeTab === 'serviceAccounts'"
-        :groupUsers="roleUsers"
-        :activeTab="activeTab"
-        :added-users="addedServiceAccounts"
-        :removed-users="removedServiceAccounts"
-      />
-
-      <div
-        v-show="activeTab === 'permissions'"
-        data-test="edit-role-permissions-section"
-        class="bg-card-glass-bg flex h-full min-h-0"
-      >
-        <ModuleRail
-          v-show="permissionsUiType === 'table'"
-          v-model="activeModule"
-          :modules="railModules"
-        />
-        <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div
-            v-if="permissionsUiType === 'json'"
-            class="bg-surface-base flex flex-shrink-0 items-center justify-end gap-2 px-3 pt-3 pb-2"
-          >
-            <OButton
-              variant="ghost"
-              size="sm"
-              icon-left="help"
-              data-test="edit-role-json-help-btn"
-              @click="toggleHelpSection"
-            >
-              {{ t("iam.editRole.help") }}
-            </OButton>
-            <PermissionsViewSwitch
-              :count="selectedPermissionsHash.size"
-              :loading="isFetchingInitialRoles"
-              :model-value="permissionsUiType"
-              @update:model-value="updatePermissionsUi"
-            />
-          </div>
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div class="min-h-0 flex-1 overflow-hidden">
+          <GroupUsers
+            data-test="edit-role-users-section"
+            v-show="activeTab === 'users'"
+            :groupUsers="roleUsers"
+            :activeTab="activeTab"
+            :added-users="addedUsers"
+            :removed-users="removedUsers"
+            context="role"
+          />
+          <GroupServiceAccounts
+            v-if="store.state.zoConfig.service_account_enabled"
+            data-test="edit-role-users-section"
+            v-show="activeTab === 'serviceAccounts'"
+            :groupUsers="roleUsers"
+            :activeTab="activeTab"
+            :added-users="addedServiceAccounts"
+            :removed-users="removedServiceAccounts"
+          />
 
           <div
-            data-test="edit-role-permissions-table-section"
-            class="rounded-default min-h-0 flex-1 overflow-y-auto"
+            v-show="activeTab === 'permissions'"
+            data-test="edit-role-permissions-section"
+            class="bg-card-glass-bg flex h-full min-h-0"
           >
-            <!-- Keyed by level, so each module or folder opens with its own empty search and filter. -->
-            <ModulePane
-              v-if="permissionsUiType === 'table' && activeModuleView"
-              :key="activeModuleView.trail.join('/')"
-              v-model:page-size="modulePageSize"
-              :lists-resources="!!moduleOf(activeModule)?.hasEntities"
-              :inner-grants="innerGrants"
-              class="h-full"
-              :trail="activeModuleView.trail"
-              :scopes="activeModuleView.scopes"
-              :entities="activeModuleView.entities"
-              :loading="moduleLoading || isFetchingInitialRoles"
-              :is-granted="isGranted"
-              :is-pending-removal="isPendingRemoval"
-              :icon="activeRailModule?.icon"
-              :added="activeRailModule?.added"
-              :removed="activeRailModule?.removed"
-              @change="(change) => handlePermissionBatchChange([change])"
-              @open="openFolderRow"
-              @navigate="navigateTrail"
-            >
-              <template #actions>
+            <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+              <div
+                v-if="permissionsUiType === 'json'"
+                class="bg-surface-base flex flex-shrink-0 items-center justify-end gap-2 px-3 pt-3 pb-2"
+              >
+                <OButton
+                  variant="ghost"
+                  size="sm"
+                  icon-left="help"
+                  data-test="edit-role-json-help-btn"
+                  @click="toggleHelpSection"
+                >
+                  {{ t("iam.editRole.help") }}
+                </OButton>
                 <PermissionsViewSwitch
                   :count="selectedPermissionsHash.size"
                   :loading="isFetchingInitialRoles"
                   :model-value="permissionsUiType"
                   @update:model-value="updatePermissionsUi"
                 />
-              </template>
-            </ModulePane>
-            <RoleSummary
-              v-else-if="permissionsUiType === 'table'"
-              class="h-full"
-              :modules="summaryModules"
-              :loading="isFetchingInitialRoles"
-              @open="(moduleKey) => (activeModule = moduleKey)"
-              @preset="applyPreset"
-            >
-              <template #actions>
-                <PermissionsViewSwitch
-                  :count="selectedPermissionsHash.size"
-                  :loading="isFetchingInitialRoles"
-                  :model-value="permissionsUiType"
-                  @update:model-value="updatePermissionsUi"
-                />
-              </template>
-            </RoleSummary>
-            <div v-show="permissionsUiType === 'json'">
-              <div class="flex flex-nowrap">
-                <div :style="isHelpOpen ? { width: 'calc(100% - 21.875rem)' } : { width: '100%' }">
-                  <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-                  <QueryEditor
-                    data-test="logs-vrl-function-editor"
-                    editor-id="add-function-editor"
-                    class="mt-2"
-                    language="json"
-                    ref="permissionJsonEditorRef"
-                    v-model:query="permissionsJsonValue"
-                    style="height: calc(100vh - var(--navbar-height) - 295px)"
-                  />
-                  <!-- eslint-enable local/no-hardcoded-px -->
-                </div>
-                <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
-                  <div class="flex items-center justify-between px-2">
-                    <div style="font-size: var(--text-base)">
-                      {{ t("iam.editRole.quickReference") }}
-                    </div>
-                    <OIcon
-                      class="cursor-pointer"
-                      name="close"
-                      size="xs"
-                      :title="t('common.close')"
-                      @click="toggleHelpSection"
+              </div>
+
+              <div
+                data-test="edit-role-permissions-table-section"
+                class="rounded-default min-h-0 flex-1 overflow-y-auto"
+              >
+                <!-- Keyed by level, so each module or folder opens with its own empty search and filter. -->
+                <ModulePane
+                  v-if="permissionsUiType === 'table' && activeModuleView"
+                  :key="activeModuleView.trail.join('/')"
+                  v-model:page-size="modulePageSize"
+                  :lists-resources="!!moduleOf(activeModule)?.hasEntities"
+                  :inner-grants="innerGrants"
+                  class="h-full"
+                  :trail="activeModuleView.trail"
+                  :scopes="activeModuleView.scopes"
+                  :entities="activeModuleView.entities"
+                  :loading="moduleLoading || isFetchingInitialRoles"
+                  :is-granted="isGranted"
+                  :is-pending-removal="isPendingRemoval"
+                  :icon="activeRailModule?.icon"
+                  :added="activeRailModule?.added"
+                  :removed="activeRailModule?.removed"
+                  @change="(change) => handlePermissionBatchChange([change])"
+                  @open="openFolderRow"
+                  @navigate="navigateTrail"
+                >
+                  <template #actions>
+                    <PermissionsViewSwitch
+                      :count="selectedPermissionsHash.size"
+                      :loading="isFetchingInitialRoles"
+                      :model-value="permissionsUiType"
+                      @update:model-value="updatePermissionsUi"
                     />
-                  </div>
-                  <OSeparator class="mt-2 mb-4" />
-                  <div class="mt-2 px-2">
-                    <div>
-                      {{ t("iam.editRole.jsonConfigHelp") }}
+                  </template>
+                </ModulePane>
+                <RoleSummary
+                  v-else-if="permissionsUiType === 'table'"
+                  class="h-full"
+                  :modules="summaryModules"
+                  :loading="isFetchingInitialRoles"
+                  @open="(moduleKey) => (activeModule = moduleKey)"
+                  @preset="applyPreset"
+                >
+                  <template #actions>
+                    <PermissionsViewSwitch
+                      :count="selectedPermissionsHash.size"
+                      :loading="isFetchingInitialRoles"
+                      :model-value="permissionsUiType"
+                      @update:model-value="updatePermissionsUi"
+                    />
+                  </template>
+                </RoleSummary>
+                <div v-show="permissionsUiType === 'json'">
+                  <div class="flex flex-nowrap">
+                    <div
+                      :style="isHelpOpen ? { width: 'calc(100% - 21.875rem)' } : { width: '100%' }"
+                    >
+                      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+                      <QueryEditor
+                        data-test="logs-vrl-function-editor"
+                        editor-id="add-function-editor"
+                        class="mt-2"
+                        language="json"
+                        ref="permissionJsonEditorRef"
+                        v-model:query="permissionsJsonValue"
+                        style="height: calc(100vh - var(--navbar-height) - 295px)"
+                      />
+                      <!-- eslint-enable local/no-hardcoded-px -->
                     </div>
-                    <pre style="font-size: var(--text-xs)">{{ raw(jsonPermissionSample) }}</pre>
-                    <div>
-                      <span class="font-bold">{{ t("iam.editRole.childResource") }}</span> <br />
-                      {{ t("iam.editRole.specificInstanceOr") }}
-                      <span class="font-bold">{{ raw("organizationID") }}</span>
-                      {{ t("iam.editRole.forAllInstances") }}
+                    <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
+                      <div class="flex items-center justify-between px-2">
+                        <div style="font-size: var(--text-base)">
+                          {{ t("iam.editRole.quickReference") }}
+                        </div>
+                        <OIcon
+                          class="cursor-pointer"
+                          name="close"
+                          size="xs"
+                          :title="t('common.close')"
+                          @click="toggleHelpSection"
+                        />
+                      </div>
+                      <OSeparator class="mt-2 mb-4" />
+                      <div class="mt-2 px-2">
+                        <div>
+                          {{ t("iam.editRole.jsonConfigHelp") }}
+                        </div>
+                        <pre style="font-size: var(--text-xs)">{{ raw(jsonPermissionSample) }}</pre>
+                        <div>
+                          <span class="font-bold">{{ t("iam.editRole.childResource") }}</span>
+                          <br />
+                          {{ t("iam.editRole.specificInstanceOr") }}
+                          <span class="font-bold">{{ raw("organizationID") }}</span>
+                          {{ t("iam.editRole.forAllInstances") }}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -184,46 +190,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </div>
-    </div>
-    <div class="z-2 mt-2.5 flex w-full flex-shrink-0 justify-end">
-      <div
-        class="bg-card-glass-bg border-border-default flex w-full items-center justify-end gap-2 border-t px-3 py-2"
-      >
-        <!-- Table view only: JSON edits stage when the view switches back, which would overwrite an undo made here. -->
-        <OButton
-          v-if="pendingChanges.length && permissionsUiType === 'table'"
-          variant="outline"
-          size="sm-action"
-          data-test="edit-role-review-changes-btn"
-          @click="unsavedDrawerOpen = true"
-        >
-          {{ t("iam.editRole.reviewChanges") }}
-          <OBadge
-            variant="warning-soft"
-            size="sm"
-            class="ms-1.5"
-            data-test="edit-role-unsaved-count"
+        <div class="z-2 mt-2.5 flex w-full flex-shrink-0 justify-end">
+          <div
+            class="bg-card-glass-bg border-border-default flex w-full items-center justify-end gap-2 border-t px-3 py-2"
           >
-            {{ raw(String(pendingChanges.length)) }}
-          </OBadge>
-        </OButton>
-        <OButton
-          data-test="edit-role-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          @click="cancelPermissionsUpdate"
-        >
-          {{ t("alerts.cancel") }}
-        </OButton>
-        <OButton
-          data-test="edit-role-save-btn"
-          variant="primary"
-          size="sm-action"
-          @click="saveRole"
-        >
-          {{ t("alerts.save") }}
-        </OButton>
+            <!-- Table view only: JSON edits stage when the view switches back, which would overwrite an undo made here. -->
+            <OButton
+              v-if="pendingChanges.length && permissionsUiType === 'table'"
+              variant="outline"
+              size="sm-action"
+              data-test="edit-role-review-changes-btn"
+              @click="unsavedDrawerOpen = true"
+            >
+              {{ t("iam.editRole.reviewChanges") }}
+              <OBadge
+                variant="warning-soft"
+                size="sm"
+                class="ms-1.5"
+                data-test="edit-role-unsaved-count"
+              >
+                {{ raw(String(pendingChanges.length)) }}
+              </OBadge>
+            </OButton>
+            <OButton
+              data-test="edit-role-cancel-btn"
+              variant="outline"
+              size="sm-action"
+              @click="cancelPermissionsUpdate"
+            >
+              {{ t("alerts.cancel") }}
+            </OButton>
+            <OButton
+              data-test="edit-role-save-btn"
+              variant="primary"
+              size="sm-action"
+              @click="saveRole"
+            >
+              {{ t("alerts.save") }}
+            </OButton>
+          </div>
+        </div>
       </div>
     </div>
   </OPageLayout>
