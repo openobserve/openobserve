@@ -18553,6 +18553,7 @@
     "assignTeamShort": "Assign a team",
     "assignTeamFailed": "Could not assign the team",
     "noTeamsToAssign": "No teams to assign yet",
+    "changeTeamShort": "Change team",
     "contextTitle": "Context worth having before you ack",
     "contextFired": "Fired",
     "contextFiredCount": "{count}× in {days} days",

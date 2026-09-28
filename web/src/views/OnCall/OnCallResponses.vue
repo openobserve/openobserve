@@ -720,6 +720,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 {{ t("oncall.timeline") }}
               </ODropdownItem>
+
+              <!-- Reassigning is a handoff to a team, same as first assignment
+                   (see assignTeamToRow) — the only reason it lived behind a
+                   separate "view team" navigation before was that this menu had
+                   nowhere to put it. Hidden once nothing is left to hand off, and
+                   the current team is excluded: reselecting it would just fail. -->
+              <template v-if="hasUnresolved(row) && reassignableTeams(row).length">
+                <ODropdownSeparator />
+                <ODropdownGroup :label="t('oncall.changeTeamShort')">
+                  <ODropdownItem
+                    v-for="team in reassignableTeams(row)"
+                    :key="team.id"
+                    :data-test="`oncall-row-changeteam-${row.rowKey}-${team.id}`"
+                    @select="assignTeamToRow(row, team.id, team.name)"
+                  >
+                    <template #icon-left>
+                      <OIcon name="swap-horiz" size="sm" />
+                    </template>
+                    {{ raw(team.name) }}
+                  </ODropdownItem>
+                </ODropdownGroup>
+              </template>
             </ODropdown>
           </template>
         </span>
@@ -1446,6 +1468,13 @@ function menuActions(row: PageRow): RowAction[] {
   if (hasUnresolved(row) && primary !== "resolve") actions.push("resolve");
   if (primary !== "timeline") actions.push("timeline");
   return actions;
+}
+
+/// Every OTHER team a row could be handed to. Excludes its own team: offering
+/// it back would just be `handoff_to_team`'s "that team already owns this page"
+/// rejection with extra steps.
+function reassignableTeams(row: PageRow): OnCallTeam[] {
+  return teams.value.filter((team) => team.id !== row.latest.team_id);
 }
 
 /// One list writes to many rows, so the id rides in the variables, not the setup.
