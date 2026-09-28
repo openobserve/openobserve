@@ -75,11 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="shrink-0"
               data-test="dbm-blocked-perspective"
             >
-              <OToggleGroupItem value="waiting" size="sm">
+              <OToggleGroupItem
+                value="waiting"
+                size="sm"
+                data-test="dbm-blocked-perspective-waiting"
+              >
                 {{ t("dbm.blocked.perspective.waiting") }}
                 <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
               </OToggleGroupItem>
-              <OToggleGroupItem value="blocking" size="sm">
+              <OToggleGroupItem
+                value="blocking"
+                size="sm"
+                data-test="dbm-blocked-perspective-blocking"
+              >
                 {{ t("dbm.blocked.perspective.blocking") }}
                 <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
               </OToggleGroupItem>

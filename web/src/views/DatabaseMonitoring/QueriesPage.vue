@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="stmtClass"
             true-value="all"
             false-value="query"
+            data-test="dbm-queries-stmt-class-checkbox"
             size="sm"
             :label="t('dbm.queries.stmtClass.overheadLabel')"
             @update:model-value="onStmtClassChange"
@@ -123,11 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dbm-queries-baseline"
           @update:model-value="onBaselineChange"
         >
-          <OToggleGroupItem value="previous" size="sm">
+          <OToggleGroupItem value="previous" size="sm" data-test="dbm-queries-baseline-previous">
             {{ t("dbm.insights.baseline.previousShort") }}
             <OTooltip side="bottom" :content="t('dbm.insights.baseline.previousHint')" />
           </OToggleGroupItem>
-          <OToggleGroupItem value="yesterday" size="sm">
+          <OToggleGroupItem value="yesterday" size="sm" data-test="dbm-queries-baseline-yesterday">
             {{ t("dbm.insights.baseline.yesterdayShort") }}
             <OTooltip side="bottom" :content="t('dbm.insights.baseline.yesterdayHint')" />
           </OToggleGroupItem>

@@ -78,11 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- What a ROW means. Not a data-processing mode — the reader is
                  choosing between "name the bug" and "give me a timestamp". -->
             <OToggleGroup v-model="grouping" class="shrink-0" data-test="dbm-deadlocks-grouping">
-              <OToggleGroupItem value="pairs" size="sm">
+              <OToggleGroupItem value="pairs" size="sm" data-test="dbm-deadlocks-grouping-pairs">
                 {{ t("dbm.deadlocks.grouping.pairs") }}
                 <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.pairsHint')" />
               </OToggleGroupItem>
-              <OToggleGroupItem value="events" size="sm">
+              <OToggleGroupItem value="events" size="sm" data-test="dbm-deadlocks-grouping-events">
                 {{ t("dbm.deadlocks.grouping.events") }}
                 <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.eventsHint')" />
               </OToggleGroupItem>
@@ -279,16 +279,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     })
                   }}
                 </span>
-                <span
-                  class="bg-surface-subtle text-text-secondary rounded-default text-3xs px-1.5 py-px font-medium"
-                >
+                <OTag variant="default-soft" size="xs" shape="rounded">
                   {{
                     t("dbm.deadlocks.detail.nthOf", {
                       index: row.selectedEventIndex + 1,
                       total: row.count,
                     })
                   }}
-                </span>
+                </OTag>
                 <div class="flex-1"></div>
                 <OButton
                   variant="ghost-muted"

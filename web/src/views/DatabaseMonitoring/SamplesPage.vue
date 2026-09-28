@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="px-page-edge border-table-row-divider h-50 w-full border-b py-1.5"
             data-test="dbm-samples-scatter"
           >
+            <!-- ChartRenderer, not PanelSchemaRenderer: a point click selects its sample, and the schema renderer does not re-emit chart clicks. -->
             <ChartRenderer :data="scatterData" @click="onScatterClick" />
           </div>
         </template>
