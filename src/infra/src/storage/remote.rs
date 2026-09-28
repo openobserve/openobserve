@@ -32,7 +32,7 @@ use crate::storage::CONCURRENT_REQUESTS;
 
 // test only
 const TEST_FILE: &str = "o2_test/check.txt";
-const MIDX_RANGE_CONCURRENCY: usize = 10;
+const RANGE_READ_CONCURRENCY: usize = 10;
 
 #[derive(Debug)]
 pub struct StorageConfig {
@@ -186,15 +186,11 @@ impl ObjectStore for Remote {
 
     async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
         let path = Path::from(self.format_key(location.as_ref()));
-        if location.as_ref().ends_with(".midx") {
-            stream::iter(ranges.iter().cloned())
-                .map(|range| self.client.get_range(&path, range))
-                .buffered(MIDX_RANGE_CONCURRENCY)
-                .try_collect()
-                .await
-        } else {
-            self.client.get_ranges(&path, ranges).await
-        }
+        stream::iter(ranges.iter().cloned())
+            .map(|range| self.client.get_range(&path, range))
+            .buffered(RANGE_READ_CONCURRENCY)
+            .try_collect()
+            .await
     }
 
     fn delete_stream(
@@ -460,6 +456,35 @@ mod tests {
         assert_eq!(
             r.format_key("my-bucket/files/foo.parquet"),
             "my-bucket/files/foo.parquet"
+        );
+    }
+
+    #[tokio::test]
+    async fn get_ranges_preserves_order_for_non_index_files() {
+        let store = object_store::memory::InMemory::new();
+        let location = Path::from("files/default/logs/sample.parquet");
+        store
+            .put(
+                &location,
+                PutPayload::from(Bytes::from_static(b"0123456789")),
+            )
+            .await
+            .unwrap();
+        let remote = Remote {
+            client: LimitStore::new(Box::new(store), CONCURRENT_REQUESTS),
+            bucket_prefix: String::new(),
+        };
+        let data = remote
+            .get_ranges(&location, &[4..6, 0..2, 8..20])
+            .await
+            .unwrap();
+        assert_eq!(
+            data,
+            vec![
+                Bytes::from_static(b"45"),
+                Bytes::from_static(b"01"),
+                Bytes::from_static(b"89"),
+            ]
         );
     }
 }

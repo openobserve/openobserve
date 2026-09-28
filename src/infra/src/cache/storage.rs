@@ -35,10 +35,6 @@ pub struct CacheFS {}
 
 static DEFAULT: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(CacheFS::new_store);
 
-const MIDX_MAX_GAP: u64 = 16 * 1024;
-const MIDX_MAX_SPAN: u64 = 16 * 1024 * 1024;
-const MIDX_MIN_READ_BUDGET: u64 = 16 * 1024 * 1024;
-
 impl std::fmt::Display for CacheFS {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Self::name())
@@ -163,21 +159,13 @@ impl ObjectStoreExt for CacheFS {
         let path = location.to_string();
         let ordered = ranges.iter().all(|range| range.start < range.end)
             && ranges.windows(2).all(|pair| pair[0].end <= pair[1].start);
-        let plan = if path.ends_with(".midx") && ranges.len() > 1 && ordered {
-            let selected = ranges.iter().try_fold(0u64, |total, range| {
-                total.checked_add(range.end - range.start)
-            });
-            let selected = selected.ok_or_else(|| crate::storage::Error::BadRange(path.clone()))?;
+        let plan = if ranges.len() > 1 && ordered {
             Some(
-                storage::range_plan::plan_coalesced_ranges(
-                    ranges,
-                    MIDX_MAX_GAP,
-                    MIDX_MAX_SPAN,
-                    selected.max(MIDX_MIN_READ_BUDGET),
-                )
-                .map_err(|error| Error::Generic {
-                    store: "CacheFS",
-                    source: Box::new(std::io::Error::other(error.to_string())),
+                storage::range_plan::plan_coalesced_ranges(ranges).map_err(|error| {
+                    Error::Generic {
+                        store: "CacheFS",
+                        source: Box::new(std::io::Error::other(error.to_string())),
+                    }
                 })?,
             )
         } else {

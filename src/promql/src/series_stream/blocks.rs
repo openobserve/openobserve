@@ -41,6 +41,7 @@ use config::{
 };
 use datafusion::error::DataFusionError;
 use hashbrown::{HashMap, HashSet};
+use itertools::Either;
 use metrics_index::{
     block::{BlockDecoder, DecodedBlockRef, Index},
     block_cache::{CacheKey, CachedIndex, INDEX_CACHE, IndexCache, ParentIdentity, cache_limit},
@@ -450,9 +451,23 @@ impl SeriesStream for BlockSeriesStream {
     }
 }
 
-struct RangeSelectedFile {
+struct BlockSelectedFile {
     file: Arc<LoadedFile>,
-    ranges: Arc<Vec<Range<usize>>>,
+    selection: BlockSelection,
+}
+
+enum BlockSelection {
+    All(Range<usize>),
+    Filtered(Arc<Vec<usize>>),
+}
+
+impl BlockSelection {
+    fn ids(&self) -> impl Iterator<Item = usize> + '_ {
+        match self {
+            Self::All(range) => Either::Left(range.clone()),
+            Self::Filtered(ids) => Either::Right(ids.iter().copied()),
+        }
+    }
 }
 
 struct SelectedFile {
@@ -533,11 +548,10 @@ pub(super) async fn prepare(
             let source = source.clone();
             let matchers = Arc::clone(&matchers);
             async move {
-                let ranges = if matchers.matchers.is_empty() && matchers.or_matchers.is_empty() {
-                    let len = file.index.blocks.len();
-                    Arc::new((len > 0).then_some(0..len).into_iter().collect())
-                } else if let Some(ranges) = metrics_index::cached_blocks(&source, &matchers) {
-                    ranges
+                let selection = if matchers.matchers.is_empty() && matchers.or_matchers.is_empty() {
+                    BlockSelection::All(0..file.index.blocks.len())
+                } else if let Some(ids) = metrics_index::cached_blocks(&source, &matchers) {
+                    BlockSelection::Filtered(ids)
                 } else {
                     let index = Arc::clone(&file.index);
                     let filter = Arc::clone(&matchers);
@@ -545,15 +559,19 @@ pub(super) async fn prepare(
                         metrics_index::matching_blocks(&index, &filter)
                     })
                     .await??;
-                    metrics_index::cache_blocks(&source, &matchers, ids)
+                    BlockSelection::Filtered(metrics_index::cache_blocks(&source, &matchers, ids))
                 };
-                ensure!(
-                    ranges.iter().all(
-                        |range| range.start < range.end && range.end <= file.index.blocks.len()
-                    ) && ranges.windows(2).all(|pair| pair[0].end < pair[1].start),
-                    "block selection ranges are not unique and ordered"
-                );
-                Ok(RangeSelectedFile { file, ranges })
+                let valid = match &selection {
+                    BlockSelection::All(range) => {
+                        range.start == 0 && range.end <= file.index.blocks.len()
+                    }
+                    BlockSelection::Filtered(ids) => {
+                        ids.iter().all(|&id| id < file.index.blocks.len())
+                            && ids.windows(2).all(|pair| pair[0] < pair[1])
+                    }
+                };
+                ensure!(valid, "block selection IDs are not unique and ordered");
+                Ok(BlockSelectedFile { file, selection })
             }
         })
         .collect::<Vec<_>>();
@@ -821,14 +839,13 @@ where
 }
 
 async fn bucket_selected_file(
-    selected: RangeSelectedFile,
+    selected: BlockSelectedFile,
     partitions: Arc<Vec<(u64, u64)>>,
 ) -> Result<Vec<SelectedFile>> {
     let mut shards = (0..partitions.len())
         .map(|_| Vec::new())
         .collect::<Vec<_>>();
-    let ids = selected.ranges.iter().flat_map(|range| range.clone());
-    for (position, id) in ids.enumerate() {
+    for (position, id) in selected.selection.ids().enumerate() {
         let block = &selected.file.index.blocks.block(id);
         let shard = partitions.partition_point(|range| range.1 < block.hash);
         ensure!(

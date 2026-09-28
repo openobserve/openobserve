@@ -18,6 +18,9 @@ use std::ops::Range;
 use anyhow::{Context, Result, ensure};
 use bytes::Bytes;
 
+const DEFAULT_MAX_GAP: u64 = 16 * 1024;
+const DEFAULT_MAX_SPAN: u64 = 16 * 1024 * 1024;
+
 pub(crate) struct ReadPlan {
     pub(crate) ranges: Vec<Range<u64>>,
     payloads: Vec<(usize, Range<usize>)>,
@@ -31,57 +34,41 @@ impl ReadPlan {
         );
         for (bytes, range) in reads.iter().zip(&self.ranges) {
             let expected = usize::try_from(range.end - range.start)?;
-            ensure!(bytes.len() == expected, "coalesced read length mismatch");
+            ensure!(bytes.len() <= expected, "coalesced read length mismatch");
         }
         self.payloads
             .into_iter()
             .map(|(read, span)| {
-                let bytes = reads.get(read).context("invalid block read index")?;
+                let bytes = reads.get(read).context("invalid coalesced read index")?;
                 ensure!(
-                    span.start < span.end && span.end <= bytes.len(),
-                    "invalid block read slice"
+                    span.start < span.end && span.start < bytes.len(),
+                    "invalid range read slice"
                 );
-                Ok(bytes.slice(span))
+                Ok(bytes.slice(span.start..span.end.min(bytes.len())))
             })
             .collect()
     }
 }
 
-pub(crate) fn plan_coalesced_ranges(
-    source: &[Range<u64>],
-    max_gap: u64,
-    max_span: u64,
-    max_total: u64,
-) -> Result<ReadPlan> {
-    ensure!(max_span > 0 && max_total > 0, "zero coalesced read budget");
-    let mut selected_bytes = 0u64;
+pub(crate) fn plan_coalesced_ranges(source: &[Range<u64>]) -> Result<ReadPlan> {
     for (position, range) in source.iter().enumerate() {
-        ensure!(range.start < range.end, "empty or inverted block range");
+        ensure!(range.start < range.end, "empty or inverted range");
         if position > 0 {
             ensure!(
                 source[position - 1].end <= range.start,
-                "unordered or overlapping block ranges"
+                "unordered or overlapping ranges"
             );
         }
-        selected_bytes = selected_bytes
-            .checked_add(range.end - range.start)
-            .context("selected block bytes overflow")?;
     }
-    ensure!(
-        selected_bytes <= max_total,
-        "selected blocks exceed read budget"
-    );
-    let mut gap_budget = max_total - selected_bytes;
     let mut ranges: Vec<Range<u64>> = Vec::with_capacity(source.len());
     let mut payloads = Vec::with_capacity(source.len());
     for range in source {
         let merge = ranges.last().is_some_and(|last| {
             let gap = range.start - last.end;
-            gap <= max_gap && gap <= gap_budget && range.end - last.start <= max_span
+            gap <= DEFAULT_MAX_GAP && range.end - last.start <= DEFAULT_MAX_SPAN
         });
         if merge {
             let last = ranges.last_mut().expect("merge requires previous range");
-            gap_budget -= range.start - last.end;
             last.end = range.end;
         } else {
             ranges.push(range.clone());
@@ -102,14 +89,15 @@ mod tests {
 
     #[test]
     fn merges_only_bounded_gaps_and_restores_exact_payload_bytes() {
-        let source = [10..14, 16..20, 20..23, 40..43];
-        let plan = plan_coalesced_ranges(&source, 2, 16, 20).unwrap();
-        assert_eq!(plan.ranges, vec![10..23, 40..43]);
-        let data = (0..64u8).collect::<Vec<_>>();
+        let far = DEFAULT_MAX_GAP + 40;
+        let source = [10..14, 16..20, 20..23, far..far + 3];
+        let plan = plan_coalesced_ranges(&source).unwrap();
+        assert_eq!(plan.ranges, vec![10..23, far..far + 3]);
+        let data = (0..far + 3).map(|value| value as u8).collect::<Vec<_>>();
         let reads = plan
             .ranges
             .iter()
-            .map(|r| Bytes::copy_from_slice(&data[r.start as usize..r.end as usize]))
+            .map(|range| Bytes::copy_from_slice(&data[range.start as usize..range.end as usize]))
             .collect();
         let payloads = plan.into_payloads(reads).unwrap();
         for (range, payload) in source.iter().zip(payloads) {
@@ -121,60 +109,83 @@ mod tests {
     }
 
     #[test]
-    fn reserves_all_selected_bytes_before_spending_gap_budget() {
-        let source = [0..4, 6..10, 12..16];
-        let plan = plan_coalesced_ranges(&source, 8, 64, 14).unwrap();
-        assert_eq!(plan.ranges, vec![0..10, 12..16]);
-        assert_eq!(plan.ranges.iter().map(|r| r.end - r.start).sum::<u64>(), 14);
-        let plan = plan_coalesced_ranges(&source, 8, 64, 12).unwrap();
-        assert_eq!(plan.ranges, source);
+    fn merges_gaps_without_a_global_read_budget() {
+        let half = DEFAULT_MAX_SPAN / 2;
+        let source = [
+            0..half,
+            half + 1..DEFAULT_MAX_SPAN,
+            DEFAULT_MAX_SPAN + 1..DEFAULT_MAX_SPAN + half,
+        ];
+        let plan = plan_coalesced_ranges(&source).unwrap();
+        assert_eq!(
+            plan.ranges,
+            vec![
+                0..DEFAULT_MAX_SPAN,
+                DEFAULT_MAX_SPAN + 1..DEFAULT_MAX_SPAN + half
+            ]
+        );
+        assert!(
+            plan.ranges
+                .iter()
+                .map(|range| range.end - range.start)
+                .sum::<u64>()
+                > DEFAULT_MAX_SPAN
+        );
     }
 
     #[test]
-    fn enforces_merged_span_and_keeps_a_large_single_range_intact() {
-        let source = [0..4, 4..8, 8..12, 20..40];
-        let plan = plan_coalesced_ranges(&source, 16, 8, 64).unwrap();
-        assert_eq!(plan.ranges, vec![0..8, 8..12, 20..40]);
-        let adjacent = plan_coalesced_ranges(&[0..1, 1..2], 0, 2, 2).unwrap();
-        assert_eq!(adjacent.ranges, vec![0..2]);
+    fn enforces_default_span_and_keeps_a_large_single_range_intact() {
+        let half = DEFAULT_MAX_SPAN / 2;
+        let source = [
+            0..half,
+            half..DEFAULT_MAX_SPAN,
+            DEFAULT_MAX_SPAN..DEFAULT_MAX_SPAN + 1,
+        ];
+        let plan = plan_coalesced_ranges(&source).unwrap();
+        assert_eq!(
+            plan.ranges,
+            vec![0..DEFAULT_MAX_SPAN, DEFAULT_MAX_SPAN..DEFAULT_MAX_SPAN + 1]
+        );
+        let large = 0..DEFAULT_MAX_SPAN + 1;
+        assert_eq!(
+            plan_coalesced_ranges(std::slice::from_ref(&large))
+                .unwrap()
+                .ranges,
+            vec![large]
+        );
     }
 
     #[test]
-    fn rejects_invalid_ranges_and_budgets_without_allocating_payloads() {
+    fn rejects_invalid_ranges_and_accepts_empty_input() {
         for source in [
             vec![Range { start: 1, end: 1 }],
             vec![Range { start: 3, end: 2 }],
             vec![2..5, 4..6],
             vec![8..9, 1..2],
         ] {
-            assert!(plan_coalesced_ranges(&source, 10, 10, 100).is_err());
+            assert!(plan_coalesced_ranges(&source).is_err());
         }
-        assert!(plan_coalesced_ranges(std::slice::from_ref(&(0..100)), 1, 100, 99).is_err());
-        assert!(plan_coalesced_ranges(std::slice::from_ref(&(0..1)), 1, 0, 2).is_err());
-        assert!(plan_coalesced_ranges(&[], 1, 1, 0).is_err());
-        assert!(
-            plan_coalesced_ranges(&[], 0, 1, 1)
-                .unwrap()
-                .ranges
-                .is_empty()
+        assert!(plan_coalesced_ranges(&[]).unwrap().ranges.is_empty());
+        let source = [u64::MAX - 4..u64::MAX - 2, u64::MAX - 1..u64::MAX];
+        assert_eq!(
+            plan_coalesced_ranges(&source).unwrap().ranges,
+            vec![u64::MAX - 4..u64::MAX]
         );
-        let plan = plan_coalesced_ranges(
-            &[u64::MAX - 4..u64::MAX - 2, u64::MAX - 1..u64::MAX],
-            1,
-            4,
-            4,
-        )
-        .unwrap();
-        assert_eq!(plan.ranges, vec![u64::MAX - 4..u64::MAX]);
     }
 
     #[test]
-    fn rejects_missing_extra_short_and_long_read_results() {
-        let make = || plan_coalesced_ranges(&[4..6, 8..10], 2, 6, 6).unwrap();
+    fn validates_read_results_and_preserves_eof_clipping() {
+        let make = || plan_coalesced_ranges(&[4..6, 8..10]).unwrap();
         assert!(make().into_payloads(vec![]).is_err());
-        assert!(
+        assert_eq!(
             make()
                 .into_payloads(vec![Bytes::from_static(b"12345")])
+                .unwrap(),
+            vec![Bytes::from_static(b"12"), Bytes::from_static(b"5")]
+        );
+        assert!(
+            make()
+                .into_payloads(vec![Bytes::from_static(b"123")])
                 .is_err()
         );
         assert!(
