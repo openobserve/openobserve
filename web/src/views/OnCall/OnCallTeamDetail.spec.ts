@@ -974,6 +974,31 @@ describe("OnCallTeamDetail", () => {
     expect(wrapper.findComponent({ name: "OnCallTeamAttention" }).exists()).toBe(false);
   });
 
+  /// Deleting a team, then hitting the browser's Back button onto its now-gone
+  /// detail page, made this exact 404 land on the entry-probe check and render
+  /// "On-call isn't available on this deployment" — a build-wide gate — for
+  /// what is really just a missing record.
+  it("treats a 404 on the team's own id as a deleted team, not a missing feature", async () => {
+    service.getTeam.mockRejectedValueOnce({ response: { status: 404 } });
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-team-detail-not-found"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-team-detail-not-available"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(false);
+  });
+
+  /// The org-level team list is the one fetch every on-call build serves
+  /// regardless of team id, so only its 404 is a real "feature unavailable" signal.
+  it("still shows the unavailable gate when the build has no on-call routes at all", async () => {
+    service.listTeams.mockRejectedValueOnce({ response: { status: 404 } });
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-team-detail-not-available"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-team-detail-not-found"]').exists()).toBe(false);
+  });
+
   /// The tabs read only when they mount, so Refresh expires their reads and remounts the open one.
   describe("Refresh and Retry", () => {
     const expiries = [

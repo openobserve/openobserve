@@ -84,6 +84,15 @@
       />
     </OContent>
 
+    <OContent v-else-if="teamNotFound" y>
+      <OEmptyState
+        size="hero"
+        :title="t('oncall.teamNotFoundTitle')"
+        :description="t('oncall.teamNotFoundDescription')"
+        data-test="oncall-team-detail-not-found"
+      />
+    </OContent>
+
     <OContent v-else-if="loadError" y>
       <OEmptyState
         size="hero"
@@ -586,6 +595,7 @@ const loaded = ref(false);
 const lastFetchedAt = ref<number | null>(null);
 const loadError = ref<string | null>(null);
 const oncallUnavailable = ref(false);
+const teamNotFound = ref(false);
 const editOpen = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
@@ -727,16 +737,32 @@ const refreshScheduleForEdit = () =>
 
 async function fetchAll(force = false) {
   loadError.value = null;
+  teamNotFound.value = false;
   const org = orgId.value;
   const id = teamId.value;
+
+  // The org-level list is the true entry probe: it exists in every on-call
+  // build regardless of whether this specific team id does, so only ITS
+  // failure means the feature itself is unavailable here.
+  let teamsRes: OnCallTeam[];
   try {
-    const [teamRes, memberRes, scheduleRes, policyRes, onCallRes, teamsRes] = await Promise.all([
+    teamsRes = await read<OnCallTeam[]>(oncallTeamsQuery(org), force);
+  } catch (err: any) {
+    if (isOnCallUnavailable(err)) {
+      oncallUnavailable.value = true;
+      return;
+    }
+    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    return;
+  }
+
+  try {
+    const [teamRes, memberRes, scheduleRes, policyRes, onCallRes] = await Promise.all([
       read<OnCallTeam | null>(oncallTeamQuery(org, id), force),
       read<OnCallTeamMember[]>(teamMembersQuery(org, id), force),
       read<OnCallSchedule | null>(teamScheduleQuery(org, id), force),
       read<OnCallPolicy | null>(teamPolicyQuery(org, id), force),
       read<OnCallPosition[]>(whoIsOnCallQuery(org, id), force),
-      read<OnCallTeam[]>(oncallTeamsQuery(org), force),
     ]);
     team.value = teamRes;
     teams.value = teamsRes;
@@ -767,10 +793,11 @@ async function fetchAll(force = false) {
       fetchPreview(force),
     ]);
   } catch (err: any) {
-    // Entry fetch ONLY: a 404 on a specific team id past this point is a
-    // missing record, not a missing feature.
-    if (isOnCallUnavailable(err)) {
-      oncallUnavailable.value = true;
+    // The probe above already confirmed on-call is available here, so a 404
+    // past this point means this team id was deleted (e.g. from another tab,
+    // or by navigating Back after deleting it) — never "feature unavailable".
+    if (err?.response?.status === 404) {
+      teamNotFound.value = true;
       return;
     }
     // The state, not a toast. With the load failed the page below renders a
