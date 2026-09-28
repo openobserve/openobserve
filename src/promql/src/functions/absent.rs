@@ -55,6 +55,7 @@ pub(crate) fn absent(data: Value, labels: Labels, eval_ctx: &EvalContext) -> Res
 /// names.
 pub(crate) fn absent_labels(expr: &Expr) -> Labels {
     let selector = match expr {
+        Expr::Paren(paren) => return absent_labels(&paren.expr),
         Expr::VectorSelector(vs) => vs,
         Expr::MatrixSelector(ms) => &ms.vs,
         _ => return Labels::default(),
@@ -266,6 +267,10 @@ mod tests {
         );
         assert_eq!(
             labels_of(r#"absent_over_time(up{job="x"}[5m])"#),
+            pairs(&[("job", "x")])
+        );
+        assert_eq!(
+            labels_of(r#"absent(((up{job="x"})))"#),
             pairs(&[("job", "x")])
         );
         assert!(labels_of(r#"absent(sum(up{job="x"}))"#).is_empty());
