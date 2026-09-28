@@ -31,9 +31,7 @@ pub enum Feature {
 }
 
 // unknown keys are dropped so a newer license still loads on an older binary
-pub fn deserialize_list<'de, D: Deserializer<'de>>(
-    d: D,
-) -> Result<Option<Vec<Feature>>, D::Error> {
+pub fn deserialize_list<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Vec<Feature>>, D::Error> {
     Ok(Option::<Vec<String>>::deserialize(d)?
         .map(|keys| keys.iter().filter_map(|k| k.parse().ok()).collect()))
 }
