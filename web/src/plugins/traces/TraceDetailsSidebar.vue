@@ -1295,6 +1295,8 @@ export default defineComponent({
           ? props.span.gen_ai_prompt_label.trim()
           : null;
       const orgId = String(store.state.selectedOrganization?.identifier ?? "");
+      // The prompts route and API are enterprise-only; OSS has nothing to link to.
+      if (!router.hasRoute("aiPrompts")) return;
       if (!orgId || !name || !Number.isInteger(version) || version < 1) return;
       try {
         const resolved = await llmPromptsService.resolve(orgId, { name, version });

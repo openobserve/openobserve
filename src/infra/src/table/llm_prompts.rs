@@ -205,6 +205,21 @@ pub async fn list_labels<C: ConnectionTrait>(
         .await
 }
 
+pub async fn list_labels_for_entities<C: ConnectionTrait>(
+    db: &C,
+    entity_ids: &[String],
+) -> Result<Vec<labels::Model>, sea_orm::DbErr> {
+    if entity_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    labels::Entity::find()
+        .filter(labels::Column::EntityId.is_in(entity_ids))
+        .order_by_asc(labels::Column::EntityId)
+        .order_by_asc(labels::Column::Name)
+        .all(db)
+        .await
+}
+
 pub async fn upsert_label<C: ConnectionTrait>(
     db: &C,
     model: labels::ActiveModel,
@@ -408,6 +423,25 @@ mod tests {
         )
         .await
         .unwrap();
+
+        let entity_ids = ["prompt-2".to_string(), "prompt-1".to_string()];
+        let labels = list_labels_for_entities(&db, &entity_ids).await.unwrap();
+        assert_eq!(
+            labels
+                .iter()
+                .map(|label| label.entity_id.as_str())
+                .collect::<Vec<_>>(),
+            ["prompt-1", "prompt-2"]
+        );
+        assert!(list_labels_for_entities(&db, &[]).await.unwrap().is_empty());
+        let folder_ids = crate::table::folders::get_public_ids_by_pks(
+            &db,
+            &["folder-1".to_string(), "missing".to_string()],
+        )
+        .await
+        .unwrap();
+        assert_eq!(folder_ids.len(), 1);
+        assert_eq!(folder_ids["folder-1"], "default");
 
         delete_by_org_with(&db, "org-1").await.unwrap();
 

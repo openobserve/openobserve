@@ -132,6 +132,7 @@ pub struct PromptConfig {
 }
 
 impl PromptConfig {
+    /// Canonical hashing form: camel-case keys, every field present, `None` as null.
     pub fn normalized_value(&self) -> Value {
         json!({
             "model": self.model,
@@ -407,7 +408,7 @@ fn validate_chat_payload(payload: &Value) -> Result<(), PromptError> {
     Ok(())
 }
 
-/// Hashes normalized camel-case content after dropping absent optional config fields.
+/// Hashes normalized camel-case content; absent optional config fields are serialized as null.
 pub fn content_hash(payload: &Value, config: &PromptConfig) -> String {
     infra::idempotency::canonical_sha256(&json!({
         "payload": payload,

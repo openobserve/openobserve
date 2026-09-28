@@ -212,11 +212,7 @@ fn prompts() -> TableCreateStatement {
         )
         .col(ColumnDef::new(LlmPrompts::OrgId).string_len(256).not_null())
         .col(ColumnDef::new(LlmPrompts::Name).string_len(256).not_null())
-        .col(
-            ColumnDef::new(LlmPrompts::FolderId)
-                .string_len(27)
-                .not_null(),
-        )
+        .col(ColumnDef::new(LlmPrompts::FolderId).char_len(27).not_null())
         .col(
             ColumnDef::new(LlmPrompts::PromptType)
                 .string_len(16)

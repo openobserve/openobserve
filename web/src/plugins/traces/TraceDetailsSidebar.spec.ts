@@ -2054,6 +2054,7 @@ describe("TraceDetailsSidebar", async () => {
         label: null,
       });
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      const hasRoute = vi.spyOn(router, "hasRoute").mockReturnValue(true);
       const attributed = mountSidebar({
         span: {
           ...mockLLMSpan,
@@ -2081,6 +2082,7 @@ describe("TraceDetailsSidebar", async () => {
       });
       attributed.unmount();
       push.mockRestore();
+      hasRoute.mockRestore();
     });
 
     it("hides evaluation with the Preview tab for an ordinary span", () => {

@@ -1,8 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <template>
-  <!-- h-full: the AI shell renders router-view inside a plain overflow-y-auto
-     section, so filling the height keeps the footer on screen (ExperimentForm
-     does the same). -->
+  <!-- h-full keeps the footer on screen inside the AI shell's scrolling section. -->
   <OForm :form="form" class="h-full w-full">
     <OPageLayout
       :back="{

@@ -257,6 +257,23 @@ pub async fn get_public_id_by_pk<C: ConnectionTrait>(
         .map(|model| model.folder_id))
 }
 
+/// Maps each primary-key `id` to its public `folder_id`; unknown keys are absent.
+pub async fn get_public_ids_by_pks<C: ConnectionTrait>(
+    db: &C,
+    pks: &[String],
+) -> Result<std::collections::HashMap<String, String>, sea_orm::DbErr> {
+    if pks.is_empty() {
+        return Ok(Default::default());
+    }
+    Ok(Entity::find()
+        .filter(Column::Id.is_in(pks))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|model| (model.id, model.folder_id))
+        .collect())
+}
+
 /// Returns `(folder name, display name)` for the given primary-key `id`.
 ///
 /// Both values are needed when building API list responses for anomaly configs

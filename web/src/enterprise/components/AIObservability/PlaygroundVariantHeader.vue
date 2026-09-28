@@ -111,7 +111,7 @@
       size="icon-xs"
       class="shrink-0"
       icon-left="save"
-      :title="raw('Save as Prompt')"
+      :title="t('aiObservability.experiments.detail.saveAsPrompt')"
       :data-test="`ai-playground-variant-save-prompt-${label}`"
       @click="emit('save-as-prompt')"
     />

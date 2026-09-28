@@ -54,11 +54,30 @@ pub async fn list_prompts(
     let models =
         llm_prompts::list_heads(db, org_id, include_archived, physical_folder_id.as_deref())
             .await?;
-    let mut prompts = Vec::with_capacity(models.len());
-    for model in models {
-        prompts.push(prompt_from_model(db, model, true).await?);
+    let folder_pks: Vec<String> = models.iter().map(|model| model.folder_id.clone()).collect();
+    let folder_ids = folders::get_public_ids_by_pks(db, &folder_pks).await?;
+    let entity_ids: Vec<String> = models.iter().map(|model| model.entity_id.clone()).collect();
+    let mut labels_by_entity: std::collections::HashMap<String, Vec<labels::Model>> =
+        std::collections::HashMap::new();
+    for label in llm_prompts::list_labels_for_entities(db, &entity_ids).await? {
+        labels_by_entity
+            .entry(label.entity_id.clone())
+            .or_default()
+            .push(label);
     }
-    Ok(prompts)
+    models
+        .into_iter()
+        .map(|model| {
+            let folder_id = folder_ids
+                .get(&model.folder_id)
+                .cloned()
+                .ok_or(PromptError::FolderNotFound)?;
+            let labels = labels_by_entity
+                .remove(&model.entity_id)
+                .unwrap_or_default();
+            prompt_from_parts(model, folder_id, labels)
+        })
+        .collect()
 }
 
 pub async fn list_versions(
@@ -207,14 +226,22 @@ pub(crate) async fn prompt_from_model<C: ConnectionTrait>(
         .await?
         .ok_or(PromptError::FolderNotFound)?;
     let labels = if include_labels {
-        llm_prompts::list_labels(db, &model.entity_id)
-            .await?
-            .into_iter()
-            .map(label_from_model)
-            .collect::<Result<Vec<_>, _>>()?
+        llm_prompts::list_labels(db, &model.entity_id).await?
     } else {
         Vec::new()
     };
+    prompt_from_parts(model, folder_id, labels)
+}
+
+fn prompt_from_parts(
+    model: prompts::Model,
+    folder_id: String,
+    labels: Vec<labels::Model>,
+) -> Result<Prompt, PromptError> {
+    let labels = labels
+        .into_iter()
+        .map(label_from_model)
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(Prompt {
         entity_id: model.entity_id,
         name: model.name,
