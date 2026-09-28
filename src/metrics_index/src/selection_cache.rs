@@ -93,11 +93,11 @@ impl MetricsIndexSelectionCache {
             self.release(Self::entry_size(&key, &previous));
         }
         self.memory_size += size;
-        metrics::promql::INDEX_SELECTION_CACHE_MEMORY_USAGE
+        metrics::promql::SELECTION_CACHE_MEMORY_USAGE
             .with_label_values::<&str>(&[])
             .add(size as i64);
         if self.memory_size > max_bytes {
-            metrics::promql::INDEX_SELECTION_CACHE_GC_TOTAL
+            metrics::promql::SELECTION_CACHE_GC_TOTAL
                 .with_label_values::<&str>(&[])
                 .inc();
         }
@@ -111,7 +111,7 @@ impl MetricsIndexSelectionCache {
 
     fn release(&mut self, size: usize) {
         self.memory_size = self.memory_size.saturating_sub(size);
-        metrics::promql::INDEX_SELECTION_CACHE_MEMORY_USAGE
+        metrics::promql::SELECTION_CACHE_MEMORY_USAGE
             .with_label_values::<&str>(&[])
             .sub(size as i64);
     }
@@ -128,7 +128,7 @@ pub fn cached_blocks(file: &FileKey, matchers: &Matchers) -> Option<Arc<Vec<usiz
     if !get_config().search.metrics_selection_cache_enabled {
         return None;
     }
-    metrics::promql::INDEX_SELECTION_CACHE_REQUESTS_TOTAL
+    metrics::promql::SELECTION_CACHE_REQUESTS_TOTAL
         .with_label_values::<&str>(&[])
         .inc();
     let value = METRICS_SELECTION_CACHE
@@ -136,7 +136,7 @@ pub fn cached_blocks(file: &FileKey, matchers: &Matchers) -> Option<Arc<Vec<usiz
         .unwrap_or_else(|error| error.into_inner())
         .get_blocks(&block_key(file, matchers));
     if value.is_some() {
-        metrics::promql::INDEX_SELECTION_CACHE_HITS_TOTAL
+        metrics::promql::SELECTION_CACHE_HITS_TOTAL
             .with_label_values::<&str>(&[])
             .inc();
     }

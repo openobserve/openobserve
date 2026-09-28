@@ -575,6 +575,10 @@ pub(super) async fn prepare(
         })
         .collect::<Vec<_>>();
     let selected = collect_preflight_tasks(jobs, concurrency).await?;
+    let label_matched_files = selected
+        .iter()
+        .filter(|file| file.selection.ids().next().is_some())
+        .count();
     let selection_ms = selection_started.elapsed().as_secs_f64() * 1000.0;
     let bucketing_started = Instant::now();
     let intervals = Arc::new(partitions.to_vec());
@@ -661,9 +665,10 @@ pub(super) async fn prepare(
             .sum::<usize>(),
     );
     log::info!(
-        "[trace_id: {}] [PromQL] metrics blocks preflight: {} files, {} series, {} hash partitions, metadata cache {} bytes",
+        "[trace_id: {}] [PromQL] metrics blocks preflight: {} candidate files, {} label-matched files, {} series, {} hash partitions, metadata cache {} bytes",
         eval.trace_id,
         scan.files.len(),
+        label_matched_files,
         series,
         partitions.len(),
         INDEX_CACHE.lock().unwrap_or_else(|e| e.into_inner()).bytes
