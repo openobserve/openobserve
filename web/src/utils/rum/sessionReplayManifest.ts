@@ -60,6 +60,19 @@ export function dedupManifest(rows: ManifestEntry[]): ManifestEntry[] {
   return out;
 }
 
+/** The manifest query's sort (start, end, index_in_view, view_id) as a comparator. */
+export function compareManifestOrder(a: ManifestEntry, b: ManifestEntry): number {
+  const byStart = Number(a.start) - Number(b.start);
+  if (byStart) return byStart;
+  const byEnd = Number(a.end) - Number(b.end);
+  if (byEnd) return byEnd;
+  const byIndex = (Number(a.index_in_view) || 0) - (Number(b.index_in_view) || 0);
+  if (byIndex) return byIndex;
+  const viewA = a.view_id ?? "";
+  const viewB = b.view_id ?? "";
+  return viewA < viewB ? -1 : viewA > viewB ? 1 : 0;
+}
+
 // Rows before the first full snapshot are orphan mutations that decode against an empty id space, so playback starts at replayStart.
 export function trimBeforeReplayStart(
   rows: ManifestEntry[],

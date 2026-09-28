@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export type LoadState = "loading" | "complete" | "failed" | "empty" | "error";
+export type LoadState = "loading" | "complete" | "failed" | "live" | "empty" | "error";
 
 export type RangeState = "inPlayer" | "fetched" | "skipped" | "unavailable";
 
@@ -44,6 +44,11 @@ export interface SkipMarker {
 }
 
 export type ReplayIntent = "play" | "pause";
+
+/** Loading and live both mean more data can still reach the player. */
+export function expectsMoreData(state: LoadState): boolean {
+  return state === "loading" || state === "live";
+}
 
 export function isSkipMarker(segment: any): segment is SkipMarker {
   return !!segment && segment.skipped === true;

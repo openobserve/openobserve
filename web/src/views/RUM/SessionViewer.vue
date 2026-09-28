@@ -25,6 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
+    <template v-if="isLive" #title-trail>
+      <OBadge variant="error" size="sm" dot data-test="session-viewer-live-badge">{{
+        t("rum.sessionReplayLiveBadge")
+      }}</OBadge>
+    </template>
     <template v-if="!sessionNotFound" #subtitle>
       <div
         class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
@@ -108,25 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         separatorClass="bg-card-glass-border w-px! hover:bg-theme-accent"
       >
         <template #before>
-          <!-- Mobile SDKs record wireframes (not a DOM); play them with the wireframe
-               player. Browser sessions use the rrweb-based VideoPlayer. -->
-          <MobileSessionPlayer
-            v-if="isMobileReplay"
-            ref="mobilePlayerRef"
-            v-bind="playerBindings"
-            v-model:speed="replaySpeed"
-            v-model:skip-inactivity="replaySkipInactivity"
-            v-model:intent="replayIntent"
-            :segments="segments"
-            :events="segmentEvents"
-            :is-loading="segmentsLoading"
-            class="h-full"
-            @ready="handlePlayerReady"
-            @seek-request="requestSeek"
-            @retry="handleRetry"
-            @playback-state="playerPlaybackState = $event"
-          />
-          <div v-else class="flex h-full min-h-0 flex-col">
+          <div class="flex h-full min-h-0 flex-col">
             <div
               v-if="segmentNotice"
               class="bg-card-glass-bg text-text-secondary border-card-glass-border border-b px-3 py-1 text-xs"
@@ -134,7 +121,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ segmentNotice }}
             </div>
+            <!-- Mobile SDKs record wireframes (not a DOM); play them with the wireframe
+                 player. Browser sessions use the rrweb-based VideoPlayer. -->
+            <MobileSessionPlayer
+              v-if="isMobileReplay"
+              ref="mobilePlayerRef"
+              v-bind="playerBindings"
+              v-model:speed="replaySpeed"
+              v-model:skip-inactivity="replaySkipInactivity"
+              v-model:intent="replayIntent"
+              :segments="segments"
+              :events="segmentEvents"
+              :is-loading="segmentsLoading"
+              class="min-h-0 flex-1"
+              @ready="handlePlayerReady"
+              @seek-request="requestSeek"
+              @retry="handleRetry"
+              @playback-state="playerPlaybackState = $event"
+            />
             <VideoPlayer
+              v-else
               ref="videoPlayerRef"
               v-bind="playerBindings"
               v-model:speed="replaySpeed"
@@ -202,6 +208,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
 
@@ -236,6 +243,7 @@ import {
   createActivityTimer,
   createLoaderState,
   createQueryError,
+  extendLoaderState,
   failBatch,
   isFetchable,
   isSettled,
@@ -243,25 +251,41 @@ import {
   markSkipped,
   markStored,
   networkSkippedIndexes,
-  nextBatch,
   requeueNetworkSkips,
   settleBatch,
   withRetries,
   type LoaderState,
   type RetryOptions,
 } from "@/utils/rum/sessionReplayLoader";
-import type {
-  LoadState,
-  LoadedRange,
-  PlaybackState,
-  ReplayIntent,
-  SkipMarker,
+import { MAX_IN_FLIGHT, nextBatches } from "@/utils/rum/sessionReplayLoadPlan";
+import {
+  LIVE_OVERLAP_US,
+  LIVE_POLL_MS,
+  errorLogKey,
+  eventKey,
+  isSessionLive,
+  mergeManifestTail,
+  raiseUpperTs,
+  shouldStopLive,
+} from "@/utils/rum/sessionReplayLive";
+import {
+  expectsMoreData,
+  type LoadState,
+  type LoadedRange,
+  type PlaybackState,
+  type ReplayIntent,
+  type SkipMarker,
 } from "@/utils/rum/sessionReplayTimeline";
 
 interface ReplayRun {
   runId: number;
   anchorIndex: number;
   appendedThroughIndex: number;
+}
+
+interface QueryWindow {
+  start: number;
+  end: number;
 }
 
 // The page cap only exists to stop a bad response looping forever.
@@ -273,6 +297,9 @@ const SECOND_US = 1_000_000;
 const EVENTS_TAIL_US = 60_000_000;
 const DEFAULT_LOOKUP_US = 30 * DAY_US;
 const WATCHDOG_MS = 2000;
+const EVENTS_PAGE_SIZE = 150;
+const RUM_EVENT_TYPES = ["action", "view", "error"];
+const MAX_EVENT_PAGES = 50;
 
 const defaultEvent = {
   id: "",
@@ -337,8 +364,22 @@ const bodyStore = new Map<string, any>();
 // Segments the player stepped past as skip markers stay gaps in this run even if a retry fetches them later.
 const skipAppended = new Set<number>();
 const liveTraceIds = new Set<string>();
-let loopRunning = false;
+let inFlightBatches = 0;
+// Keyed by a batch's first index, so the overlay shows the worst retry among the batches in flight.
+const batchAttempts = new Map<number, number>();
 let watchdog: ReturnType<typeof setInterval> | null = null;
+// Server-time upper bound for body queries; it only moves forward, and never from the viewer's clock.
+let upperTs = 0;
+const isLive = ref(false);
+const lateRows = ref(false);
+let liveTimer: ReturnType<typeof setTimeout> | null = null;
+let livePolling = false;
+let lastNewIdAtMs = 0;
+let lastEventsTs = 0;
+let lastLogsTs = 0;
+// Formatted events by stream key, so a poll overlapping the last one adds nothing twice.
+const rumEvents = new Map<string, any>();
+const logEvents = new Map<string, any>();
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -480,9 +521,10 @@ const playerBindings = computed(() => ({
   retryAttempt: retryAttempt.value,
 }));
 
-// One line under the player: a seek before the loaded window, else a manifest cut short.
+// One notice at a time: a seek before the loaded window, then late earlier rows, then a manifest cut short.
 const segmentNotice = computed(() => {
   if (unreachableSeek.value) return t("rum.sessionReplaySeekBehindWindow");
+  if (lateRows.value) return t("rum.sessionReplayLateRows");
   if (manifestSummary.value?.truncated)
     return t("rum.sessionReplayTruncated", { count: manifestSummary.value.segmentCount });
   return "";
@@ -503,6 +545,7 @@ const rawEventsMap = ref<Map<string, any>>(new Map());
 onBeforeUnmount(() => {
   cancelled = true;
   stopWatchdog();
+  stopLivePolling();
   // Leaving the page must stop the streams too, not only the loop that would start new ones.
   for (const traceId of liveTraceIds) {
     cancelStreamQueryBasedOnRequestId({
@@ -548,8 +591,7 @@ const routeRangeUs = () => {
 // Rows are stamped with server receive time, so later queries use the arrival bounds getSession found, not the device clock.
 const serverWindowUs = (tailUs: number) => {
   const minTs = Number(sessionState.data.selectedSession?.min_ts);
-  const maxTs = Number(sessionState.data.selectedSession?.max_ts);
-  if (minTs > 0 && maxTs > 0) return { start: minTs - SECOND_US, end: maxTs + tailUs };
+  if (minTs > 0 && upperTs > 0) return { start: minTs - SECOND_US, end: upperTs + tailUs };
   return routeRangeUs();
 };
 
@@ -625,6 +667,8 @@ const getSession = async () => {
       min_ts: hit.zo_sql_timestamp,
       max_ts: hit.max_ts,
     };
+    upperTs = Math.max(upperTs, Number(hit.max_ts) || 0);
+    isLive.value = isSessionLive(hit.end_time, Date.now());
 
     getSessionDetails();
   } catch (error) {
@@ -638,8 +682,7 @@ const getSession = async () => {
   }
 };
 
-const buildSegmentRequest = (sql: string, from: number, size: number) => {
-  const window = serverWindowUs(SECOND_US);
+const buildSegmentRequest = (sql: string, from: number, size: number, window: QueryWindow) => {
   const req = buildQueryPayload(
     {
       from,
@@ -678,7 +721,12 @@ const queryErrorFrom = (response: any) => {
   return createQueryError(content.message || "session replay query failed", status, errorCode);
 };
 
-const runSegmentQuery = (sql: string, from: number, size: number): Promise<any[]> =>
+const runSegmentQuery = (
+  sql: string,
+  from: number,
+  size: number,
+  window: QueryWindow,
+): Promise<any[]> =>
   new Promise((resolve, reject) => {
     const hits: any[] = [];
     const traceId = generateTraceContext()?.traceId || getUUID();
@@ -702,7 +750,7 @@ const runSegmentQuery = (sql: string, from: number, size: number): Promise<any[]
 
     void fetchQueryDataWithHttpStream(
       {
-        queryReq: buildSegmentRequest(sql, from, size),
+        queryReq: buildSegmentRequest(sql, from, size, window),
         type: "search",
         traceId,
         org_id: orgId,
@@ -723,10 +771,13 @@ const runSegmentQuery = (sql: string, from: number, size: number): Promise<any[]
   });
 
 // A manifest truncated by the per-request size cap corrupts the snapshot-anchor search, so page past it.
-const fetchAllPages = async (sql: string): Promise<{ hits: any[]; complete: boolean }> => {
+const fetchAllPages = async (
+  sql: string,
+  window: QueryWindow = serverWindowUs(SECOND_US),
+): Promise<{ hits: any[]; complete: boolean }> => {
   const hits: any[] = [];
   for (let page = 0; page < MAX_SEGMENT_PAGES; page++) {
-    const batch = await runSegmentQuery(sql, page * SEGMENT_PAGE_SIZE, SEGMENT_PAGE_SIZE);
+    const batch = await runSegmentQuery(sql, page * SEGMENT_PAGE_SIZE, SEGMENT_PAGE_SIZE, window);
     hits.push(...batch);
     if (batch.length < SEGMENT_PAGE_SIZE) return { hits, complete: true };
     if (cancelled) break;
@@ -746,8 +797,11 @@ const segmentOrder = () =>
     ? `order by start asc, "end" asc, index_in_view asc, view_id asc`
     : `order by start asc, "end" asc`;
 
-const manifestSql = () =>
-  `select start, "end", has_full_snapshot, records_count${hasViewColumns() ? ", view_id, index_in_view" : ""} from "_sessionreplay" where ${sqlEquals("session_id", sessionId.value)} ${segmentOrder()}`;
+const timestampField = () => store.state.zoConfig.timestamp_column || "_timestamp";
+
+// The arrival time is selected for the live upper bound only; it is not sorted on and not part of the segment id.
+const manifestSql = (minStart: number | null = null) =>
+  `select start, "end", has_full_snapshot, records_count${hasViewColumns() ? ", view_id, index_in_view" : ""}, ${timestampField()} from "_sessionreplay" where ${sqlEquals("session_id", sessionId.value)}${minStart === null ? "" : ` and start >= ${minStart}`} ${segmentOrder()}`;
 
 // Inclusive bounds: a tie fetched by two batches is matched by segment id and stored once.
 const bodiesSql = (lo: number, hi: number) =>
@@ -779,16 +833,41 @@ const resetLoader = () => {
   playerLoadedEndMs.value = null;
   playerTakenCount.value = 0;
   unreachableSeek.value = false;
+  lateRows.value = false;
   bumpLoader();
 };
 
 const adoptManifest = (rows: ManifestEntry[], complete: boolean) => {
+  upperTs = raiseUpperTs(upperTs, rows, timestampField());
   manifest.value = rows;
   manifestSummary.value = summarizeManifest(rows, complete);
   loader = createLoaderState(rows.length);
   segmentIds = rows.map(segmentId);
   indexById = new Map(segmentIds.map((id, i) => [id, i]));
   bumpLoader();
+};
+
+// A live poll only appends, so every index the loader and the run already hold stays valid.
+const extendManifest = (rows: ManifestEntry[]) => {
+  const first = manifest.value.length;
+  manifest.value = [...manifest.value, ...rows];
+  manifestSummary.value = summarizeManifest(manifest.value, !manifestSummary.value?.truncated);
+  extendLoaderState(loader, rows.length);
+  rows.forEach((row, i) => {
+    const id = segmentId(row);
+    segmentIds.push(id);
+    indexById.set(id, first + i);
+  });
+  extendSessionEnd(Math.max(...rows.map((row) => Number(row.end) || 0)));
+  bumpLoader();
+};
+
+const extendSessionEnd = (endMs: number) => {
+  const session = sessionState.data.selectedSession;
+  if (!session || !(endMs > (Number(session.end_time) || 0))) return;
+  session.end_time = endMs;
+  session.time_spent = endMs - Number(session.start_time);
+  sessionDetails.value.duration = formatSessionDuration(Number(session.time_spent));
 };
 
 // A body is kept only if its id is in the manifest and not stored yet, so ties and duplicate rows are dropped.
@@ -833,48 +912,67 @@ const appendInOrder = () => {
   run.value = { ...current, appendedThroughIndex: next[next.length - 1] };
 };
 
+// Complete only once nothing is in flight and every segment is stored or skipped; a live session stays live instead.
 const settleLoadState = () => {
-  if (!isSettled(loader)) return;
+  if (inFlightBatches > 0 || !isSettled(loader)) return;
   const failed = networkSkippedIndexes(loader).length > 0;
-  loadState.value = failed ? "failed" : "complete";
+  loadState.value = failed ? "failed" : isLive.value ? "live" : "complete";
   // A wait that can no longer be satisfied must end, or the overlay spins forever.
   if (failed) pendingSeekMs.value = null;
 };
 
+const activeLoadState = (): LoadState => (isLive.value ? "live" : "loading");
+
+const setBatchAttempt = (key: number, attempt: number) => {
+  if (attempt > 0) batchAttempts.set(key, attempt);
+  else batchAttempts.delete(key);
+  retryAttempt.value = Math.max(0, ...batchAttempts.values());
+};
+
+// The loader state is captured, so a batch that outlives a reset settles against the state it was started on.
 const fetchBatch = async (batch: number[], runId: number) => {
-  markInFlight(loader, batch);
+  const state = loader;
+  markInFlight(state, batch);
   bumpLoader();
   try {
-    const hits = await withRetries(() => fetchBodies(batch), retryOptions());
+    const hits = await withRetries(() => fetchBodies(batch), {
+      isCancelled: () => cancelled,
+      onRetry: (attempt: number) => setBatchAttempt(batch[0], attempt),
+    });
     if (cancelled) return;
     storeBodies(hits);
-    settleBatch(loader, batch);
+    settleBatch(state, batch);
   } catch (error) {
     if (cancelled) return;
     console.error("Failed to fetch session replay segments:", error);
-    failBatch(loader, batch);
+    failBatch(state, batch);
   } finally {
-    retryAttempt.value = 0;
+    setBatchAttempt(batch[0], 0);
   }
   bumpLoader();
   if (runId === run.value.runId) appendInOrder();
 };
 
-// One batch in flight, in manifest order after the run edge, then any holes; a failed batch is skipped, not fatal.
-const runLoader = async () => {
-  if (loopRunning) return;
-  loopRunning = true;
-  const runId = run.value.runId;
+const launchBatch = async (batch: number[], runId: number) => {
+  inFlightBatches++;
   try {
-    while (!cancelled && runId === run.value.runId) {
-      const batch = nextBatch(loader, run.value.appendedThroughIndex + 1);
-      if (!batch.length) break;
-      await fetchBatch(batch, runId);
-    }
+    await fetchBatch(batch, runId);
   } finally {
-    loopRunning = false;
+    inFlightBatches--;
   }
-  if (!cancelled && runId === run.value.runId) settleLoadState();
+  pumpLoader();
+};
+
+// Up to three batches in flight; bodies may land in any order, and appendInOrder is the reorder buffer.
+const pumpLoader = () => {
+  if (cancelled) return;
+  const batches = nextBatches(manifest.value, loader, run.value, {
+    maxInFlight: MAX_IN_FLIGHT,
+    inFlight: inFlightBatches,
+  });
+  const runId = run.value.runId;
+  for (const batch of batches) void launchBatch(batch, runId);
+  settleLoadState();
 };
 
 // Absolute time the player must reach first; mobile always starts at the session start so nothing before the event is lost.
@@ -897,7 +995,7 @@ const getSessionSegments = async () => {
   isLoading.value.push(true);
   segmentsLoading.value = true;
   resetLoader();
-  loadState.value = "loading";
+  loadState.value = activeLoadState();
   try {
     const { hits, complete } = await withRetries(
       () => fetchAllPages(manifestSql()),
@@ -933,7 +1031,8 @@ const getSessionSegments = async () => {
     settleBatch(loader, indexes);
     appendInOrder();
     bumpLoader();
-    void runLoader();
+    pumpLoader();
+    startLivePolling();
   } catch (error) {
     if (cancelled) return;
     console.error("Failed to fetch session replay segments:", error);
@@ -951,9 +1050,9 @@ const getSessionSegments = async () => {
 // E1: only segments lost to the network go back on the queue; the player keeps the gaps it already stepped past.
 const retryFailedSegments = () => {
   if (!requeueNetworkSkips(loader).length) return;
-  loadState.value = "loading";
+  loadState.value = activeLoadState();
   bumpLoader();
-  void runLoader();
+  pumpLoader();
 };
 
 const handleRetry = async () => {
@@ -963,7 +1062,7 @@ const handleRetry = async () => {
   }
   if (loadState.value !== "error") return;
   if (sessionLoadFailed.value) {
-    loadState.value = "loading";
+    loadState.value = activeLoadState();
     segmentsLoading.value = true;
     await getSession();
     if (sessionNotFound.value || sessionLoadFailed.value) return;
@@ -974,11 +1073,11 @@ const handleRetry = async () => {
   void getSessionSegments();
 };
 
-// Restarts a loader that stopped while the player still waits on a segment it can fetch; skipped and capped ones never qualify.
+// Restarts a loader that stopped while the player still waits on a segment it can fetch; skipped, capped and in-flight ones never qualify.
 const checkWatchdog = () => {
-  if (cancelled || loopRunning || loadState.value !== "loading") return;
+  if (cancelled || !expectsMoreData(loadState.value)) return;
   const next = run.value.appendedThroughIndex + 1;
-  if (next < loader.status.length && isFetchable(loader, next)) void runLoader();
+  if (next < loader.status.length && isFetchable(loader, next)) pumpLoader();
 };
 
 const stopWatchdog = () => {
@@ -992,53 +1091,192 @@ watch(playerPlaybackState, (state) => {
   if (!waiting) stopWatchdog();
 });
 
-const getSessionEvents = () => {
-  const window = serverWindowUs(EVENTS_TAIL_US);
-  const queryPayload: any = {
-    from: 0,
-    size: 150,
-    timestamp_column: store.state.zoConfig.timestamp_column,
-    timestamps: {
-      startTime: window.start,
-      endTime: window.end,
-    },
-    sqlMode: false,
-    currentPage: 0,
-    parsedQuery: null,
-  };
+const clearLiveTimer = () => {
+  if (liveTimer !== null) clearTimeout(liveTimer);
+  liveTimer = null;
+};
 
-  const req = buildQueryPayload(queryPayload, t);
-  req.query.sql = `select * from "_rumdata" where ${sqlEquals("session_id", sessionId.value)} and (type='error' or type='action' or type='view') order by date asc`;
+const scheduleLivePoll = () => {
+  clearLiveTimer();
+  if (!isLive.value || cancelled || document.visibilityState === "hidden") return;
+  liveTimer = setTimeout(() => void runLivePoll(), LIVE_POLL_MS);
+};
+
+// A hidden tab polls nothing; showing it again starts a fresh wait.
+const handleVisibilityChange = () => {
+  if (document.visibilityState === "hidden") clearLiveTimer();
+  else if (!livePolling) scheduleLivePoll();
+};
+
+const startLivePolling = () => {
+  if (!isLive.value || cancelled) return;
+  lastNewIdAtMs = Date.now();
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  if (!livePolling) scheduleLivePoll();
+};
+
+const stopLivePolling = () => {
+  clearLiveTimer();
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
+};
+
+// The badge goes and the chip settles; batches still in flight keep the chip on loading until they land.
+const endLive = () => {
+  stopLivePolling();
+  isLive.value = false;
+  if (loadState.value !== "live") return;
+  loadState.value = "loading";
+  settleLoadState();
+};
+
+const runLivePoll = async () => {
+  liveTimer = null;
+  if (!isLive.value || cancelled || document.visibilityState === "hidden") return;
+  livePolling = true;
+  try {
+    await Promise.allSettled([pollManifest(), pollEvents()]);
+  } finally {
+    livePolling = false;
+  }
+  if (cancelled || !isLive.value) return;
+  if (shouldStopLive(lastNewIdAtMs, sessionStartMs.value, Date.now())) endLive();
+  else scheduleLivePoll();
+};
+
+// Polls look a minute behind the bound so a row that arrived late is still found; the dedup drops what was already seen.
+const liveWindowUs = (cursorUs: number): QueryWindow => {
+  const nowUs = Date.now() * 1000;
+  const from = cursorUs > 0 ? cursorUs - LIVE_OVERLAP_US : serverWindowUs(0).start;
+  return { start: from, end: Math.max(nowUs, upperTs) + LIVE_OVERLAP_US };
+};
+
+// New ids join the end of the manifest and load through the normal loader; a row sorting before the tail only raises the notice.
+const pollManifest = async () => {
+  const rows = manifest.value;
+  if (!rows.length || manifestSummary.value?.truncated) return;
+  const { hits } = await fetchAllPages(
+    manifestSql(rows[rows.length - 1].start),
+    liveWindowUs(upperTs),
+  );
+  if (cancelled || !isLive.value) return;
+  upperTs = raiseUpperTs(upperTs, hits, timestampField());
+  const { appended, late } = mergeManifestTail(manifest.value, hits as ManifestEntry[], indexById);
+  if (late) lateRows.value = true;
+  if (!appended.length) return;
+  lastNewIdAtMs = Date.now();
+  extendManifest(appended);
+  pumpLoader();
+};
+
+const pollEvents = async () => {
+  const hits = await fetchEventPages(rumEventsSql(), liveWindowUs(lastEventsTs));
+  if (cancelled) return;
+  const logs = await fetchEventPages(errorLogsSql(), liveWindowUs(lastLogsTs));
+  if (cancelled) return;
+  const changed = addRumEvents(hits);
+  if (addErrorLogs(logs) || changed) publishEvents();
+};
+
+const eventsRequest = (sql: string, window: QueryWindow, from: number) => {
+  const req = buildQueryPayload(
+    {
+      from,
+      size: EVENTS_PAGE_SIZE,
+      timestamp_column: store.state.zoConfig.timestamp_column,
+      timestamps: {
+        startTime: window.start,
+        endTime: window.end,
+      },
+      sqlMode: false,
+      currentPage: 0,
+      parsedQuery: null,
+    } as any,
+    t,
+  );
+  req.query.sql = sql;
+  req.query.from = from;
+  req.query.size = EVENTS_PAGE_SIZE;
   delete req.aggs;
+  return req;
+};
+
+const rumEventsSql = () =>
+  `select * from "_rumdata" where ${sqlEquals("session_id", sessionId.value)} and (type='error' or type='action' or type='view') order by date asc`;
+
+const errorLogsSql = () =>
+  `select * from "_rumlog" where ${sqlEquals("session_id", sessionId.value)} and status='error' order by date asc`;
+
+// Polls page past the query size, since a busy half minute can hold more than one page of events.
+const fetchEventPages = async (sql: string, window: QueryWindow) => {
+  const hits: any[] = [];
+  for (let page = 0; page < MAX_EVENT_PAGES; page++) {
+    const res: any = await searchWithRetry(eventsRequest(sql, window, page * EVENTS_PAGE_SIZE));
+    const rows = res?.data?.hits ?? [];
+    hits.push(...rows);
+    if (rows.length < EVENTS_PAGE_SIZE || cancelled) break;
+  }
+  return hits;
+};
+
+// A re-sent view merges into the stored one (latest document, earliest date), because a view is updated under the same view_id; other rows are kept once.
+const addRumEvents = (hits: any[]) => {
+  const start = Number(sessionState.data.selectedSession?.start_time);
+  const field = timestampField();
+  let changed = false;
+  for (const hit of hits) {
+    lastEventsTs = Math.max(lastEventsTs, Number(hit[field]) || 0);
+    if (!RUM_EVENT_TYPES.includes(hit.type) || !(hit.date >= start)) continue;
+    const key = eventKey(hit) ?? `unkeyed|${rumEvents.size}`;
+    if (rumEvents.has(key) && hit.type !== "view") continue;
+    const eventId = hit[`${hit.type}_id`];
+    const previous = rumEvents.has(key) && eventId ? rawEventsMap.value.get(eventId) : undefined;
+    const row = previous ? collapseViewDocuments([previous, hit])[0] : hit;
+    if (eventId) rawEventsMap.value.set(eventId, row);
+    rumEvents.set(key, formatEvent(row));
+    changed = true;
+  }
+  return changed;
+};
+
+const addErrorLogs = (hits: any[]) => {
+  const start = Number(sessionState.data.selectedSession?.start_time);
+  const field = timestampField();
+  let changed = false;
+  for (const hit of hits) {
+    lastLogsTs = Math.max(lastLogsTs, Number(hit[field]) || 0);
+    const key = errorLogKey(hit, field);
+    if (!(hit.date >= start) || logEvents.has(key)) continue;
+    hit.type = "error";
+    hit.error_id = getUUID();
+    hit.error_message = hit.message;
+    rawEventsMap.value.set(hit.error_id, hit);
+    logEvents.set(key, formatEvent(hit));
+    changed = true;
+  }
+  return changed;
+};
+
+// One assignment: a shallowRef does not react to a push.
+const publishEvents = () => {
+  segmentEvents.value = [...rumEvents.values(), ...logEvents.values()]
+    .filter(Boolean)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  videoPlayerRef.value?.updatePlayerState?.();
+};
+
+const getSessionEvents = () => {
+  const req = eventsRequest(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US), 0);
   isLoading.value.push(true);
   searchWithRetry(req)
     .then((res: any) => {
-      const events = ["action", "view", "error"];
-
       // Test the SOURCE field, not the rendered value: user_email is filled with
       // t("common.unknownUser") when absent, so comparing it to the English
       // literal stopped this backfill firing in every non-English locale.
       if (!sessionState.data.selectedSession?.user_email)
         sessionDetails.value.user_email = res.data.hits[0]?.usr_email;
 
-      // Each view arrives once per SDK update (same view_id, rising document
-      // version); collapse them so one navigation reads as one breadcrumb.
-      segmentEvents.value = collapseViewDocuments(
-        res.data.hits.filter((hit: any) => {
-          return (
-            !!events.includes(hit.type) &&
-            hit.date >= Number(sessionState.data.selectedSession.start_time)
-          );
-        }),
-      );
-      segmentEvents.value = segmentEvents.value.map((hit: any) => {
-        // Store raw event data for detail view
-        const eventId = hit[`${hit.type}_id`];
-        if (eventId) {
-          rawEventsMap.value.set(eventId, hit);
-        }
-        return formatEvent(hit);
-      });
+      addRumEvents(res.data.hits);
+      publishEvents();
       getSessionErrorLogs();
     })
     .catch((error) => {
@@ -1048,45 +1286,12 @@ const getSessionEvents = () => {
 };
 
 const getSessionErrorLogs = () => {
-  const window = serverWindowUs(EVENTS_TAIL_US);
-  const queryPayload: any = {
-    from: 0,
-    size: 150,
-    timestamp_column: store.state.zoConfig.timestamp_column,
-    timestamps: {
-      startTime: window.start,
-      endTime: window.end,
-    },
-    sqlMode: false,
-    currentPage: 0,
-    parsedQuery: null,
-  };
-
-  const req = buildQueryPayload(queryPayload, t);
-  req.query.sql = `select * from "_rumlog" where ${sqlEquals("session_id", sessionId.value)} and status='error' order by date asc`;
-  delete req.aggs;
+  const req = eventsRequest(errorLogsSql(), serverWindowUs(EVENTS_TAIL_US), 0);
   isLoading.value.push(true);
   searchWithRetry(req)
     .then((res: any) => {
-      const events = res.data.hits.filter((hit: any) => {
-        return hit.date >= Number(sessionState.data.selectedSession.start_time);
-      });
-
-      const errorEvents = events.map((hit: any) => {
-        hit.type = "error";
-        hit.error_id = getUUID();
-        hit.error_message = hit.message;
-        // Store raw event data
-        rawEventsMap.value.set(hit.error_id, hit);
-        return formatEvent(hit);
-      });
-
-      // One assignment: a shallowRef does not react to a push.
-      segmentEvents.value = [...segmentEvents.value, ...errorEvents].sort(
-        (a, b) => a.timestamp - b.timestamp,
-      );
-
-      videoPlayerRef.value?.updatePlayerState?.();
+      addErrorLogs(res.data.hits);
+      publishEvents();
     })
     .catch((error) => {
       console.error("Failed to fetch sesion error logs:", error);
@@ -1238,9 +1443,11 @@ const runCoverage = (): RunCoverage => ({
 // Once nothing more can load, a mobile target outside the records would wait forever, so the player clamps it instead.
 const isCoveredMobileTarget = (sessionMs: number) => {
   const records = mobileRecords.value;
-  if (records.length && (loadState.value === "complete" || loadState.value === "failed")) {
-    return true;
-  }
+  const settled =
+    loadState.value === "complete" ||
+    loadState.value === "failed" ||
+    (loadState.value === "live" && runComplete.value);
+  if (records.length && settled) return true;
   const firstMs = records.length ? records[0].timestamp : 0;
   return isCoveredMobile(Math.max(sessionStartMs.value + sessionMs, firstMs), records);
 };

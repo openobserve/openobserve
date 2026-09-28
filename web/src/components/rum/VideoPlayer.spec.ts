@@ -1219,6 +1219,69 @@ describe("VideoPlayer", () => {
       }
     });
 
+    it("in a live session, ends at the loaded end with nothing in flight and resumes in place with goto", async () => {
+      const { local, instance } = await mountPlayer({ loadState: "live", runComplete: true });
+      await playTo(local, instance, 119_900);
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      expect(local.vm.playbackState).toBe("ended");
+      expect(local.emitted("update:intent")?.at(-1)).toEqual(["play"]);
+      instance.play.mockClear();
+      instance.goto.mockClear();
+
+      await append(local, { endTime: origin + 150_000, totalTime: 150_000 }, origin + 149_000);
+
+      expect(instance.goto).toHaveBeenCalledWith(119_900, true);
+      expect(instance.play).not.toHaveBeenCalled();
+      expect(local.vm.playbackState).toBe("playing");
+      local.unmount();
+    });
+
+    it("in a live session, does not resume on new activity once the user moved the playhead", async () => {
+      const { local, instance } = await mountPlayer({ loadState: "live", runComplete: true });
+      await playTo(local, instance, 119_900);
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      local.vm.seekTo(90_000, false);
+      instance.goto.mockClear();
+
+      await append(local, { endTime: origin + 150_000, totalTime: 150_000 }, origin + 149_000);
+
+      expect(instance.goto).not.toHaveBeenCalled();
+      expect(local.vm.playbackState).toBe("paused");
+      local.unmount();
+    });
+
+    it("in a live session, buffers at the edge while a batch is in flight", async () => {
+      const { local, instance } = await mountPlayer({ loadState: "live" });
+      await playTo(local, instance, 119_000);
+      expect(local.vm.playbackState).toBe("buffering");
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      expect(local.vm.playbackState).toBe("buffering");
+      local.unmount();
+    });
+
+    it("reads Live while live and never Fully loaded", async () => {
+      vi.useFakeTimers();
+      try {
+        const { local } = await mountPlayer({ loadPercent: 45.6 });
+        await local.setProps({ loadState: "live", loadPercent: 100 });
+        const chip = () => local.find('[data-test="replay-status-chip"]');
+        expect(chip().text()).toBe("Live · new activity loads automatically");
+
+        vi.advanceTimersByTime(5000);
+        await local.vm.$nextTick();
+        expect(chip().text()).toBe("Live · new activity loads automatically");
+
+        await local.setProps({ loadState: "complete" });
+        expect(chip().exists()).toBe(false);
+        local.unmount();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("shows a failed chip and overlay whose Retry reaches the parent", async () => {
       const { local, instance } = await mountPlayer({ loadState: "failed", failedFromMs: 60_000 });
       await playTo(local, instance, 1_000);

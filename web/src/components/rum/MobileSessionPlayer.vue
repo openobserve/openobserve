@@ -36,6 +36,7 @@ import {
 import { MAX_ATTEMPTS } from "@/utils/rum/sessionReplayLoader";
 import {
   canResume,
+  expectsMoreData,
   shouldBuffer,
   skippedCount,
   timelineLength,
@@ -127,11 +128,13 @@ const stageWidth = ref(0);
 const stageHeight = ref(0);
 let failedWasPlaying = false;
 let announcedReady = false;
+// Ended at the loaded end of a live session; new activity resumes it unless the user moved the playhead since.
+let liveEnded = false;
 
 const speed = computed(() => props.speed ?? localSpeed.value);
 const skipInactivity = computed(() => props.skipInactivity ?? localSkipInactivity.value);
 // Once the run holds the last segment, nothing still loading can extend this player.
-const awaitingData = computed(() => props.loadState === "loading" && !props.runComplete);
+const awaitingData = computed(() => expectsMoreData(props.loadState) && !props.runComplete);
 const playing = computed(() => mode.value === "playing" || mode.value === "buffering");
 const currentTime = computed(() => timeline.value.startTime + playhead.value);
 const viewport = computed(() => viewportAt(timeline.value.records, currentTime.value));
@@ -244,6 +247,9 @@ function handleLoadedEdge() {
   } else if (props.loadState === "failed") {
     mode.value = "failed";
     failedWasPlaying = true;
+  } else if (props.loadState === "live") {
+    mode.value = "ended";
+    liveEnded = true;
   } else {
     mode.value = "ended";
     emit("update:intent", "pause");
@@ -280,6 +286,7 @@ function tick(ts: number) {
 
 function startTick() {
   mode.value = "playing";
+  liveEnded = false;
   lastTs = 0;
   if (rafId != null) cancelAnimationFrame(rafId);
   rafId = requestAnimationFrame(tick);
@@ -294,10 +301,16 @@ function stopTick() {
 function tryResume() {
   if (mode.value !== "buffering" || props.pendingSeekMs !== null) return;
   const final =
-    props.loadState === "complete" || (props.loadState === "loading" && !awaitingData.value);
+    props.loadState === "complete" || (expectsMoreData(props.loadState) && !awaitingData.value);
   if (final || canResume(playhead.value, timeline.value.duration, speed.value)) {
     startTick();
   }
+}
+
+// The playhead is where the live edge stopped it, so ticking on from there is the resume.
+function resumeLiveEnded() {
+  if (mode.value !== "ended" || !liveEnded || props.pendingSeekMs !== null) return;
+  if (playhead.value < timeline.value.duration) startTick();
 }
 
 function beginPlayback() {
@@ -355,6 +368,7 @@ function seekTo(sessionMs: number, shouldPlay = false) {
   const offset = sessionStart.value + sessionMs - timeline.value.startTime;
   playhead.value = Math.max(0, Math.min(timeline.value.duration, offset));
   lastTs = 0;
+  liveEnded = false;
   // The parent clears pendingSeekMs in this same tick, so the prop still holds the stale target here.
   if (shouldPlay) {
     beginPlayback();
@@ -414,6 +428,7 @@ watch(
     refreshTimeline();
     if (hasReplay.value) emit("loaded-end-change", loadedEndSessionMs.value);
     tryResume();
+    resumeLiveEnded();
   },
   { immediate: true },
 );
@@ -465,14 +480,14 @@ watch(
       }
       return;
     }
-    if (state === "loading" && previous === "failed" && mode.value === "failed") {
+    if (expectsMoreData(state) && previous === "failed" && mode.value === "failed") {
       mode.value = failedWasPlaying ? "buffering" : "paused";
     }
   },
 );
 
 watch(awaitingData, (awaiting) => {
-  if (!awaiting && props.loadState === "loading") tryResume();
+  if (!awaiting && expectsMoreData(props.loadState)) tryResume();
 });
 
 watch(playbackState, (state) => emit("playback-state", state));

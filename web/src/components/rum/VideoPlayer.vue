@@ -206,6 +206,7 @@ import { resolveRelativeLinks } from "@/utils/rum/sessionReplayUrls";
 import { MAX_ATTEMPTS } from "@/utils/rum/sessionReplayLoader";
 import {
   canResume,
+  expectsMoreData,
   formatReplayTime,
   isLoadedAt,
   isSkipMarker,
@@ -297,6 +298,8 @@ let segmentWork: Promise<unknown> = Promise.resolve();
 let finished = false;
 let failedWasPlaying = false;
 let seekCount = 0;
+// Ended at the loaded end of a live session; new activity resumes it unless the user moved the playhead since.
+let liveEnded = false;
 
 const sessionWidth = ref(0);
 const sessionHeight = ref(0);
@@ -353,7 +356,7 @@ const playbackState = computed<PlaybackState>(() => {
 // Once the run has reached the last segment and the player holds it, a hole still loading can never extend this player.
 const awaitingData = computed(
   () =>
-    props.loadState === "loading" &&
+    expectsMoreData(props.loadState) &&
     !(props.runComplete && takenCount.value >= props.segments.length),
 );
 
@@ -710,6 +713,7 @@ const appendSegments = async (newSegments: any[], takenAfter: number) => {
   takenCount.value = takenAfter;
   emit("segments-taken", takenAfter);
   tryResume();
+  resumeLiveEnded();
 };
 
 const updatePlayerState = () => {
@@ -787,6 +791,9 @@ const handleFinish = () => {
   } else if (props.loadState === "failed") {
     mode.value = "failed";
     failedWasPlaying = true;
+  } else if (props.loadState === "live") {
+    mode.value = "ended";
+    liveEnded = true;
   } else {
     mode.value = "ended";
     emit("update:intent", "pause");
@@ -801,6 +808,7 @@ const enterBuffering = () => {
 const resumeAt = (offset: number) => {
   player.value?.goto(offset, true);
   finished = false;
+  liveEnded = false;
   mode.value = "playing";
 };
 
@@ -809,10 +817,16 @@ const tryResume = () => {
   if (mode.value !== "buffering" || props.pendingSeekMs !== null || !player.value) return;
   const now = playerState.value.actualTime;
   const final =
-    props.loadState === "complete" || (props.loadState === "loading" && !awaitingData.value);
+    props.loadState === "complete" || (expectsMoreData(props.loadState) && !awaitingData.value);
   if (final || canResume(now, playerState.value.totalTime, speedValue.value)) {
     resumeAt(now);
   }
+};
+
+// goto, never the controller's play(): after a finish, play() restarts the replay at 0.
+const resumeLiveEnded = () => {
+  if (mode.value !== "ended" || !liveEnded || props.pendingSeekMs !== null || !player.value) return;
+  resumeAt(playerState.value.actualTime);
 };
 
 // A pending seek is display-only, so rrweb must not start from where it sits until the parent seeks.
@@ -912,6 +926,7 @@ const handleSkipInactivityChange = (value: SwitchValue) => {
 const goto = (timeOffset: number, play: boolean = false) => {
   player.value?.goto(timeOffset, play);
   finished = false;
+  liveEnded = false;
   mode.value = play ? "playing" : "paused";
 };
 
@@ -1030,7 +1045,7 @@ watch(
       }
       return;
     }
-    if (state === "loading" && previous === "failed" && mode.value === "failed") {
+    if (expectsMoreData(state) && previous === "failed" && mode.value === "failed") {
       mode.value = failedWasPlaying ? "buffering" : "paused";
     }
   },
@@ -1038,7 +1053,7 @@ watch(
 
 // The run reaching its last segment ends the wait just as a complete load does.
 watch(awaitingData, (awaiting) => {
-  if (!awaiting && props.loadState === "loading") tryResume();
+  if (!awaiting && expectsMoreData(props.loadState)) tryResume();
 });
 
 watch(playbackState, (state) => emit("playback-state", state));

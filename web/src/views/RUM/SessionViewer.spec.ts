@@ -156,6 +156,7 @@ import SessionViewer from "./SessionViewer.vue";
 import store from "@/test/unit/helpers/store";
 import ShareButton from "@/components/common/ShareButton.vue";
 import searchService from "@/services/search";
+import { ACTIVE_WINDOW_MS } from "@/utils/rum/sessionReplayLive";
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -1003,7 +1004,9 @@ describe("SessionViewer.vue — segment manifest and windowed fetch", () => {
     const wrapper = await mountLoaded();
 
     const manifestSql = streaming.sqls[0];
-    expect(manifestSql).toContain('select start, "end", has_full_snapshot, records_count from');
+    expect(manifestSql).toContain(
+      'select start, "end", has_full_snapshot, records_count, _timestamp from',
+    );
     expect(manifestSql).not.toContain("select *");
     expect(manifestSql).not.toContain(", segment");
     wrapper.unmount();
@@ -1022,7 +1025,7 @@ describe("SessionViewer.vue — segment manifest and windowed fetch", () => {
     const wrapper = await mountLoaded();
 
     expect(streaming.sqls[0]).toContain(
-      'select start, "end", has_full_snapshot, records_count, view_id, index_in_view from',
+      'select start, "end", has_full_snapshot, records_count, view_id, index_in_view, _timestamp from',
     );
     expect(streaming.sqls[1]).toContain(
       'select start, "end", segment, records_count, view_id, index_in_view from',
@@ -1103,13 +1106,14 @@ describe("SessionViewer.vue — segment identity (Risk 1)", () => {
 
   it("stores a row tied at a batch edge once and does not fetch it again", async () => {
     const rows = manyRows(27);
-    // Rows 25 and 26 tie on start, so the inclusive range of batch 1..25 also returns row 26.
+    // Rows 25 and 26 tie on start, so the full batch ends before them and they travel together in the next one.
     rows[26] = { ...rows[26], start: rows[25].start, end: rows[25].start + 500 };
     resetStreaming(rowsResponder(rows));
     const wrapper = await mountLoaded();
     const vm = wrapper.vm as any;
 
-    expect(bodySqls()).toHaveLength(2);
+    expect(bodySqls()).toHaveLength(3);
+    expect(bodySqls().filter((sql) => sql.includes(`start <= ${rows[25].start}`))).toHaveLength(1);
     expect(vm.segments).toHaveLength(27);
     expect(new Set(vm.segments).size).toBe(27);
     expect(vm.loadState).toBe("complete");
@@ -1746,5 +1750,415 @@ describe("SessionViewer.vue — mobile sessions (F0.2)", () => {
     expect(vm.isMobileReplay).toBe(false);
     expect(wrapper.find('[data-test="stub-mobile-player"]').exists()).toBe(false);
     wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — parallel batches, ordered append (D1)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    replaySchema.fields = { geo_info_country: true, geo_info_city: true };
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Every background batch hangs until the test answers it, so completion order is the test's choice.
+  function hangBatches(rows: any[], fail: (sql: string) => boolean = () => false) {
+    const good = rowsResponder(rows);
+    resetStreaming((sql, from) => {
+      if (!sql.includes("segment") || sql.includes(`start >= ${S} `)) return good(sql, from);
+      return fail(sql) ? { error: { status: 502 } } : "hang";
+    });
+  }
+
+  const batchRequest = (lo: number) =>
+    streaming.requests.filter((r) => r.data.queryReq.query.sql.includes(`start >= ${lo} `));
+
+  function answer(request: any, rows: any[]) {
+    const hits = rowsResponder(rows)(request.data.queryReq.query.sql, 0);
+    request.handlers.data(request.data, {
+      type: "search_response_hits",
+      content: { results: { hits } },
+    });
+    request.handlers.complete(request.data, null);
+  }
+
+  async function mountHanging() {
+    const wrapper = mountSessionViewer(await pushRoute());
+    await vi.advanceTimersByTimeAsync(100);
+    return wrapper;
+  }
+
+  it("keeps three batches in flight and starts the next one when a slot frees", async () => {
+    const rows = manyRows(101);
+    hangBatches(rows);
+    const wrapper = await mountHanging();
+
+    const background = bodySqls().slice(1);
+    expect(background).toHaveLength(3);
+    expect(background[0]).toContain(`start >= ${S + 1000} and start <= ${S + 25_000}`);
+    expect(background[1]).toContain(`start >= ${S + 26_000} and start <= ${S + 50_000}`);
+    expect(background[2]).toContain(`start >= ${S + 51_000} and start <= ${S + 75_000}`);
+
+    answer(batchRequest(S + 1000)[0], rows);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(bodySqls()).toHaveLength(5);
+    expect(bodySqls()[4]).toContain(`start >= ${S + 76_000} and start <= ${S + 100_000}`);
+    wrapper.unmount();
+  });
+
+  it("stores a later batch that lands first, and appends it only once the earlier one lands", async () => {
+    const rows = manyRows(76);
+    hangBatches(rows);
+    const wrapper = await mountHanging();
+    const vm = wrapper.vm as any;
+
+    answer(batchRequest(S + 26_000)[0], rows);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vm.loader.status[26]).toBe("stored");
+    expect(vm.segments).toHaveLength(1);
+    expect(vm.run.appendedThroughIndex).toBe(0);
+
+    answer(batchRequest(S + 1000)[0], rows);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vm.segments).toHaveLength(51);
+    const starts = vm.segments.map((segment: any) => segment.records[0].timestamp);
+    expect(starts).toEqual(rows.slice(0, 51).map((row) => row.start));
+
+    answer(batchRequest(S + 51_000)[0], rows);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vm.segments).toHaveLength(76);
+    expect(vm.loadState).toBe("complete");
+    wrapper.unmount();
+  });
+
+  it("appends later stored segments after a failed middle batch's skip markers", async () => {
+    const rows = manyRows(76);
+    hangBatches(rows, (sql) => sql.includes(`start >= ${S + 26_000} `));
+    const wrapper = await mountHanging();
+    const vm = wrapper.vm as any;
+
+    answer(batchRequest(S + 51_000)[0], rows);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(batchRequest(S + 26_000)).toHaveLength(3);
+    expect(vm.loader.status[30]).toBe("skipped");
+    expect(vm.segments).toHaveLength(1);
+    expect(vm.loadState).not.toBe("failed");
+
+    answer(batchRequest(S + 1000)[0], rows);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vm.segments).toHaveLength(76);
+    expect(vm.segments[26]).toMatchObject({ skipped: true, start: S + 26_000 });
+    expect(vm.segments[50]).toMatchObject({ skipped: true });
+    expect(vm.segments[51].records[0].timestamp).toBe(S + 51_000);
+    expect(vm.loadState).toBe("failed");
+    expect(vm.failedFromMs).toBe(26_000);
+    wrapper.unmount();
+  });
+
+  it("has the watchdog leave an in-flight segment alone", async () => {
+    const rows = manyRows(30);
+    hangBatches(rows);
+    const wrapper = await mountHanging();
+    const vm = wrapper.vm as any;
+    expect(vm.loader.status[1]).toBe("inFlight");
+    const before = streaming.sqls.length;
+
+    vm.playerPlaybackState = "buffering";
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(streaming.sqls).toHaveLength(before);
+    wrapper.unmount();
+  });
+
+  it("cancels every in-flight batch when the page unmounts", async () => {
+    const rows = manyRows(101);
+    hangBatches(rows);
+    const wrapper = await mountHanging();
+    const traceIds = streaming.requests
+      .filter((r) => r.data.queryReq.query.sql.includes("segment"))
+      .slice(1)
+      .map((r) => r.data.traceId);
+    expect(new Set(traceIds).size).toBe(3);
+
+    wrapper.unmount();
+
+    for (const traceId of traceIds) {
+      expect(streaming.cancel).toHaveBeenCalledWith(expect.objectContaining({ trace_id: traceId }));
+    }
+  });
+});
+
+describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
+  const NOW = 1_750_000_000_000;
+  const L = NOW - 10 * 60_000;
+  const maxTs = (NOW - 30_000) * 1000;
+  const server = { rows: [] as any[], rum: [] as any[], logs: [] as any[] };
+  let originalSearch: any;
+
+  // Arrival time half a second after the segment start, in µs like _timestamp.
+  const liveRow = (i: number, extra: Record<string, any> = {}) => ({
+    start: L + i * 1000,
+    end: L + i * 1000 + 999,
+    has_full_snapshot: i === 0,
+    records_count: 1,
+    _timestamp: (L + i * 1000 + 500) * 1000,
+    ...extra,
+  });
+
+  function liveResponder(sql: string, from: number) {
+    if (from > 0) return [];
+    const lo = Number(/start >= (\d+)/.exec(sql)?.[1] ?? 0);
+    if (sql.includes("has_full_snapshot")) return server.rows.filter((row) => row.start >= lo);
+    const hi = Number(/start <= (\d+)/.exec(sql)?.[1] ?? 0);
+    return server.rows.filter((row) => row.start >= lo && row.start <= hi).map(fixtureBody);
+  }
+
+  function lookupRow(endTime: number) {
+    return {
+      ...sessionLookupRow,
+      zo_sql_timestamp: L * 1000,
+      start_time: L,
+      end_time: endTime,
+      max_ts: maxTs,
+    };
+  }
+
+  function serve(endTime: number) {
+    vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+      const query = params?.query?.query ?? {};
+      const sql: string = query.sql ?? "";
+      const from = Number(query.from) || 0;
+      const size = Number(query.size) || 150;
+      if (sql.includes("min(start)")) return { data: { hits: [lookupRow(endTime)] } } as any;
+      const rows = sql.includes("_rumlog")
+        ? server.logs
+        : sql.includes("_rumdata")
+          ? server.rum
+          : [];
+      return { data: { hits: rows.slice(from, from + size) } } as any;
+    });
+  }
+
+  const segmentWindows = () =>
+    queryPayload.build.mock.calls
+      .map((call: any[]) => call[0])
+      .filter((payload: any) => payload.size === 1000)
+      .map((payload: any) => payload.timestamps);
+
+  const manifestPolls = () =>
+    streaming.sqls.filter((sql) => sql.includes("has_full_snapshot") && sql.includes("start >="));
+
+  async function mountLive(endTime = NOW - 60_000) {
+    serve(endTime);
+    const wrapper = mountSessionViewer(await pushRoute());
+    await vi.advanceTimersByTimeAsync(100);
+    return wrapper;
+  }
+
+  const setVisibility = (state: "visible" | "hidden") => {
+    Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    originalSearch = vi.mocked(searchService.search).getMockImplementation();
+    replaySchema.fields = { geo_info_country: true, geo_info_city: true };
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    server.rows = [liveRow(0), liveRow(1), liveRow(2)];
+    server.rum = [];
+    server.logs = [];
+    resetStreaming(liveResponder);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.mocked(searchService.search).mockImplementation(originalSearch);
+    setVisibility("visible");
+  });
+
+  it("detects a live session with the Sessions list's rule, inclusive at the boundary", async () => {
+    const live = await mountLive(NOW - ACTIVE_WINDOW_MS);
+    const vm = live.vm as any;
+    expect(vm.isLive).toBe(true);
+    expect(vm.loadState).toBe("live");
+    expect(live.find('[data-test="session-viewer-live-badge"]').text()).toBe("LIVE");
+    live.unmount();
+
+    const ended = await mountLive(NOW - ACTIVE_WINDOW_MS - 1);
+    expect((ended.vm as any).isLive).toBe(false);
+    expect((ended.vm as any).loadState).toBe("complete");
+    expect(ended.find('[data-test="session-viewer-live-badge"]').exists()).toBe(false);
+    expect(manifestPolls()).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(manifestPolls()).toHaveLength(0);
+    ended.unmount();
+  });
+
+  it("selects the arrival time in the manifest, not as a sort key or part of the id", async () => {
+    const wrapper = await mountLive();
+    expect(streaming.sqls[0]).toContain("records_count, _timestamp from");
+    expect(streaming.sqls[0]).toMatch(/order by start asc, "end" asc$/);
+    expect((wrapper.vm as any).segmentIds[0]).not.toContain(String(liveRow(0)._timestamp));
+    wrapper.unmount();
+  });
+
+  it("raises upperTs from polled arrival times only, and bounds body queries with it", async () => {
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    expect(vm.upperTs).toBe(maxTs);
+    for (const window of segmentWindows()) {
+      expect(window).toEqual({ startTime: L * 1000 - 1_000_000, endTime: maxTs + 1_000_000 });
+    }
+
+    const arrival = maxTs + 20_000_000;
+    server.rows.push(liveRow(3, { _timestamp: arrival }));
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(vm.upperTs).toBe(arrival);
+    const windows = segmentWindows();
+    const bodyIndex = streaming.sqls.findLastIndex((sql) => sql.includes("segment"));
+    expect(streaming.sqls[bodyIndex]).toContain(`start >= ${L + 3000} `);
+    expect(windows[bodyIndex]).toEqual({
+      startTime: L * 1000 - 1_000_000,
+      endTime: arrival + 1_000_000,
+    });
+
+    // The manifest poll looks from a minute before the bound to a minute past the later of now and the bound.
+    const pollIndex = streaming.sqls.indexOf(manifestPolls()[0]);
+    expect(windows[pollIndex]).toEqual({
+      startTime: maxTs - 60_000_000,
+      endTime: (NOW + 30_000) * 1000 + 60_000_000,
+    });
+
+    server.rows = server.rows.map((row) => ({ ...row, _timestamp: 1 }));
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(vm.upperTs).toBe(arrival);
+    wrapper.unmount();
+  });
+
+  it("appends only new segment ids, loads them, and extends the session end", async () => {
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    expect(vm.segments).toHaveLength(3);
+
+    // The second row ends after the metadata end, so the timeline has to grow to hold it.
+    server.rows.push(liveRow(3), liveRow(600));
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(manifestPolls()[0]).toContain(`and start >= ${L + 2000} `);
+    expect(vm.manifest).toHaveLength(5);
+    expect(vm.segments).toHaveLength(5);
+    expect(vm.segments[4].records[0].timestamp).toBe(L + 600_000);
+    expect(vm.sessionEndMs).toBe(L + 600_999);
+    expect(vm.loadState).toBe("live");
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(vm.manifest).toHaveLength(5);
+    expect(vm.segments).toHaveLength(5);
+    wrapper.unmount();
+  });
+
+  it("does not insert a late row that sorts before the tail, and says so", async () => {
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+
+    server.rows.push(liveRow(2, { end: L + 2500 }));
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(vm.manifest).toHaveLength(3);
+    expect(vm.segmentNotice).toBe(
+      "Earlier activity arrived after the replay loaded. Reload to include it.",
+    );
+    expect(wrapper.find('[data-test="session-viewer-segment-notice"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("dedups polled events by id, replaces a re-sent view, and pages past 150", async () => {
+    const at = (offset: number) => ({ date: L + offset, _timestamp: (L + offset) * 1000 });
+    server.rum = [
+      { type: "view", view_id: "v1", view_loading_type: "initial_load", view_url: "/a", ...at(10) },
+      { type: "action", action_id: "a1", action_type: "click", ...at(20) },
+    ];
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    expect(vm.segmentEvents).toHaveLength(2);
+
+    const more = Array.from({ length: 160 }, (_, i) => ({
+      type: "action",
+      action_id: `n${i}`,
+      action_type: "click",
+      ...at(100 + i),
+    }));
+    server.rum = [server.rum[1], { ...server.rum[0], view_url: "/b", ...at(10) }, ...more];
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(vm.segmentEvents).toHaveLength(162);
+    const views = vm.segmentEvents.filter((event: any) => event.type === "view");
+    expect(views).toHaveLength(1);
+    expect(views[0].name).toBe("initial_load : /b");
+    expect(vm.segmentEvents.filter((event: any) => event.id === "a1")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("dedups polled error logs by arrival time, device time and message", async () => {
+    const log = (offset: number, message: string) => ({
+      date: L + offset,
+      _timestamp: (L + offset) * 1000,
+      message,
+      status: "error",
+    });
+    server.logs = [log(50, "boom")];
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    expect(vm.segmentEvents).toHaveLength(1);
+
+    server.logs = [log(50, "boom"), log(60, "bang")];
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(vm.segmentEvents.map((event: any) => event.name)).toEqual(["boom", "bang"]);
+    wrapper.unmount();
+  });
+
+  it("stops 15 minutes after the last new segment id, then reads complete", async () => {
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+
+    await vi.advanceTimersByTimeAsync(14 * 60_000);
+    expect(vm.isLive).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(vm.isLive).toBe(false);
+    expect(vm.loadState).toBe("complete");
+    expect(wrapper.find('[data-test="session-viewer-live-badge"]').exists()).toBe(false);
+
+    const polls = manifestPolls().length;
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(manifestPolls()).toHaveLength(polls);
+    wrapper.unmount();
+  });
+
+  it("pauses polling while the tab is hidden and resumes once it is visible", async () => {
+    const wrapper = await mountLive();
+
+    setVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(manifestPolls()).toHaveLength(0);
+
+    setVisibility("visible");
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(manifestPolls()).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("clears the poll timer on unmount", async () => {
+    const wrapper = await mountLive();
+    wrapper.unmount();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(manifestPolls()).toHaveLength(0);
   });
 });

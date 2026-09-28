@@ -29,10 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="border-border-default bg-surface-subtle text-text-secondary inline-flex items-center gap-1.5 rounded-full border px-2 text-xs whitespace-nowrap"
     data-test="replay-status-chip"
   >
-    <span
-      class="h-1.5 w-1.5 rounded-full"
-      :class="loadState === 'complete' ? 'bg-badge-teal-solid-bg' : 'bg-button-primary'"
-    />
+    <span class="h-1.5 w-1.5 rounded-full" :class="dotClass" />
     {{ label }}{{ skippedSuffix }}
   </span>
 </template>
@@ -62,10 +59,17 @@ const label = computed(() => {
   if (props.loadState === "loading") {
     return t("rum.sessionReplayLoadingPercent", { percent: Math.floor(props.loadPercent) });
   }
+  // Live never reads "Fully loaded": more of the session is still being recorded.
+  if (props.loadState === "live") return t("rum.sessionReplayLiveChip");
   if (props.loadState === "complete" && showFullyLoaded.value) {
     return t("rum.sessionReplayFullyLoaded");
   }
   return "";
+});
+
+const dotClass = computed(() => {
+  if (props.loadState === "live") return "bg-badge-error-solid-bg";
+  return props.loadState === "complete" ? "bg-badge-teal-solid-bg" : "bg-button-primary";
 });
 
 const skippedSuffix = computed(() =>

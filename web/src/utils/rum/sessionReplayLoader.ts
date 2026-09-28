@@ -55,6 +55,15 @@ export function createLoaderState(count: number): LoaderState {
   };
 }
 
+/** Adds `count` missing segments at the end, for manifest rows a live poll appended. */
+export function extendLoaderState(state: LoaderState, count: number): void {
+  for (let i = 0; i < count; i++) {
+    state.status.push("missing");
+    state.missingCount.push(0);
+    state.skipReason.push(null);
+  }
+}
+
 /** Skipped and capped segments are never fetchable, which is what stops the watchdog looping. */
 export function isFetchable(state: LoaderState, index: number): boolean {
   const status = state.status[index];

@@ -194,6 +194,48 @@ describe("MobileSessionPlayer", () => {
     wrapper.unmount();
   });
 
+  it("in a live session, ends at the loaded end, then resumes in place on new activity", async () => {
+    const wrapper = mountPlayer({ loadState: "live", runComplete: true });
+    await playIcon(wrapper).trigger("click");
+    vi.advanceTimersByTime(6_000);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.playbackState).toBe("ended");
+    expect(wrapper.find('[data-test="replay-status-chip"]').text()).toBe(
+      "Live · new activity loads automatically",
+    );
+    expect(wrapper.emitted("seek-request")).toBeUndefined();
+
+    await wrapper.setProps({ segments: [segmentA, segmentB] });
+    expect(wrapper.vm.playbackState).toBe("playing");
+    expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("0:05 / 0:20");
+    expect(wrapper.emitted("seek-request")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("in a live session, stays put on new activity once the user moved the playhead", async () => {
+    const wrapper = mountPlayer({ loadState: "live", runComplete: true });
+    await playIcon(wrapper).trigger("click");
+    vi.advanceTimersByTime(6_000);
+    await wrapper.vm.$nextTick();
+    wrapper.vm.seekTo(2_000, false);
+
+    await wrapper.setProps({ segments: [segmentA, segmentB] });
+    expect(wrapper.vm.playbackState).toBe("paused");
+    wrapper.unmount();
+  });
+
+  it("in a live session, buffers at the edge while a batch is still in flight", async () => {
+    const wrapper = mountPlayer({ loadState: "live", runComplete: false });
+    await playIcon(wrapper).trigger("click");
+    vi.advanceTimersByTime(6_000);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.playbackState).toBe("buffering");
+
+    await wrapper.setProps({ segments: [segmentA, segmentB] });
+    expect(wrapper.vm.playbackState).toBe("playing");
+    wrapper.unmount();
+  });
+
   it("announces ready once the first records are there", async () => {
     const wrapper = mountPlayer({ segments: [] });
     expect(wrapper.emitted("ready")).toBeUndefined();
