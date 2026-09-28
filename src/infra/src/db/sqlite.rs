@@ -25,9 +25,9 @@ use bytes::Bytes;
 use config::{FxIndexMap, cluster, utils::util::zero_or};
 use hashbrown::HashMap;
 use sqlx::{
-    Pool, Sqlite,
+    FromRow, Pool, Row, Sqlite,
     sqlite::{
-        SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode, SqlitePoolOptions,
+        SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode, SqlitePoolOptions, SqliteRow,
         SqliteSynchronous,
     },
 };
@@ -631,11 +631,11 @@ impl super::Db for SqliteDb {
         sql.push_str(" ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
-        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        let mut query = sqlx::query(&sql);
         for p in params {
             query = query.bind(p);
         }
-        let ret = query.fetch_all(&pool).await?;
+        let ret = decode_meta_records(query.fetch_all(&pool).await?)?;
         Ok(ret
             .into_iter()
             .map(|r| {
@@ -674,11 +674,11 @@ impl super::Db for SqliteDb {
 
         sql.push_str(" ORDER BY start_dt ASC");
         let pool = CLIENT_RO.clone();
-        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        let mut query = sqlx::query(&sql);
         for p in params {
             query = query.bind(p);
         }
-        let ret = query.fetch_all(&pool).await?;
+        let ret = decode_meta_records(query.fetch_all(&pool).await?)?;
         Ok(ret
             .into_iter()
             .map(|r| format!("/{}/{}/{}", r.module, r.key1, r.key2))
@@ -709,14 +709,14 @@ impl super::Db for SqliteDb {
         let (sql, str_params) = build_list_by_start_dt_sql(prefix, min_dt, max_dt);
 
         let pool = CLIENT_RO.clone();
-        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        let mut query = sqlx::query(&sql);
         for p in str_params {
             query = query.bind(p);
         }
         // Bind min_dt / max_dt as i64 so SQLite receives them as INTEGER, not TEXT.
         query = query.bind(min_dt);
         query = query.bind(max_dt);
-        let ret = query.fetch_all(&pool).await?;
+        let ret = decode_meta_records(query.fetch_all(&pool).await?)?;
         Ok(ret
             .into_iter()
             .map(|r| (r.start_dt, Bytes::from(r.value)))
@@ -863,6 +863,26 @@ async fn create_meta_backup() -> Result<()> {
     Ok(())
 }
 
+fn decode_meta_records(rows: Vec<SqliteRow>) -> sqlx::Result<Vec<super::MetaRecord>> {
+    let mut records = Vec::with_capacity(rows.len());
+    for row in rows {
+        match super::MetaRecord::from_row(&row) {
+            Ok(record) => records.push(record),
+            // NULLs and type mismatches are also ColumnDecode; only bad UTF-8 is skippable.
+            Err(sqlx::Error::ColumnDecode { index, source })
+                if source.is::<std::str::Utf8Error>() =>
+            {
+                let id = row.try_get::<i64, _>("id").unwrap_or_default();
+                log::error!(
+                    "[SQLITE] skipping meta row with invalid UTF-8, id: {id}, column: {index}, error: {source}"
+                );
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(records)
+}
+
 pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
     let client = CLIENT_RW.clone();
     let indices = INDICES.get_or_init(cache_indices).await;
@@ -990,6 +1010,7 @@ pub(crate) fn build_list_by_start_dt_sql(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::MetaRecord;
 
     #[test]
     fn test_sqlite_db_new() {
@@ -1357,6 +1378,55 @@ mod tests {
         assert!(
             sql.starts_with("SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1"),
             "unexpected SQL start: {sql}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_decode_meta_records_skips_invalid_utf8_key2() {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE TABLE meta (id INTEGER PRIMARY KEY AUTOINCREMENT, module VARCHAR NOT NULL, \
+             key1 VARCHAR NOT NULL, key2 VARCHAR NOT NULL, start_dt INTEGER NOT NULL, value TEXT NOT NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO meta (module, key1, key2, start_dt, value) VALUES \
+             ('schema', 'org', 'logs/good', 1, '[]'), \
+             ('schema', 'org', CAST(X'6d657461646174612f80' AS TEXT), 2, '[]')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let sql = "SELECT id, module, key1, key2, start_dt, value FROM meta ORDER BY id";
+
+        let strict = sqlx::query_as::<_, MetaRecord>(sql).fetch_all(&pool).await;
+        assert!(
+            matches!(strict, Err(sqlx::Error::ColumnDecode { .. })),
+            "one bad row must fail a strict decode"
+        );
+
+        let rows = sqlx::query(sql).fetch_all(&pool).await.unwrap();
+        let records = decode_meta_records(rows).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].key2, "logs/good");
+
+        sqlx::query("UPDATE meta SET start_dt = 'not-a-number' WHERE key2 = 'logs/good'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rows = sqlx::query(sql).fetch_all(&pool).await.unwrap();
+        assert!(
+            matches!(
+                decode_meta_records(rows),
+                Err(sqlx::Error::ColumnDecode { .. })
+            ),
+            "a non-UTF-8 decode error must propagate"
         );
     }
 }

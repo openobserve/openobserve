@@ -33,6 +33,10 @@ pub(crate) async fn read_query_insights_response(
     if q.fingerprint.as_deref().filter(|f| !f.is_empty()).is_none() {
         return MetaHttpResponse::bad_request("fingerprint is required");
     }
+    // Before the prologue: a section's 400 would otherwise surface as `plans_read_failed`.
+    if let Err(resp) = validate_server_stream(q.stream.as_deref()) {
+        return resp;
+    }
 
     let plans_q = PlansQuery {
         fingerprint: q.fingerprint.clone(),

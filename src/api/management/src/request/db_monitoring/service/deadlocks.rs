@@ -665,11 +665,7 @@ pub(crate) async fn read_deadlocks_body(
             "start_time must be before end_time",
         ));
     }
-    let stream = q
-        .stream
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or(DEFAULT_SERVER_STREAM);
+    let stream = validate_server_stream(q.stream.as_deref())?.unwrap_or(DBM_SERVER_STREAM);
     let shared_prologue = prologue.filter(|p| p.stream == stream);
     // Server-vantage events live in a LOGS stream (`_o2_dbm_server` by default),
     // not a trace stream — the permission is checked against the type actually

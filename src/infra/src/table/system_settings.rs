@@ -26,13 +26,30 @@ use config::meta::system_settings::{SettingScope, SystemSetting};
 use sea_orm::{
     ActiveModelTrait,
     ActiveValue::{NotSet, Set},
-    ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Schema,
 };
 
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table::entity::system_settings::{ActiveModel, Column, Entity, Model},
 };
+
+/// Create the table from the entity, for callers that stand up a schema without running the
+/// migrations that own it in production.
+pub async fn create_table() -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    let builder = client.get_database_backend();
+
+    let schema = Schema::new(builder);
+    let create_table_stmt = schema
+        .create_table_from_entity(Entity)
+        .if_not_exists()
+        .take();
+
+    client.execute(builder.build(&create_table_stmt)).await?;
+
+    Ok(())
+}
 
 /// Get a single setting by scope, org_id, user_id, and key
 pub async fn get(

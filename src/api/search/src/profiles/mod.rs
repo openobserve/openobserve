@@ -186,7 +186,7 @@ pub(crate) fn query_body_from_params(params: &HashMap<String, String>) -> Profil
     }
 }
 
-/// `filters` query param: `key=value,key2=value2` (comma-separated pairs).
+/// `filters` query param: `key=value,key2=value2`. Each side is percent-encoded.
 fn parse_filters_param(raw: Option<&str>) -> Vec<ProfileFilter> {
     let Some(raw) = raw.filter(|s| !s.is_empty()) else {
         return Vec::new();
@@ -194,18 +194,25 @@ fn parse_filters_param(raw: Option<&str>) -> Vec<ProfileFilter> {
     raw.split(',')
         .filter_map(|pair| {
             let (key, value) = pair.split_once('=')?;
-            let key = key.trim();
-            let value = value.trim();
+            let key = decode_filter_component(key);
+            let value = decode_filter_component(value);
             if key.is_empty() {
                 return None;
             }
             Some(ProfileFilter {
-                key: key.to_string(),
+                key,
                 op: "=".to_string(),
-                value: value.to_string(),
+                value,
             })
         })
         .collect()
+}
+
+fn decode_filter_component(raw: &str) -> String {
+    let trimmed = raw.trim();
+    urlencoding::decode(trimmed)
+        .map(|value| value.into_owned())
+        .unwrap_or_else(|_| trimmed.to_string())
 }
 
 pub(crate) fn build_where_clause(body: &ProfilesQueryBody) -> Result<String, Response> {
@@ -483,6 +490,23 @@ pub(crate) fn default_result_size() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_filters_param_keeps_a_comma_inside_a_value() {
+        let filters = parse_filters_param(Some("k8s_pod_name=a%2Cb,env=prod"));
+        assert_eq!(filters.len(), 2);
+        assert_eq!(filters[0].key, "k8s_pod_name");
+        assert_eq!(filters[0].value, "a,b");
+        assert_eq!(filters[1].key, "env");
+        assert_eq!(filters[1].value, "prod");
+    }
+
+    #[test]
+    fn parse_filters_param_reads_plain_pairs() {
+        let filters = parse_filters_param(Some("env=prod,region=us"));
+        assert_eq!(filters[0].value, "prod");
+        assert_eq!(filters[1].value, "us");
+    }
 
     #[test]
     fn tag_filter_uses_column_equality() {

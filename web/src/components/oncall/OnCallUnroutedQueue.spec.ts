@@ -176,4 +176,58 @@ describe("OnCallUnroutedQueue", () => {
     await wrapper.find('[data-test="oncall-unrouted-claim-s1"]').trigger("click");
     expect(wrapper.emitted("claim")?.[0][0]).toMatchObject({ id: "s1" });
   });
+
+  describe("the toolbar every other table has", () => {
+    // An empty search result says nothing about whether alerts reached a team.
+    it("shows the no-results state under a search, and asks the host to clear it", async () => {
+      const wrapper = mount(OnCallUnroutedQueue, {
+        props: { signals: [signal()], search: "nothing-matches" },
+        global: { plugins: [i18n, store], stubs },
+      });
+      const empty = wrapper.find('[data-test="oncall-unrouted-empty"]');
+      expect(empty.exists()).toBe(true);
+      expect(empty.text()).not.toContain(String(i18n.global.t("oncall.unroutedNone")));
+
+      const clear = empty
+        .findAll("button")
+        .find((b) => b.text().includes(String(i18n.global.t("emptyState.filtered.action"))));
+      await clear!.trigger("click");
+      expect(wrapper.emitted("clear-search")).toHaveLength(1);
+    });
+
+    it("filters its rows by the host's search", () => {
+      const wrapper = mount(OnCallUnroutedQueue, {
+        props: {
+          signals: [signal(), signal({ id: "s2", last_title: "Checkout latency" })],
+          search: "checkout",
+        },
+        global: { plugins: [i18n, store], stubs },
+      });
+      expect(wrapper.text()).toContain("Checkout latency");
+      expect(wrapper.text()).not.toContain("Dispute webhook backlog");
+    });
+
+    it("resizes, and offers a column manager for its secondary columns", () => {
+      const table = render().findComponent({ name: "OTable" });
+      expect(table.props("enableColumnResize")).toBe(true);
+      expect(table.props("persistColumns")).toBe(true);
+      const hideable = (table.props("columns") as any[]).filter((c) => c.hideable).map((c) => c.id);
+      expect(hideable).toEqual(["path", "fires", "outcome"]);
+    });
+
+    // The error sits in the table body, so the host's toolbar — and its tabs — stay on screen.
+    it("shows its own failure in the table with a Retry, keeping the host's toolbar", async () => {
+      const wrapper = mount(OnCallUnroutedQueue, {
+        props: { signals: [], error: "Could not load the unrouted queue" },
+        slots: { toolbar: '<span data-test="host-toolbar" />' },
+        global: { plugins: [i18n, store], stubs },
+      });
+      const error = wrapper.find('[data-test="oncall-unrouted-error"]');
+      expect(error.exists()).toBe(true);
+      expect(wrapper.find('[data-test="host-toolbar"]').exists()).toBe(true);
+
+      await error.find("button").trigger("click");
+      expect(wrapper.emitted("retry")).toHaveLength(1);
+    });
+  });
 });

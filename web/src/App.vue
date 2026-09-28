@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OToastProvider />
     <ConfirmDialogProvider />
     <CreateAlertDialogProvider />
+    <UpdatePasswordDialog />
   </ConfigProvider>
 </template>
 
@@ -33,6 +34,7 @@ import { ConfigProvider } from "reka-ui";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
+import UpdatePasswordDialog from "@/components/common/UpdatePasswordDialog.vue";
 
 export default {
   components: {
@@ -40,6 +42,7 @@ export default {
     OToastProvider,
     ConfirmDialogProvider,
     CreateAlertDialogProvider,
+    UpdatePasswordDialog,
   },
   setup() {
     const store = useStore();

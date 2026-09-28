@@ -24,12 +24,15 @@ pub mod db;
 pub mod dist_lock;
 pub mod errors;
 pub mod file_list;
+pub mod idempotency;
 pub mod local_lock;
+pub mod outbound_http;
 pub mod pipeline;
 pub mod queue;
 pub mod runtime;
 pub mod scheduler;
 pub mod schema;
+pub mod secrets;
 pub mod storage;
 pub mod table;
 

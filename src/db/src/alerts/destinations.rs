@@ -57,10 +57,6 @@ pub enum DestinationError {
     AlreadyExists,
     #[error("Destination not found")]
     NotFound,
-    #[error("Destination is currently used by alert: {0}")]
-    UsedByAlert(String),
-    #[error("Destination is currently used by pipeline: {0}")]
-    UsedByPipeline(String),
     #[error("Prebuilt template not found for type: {0}")]
     PrebuiltTemplateNotFound(String),
     #[error("Failed to create template: {0}")]
@@ -71,8 +67,8 @@ pub enum DestinationError {
     EmailSendFailed(String),
     #[error("LLM Evaluation destinations are only supported for pipelines, not alerts")]
     NotSupportedAlertDestinationType,
-    #[error("Destination is currently used by workflow: {0}")]
-    UsedByWorkflow(String),
+    #[error("{0}")]
+    InUse(String),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
@@ -305,17 +301,17 @@ mod tests {
     }
 
     #[test]
-    fn test_destination_error_display_used_by_alert() {
-        let e = DestinationError::UsedByAlert("my-alert".to_string());
-        assert!(e.to_string().contains("my-alert"));
-    }
-
-    #[test]
     fn test_destination_error_display_already_exists() {
         let e = DestinationError::AlreadyExists;
         assert_eq!(
             e.to_string(),
             "Destination with the same name already exists"
         );
+    }
+
+    #[test]
+    fn test_destination_error_display_in_use() {
+        let e = DestinationError::InUse("'x' is used by 1 alert".to_string());
+        assert_eq!(e.to_string(), "'x' is used by 1 alert");
     }
 }

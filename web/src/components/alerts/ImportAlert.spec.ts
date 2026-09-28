@@ -57,6 +57,14 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), { default: {} });
 });
+const anomalyCreate = vi.fn().mockResolvedValue({ data: { anomaly_id: "a1" } });
+vi.mock("@/services/anomaly_detection", () => ({
+  default: {
+    create: (...args: any[]) => anomalyCreate(...args),
+    update: vi.fn(),
+  },
+}));
+
 vi.mock("axios", () => ({
   default: {
     get: vi.fn().mockResolvedValue({
@@ -845,6 +853,69 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
     it("should manage filtered destinations state", () => {
       expect(Array.isArray(wrapper.vm.filteredDestinations)).toBe(true);
+    });
+  });
+
+  describe("10. Anomaly Config Import Payload", () => {
+    // An exported anomaly config always carries anomaly_id; that is what routes the import here.
+    const exportedAnomaly = (overrides: Record<string, any> = {}) => ({
+      anomaly_id: "anomaly-1",
+      alert_type: "anomaly_detection",
+      name: "cpu_anomaly",
+      stream_name: "test-stream",
+      stream_type: "logs",
+      detection_function: "avg(cpu)",
+      histogram_interval: "5m",
+      schedule_interval: "1h",
+      detection_window_seconds: 10800,
+      training_window_days: 14,
+      ...overrides,
+    });
+
+    const submitAnomaly = async (jsonObj: Record<string, any>) => {
+      anomalyCreate.mockClear();
+      await wrapper.vm.importJson({ jsonStr: JSON.stringify([jsonObj]) });
+      expect(anomalyCreate).toHaveBeenCalledTimes(1);
+      return anomalyCreate.mock.calls[0][1];
+    };
+
+    it("defaults an absent retrain_interval_days to the backend's 7, not to 0 (Never)", async () => {
+      const payload = await submitAnomaly(exportedAnomaly());
+
+      expect(payload.anomaly_config.retrain_interval_days).toBe(7);
+    });
+
+    it("preserves an explicit retrain_interval_days of 0, the operator's Never", async () => {
+      const payload = await submitAnomaly(exportedAnomaly({ retrain_interval_days: 0 }));
+
+      expect(payload.anomaly_config.retrain_interval_days).toBe(0);
+    });
+
+    it("preserves an explicit non-default retrain_interval_days", async () => {
+      const payload = await submitAnomaly(exportedAnomaly({ retrain_interval_days: 14 }));
+
+      expect(payload.anomaly_config.retrain_interval_days).toBe(14);
+    });
+
+    it("sends alert_destinations at the top level, where the flattened Alert reads them", async () => {
+      const payload = await submitAnomaly(
+        exportedAnomaly({ alert_destinations: ["test-destination-1"] }),
+      );
+
+      expect(payload.destinations).toEqual(["test-destination-1"]);
+      expect(payload.anomaly_config.alert_destinations).toBeUndefined();
+    });
+
+    it("sends an empty destination list when the export names none", async () => {
+      const payload = await submitAnomaly(exportedAnomaly());
+
+      expect(payload.destinations).toEqual([]);
+    });
+
+    it("does not send seasonality, which create derives rather than accepts", async () => {
+      const payload = await submitAnomaly(exportedAnomaly({ seasonality: "daily" }));
+
+      expect(payload.anomaly_config.seasonality).toBeUndefined();
     });
   });
 });

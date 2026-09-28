@@ -90,6 +90,7 @@ test.describe("Pre-Test Cleanup", () => {
     // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
     await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
 
+
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
 
@@ -231,6 +232,7 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupFileEnrichmentTables([
       /^e2e_2937_/,                                                                          // enrichment-lifecycle.spec.js (#2937)
       /^e2e_2067_/,                                                                          // enrichment-lifecycle.spec.js (#2067)
+      /^e2e_enrich_/,                                                                        // enrichment-explore-context.spec.js (#7346, #6645)
       /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // protocols_<uuid>_csv (VRL test)
       /^enrichment_info_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/, // enrichment_info_<uuid>_csv (upload test)
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
@@ -297,6 +299,9 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupStreams(
       [
         /^e2e_slo_14269_/,             // slo-error-messages.spec.js (#14269) seeded stream
+        /^e2e_13354_/,                 // logs-field-value-rendering.spec.js (#13354)
+        /^e2e_13896_/,                 // logs-result-display.spec.js (#13896)
+        /^e2e_13990_other_/,           // logs-bugs.spec.js (#13990)
         /^e2e_sev_str_/,               // logs-histogram-severity.spec.js (#11353)
         /^e2e_sev_num_/,               // logs-histogram-severity.spec.js (#11441)
         /^e2e_ms7332_/,                // logs-multistream-share-url.spec.js (#7332)

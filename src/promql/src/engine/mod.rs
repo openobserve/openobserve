@@ -19,6 +19,7 @@ mod call;
 mod columns;
 mod selector;
 mod streaming;
+mod subquery;
 use std::sync::Arc;
 
 use async_recursion::async_recursion;
@@ -87,7 +88,10 @@ impl Engine {
         self.has_at_modifier = uses_at(prom_expr);
         let value = match self.exec_root_range_selector(prom_expr).await? {
             Some(value) => value,
-            None => self.exec_expr(prom_expr).await?,
+            None => match self.exec_root_subquery(prom_expr).await? {
+                Some(value) => value,
+                None => self.exec_expr(prom_expr).await?,
+            },
         };
         Ok((value, self.result_type.clone()))
     }
@@ -184,43 +188,12 @@ impl Engine {
                 }
             }
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
-            PromExpr::Subquery(expr) => {
-                let val = self.exec_expr(&expr.expr).await?;
-                let range = expr.range;
-                let matrix = match val {
-                    Value::Matrix(mut vs) => {
-                        // For matrix type, update the time_window range
-                        for rv in &mut vs {
-                            // Update time_window with new range
-                            rv.time_window = Some(TimeWindow::new(range));
-                        }
-                        vs
-                    }
-                    v => {
-                        return Err(DataFusionError::NotImplemented(format!(
-                            "Unsupported subquery, the return value should have been a matrix but got {:?}",
-                            v.get_type()
-                        )));
-                    }
-                };
-
-                Value::Matrix(matrix)
-            }
+            PromExpr::Subquery(sq) => self.exec_subquery(sq).await?,
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
             PromExpr::VectorSelector(vs) => {
-                let data = match self.try_streaming_instant_selector(vs).await? {
-                    Some(data) => data,
-                    None => {
-                        let vs = selector::plain_selector(vs, "VectorSelector")?;
-                        self.eval_vector_selector(&vs, None).await?
-                    }
-                };
-                if data.is_empty() {
-                    Value::None
-                } else {
-                    Value::Matrix(data)
-                }
+                self.exec_vector_selector(vs, selector::SelectorOutput::Value)
+                    .await?
             }
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
                 let vs = selector::plain_selector(vs, "MatrixSelector")?;
@@ -704,6 +677,35 @@ pub(crate) mod tests {
         let series = matrix(eval_on_empty(sparse, 3).await.unwrap());
         assert_eq!(series.len(), 2);
         assert_eq!(series.iter().map(|s| s.samples.len()).sum::<usize>(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_or_fills_gaps_into_one_series() {
+        let series = matrix(
+            eval_on_empty("(vector(time()) < 1640995260) or vector(2)", 3)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(series.len(), 1);
+        let values: Vec<f64> = series[0].samples.iter().map(|s| s.value).collect();
+        assert_eq!(values, vec![1640995200.0, 2.0, 2.0]);
+
+        let query = "sum_over_time(((vector(time()) < 1640995260) or vector(2))[2m:1m])";
+        let series = matrix(eval_on_empty(query, 2).await.unwrap());
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].samples.last().unwrap().value, 1640995202.0);
+    }
+
+    #[tokio::test]
+    async fn test_absent_drops_empty_matcher_labels() {
+        let series = matrix(
+            eval_on_empty(r#"absent(missing{job=""}) + vector(1)"#, 1)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(series.len(), 1);
+        assert!(series[0].labels.is_empty());
+        assert_eq!(series[0].samples[0].value, 2.0);
     }
 
     fn single_value(value: Value) -> f64 {
