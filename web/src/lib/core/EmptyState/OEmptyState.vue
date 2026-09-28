@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
     >
       <!-- illustration (hero/block) — preset/illustration prop or slot -->
-      <div v-if="hasIllustration" class="shrink-0">
+      <div v-if="hasIllustration" :class="['shrink-0', sizeClass.illustration]">
         <slot name="illustration">
           <component
             :is="illustrationComponent"
@@ -328,29 +328,34 @@ const SIZE_MAP: Record<
     title: I18nText;
     description: I18nText;
     illustrationWidth: number;
+    illustration: string;
     iconWrap: string;
   }
 > = {
+  // The max-md: half shrinks each size so the whole state, action included, fits one phone screen.
   hero: {
-    root: "w-full h-full min-h-80 px-6 py-12",
-    stack: "gap-7",
-    copy: "gap-2.5",
-    actions: "gap-3 pt-1",
-    extra: "w-full flex flex-col items-center gap-3 pt-2",
-    title: raw("text-2xl!"),
-    description: raw("text-base"),
+    root: "w-full h-full min-h-80 px-6 py-12 max-md:min-h-0 max-md:px-4 max-md:py-5",
+    stack: "gap-7 max-md:gap-3.5",
+    copy: "gap-2.5 max-md:gap-1.5",
+    actions: "gap-3 pt-1 max-md:gap-2 max-md:pt-0",
+    extra: "w-full flex flex-col items-center gap-3 pt-2 max-md:gap-2 max-md:pt-0",
+    title: raw("text-2xl! max-md:text-lg!"),
+    description: raw("text-base max-md:text-sm"),
     illustrationWidth: 300,
+    // CSS width beats the SVG width attribute; h-auto keeps the viewBox ratio.
+    illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-36",
     iconWrap: "",
   },
   block: {
-    root: "w-full min-h-65 px-6 py-10",
-    stack: "gap-5",
-    copy: "gap-2",
-    actions: "gap-2.5 pt-0.5",
-    extra: "w-full flex flex-col items-center gap-2 pt-1",
-    title: raw("text-lg!"),
+    root: "w-full min-h-65 px-6 py-10 max-md:min-h-0 max-md:px-4 max-md:py-5",
+    stack: "gap-5 max-md:gap-3",
+    copy: "gap-2 max-md:gap-1",
+    actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
+    extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
+    title: raw("text-lg! max-md:text-base!"),
     description: raw("text-sm"),
     illustrationWidth: 150,
+    illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-28",
     iconWrap: "",
   },
   inline: {
@@ -362,6 +367,7 @@ const SIZE_MAP: Record<
     title: raw("text-sm!"),
     description: raw("text-xs"),
     illustrationWidth: 0,
+    illustration: "",
     iconWrap: "w-12 h-12 bg-surface-subtle text-text-secondary mb-0.5",
   },
 };
