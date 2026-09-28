@@ -241,6 +241,7 @@ const props = defineProps({
   sessionEndMs: { type: Number, default: 0 },
   loadedRanges: { type: Array as PropType<LoadedRange[]>, default: () => [] },
   loadState: { type: String as PropType<LoadState>, default: "complete" },
+  runComplete: { type: Boolean, default: false },
   loadPercent: { type: Number, default: 0 },
   failedFromMs: { type: Number as PropType<number | null>, default: null },
   truncated: { type: Boolean, default: false },
@@ -262,6 +263,7 @@ const emit = defineEmits<{
   "update:intent": [intent: ReplayIntent];
   "playback-state": [state: PlaybackState];
   "loaded-end-change": [sessionMs: number];
+  "segments-taken": [count: number];
 }>();
 
 const { t } = useI18nTyped();
@@ -294,6 +296,7 @@ let segmentWork: Promise<unknown> = Promise.resolve();
 // rrweb's controller restarts at 0 on play() after a finish, so every resume after one must go through goto.
 let finished = false;
 let failedWasPlaying = false;
+let seekCount = 0;
 
 const sessionWidth = ref(0);
 const sessionHeight = ref(0);
@@ -301,6 +304,8 @@ const resizeObserver = ref<ResizeObserver | null>(null);
 
 const mode = ref<Mode>("paused");
 const playerBuilt = ref(false);
+// How many of the segments prop the live player holds; the parent's coverage check waits on it.
+const takenCount = ref(0);
 const localSpeed = ref(DEFAULT_SPEED);
 const localSkipInactivity = ref(true);
 // Never shrinks: a batch whose records end before the metadata end must not pull the bar back.
@@ -344,6 +349,13 @@ const playbackState = computed<PlaybackState>(() => {
   if (!playerBuilt.value) return "loading";
   return mode.value;
 });
+
+// Once the run has reached the last segment and the player holds it, a hole still loading can never extend this player.
+const awaitingData = computed(
+  () =>
+    props.loadState === "loading" &&
+    !(props.runComplete && takenCount.value >= props.segments.length),
+);
 
 const sessionStart = computed(() => props.sessionStartMs || playerState.value.startTime);
 
@@ -640,6 +652,7 @@ const setupSession = async () => {
   // Adopt the run only once the player exists; a discarded conversion must not be appended to.
   runConverter = converter;
   convertedSegmentCount = consumed;
+  takenCount.value = consumed;
 
   player.value.addEventListener("ui-update-current-time", updateProgressBar);
   player.value.addEventListener("finish", handleFinish);
@@ -650,13 +663,17 @@ const setupSession = async () => {
   if (!player.value) return;
   updatePlayerState();
   playerBuilt.value = true;
+  emit("segments-taken", consumed);
+  const seeksBefore = seekCount;
   emit("ready");
+  // The parent may have seeked on ready, which already set the mode; its cleared pendingSeekMs has not reached the props yet.
+  if (seekCount !== seeksBefore) return;
   // A Play pressed while the first window was still loading is honoured once there is something to play.
   if (mode.value === "playing" || props.intent === "play") startPlayback();
 };
 
 // Re-running setupSession per batch would re-convert the whole session, which is the cost this path exists to avoid.
-const appendSegments = async (newSegments: any[]) => {
+const appendSegments = async (newSegments: any[], takenAfter: number) => {
   if (!player.value || !runConverter || !newSegments.length) return;
 
   const records = convertSegments(newSegments, runConverter, false).sort(
@@ -690,6 +707,8 @@ const appendSegments = async (newSegments: any[]) => {
   // addEvent and the controller's meta refresh both defer through a microtask.
   await nextTick();
   updatePlayerState();
+  takenCount.value = takenAfter;
+  emit("segments-taken", takenAfter);
   tryResume();
 };
 
@@ -752,7 +771,7 @@ const updateProgressBar = (time: { payload: number }) => {
   emit("time-update", sessionTimeMs.value);
   if (
     mode.value === "playing" &&
-    props.loadState === "loading" &&
+    awaitingData.value &&
     shouldBuffer(time.payload, playerState.value.totalTime, speedValue.value)
   ) {
     enterBuffering();
@@ -763,7 +782,7 @@ const updateProgressBar = (time: { payload: number }) => {
 const handleFinish = () => {
   finished = true;
   if (mode.value !== "playing" && mode.value !== "buffering") return;
-  if (props.loadState === "loading") {
+  if (awaitingData.value) {
     mode.value = "buffering";
   } else if (props.loadState === "failed") {
     mode.value = "failed";
@@ -789,24 +808,25 @@ const resumeAt = (offset: number) => {
 const tryResume = () => {
   if (mode.value !== "buffering" || props.pendingSeekMs !== null || !player.value) return;
   const now = playerState.value.actualTime;
-  if (
-    props.loadState === "complete" ||
-    canResume(now, playerState.value.totalTime, speedValue.value)
-  ) {
+  const final =
+    props.loadState === "complete" || (props.loadState === "loading" && !awaitingData.value);
+  if (final || canResume(now, playerState.value.totalTime, speedValue.value)) {
     resumeAt(now);
   }
 };
 
+// A pending seek is display-only, so rrweb must not start from where it sits until the parent seeks.
 const startPlayback = () => {
+  if (props.pendingSeekMs !== null) {
+    mode.value = "buffering";
+    return;
+  }
   if (!player.value) {
     mode.value = "playing";
     return;
   }
   const now = playerState.value.actualTime;
-  if (
-    props.loadState === "loading" &&
-    shouldBuffer(now, playerState.value.totalTime, speedValue.value)
-  ) {
+  if (awaitingData.value && shouldBuffer(now, playerState.value.totalTime, speedValue.value)) {
     mode.value = "buffering";
     return;
   }
@@ -897,6 +917,7 @@ const goto = (timeOffset: number, play: boolean = false) => {
 
 /** The only seek entry point: session ms in, converted to this player's own origin. */
 const seekTo = (sessionMs: number, play: boolean = false) => {
+  seekCount++;
   const offset = Math.max(0, sessionMs - originOffsetMs.value);
   playerState.value.actualTime = offset;
   goto(offset, play);
@@ -949,7 +970,7 @@ watch(
       if (!player.value) return setupSession();
       const pending = props.segments.slice(convertedSegmentCount);
       convertedSegmentCount = props.segments.length;
-      return appendSegments(pending as any[]);
+      return appendSegments(pending as any[], convertedSegmentCount);
     };
     // Serialised and kept alive on failure: a batch must not convert before the previous one has adopted the run.
     segmentWork = segmentWork.then(step, step).catch((e) => {
@@ -1014,6 +1035,11 @@ watch(
     }
   },
 );
+
+// The run reaching its last segment ends the wait just as a complete load does.
+watch(awaitingData, (awaiting) => {
+  if (!awaiting && props.loadState === "loading") tryResume();
+});
 
 watch(playbackState, (state) => emit("playback-state", state));
 

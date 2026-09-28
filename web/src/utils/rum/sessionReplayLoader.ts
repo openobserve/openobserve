@@ -42,6 +42,8 @@ export const RETRY_DELAYS_MS = [1000, 2000];
 export const MAX_MISSING_REQUEUES = 2;
 export const FIRST_BYTE_TIMEOUT_MS = 90_000;
 export const IDLE_TIMEOUT_MS = 30_000;
+// Parquet file not found, SQL execute error, cancelled, timed out, rate limited (infra/src/errors/mod.rs).
+const TRANSIENT_SEARCH_CODES = new Set([20006, 20008, 20009, 20010, 20012]);
 
 const defaultWait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -150,8 +152,8 @@ export function createQueryError(message: string, status?: number, code?: string
 export function isRetryableError(error: any): boolean {
   if (error?.code === "timeout") return true;
   const status = errorStatus(error);
-  if (status === undefined) return true;
-  return status >= 500 || status === 429 || status === 401;
+  if (status !== undefined) return status >= 500 || status === 429 || status === 401;
+  return !isPermanentSearchCode(error?.code);
 }
 
 // The caller's cancel check runs after every wait, so leaving the page stops the retries too.
@@ -191,6 +193,13 @@ export function createActivityTimer(
       handle = null;
     },
   };
+}
+
+// Search error codes 20xxx that describe the query itself; cancel, timeout, rate limit and execution errors can pass next time.
+function isPermanentSearchCode(code: unknown): boolean {
+  const value = Number(code);
+  if (!Number.isInteger(value) || value < 20000 || value >= 30000) return false;
+  return !TRANSIENT_SEARCH_CODES.has(value);
 }
 
 function errorStatus(error: any): number | undefined {

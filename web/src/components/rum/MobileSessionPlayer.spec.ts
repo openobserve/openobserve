@@ -111,6 +111,26 @@ describe("MobileSessionPlayer", () => {
     wrapper.unmount();
   });
 
+  it("ends at the run's last segment instead of buffering while earlier holes load", async () => {
+    const wrapper = mountPlayer({ runComplete: true });
+    await playIcon(wrapper).trigger("click");
+    vi.advanceTimersByTime(6_000);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.playbackState).toBe("ended");
+    wrapper.unmount();
+  });
+
+  it("plays a seek the parent makes in the tick it clears the pending target", async () => {
+    const wrapper = mountPlayer({ segments: [segmentA, segmentB], pendingSeekMs: 12_000 });
+    expect(wrapper.vm.playbackState).toBe("waiting");
+
+    wrapper.vm.seekTo(12_000, true);
+    expect(wrapper.vm.playbackState).toBe("playing");
+    await wrapper.setProps({ pendingSeekMs: null });
+    expect(wrapper.vm.playbackState).toBe("playing");
+    wrapper.unmount();
+  });
+
   it("uses the fixed session length from the parent for the total", () => {
     const wrapper = mountPlayer({ sessionEndMs: T + 600_000 });
     expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("0:00 / 10:00");

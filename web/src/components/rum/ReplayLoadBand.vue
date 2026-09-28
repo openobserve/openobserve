@@ -45,8 +45,7 @@ const stateClass: Record<RangeState, string> = {
   inPlayer: "bg-surface-subtle-hover",
   fetched: "bg-surface-subtle-hover/50",
   skipped: "bg-badge-error-solid-bg/60",
-  unavailable:
-    "bg-[repeating-linear-gradient(45deg,var(--color-surface-subtle-hover)_0_0.1875rem,transparent_0.1875rem_0.4375rem)]",
+  unavailable: "bg-hatch-unavailable",
 };
 
 const visibleRanges = computed(() =>

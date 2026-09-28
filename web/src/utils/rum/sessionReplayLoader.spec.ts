@@ -131,6 +131,11 @@ describe("isRetryableError", () => {
     ["a 400", createQueryError("x", 400), false],
     ["a 403", createQueryError("x", 403), false],
     ["a 404", { response: { status: 404 } }, false],
+    ["an in-stream invalid-SQL code", createQueryError("x", undefined, "20001"), false],
+    ["an in-stream field-not-found code", createQueryError("x", undefined, "20004"), false],
+    ["an in-stream search timeout code", createQueryError("x", undefined, "20010"), true],
+    ["an in-stream rate-limit code", createQueryError("x", undefined, "20012"), true],
+    ["an in-stream internal error code", createQueryError("x", undefined, "10001"), true],
   ])("classifies %s", (_label, error, expected) => {
     expect(isRetryableError(error)).toBe(expected);
   });

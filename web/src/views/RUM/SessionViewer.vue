@@ -150,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @retry="handleRetry"
               @playback-state="playerPlaybackState = $event"
               @loaded-end-change="playerLoadedEndMs = $event"
+              @segments-taken="playerTakenCount = $event"
             />
           </div>
         </template>
@@ -316,6 +317,8 @@ const loaderVersion = ref(0);
 const pendingSeekMs = ref<number | null>(null);
 const playerReady = ref(false);
 const playerLoadedEndMs = ref<number | null>(null);
+// The browser player converts appended segments asynchronously, so the run record runs ahead of what it can show.
+const playerTakenCount = ref(0);
 const playerPlaybackState = ref<PlaybackState>("loading");
 const replayIntent = ref<ReplayIntent>("pause");
 const replaySpeed = ref<number | undefined>(undefined);
@@ -452,7 +455,13 @@ const activePlayer = computed(() =>
   isMobileReplay.value ? mobilePlayerRef.value : videoPlayerRef.value,
 );
 
+// Holes before the anchor may still load, but nothing after the run's edge will reach this player.
+const runComplete = computed(
+  () => manifest.value.length > 0 && run.value.appendedThroughIndex >= manifest.value.length - 1,
+);
+
 const playerBindings = computed(() => ({
+  runComplete: runComplete.value,
   sessionStartMs: sessionStartMs.value,
   sessionEndMs: sessionEndMs.value,
   loadedRanges: loadedRanges.value,
@@ -650,7 +659,9 @@ const queryErrorFrom = (response: any) => {
       : code >= 100 && code < 600
         ? code
         : undefined;
-  return createQueryError(content.message || "session replay query failed", status);
+  const errorCode =
+    content.code === undefined || content.code === null ? undefined : String(content.code);
+  return createQueryError(content.message || "session replay query failed", status, errorCode);
 };
 
 const runSegmentQuery = (sql: string, from: number, size: number): Promise<any[]> =>
@@ -752,6 +763,7 @@ const resetLoader = () => {
   segments.value = [];
   run.value = { runId: run.value.runId + 1, anchorIndex: 0, appendedThroughIndex: -1 };
   playerLoadedEndMs.value = null;
+  playerTakenCount.value = 0;
   unreachableSeek.value = false;
   bumpLoader();
 };
@@ -869,6 +881,7 @@ const getSessionSegments = async () => {
   }
 
   isLoading.value.push(true);
+  segmentsLoading.value = true;
   resetLoader();
   loadState.value = "loading";
   try {
@@ -1196,7 +1209,10 @@ const openEventSeek = () => {
 
 const runCoverage = (): RunCoverage => ({
   anchorIndex: run.value.anchorIndex,
-  appendedThroughIndex: run.value.appendedThroughIndex,
+  appendedThroughIndex: Math.min(
+    run.value.appendedThroughIndex,
+    run.value.anchorIndex + playerTakenCount.value - 1,
+  ),
   lastIndex: manifest.value.length - 1,
   anchorStartMs: windowStart.value - sessionStartMs.value,
   playerEndMs: playerLoadedEndMs.value,
@@ -1258,7 +1274,10 @@ const handlePlayerReady = () => {
   resolvePendingSeek();
 };
 
-watch([run, playerLoadedEndMs, mobileRecords, loadState], resolvePendingSeek);
+// Post flush, so a player's props already hold the segments this check counted.
+watch([run, playerLoadedEndMs, playerTakenCount, mobileRecords, loadState], resolvePendingSeek, {
+  flush: "post",
+});
 
 const handleSidebarEvent = (event: string, payload: any) => {
   if (event === "event-click") {

@@ -679,6 +679,7 @@ describe("SessionViewer.vue", () => {
       const seekTo = vi.fn();
       (wrapper.vm as any).videoPlayerRef = { seekTo };
       (wrapper.vm as any).playerLoadedEndMs = 2999;
+      (wrapper.vm as any).playerTakenCount = (wrapper.vm as any).segments.length;
       (wrapper.vm as any).handlePlayerReady();
       return seekTo;
     }
@@ -1235,6 +1236,53 @@ describe("SessionViewer.vue — retries and the error state (E0)", () => {
     wrapper.unmount();
   });
 
+  it("does not retry an in-stream search error that describes the query itself", async () => {
+    resetStreaming(() => ({ error: { code: 20001, message: "sql not valid" } }));
+    const wrapper = await mountWithFakeTimers();
+
+    expect(streaming.sqls).toHaveLength(1);
+    expect((wrapper.vm as any).loadState).toBe("error");
+    wrapper.unmount();
+  });
+
+  it("retries an in-stream search timeout code", async () => {
+    resetStreaming(() => ({ error: { code: 20010, message: "search timeout" } }));
+    const wrapper = await mountWithFakeTimers();
+
+    expect(streaming.sqls).toHaveLength(3);
+    wrapper.unmount();
+  });
+
+  it("keeps a mobile player on its loading state while a Retry after a manifest failure runs", async () => {
+    const good = rowsResponder(fixtureRows);
+    resetStreaming((sql, from) =>
+      sql.includes("has_full_snapshot") ? { error: { status: 502 } } : good(sql, from),
+    );
+    vi.mocked(searchService.search).mockResolvedValueOnce({
+      data: { hits: [{ ...sessionLookupRow, source: "android" }] },
+    } as any);
+    const wrapper = await mountWithFakeTimers();
+    const vm = wrapper.vm as any;
+    expect(vm.loadState).toBe("error");
+    expect(vm.segmentsLoading).toBe(false);
+
+    const retry = vm.handleRetry();
+    await vi.advanceTimersByTimeAsync(0);
+    const mobile = wrapper.findComponent('[data-test="stub-mobile-player"]');
+    expect(vm.loadState).toBe("loading");
+    expect(mobile.attributes("is-loading")).toBe("true");
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(vm.retryAttempt).toBe(2);
+    expect(vm.segmentsLoading).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await retry;
+    expect(vm.loadState).toBe("error");
+    expect(vm.segmentsLoading).toBe(false);
+    wrapper.unmount();
+  });
+
   it("clears a pending seek when the first window fails", async () => {
     const good = rowsResponder(fixtureRows);
     resetStreaming((sql, from) =>
@@ -1355,13 +1403,22 @@ describe("SessionViewer.vue — background batches (G5)", () => {
     );
     const wrapper = await mountWithFakeTimers();
     const vm = wrapper.vm as any;
-    expect(vm.loadState).toBe("failed");
-    const before = streaming.sqls.length;
+    expect(vm.loader.status).toEqual(["stored", "skipped", "skipped"]);
 
+    // Still loading, loop idle, and the segment right after the player's edge is skipped: the watchdog's own case.
+    vm.run = { ...vm.run, appendedThroughIndex: 0 };
+    vm.loadState = "loading";
     vm.playerPlaybackState = "buffering";
+    await wrapper.vm.$nextTick();
+    const before = streaming.sqls.length;
     await vi.advanceTimersByTimeAsync(20_000);
-
     expect(streaming.sqls).toHaveLength(before);
+
+    // Control: the same watchdog does fetch a segment that is merely missing.
+    vm.loader.status[1] = "missing";
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(streaming.sqls.length).toBeGreaterThan(before);
+    expect(streaming.sqls[before]).toContain(`start >= ${S + 1000} `);
     wrapper.unmount();
   });
 });
@@ -1440,6 +1497,7 @@ describe("SessionViewer.vue — seeks in session ms (G4, G7)", () => {
     playerStubs.videoSeek = seekTo;
     const vm = wrapper.vm as any;
     vm.playerLoadedEndMs = endMs;
+    vm.playerTakenCount = vm.segments.length;
     vm.handlePlayerReady();
     return seekTo;
   }
@@ -1521,6 +1579,14 @@ describe("SessionViewer.vue — seeks in session ms (G4, G7)", () => {
       content: { results: { hits: rows.slice(1).map(fixtureBody) } },
     });
     pending.handlers.complete(pending.data, null);
+    await flushMany();
+
+    // The run now holds the last segment, but the player has not converted it, so seeking would drop records.
+    expect(vm.run.appendedThroughIndex).toBe(4);
+    expect(seekTo).not.toHaveBeenCalled();
+    expect(vm.pendingSeekMs).toBe(3500);
+
+    wrapper.findComponent('[data-test="stub-video-player"]').vm.$emit("segments-taken", 5);
     await flushMany();
 
     expect(seekTo).toHaveBeenCalledWith(3500, false);

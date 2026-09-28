@@ -1005,6 +1005,96 @@ describe("VideoPlayer", () => {
       complete.local.unmount();
     });
 
+    it("treats the run edge as the end once the run holds the last segment, while holes still load", async () => {
+      const { local, instance } = await mountPlayer({ runComplete: true });
+      await playTo(local, instance, 119_500);
+      expect(local.vm.playbackState).toBe("playing");
+
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      expect(local.vm.playbackState).toBe("ended");
+      local.unmount();
+    });
+
+    it("resumes from Buffering once the last segment of the run is in the player", async () => {
+      const { local, instance } = await mountPlayer();
+      await playTo(local, instance, 119_000);
+      instance.goto.mockClear();
+
+      Object.assign(playerSpies.meta, { endTime: origin + 120_500, totalTime: 120_500 });
+      await local.setProps({
+        runComplete: true,
+        segments: [...(local.props("segments") as any[]), batch(origin + 120_400)],
+      });
+      expect(local.vm.playbackState).toBe("buffering");
+      await flushPromises();
+      await local.vm.$nextTick();
+      await flushPromises();
+
+      expect(instance.goto).toHaveBeenCalledWith(119_000, true);
+      expect(local.vm.playbackState).toBe("playing");
+      local.unmount();
+    });
+
+    it("reports how many segments the player holds, after it has converted them", async () => {
+      const { local } = await mountPlayer();
+      expect(local.emitted("segments-taken")?.at(-1)).toEqual([1]);
+      await append(local, { endTime: origin + 130_000, totalTime: 130_000 }, origin + 129_000);
+      expect(local.emitted("segments-taken")?.at(-1)).toEqual([2]);
+      local.unmount();
+    });
+
+    it("does not start rrweb on build while a pending seek is still outstanding", async () => {
+      playerSpies.instances.length = 0;
+      const local = mountComponent({
+        events: [],
+        segments: [],
+        sessionStartMs: sessionStart,
+        sessionEndMs: sessionEnd,
+        loadState: "loading",
+        pendingSeekMs: 300_000,
+        speed: 1,
+      });
+      await flushPromises();
+      expect(local.vm.playbackState).toBe("loading");
+      local.vm.togglePlay();
+      await local.setProps({ intent: "play", segments: mockSegments });
+      await flushPromises();
+      await local.vm.$nextTick();
+      const instance = playerSpies.instances[0];
+
+      expect(local.emitted("ready")).toHaveLength(1);
+      expect(instance.goto).not.toHaveBeenCalled();
+      expect(instance.play).not.toHaveBeenCalled();
+      expect(local.vm.playbackState).toBe("buffering");
+      local.unmount();
+    });
+
+    it("keeps the mode set by a seek the parent makes on ready", async () => {
+      playerSpies.instances.length = 0;
+      let local: any = null;
+      local = mountComponent({
+        events: [],
+        segments: [],
+        sessionStartMs: sessionStart,
+        sessionEndMs: sessionEnd,
+        loadState: "loading",
+        pendingSeekMs: 90_000,
+        intent: "play",
+        speed: 1,
+        onReady: () => local.vm.seekTo(90_000, true),
+      });
+      await flushPromises();
+      await local.setProps({ segments: mockSegments });
+      await flushPromises();
+      await local.vm.$nextTick();
+      const instance = playerSpies.instances[0];
+
+      expect(instance.goto).toHaveBeenLastCalledWith(30_000, true);
+      expect(local.vm.playbackState).toBe("playing");
+      local.unmount();
+    });
+
     it("cancels the auto-resume when the user pauses while buffering", async () => {
       const { local, instance } = await mountPlayer();
       await playTo(local, instance, 119_000);

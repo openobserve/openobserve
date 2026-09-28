@@ -60,6 +60,7 @@ const props = withDefaults(
     sessionEndMs?: number;
     loadedRanges?: LoadedRange[];
     loadState?: LoadState;
+    runComplete?: boolean;
     loadPercent?: number;
     failedFromMs?: number | null;
     truncated?: boolean;
@@ -76,6 +77,7 @@ const props = withDefaults(
     sessionEndMs: 0,
     loadedRanges: () => [],
     loadState: "complete",
+    runComplete: false,
     loadPercent: 0,
     failedFromMs: null,
     truncated: false,
@@ -128,6 +130,8 @@ let announcedReady = false;
 
 const speed = computed(() => props.speed ?? localSpeed.value);
 const skipInactivity = computed(() => props.skipInactivity ?? localSkipInactivity.value);
+// Once the run holds the last segment, nothing still loading can extend this player.
+const awaitingData = computed(() => props.loadState === "loading" && !props.runComplete);
 const playing = computed(() => mode.value === "playing" || mode.value === "buffering");
 const currentTime = computed(() => timeline.value.startTime + playhead.value);
 const viewport = computed(() => viewportAt(timeline.value.records, currentTime.value));
@@ -235,7 +239,7 @@ function nextRecordAfter(absTime: number): number | null {
 // Reaching the end of what is loaded means different things depending on whether more is coming.
 function handleLoadedEdge() {
   stopTick();
-  if (props.loadState === "loading") {
+  if (awaitingData.value) {
     mode.value = "buffering";
   } else if (props.loadState === "failed") {
     mode.value = "failed";
@@ -262,7 +266,7 @@ function tick(ts: number) {
   }
   emit("time-update", sessionTimeMs.value);
 
-  if (props.loadState === "loading" && shouldBuffer(playhead.value, duration, speed.value)) {
+  if (awaitingData.value && shouldBuffer(playhead.value, duration, speed.value)) {
     stopTick();
     mode.value = "buffering";
     return;
@@ -289,24 +293,29 @@ function stopTick() {
 // Resumes where the clock held once enough has loaded past it, or unconditionally once nothing more is coming.
 function tryResume() {
   if (mode.value !== "buffering" || props.pendingSeekMs !== null) return;
-  if (
-    props.loadState === "complete" ||
-    canResume(playhead.value, timeline.value.duration, speed.value)
-  ) {
+  const final =
+    props.loadState === "complete" || (props.loadState === "loading" && !awaitingData.value);
+  if (final || canResume(playhead.value, timeline.value.duration, speed.value)) {
     startTick();
   }
 }
 
-function startPlayback() {
+function beginPlayback() {
   if (!hasReplay.value) return;
-  if (
-    props.loadState === "loading" &&
-    shouldBuffer(playhead.value, timeline.value.duration, speed.value)
-  ) {
+  if (awaitingData.value && shouldBuffer(playhead.value, timeline.value.duration, speed.value)) {
     mode.value = "buffering";
     return;
   }
   startTick();
+}
+
+// A pending seek is display-only, so the playhead must not start moving until the parent seeks.
+function startPlayback() {
+  if (props.pendingSeekMs !== null) {
+    mode.value = "buffering";
+    return;
+  }
+  beginPlayback();
 }
 
 function play() {
@@ -346,8 +355,9 @@ function seekTo(sessionMs: number, shouldPlay = false) {
   const offset = sessionStart.value + sessionMs - timeline.value.startTime;
   playhead.value = Math.max(0, Math.min(timeline.value.duration, offset));
   lastTs = 0;
+  // The parent clears pendingSeekMs in this same tick, so the prop still holds the stale target here.
   if (shouldPlay) {
-    startPlayback();
+    beginPlayback();
   } else {
     stopTick();
     mode.value = "paused";
@@ -460,6 +470,10 @@ watch(
     }
   },
 );
+
+watch(awaitingData, (awaiting) => {
+  if (!awaiting && props.loadState === "loading") tryResume();
+});
 
 watch(playbackState, (state) => emit("playback-state", state));
 
