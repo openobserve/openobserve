@@ -45,7 +45,13 @@ test.describe("Organization Management - CRUD Operations", () => {
             expect(isSaveEnabled).toBe(true);
             
             // Save organization
-            await pageManager.createOrgPage.clickSaveOrgAndWaitForResult(); // Wait for org creation
+            await pageManager.createOrgPage.clickSaveOrg();
+
+            // Assert the success toast fires (relocated from usersOrg.spec
+            // "Add Organization Successfully") and the drawer closes on success
+            // (relocated from iam-form-validation "create organization successfully").
+            await pageManager.createOrgPage.verifyOrgAddedSuccessfully('Organization added successfully.');
+            await expect(pageManager.createOrgPage.addUpdateDialog).not.toBeVisible({ timeout: 10000 });
 
             // Search and verify organization appears in the list
             await pageManager.createOrgPage.searchOrg(orgName);
@@ -227,30 +233,24 @@ test.describe("Organization Management - CRUD Operations", () => {
         try {
             // Click to add organization
             await pageManager.createOrgPage.clickAddOrg();
-            
-            // Leave name field empty and try to save
-            testLogger.info('Attempting to save organization with empty name');
-            
+
+            // Dialog must be open (relocated from iam-form-validation empty-name test).
+            await expect(pageManager.createOrgPage.addUpdateDialog).toBeVisible();
+
+            // R3 (Zod migration): Save stays ENABLED; the schema gates the submit
+            // and reveals the inline required error. Assert deterministically —
+            // no conditional (relocated from usersOrg "Save button stays enabled"
+            // + "Error Message displayed if Add Organization is blank").
             const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
-            
-            if (isSaveEnabled) {
-                // If save is enabled, click it and check for validation error
-                await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
+            expect(isSaveEnabled).toBe(true);
 
-                // Check if validation error message appears
-                const validationError = pageManager.createOrgPage.getOrgNameError();
+            testLogger.info('Attempting to save organization with empty name');
+            await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
 
-                const hasValidationError = await validationError.isVisible({ timeout: 3000 });
-                if (hasValidationError) {
-                    testLogger.info('✓ Validation error shown: "Use alphanumeric characters,"');
-                    expect(hasValidationError).toBe(true);
-                } else {
-                    testLogger.info('ℹ No validation error message visible, empty name may be handled differently');
-                }
-            } else {
-                testLogger.info('✓ Save button correctly disabled for empty name');
-            }
-            
+            const validationError = pageManager.createOrgPage.getOrgNameError();
+            await expect(validationError).toBeVisible({ timeout: 10000 });
+            await expect(validationError).toContainText('Name is required');
+
         } finally {
             // Try to cancel/close the dialog
             try {
@@ -347,6 +347,13 @@ test.describe("Organization Management - CRUD Operations", () => {
                     await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
                 }
 
+                // All inputs here violate /^[a-zA-Z0-9_ ]+$/ so the inline charset
+                // error must surface (relocated from iam-form-validation
+                // "invalid characters" assertion).
+                const orgNameError = pageManager.createOrgPage.getOrgNameError();
+                await expect(orgNameError, `Charset error should show for ${testCase.description}`).toBeVisible({ timeout: 10000 });
+                await expect(orgNameError).toContainText('Use alphanumeric characters, space and underscore only.');
+
                 // Invalid names cause either Save to stay disabled, or onSubmit() to
                 // early-return when clicked — in both cases the drawer must still
                 // be open and the org-name input still present.
@@ -435,6 +442,12 @@ test.describe("Organization Management - CRUD Operations", () => {
                     await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
                 }
 
+                // The inline charset error must surface with its exact message
+                // (relocated from iam-form-validation "invalid characters" test).
+                const orgNameError = pageManager.createOrgPage.getOrgNameError();
+                await expect(orgNameError, `Charset error should show for "${invalidName}"`).toBeVisible({ timeout: 10000 });
+                await expect(orgNameError).toContainText('Use alphanumeric characters, space and underscore only.');
+
                 // Invalid names cause either Save to stay disabled, or onSubmit() to
                 // return early when clicked. In both cases the drawer must stay
                 // open. The input keeps the rejected value, which is the strongest
@@ -453,6 +466,65 @@ test.describe("Organization Management - CRUD Operations", () => {
         }
 
         testLogger.info('✓ Validation message testing completed');
+    });
+
+    test("should clear the org name error when corrected to a valid value", {
+        tag: ['@organization', '@all', '@validation', '@errorMessage']
+    }, async ({ page }) => {
+        // Relocated from Management/iam-form-validation.spec.js
+        // "should clear format error when organization name is corrected".
+        testLogger.info('Testing org name error clears on correction');
+
+        try {
+            await pageManager.createOrgPage.clickAddOrg();
+
+            // Fill invalid → submit reveals the charset error (R3 submit-then-change).
+            await pageManager.createOrgPage.fillOrgName('bad@name!');
+            await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
+
+            const orgNameError = pageManager.createOrgPage.getOrgNameError();
+            await expect(orgNameError).toBeVisible({ timeout: 10000 });
+            await expect(orgNameError).toContainText('Use alphanumeric characters, space and underscore only.');
+
+            // After the first submit the form revalidates live on change, so
+            // correcting to a valid value clears the error and keeps Save enabled.
+            await pageManager.createOrgPage.clearOrgName();
+            await pageManager.createOrgPage.fillOrgName('valid_name');
+            await expect(orgNameError).not.toBeVisible();
+            expect(await pageManager.createOrgPage.checkSaveEnabled()).toBe(true);
+
+            testLogger.info('✓ Org name error correctly cleared on fix');
+        } finally {
+            try {
+                await pageManager.createOrgPage.clickCancelButton();
+            } catch (error) {
+                testLogger.info('Cancel not available - drawer may have closed');
+            }
+        }
+    });
+
+    test("should not add organization when cancel is clicked", {
+        tag: ['@organization', '@all', '@validation', '@cancel']
+    }, async ({ page }) => {
+        // Relocated from usersOrg.spec.js "Organization not added if Cancel clicked"
+        // and iam-form-validation "close dialog without error when cancel is clicked".
+        testLogger.info('Testing organization is not added when cancel is clicked');
+
+        const timestamp = Date.now();
+        const orgName = `cancelorg_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+
+        await pageManager.createOrgPage.clickAddOrg();
+        await pageManager.createOrgPage.fillOrgName(orgName);
+
+        // Cancel closes the dialog without creating the org.
+        await pageManager.createOrgPage.clickCancelButton();
+        await expect(pageManager.createOrgPage.addUpdateDialog).not.toBeVisible({ timeout: 10000 });
+
+        // The organization must not exist in the list.
+        await pageManager.createOrgPage.searchOrg(orgName);
+        await pageManager.createOrgPage.verifyOrgNotExists();
+
+        testLogger.info('✓ Organization correctly not added after cancel');
     });
 
     test("should test organization management workflow end-to-end", {

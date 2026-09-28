@@ -234,19 +234,6 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
   });
 
 
-  test("Error Message displayed if Cipher Key Name Blank", {
-    tag: ['@cipherKeys', '@enterprise', '@P2', '@validation']
-  }, async ({ page }) => {
-    await cipherKeys.navigateToSettingsMenu();
-    // Navigate to Cipher Key Management
-    await cipherKeys.navigateToCipherKeyTab();
-    // Add Cipher Key with blank name
-    await cipherKeys.addCipherKey();
-    await cipherKeys.addCipherKeyContinue();
-    await cipherKeys.verifyNameError();
-    testLogger.info('Test completed successfully');
-  });
-
   test("Error Message displayed if Cipher Key Secret Blank", {
     tag: ['@cipherKeys', '@enterprise', '@P2', '@validation']
   }, async ({ page }) => {

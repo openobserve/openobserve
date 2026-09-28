@@ -246,69 +246,13 @@ test.describe("Users and Organizations", () => {
         testLogger.info('Test completed successfully');
     });
 
-    test('Add Organization Successfully', async ({ page }, testInfo) => {
-        const uniqueOrgName = `Org${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-        testLogger.testStart(testInfo.title, testInfo.file);
-        
-        await navigateToBase(page);
-        pageManager = new PageManager(page);
-        
-        await pageManager.createOrgPage.navigateToOrg();
-        await pageManager.createOrgPage.clickAddOrg();
-        await pageManager.createOrgPage.fillOrgName(uniqueOrgName);
-        await pageManager.createOrgPage.clickSaveOrg();
-        await pageManager.userPage.verifySuccessMessage('Organization added successfully.');
-        
-        testLogger.info('Test completed successfully');
-    });
-
-    test('Save button stays enabled for empty org name (submit-gated)', async ({ page }, testInfo) => {
-        testLogger.testStart(testInfo.title, testInfo.file);
-
-        await navigateToBase(page);
-        pageManager = new PageManager(page);
-
-        await pageManager.createOrgPage.navigateToOrg();
-        await pageManager.createOrgPage.clickAddOrg();
-        await pageManager.createOrgPage.fillOrgName('');
-        // R3 (Zod migration): Save is always enabled; the schema gates the submit
-        // (the inline required error is asserted by the "Error Message displayed
-        // if Add Organization is blank" test).
-        const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
-        expect(isSaveEnabled).toBe(true);
-
-        testLogger.info('Test completed successfully');
-    });
-
-    test('Organization not added if Cancel clicked', async ({ page }, testInfo) => {
-        const uniqueOrgName = `Org${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-        testLogger.testStart(testInfo.title, testInfo.file);
-        
-        await navigateToBase(page);
-        pageManager = new PageManager(page);
-        
-        await pageManager.createOrgPage.navigateToOrg();
-        await pageManager.createOrgPage.clickAddOrg();
-        await pageManager.createOrgPage.fillOrgName(uniqueOrgName);
-        await pageManager.createOrgPage.clickCancelButton();
-        await pageManager.createOrgPage.navigateToOrg();
-        await pageManager.createOrgPage.searchOrg(uniqueOrgName);
-        await pageManager.createOrgPage.verifyOrgNotExists();
-        
-        testLogger.info('Test completed successfully');
-    });
-
-    test('Error Message displayed if Add Organization is blank', async ({ page }, testInfo) => {
-        testLogger.testStart(testInfo.title, testInfo.file);
-
-        await navigateToBase(page);
-        pageManager = new PageManager(page);
-
-        await pageManager.createOrgPage.navigateToOrg();
-        await pageManager.createOrgPage.clickAddOrg();
-        await pageManager.createOrgPage.fillOrgName('');
-        await pageManager.userPage.verifyOrgNameRequiredError('Name is required');
-
-        testLogger.info('Test completed successfully');
-    });
+    // NOTE: The organization tests that previously lived here
+    // ("Add Organization Successfully", "Save button stays enabled for empty org
+    // name", "Organization not added if Cancel clicked", "Error Message displayed
+    // if Add Organization is blank") were consolidated into
+    // playwright-tests/Org/org.spec.js (the chosen home for the shared org dialog).
+    // Their assertions — success toast "Organization added successfully.",
+    // Save-enabled on empty name, cancel-not-added, and the "Name is required"
+    // inline error — are all asserted there. No org assertions were dropped.
+    // Only the USER tests remain in this file.
 });

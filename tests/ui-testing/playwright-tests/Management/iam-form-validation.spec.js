@@ -19,107 +19,12 @@ const PageManager = require('../../pages/page-manager.js');
 const featureAvailable = {};
 
 // ── Organization form ─────────────────────────────────────────────────────────
-
-test.describe("IAM Organization form validation", () => {
-    test.describe.configure({ mode: 'serial' });
-    let pm;
-
-    test.beforeEach(async ({ page }, testInfo) => {
-        testLogger.testStart(testInfo.title, testInfo.file);
-        await navigateToBase(page);
-        pm = new PageManager(page);
-        await pm.iamFormValidation.navigateToOrganizationsTab();
-        testLogger.info('Navigated to IAM Organizations tab');
-    });
-
-    test("should keep submit enabled and block empty organization name on submit", {
-        tag: ['@iamFormValidation', '@smoke', '@P0']
-    }, async ({ page }) => {
-        testLogger.info('Testing submit gating for empty org name');
-
-        await pm.iamFormValidation.openOrganizationForm();
-        await expect(pm.iamFormValidation.getOrgDialogLocator()).toBeVisible();
-        // R3 (Zod migration): Save stays enabled; the schema gates the submit,
-        // not the button. Submitting an empty name reveals the inline error.
-        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
-        await pm.iamFormValidation.getOrgSubmitBtnLocator().click();
-        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
-
-        testLogger.info('Empty org name correctly blocked on submit');
-    });
-
-    test("should show error when organization name contains invalid characters", {
-        tag: ['@iamFormValidation', '@functional', '@P1']
-    }, async ({ page }) => {
-        testLogger.info('Testing org name invalid character error');
-
-        await pm.iamFormValidation.openOrganizationForm();
-        // R3 (Zod migration): errors are revealed on SUBMIT (revalidateLogic),
-        // not on input; Save stays enabled and the schema gates the submit.
-        await pm.iamFormValidation.fillOrgName('org@name!');
-        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
-        await pm.iamFormValidation.submitOrgForm();
-        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText(
-            'Use alphanumeric characters, space and underscore only.'
-        );
-
-        testLogger.info('Invalid org name error correctly shown');
-    });
-
-    test("should clear format error when organization name is corrected", {
-        tag: ['@iamFormValidation', '@functional', '@P1']
-    }, async ({ page }) => {
-        testLogger.info('Testing org name error clears on correction');
-
-        await pm.iamFormValidation.openOrganizationForm();
-        await pm.iamFormValidation.fillOrgName('bad@name!');
-        await pm.iamFormValidation.submitOrgForm(); // reveal the error (submit-then-change)
-        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText('Use alphanumeric characters, space and underscore only.');
-
-        // After the first submit, errors revalidate live on change → fixing clears it.
-        await pm.iamFormValidation.fillOrgName('valid_name');
-        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).not.toBeVisible();
-        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
-
-        testLogger.info('Org name error correctly cleared on fix');
-    });
-
-    test("should create organization successfully with valid name", {
-        tag: ['@iamFormValidation', '@smoke', '@P0']
-    }, async ({ page }) => {
-        const orgName = `e2e_iam_org_${Date.now()}`;
-        testLogger.info(`Creating org: ${orgName}`);
-
-        await pm.iamFormValidation.openOrganizationForm();
-        await pm.iamFormValidation.fillOrgName(orgName);
-        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
-        await pm.iamFormValidation.submitOrgForm();
-
-        // Dialog should close and a success toast should appear
-        await expect(pm.iamFormValidation.getOrgDialogLocator()).not.toBeVisible();
-
-        testLogger.info('Org created successfully');
-    });
-
-    test("should close dialog without error when cancel is clicked", {
-        tag: ['@iamFormValidation', '@functional', '@P2']
-    }, async ({ page }) => {
-        testLogger.info('Testing org form cancel');
-
-        await pm.iamFormValidation.openOrganizationForm();
-        await pm.iamFormValidation.fillOrgName('bad@name!');
-        await pm.iamFormValidation.submitOrgForm(); // reveal the error (submit-then-change)
-        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText('Use alphanumeric characters, space and underscore only.');
-
-        await pm.iamFormValidation.cancelOrgForm();
-        await expect(pm.iamFormValidation.getOrgDialogLocator()).not.toBeVisible();
-
-        testLogger.info('Org form cancelled correctly');
-    });
-});
+// NOTE: The "IAM Organization form validation" describe was consolidated into
+// playwright-tests/Org/org.spec.js (the chosen home for the shared org dialog
+// [data-test="add-update-organization-dialog"] / [data-test="org-name-error"]).
+// Every assertion (empty-name required error, invalid-char charset error,
+// error-clears-on-correction, create-success dialog close + toast, cancel close)
+// now lives there. No org-name assertions were dropped in the move.
 
 // ── Group form (@enterprise — Groups tab requires isEnterprise && rbac_enabled) ──
 

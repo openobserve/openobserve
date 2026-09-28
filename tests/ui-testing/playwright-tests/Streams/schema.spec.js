@@ -153,7 +153,7 @@ test.describe("Schema testcases", () => {
         );
     }
 
-    test('stream schema settings updated to be displayed under logs', async ({ page }, testInfo) => {
+    test('should open a stream schema editor from logs and load its fields without errors', async ({ page }, testInfo) => {
         const testStreamName = `test1_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
         
         // Initialize test setup
@@ -181,14 +181,17 @@ test.describe("Schema testcases", () => {
         await pm.schemaPage.applyQuery();
         await allsearch;
         
-        // Start of actual test - simplified schema workflow
+        // Start of actual test - open the stream's schema editor
         await pm.schemaPage.completeStreamSettingsSchemaWorkflow(testStreamName);
-        
-        // Verify schema workflow completed by checking no error messages are present
+
+        // Real outcome: the schema editor actually rendered (drawer + title +
+        // field-mapping table with the stream's fields), and no logs-search error
+        // is present. (Original title claimed a "settings update" the workflow
+        // never performed — renamed to match the verified behaviour.)
+        await pm.schemaPage.verifySchemaEditorLoaded();
         await pm.schemaPage.verifyNoErrorMessages();
-        testLogger.assertion('Schema workflow completed without errors', true);
-        
-        testLogger.info('Stream schema settings test completed');
+
+        testLogger.info('Stream schema editor load test completed');
     });
 
     test('should display stream details on navigating from blank stream to stream with details', async ({ page }, testInfo) => {
@@ -225,7 +228,7 @@ test.describe("Schema testcases", () => {
         testLogger.assertion('Stream navigation workflow completed successfully', true);
     });
 
-    test('should add a new field and delete it from schema', async ({ page }, testInfo) => {
+    test('should open the schema editor for a stream and list its fields', async ({ page }, testInfo) => {
         const testStreamName = `test3_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
         
         // Initialize test setup
@@ -251,9 +254,132 @@ test.describe("Schema testcases", () => {
         await pm.schemaPage.applyQuery();
         await allsearch3;
 
-        // Start of actual test - use original working enhanced framework method
+        // Open the stream's schema editor. NOTE: the underlying workflow only
+        // navigates into the schema detail view — it never adds or deletes a field
+        // (the add/delete-field controls are gated behind isSchemaUDSEnabled, an
+        // enterprise/config feature, so they are not a reliable cross-environment
+        // signal). The title was renamed to match the verified behaviour.
         await pm.schemaPage.completeAddAndDeleteFieldWorkflow(testStreamName);
-        
-        testLogger.assertion('Add/delete field workflow completed successfully', true);
+
+        // Real outcome: the schema editor rendered with the stream's field list.
+        await pm.schemaPage.verifySchemaEditorLoaded();
+    });
+});
+
+test.describe("Schema Load testcases", () => {
+    let pm;
+
+    // Unique run ID so stream names are unique across runs (not just within a run)
+    const testRunId = Date.now().toString(36).slice(-4);
+
+    // Ingestion helper function for large payloads
+    async function largePayloadIngestion(page, streamName, logData) {
+        testLogger.debug('Starting large payload ingestion', { streamName, fieldCount: Object.keys(logData[0]).length });
+
+        const orgId = getOrgIdentifier();
+
+        const headers = {
+            ...getAuthHeaders(),
+            "Content-Type": "application/json",
+        };
+
+        const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+            const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(logsdata)
+            });
+            const responseText = await fetchResponse.text();
+            return {
+                status: fetchResponse.status,
+                statusText: fetchResponse.statusText,
+                body: responseText,
+                ok: fetchResponse.ok
+            };
+        }, {
+            url: process.env.INGESTION_URL,
+            headers: headers,
+            orgId: orgId,
+            streamName: streamName,
+            logsdata: logData
+        });
+
+        testLogger.debug('Large payload ingestion response', { response });
+
+        // Check if ingestion was actually successful
+        if (!response.ok) {
+            throw new Error(`Ingestion failed: ${response.status} ${response.statusText} - ${response.body}`);
+        }
+
+        return response;
+    }
+
+    // Generate manageable log data for schema load testing (100 fields for practical testing)
+    function generateLogData() {
+        testLogger.debug('Generating schema load test data with 100 fields');
+
+        // Base structure similar to the working logs_data.json
+        const logData = [{
+            // Core kubernetes-like fields (similar to working test data)
+            "kubernetes.container_name": "schema-test-container",
+            "kubernetes.namespace_name": "schema-test",
+            "kubernetes.host": "test-host.internal",
+            "kubernetes.pod_name": "schema-test-pod",
+            "stream": "stdout",
+            "level": "info",
+            "message": "Schema load testing message",
+            "log": "Schema load test log entry for field testing",
+
+            // Generate additional fields for schema testing
+            ...Array.from({ length: 90 }, (_, i) => ({
+                [`schema_field_${i + 1}`]: `Schema test value ${i + 1} - Lorem ipsum dolor sit amet`
+            })).reduce((acc, obj) => ({ ...acc, ...obj }), {}),
+
+            // Timestamp
+            "_timestamp": new Date().toISOString()
+        }];
+
+        testLogger.debug('Generated schema load test data successfully', {
+            fieldCount: Object.keys(logData[0]).length
+        });
+        return logData;
+    }
+
+    test('should send a large log payload to the API and verify success', async ({ page }, testInfo) => {
+        // Generate unique stream name using testRunId and worker index to avoid conflicts
+        // in parallel execution and across test runs
+        const streamName = `stress_test_${testRunId}_w${testInfo.parallelIndex}`;
+
+        // Initialize test setup
+        testLogger.testStart(testInfo.title, testInfo.file);
+        testLogger.info('Using unique stream name for this test run', { streamName, testRunId, workerIndex: testInfo.parallelIndex });
+
+        // Navigate to base URL with authentication
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+        // Generate and send large payload
+        const logData = generateLogData();
+        await largePayloadIngestion(page, streamName, logData);
+
+        testLogger.info('Large payload ingestion completed successfully');
+
+        // Wait for indexing to complete - crucial for large payloads
+        // The schemaLoadPage workflow polls the streams list deterministically for the new
+        // stream cell (waitFor on `log-stream-name-cell-<name>`), which is the
+        // post-indexing signal. No blanket timeout needed.
+        testLogger.debug('Indexing will be polled by the streams-page verification step');
+
+        // Navigate to logs page and verify data
+        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${getOrgIdentifier()}`;
+        testLogger.navigation('Navigating to logs page', { url: logsUrl });
+        await page.goto(logsUrl);
+        await page.waitForLoadState('domcontentloaded');
+
+        // Complete schema load verification workflow
+        await pm.schemaLoadPage.completeSchemaLoadVerificationWorkflow(streamName);
+
+        testLogger.info('Schema load test completed successfully');
     });
 });
