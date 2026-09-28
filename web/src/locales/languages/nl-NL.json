@@ -17928,7 +17928,34 @@
     },
     "samples": {
       "logOffTitle": "Je databases loggen nog geen trage statements",
-      "logOffDescription": "Niets heeft deze aanroepen getraceerd, dus we hebben de databases gevraagd naar hun eigen traagste statements — en ze loggen er geen. Deze lijst komt uit PostgreSQL's statementlog (log_min_duration_statement), dat standaard is uitgeschakeld — de logstap van de setupkaart schakelt dit in. Per-statement-capturering is momenteel alleen voor PostgreSQL, dus MySQL en MariaDB kunnen deze lijst nog niet voeden. Top queries kunnen nog steeds tonen wat het meest draait, omdat die in plaats daarvan de tellertabellen leest.",
+      "notCollecting": {
+        "description": "Niets heeft deze aanroepen getraceerd, dus we hebben de databases gevraagd naar hun eigen traagste statements — en ze loggen er geen. We controleren vier dingen.",
+        "checklistTitle": "Wat we hebben gecontroleerd",
+        "setUp": "Statementlogging instellen",
+        "checks": {
+          "queries": {
+            "ok": "Uw querygegevens komen binnen",
+            "okDetail": "{queries} van {databases} — het tabblad Top queries werkt",
+            "okDetailNoFleet": "{queries} — het tabblad Top queries werkt",
+            "no": "Er komen ook geen querygegevens binnen",
+            "noDetail": "Begin met het tabblad Top queries — er komt nog niets van deze databases bij ons binnen."
+          },
+          "enabled": {
+            "ok": "Databasemonitoring is ingeschakeld",
+            "okDetail": "voor deze organisatie",
+            "no": "Databasemonitoring is uitgeschakeld",
+            "noDetail": "Schakel het in in Instellingen om te beginnen met verzamelen."
+          },
+          "log": {
+            "no": "Trage statements worden niet gelogd",
+            "noDetail": "Deze lijst komt uit PostgreSQL's statementlog (log_min_duration_statement), dat standaard is uitgeschakeld — de logstap van de setupkaart schakelt dit in."
+          },
+          "engines": {
+            "title": "Voorlopig alleen PostgreSQL",
+            "detail": "Per-statement-capturering is momenteel alleen voor PostgreSQL, dus MySQL en MariaDB kunnen deze lijst nog niet voeden. Top queries kunnen nog steeds tonen wat het meest draait, omdat die in plaats daarvan de tellertabellen leest."
+          }
+        }
+      },
       "searchPlaceholder": "Zoek querytekst, service of database…",
       "columns": {
         "query": "Query",

@@ -241,12 +241,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                ships off), so the honest reading is "not switched on", not "no
                slow calls". The generic empty state below cannot say this: it
                reasons about traces, and this is a database setting. -->
-          <DbmStateNote
+          <DbmLockEmptyState
             v-else-if="serverLogOff"
+            :healthy="false"
             :title="t('dbm.samples.logOffTitle')"
-            :hint="t('dbm.samples.logOffDescription')"
-            placement="centered"
+            :description="t('dbm.samples.notCollecting.description')"
+            :checklist-title="t('dbm.samples.notCollecting.checklistTitle')"
+            :checks="logOffChecks"
+            :actions="logOffActions"
             data-test="dbm-samples-log-off"
+            @action="onLogOffAction"
           />
           <DbmEmptyState
             v-else-if="!loading"
@@ -351,7 +355,11 @@ import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
-import DbmStateNote from "@/components/dbm/DbmStateNote.vue";
+import DbmLockEmptyState, {
+  type DbmLockCheck,
+  type DbmLockEmptyAction,
+} from "@/components/dbm/DbmLockEmptyState.vue";
+import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -411,6 +419,8 @@ const {
   lastRunAt,
   org,
   dbmEnabled,
+  queryCount,
+  databaseCount,
   run,
   onRefresh,
   onDateChange,
@@ -933,13 +943,56 @@ const onRowClick = (row: DbmSampleRow) => {
     .catch(() => {});
 };
 
+const openSetup = () =>
+  router.push({
+    name: DBM_SETUP_ROUTE,
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
+
+// The same diagnosis the other server-fed tabs give: is the rest of DBM answering, is it on, and which setting is off.
+const logOffChecks = computed<DbmLockCheck[]>(() =>
+  buildDbmNotCollectingChecks(
+    "samples",
+    {
+      queryCount: queryCount.value,
+      databaseCount: databaseCount.value,
+      dbmEnabled: dbmEnabled.value,
+    },
+    t,
+    [
+      {
+        id: "log",
+        status: "fail",
+        title: t("dbm.samples.notCollecting.checks.log.no"),
+        detail: t("dbm.samples.notCollecting.checks.log.noDetail"),
+      },
+      {
+        id: "engines",
+        status: "note",
+        title: t("dbm.samples.notCollecting.checks.engines.title"),
+        detail: t("dbm.samples.notCollecting.checks.engines.detail"),
+      },
+    ],
+  ),
+);
+
+const logOffActions = computed<DbmLockEmptyAction[]>(() => [
+  {
+    id: "open-setup",
+    label: t("dbm.samples.notCollecting.setUp"),
+    primary: true,
+    icon: "settings",
+  },
+]);
+
+const onLogOffAction = (id: string) => {
+  if (id === "open-setup") openSetup();
+};
+
 const onEmptyAction = (cause: DbmEmptyCauseId) => {
   switch (dbmEmptyAction(cause)) {
     case "open-setup":
-      router.push({
-        name: DBM_SETUP_ROUTE,
-        query: { org_identifier: store.state.selectedOrganization.identifier },
-      });
+      openSetup();
       return;
     case "clear-filters":
       clearScope();

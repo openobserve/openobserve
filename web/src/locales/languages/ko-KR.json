@@ -17928,7 +17928,34 @@
     },
     "samples": {
       "logOffTitle": "데이터베이스가 아직 느린 문장을 기록하지 않고 있습니다",
-      "logOffDescription": "이 호출들을 추적한 것이 없어 데이터베이스에 자체 가장 느린 문장을 요청했지만 로그가 없습니다. 이 목록은 PostgreSQL의 문장 로그(log_min_duration_statement)에서 가져오며 기본적으로 꺼져 있습니다 — 설정 카드의 로깅 단계에서 켭니다. 문장별 캡처는 현재 PostgreSQL 전용이므로 MySQL과 MariaDB는 아직 이 목록을 제공할 수 없습니다. 상위 쿼리는 카운터 테이블을 읽으므로 가장 많이 실행되는 것을 계속 보여줄 수 있습니다.",
+      "notCollecting": {
+        "description": "이 호출들을 추적한 것이 없어 데이터베이스에 자체 가장 느린 문장을 요청했지만 로그가 없습니다. 네 가지를 확인합니다.",
+        "checklistTitle": "확인한 항목",
+        "setUp": "문장 로깅 설정",
+        "checks": {
+          "queries": {
+            "ok": "쿼리 데이터가 도착하고 있습니다",
+            "okDetail": "{databases}에서 {queries} — Top queries 탭이 작동합니다",
+            "okDetailNoFleet": "{queries} — Top queries 탭이 작동합니다",
+            "no": "쿼리 데이터도 도착하지 않습니다",
+            "noDetail": "Top queries 탭부터 시작하세요 — 이 데이터베이스에서 아직 아무것도 도달하지 않았습니다."
+          },
+          "enabled": {
+            "ok": "데이터베이스 모니터링이 켜져 있습니다",
+            "okDetail": "이 조직에 대해",
+            "no": "데이터베이스 모니터링이 꺼져 있습니다",
+            "noDetail": "수집을 시작하려면 설정에서 켜세요."
+          },
+          "log": {
+            "no": "느린 문장이 기록되지 않고 있습니다",
+            "noDetail": "이 목록은 PostgreSQL의 문장 로그(log_min_duration_statement)에서 가져오며 기본적으로 꺼져 있습니다 — 설정 카드의 로깅 단계에서 켭니다."
+          },
+          "engines": {
+            "title": "현재는 PostgreSQL 전용",
+            "detail": "문장별 캡처는 현재 PostgreSQL 전용이므로 MySQL과 MariaDB는 아직 이 목록을 제공할 수 없습니다. 상위 쿼리는 카운터 테이블을 읽으므로 가장 많이 실행되는 것을 계속 보여줄 수 있습니다."
+          }
+        }
+      },
       "searchPlaceholder": "쿼리 텍스트, 서비스 또는 데이터베이스 검색…",
       "columns": {
         "query": "쿼리",

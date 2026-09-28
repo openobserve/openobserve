@@ -17928,7 +17928,34 @@
     },
     "samples": {
       "logOffTitle": "Ihre Datenbanken protokollieren noch keine langsamen Anweisungen.",
-      "logOffDescription": "Nichts hat diese Aufrufe getracet, also haben wir die Datenbanken nach ihren eigenen langsamsten Anweisungen gefragt — und sie protokollieren keine. Diese Liste stammt aus dem Anweisungsprotokoll von PostgreSQL (log_min_duration_statement), das standardmäßig deaktiviert ist — der Protokollierungsschritt der Setup-Karte aktiviert es. Die Erfassung pro Anweisung ist derzeit nur für PostgreSQL verfügbar, daher können MySQL und MariaDB diese Liste noch nicht speisen. Top-Abfragen können Ihnen weiterhin zeigen, was am häufigsten läuft, da sie stattdessen die Zähltabellen liest.",
+      "notCollecting": {
+        "description": "Nichts hat diese Aufrufe getracet, also haben wir die Datenbanken nach ihren eigenen langsamsten Anweisungen gefragt — und sie protokollieren keine. Wir überprüfen vier Dinge.",
+        "checklistTitle": "Was wir überprüft haben",
+        "setUp": "Anweisungsprotokollierung einrichten",
+        "checks": {
+          "queries": {
+            "ok": "Ihre Abfragedaten kommen an",
+            "okDetail": "{queries} von {databases} — der Tab „Top queries“ funktioniert",
+            "okDetailNoFleet": "{queries} — der Tab „Top queries“ funktioniert",
+            "no": "Es kommen auch keine Abfragedaten an",
+            "noDetail": "Beginnen Sie mit dem Tab „Top queries“ — von diesen Datenbanken erreicht uns noch nichts."
+          },
+          "enabled": {
+            "ok": "Datenbanküberwachung ist eingeschaltet",
+            "okDetail": "für diese Organisation",
+            "no": "Datenbanküberwachung ist ausgeschaltet",
+            "noDetail": "Aktivieren Sie es in den Einstellungen, um mit der Erfassung zu beginnen."
+          },
+          "log": {
+            "no": "Langsame Anweisungen werden nicht protokolliert",
+            "noDetail": "Diese Liste stammt aus dem Anweisungsprotokoll von PostgreSQL (log_min_duration_statement), das standardmäßig deaktiviert ist — der Protokollierungsschritt der Setup-Karte aktiviert es."
+          },
+          "engines": {
+            "title": "Vorerst nur PostgreSQL",
+            "detail": "Die Erfassung pro Anweisung ist derzeit nur für PostgreSQL verfügbar, daher können MySQL und MariaDB diese Liste noch nicht speisen. Top-Abfragen können Ihnen weiterhin zeigen, was am häufigsten läuft, da sie stattdessen die Zähltabellen liest."
+          }
+        }
+      },
       "searchPlaceholder": "Abfragetext, Dienst oder Datenbank suchen…",
       "columns": {
         "query": "Abfrage",
