@@ -18,21 +18,6 @@ test.describe("Org Ingestion Token (Passcode) Access Control", () => {
     // accounts created here are swept by the pre-test cleanup on the next run.
     const uniqueSaName = () => `sa${Date.now()}x${Math.floor(Math.random() * 10000)}`;
 
-    test("Admin/Root sees the real Kubernetes setup card with no forbidden banner", {
-        tag: ['@ingestion-passcode-forbidden', '@all', '@P0'],
-    }, async ({ page }, testInfo) => {
-        testLogger.testStart(testInfo.title, testInfo.file);
-
-        await navigateToBase(page);
-        pm = new PageManager(page);
-
-        await pm.ingestionConfigPage.navigateToIngestion(getOrgIdentifier());
-        await pm.ingestionConfigPage.expectDataSourceSetupCardVisible();
-        await pm.ingestionConfigPage.expectDataSourceSetupCardForbiddenHidden();
-
-        testLogger.info('Test completed');
-    });
-
     test("ServiceAccount GET /passcode returns 403 (API boundary)", {
         tag: ['@ingestion-passcode-forbidden', '@all', '@api', '@P0'],
     }, async ({ page, request }, testInfo) => {
@@ -87,6 +72,10 @@ test.describe("Org Ingestion Token (Passcode) Access Control", () => {
         testLogger.info('Test completed');
     });
 
+    // The one allowed-session control this spec needs: the frontend latches a 403
+    // and withholds any card embedding the token, so a mis-latch would blank this
+    // for admins too. Rendering of the other ingestion routes is already covered by
+    // GeneralTests/ingestion-config.spec.js — not repeated here.
     test("Legacy curl CopyContent renders normally for an allowed session", {
         tag: ['@ingestion-passcode-forbidden', '@all', '@P1'],
     }, async ({ page }, testInfo) => {
@@ -104,18 +93,4 @@ test.describe("Org Ingestion Token (Passcode) Access Control", () => {
         testLogger.info('Test completed');
     });
 
-    test("AI Integrations card renders normally for an allowed session", {
-        tag: ['@ingestion-passcode-forbidden', '@all', '@P1'],
-    }, async ({ page }, testInfo) => {
-        testLogger.testStart(testInfo.title, testInfo.file);
-
-        await navigateToBase(page);
-        pm = new PageManager(page);
-
-        await pm.ingestionConfigPage.navigateToIntegration('/ingestion/ai-integrations', getOrgIdentifier());
-        await pm.ingestionConfigPage.expectAiIntegrationContentVisible();
-        await pm.ingestionConfigPage.expectAiIntegrationForbiddenHidden();
-
-        testLogger.info('Test completed');
-    });
 });

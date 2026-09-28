@@ -52,11 +52,6 @@ export class IngestionConfigPage {
         this.dataSourceSetupCardForbidden = page.locator('[data-test="data-source-setup-card-passcode-forbidden"]');
         this.copyContentForbidden = page.locator('[data-test="copy-content-passcode-forbidden"]');
         this.rumContentText = page.locator('[data-test="rum-content-text"]');
-        // AIIntegrationDetail renders one of: rich setup card, markdown card, or legacy
-        // CopyContent — assert "some normal content" rather than a single hard-coded surface.
-        this.aiIntegrationContent = page.locator('[data-test="ai-integration-card"], [data-test="ai-rich-setup-card"], [data-test="rum-content-text"]');
-        this.aiIntegrationCardForbidden = page.locator('[data-test="ai-integration-card-passcode-forbidden"]');
-        this.aiIntegrationDetailForbidden = page.locator('[data-test="ai-integration-detail-passcode-forbidden"]');
     }
 
     // ==================== Navigation ====================
@@ -113,14 +108,6 @@ export class IngestionConfigPage {
 
     // ==================== Org Passcode Access-Control Assertions ====================
 
-    async expectDataSourceSetupCardVisible(timeout = 15000) {
-        await expect(this.dataSourceSetupCard).toBeVisible({ timeout });
-    }
-
-    async expectDataSourceSetupCardForbiddenHidden() {
-        await expect(this.dataSourceSetupCardForbidden).toBeHidden();
-    }
-
     async expectDataSourceSetupCardForbiddenVisible(timeout = 15000) {
         await expect(this.dataSourceSetupCardForbidden).toBeVisible({ timeout });
     }
@@ -139,15 +126,6 @@ export class IngestionConfigPage {
 
     async getRumContentText() {
         return await this.rumContentText.textContent();
-    }
-
-    async expectAiIntegrationContentVisible(timeout = 15000) {
-        await expect(this.aiIntegrationContent.first()).toBeVisible({ timeout });
-    }
-
-    async expectAiIntegrationForbiddenHidden() {
-        await expect(this.aiIntegrationCardForbidden).toBeHidden();
-        await expect(this.aiIntegrationDetailForbidden).toBeHidden();
     }
 
     async verifyNotificationVisible(expectedText = null, timeout = 5000) {
