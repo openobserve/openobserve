@@ -1577,6 +1577,46 @@ pub async fn deepest_rungs(
         .collect())
 }
 
+#[derive(Debug, FromQueryResult)]
+struct HandoffRecipient {
+    response_id: String,
+    recipient: Option<String>,
+}
+
+/// Who each of these records was most recently handed off to, in one grouped
+/// query — the same shape as [`deepest_rungs`]. `MAX(at)` cannot be paired with
+/// `recipient` in a single `GROUP BY` without the aggregate losing which row it
+/// came from, so this reads every handoff for the page and keeps the first one
+/// seen per record in a globally `at`-descending scan, which is that record's
+/// latest.
+pub async fn latest_handoff_recipients(
+    ids: &[String],
+) -> Result<std::collections::HashMap<String, String>, errors::Error> {
+    if ids.is_empty() {
+        return Ok(Default::default());
+    }
+    let client = get_orm_client_rw().await;
+    let mut out: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for row in oncall_response_events::Entity::find()
+        .filter(oncall_response_events::Column::ResponseId.is_in(ids.to_vec()))
+        .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Handoff.to_i32()))
+        .filter(oncall_response_events::Column::Recipient.is_not_null())
+        .select_only()
+        .column_as(oncall_response_events::Column::ResponseId, "response_id")
+        .column_as(oncall_response_events::Column::Recipient, "recipient")
+        .order_by_desc(oncall_response_events::Column::At)
+        .order_by_desc(oncall_response_events::Column::Id)
+        .into_model::<HandoffRecipient>()
+        .all(client)
+        .await?
+    {
+        if let Some(recipient) = row.recipient {
+            out.entry(row.response_id).or_insert(recipient);
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -450,6 +450,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           copy
           :copy-label="t('oncall.copyEmail')"
         />
+        <!-- Handed to a person but not yet acked: still nobody's per the
+             ladder, but naming who it's waiting on beats an em dash — that's
+             the whole point of tracking a handoff. -->
+        <span
+          v-else-if="row.latest.handed_off_to"
+          class="inline-flex items-center gap-1.5"
+          data-test="oncall-responder-handed-off"
+        >
+          <OTag variant="warning-soft" size="xs">{{ t("oncall.handedOffTag") }}</OTag>
+          <OUserCell
+            :value="row.latest.handed_off_to"
+            :name="row.latest.handed_off_to === viewerEmail ? youLabel : undefined"
+            local-part
+          />
+        </span>
         <!-- Same text color as the P2 priority tag, so an unanswered page
              reads as the same order of urgency the priority column already
              establishes. -->

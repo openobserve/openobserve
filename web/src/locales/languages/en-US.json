@@ -18566,6 +18566,7 @@
     "escalationDetailCapped": "Live escalation detail is loaded for the {count} oldest open pages.",
     "responder": "Responder",
     "nobodyYet": "—",
+    "handedOffTag": "Handed off",
     "copyEmail": "Copy email",
     "attentionTitle": "Needs a human right now",
     "attentionUnacked": "unacknowledged",

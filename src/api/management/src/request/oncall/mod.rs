@@ -1741,6 +1741,12 @@ async fn with_page_details(
             tracing::error!("[oncall] rung lookup: {e}");
             Default::default()
         });
+    let handoffs = infra::table::oncall_responses::latest_handoff_recipients(&ids)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!("[oncall] handoff recipient lookup: {e}");
+            Default::default()
+        });
     rows.into_iter()
         .map(|r| {
             let mut value = serde_json::json!(r);
@@ -1751,6 +1757,12 @@ async fn with_page_details(
                 // The rung's `after_micros`: an index would not survive a reordered ladder.
                 if let Some(rung) = rungs.get(&r.id) {
                     obj.insert("reached_rung_micros".to_string(), (*rung).into());
+                }
+                // Cleared once the recipient acks: `acked_by` then says who owns it instead.
+                if r.acked_by.is_none()
+                    && let Some(to) = handoffs.get(&r.id)
+                {
+                    obj.insert("handed_off_to".to_string(), to.clone().into());
                 }
                 // Only when answered: a null is indistinguishable from "answered instantly".
                 if let Some(acked_at) = r.acked_at {

@@ -322,7 +322,8 @@ pub struct ResponseEvent {
     /// +5m having already fired. Absent means the first run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ladder_run: Option<i32>,
-    /// Who a `Delivery` entry was addressed to.
+    /// Who a `Delivery` entry was addressed to, or who a `Handoff` entry
+    /// passed the page to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recipient: Option<String>,
     /// The channel it went out on.

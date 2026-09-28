@@ -554,6 +554,11 @@ export interface OnCallResponse {
   reached_rung_micros?: number | null;
   /** Server-computed, and only present on a record somebody answered. */
   time_to_ack_micros?: number | null;
+  /**
+   * Who the record was most recently handed off to, person-to-person. Cleared
+   * server-side once that person acks — `acked_by` says who owns it after that.
+   */
+  handed_off_to?: string | null;
 }
 
 /**
