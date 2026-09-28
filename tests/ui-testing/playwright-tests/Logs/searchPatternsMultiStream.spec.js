@@ -10,11 +10,15 @@
  * the guard fires on selectedStream.length alone.
  */
 
-const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { waitForStreamListed } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+
+// POST /api/{org}/streams/{stream}/patterns/extract — the single-stream extraction API
+// the guard exists to keep multi-stream selections away from (web/src/services/patterns.ts).
+const PATTERNS_EXTRACT_URL = /\/streams\/[^/]+\/patterns\/extract/;
 
 // Unique per-test stream names so parallel tests never collide. cleanup.spec.js reclaims
 // these via the /^e2e_multi_patterns/ prefix.
@@ -50,6 +54,14 @@ test.describe("Logs Patterns Multi-Stream Guard testcases", () => {
         await waitForStreamListed(page, streamA, 'logs');
         await waitForStreamListed(page, streamB, 'logs');
 
+        // The guard's whole point is that it returns before the request is built, so record
+        // every extraction call and assert none was made — a toast alone would still pass if
+        // the guard ran after the API had already been hit.
+        const extractCalls = [];
+        page.on('request', (req) => {
+            if (PATTERNS_EXTRACT_URL.test(req.url())) extractCalls.push(req.url());
+        });
+
         // Enter patterns mode via URL (the toggle is enterprise-gated in OSS). restoreUrlQueryParams
         // splits `stream` on ',' into [a, b], so the guard condition is true on mount and the toast fires.
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}`;
@@ -57,7 +69,8 @@ test.describe("Logs Patterns Multi-Stream Guard testcases", () => {
         await page.goto(`${logsUrl}&stream_type=logs&stream=${streamA},${streamB}&logs_visualize_toggle=patterns`, { waitUntil: 'domcontentloaded' });
 
         await pm.logsPage.expectMultiStreamPatternsToast();
-        testLogger.info('PASSED: multi-stream guard error toast shown');
+        expect(extractCalls, `patterns/extract must not be called for a multi-stream selection, got: ${extractCalls.join(', ')}`).toHaveLength(0);
+        testLogger.info('PASSED: multi-stream guard error toast shown, no extraction request issued');
     });
 
     test("should not show the multi-stream patterns toast for a single stream @P1", {
