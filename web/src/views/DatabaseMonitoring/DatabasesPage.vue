@@ -125,7 +125,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
           <DbmSubheaderBand data-test="dbm-databases-summary">
-            <OStatStrip :items="summaryStats" :loading="loading" />
+            <OStatStrip
+              :items="summaryStats"
+              :loading="loading"
+              selectable
+              :selected-key="statFilter"
+              default-key="databases"
+              @select="onStatSelect"
+            />
           </DbmSubheaderBand>
           <DbmCoverageLine
             :freshness="freshness"
@@ -620,6 +627,12 @@ const errorCount = computed(() => rows.value.reduce((acc, row) => acc + (row.err
  * facet the table can filter to, so making them clickable would promise a
  * behaviour the page does not have.
  */
+// The Failed tile narrows the table to databases with a failed call; Calls and Database time are totals, not rows.
+const statFilter = ref<"failed" | null>(null);
+const onStatSelect = (key: string) => {
+  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
+};
+
 const summaryStats = computed<StatItem[]>(() => {
   // Both figures are summed over the CLIENT hits, so the trace vantage is the
   // population signal: no trace rows means nobody measured, and the sums are
@@ -649,6 +662,7 @@ const summaryStats = computed<StatItem[]>(() => {
       value: calls.value ?? raw("—"),
       icon: "bar-chart",
       tone: "info",
+      selectable: false,
       dataTest: "dbm-databases-summary-calls",
     },
     {
@@ -657,6 +671,7 @@ const summaryStats = computed<StatItem[]>(() => {
       value: time.value ?? raw("—"),
       icon: "timer",
       tone: "teal",
+      selectable: false,
       dataTest: "dbm-databases-summary-time",
     },
     {
@@ -665,12 +680,15 @@ const summaryStats = computed<StatItem[]>(() => {
       value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
       icon: "error-outline",
       tone: errorCount.value ? "error" : "neutral",
+      selectable: errorCount.value > 0 || statFilter.value === "failed",
       dataTest: "dbm-databases-summary-failed",
     },
   ];
 });
 
-const isFiltered = computed(() => !!search.value || !!systemFilter.value);
+const isFiltered = computed(
+  () => !!search.value || !!systemFilter.value || statFilter.value !== null,
+);
 
 // Every filter change publishes the scope to the URL BEFORE reloading — the
 // factory owns the handler, so no entry can forget the URL half.
@@ -701,8 +719,10 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => [
  */
 const visibleRows = computed(() => {
   const needle = search.value.trim().toLowerCase();
-  if (!needle) return rows.value;
-  return rows.value.filter((row) =>
+  const scoped =
+    statFilter.value === "failed" ? rows.value.filter((row) => (row.errors ?? 0) > 0) : rows.value;
+  if (!needle) return scoped;
+  return scoped.filter((row) =>
     [row.db_instance, row.db_namespace, row.db_system, ...(row.calling_services ?? [])]
       .filter(Boolean)
       .some((field) => String(field).toLowerCase().includes(needle)),
@@ -1572,6 +1592,7 @@ const defaultColumnVisibility = {};
 
 const clearScope = () => {
   systemFilter.value = null;
+  statFilter.value = null;
   // Clear the SEARCH too, the way every sibling tab's clear does
   // (TableHealthPage, SamplesPage, QueriesPage). Leaving it set makes "clear"
   // mean two different things inside one section: the list stays narrowed by a

@@ -203,7 +203,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
           <DbmSubheaderBand data-test="dbm-queries-summary">
-            <OStatStrip :items="visibleSummaryStats" :loading="loading" />
+            <OStatStrip
+              :items="visibleSummaryStats"
+              :loading="loading"
+              selectable
+              :selected-key="statFilter"
+              default-key="queries"
+              @select="onStatSelect"
+            />
           </DbmSubheaderBand>
           <DbmCoverageLine
             :freshness="freshness"
@@ -1133,6 +1140,12 @@ const fallbackTimeQualifier = computed(() =>
  * database time with no word for WHICH time it is reads as execution time on a
  * MySQL fleet, whether it sits in a cell or a tile.
  */
+// The Failed tile narrows the table to the queries with a failed call; Calls and Database time are totals, not rows.
+const statFilter = ref<"failed" | null>(null);
+const onStatSelect = (key: string) => {
+  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
+};
+
 const summaryStats = computed<StatItem[]>(() => {
   const totals = overlapTotals.value;
   const qualifier = (key: string | null): I18nText =>
@@ -1186,6 +1199,7 @@ const summaryStats = computed<StatItem[]>(() => {
         : {}),
       icon: "bar-chart",
       tone: "info",
+      selectable: false,
       dataTest: "dbm-queries-summary-calls",
     },
     {
@@ -1197,6 +1211,7 @@ const summaryStats = computed<StatItem[]>(() => {
         : {}),
       icon: "timer",
       tone: "teal",
+      selectable: false,
       dataTest: "dbm-queries-summary-time",
     },
     // TRACE-ONLY: the server feed carries no error counts. In fallback mode
@@ -1208,6 +1223,7 @@ const summaryStats = computed<StatItem[]>(() => {
       value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
       icon: "error-outline",
       tone: errorCount.value ? "error" : "neutral",
+      selectable: errorCount.value > 0 || statFilter.value === "failed",
       dataTest: "dbm-queries-summary-failed",
     },
   ];
@@ -1232,7 +1248,8 @@ const isFiltered = computed(
     !!namespaceFilter.value ||
     !!envFilter.value ||
     !!serviceFilter.value ||
-    activeInsightId.value !== null,
+    activeInsightId.value !== null ||
+    statFilter.value !== null,
 );
 
 /**
@@ -1825,11 +1842,15 @@ const tableRows = computed<QueryRow[]>(() => {
   // An insight filter is already a narrowing, so nothing folds inside it: the
   // user asked for exactly these rows and hiding some would answer a different
   // question than the one they clicked.
+  const failedOnly = statFilter.value === "failed";
   const base = active
     ? rows.value.filter((row) => active.fingerprints.includes(row.fingerprint))
-    : foldedRows.value;
+    : failedOnly
+      ? rows.value
+      : foldedRows.value;
 
   // The remainder is suppressed while filtering: it does not reconcile a subset.
+  if (failedOnly) return base.filter((row) => (row.errors ?? 0) > 0);
   if (active || !other.value.length) return base;
 
   const scopeTotal = scopeTotalTime.value;
@@ -2295,6 +2316,7 @@ const clearScope = () => {
   serviceFilter.value = null;
   search.value = "";
   activeInsightId.value = null;
+  statFilter.value = null;
   syncUrl();
   load();
 };
@@ -2341,7 +2363,7 @@ const onEmptyAction = (cause: DbmEmptyCauseId) => {
       });
       return;
     case "clear-filters":
-      // clearScope() drops search and the active insight too.
+      // clearScope() drops search, the active insight and the Failed tile too.
       clearScope();
       return;
     case "reload":
