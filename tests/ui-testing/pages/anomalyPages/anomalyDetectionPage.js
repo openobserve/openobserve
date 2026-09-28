@@ -371,19 +371,19 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.detectionFunctionInfo);
     }
 
-    /** @param {'m'|'h'} unit */
+    /** @param {'s'|'m'|'h'|'d'} unit */
     async setHistogramInterval(value, unit = 'm') {
         await this.fillFormInput(this.selectors.histogramIntervalValue, value);
         await this.selectOptionByValue(this.selectors.histogramIntervalUnit, unit);
     }
 
-    /** @param {'m'|'h'} unit */
+    /** @param {'s'|'m'|'h'|'d'} unit */
     async setScheduleInterval(value, unit = 'm') {
         await this.fillFormInput(this.selectors.scheduleIntervalValue, value);
         await this.selectOptionByValue(this.selectors.scheduleIntervalUnit, unit);
     }
 
-    /** @param {'m'|'h'} unit */
+    /** @param {'s'|'m'|'h'|'d'} unit */
     async setDetectionWindow(value, unit = 'h') {
         await this.fillFormInput(this.selectors.detectionWindowValue, value);
         await this.selectOptionByValue(this.selectors.detectionWindowUnit, unit);
@@ -392,6 +392,23 @@ class AnomalyDetectionPage {
     /** Blank the resolution field, to exercise a mid-edit invalid interval. */
     async clearHistogramInterval() {
         await this.fillFormInput(this.selectors.histogramIntervalValue, '');
+    }
+
+    /** The below-floor validation message painted under the detection window. */
+    getDetectionWindowErrorLocator() {
+        return this.page.locator(this.selectors.detectionWindowError);
+    }
+
+    async getDetectionWindowValue() {
+        return this.getFormInputValue(this.selectors.detectionWindowValue);
+    }
+
+    /** The selected window unit ('s' | 'm' | 'h' | 'd'), read from the OSelect value. */
+    async getDetectionWindowUnit() {
+        const trigger = this.page
+            .locator(`${this.selectors.detectionWindowUnit} [data-test$="-trigger"]`)
+            .first();
+        return trigger.getAttribute('data-test-selected-value');
     }
 
     async setTrainingWindow(days) {

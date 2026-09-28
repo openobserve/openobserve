@@ -22,6 +22,7 @@ pub mod model_pricing;
 pub mod oncall;
 pub mod org_status;
 pub mod pipelines;
+pub mod prompts;
 pub mod service_streams;
 pub mod synthetics;
 pub mod system_settings;

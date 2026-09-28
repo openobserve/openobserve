@@ -4156,6 +4156,15 @@ export class LogsPage {
         return await expect(errorLocator).toBeVisible({ timeout: 30000 });
     }
 
+    /** Assert the logs error banner is showing and carries the given text. */
+    async expectSearchErrorContaining(text, timeout = 30000) {
+        const errorLocator = this.page.locator(
+            `[data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
+        ).first();
+        await expect(errorLocator).toBeVisible({ timeout });
+        await expect(errorLocator).toContainText(text, { timeout });
+    }
+
     async expectSqlErrorStateNotVisible(timeout = 5000) {
         return await expect(this.page.locator(this.errorMessage)).not.toBeVisible({ timeout });
     }
@@ -12846,4 +12855,67 @@ export class LogsPage {
             .locator('[data-test^="log-details-include-field-"], [data-test^="log-details-exclude-field-"]')
             .count();
     }
+
+    /** Open the logs explorer already scoped to a stream type. */
+    async openExplorerForStreamType(streamType) {
+        const orgId = getOrgIdentifier();
+        await this.page.goto(
+            `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}&stream_type=${streamType}`,
+            { waitUntil: 'domcontentloaded', timeout: 30000 }
+        );
+        await this.page.locator(this.indexDropDown).waitFor({ state: 'visible', timeout: 20000 });
+        await this.waitForUrlParam('stream_type', streamType, 20000, true);
+    }
+
+    getBackToLogsStreamTypeButton() {
+        return this.page.locator('[data-test="log-search-index-list-back-to-logs-btn"]');
+    }
+
+    /** The only way back to logs once the explorer is scoped to another stream type. */
+    async clickBackToLogsStreamType() {
+        const button = this.getBackToLogsStreamTypeButton();
+        await button.waitFor({ state: 'visible', timeout: 15000 });
+        await button.click();
+        // The button is rendered only for a non-logs type, so its removal is the switch
+        // completing — the URL is not rewritten until the next search runs.
+        await button.waitFor({ state: 'hidden', timeout: 15000 });
+    }
+
+    async expectBackToLogsStreamTypeButtonVisible() {
+        await expect(this.getBackToLogsStreamTypeButton()).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectBackToLogsStreamTypeButtonAbsent() {
+        await expect(this.getBackToLogsStreamTypeButton()).toHaveCount(0);
+    }
+
+    /** Open the stream picker and read back which streams it offers. */
+    async listStreamOptionValues(filterText = '') {
+        const trigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        const popover = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
+        const search = this.page.locator('[data-test="log-search-index-list-select-stream-search"]');
+        const options = this.page.locator('[data-test="log-search-index-list-select-stream-option"]');
+
+        if (await trigger.count() > 0) {
+            await trigger.first().click();
+        } else {
+            await this.page.locator(this.indexDropDown).click();
+        }
+        await popover.waitFor({ state: 'visible', timeout: 15000 });
+
+        if (filterText && await search.count() > 0) {
+            await search.press('ControlOrMeta+a').catch(() => {});
+            await search.press('Backspace').catch(() => {});
+            await search.fill(filterText);
+        }
+        // The option list is virtualised, so give the filtered rows a beat to render.
+        await options.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+
+        const values = await options.evaluateAll((nodes) =>
+            nodes.map((n) => n.getAttribute('data-test-value')).filter(Boolean)
+        );
+        await this.page.keyboard.press('Escape');
+        return values;
+    }
+
 }
