@@ -17119,17 +17119,17 @@
       "alertMe": "Alert me",
       "columnHints": {
         "qps": "Calls per second — this window's calls divided by its length, so a 15-minute view and a 4-hour view stay comparable.",
-        "p50": "Half of all calls finished faster than this. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p95": "The slow tail — 1 call in 20 took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p99": "The worst 1% of calls took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "load": "Total time your applications spent waiting on this database. Measured from the client side, so it reflects how much traffic this database served — not how loaded the server is.",
+        "p50": "Half of all calls finished faster than this. Measured from completed calls in your application's traces.",
+        "p95": "The slow tail — 1 call in 20 took at least this long. Measured from completed calls in your application's traces.",
+        "p99": "The worst 1% of calls took at least this long. Measured from completed calls in your application's traces.",
+        "load": "Total time your apps spent on calls to this database, measured from your application's traces. It shows how much traffic this database served for your apps.",
         "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it."
       },
       "failedChip": "{count} failed",
       "columnSubLabels": {
-        "attention": "server",
-        "load": "client",
-        "calls": "client"
+        "attention": "from the database",
+        "load": "from your apps",
+        "calls": "from your apps"
       },
       "attention": {
         "connections": "connections",
@@ -17191,14 +17191,14 @@
         "failed": "Failed"
       },
       "columnHints": {
-        "calls": "How many times this query ran. Your database's own count where it reports one — that covers every client, not just the parts of your system sending traces. Rows marked client-observed are counted from traces instead, because your database didn't report them.",
-        "p50": "Half of all calls finished faster than this. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p95": "The slow tail — 1 call in 20 took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p99": "The worst 1% of calls took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
+        "calls": "How many times this query ran, as counted by your database — every app that connects is included. Where your database has no count for a query, the traces icon marks one measured from your application's traces.",
+        "p50": "Half of all calls finished faster than this. Measured from completed calls in your application's traces.",
+        "p95": "The slow tail — 1 call in 20 took at least this long. Measured from completed calls in your application's traces.",
+        "p99": "The worst 1% of calls took at least this long. Measured from completed calls in your application's traces.",
         "max": "The single slowest call in this window — one real call, not an average.",
         "errors": "How many of these calls came back with an error.",
         "perTrace": "How many times this runs inside a single request. A high number usually means a loop.",
-        "load": "Total time this query spent in the database. Your database's own figure where it reports one: execution time on Postgres, but WAIT time on MySQL and MariaDB — each row says which. Rows marked client-observed are measured from traces, so they include network round-trip."
+        "load": "Total time this query spent in the database, as your database reports it: execution time on Postgres, wait time on MySQL and MariaDB — each row says which. Rows with the traces icon are measured from your application's traces, so they also include the trip to the database and back."
       },
       "errorsNone": "none",
       "errorsAll": "all",
@@ -17462,8 +17462,7 @@
       "overlap": {
         "serverExecution": "Time {engine} spent executing it",
         "serverWait": "Time {engine} spent waiting on it — wait time, not execution time",
-        "serverCounted": "Counted by {engine}, across every client",
-        "clientObserved": "Observed by instrumented callers — your database didn't report this one"
+        "serverCounted": "Counted by {engine}, across every client"
       },
       "endpointsConcentrated": "One endpoint accounts for {percent} of this query's time. Fix {endpoint} and you've fixed this query.",
       "typicalMarker": "slow calls {value}",
@@ -17490,8 +17489,8 @@
       },
       "serverMetrics": {
         "title": "What the database itself recorded",
-        "subtitle": "Server-side — all clients",
-        "clientSubtitle": "Client-observed — instrumented callers only, finished calls only. A query still running, or one that hung, isn't in these numbers.",
+        "subtitle": "From your database — every app that connects",
+        "clientSubtitle": "Marked figures are measured from your application's traces — the calls your apps completed in this window",
         "instance": "Reported by {instance}",
         "instanceWide": "All databases on this instance",
         "calls": "Executions",
@@ -17537,9 +17536,13 @@
         "serverExecution": "exec time",
         "serverWait": "wait time",
         "serverCounted": "server count",
-        "clientObserved": "client-observed",
         "serverReported": "reported by your databases"
       }
+    },
+    "appSource": {
+      "marker": "Measured from your application's traces",
+      "markerHint": "Measured from your application's traces, adding your apps' view to what your database reports.",
+      "legend": "From your app's traces"
     },
     "page": {
       "tabs": {
@@ -17548,7 +17551,7 @@
         "metricsHint": "Database load by wait event, and every metric your database receivers collect.",
         "queries": "Top queries",
         "samples": "Slowest calls",
-        "samplesHintClient": "Finished calls your instrumented services observed in this window — callers without tracing are not counted, so this is a floor, not the total. The table shows the slowest of them.",
+        "samplesHintClient": "Calls measured from your application's traces in this window, adding your apps' view to what your database reports. The table shows the slowest of them.",
         "samplesHintServer": "Statements your databases reported completing in this window, counted inside the database. The table shows the slowest of them.",
         "samplesHintUnknown": "The slowest individual database calls in this window.",
         "deadlocks": "Deadlocks",
@@ -17704,7 +17707,7 @@
         "status": "Status"
       },
       "columnHints": {
-        "duration": "How long this one call took, measured by the caller. Counts finished calls only — a query still running, or one that never came back, isn't measured here."
+        "duration": "How long this one call took, as your application timed it from start to finish."
       },
       "failed": "Failed",
       "failedWithCode": "Failed · {code}",
