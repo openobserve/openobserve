@@ -35,7 +35,7 @@ use datafusion::{
     common::TableReference,
     physical_optimizer::{
         PhysicalOptimizerRule, filter_pushdown::FilterPushdown, limit_pushdown::LimitPushdown,
-        projection_pushdown::ProjectionPushdown,
+        projection_pushdown::ProjectionPushdown, pushdown_sort::PushdownSort,
     },
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
@@ -572,6 +572,15 @@ fn apply_pushdowns_and_optimizations(
             log::error!("[trace_id {trace_id}] flight->search: projection pushdown error: {e}");
             e
         })?;
+    // Real scans only exist after placeholder replacement, so DataFusion's
+    // default pipeline never saw them with sort requirements attached.
+    let pushdown_sort = PushdownSort::new();
+    physical_plan = pushdown_sort
+        .optimize(physical_plan, ctx.state().config_options())
+        .map_err(|e| {
+            log::error!("[trace_id {trace_id}] flight->search: sort pushdown error: {e}");
+            e
+        })?;
 
     if cfg.search.feature_dynamic_pushdown_filter_enabled {
         let pushdown_filter = FilterPushdown::new_post_optimization();
@@ -839,19 +848,28 @@ fn collect_stats(files: &[FileKey]) -> ScanStats {
 mod tests {
     use std::sync::Arc;
 
+    use arrow::array::Int64Array;
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::{FileKey, FileMeta};
     use datafusion::{
+        datasource::{
+            file_format::parquet::ParquetFormat,
+            listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
+        },
         execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
-        prelude::SessionConfig,
+        physical_plan::{collect, displayable},
+        prelude::{SessionConfig, SessionContext},
     };
+    use parquet::arrow::ArrowWriter;
 
     use super::*;
     use crate::{
         datafusion::{
             distributed_plan::empty_exec::NewEmptyExec,
             optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram,
-            table_provider::empty_table::NewEmptyTable, udf::histogram_udf,
+            sort_order::FileSortOrder,
+            table_provider::{empty_table::NewEmptyTable, listing_adapter::ListingTableAdapter},
+            udf::histogram_udf,
         },
         index::Condition,
     };
@@ -1118,6 +1136,213 @@ mod tests {
 
             assert_eq!(index_optimizer_rule_ref.lock().clone(), expected_mode);
             assert_eq!(index_condition_ref.lock().is_none(), is_metrics);
+        }
+    }
+
+    fn write_timestamp_parquet(dir: &std::path::Path, name: &str, values: Vec<i64>) {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "_timestamp",
+            DataType::Int64,
+            false,
+        )]));
+        let batch = arrow::array::RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int64Array::from(values)) as _],
+        )
+        .unwrap();
+        let file = std::fs::File::create(dir.join(name)).unwrap();
+        let mut writer = ArrowWriter::try_new(file, schema, None).unwrap();
+        writer.write(&batch).unwrap();
+        writer.close().unwrap();
+    }
+
+    struct FilePathVisitor(Vec<String>);
+
+    impl<'n> datafusion::common::tree_node::TreeNodeVisitor<'n> for FilePathVisitor {
+        type Node = Arc<dyn ExecutionPlan>;
+        fn f_up(
+            &mut self,
+            node: &'n Self::Node,
+        ) -> datafusion::common::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+            use datafusion::{
+                catalog::memory::DataSourceExec, datasource::physical_plan::FileScanConfig,
+            };
+
+            let Some(exec) = node.downcast_ref::<DataSourceExec>() else {
+                return Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue);
+            };
+            let Some(config) = exec.data_source().downcast_ref::<FileScanConfig>() else {
+                return Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue);
+            };
+            self.0.extend(
+                config
+                    .file_groups
+                    .iter()
+                    .flat_map(|group| group.iter())
+                    .map(|file| file.path().to_string()),
+            );
+            Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
+        }
+    }
+
+    fn file_paths(plan: &Arc<dyn ExecutionPlan>) -> Vec<String> {
+        use datafusion::common::tree_node::TreeNode;
+
+        let mut visitor = FilePathVisitor(Vec::new());
+        let _ = plan.visit(&mut visitor);
+        visitor.0
+    }
+
+    async fn sort_pushdown_output(
+        sql: &str,
+        files: &[(&str, Vec<i64>)],
+        enable_sort_pushdown: bool,
+    ) -> datafusion::common::Result<(String, Vec<String>, Vec<i64>)> {
+        let dir = tempfile::tempdir().unwrap();
+        for (name, values) in files {
+            write_timestamp_parquet(dir.path(), name, values.clone());
+        }
+        let mut config = SessionConfig::from_env()
+            .unwrap()
+            .with_target_partitions(1)
+            .with_repartition_file_scans(false)
+            .with_collect_statistics(true)
+            .set_bool(
+                "datafusion.optimizer.enable_sort_pushdown",
+                enable_sort_pushdown,
+            );
+        config
+            .options_mut()
+            .execution
+            .split_file_groups_by_statistics = true;
+        let state = SessionStateBuilder::new()
+            .with_config(config)
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let sort_order = FileSortOrder::TimestampDesc;
+        let listing_options = ListingOptions::new(Arc::new(ParquetFormat::default()))
+            .with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
+        let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
+        let config = ListingTableConfig::new(url)
+            .with_listing_options(listing_options)
+            .with_schema(Arc::new(Schema::new(vec![Field::new(
+                "_timestamp",
+                DataType::Int64,
+                false,
+            )])));
+        let table = ListingTableAdapter::try_new(
+            config,
+            "test".to_string(),
+            sort_order,
+            None,
+            vec![],
+            None,
+            1,
+        )
+        .unwrap();
+        ctx.register_table("logs", Arc::new(table)).unwrap();
+        let provider = ctx.table_provider("logs").await?;
+        let scan = provider.scan(&ctx.state(), None, &[], None).await?;
+
+        let plan = ctx.state().create_logical_plan(sql).await?;
+        let plan = ctx.state().create_physical_plan(&plan).await?;
+        let mut rewriter = ReplaceTableScanExec::new(scan);
+        let plan = plan
+            .rewrite(&mut rewriter)
+            .map_err(datafusion::error::DataFusionError::from)?
+            .data;
+        let mut scan_stats = ScanStats::new();
+        let plan = apply_pushdowns_and_optimizations(
+            "test",
+            &ctx,
+            plan,
+            &mut scan_stats,
+            Arc::new(QueryParams {
+                trace_id: "test".to_string(),
+                org_id: "default".to_string(),
+                stream: TableReference::bare("logs"),
+                stream_type: StreamType::Logs,
+                stream_name: "logs".to_string(),
+                time_range: (0, 100),
+                work_group: None,
+                use_inverted_index: false,
+            }),
+            vec![],
+            vec![],
+            None,
+            None,
+        )
+        .map_err(|e| datafusion::error::DataFusionError::External(e.into()))?;
+        let display = displayable(plan.as_ref()).indent(true).to_string();
+        let paths = file_paths(&plan);
+        let batches = collect(plan, ctx.task_ctx()).await?;
+        let values = batches
+            .iter()
+            .flat_map(|batch| {
+                batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap()
+                    .values()
+                    .to_vec()
+            })
+            .collect();
+        Ok((display, paths, values))
+    }
+
+    #[tokio::test]
+    async fn test_follower_sort_pushdown_reaches_real_scan() {
+        // `TimestampDesc` files with non-overlapping ranges: the follower's
+        // replacement/optimization path must order the scan by statistics for
+        // the DESC request while an ASC request keeps its explicit sort.
+        let files = vec![("a.parquet", vec![3, 2, 1]), ("b.parquet", vec![9, 8, 7])];
+        let (display, paths, values) = sort_pushdown_output(
+            "SELECT * FROM logs ORDER BY _timestamp DESC LIMIT 10",
+            &files,
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(values, vec![9, 8, 7, 3, 2, 1], "results must match");
+        assert_eq!(paths.len(), 2, "expected two files, got: {paths:?}");
+        assert!(
+            paths[0].ends_with("b.parquet") && paths[1].ends_with("a.parquet"),
+            "DESC request must read newest file first, got: {paths:?}\n{display}"
+        );
+        assert!(
+            !display.contains("SortExec"),
+            "ordered scan must not need a sort, got:\n{display}"
+        );
+
+        let (display, ..) = sort_pushdown_output(
+            "SELECT * FROM logs ORDER BY _timestamp ASC LIMIT 10",
+            &files,
+            false,
+        )
+        .await
+        .unwrap();
+        assert!(
+            display.contains("SortExec"),
+            "mismatched sort direction keeps the sort, got:\n{display}"
+        );
+
+        for enable_sort_pushdown in [true, false] {
+            let (display, paths, values) = sort_pushdown_output(
+                "SELECT * FROM logs ORDER BY _timestamp ASC LIMIT 10",
+                &files,
+                enable_sort_pushdown,
+            )
+            .await
+            .unwrap();
+            assert_eq!(values, vec![1, 2, 3, 7, 8, 9], "results must match");
+            assert_eq!(paths.len(), 2, "expected two files, got: {paths:?}");
+            assert!(
+                display.contains("SortExec"),
+                "ASC request over DESC files keeps its sort, got:\n{display}"
+            );
         }
     }
 }
