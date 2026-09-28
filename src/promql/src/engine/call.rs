@@ -81,6 +81,16 @@ impl Engine {
 
     async fn call_builtin(&mut self, func_name: Func, args: &FunctionArgs) -> Result<Value> {
         match func_name {
+            Func::Absent | Func::AbsentOverTime => {
+                self.ensure_args_len(args, 1, "Invalid args, expected one argument")?;
+                let labels = functions::absent_labels(&args.args[0]);
+                let input = self.call_expr_arg(args, 0).await?;
+                if func_name == Func::Absent {
+                    functions::absent(input, labels, &self.eval_ctx)
+                } else {
+                    functions::absent_over_time(input, labels, &self.eval_ctx)
+                }
+            }
             Func::Clamp => {
                 let err = "Invalid args, expected clamp(v instant-vector, min scalar, max scalar)";
                 self.ensure_args_len(args, 3, err)?;

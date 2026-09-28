@@ -59,7 +59,16 @@ pub(crate) fn round(data: Value, to_nearest: &ScalarParam) -> Result<Value> {
 }
 
 pub(crate) fn sgn(data: Value) -> Result<Value> {
-    exec(data, f64::signum)
+    // f64::signum maps ±0 to ±1; Prometheus returns zeros and NaN unchanged.
+    exec(data, |value| {
+        if value > 0.0 {
+            1.0
+        } else if value < 0.0 {
+            -1.0
+        } else {
+            value
+        }
+    })
 }
 
 /// Apply a given simple match function to a float type
@@ -151,7 +160,9 @@ mod tests {
         assert_eq!(round(12.4), 10.0);
 
         assert_eq!(apply(sgn, 5.0), 1.0);
-        assert_eq!(apply(sgn, 0.0), 1.0);
+        assert_eq!(apply(sgn, 0.0).to_bits(), 0.0f64.to_bits());
+        assert_eq!(apply(sgn, -0.0).to_bits(), (-0.0f64).to_bits());
+        assert!(apply(sgn, f64::NAN).is_nan());
         assert_eq!(apply(sgn, -5.0), -1.0);
     }
 
@@ -304,7 +315,7 @@ mod tests {
             assert_eq!(result_matrix.len(), 3);
             assert_eq!(result_matrix[0].samples[0].value, 1.0);
             assert_eq!(result_matrix[1].samples[0].value, -1.0);
-            assert_eq!(result_matrix[2].samples[0].value, 1.0);
+            assert_eq!(result_matrix[2].samples[0].value, 0.0);
         } else {
             panic!("Expected Matrix result");
         }
