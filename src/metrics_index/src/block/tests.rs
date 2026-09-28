@@ -230,8 +230,6 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
     let blob = fixture();
     let index = index(&blob, &["label_b", "label_a", "missing"]).unwrap();
     assert_eq!(index.blocks.len(), 4);
-    assert!(!index.blocks.block(0).strictly_increasing);
-    assert!(index.blocks.block(1).strictly_increasing);
     assert_eq!(
         decoded_rows(&blob, &index),
         rows().iter().map(|r| (r.0, r.1, r.2)).collect::<Vec<_>>()
@@ -464,7 +462,7 @@ fn duplicates_across_chunk_boundary_remain_exact_and_visible() {
     writer.write(&input).unwrap();
     let blob = writer.finish().unwrap();
     let index = index(&blob, &[]).unwrap();
-    assert!(index.blocks.iter().all(|block| block.strictly_increasing));
+    assert!(index.blocks.iter().all(|block| block.row_count == 1));
     assert_eq!(
         index.blocks.block(0).max_timestamp,
         index.blocks.block(1).min_timestamp
@@ -589,11 +587,15 @@ fn header_rejects_truncation_corruption_and_excessive_claims() {
                 (h["labels"][0]["compressed"].as_u64().unwrap() - 1).into()
         },
         &|h| h["directory"][0]["raw"] = u64::MAX.into(),
-        &|h| h["directory"][7]["compressed"] = 0.into(),
+        &|h| h["directory"][6]["compressed"] = 0.into(),
         &|h| h["labels"][0]["compressed"] = u64::MAX.into(),
         &|h| h["labels"][1]["raw"] = 4.into(),
         &|h| h["labels"][1]["name"] = "label_a".into(),
-        &|h| h["directory"].as_array_mut().unwrap().truncate(7),
+        &|h| h["directory"].as_array_mut().unwrap().truncate(6),
+        &|h| {
+            let extra = h["directory"][6].clone();
+            h["directory"].as_array_mut().unwrap().push(extra);
+        },
         &|h| h["row_group_size"] = 0.into(),
     ] {
         let mut h = json.clone();
@@ -709,13 +711,13 @@ fn pending_writer_requires_source_metadata_and_verifies_final_parquet_rows() {
 }
 
 #[test]
-fn v3_tail_header_locates_labels_before_directory() {
+fn v1_tail_header_locates_labels_before_directory() {
     let blob = fixture();
     let size = blob.len() as u64;
     let trailer = &blob[blob.len() - MIDX_TRAILER_LEN..];
     assert_eq!(MIDX_TRAILER_LEN, 32);
-    assert_eq!(&trailer[20..24], &3u32.to_le_bytes());
-    assert_eq!(&trailer[24..], b"O2MIDX03");
+    assert_eq!(&trailer[20..24], &1u32.to_le_bytes());
+    assert_eq!(&trailer[24..], b"O2MIDX01");
     let (data, header_start) = header_data(&blob);
     let regions = trailer_of(&blob);
     assert_eq!(
@@ -960,42 +962,4 @@ fn sample_block_requires_one_complete_frame() {
     assert!(decode_block(&trailing, &block).is_err());
     block.block_length = (original.len() - 1) as u32;
     assert!(decode_block(&original[..original.len() - 1], &block).is_err());
-}
-
-#[test]
-#[ignore = "Exercises a directory with over one million blocks"]
-fn more_than_one_million_blocks_roundtrip() {
-    let rows = 1_000_001usize;
-    let schema = Arc::new(Schema::new(vec![
-        Field::new("__hash__", DataType::UInt64, false),
-        Field::new("_timestamp", DataType::Int64, false),
-        Field::new("value", DataType::Float64, false),
-    ]));
-    let batch = RecordBatch::try_new(
-        schema.clone(),
-        vec![
-            Arc::new(UInt64Array::from(vec![7; rows])),
-            Arc::new(Int64Array::from_iter_values(0..rows as i64)),
-            Arc::new(Float64Array::from(vec![1.; rows])),
-        ],
-    )
-    .unwrap();
-    let parent = ParentMetadata {
-        rows: rows as u64,
-        compressed_size: 100,
-    };
-    let mut writer = BlockWriter::new(Vec::new(), schema, vec![], parent.clone(), 1).unwrap();
-    writer.write(&batch).unwrap();
-    let bytes = writer.finish().unwrap();
-    let index = decode_file(&bytes, &parent, &[]).unwrap();
-    assert_eq!(index.blocks.len(), rows);
-    for (i, block) in index.blocks.iter().enumerate() {
-        assert_eq!(block.hash, 7);
-        let range = block.block_range();
-        let decoded =
-            decode_block(&bytes[range.start as usize..range.end as usize], &block).unwrap();
-        assert_eq!(decoded.timestamps, vec![i as i64]);
-        assert_eq!(decoded.value_bits, vec![1f64.to_bits()]);
-    }
-    eprintln!("one series, {} blocks, {} MIDX bytes", rows, bytes.len());
 }

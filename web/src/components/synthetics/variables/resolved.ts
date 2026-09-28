@@ -178,3 +178,12 @@ export function buildResolvedGrouped(
   }
   return { environments: names, resolved };
 }
+
+/** Every name the check resolves in any environment; drives the unbound-variable banner. */
+export function knownVariableNames(grouped: ResolvedVariablesGrouped): Set<string> {
+  return new Set(
+    Object.values(grouped.resolved)
+      .flat()
+      .map((v) => v.name),
+  );
+}

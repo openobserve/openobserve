@@ -29,6 +29,7 @@ const SECTION_BY_ROUTE_PREFIX: ReadonlyArray<readonly [string, string]> = [
   ["aiDiscovery", "discovery"],
   ["aiQueue", "queues"],
   ["aiDataset", "datasets"],
+  ["aiPrompt", "prompts"],
   ["aiPlayground", "playground"],
   ["aiExperiment", "experiments"],
   ["aiRemoteTask", "remoteTasks"],

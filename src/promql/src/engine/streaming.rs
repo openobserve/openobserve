@@ -31,8 +31,9 @@ use super::{
 use crate::{
     aggregations::AggOp,
     functions, micros,
-    series_stream::plan::{
-        LabelColumns, StreamingSelector, execute_partitioned, series_label_columns,
+    series_stream::{
+        blocks,
+        plan::{LabelColumns, StreamingSelector, execute_partitioned, series_label_columns},
     },
     streaming_eval,
 };
@@ -296,8 +297,9 @@ impl Engine {
         let selector = named_selector(plain_selector(vs, kind)?, kind)?;
         let (start, end, offset) = self.selector_time_range(&selector, Some(range));
         let label_selector = self.selector_labels();
+        let prefer_blocks = blocks::query_window(&self.eval_ctx, offset, micros(range)).is_some();
         let ctxs = self
-            .create_selector_contexts(&selector, (start, end), &label_selector)
+            .create_selector_contexts(&selector, (start, end), &label_selector, prefer_blocks)
             .await?;
         let scan_matchers = match ctxs.as_slice() {
             [(_, _, _, false)] => Matchers::empty(),
@@ -355,6 +357,7 @@ mod tests {
     struct StreamingProvider {
         ctx: SessionContext,
         calls: Arc<AtomicUsize>,
+        prefer_calls: Arc<AtomicUsize>,
         canceled: bool,
         // a dropped sender reads as a cancel, so a live registration keeps it
         cancel: std::sync::Mutex<Option<oneshot::Sender<()>>>,
@@ -378,6 +381,27 @@ mod tests {
                 ScanStats::default(),
                 true,
             )])
+        }
+
+        async fn create_context_prefer_blocks(
+            &self,
+            org_id: &str,
+            stream_name: &str,
+            time_range: (i64, i64),
+            matchers: Matchers,
+            label_selector: HashSet<String>,
+            filters: &mut [(String, Vec<String>)],
+        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+            self.prefer_calls.fetch_add(1, Ordering::SeqCst);
+            self.create_context(
+                org_id,
+                stream_name,
+                time_range,
+                matchers,
+                label_selector,
+                filters,
+            )
+            .await
         }
 
         async fn register_cancellation(
@@ -441,6 +465,7 @@ mod tests {
         StreamingProvider {
             ctx,
             calls: Default::default(),
+            prefer_calls: Default::default(),
             canceled,
             cancel: Default::default(),
         }
@@ -576,6 +601,24 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn sparse_window_still_prefers_blocks_before_registration() {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse("m{instance=\"a\"}").unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        let provider = provider(true, false);
+        let prefer_calls = Arc::clone(&provider.prefer_calls);
+        let mut engine = engine_at(provider, 30, BASE + 60 * SECOND, 30 * SECOND, None);
+        engine
+            .selector_scan(&selector, Duration::from_secs(5), "VectorSelector")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(prefer_calls.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
