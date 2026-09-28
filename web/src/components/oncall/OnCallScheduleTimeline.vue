@@ -133,184 +133,178 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
-    <!-- A floor under whichever of loading/empty/grid renders below, so a
-         team with zero or one rotation doesn't leave the grid barely taller
-         than a couple of chart rows — which read as a much shorter page and
-         yanked the Covers card below it right up under these controls. -->
-    <div class="min-h-65">
-      <OInnerLoading v-if="loading" showing />
+    <OInnerLoading v-if="loading" showing />
 
-      <!-- A team with no rotations is exactly the reader the presets were built
-           for, so the empty state offers both roads rather than only the one
-           that starts with a blank rotation form. -->
-      <OEmptyState
-        v-else-if="!tracks.length"
-        size="block"
-        preset="no-oncall-schedule"
-        data-test="oncall-timeline-empty"
-        @action="(id) => (id === 'presets' ? emit('presets') : emit('add'))"
-      />
+    <!-- A team with no rotations is exactly the reader the presets were built
+         for, so the empty state offers both roads rather than only the one
+         that starts with a blank rotation form. -->
+    <OEmptyState
+      v-else-if="!tracks.length"
+      size="block"
+      preset="no-oncall-schedule"
+      data-test="oncall-timeline-empty"
+      @action="(id) => (id === 'presets' ? emit('presets') : emit('add'))"
+    />
 
-      <OScheduleTimeline
-        v-else
-        lane-headers
-        :tracks="tracks"
-        :axis-ticks="axisTicks"
-        :now-offset="nowOffset"
-        :now-label="nowLabel"
-        :hover-label="hoverLabel"
-        data-test="oncall-timeline-chart"
-        @hover="hoverAt = $event"
-      >
-        <!-- What the rail's cards used to say, on the row they describe: what
+    <OScheduleTimeline
+      v-else
+      lane-headers
+      :tracks="tracks"
+      :axis-ticks="axisTicks"
+      :now-offset="nowOffset"
+      :now-label="nowLabel"
+      :hover-label="hoverLabel"
+      data-test="oncall-timeline-chart"
+      @hover="hoverAt = $event"
+    >
+      <!-- What the rail's cards used to say, on the row they describe: what
            this rotation is, when it turns over, and how many people carry it. -->
-        <template #track-header="{ track }">
-          <div
-            class="flex flex-wrap items-center gap-x-2 gap-y-1"
-            :data-test="`oncall-lane-header-${track.key}`"
-          >
-            <span
-              class="size-2 shrink-0 rounded-full"
-              :class="dotClass(laneOf(track).index)"
-              aria-hidden="true"
-            />
-            <OText variant="section">{{ track.label }}</OText>
-            <OText variant="meta" :data-test="`oncall-lane-cadence-${track.key}`">
-              {{ laneOf(track).cadence }}
-            </OText>
+      <template #track-header="{ track }">
+        <div
+          class="flex flex-wrap items-center gap-x-2 gap-y-1"
+          :data-test="`oncall-lane-header-${track.key}`"
+        >
+          <span
+            class="size-2 shrink-0 rounded-full"
+            :class="dotClass(laneOf(track).index)"
+            aria-hidden="true"
+          />
+          <OText variant="section">{{ track.label }}</OText>
+          <OText variant="meta" :data-test="`oncall-lane-cadence-${track.key}`">
+            {{ laneOf(track).cadence }}
+          </OText>
 
-            <span class="ms-auto flex items-center gap-1">
-              <!-- Stated in the words that describe the consequence, not as a
+          <span class="ms-auto flex items-center gap-1">
+            <!-- Stated in the words that describe the consequence, not as a
                  load figure somebody has to convert into one. -->
-              <OTag
-                v-if="laneOf(track).notPaging"
-                variant="error-soft"
-                size="sm"
-                :data-test="`oncall-lane-not-paging-${track.key}`"
-              >
-                {{ t("oncall.laneNotPaging") }}
-                <OTooltip side="bottom" :content="t('oncall.laneNotPagingWhy')" />
-              </OTag>
+            <OTag
+              v-if="laneOf(track).notPaging"
+              variant="error-soft"
+              size="sm"
+              :data-test="`oncall-lane-not-paging-${track.key}`"
+            >
+              {{ t("oncall.laneNotPaging") }}
+              <OTooltip side="bottom" :content="t('oncall.laneNotPagingWhy')" />
+            </OTag>
 
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                icon-left="edit"
-                :aria-label="t('oncall.edit')"
-                :data-test="`oncall-lane-edit-${track.key}`"
-                @click="emit('edit', laneOf(track).id)"
-              >
-                <OTooltip side="bottom" :content="t('oncall.edit')" />
-              </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="edit"
+              :aria-label="t('oncall.edit')"
+              :data-test="`oncall-lane-edit-${track.key}`"
+              @click="emit('edit', laneOf(track).id)"
+            >
+              <OTooltip side="bottom" :content="t('oncall.edit')" />
+            </OButton>
 
-              <!-- Edit is the one act worth a button of its own; the rest are
+            <!-- Edit is the one act worth a button of its own; the rest are
                  rarer and would each cost a lane's width every row. -->
-              <ODropdown align="end">
-                <template #trigger>
-                  <OButton
-                    variant="ghost"
-                    size="icon-sm"
-                    icon-left="more-horiz"
-                    :aria-label="t('oncall.laneMore', { name: track.label })"
-                    :data-test="`oncall-lane-menu-${track.key}`"
-                  />
-                </template>
-                <ODropdownItem
-                  :data-test="`oncall-lane-override-${track.key}`"
-                  @select="emit('override', laneOf(track).id)"
-                >
-                  {{ t("oncall.railOverride") }}
-                </ODropdownItem>
-                <ODropdownItem
-                  :data-test="`oncall-lane-duplicate-${track.key}`"
-                  @select="emit('duplicate', laneOf(track).id)"
-                >
-                  {{ t("oncall.railDuplicate") }}
-                </ODropdownItem>
-                <ODropdownItem
-                  variant="destructive"
-                  :data-test="`oncall-lane-delete-${track.key}`"
-                  @select="emit('delete', laneOf(track).id)"
-                >
-                  {{ t("oncall.laneDelete") }}
-                </ODropdownItem>
-              </ODropdown>
-            </span>
-          </div>
-        </template>
+            <ODropdown align="end">
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="more-horiz"
+                  :aria-label="t('oncall.laneMore', { name: track.label })"
+                  :data-test="`oncall-lane-menu-${track.key}`"
+                />
+              </template>
+              <ODropdownItem
+                :data-test="`oncall-lane-override-${track.key}`"
+                @select="emit('override', laneOf(track).id)"
+              >
+                {{ t("oncall.railOverride") }}
+              </ODropdownItem>
+              <ODropdownItem
+                :data-test="`oncall-lane-duplicate-${track.key}`"
+                @select="emit('duplicate', laneOf(track).id)"
+              >
+                {{ t("oncall.railDuplicate") }}
+              </ODropdownItem>
+              <ODropdownItem
+                variant="destructive"
+                :data-test="`oncall-lane-delete-${track.key}`"
+                @select="emit('delete', laneOf(track).id)"
+              >
+                {{ t("oncall.laneDelete") }}
+              </ODropdownItem>
+            </ODropdown>
+          </span>
+        </div>
+      </template>
 
-        <!-- An empty lane is the loudest answer on the chart, and it was a blank
+      <!-- An empty lane is the loudest answer on the chart, and it was a blank
            strip. It says what the emptiness costs, and offers the one act that
            ends it. -->
-        <template #track-empty="{ track }">
-          <div
-            class="border-border-default rounded-default flex min-h-7 flex-wrap items-center gap-2 border border-dashed px-3 py-2"
-            :data-test="`oncall-lane-empty-${track.key}`"
+      <template #track-empty="{ track }">
+        <div
+          class="border-border-default rounded-default flex min-h-7 flex-wrap items-center gap-2 border border-dashed px-3 py-2"
+          :data-test="`oncall-lane-empty-${track.key}`"
+        >
+          <span class="text-text-secondary text-sm">{{ emptyLine(track) }}</span>
+          <OButton
+            v-if="laneOf(track).notPaging"
+            variant="primary"
+            size="xs"
+            class="ms-auto"
+            :data-test="`oncall-lane-assign-${track.key}`"
+            @click="emit('assign-people', laneOf(track).id)"
           >
-            <span class="text-text-secondary text-sm">{{ emptyLine(track) }}</span>
-            <OButton
-              v-if="laneOf(track).notPaging"
-              variant="primary"
-              size="xs"
-              class="ms-auto"
-              :data-test="`oncall-lane-assign-${track.key}`"
-              @click="emit('assign-people', laneOf(track).id)"
-            >
-              {{ t("oncall.laneEmptyAssign") }}
-            </OButton>
-          </div>
-        </template>
+            {{ t("oncall.laneEmptyAssign") }}
+          </OButton>
+        </div>
+      </template>
 
-        <!-- Three entries, and every one of them means something. The old key
+      <!-- Three entries, and every one of them means something. The old key
            explained that a six-colour ramp meant nothing on its own, which is
            an argument for a different ramp rather than a longer caption: hue is
            now the ROTATION, and the three fills are the three kinds of span. -->
-        <template #legend>
-          <span class="flex w-full flex-wrap items-center gap-x-4 gap-y-1">
-            <span class="text-text-secondary flex items-center gap-1.5 text-xs">
-              <span class="bg-schedule-band-1-solid-bg size-2 rounded-full" aria-hidden="true" />
-              {{ t("oncall.legendOnShift") }}
-            </span>
-            <span class="text-text-secondary flex items-center gap-1.5 text-xs">
-              <span
-                class="border-schedule-band-1-border size-2 rounded-full border"
-                aria-hidden="true"
-              />
-              {{ t("oncall.legendOverride") }}
-            </span>
-            <span class="text-text-secondary flex items-center gap-1.5 text-xs">
-              <span
-                class="bg-schedule-gap-bg border-schedule-gap-border size-2 rounded-full border border-dashed"
-                aria-hidden="true"
-              />
-              {{ t("oncall.legendNobody") }}
-            </span>
+      <template #legend>
+        <span class="flex w-full flex-wrap items-center gap-x-4 gap-y-1">
+          <span class="text-text-secondary flex items-center gap-1.5 text-xs">
+            <span class="bg-schedule-band-1-solid-bg size-2 rounded-full" aria-hidden="true" />
+            {{ t("oncall.legendOnShift") }}
+          </span>
+          <span class="text-text-secondary flex items-center gap-1.5 text-xs">
+            <span
+              class="border-schedule-band-1-border size-2 rounded-full border"
+              aria-hidden="true"
+            />
+            {{ t("oncall.legendOverride") }}
+          </span>
+          <span class="text-text-secondary flex items-center gap-1.5 text-xs">
+            <span
+              class="bg-schedule-gap-bg border-schedule-gap-border size-2 rounded-full border border-dashed"
+              aria-hidden="true"
+            />
+            {{ t("oncall.legendNobody") }}
+          </span>
 
-            <!-- The gap is the only thing on this chart worth acting on, so it is
+          <!-- The gap is the only thing on this chart worth acting on, so it is
                the only legend entry that carries its own sentence and a way to
                fix it. -->
-            <template v-if="firstGap">
-              <span
-                class="text-status-error-text flex flex-wrap items-center gap-1.5 text-xs"
-                data-test="oncall-timeline-gap"
-              >
-                {{ gapLabel }}
-              </span>
-              <OButton
-                v-if="canCover"
-                variant="outline"
-                size="xs"
-                class="ms-auto"
-                data-test="oncall-timeline-fill-gap"
-                @click="emit('fill-gap', firstGap)"
-              >
-                {{ t("oncall.timelineFillGap") }}
-              </OButton>
-            </template>
-          </span>
-        </template>
-      </OScheduleTimeline>
-    </div>
+          <template v-if="firstGap">
+            <span
+              class="text-status-error-text flex flex-wrap items-center gap-1.5 text-xs"
+              data-test="oncall-timeline-gap"
+            >
+              {{ gapLabel }}
+            </span>
+            <OButton
+              v-if="canCover"
+              variant="outline"
+              size="xs"
+              class="ms-auto"
+              data-test="oncall-timeline-fill-gap"
+              @click="emit('fill-gap', firstGap)"
+            >
+              {{ t("oncall.timelineFillGap") }}
+            </OButton>
+          </template>
+        </span>
+      </template>
+    </OScheduleTimeline>
   </div>
 </template>
 
