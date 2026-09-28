@@ -225,7 +225,13 @@ static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLo
         Field::new("gen_ai_system_instructions", DataType::Utf8, true),
         Field::new("user_id", DataType::Utf8, true),
         Field::new("gen_ai_conversation_id", DataType::Utf8, true),
+        Field::new("gen_ai_request_model", DataType::Utf8, true),
+        // Prompt Management attribution (`gen_ai.prompt.*`); label is only
+        // written for label-resolved calls, so it must be provisioned up front.
+        Field::new("gen_ai_prompt_name", DataType::Utf8, true),
+        Field::new("gen_ai_prompt_label", DataType::Utf8, true),
         // Integer fields
+        Field::new("gen_ai_prompt_version", DataType::Int64, true),
         Field::new("gen_ai_usage_input_tokens", DataType::Int64, true),
         Field::new("gen_ai_usage_output_tokens", DataType::Int64, true),
         Field::new("gen_ai_usage_total_tokens", DataType::Int64, true),

@@ -17,7 +17,10 @@ use std::collections::{HashMap, HashSet, hash_map::Entry};
 
 use config::meta::promql::{
     NAME_LABEL,
-    value::{Labels, LabelsExt, RangeValue, Sample, Value},
+    value::{
+        Labels, LabelsExt, RangeValue, Sample, Value, signature_with_labels,
+        signature_without_labels,
+    },
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
@@ -178,12 +181,11 @@ fn vector_or(expr: &BinaryExpr, left: Vec<RangeValue>, right: Vec<RangeValue>) -
     if right.is_empty() {
         return Ok(Value::Matrix(left));
     }
-    // Add all right-hand side elements which have not been added from the left-hand
-    // side.
-    let unmatched = filter_set_series(right, &left, false);
+    let unmatched = filter_set_series(right, &left, false, match_signature(expr));
     let mut output = left;
     output.extend(unmatched);
-    Ok(Value::Matrix(output))
+    // equal labels imply an equal signature, so left and right fragments never share a step
+    Ok(Value::Matrix(merge_same_labelset(output)?))
 }
 
 /// matrix1 unless matrix2 results in a matrix consisting of the elements of
@@ -202,7 +204,12 @@ fn vector_unless(
     if left.is_empty() || right.is_empty() {
         return Ok(Value::Matrix(left));
     }
-    Ok(Value::Matrix(filter_set_series(left, &right, false)))
+    Ok(Value::Matrix(filter_set_series(
+        left,
+        &right,
+        false,
+        match_signature(expr),
+    )))
 }
 
 /// matrix1 and matrix2 results in a matrix consisting of the elements of
@@ -217,14 +224,12 @@ fn vector_and(expr: &BinaryExpr, left: Vec<RangeValue>, right: Vec<RangeValue>) 
     if left.is_empty() || right.is_empty() {
         return Ok(Value::Matrix(vec![]));
     }
-    let output = filter_set_series(left, &right, true)
-        .into_par_iter()
-        .map(|mut range| {
-            range.labels = range.labels.without_metric_name();
-            range
-        })
-        .collect();
-    Ok(Value::Matrix(output))
+    Ok(Value::Matrix(filter_set_series(
+        left,
+        &right,
+        true,
+        match_signature(expr),
+    )))
 }
 
 fn validate_set_matching(expr: &BinaryExpr) -> Result<()> {
@@ -236,19 +241,58 @@ fn validate_set_matching(expr: &BinaryExpr) -> Result<()> {
     Ok(())
 }
 
+/// Keeps `input` samples whose step matches (`keep_matches`) or misses an `other` sample.
 fn filter_set_series(
     input: Vec<RangeValue>,
     other: &[RangeValue],
     keep_matches: bool,
+    signature: impl Fn(&Labels) -> u64 + Sync,
 ) -> Vec<RangeValue> {
-    let signatures: HashSet<u64> = other
-        .par_iter()
-        .map(|series| series.labels.signature())
-        .collect();
+    let mut other_steps: HashMap<u64, HashSet<i64>> = HashMap::with_capacity(other.len());
+    for range in other {
+        other_steps
+            .entry(signature(&range.labels))
+            .or_default()
+            .extend(range.samples.iter().map(|sample| sample.timestamp));
+    }
     input
         .into_par_iter()
-        .filter(|series| signatures.contains(&series.labels.signature()) == keep_matches)
+        .filter_map(|mut range| {
+            let steps = other_steps.get(&signature(&range.labels));
+            range.samples.retain(|sample| {
+                steps.is_some_and(|steps| steps.contains(&sample.timestamp)) == keep_matches
+            });
+            (!range.samples.is_empty()).then_some(range)
+        })
         .collect()
+}
+
+/// Signature of the labels `on`/`ignoring` compare; without `on`, `__name__` is never compared.
+fn match_signature(expr: &BinaryExpr) -> impl Fn(&Labels) -> u64 + Sync + '_ {
+    let on = expr.is_matching_on();
+    let mut names: Vec<&str> = expr
+        .modifier
+        .as_ref()
+        .and_then(|modifier| modifier.matching.as_ref())
+        .map(|matching| {
+            matching
+                .labels()
+                .labels
+                .iter()
+                .map(String::as_str)
+                .collect()
+        })
+        .unwrap_or_default();
+    if !on {
+        names.push(NAME_LABEL);
+    }
+    move |labels: &Labels| {
+        if on {
+            signature_with_labels(labels, &names)
+        } else {
+            signature_without_labels(labels, &names)
+        }
+    }
 }
 
 fn vector_arithmetic_operators(
@@ -256,23 +300,13 @@ fn vector_arithmetic_operators(
     left: Vec<RangeValue>,
     right: Vec<RangeValue>,
 ) -> Result<Value> {
-    let is_matching_on = expr.is_matching_on();
     let matching_labels: Vec<String> = expr
         .modifier
         .as_ref()
         .and_then(|modifier| modifier.matching.as_ref())
         .map(|matching| matching.labels().labels.clone())
         .unwrap_or_default();
-    let mut excluded_labels = matching_labels.clone();
-    excluded_labels.push(NAME_LABEL.to_string());
-
-    let match_signature = |labels: &Labels| {
-        if is_matching_on {
-            labels.keep(&matching_labels).signature()
-        } else {
-            labels.delete(&excluded_labels).signature()
-        }
-    };
+    let match_signature = match_signature(expr);
 
     let card = expr.modifier.as_ref().map(|modifier| &modifier.card);
     // group_right makes the lhs the "one" side, so the rhs series drive the output
@@ -1372,5 +1406,108 @@ mod tests {
         );
         assert_eq!(sample_pairs(&result[0]), vec![(1, 5.0), (3, 10.0)]);
         assert_eq!(sample_pairs(&result[1]), vec![(2, 5.0)]);
+    }
+
+    #[test]
+    fn test_and_keeps_metric_name_and_ignores_it_when_matching() {
+        let left = vec![range_at(
+            &[(1, 1.0)],
+            vec![("__name__", "up"), ("job", "api")],
+        )];
+        let right = vec![range_at(
+            &[(1, 2.0)],
+            vec![("__name__", "ready"), ("job", "api")],
+        )];
+        let result = eval_bin_op("up and ready", left, right);
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            label_pairs(&result[0]),
+            pairs(&[("__name__", "up"), ("job", "api")])
+        );
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 1.0)]);
+    }
+
+    #[test]
+    fn test_set_operators_honor_on_and_ignoring() {
+        let left = || {
+            vec![
+                range_at(&[(1, 1.0)], vec![("instance", "a"), ("job", "api")]),
+                range_at(&[(1, 2.0)], vec![("instance", "b"), ("job", "db")]),
+            ]
+        };
+        let right = || {
+            vec![range_at(
+                &[(1, 9.0)],
+                vec![("instance", "x"), ("job", "api")],
+            )]
+        };
+        for (query, expected) in [
+            ("a and b", vec![]),
+            (
+                "a and on (job) b",
+                vec![pairs(&[("instance", "a"), ("job", "api")])],
+            ),
+            (
+                "a and ignoring (instance) b",
+                vec![pairs(&[("instance", "a"), ("job", "api")])],
+            ),
+            (
+                "a unless on (job) b",
+                vec![pairs(&[("instance", "b"), ("job", "db")])],
+            ),
+            (
+                "a or on (job) b",
+                vec![
+                    pairs(&[("instance", "a"), ("job", "api")]),
+                    pairs(&[("instance", "b"), ("job", "db")]),
+                ],
+            ),
+            (
+                "a or b",
+                vec![
+                    pairs(&[("instance", "a"), ("job", "api")]),
+                    pairs(&[("instance", "b"), ("job", "db")]),
+                    pairs(&[("instance", "x"), ("job", "api")]),
+                ],
+            ),
+        ] {
+            let mut labels: Vec<_> = eval_bin_op(query, left(), right())
+                .iter()
+                .map(label_pairs)
+                .collect();
+            labels.sort();
+            assert_eq!(labels, expected, "{query}");
+        }
+    }
+
+    #[test]
+    fn test_set_operators_match_per_step() {
+        let left = || {
+            vec![range_at(
+                &[(1, 1.0), (2, 2.0), (3, 3.0)],
+                vec![("job", "api")],
+            )]
+        };
+        let right = || vec![range_at(&[(2, 20.0), (4, 40.0)], vec![("job", "api")])];
+        let samples = |query| {
+            let mut result = eval_bin_op(query, left(), right());
+            result.sort_by_key(|range| range.samples[0].timestamp);
+            result.iter().flat_map(sample_pairs).collect::<Vec<_>>()
+        };
+        assert_eq!(samples("a and b"), vec![(2, 2.0)]);
+        assert_eq!(samples("a unless b"), vec![(1, 1.0), (3, 3.0)]);
+        assert_eq!(
+            samples("a or b"),
+            vec![(1, 1.0), (2, 2.0), (3, 3.0), (4, 40.0)]
+        );
+    }
+
+    #[test]
+    fn test_or_merges_fragments_with_the_same_labels() {
+        let left = vec![range_at(&[(1, 1.0)], vec![])];
+        let right = vec![range_at(&[(1, 2.0), (2, 2.0)], vec![])];
+        let result = eval_bin_op("a or b", left, right);
+        assert_eq!(result.len(), 1);
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 1.0), (2, 2.0)]);
     }
 }

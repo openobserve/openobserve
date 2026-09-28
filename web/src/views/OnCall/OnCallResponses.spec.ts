@@ -16,8 +16,10 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import destinationService from "@/services/alert_destination";
+import incidentsService from "@/services/incidents";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallResponses from "@/views/OnCall/OnCallResponses.vue";
@@ -50,6 +52,10 @@ vi.mock("@/services/alert_destination", () => ({
   default: { list: vi.fn() },
 }));
 
+vi.mock("@/services/incidents", () => ({
+  default: { get: vi.fn() },
+}));
+
 const push = vi.fn();
 const routeQuery: Record<string, string> = {};
 vi.mock("vue-router", () => ({
@@ -59,6 +65,7 @@ vi.mock("vue-router", () => ({
 
 const service = vi.mocked(oncallService);
 const destinations = vi.mocked(destinationService);
+const incidents = vi.mocked(incidentsService);
 
 // Every `mount()` in this file — across all three top-level `describe`s —
 // stays alive as a real, reactive component instance unless something
@@ -226,6 +233,10 @@ function render() {
 describe("OnCallResponses", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The global teardown clears too, but a test that leaves a load in flight
+    // repopulates the cache between the two hooks, and the next test would then
+    // be served that entry instead of the mock it had just declared.
+    queryClient.clear();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     service.listResponses.mockResolvedValue({ data: [] } as any);
     service.listTeams.mockResolvedValue({ data: [] } as any);
@@ -383,6 +394,61 @@ describe("OnCallResponses", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  /// Every read behind this screen — the paged walk itself, teams, coverage,
+  /// rules, each team's policy and rotation, each open page's ladder — is a
+  /// cache entry. Opening the screen again inside their freshness window must
+  /// spend no request on them; only the reader's own refresh forces one.
+  it("serves a remount from the cache, and still reaches the server on refresh", async () => {
+    const cachedCalls = () =>
+      service.listResponses.mock.calls.length +
+      service.listTeams.mock.calls.length +
+      service.coverageGaps.mock.calls.length +
+      service.listOwnershipRules.mock.calls.length +
+      service.getPolicy.mock.calls.length +
+      service.whoIsOnCall.mock.calls.length +
+      service.getSchedule.mock.calls.length +
+      service.escalationProgress.mock.calls.length;
+
+    const first = await withPages([page()]);
+    const afterFirst = cachedCalls();
+    expect(afterFirst).toBeGreaterThan(0);
+    first.unmount();
+
+    const second = await withPages([page()]);
+    expect(cachedCalls()).toBe(afterFirst);
+    expect(service.listResponses).toHaveBeenCalledTimes(1);
+    expect(service.listTeams).toHaveBeenCalledTimes(1);
+    // The rows are the cached ones, not an empty table over a fetch nobody made.
+    expect(second.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
+
+    await second.find('[data-test="oncall-responses-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(cachedCalls()).toBe(afterFirst * 2);
+    expect(service.listResponses).toHaveBeenCalledTimes(2);
+    expect(service.listTeams).toHaveBeenCalledTimes(2);
+  });
+
+  // Incident titles and the destination check are other modules' cache entries; only Refresh forces them.
+  it("serves incident titles and the destination check from the cache, and forces both on refresh", async () => {
+    incidents.get.mockResolvedValue({ data: { title: "Checkout down" } } as any);
+
+    const first = await withPages([page({ incident_id: "inc_1" })]);
+    expect(incidents.get).toHaveBeenCalledTimes(1);
+    expect(destinations.list).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const second = await withPages([page({ incident_id: "inc_1" })]);
+    expect(incidents.get).toHaveBeenCalledTimes(1);
+    expect(destinations.list).toHaveBeenCalledTimes(1);
+    expect(second.text()).toContain("Checkout down");
+
+    await second.find('[data-test="oncall-responses-refresh"]').trigger("click");
+    await flushPromises();
+    expect(incidents.get).toHaveBeenCalledTimes(2);
+    expect(destinations.list).toHaveBeenCalledTimes(2);
   });
 
   describe("the ringing run", () => {
@@ -545,12 +611,16 @@ describe("OnCallResponses", () => {
     });
 
     /// The labelled action and the menu must never offer the same thing twice.
-    it("keeps the labelled action out of the menu", async () => {
+    /// One row state per test: two mounts in one test would share the cached
+    /// list and the second would render the first's rows.
+    it("keeps the labelled action out of a ringing row's menu", async () => {
       const ringing = await withPages([page()]);
       // Acknowledge is labelled, so resolve and timeline are the menu's.
       expect(ringing.findAll('[data-test^="oncall-row-resolve-"]')).toHaveLength(1);
       expect(ringing.findAll('[data-test^="oncall-row-timeline-"]')).toHaveLength(1);
+    });
 
+    it("keeps the labelled action out of a handled row's menu", async () => {
       const handled = await withPages([
         page({ state: "acknowledged", acked_by: "engineer@example.com" }),
       ]);
@@ -864,6 +934,15 @@ describe("OnCallResponses", () => {
       expect(pagingCalls()).toHaveLength(3);
       expect(pagingCalls().at(-1)?.[0]).toEqual(expect.objectContaining({ offset: 400 }));
       expect(wrapper.find('[data-test="oncall-responses-truncated"]').exists()).toBe(true);
+
+      // Stopping at the cap is a fact about these rows, so it rides in the
+      // cached value: a remount still says so without walking the pages again.
+      wrapper.unmount();
+      const again = render();
+      await flushPromises();
+
+      expect(pagingCalls()).toHaveLength(3);
+      expect(again.find('[data-test="oncall-responses-truncated"]').exists()).toBe(true);
     }, 20_000);
 
     /// The truncation line never claims a total. `/responses/count` was
@@ -1057,11 +1136,15 @@ describe("OnCallResponses", () => {
     });
 
     /// A page somebody already owns cannot be claimed again, so offering the
-    /// button would only produce an error.
-    it("offers acknowledge only while something in the row is escalating", async () => {
+    /// button would only produce an error. Split in two: the list is one cache
+    /// entry per filter set, so a second mount in the same test would be served
+    /// the first one's rows rather than the ones it just mocked.
+    it("offers acknowledge while something in the row is escalating", async () => {
       const escalating = await withPages([page()]);
       expect(escalating.find('[data-test="oncall-row-ack-alert:al_ckt"]').exists()).toBe(true);
+    });
 
+    it("offers resolve rather than acknowledge once the row is owned", async () => {
       const owned = await withPages([
         page({ state: "acknowledged", acked_by: "engineer@example.com" }),
       ]);
@@ -1222,6 +1305,10 @@ describe("OnCallResponses — the rows' own fields", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The global teardown clears too, but a test that leaves a load in flight
+    // repopulates the cache between the two hooks, and the next test would then
+    // be served that entry instead of the mock it had just declared.
+    queryClient.clear();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     service.listResponses.mockResolvedValue({ data: [] } as any);
     service.listTeams.mockResolvedValue({ data: [] } as any);
@@ -1310,19 +1397,87 @@ describe("OnCallResponses — the rows' own fields", () => {
       expect(service.listResponses.mock.calls.at(-1)![0]).toMatchObject({ team_id: "team_1" });
     });
 
-    it("sends no team_id when the filter is cleared", async () => {
+    /// Clearing sends no `team_id` — and because that is the same request the
+    /// first load already made, the unfiltered walk comes back from the cache
+    /// rather than off the wire. A filter that sent `team_id: "all"` would key
+    /// itself differently and show up here as a round trip.
+    it("sends no team_id when the filter is cleared, re-using the walk it already made", async () => {
       service.listTeams.mockResolvedValue({
         data: [{ id: "team_1", name: "Platform" }],
       } as any);
       const wrapper = await withRows([row()]);
+      const filter = wrapper.findComponent('[data-test="oncall-responses-team-filter"]');
+
+      filter.vm.$emit("update:modelValue", "team_1");
+      await flushPromises();
+      expect(service.listResponses.mock.calls.at(-1)![0]).toMatchObject({ team_id: "team_1" });
 
       service.listResponses.mockClear();
-      wrapper
-        .findComponent('[data-test="oncall-responses-team-filter"]')
-        .vm.$emit("update:modelValue", "all");
+      filter.vm.$emit("update:modelValue", "all");
       await flushPromises();
 
-      expect(service.listResponses.mock.calls.at(-1)![0]).not.toHaveProperty("team_id");
+      expect(service.listResponses).not.toHaveBeenCalled();
+      expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
+    });
+
+    /// A cached filter answers at once while a cold one is still on the wire,
+    /// so the cold answer lands LAST — and must not paint its rows under a
+    /// filter the reader has already left.
+    it("ignores a slower answer for a filter the reader has already left", async () => {
+      service.listTeams.mockResolvedValue({
+        data: [{ id: "team_1", name: "Platform" }],
+      } as any);
+      const wrapper = await withRows([row()]);
+      let answerTeam: (value: unknown) => void = () => {};
+      service.listResponses.mockImplementationOnce(
+        () => new Promise((resolve) => (answerTeam = resolve)),
+      );
+      const filter = wrapper.findComponent('[data-test="oncall-responses-team-filter"]');
+
+      filter.vm.$emit("update:modelValue", "team_1");
+      await flushPromises();
+      filter.vm.$emit("update:modelValue", "all");
+      await flushPromises();
+      answerTeam({ data: [row({ id: "resp_t1" }), row({ id: "resp_t2" })] });
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
+    });
+  });
+
+  /// A timeline is live state: the reader expands a row to see what has
+  /// happened since, so every expand and every Refresh reaches the server.
+  describe("the expanded row's timeline", () => {
+    const ROW_KEY = "alert:al_ckt";
+
+    async function withExpandedRow() {
+      service.getResponse.mockResolvedValue({ data: { response: row(), events: [] } } as any);
+      const wrapper = await withRows([row()]);
+      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:expandedIds", [ROW_KEY]);
+      await flushPromises();
+      expect(service.getResponse).toHaveBeenCalledTimes(1);
+      return wrapper;
+    }
+
+    it("reads the timeline fresh each time the row is expanded", async () => {
+      const wrapper = await withExpandedRow();
+      const table = wrapper.findComponent({ name: "OTable" });
+
+      table.vm.$emit("update:expandedIds", []);
+      await flushPromises();
+      table.vm.$emit("update:expandedIds", [ROW_KEY]);
+      await flushPromises();
+
+      expect(service.getResponse).toHaveBeenCalledTimes(2);
+    });
+
+    it("re-reads the open row's timeline on Refresh", async () => {
+      const wrapper = await withExpandedRow();
+
+      await wrapper.find('[data-test="oncall-responses-refresh"]').trigger("click");
+      await flushPromises();
+
+      expect(service.getResponse).toHaveBeenCalledTimes(2);
     });
   });
 });
@@ -1334,6 +1489,10 @@ describe("OnCallResponses — the rows' own fields", () => {
 describe("OnCallResponses — filtering by cause", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The global teardown clears too, but a test that leaves a load in flight
+    // repopulates the cache between the two hooks, and the next test would then
+    // be served that entry instead of the mock it had just declared.
+    queryClient.clear();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     service.listResponses.mockResolvedValue({ data: [] } as any);
     service.listTeams.mockResolvedValue({ data: [] } as any);
@@ -1422,17 +1581,23 @@ describe("OnCallResponses — filtering by cause", () => {
     });
   });
 
-  it("sends no cause when the filter is cleared", async () => {
+  /// Clearing asks for the unfiltered list again, which is the request the
+  /// first load already made — so it is answered from the cache. A cleared
+  /// filter that still carried `cause: ""` would key itself apart from that
+  /// entry and betray itself here as a round trip.
+  it("sends no cause when the filter is cleared, re-using the walk it already made", async () => {
     const wrapper = await open();
     await showResolved(wrapper);
     cause(wrapper)!.vm.$emit("update:modelValue", "genuine_defect");
     await flushPromises();
+    expect(service.listResponses.mock.calls.at(-1)![0]).toMatchObject({ cause: "genuine_defect" });
 
     service.listResponses.mockClear();
     cause(wrapper)!.vm.$emit("update:modelValue", "");
     await flushPromises();
 
-    expect(service.listResponses.mock.calls.at(-1)![0]).not.toHaveProperty("cause");
+    expect(service.listResponses).not.toHaveBeenCalled();
+    expect(cause(wrapper)!.attributes("model-value")).toBe("");
   });
 
   /// Left behind when resolved pages go, it would narrow an open list to

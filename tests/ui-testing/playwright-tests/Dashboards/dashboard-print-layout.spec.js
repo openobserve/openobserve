@@ -4,6 +4,8 @@ import testLogger from "../utils/test-logger.js";
 import PageManager from "../../pages/page-manager.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { setupTestDashboard, deleteDashboard } from "./utils/dashCreation.js";
+import { gotoWithRetry } from "../utils/navigation.js";
+import { getOrgIdentifier } from "../utils/cloud-auth.js";
 import {
   generateDashboardName,
   setupTablePanel,
@@ -34,8 +36,9 @@ test.describe("Dashboard Print Layout testcases", () => {
     }
     if (uiDashboardName) {
       try {
-        await page.goto(
-          `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}`,
+        await gotoWithRetry(
+          page,
+          `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${getOrgIdentifier()}`,
           { waitUntil: "domcontentloaded" }
         );
         await deleteDashboard(page, uiDashboardName);
@@ -110,7 +113,7 @@ test.describe("Dashboard Print Layout testcases", () => {
       await pm.dashboardPrint.expectPrintChromeApplied();
       await pm.dashboardPrint.expectPrintPageStyleInjected();
 
-      await page.reload();
+      await pm.dashboardPrint.reload();
       await pm.dashboardPrint.waitForPrintLayout();
       await pm.dashboardPrint.expectPrintChromeApplied();
 

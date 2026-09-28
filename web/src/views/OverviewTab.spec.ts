@@ -252,6 +252,33 @@ describe("OverviewTab", () => {
     });
   });
 
+  describe("the recent-events request", () => {
+    // Off every minute and 5-minute mark, so a rounded bound cannot pass for the exact one.
+    const NOW = Date.UTC(2026, 8, 23, 11, 44, 30);
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should ask the server for the exact window, so the newest alerts are not cut off", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(alertsService.getHistory).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          start_time: (NOW - 15 * 60 * 1000) * 1000,
+          end_time: NOW * 1000,
+        }),
+      );
+    });
+  });
+
   describe("first load with every section still in flight", () => {
     let anomaliesPending: Deferred<{ data: unknown[] }>;
     let recentEventsPending: Deferred<{ data: { hits: unknown[] } }>;
