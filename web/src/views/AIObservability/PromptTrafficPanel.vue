@@ -9,7 +9,7 @@
         value-key="value"
         :placeholder="t('aiObservability.promptManagement.traceStream')"
         searchable
-        class="w-56"
+        width="sm"
         data-test="prompt-traffic-stream"
       />
       <OSelect
@@ -17,7 +17,7 @@
         :options="windowOptions"
         label-key="label"
         value-key="value"
-        class="w-28"
+        width="xs"
         data-test="prompt-traffic-window"
       />
       <ORefreshButton :loading="loading" data-test="prompt-traffic-refresh" @click="refresh" />
