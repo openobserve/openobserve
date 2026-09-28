@@ -81,6 +81,16 @@ impl Engine {
 
     async fn call_builtin(&mut self, func_name: Func, args: &FunctionArgs) -> Result<Value> {
         match func_name {
+            Func::Absent | Func::AbsentOverTime => {
+                self.ensure_args_len(args, 1, "Invalid args, expected one argument")?;
+                let labels = functions::absent_labels(&args.args[0]);
+                let input = self.call_expr_arg(args, 0).await?;
+                if func_name == Func::Absent {
+                    functions::absent(input, labels, &self.eval_ctx)
+                } else {
+                    functions::absent_over_time(input, labels, &self.eval_ctx)
+                }
+            }
             Func::Clamp => {
                 let err = "Invalid args, expected clamp(v instant-vector, min scalar, max scalar)";
                 self.ensure_args_len(args, 3, err)?;
@@ -220,7 +230,8 @@ impl Engine {
                     .eval_ctx
                     .timestamps()
                     .into_iter()
-                    .map(|ts| Sample::new(ts, ts as f64))
+                    // Prometheus truncates toward zero (`enh.Ts/1000`): a step at -0.5 s reads as second 0
+                    .map(|ts| Sample::new(ts, (ts / 1_000_000) as f64))
                     .collect(),
                 exemplars: None,
                 time_window: None,
@@ -375,11 +386,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_default_date_truncates_toward_zero() {
+        let eval_ctx = EvalContext::new(-500_000, -500_000, 0, "test".into());
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            eval_ctx,
+        );
+        for query in ["year()", "year(vector(time()))"] {
+            let expr = promql_parser::parser::parse(query).unwrap();
+            let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+                panic!("expected a matrix for {query}");
+            };
+            assert_eq!(series[0].samples[0].value, 1970.0, "{query}");
+        }
+    }
+
+    #[tokio::test]
     async fn test_call_dispatch_preserves_values() {
         let eval_ctx = EvalContext::new(1_000_000, 1_000_000, 1_000_000, "test".into());
         for (query, expected) in [
             ("time()", 1.0),
-            ("day_of_month()", 12.0),
+            ("day_of_month()", 1.0),
             ("day_of_month(vector(1000000))", 12.0),
             ("clamp(vector(5), 1, 3)", 3.0),
             ("clamp_min(vector(5), 7)", 7.0),

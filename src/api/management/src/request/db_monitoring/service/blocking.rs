@@ -418,11 +418,7 @@ pub(crate) async fn read_blocking_body(
             "start_time must be before end_time",
         ));
     }
-    let stream = q
-        .stream
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or(DEFAULT_SERVER_STREAM);
+    let stream = validate_server_stream(q.stream.as_deref())?.unwrap_or(DBM_SERVER_STREAM);
     let shared_prologue = prologue.filter(|p| p.stream == stream);
     // Logs stream, same reasoning as `get_dbm_deadlocks`.
     if shared_prologue.is_none()

@@ -15387,6 +15387,9 @@
       "multiSelect": "Seleção múltipla",
       "singleSelect": "Seleção única"
     },
+    "templateInput": {
+      "suggestions": "Sugestões de variáveis"
+    },
     "time": {
       "openTimePicker": "Abrir seletor de hora",
       "clear": "Limpar",
@@ -17096,17 +17099,17 @@
       "alertMe": "Alertar-me",
       "columnHints": {
         "qps": "Chamadas por segundo — as chamadas desta janela divididas pela sua duração, para que uma visão de 15 minutos e uma de 4 horas permaneçam comparáveis.",
-        "p50": "Metade de todas as chamadas terminou mais rápido do que isto. Conta apenas chamadas concluídas — uma consulta ainda em execução ou que nunca retornou não é medida aqui.",
-        "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução ou que nunca retornou não é medida aqui.",
-        "p99": "As 1% piores chamadas levaram pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução ou que nunca retornou não é medida aqui.",
-        "load": "Tempo total que suas aplicações passaram esperando por este banco de dados. Medido do lado do cliente, então reflete quanto tráfego este banco atendeu — não o quão carregado o servidor está.",
+        "p50": "Metade de todas as chamadas terminou mais rápido que isso. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
+        "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos esse tempo. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
+        "p99": "Os 1% piores de chamadas levaram pelo menos esse tempo. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
+        "load": "Tempo total que seus aplicativos gastaram em chamadas a este banco de dados, medido a partir dos rastros da sua aplicação. Mostra quanto tráfego este banco de dados atendeu para seus aplicativos.",
         "attention": "O quão perto esta instância está de um limite que seu próprio mecanismo publica — hoje, conexões em relação a max_connections. A pior dessas proporções, não uma pontuação combinada. Ordenado do maior para o menor, com as instâncias cuja saúde não pode ser lida no topo, porque uma que você não pode ver não é uma que você sabe que está saudável. Medido no servidor do banco de dados, portanto não é comparável com o Tempo de banco de dados ao lado."
       },
       "failedChip": "{count} falhas",
       "columnSubLabels": {
-        "attention": "servidor",
-        "load": "cliente",
-        "calls": "cliente"
+        "attention": "do banco de dados",
+        "load": "dos seus aplicativos",
+        "calls": "dos seus aplicativos"
       },
       "attention": {
         "connections": "conexões",
@@ -17168,14 +17171,14 @@
         "failed": "Falhas"
       },
       "columnHints": {
-        "calls": "Quantas vezes esta consulta foi executada. A contagem do próprio banco de dados, quando ele a reporta — isso cobre todos os clientes, não apenas as partes do seu sistema que enviam traces. Linhas marcadas como observadas pelo cliente são contadas a partir de traces, porque o banco de dados não as reportou.",
-        "p50": "Metade de todas as chamadas terminou mais rápido que isto. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
-        "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
-        "p99": "Os piores 1% das chamadas levaram pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
+        "calls": "Quantas vezes esta consulta foi executada, conforme contabilizado pelo seu banco de dados — todos os aplicativos que se conectam estão incluídos. Quando seu banco de dados não tem uma contagem para uma consulta, o ícone de rastros marca uma medida a partir dos rastros da sua aplicação.",
+        "p50": "Metade de todas as chamadas terminou mais rápido que isso. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
+        "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos esse tempo. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
+        "p99": "Os 1% piores de chamadas levaram pelo menos esse tempo. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
         "max": "A chamada individual mais lenta nesta janela — uma chamada real, não uma média.",
         "errors": "Quantas dessas chamadas voltaram com erro.",
         "perTrace": "Quantas vezes isso é executado dentro de uma única solicitação. Um número alto geralmente significa um loop.",
-        "load": "Tempo total que esta consulta passou no banco de dados. O próprio valor do banco de dados quando ele reporta um: tempo de execução no Postgres, mas tempo de espera no MySQL e MariaDB — cada linha indica qual. Linhas marcadas como observadas pelo cliente são medidas a partir de traces, então incluem a ida e volta da rede."
+        "load": "Tempo total que esta consulta passou no banco de dados, conforme relatado pelo seu banco de dados: tempo de execução no Postgres, tempo de espera no MySQL e MariaDB — cada linha indica qual. As linhas com o ícone de rastros são medidas a partir dos rastros da sua aplicação, portanto também incluem a ida e volta ao banco de dados."
       },
       "errorsNone": "nenhum",
       "errorsAll": "todos",
@@ -17439,8 +17442,7 @@
       "overlap": {
         "serverExecution": "Tempo que {engine} gastou executando",
         "serverWait": "Tempo que {engine} gastou esperando por ela — tempo de espera, não tempo de execução",
-        "serverCounted": "Contado por {engine}, em todos os clientes",
-        "clientObserved": "Observado por chamadores instrumentados — seu banco de dados não reportou isso"
+        "serverCounted": "Contado por {engine}, em todos os clientes"
       },
       "endpointsConcentrated": "Um endpoint é responsável por {percent} do tempo desta consulta. Corrija {endpoint} e você corrigiu esta consulta.",
       "typicalMarker": "chamadas lentas {value}",
@@ -17467,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "O que o próprio banco de dados registrou",
-        "subtitle": "Lado do servidor — todos os clientes",
-        "clientSubtitle": "Observado pelo cliente — apenas chamadores instrumentados, apenas chamadas concluídas. Uma consulta ainda em execução, ou que travou, não está nesses números.",
+        "subtitle": "Do seu banco de dados — todos os aplicativos que se conectam",
+        "clientSubtitle": "Os números marcados são medidos a partir dos rastros da sua aplicação — as chamadas que seus aplicativos concluíram nesta janela",
         "instance": "Relatado por {instance}",
         "instanceWide": "Todos os bancos de dados nesta instância",
         "calls": "Execuções",
@@ -17514,9 +17516,13 @@
         "serverExecution": "tempo de execução",
         "serverWait": "tempo de espera",
         "serverCounted": "contagem de servidores",
-        "clientObserved": "observado pelo cliente",
         "serverReported": "relatado pelos seus bancos de dados"
       }
+    },
+    "appSource": {
+      "marker": "Medido a partir dos rastros da sua aplicação",
+      "markerHint": "Medido a partir dos rastros da sua aplicação, adicionando a visão dos seus aplicativos ao que seu banco de dados relata.",
+      "legend": "Dos rastros do seu aplicativo"
     },
     "page": {
       "tabs": {
@@ -17525,7 +17531,7 @@
         "metricsHint": "Carga do banco de dados por evento de espera e todas as métricas que seus receptores de banco de dados coletam.",
         "queries": "Principais consultas",
         "samples": "Chamadas mais lentas",
-        "samplesHintClient": "Chamadas concluídas que seus serviços instrumentados observaram nesta janela — chamadores sem rastreamento não são contados, então este é um mínimo, não o total. A tabela mostra as mais lentas delas.",
+        "samplesHintClient": "Chamadas medidas a partir dos rastros da sua aplicação nesta janela, adicionando a visão dos seus aplicativos ao que seu banco de dados relata. A tabela mostra as mais lentas delas.",
         "samplesHintServer": "Declarações que seus bancos de dados relataram concluídas nesta janela, contadas dentro do banco de dados. A tabela mostra as mais lentas delas.",
         "samplesHintUnknown": "As chamadas individuais mais lentas ao banco de dados nesta janela.",
         "deadlocks": "Deadlocks",
@@ -17681,7 +17687,7 @@
         "status": "Status"
       },
       "columnHints": {
-        "duration": "Quanto tempo esta chamada levou, medido pelo chamador. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou uma que nunca retornou, não é medida aqui."
+        "duration": "Quanto tempo esta chamada levou, conforme cronometrado pela sua aplicação do início ao fim."
       },
       "failed": "Falhou",
       "failedWithCode": "Falhou · {code}",
