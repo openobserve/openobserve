@@ -21,7 +21,7 @@ use std::{
     hash::Hasher,
     ops::Range,
     sync::{
-        Arc, LazyLock, Mutex,
+        Arc, Mutex,
         atomic::{AtomicU64, Ordering},
     },
     time::Instant,
@@ -52,11 +52,10 @@ use tokio::task::JoinSet;
 use super::{SeriesStream, plan::LabelColumns};
 use crate::series_loader::label_interner::LabelInterner;
 
-const PREFLIGHT_CPU_CHUNK: usize = 1024;
+const PREFLIGHT_YIELD_INTERVAL: usize = 1024;
 const PREFETCH_BLOCKS: usize = 512;
 const PREFETCH_BYTES: usize = 16 * 1024 * 1024;
-static FILE_LOADS: LazyLock<Arc<loads::LoadRegistry>> =
-    LazyLock::new(|| Arc::new(loads::LoadRegistry::default()));
+
 struct MetadataLoad<'a> {
     file: &'a FileKey,
     labels: &'a [String],
@@ -715,7 +714,7 @@ async fn load_metadata(
 
 async fn load_index(file: &FileKey, labels: &[String]) -> Result<Arc<LoadedFile>> {
     let limit = cache_limit();
-    load_index_cached(file, labels, &INDEX_CACHE, &FILE_LOADS, limit).await
+    load_index_cached(file, labels, &INDEX_CACHE, &loads::FILE_LOADS, limit).await
 }
 
 async fn load_index_cached(
@@ -853,7 +852,7 @@ async fn bucket_selected_file(
             "hash outside shard intervals"
         );
         shards[shard].push(id);
-        if (position + 1).is_multiple_of(PREFLIGHT_CPU_CHUNK) {
+        if (position + 1).is_multiple_of(PREFLIGHT_YIELD_INTERVAL) {
             tokio::task::yield_now().await;
         }
     }
@@ -874,7 +873,7 @@ async fn validate_partition(
 ) -> Result<ValidatedPartition> {
     let mut identities: HashMap<u64, SeriesValidation> = HashMap::new();
     for (file_id, file) in files.iter().enumerate() {
-        for chunk in file.ids.chunks(PREFLIGHT_CPU_CHUNK) {
+        for chunk in file.ids.chunks(PREFLIGHT_YIELD_INTERVAL) {
             for &id in chunk {
                 let block = &file.file.index.blocks.block(id);
                 ensure!(
@@ -919,7 +918,7 @@ async fn validate_partition(
     };
     for file in files {
         let mut selected = Vec::with_capacity(file.ids.len());
-        for chunk in file.ids.chunks(PREFLIGHT_CPU_CHUNK) {
+        for chunk in file.ids.chunks(PREFLIGHT_YIELD_INTERVAL) {
             for &id in chunk {
                 let block = &file.file.index.blocks.block(id);
                 if block.max_timestamp >= window.0 && block.min_timestamp <= window.1 {

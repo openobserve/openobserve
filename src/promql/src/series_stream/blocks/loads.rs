@@ -13,13 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::{Result, anyhow};
 use hashbrown::HashMap;
 use tokio::sync::Notify;
 
 use super::{CacheKey, CachedIndex};
+
+pub(super) static FILE_LOADS: LazyLock<Arc<LoadRegistry>> =
+    LazyLock::new(|| Arc::new(LoadRegistry::default()));
 
 #[derive(Default)]
 pub(super) struct LoadRegistry {
