@@ -135,14 +135,14 @@
             />
           </template>
           <template #cell-name="{ row }">
-            <div class="flex min-w-0 flex-col">
-              <OButton variant="ghost" size="xs" @click.stop="openDetail(row)">{{
-                row.name
-              }}</OButton>
-              <span v-if="row.description" class="text-text-secondary text-2xs truncate">{{
-                row.description
-              }}</span>
-            </div>
+            <OButton variant="ghost" size="xs" @click.stop="openDetail(row)">{{
+              row.name
+            }}</OButton>
+          </template>
+          <template #cell-description="{ row }">
+            <span class="text-text-body" :title="raw(row.description ?? '')">{{
+              row.description || raw("—")
+            }}</span>
           </template>
           <template #cell-tags="{ row }">
             <div class="flex max-w-64 flex-wrap gap-1">
@@ -445,6 +445,15 @@ const columns: OTableColumnDef[] = [
     header: t("aiObservability.promptManagement.name"),
     accessorKey: "name",
     sortable: true,
+  },
+  {
+    id: "description",
+    header: t("aiObservability.promptManagement.description"),
+    accessorKey: "description",
+    sortable: true,
+    resizable: true,
+    hideable: true,
+    size: 280,
   },
   {
     id: "tags",
