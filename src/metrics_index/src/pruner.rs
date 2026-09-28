@@ -44,7 +44,7 @@ use crate::{
     block::Index,
     layout::MetricsFileLayout,
     reader::{IndexLabels, evaluate_metrics_index, load_metrics_index_file},
-    selection_cache::METRICS_INDEX_SELECTION_CACHE,
+    selection_cache::METRICS_SELECTION_CACHE,
 };
 
 pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>> {
@@ -175,7 +175,7 @@ pub async fn search(
     let mut evaluated = Vec::with_capacity(index_files.len());
     let mut misses = Vec::new();
     if selection_cache_enabled {
-        let mut cache = METRICS_INDEX_SELECTION_CACHE
+        let mut cache = METRICS_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         for (
@@ -294,7 +294,7 @@ pub async fn search(
         match result {
             Ok((cache_key, ranges, complete, row_group_size)) => {
                 if complete && selection_cache_enabled {
-                    METRICS_INDEX_SELECTION_CACHE
+                    METRICS_SELECTION_CACHE
                         .lock()
                         .unwrap_or_else(|poisoned| poisoned.into_inner())
                         .insert(cache_key, (Arc::clone(&ranges), row_group_size));

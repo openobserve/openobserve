@@ -22,7 +22,7 @@ use config::{get_config, meta::stream::FileKey, metrics};
 use hashlink::LruCache;
 use promql_parser::label::Matchers;
 
-pub(super) static METRICS_INDEX_SELECTION_CACHE: LazyLock<Mutex<MetricsIndexSelectionCache>> =
+pub(super) static METRICS_SELECTION_CACHE: LazyLock<Mutex<MetricsIndexSelectionCache>> =
     LazyLock::new(|| Mutex::new(MetricsIndexSelectionCache::default()));
 
 /// Selected physical row ranges and the Parquet row-group size, absent for Vortex.
@@ -84,7 +84,7 @@ impl MetricsIndexSelectionCache {
     }
 
     fn insert_value(&mut self, key: String, value: CacheValue) {
-        let max_bytes = get_config().search.metrics_index_selection_cache_max_size * 1024 * 1024;
+        let max_bytes = get_config().search.metrics_selection_cache_max_size * 1024 * 1024;
         let size = Self::entry_size(&key, &value);
         if size > max_bytes {
             return;
@@ -131,7 +131,7 @@ pub fn cached_blocks(file: &FileKey, matchers: &Matchers) -> Option<Arc<Vec<usiz
     metrics::promql::INDEX_SELECTION_CACHE_REQUESTS_TOTAL
         .with_label_values::<&str>(&[])
         .inc();
-    let value = METRICS_INDEX_SELECTION_CACHE
+    let value = METRICS_SELECTION_CACHE
         .lock()
         .unwrap_or_else(|error| error.into_inner())
         .get_blocks(&block_key(file, matchers));
@@ -146,7 +146,7 @@ pub fn cached_blocks(file: &FileKey, matchers: &Matchers) -> Option<Arc<Vec<usiz
 pub fn cache_blocks(file: &FileKey, matchers: &Matchers, ids: Vec<usize>) -> Arc<Vec<usize>> {
     let ids = Arc::new(ids);
     if get_config().search.metrics_selection_cache_enabled {
-        METRICS_INDEX_SELECTION_CACHE
+        METRICS_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|error| error.into_inner())
             .insert_blocks(block_key(file, matchers), Arc::clone(&ids));

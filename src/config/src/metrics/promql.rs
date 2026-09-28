@@ -36,7 +36,7 @@ pub struct IndexBlocksCacheMetrics {
 impl Default for IndexBlocksCacheMetrics {
     fn default() -> Self {
         let options = |suffix: &str, help: &str| {
-            Opts::new(format!("metrics_index_blocks_cache_{suffix}"), help)
+            Opts::new(format!("metrics_blocks_cache_{suffix}"), help)
                 .namespace(NAMESPACE)
                 .const_labels(create_const_labels())
         };
@@ -120,10 +120,10 @@ pub static LABEL_CACHE_MISS_COUNT: LazyLock<IntCounterVec> = LazyLock::new(|| {
 });
 
 // metrics for metrics index selection cache
-pub static INDEX_SELECTION_CACHE_MEMORY_USAGE: LazyLock<IntGaugeVec> = LazyLock::new(|| {
+pub static SELECTION_CACHE_MEMORY_USAGE: LazyLock<IntGaugeVec> = LazyLock::new(|| {
     IntGaugeVec::new(
         Opts::new(
-            "metrics_index_selection_cache_memory_usage",
+            "metrics_selection_cache_memory_usage",
             "Total memory usage (bytes) of metrics index selection cache",
         )
         .namespace(NAMESPACE)
@@ -133,10 +133,10 @@ pub static INDEX_SELECTION_CACHE_MEMORY_USAGE: LazyLock<IntGaugeVec> = LazyLock:
     .expect("Metric created")
 });
 
-pub static INDEX_SELECTION_CACHE_GC_TOTAL: LazyLock<IntCounterVec> = LazyLock::new(|| {
+pub static SELECTION_CACHE_GC_TOTAL: LazyLock<IntCounterVec> = LazyLock::new(|| {
     IntCounterVec::new(
         Opts::new(
-            "metrics_index_selection_cache_gc_total",
+            "metrics_selection_cache_gc_total",
             "Total number of GC of metrics index selection cache",
         )
         .namespace(NAMESPACE)
@@ -146,10 +146,10 @@ pub static INDEX_SELECTION_CACHE_GC_TOTAL: LazyLock<IntCounterVec> = LazyLock::n
     .expect("Metric created")
 });
 
-pub static INDEX_SELECTION_CACHE_REQUESTS_TOTAL: LazyLock<IntCounterVec> = LazyLock::new(|| {
+pub static SELECTION_CACHE_REQUESTS_TOTAL: LazyLock<IntCounterVec> = LazyLock::new(|| {
     IntCounterVec::new(
         Opts::new(
-            "metrics_index_selection_cache_requests_total",
+            "metrics_selection_cache_requests_total",
             "Total number of search of metrics index selection cache",
         )
         .namespace(NAMESPACE)
@@ -159,10 +159,10 @@ pub static INDEX_SELECTION_CACHE_REQUESTS_TOTAL: LazyLock<IntCounterVec> = LazyL
     .expect("Metric created")
 });
 
-pub static INDEX_SELECTION_CACHE_HITS_TOTAL: LazyLock<IntCounterVec> = LazyLock::new(|| {
+pub static SELECTION_CACHE_HITS_TOTAL: LazyLock<IntCounterVec> = LazyLock::new(|| {
     IntCounterVec::new(
         Opts::new(
-            "metrics_index_selection_cache_hits_total",
+            "metrics_selection_cache_hits_total",
             "Total number of hit of metrics index selection cache",
         )
         .namespace(NAMESPACE)
@@ -193,16 +193,16 @@ pub(crate) fn register(registry: &prometheus::Registry) {
 
     // metrics for metrics index selection cache
     registry
-        .register(Box::new(INDEX_SELECTION_CACHE_MEMORY_USAGE.clone()))
+        .register(Box::new(SELECTION_CACHE_MEMORY_USAGE.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(INDEX_SELECTION_CACHE_GC_TOTAL.clone()))
+        .register(Box::new(SELECTION_CACHE_GC_TOTAL.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(INDEX_SELECTION_CACHE_REQUESTS_TOTAL.clone()))
+        .register(Box::new(SELECTION_CACHE_REQUESTS_TOTAL.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(INDEX_SELECTION_CACHE_HITS_TOTAL.clone()))
+        .register(Box::new(SELECTION_CACHE_HITS_TOTAL.clone()))
         .expect("Metric registered");
 }
 
@@ -224,9 +224,9 @@ mod tests {
                 .map(|family| family.name())
                 .collect::<Vec<_>>(),
             vec![
-                "zo_metrics_index_blocks_cache_evictions_total",
-                "zo_metrics_index_blocks_cache_hits_total",
-                "zo_metrics_index_blocks_cache_used_bytes",
+                "zo_metrics_blocks_cache_evictions_total",
+                "zo_metrics_blocks_cache_hits_total",
+                "zo_metrics_blocks_cache_used_bytes",
             ]
         );
         for family in families {

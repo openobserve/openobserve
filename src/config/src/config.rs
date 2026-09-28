@@ -1723,11 +1723,11 @@ pub struct Search {
     )]
     pub metrics_selection_cache_enabled: bool,
     #[env_config(
-        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
+        name = "ZO_METRICS_SELECTION_CACHE_MAX_SIZE",
         default = 256,
         help = "Maximum memory size in MB of the metrics index selection cache."
     )]
-    pub metrics_index_selection_cache_max_size: usize,
+    pub metrics_selection_cache_max_size: usize,
     #[env_config(
         name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
         default = 0,
