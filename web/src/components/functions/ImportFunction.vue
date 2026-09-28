@@ -36,13 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm-action"
-        type="submit"
         data-test="function-import-json-btn"
         :loading="isImporting"
         :disabled="isImporting"
         @click="triggerImport"
       >
-        {{ t("common.import") }}
+        {{ t("dashboard.import") }}
       </OButton>
     </template>
 
@@ -52,11 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       test-prefix="function"
       hide-header
       container-class="flex-1 min-h-0"
-      container-style=""
       :is-importing="isImporting"
       @back="goBack"
       @cancel="goBack"
       @import="importJson"
+      @update:json-str="onDocumentChanged"
+      @update:json-array="onDocumentArrayChanged"
     >
       <template #output-content>
         <div
@@ -91,16 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="w-75 py-2">
                       <OSelect
                         :data-test="`function-import-conflict-select-${errorMessage.itemIndex}`"
-                        :model-value="conflictChoice[errorMessage.itemIndex] ?? USE_EXISTING"
+                        :model-value="conflictChoice[errorMessage.name] ?? USE_EXISTING"
                         :options="conflictOptions"
                         :label="t('function.import.conflictActionLabel')"
-                        @update:model-value="
-                          (val: any) => onConflictChoice(errorMessage.itemIndex, val)
-                        "
+                        @update:model-value="(val: any) => onConflictChoice(errorMessage.name, val)"
                       />
                       <div
                         v-if="
-                          conflictChoice[errorMessage.itemIndex] === OVERRIDE &&
+                          conflictChoice[errorMessage.name] === OVERRIDE &&
                           dependentPipelines[errorMessage.name]?.length
                         "
                         class="text-text-secondary pt-2 text-xs"
@@ -159,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, ref } from "vue";
+import { defineAsyncComponent, defineComponent, onBeforeUnmount, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
@@ -169,6 +167,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import BaseImport from "../common/BaseImport.vue";
+import { functionNameRegex } from "./AddFunction.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import jsTransformService from "@/services/jstransform";
 import { functionsQuery, saveFunctionMutation } from "@/services/jstransform.queries";
@@ -176,14 +175,18 @@ import { useOrgId } from "@/composables/query/useOrgId";
 
 type ImportStatus = "created" | "overridden" | "skipped" | "failed";
 
-type ImportError =
-  | I18nText
-  | {
-      field: "function_name" | "name_exists";
-      message: I18nText;
-      itemIndex: number;
-      name: string;
-    };
+type FieldError = {
+  field: "function_name" | "name_exists";
+  message: I18nText;
+  itemIndex: number;
+  name: string;
+  /** False = shown for context but does not hold the import back. */
+  blocking: boolean;
+};
+
+// A plain I18nText is a branded string, so `typeof e === "object"` is what
+// separates the two arms — in the template as well as here.
+type ImportError = I18nText | FieldError;
 
 const USE_EXISTING = "use_existing";
 const OVERRIDE = "override";
@@ -208,13 +211,27 @@ export default defineComponent({
     const isImporting = ref(false);
     const functionErrors = ref<ImportError[][]>([]);
     const importResults = ref<{ message: I18nText; status: ImportStatus }[]>([]);
-    const userSelectedName = ref<string[]>([]);
-    const conflictChoice = ref<string[]>([]);
+
+    // Keyed by position, unlike everything below it: the rename box only appears
+    // for an item whose name is missing or unusable, so there is no name to key
+    // it by. Safe only because this state is dropped when the document changes.
+    const userSelectedName = ref<Record<number, string>>({});
+
+    // Keyed by NAME. Index 0 of the next file is a different function, and an
+    // "override" the user meant for one must never be applied to another.
+    const conflictChoice = ref<Record<string, string>>({});
     const dependentPipelines = ref<Record<string, string[]>>({});
 
-    // A conflict is surfaced once and written on the next press, so the user
-    // never has an existing function replaced by a click they did not make.
-    const conflictsAwaitingConfirm = ref(false);
+    // Names whose clash has been put on screen with a picker. A conflict is
+    // surfaced once and written on the next press, so the user never has an
+    // existing function replaced by a click they did not make. Per name rather
+    // than one flag for the screen: a rename, or a second file, brings names
+    // that have never been confirmed and must be prompted for in their own right.
+    const conflictsSurfaced = ref<Set<string>>(new Set());
+
+    // Written by this run. Without it the press after a partial failure reports
+    // what the previous press created as "skipped, the existing function was kept".
+    const writtenNames = ref<Set<string>>(new Set());
 
     const conflictOptions = [
       { label: t("function.import.useExisting"), value: USE_EXISTING },
@@ -230,6 +247,13 @@ export default defineComponent({
     const saveFunction = useMutation(() =>
       saveFunctionMutation(orgId.value, () => isOverride.value),
     );
+
+    // Cleared on unmount: without it, navigating away inside the window pulls
+    // the user back to the Functions list from wherever they went.
+    let redirectTimer: ReturnType<typeof setTimeout> | undefined;
+    onBeforeUnmount(() => {
+      if (redirectTimer !== undefined) clearTimeout(redirectTimer);
+    });
 
     const goBack = () => {
       router.push({
@@ -254,8 +278,54 @@ export default defineComponent({
       (existingFunctions.data.value ?? []).some((fn: any) => fn.name === name) ||
       serverReportedExisting.value.has(name);
 
+    // ── Document identity ──────────────────────────────────────────────────
+    // Every choice above belongs to the document that produced it. BaseImport
+    // re-emits for our own writes too (a rename restringifies the array), so the
+    // text we just wrote is recorded here and its echo ignored; anything else is
+    // the user loading a file, fetching a URL or typing, and starts over.
+    const currentDocument = ref("");
+
+    const resetPendingState = () => {
+      functionErrors.value = [];
+      importResults.value = [];
+      userSelectedName.value = {};
+      conflictChoice.value = {};
+      dependentPipelines.value = {};
+      conflictsSurfaced.value = new Set();
+      writtenNames.value = new Set();
+    };
+
+    // Compared on CONTENT, not on the text: BaseImport reformats what it holds
+    // and emits the text and the array separately, so the same document arrives
+    // in several spellings. Only a real change of content starts over.
+    const normalizeDocument = (value: unknown): string => {
+      if (Array.isArray(value)) return JSON.stringify(value);
+      const text = String(value ?? "").trim();
+      if (!text) return "";
+      try {
+        const parsed = JSON.parse(text);
+        return JSON.stringify(Array.isArray(parsed) ? parsed : [parsed]);
+      } catch {
+        return text;
+      }
+    };
+
+    const adoptDocument = (items: any[]) => {
+      currentDocument.value = JSON.stringify(items);
+    };
+
+    const onDocumentChanged = (value: unknown) => {
+      const next = normalizeDocument(value);
+      if (next === currentDocument.value) return;
+      currentDocument.value = next;
+      resetPendingState();
+    };
+
+    const onDocumentArrayChanged = (items: unknown) => onDocumentChanged(items ?? []);
+
     const writeBackToEditor = () => {
       if (!baseImportRef.value) return;
+      adoptDocument(baseImportRef.value.jsonArrayOfObj);
       baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
     };
 
@@ -267,10 +337,10 @@ export default defineComponent({
       writeBackToEditor();
     };
 
-    const onConflictChoice = async (index: number, choice: string) => {
-      conflictChoice.value[index] = choice;
-      const name = baseImportRef.value?.jsonArrayOfObj?.[index]?.name;
-      if (choice !== OVERRIDE || !name || dependentPipelines.value[name]) return;
+    const onConflictChoice = async (name: string, choice: string) => {
+      if (!name) return;
+      conflictChoice.value[name] = choice;
+      if (choice !== OVERRIDE || dependentPipelines.value[name]) return;
       try {
         const res: any = await jsTransformService.getAssociatedPipelines(orgId.value, name);
         dependentPipelines.value[name] = (res.data.list ?? []).map((p: any) => p.name);
@@ -279,24 +349,42 @@ export default defineComponent({
       }
     };
 
-    const validate = (item: any, index: number, itemIndex: number) => {
-      const errors: ImportError[] = [];
+    const nameError = (message: I18nText, itemIndex: number, name: string): FieldError => ({
+      field: "function_name",
+      message,
+      itemIndex,
+      name,
+      blocking: true,
+    });
 
-      if (!item?.name || typeof item.name !== "string" || !item.name.trim()) {
-        errors.push({
-          field: "function_name",
-          message: t("function.import.nameRequired", { index }),
-          itemIndex,
-          name: "",
-        });
-      } else if (nameExists(item.name) && conflictsAwaitingConfirm.value === false) {
+    const validate = (item: any, index: number, itemIndex: number, seen: Set<string>) => {
+      const errors: ImportError[] = [];
+      const name = typeof item?.name === "string" ? item.name : "";
+
+      if (!name.trim()) {
+        errors.push(nameError(t("function.import.nameRequired", { index }), itemIndex, ""));
+      } else if (!functionNameRegex.test(name)) {
+        // The Add Function form's own rule. The backend does not enforce it, so
+        // an import could otherwise create "my-fn with space": a function its
+        // edit form refuses to save and no VRL call can resolve. It is also what
+        // catches " parse_nginx ", whose spaces would hide a real clash.
+        errors.push(nameError(t("function.import.nameInvalid", { index, name }), itemIndex, name));
+      } else if (seen.has(name)) {
+        // Left undetected, the second copy lands as a server 400 that reads as a
+        // clash — and overriding it would replace what this same import created.
+        errors.push(
+          nameError(t("function.import.duplicateName", { index, name }), itemIndex, name),
+        );
+      } else if (!writtenNames.value.has(name) && nameExists(name)) {
         errors.push({
           field: "name_exists",
-          message: t("function.import.nameExists", { index, name: item.name }),
+          message: t("function.import.nameExists", { index, name }),
           itemIndex,
-          name: item.name,
+          name,
+          blocking: !conflictsSurfaced.value.has(name),
         });
       }
+      if (name) seen.add(name);
 
       if (!item?.function || typeof item.function !== "string" || !item.function.trim()) {
         errors.push(t("function.import.bodyRequired", { index }));
@@ -314,28 +402,43 @@ export default defineComponent({
       return errors;
     };
 
-    const conflictError = (item: any, index: number, itemIndex: number): ImportError => ({
+    const conflictError = (item: any, index: number, itemIndex: number): FieldError => ({
       field: "name_exists",
       message: t("function.import.nameExists", { index, name: item.name }),
       itemIndex,
       name: item.name,
+      blocking: false,
     });
 
-    const writeFunction = async (item: any, index: number, itemIndex: number) => {
-      const override = nameExists(item.name) && conflictChoice.value[itemIndex] === OVERRIDE;
+    // Remembering what the user has now been shown, so the next press acts on the
+    // picker rather than reporting the same clash again.
+    const rememberSurfacedConflicts = (groups: ImportError[][]) => {
+      for (const group of groups) {
+        for (const error of group) {
+          if (typeof error === "object" && error.field === "name_exists") {
+            conflictsSurfaced.value.add(error.name);
+          }
+        }
+      }
+    };
+
+    const writeFunction = async (item: any, index: number) => {
+      const name: string = item.name;
+      const override = nameExists(name) && conflictChoice.value[name] === OVERRIDE;
       isOverride.value = override;
 
       try {
         await saveFunction.mutateAsync({
-          name: item.name.trim(),
+          name,
           function: item.function.trim(),
           params: typeof item.params === "string" && item.params.trim() ? item.params : "row",
           transType: parseInt(String(item.transType ?? 0)),
         });
+        writtenNames.value.add(name);
         importResults.value.push({
           message: override
-            ? t("function.import.overridden", { index, name: item.name })
-            : t("function.import.createSuccess", { index, name: item.name }),
+            ? t("function.import.overridden", { index, name })
+            : t("function.import.createSuccess", { index, name }),
           status: override ? "overridden" : "created",
         });
         return override ? "overridden" : "created";
@@ -344,13 +447,13 @@ export default defineComponent({
         // The name was taken after all, so the user gets the same choice a
         // visible clash would have offered rather than a dead failure line.
         if (/already exist/i.test(String(reason))) {
-          serverReportedExisting.value.add(item.name);
+          serverReportedExisting.value.add(name);
           return "conflict";
         }
         importResults.value.push({
           message: t("function.import.createFailed", {
             index,
-            name: item.name,
+            name,
             reason: raw(reason) || raw("unknown error"),
           }),
           status: "failed",
@@ -370,6 +473,9 @@ export default defineComponent({
         }
         const parsed = JSON.parse(jsonString);
         items = Array.isArray(parsed) ? parsed : [parsed];
+        // BaseImport restringifies what we hand it and emits the result back;
+        // that echo is this same document, not a new one.
+        adoptDocument(items);
         baseImportRef.value.jsonArrayOfObj = items;
       } catch (e: any) {
         toast({
@@ -390,12 +496,14 @@ export default defineComponent({
 
       isImporting.value = true;
 
-      const errors = items.map((item, i) => validate(item, i + 1, i));
-      const blocking = errors.filter((group) => group.length > 0);
-      if (blocking.length > 0) {
-        functionErrors.value = blocking;
-        // The next press acts on the choices now on screen rather than re-reporting them.
-        conflictsAwaitingConfirm.value = true;
+      const seen = new Set<string>();
+      const errorGroups = items
+        .map((item, i) => validate(item, i + 1, i, seen))
+        .filter((group) => group.length > 0);
+      const isBlocking = (error: ImportError) => typeof error !== "object" || error.blocking;
+      if (errorGroups.some((group) => group.some(isBlocking))) {
+        functionErrors.value = errorGroups;
+        rememberSurfacedConflicts(errorGroups);
         isImporting.value = false;
         if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
         return;
@@ -407,15 +515,26 @@ export default defineComponent({
       const lateConflicts: ImportError[][] = [];
       for (const [itemIndex, item] of items.entries()) {
         const index = itemIndex + 1;
-        if (nameExists(item.name) && conflictChoice.value[itemIndex] !== OVERRIDE) {
+        const name: string = item.name;
+        // Created by an earlier press of this same file, so it exists now
+        // because of this import — not because the user is keeping an older one.
+        if (writtenNames.value.has(name)) {
           importResults.value.push({
-            message: t("function.import.skipped", { index, name: item.name }),
+            message: t("function.import.alreadyImported", { index, name }),
             status: "skipped",
           });
           skipped++;
           continue;
         }
-        const outcome = await writeFunction(item, index, itemIndex);
+        if (nameExists(name) && conflictChoice.value[name] !== OVERRIDE) {
+          importResults.value.push({
+            message: t("function.import.skipped", { index, name }),
+            status: "skipped",
+          });
+          skipped++;
+          continue;
+        }
+        const outcome = await writeFunction(item, index);
         if (outcome === "conflict") {
           lateConflicts.push([conflictError(item, index, itemIndex)]);
         } else if (outcome === "failed") {
@@ -427,6 +546,7 @@ export default defineComponent({
 
       if (lateConflicts.length > 0) {
         functionErrors.value = [...functionErrors.value, ...lateConflicts];
+        rememberSurfacedConflicts(lateConflicts);
       }
 
       // Nothing was written, so the run stays on screen with its skipped lines
@@ -441,11 +561,9 @@ export default defineComponent({
           message: t("function.import.importSuccess", { count: written }, written),
           variant: "success",
         });
-        setTimeout(goBack, 400);
+        redirectTimer = setTimeout(goBack, 400);
       }
 
-      // Held across the press only while a conflict is still on screen awaiting a choice.
-      conflictsAwaitingConfirm.value = lateConflicts.length > 0;
       isImporting.value = false;
       if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
     };
@@ -467,6 +585,8 @@ export default defineComponent({
       resultClass,
       updateFunctionName,
       onConflictChoice,
+      onDocumentChanged,
+      onDocumentArrayChanged,
       importJson,
       validate,
     };

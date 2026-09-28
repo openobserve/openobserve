@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="function-list-import-function-btn"
           @click="goToImportFunction"
         >
-          {{ t("common.import") }}
+          {{ t("dashboard.import") }}
         </OButton>
         <OButton
           variant="primary"
@@ -138,16 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-sm"
-                  icon-left="download"
-                  :title="t('common.export')"
-                  data-test="function-list-export-function-btn"
-                  data-row-action="export"
-                  class="max-md:hidden"
-                  @click="exportFunction(row)"
-                />
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
                   icon-left="account-tree"
                   :title="t('function.associatedPipelines')"
                   data-row-action="view"
@@ -164,13 +154,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="showDeleteDialogFn({ row })"
                   icon-left="delete"
                 />
+                <!-- Hidden proxy so the row-hover shortcut reaches Export,
+                     which lives in the more-menu (teleported out of the row). -->
+                <button
+                  type="button"
+                  data-row-action="export"
+                  data-test="function-list-export-function-btn"
+                  class="hidden"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @click.stop="exportFunction(row)"
+                />
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
                       icon-left="more-vert"
                       variant="ghost"
-                      size="icon-xs-sq"
-                      class="md:hidden"
+                      size="icon-sm"
                       data-test="function-list-row-more-actions"
                       @click.stop
                     />
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <ODropdownItem
                     icon-left="download"
-                    class="md:hidden"
+                    shortcut-id="functionsRowExport"
                     data-test="function-list-export-function-btn-menu"
                     @select="exportFunction(row)"
                   >
@@ -415,7 +415,6 @@ export default defineComponent({
         id: "actions",
         header: t("function.actions"),
         isAction: true,
-        size: 190,
         meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
       },
     ];
@@ -768,33 +767,42 @@ export default defineComponent({
       };
     };
 
-    const exportFunction = (row: any) => {
-      const payload = exportPayload(row.name);
-      if (!payload) {
-        toast({
-          variant: "error",
-          message: t("toastMessages.functions.errorExportingFunctions"),
-        });
-        return;
+    const exportLoading = ref(false);
+
+    // The row came from this very list, so a miss means the cache has moved on
+    // (renamed or removed elsewhere). Re-read it once before giving up, the way
+    // the alerts list re-reads each definition it is about to export.
+    const collectForExport = async (names: string[]) => {
+      let payloads = names.map(exportPayload);
+      if (payloads.some((payload) => !payload)) {
+        await functions.refetch();
+        payloads = names.map(exportPayload);
       }
-      functionsToExport.value = [payload];
-      showExportDialog.value = true;
+      return payloads.filter(Boolean) as Record<string, unknown>[];
     };
 
-    const exportSelectedFunctions = () => {
-      const payloads = selectedFunctions.value
-        .map((row: any) => exportPayload(row.name))
-        .filter(Boolean) as Record<string, unknown>[];
-      if (!payloads.length) {
+    const openExportDialog = async (names: string[]) => {
+      if (exportLoading.value) return;
+      exportLoading.value = true;
+      try {
+        const payloads = await collectForExport(names);
+        if (!payloads.length) throw new Error("no exportable function");
+        functionsToExport.value = payloads;
+        showExportDialog.value = true;
+      } catch (error) {
         toast({
           variant: "error",
           message: t("toastMessages.functions.errorExportingFunctions"),
         });
-        return;
+      } finally {
+        exportLoading.value = false;
       }
-      functionsToExport.value = payloads;
-      showExportDialog.value = true;
     };
+
+    const exportFunction = (row: any) => openExportDialog([row.name]);
+
+    const exportSelectedFunctions = () =>
+      openExportDialog(selectedFunctions.value.map((row: any) => row.name));
 
     const onExportDownloaded = ({ count }: { format: string; count: number }) => {
       toast({

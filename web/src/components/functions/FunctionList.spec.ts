@@ -1082,4 +1082,79 @@ describe("FunctionList", () => {
       expect(vm.isUpdated).toBe(true);
     });
   });
+
+  // The list query already carries every field the file needs, so export reads
+  // from it rather than fetching each definition again.
+  describe("Export", () => {
+    const mountList = async () => {
+      const wrapper = mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("hands the row's definition to the export dialog", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      await vm.exportFunction({ name: "js_func" });
+      await flushPromises();
+
+      expect(vm.showExportDialog).toBe(true);
+      // `streams` is deliberately absent: the deprecated stream association
+      // names streams that mean nothing in the org this file is imported into.
+      expect(vm.functionsToExport).toEqual([
+        {
+          name: "js_func",
+          function: "return event;",
+          params: "",
+          transType: 1,
+          numArgs: undefined,
+        },
+      ]);
+    });
+
+    it("exports every selected row from one press", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      vm.selectedFunctionIds = ["func1", "js_func"];
+      await nextTick();
+      await vm.exportSelectedFunctions();
+      await flushPromises();
+
+      expect(vm.showExportDialog).toBe(true);
+      expect(vm.functionsToExport.map((fn: any) => fn.name)).toEqual(["func1", "js_func"]);
+    });
+
+    // The row is on screen, so a miss means the cache has moved on rather than
+    // that the function is gone. One re-read before giving up.
+    it("re-reads the list once when a row is missing from the cache", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+      const callsBefore = mockJsTransformList.mock.calls.length;
+
+      mockJsTransformList.mockResolvedValueOnce({
+        data: { list: [...mockFunctionData.data.list, { name: "late_fn", function: ".a = 1" }] },
+      });
+      await vm.exportFunction({ name: "late_fn" });
+      await flushPromises();
+
+      expect(mockJsTransformList.mock.calls.length).toBe(callsBefore + 1);
+      expect(vm.showExportDialog).toBe(true);
+      expect(vm.functionsToExport[0]).toMatchObject({ name: "late_fn" });
+    });
+
+    it("reports a row the re-read cannot find instead of opening an empty dialog", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      await vm.exportFunction({ name: "gone_fn" });
+      await flushPromises();
+
+      expect(vm.showExportDialog).toBe(false);
+      expect(vm.functionsToExport).toEqual([]);
+    });
+  });
 });

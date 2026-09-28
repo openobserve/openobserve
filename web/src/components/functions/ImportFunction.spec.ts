@@ -15,7 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { nextTick, ref } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
@@ -46,16 +46,32 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Stands in for BaseImport: the screen drives it through the same three fields
-// and one method, so the stub exposes exactly those.
+// and one method, so the stub exposes exactly those — and re-emits the way the
+// real one does, because the screen reads those events to decide when the
+// document on screen has been replaced.
 const BaseImportStub = {
   name: "BaseImport",
-  props: ["title", "testPrefix", "hideHeader", "isImporting", "containerClass", "containerStyle"],
-  emits: ["back", "cancel", "import"],
+  props: ["title", "testPrefix", "hideHeader", "isImporting", "containerClass"],
+  emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray"],
   template: '<div data-test-stub="base-import"><slot name="output-content"></slot></div>',
   setup(_props: any, { expose, emit }: any) {
     const jsonArrayOfObj = ref<any[]>([]);
     const jsonStr = ref("");
     const isImportingLocal = ref(false);
+
+    watch(jsonStr, (newVal) => emit("update:jsonStr", newVal));
+    watch(
+      jsonArrayOfObj,
+      (newVal) => {
+        if (newVal && newVal.length > 0) {
+          jsonStr.value = JSON.stringify(newVal, null, 2);
+          emit("update:jsonStr", jsonStr.value);
+          emit("update:jsonArray", newVal);
+        }
+      },
+      { deep: true },
+    );
+
     const handleImport = () => {
       isImportingLocal.value = true;
       emit("import", { jsonStr: jsonStr.value, jsonArray: jsonArrayOfObj.value });
@@ -71,6 +87,7 @@ describe("ImportFunction", () => {
 
   const existing = [
     { name: "parse_nginx", function: ".a = 1", params: "row", transType: 0, numArgs: 1 },
+    { name: "parse_json", function: ".b = 1", params: "row", transType: 0, numArgs: 1 },
   ];
 
   const mountScreen = () =>
@@ -81,12 +98,25 @@ describe("ImportFunction", () => {
       },
     });
 
-  // Feeds the editor and presses Import, the way the header button does.
-  const importJson = async (wrapper: any, payload: unknown) => {
+  // Puts a document in the editor, the way choosing a file or typing does. The
+  // await matters: BaseImport announces the new content before the user can
+  // reach the Import button, and the screen drops its pending choices on it.
+  const loadDocument = async (wrapper: any, payload: unknown) => {
     wrapper.vm.baseImportRef.jsonStr = JSON.stringify(payload);
+    await nextTick();
+    await flushPromises();
+  };
+
+  // Presses Import on whatever is in the editor, the way the header button does.
+  const pressImport = async (wrapper: any) => {
     await wrapper.vm.importJson({ jsonStr: wrapper.vm.baseImportRef.jsonStr });
     await flushPromises();
     await nextTick();
+  };
+
+  const importJson = async (wrapper: any, payload: unknown) => {
+    await loadDocument(wrapper, payload);
+    await pressImport(wrapper);
   };
 
   beforeEach(async () => {
@@ -186,6 +216,48 @@ describe("ImportFunction", () => {
     expect(wrapper.text()).toContain("function body is required");
   });
 
+  // The create form's own rule, which the backend does not enforce: without it
+  // an import can write a name the edit form then refuses to save.
+  describe("name rules", () => {
+    it("refuses a name the Add Function form would reject", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "my-fn with space", function: ".a = 1" });
+
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("is not a valid function name");
+    });
+
+    // Padding used to slip past the clash check (which read the raw name) and
+    // reach the server, which saw the trimmed one and answered 400.
+    it("refuses a padded name rather than letting it hide a clash", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: " parse_nginx ", function: ".a = 1" });
+
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("is not a valid function name");
+    });
+
+    // Undetected, the second copy came back as a server clash — and overriding
+    // it would have replaced what this same import had just created.
+    it("flags a name repeated inside one file", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, [
+        { name: "dup", function: ".a = 1" },
+        { name: "dup", function: ".b = 2" },
+      ]);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("appears more than once in this file");
+    });
+  });
+
   describe("name already exists", () => {
     const conflicting = { name: "parse_nginx", function: ".b = 2", params: "row", transType: 0 };
 
@@ -206,7 +278,7 @@ describe("ImportFunction", () => {
       await flushPromises();
 
       await importJson(wrapper, conflicting);
-      await importJson(wrapper, conflicting);
+      await pressImport(wrapper);
 
       expect(mockCreate).not.toHaveBeenCalled();
       expect(mockUpdate).not.toHaveBeenCalled();
@@ -218,7 +290,7 @@ describe("ImportFunction", () => {
       await flushPromises();
 
       await importJson(wrapper, conflicting);
-      await importJson(wrapper, conflicting);
+      await pressImport(wrapper);
 
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -234,9 +306,9 @@ describe("ImportFunction", () => {
       await flushPromises();
 
       await importJson(wrapper, conflicting);
-      await wrapper.vm.onConflictChoice(0, "override");
+      await wrapper.vm.onConflictChoice("parse_nginx", "override");
       await flushPromises();
-      await importJson(wrapper, conflicting);
+      await pressImport(wrapper);
 
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(mockUpdate.mock.calls[0][1]).toMatchObject({
@@ -251,12 +323,67 @@ describe("ImportFunction", () => {
       await flushPromises();
 
       await importJson(wrapper, conflicting);
-      await wrapper.vm.onConflictChoice(0, "override");
+      await wrapper.vm.onConflictChoice("parse_nginx", "override");
       await flushPromises();
       await nextTick();
 
       expect(mockGetAssociatedPipelines).toHaveBeenCalledWith("test-org", "parse_nginx");
       expect(wrapper.text()).toContain("nginx_ingest");
+    });
+
+    // The choice belonged to the file that raised it. Kept across a new file —
+    // and keyed by position — it silently overrode whatever sat at that index.
+    it("drops the choices made for one file when another is loaded", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, conflicting);
+      await wrapper.vm.onConflictChoice("parse_nginx", "override");
+      await flushPromises();
+
+      // A different file, a different existing function, same position.
+      await importJson(wrapper, { name: "parse_json", function: ".c = 3" });
+
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain('"parse_json" already exists');
+      expect(wrapper.vm.conflictChoice).toEqual({});
+    });
+
+    // The clash was reported once per screen, so a name typed into the rename
+    // box was skipped with no prompt at all.
+    it("prompts for a clash the rename box introduces", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { function: ".a = 1" });
+      expect(wrapper.text()).toContain("name is required");
+
+      wrapper.vm.updateFunctionName("parse_nginx", 0);
+      await nextTick();
+      await flushPromises();
+      await pressImport(wrapper);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain('"parse_nginx" already exists');
+    });
+
+    // The picker has to stay reachable while a second item is still being
+    // fixed, even though its own clash no longer holds the import back.
+    it("keeps the picker on screen while another item is still invalid", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, [conflicting, { name: "fn_b", function: "  " }]);
+      expect(wrapper.text()).toContain('"parse_nginx" already exists');
+
+      await pressImport(wrapper);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("function body is required");
+      expect(wrapper.text()).toContain('"parse_nginx" already exists');
     });
   });
 
@@ -275,12 +402,35 @@ describe("ImportFunction", () => {
     expect(mockToastFn).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
 
     // Override then writes through PUT, even though the list never showed it.
-    await wrapper.vm.onConflictChoice(0, "override");
+    await wrapper.vm.onConflictChoice("hidden_fn", "override");
     await flushPromises();
-    await importJson(wrapper, invisible);
+    await pressImport(wrapper);
 
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(mockUpdate.mock.calls[0][1]).toMatchObject({ name: "hidden_fn" });
+  });
+
+  // After a partial run the second press used to report the functions the first
+  // press created as "skipped, the existing function was kept".
+  it("says what this run already wrote, and does not write it twice", async () => {
+    mockCreate
+      .mockResolvedValueOnce({ data: { code: 200 } })
+      .mockRejectedValueOnce({ response: { data: { message: "Function already exist" } } });
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    await importJson(wrapper, [
+      { name: "fn_a", function: ".a = 1" },
+      { name: "hidden_fn", function: ".b = 2" },
+    ]);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+
+    await pressImport(wrapper);
+
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[data-test="function-import-result-0"]').text()).toContain(
+      "already imported by this run",
+    );
   });
 
   it("reports a failed item instead of navigating away", async () => {
@@ -305,5 +455,20 @@ describe("ImportFunction", () => {
 
     expect(mockCreate).toHaveBeenCalledTimes(2);
     expect(mockCreate.mock.calls[1][1].transType).toBe(1);
+  });
+
+  // The post-import redirect is a timer. Left running, it pulls the user back to
+  // the Functions list from wherever they went inside the window.
+  it("abandons the redirect when the screen is left before it fires", async () => {
+    const wrapper = mountScreen();
+    await flushPromises();
+
+    await importJson(wrapper, { name: "new_fn", function: ".a = 1" });
+    const push = vi.spyOn(router, "push");
+
+    wrapper.unmount();
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    expect(push).not.toHaveBeenCalled();
   });
 });
