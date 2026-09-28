@@ -50,7 +50,8 @@
     "browser": "chrome",
     "run_files": [
       "dashboard-regression.spec.js",
-      "dashboard-cache-browser-refresh.spec.js"
+      "dashboard-cache-browser-refresh.spec.js",
+      "dashboard-save-validation-message-11283.spec.js"
     ],
     "disabled": []
   },
@@ -110,7 +111,8 @@
     "run_files": [
       "ui-regression.spec.js",
       "landing-regression.spec.js",
-      "internal-route-guards.spec.js"
+      "internal-route-guards.spec.js",
+      "datetime-paste-invalid-values-14648.spec.js"
     ],
     "disabled": []
   },
