@@ -445,8 +445,8 @@ export default class DashboardactionPage {
     const noDataVisible = await this.noDataElement.isVisible().catch(() => false);
     expect(noDataVisible).toBe(false);
 
-    // 2. Canvas has non-background pixels
-    const hasData = await this.page.evaluate(() => {
+    // 2. Canvas has non-background pixels; polled because a mounted canvas can still be awaiting its query.
+    const scanCanvases = () => this.page.evaluate(() => {
       const canvases = document.querySelectorAll("canvas");
       for (const canvas of canvases) {
         if (canvas.width < 10 || canvas.height < 10) continue;
@@ -470,7 +470,7 @@ export default class DashboardactionPage {
       }
       return false;
     });
-    expect(hasData).toBe(true);
+    await expect.poll(scanCanvases, { timeout: 15000 }).toBe(true);
   }
 
   /**

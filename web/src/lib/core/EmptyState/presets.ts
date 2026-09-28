@@ -174,6 +174,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-prompts": {
+    illustration: "function",
+    variant: "create",
+    titleKey: "emptyState.noPrompts.title",
+    descriptionKey: "emptyState.noPrompts.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noPrompts.action",
+        descriptionKey: "emptyState.noPrompts.actionDesc",
+      },
+    ],
+  },
   "no-pipelines": {
     illustration: "pipeline",
     variant: "create",
@@ -973,6 +987,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-dashboards": "emptyState.nouns.dashboards",
   "no-pipelines": "emptyState.nouns.pipelines",
   "no-workflows": "emptyState.nouns.workflows",
+  "no-prompts": "emptyState.nouns.prompts",
   "no-functions": "emptyState.nouns.functions",
   "no-streams": "emptyState.nouns.streams",
   "no-alerts": "emptyState.nouns.alerts",
