@@ -13,26 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{ops::Range, time::Duration};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, metrics};
-use futures::{
-    StreamExt, TryStreamExt,
-    stream::{self, BoxStream},
-};
+use futures::{StreamExt, stream::BoxStream};
 use object_store::{
     CopyOptions, Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
-    ObjectStore, ObjectStoreExt as _, PutMultipartOptions, PutOptions, PutPayload, PutResult,
-    Result, limit::LimitStore, path::Path,
+    ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
+    path::Path,
 };
 
 use crate::storage::CONCURRENT_REQUESTS;
 
 // test only
 const TEST_FILE: &str = "o2_test/check.txt";
-const RANGE_READ_CONCURRENCY: usize = 10;
 
 #[derive(Debug)]
 pub struct StorageConfig {
@@ -182,15 +178,6 @@ impl ObjectStore for Remote {
         }
 
         Ok(result)
-    }
-
-    async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
-        let path = Path::from(self.format_key(location.as_ref()));
-        stream::iter(ranges.iter().cloned())
-            .map(|range| self.client.get_range(&path, range))
-            .buffered(RANGE_READ_CONCURRENCY)
-            .try_collect()
-            .await
     }
 
     fn delete_stream(
@@ -456,35 +443,6 @@ mod tests {
         assert_eq!(
             r.format_key("my-bucket/files/foo.parquet"),
             "my-bucket/files/foo.parquet"
-        );
-    }
-
-    #[tokio::test]
-    async fn get_ranges_preserves_order_for_non_index_files() {
-        let store = object_store::memory::InMemory::new();
-        let location = Path::from("files/default/logs/sample.parquet");
-        store
-            .put(
-                &location,
-                PutPayload::from(Bytes::from_static(b"0123456789")),
-            )
-            .await
-            .unwrap();
-        let remote = Remote {
-            client: LimitStore::new(Box::new(store), CONCURRENT_REQUESTS),
-            bucket_prefix: String::new(),
-        };
-        let data = remote
-            .get_ranges(&location, &[4..6, 0..2, 8..20])
-            .await
-            .unwrap();
-        assert_eq!(
-            data,
-            vec![
-                Bytes::from_static(b"45"),
-                Bytes::from_static(b"01"),
-                Bytes::from_static(b"89"),
-            ]
         );
     }
 }
