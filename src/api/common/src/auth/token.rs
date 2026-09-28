@@ -54,7 +54,7 @@ fn may_skip_permission_check(
     is_list_invite_call || is_reject_invite_call || is_member_subscription || is_org_list_call
 }
 
-/// Dynamic MCP clients carry a foreign `aud`, so only their entry points may skip it.
+/// Foreign-`aud` MCP tokens pass only on /{org}/mcp or our own loopback calls.
 #[cfg(any(feature = "enterprise", test))]
 fn relaxes_audience_check(path_columns: &[&str], mcp_marker: Option<&[u8]>) -> bool {
     let is_mcp_endpoint = path_columns.len() == 2 && path_columns[1] == "mcp";
