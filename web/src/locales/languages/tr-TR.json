@@ -17098,17 +17098,17 @@
       "alertMe": "Beni uyar",
       "columnHints": {
         "qps": "Saniye başına çağrı — bu penceredeki çağrıların pencere uzunluğuna bölünmesiyle hesaplanır, böylece 15 dakikalık bir görünüm ile 4 saatlik bir görünüm karşılaştırılabilir kalır.",
-        "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Yalnızca tamamlanmış çağrılar sayılır — hâlâ çalışan veya hiç dönmeyen bir sorgu burada ölçülmez.",
-        "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Yalnızca tamamlanmış çağrılar sayılır — hâlâ çalışan veya hiç dönmeyen bir sorgu burada ölçülmez.",
-        "p99": "Çağrıların en kötü %1'i en az bu kadar sürdü. Yalnızca tamamlanmış çağrılar sayılır — hâlâ çalışan veya hiç dönmeyen bir sorgu burada ölçülmez.",
-        "load": "Uygulamalarınızın bu veritabanını bekleyerek geçirdiği toplam süre. İstemci tarafından ölçülür, bu nedenle veritabanının ne kadar trafik hizmet verdiğini yansıtır — sunucunun ne kadar yüklü olduğunu değil.",
+        "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
+        "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
+        "p99": "Çağrıların en kötü %1'i en az bu kadar sürdü. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
+        "load": "Uygulamalarınızın bu veritabanına yaptığı çağrılarda harcadığı toplam süre, uygulamanızın izlerinden ölçülmüştür. Bu veritabanının uygulamalarınıza ne kadar trafik sunduğunu gösterir.",
         "attention": "Bu örneğin kendi motorunun yayınladığı bir limite ne kadar yakın olduğu — bugün, max_connections'a karşı bağlantılar. En kötü oran, harmanlanmış bir puan değil. En yüksekten başlayarak sıralanır; sağlığı okunamayan örnekler en üsttedir, çünkü göremediğiniz bir şeyin sağlıklı olduğunu bilemezsiniz. Veritabanı sunucusunda ölçülür, bu nedenle yanındaki Veritabanı süresiyle karşılaştırılamaz."
       },
       "failedChip": "{count} başarısız",
       "columnSubLabels": {
-        "attention": "sunucu",
-        "load": "istemci",
-        "calls": "istemci"
+        "attention": "veritabanından",
+        "load": "uygulamalarınızdan",
+        "calls": "uygulamalarınızdan"
       },
       "attention": {
         "connections": "bağlantılar",
@@ -17170,14 +17170,14 @@
         "failed": "Başarısız"
       },
       "columnHints": {
-        "calls": "Bu sorgunun kaç kez çalıştığı. Veritabanınızın raporladığı durumlarda kendi sayısı — bu, tüm istemcileri kapsar, yalnızca sisteminizin iz gönderen bölümlerini değil. İstemci tarafından gözlemlenen olarak işaretlenen satırlar, veritabanınız bunları raporlamadığı için izlerden sayılır.",
-        "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç yanıt vermeyen bir sorgu burada ölçülmez.",
-        "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç yanıt vermeyen bir sorgu burada ölçülmez.",
-        "p99": "En kötü %1'lik çağrılar en az bu kadar sürdü. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç yanıt vermeyen bir sorgu burada ölçülmez.",
+        "calls": "Bu sorgunun kaç kez çalıştığı, veritabanınız tarafından sayıldığı şekliyle — bağlanan her uygulama dahildir. Veritabanınızın bir sorgu için sayımı yoksa, izler simgesi uygulamanızın izlerinden ölçüleni işaretler.",
+        "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
+        "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
+        "p99": "Çağrıların en kötü %1'i en az bu kadar sürdü. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
         "max": "Bu zaman aralığındaki en yavaş tek çağrı — gerçek bir çağrı, ortalama değil.",
         "errors": "Bu çağrıların kaçı hata ile geri döndü.",
         "perTrace": "Bu, tek bir istek içinde kaç kez çalışır. Yüksek bir sayı genellikle bir döngü anlamına gelir.",
-        "load": "Bu sorgunun veritabanında geçirdiği toplam süre. Veritabanınızın raporladığı durumlarda kendi değeri: Postgres'te yürütme süresi, ancak MySQL ve MariaDB'de bekleme süresi — her satır hangisi olduğunu belirtir. İstemci tarafından gözlemlenen olarak işaretlenen satırlar izlerden ölçülür, bu nedenle ağ gidiş-dönüşünü içerir."
+        "load": "Bu sorgunun veritabanında harcadığı toplam süre, veritabanınızın bildirdiği şekliyle: Postgres'te yürütme süresi, MySQL ve MariaDB'de bekleme süresi — her satır hangisi olduğunu belirtir. İzler simgesi bulunan satırlar uygulamanızın izlerinden ölçülmüştür, dolayısıyla veritabanına gidiş ve dönüşü de içerir."
       },
       "errorsNone": "yok",
       "errorsAll": "tümü",
@@ -17441,8 +17441,7 @@
       "overlap": {
         "serverExecution": "{engine} onu çalıştırmak için harcadığı süre",
         "serverWait": "{engine} onu beklemek için harcadığı süre — bekleme süresi, yürütme süresi değil",
-        "serverCounted": "{engine} tarafından, tüm istemcilerde sayıldı",
-        "clientObserved": "İzlenen çağıranlar tarafından gözlemlendi — veritabanınız bunu bildirmedi"
+        "serverCounted": "{engine} tarafından, tüm istemcilerde sayıldı"
       },
       "endpointsConcentrated": "Bu sorgunun süresinin {percent}'i tek bir uç noktadan geliyor. {endpoint}'i düzeltirseniz bu sorguyu düzeltmiş olursunuz.",
       "typicalMarker": "yavaş çağrılar {value}",
@@ -17469,8 +17468,8 @@
       },
       "serverMetrics": {
         "title": "Veritabanının kendisinin kaydettiği",
-        "subtitle": "Sunucu tarafı — tüm istemciler",
-        "clientSubtitle": "İstemci tarafından gözlemlenen — yalnızca enstrümante edilmiş çağıranlar, yalnızca tamamlanmış çağrılar. Hâlâ çalışan veya takılıp kalan bir sorgu bu sayılarda yer almaz.",
+        "subtitle": "Veritabanınızdan — bağlanan her uygulama",
+        "clientSubtitle": "İşaretli değerler uygulamanızın izlerinden ölçülmüştür — uygulamalarınızın bu pencerede tamamladığı çağrılar",
         "instance": "{instance} tarafından bildirildi",
         "instanceWide": "Bu örnekteki tüm veritabanları",
         "calls": "Çalıştırmalar",
@@ -17516,9 +17515,13 @@
         "serverExecution": "çalıştırma süresi",
         "serverWait": "bekleme süresi",
         "serverCounted": "sunucu sayısı",
-        "clientObserved": "istemci tarafından gözlemlenen",
         "serverReported": "veritabanlarınız tarafından bildirildi"
       }
+    },
+    "appSource": {
+      "marker": "Uygulamanızın izlerinden ölçülmüştür",
+      "markerHint": "Uygulamanızın izlerinden ölçülmüştür; uygulamalarınızın görünümünü veritabanınızın bildirdiklerine ekler.",
+      "legend": "Uygulamanızın izlerinden"
     },
     "page": {
       "tabs": {
@@ -17527,7 +17530,7 @@
         "metricsHint": "Bekleme olayına göre veritabanı yükü ve veritabanı alıcılarınızın topladığı her metrik.",
         "queries": "En İyi Sorgular",
         "samples": "En Yavaş Çağrılar",
-        "samplesHintClient": "Bu pencerede enstrümante edilmiş hizmetlerinizin gözlemlediği tamamlanmış çağrılar — izleme olmayan çağıranlar sayılmaz, bu yüzden bu bir alt sınırdır, toplam değil. Tablo bunların en yavaşlarını gösterir.",
+        "samplesHintClient": "Bu pencerede uygulamanızın izlerinden ölçülen çağrılar; uygulamalarınızın görünümünü veritabanınızın bildirdiklerine ekler. Tablo bunların en yavaşlarını gösterir.",
         "samplesHintServer": "Veritabanlarınızın bu pencerede tamamlandığını bildirdiği ifadeler, veritabanının içinde sayılır. Tablo bunların en yavaşlarını gösterir.",
         "samplesHintUnknown": "Bu penceredeki en yavaş bireysel veritabanı çağrıları.",
         "deadlocks": "Kilitlenmeler",
@@ -17683,7 +17686,7 @@
         "status": "Durum"
       },
       "columnHints": {
-        "duration": "Bu tek çağrının ne kadar sürdüğü, çağıran tarafından ölçülür. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç geri dönmeyen bir sorgu burada ölçülmez."
+        "duration": "Bu tek çağrının ne kadar sürdüğü, uygulamanızın baştan sona ölçtüğü şekliyle."
       },
       "failed": "Başarısız",
       "failedWithCode": "Başarısız · {code}",

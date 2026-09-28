@@ -17098,17 +17098,17 @@
       "alertMe": "Cảnh báo tôi",
       "columnHints": {
         "qps": "Lời gọi mỗi giây — số lời gọi trong cửa sổ này chia cho độ dài của nó, để chế độ xem 15 phút và chế độ xem 4 giờ vẫn so sánh được.",
-        "p50": "Một nửa số lời gọi hoàn thành nhanh hơn mức này. Chỉ tính các lời gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ trả về sẽ không được đo ở đây.",
-        "p95": "Phần đuôi chậm — 1 trong 20 lời gọi mất ít nhất thời gian này. Chỉ tính các lời gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ trả về sẽ không được đo ở đây.",
-        "p99": "1% tệ nhất các lời gọi mất ít nhất thời gian này. Chỉ tính các lời gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ trả về sẽ không được đo ở đây.",
-        "load": "Tổng thời gian ứng dụng của bạn chờ đợi cơ sở dữ liệu này. Được đo từ phía máy khách, vì vậy nó phản ánh lượng lưu lượng mà cơ sở dữ liệu này phục vụ — không phải mức độ tải của máy chủ.",
+        "p50": "Một nửa số lệnh gọi hoàn tất nhanh hơn mức này. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
+        "p95": "Phần đuôi chậm — 1 trong 20 lệnh gọi mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
+        "p99": "1% lệnh gọi tệ nhất mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
+        "load": "Tổng thời gian ứng dụng của bạn dành cho các lệnh gọi đến cơ sở dữ liệu này, được đo từ trace của ứng dụng của bạn. Nó cho thấy cơ sở dữ liệu này đã phục vụ bao nhiêu lưu lượng cho ứng dụng của bạn.",
         "attention": "Phiên bản này gần đến mức nào so với giới hạn mà công cụ của chính nó công bố — hôm nay, số kết nối so với max_connections. Tỷ lệ tệ nhất, không phải điểm tổng hợp. Sắp xếp theo thứ tự giảm dần, với các phiên bản không thể đọc tình trạng ở trên cùng, vì một phiên bản bạn không thể thấy không phải là phiên bản bạn biết là khỏe mạnh. Được đo trên máy chủ cơ sở dữ liệu, vì vậy nó không thể so sánh với Thời gian cơ sở dữ liệu bên cạnh."
       },
       "failedChip": "{count} thất bại",
       "columnSubLabels": {
-        "attention": "máy chủ",
-        "load": "máy khách",
-        "calls": "máy khách"
+        "attention": "từ cơ sở dữ liệu",
+        "load": "từ ứng dụng của bạn",
+        "calls": "từ ứng dụng của bạn"
       },
       "attention": {
         "connections": "kết nối",
@@ -17170,14 +17170,14 @@
         "failed": "Thất bại"
       },
       "columnHints": {
-        "calls": "Số lần truy vấn này được thực thi. Số đếm của cơ sở dữ liệu của bạn ở nơi nó báo cáo — bao gồm mọi máy khách, không chỉ các phần của hệ thống gửi trace. Các hàng được đánh dấu client-observed được đếm từ trace, vì cơ sở dữ liệu của bạn không báo cáo chúng.",
-        "p50": "Một nửa số cuộc gọi hoàn thành nhanh hơn mức này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
-        "p95": "Đuôi chậm — 1 trong 20 cuộc gọi mất ít nhất khoảng thời gian này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
-        "p99": "1% cuộc gọi tệ nhất mất ít nhất khoảng thời gian này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
+        "calls": "Số lần truy vấn này đã chạy, theo số đếm của cơ sở dữ liệu của bạn — bao gồm mọi ứng dụng kết nối. Khi cơ sở dữ liệu của bạn không có số đếm cho một truy vấn, biểu tượng trace đánh dấu truy vấn được đo từ trace của ứng dụng của bạn.",
+        "p50": "Một nửa số lệnh gọi hoàn tất nhanh hơn mức này. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
+        "p95": "Phần đuôi chậm — 1 trong 20 lệnh gọi mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
+        "p99": "1% lệnh gọi tệ nhất mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
         "max": "Cuộc gọi chậm nhất duy nhất trong cửa sổ này — một cuộc gọi thực sự, không phải trung bình.",
         "errors": "Có bao nhiêu cuộc gọi trong số này trả về lỗi.",
         "perTrace": "Số lần điều này chạy bên trong một yêu cầu. Số cao thường có nghĩa là một vòng lặp.",
-        "load": "Tổng thời gian truy vấn này dành cho cơ sở dữ liệu. Số liệu của chính cơ sở dữ liệu của bạn ở nơi nó báo cáo: thời gian thực thi trên Postgres, nhưng thời gian CHỜ trên MySQL và MariaDB — mỗi hàng cho biết loại nào. Các hàng được đánh dấu client-observed được đo từ trace, vì vậy chúng bao gồm cả thời gian khứ hồi mạng."
+        "load": "Tổng thời gian truy vấn này đã ở trong cơ sở dữ liệu, theo báo cáo của cơ sở dữ liệu của bạn: thời gian thực thi trên Postgres, thời gian chờ trên MySQL và MariaDB — mỗi dòng ghi rõ là loại nào. Các dòng có biểu tượng trace được đo từ trace của ứng dụng của bạn, nên chúng cũng bao gồm cả chặng đi đến cơ sở dữ liệu và quay về."
       },
       "errorsNone": "không có",
       "errorsAll": "tất cả",
@@ -17441,8 +17441,7 @@
       "overlap": {
         "serverExecution": "Thời gian {engine} dành để thực thi nó",
         "serverWait": "Thời gian {engine} chờ nó — thời gian chờ, không phải thời gian thực thi",
-        "serverCounted": "Được đếm bởi {engine}, trên mọi máy khách",
-        "clientObserved": "Được quan sát bởi các bên gọi được cài đặt đo lường — cơ sở dữ liệu của bạn không báo cáo điều này."
+        "serverCounted": "Được đếm bởi {engine}, trên mọi máy khách"
       },
       "endpointsConcentrated": "Một endpoint chiếm {percent} thời gian của truy vấn này. Sửa {endpoint} là bạn đã sửa xong truy vấn này.",
       "typicalMarker": "lời gọi chậm {value}",
@@ -17469,8 +17468,8 @@
       },
       "serverMetrics": {
         "title": "Dữ liệu do cơ sở dữ liệu tự ghi nhận",
-        "subtitle": "Phía máy chủ — mọi máy khách",
-        "clientSubtitle": "Quan sát từ phía máy khách — chỉ các bên gọi được đo lường, chỉ các cuộc gọi hoàn tất. Một truy vấn vẫn đang chạy hoặc bị treo sẽ không nằm trong những con số này.",
+        "subtitle": "Từ cơ sở dữ liệu của bạn — mọi ứng dụng kết nối",
+        "clientSubtitle": "Các số liệu được đánh dấu được đo từ trace của ứng dụng của bạn — những lệnh gọi mà ứng dụng của bạn đã hoàn tất trong khoảng thời gian này",
         "instance": "Do {instance} báo cáo",
         "instanceWide": "Tất cả cơ sở dữ liệu trên instance này",
         "calls": "Số lần thực thi",
@@ -17516,9 +17515,13 @@
         "serverExecution": "thời gian thực thi",
         "serverWait": "thời gian chờ",
         "serverCounted": "số lượng máy chủ",
-        "clientObserved": "quan sát từ máy khách",
         "serverReported": "được báo cáo bởi các cơ sở dữ liệu của bạn"
       }
+    },
+    "appSource": {
+      "marker": "Được đo từ trace của ứng dụng của bạn",
+      "markerHint": "Được đo từ trace của ứng dụng của bạn, bổ sung góc nhìn của ứng dụng vào những gì cơ sở dữ liệu của bạn báo cáo.",
+      "legend": "Từ trace của ứng dụng của bạn"
     },
     "page": {
       "tabs": {
@@ -17527,7 +17530,7 @@
         "metricsHint": "Tải cơ sở dữ liệu theo sự kiện chờ, và mọi chỉ số mà các receiver cơ sở dữ liệu của bạn thu thập.",
         "queries": "Truy vấn hàng đầu",
         "samples": "Cuộc gọi chậm nhất",
-        "samplesHintClient": "Các cuộc gọi hoàn tất mà các dịch vụ được đo lường của bạn quan sát được trong khoảng thời gian này — các bên gọi không được truy vết không được tính, vì vậy đây là mức tối thiểu, không phải tổng số. Bảng hiển thị những cuộc gọi chậm nhất trong số đó.",
+        "samplesHintClient": "Các lệnh gọi được đo từ trace của ứng dụng của bạn trong khoảng thời gian này, bổ sung góc nhìn của ứng dụng vào những gì cơ sở dữ liệu của bạn báo cáo. Bảng hiển thị những lệnh gọi chậm nhất trong số đó.",
         "samplesHintServer": "Các câu lệnh mà cơ sở dữ liệu của bạn báo cáo đã hoàn thành trong khoảng thời gian này, được đếm trong cơ sở dữ liệu. Bảng hiển thị những câu lệnh chậm nhất.",
         "samplesHintUnknown": "Các cuộc gọi cơ sở dữ liệu riêng lẻ chậm nhất trong khoảng thời gian này.",
         "deadlocks": "Bế tắc",
@@ -17683,7 +17686,7 @@
         "status": "Trạng thái"
       },
       "columnHints": {
-        "duration": "Cuộc gọi này mất bao lâu, được đo bởi người gọi. Chỉ tính các cuộc gọi đã hoàn thành — một truy vấn đang chạy hoặc không bao giờ quay lại sẽ không được đo ở đây."
+        "duration": "Thời gian lệnh gọi này mất, theo đo đạc của ứng dụng từ lúc bắt đầu đến khi kết thúc."
       },
       "failed": "Thất bại",
       "failedWithCode": "Thất bại · {code}",

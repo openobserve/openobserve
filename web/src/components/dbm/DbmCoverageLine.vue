@@ -67,37 +67,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div
-        v-if="countedTo"
-        class="text-text-muted flex shrink-0 items-center gap-1.5"
-        data-test="dbm-coverage-counted"
-      >
-        <OIcon name="access-time" size="xs" class="shrink-0" aria-hidden="true" />
-        <i18n-t
-          v-if="countedTo.behind !== null"
-          keypath="dbm.coverage.lineCountedToBehind"
-          tag="span"
-          class="text-2xs"
-          :class="toneText"
+      <div v-if="$slots.legend || countedTo" class="flex min-w-0 items-center gap-4">
+        <!-- The key for any marker in the rows below, where the eye meets the table. -->
+        <slot name="legend" />
+        <div
+          v-if="countedTo"
+          class="text-text-muted flex shrink-0 items-center gap-1.5"
+          data-test="dbm-coverage-counted"
         >
-          <template #time>
-            <span class="font-semibold tabular-nums">{{ countedTo.time }}</span>
-          </template>
-          <template #minutes>
-            <span class="font-semibold tabular-nums">{{ countedTo.behind }}</span>
-          </template>
-        </i18n-t>
-        <i18n-t
-          v-else
-          keypath="dbm.coverage.lineCountedTo"
-          tag="span"
-          class="text-2xs"
-          :class="toneText"
-        >
-          <template #time>
-            <span class="font-semibold tabular-nums">{{ countedTo.time }}</span>
-          </template>
-        </i18n-t>
+          <OIcon name="access-time" size="xs" class="shrink-0" aria-hidden="true" />
+          <i18n-t
+            v-if="countedTo.behind !== null"
+            keypath="dbm.coverage.lineCountedToBehind"
+            tag="span"
+            class="text-2xs"
+            :class="toneText"
+          >
+            <template #time>
+              <span class="font-semibold tabular-nums">{{ countedTo.time }}</span>
+            </template>
+            <template #minutes>
+              <span class="font-semibold tabular-nums">{{ countedTo.behind }}</span>
+            </template>
+          </i18n-t>
+          <i18n-t
+            v-else
+            keypath="dbm.coverage.lineCountedTo"
+            tag="span"
+            class="text-2xs"
+            :class="toneText"
+          >
+            <template #time>
+              <span class="font-semibold tabular-nums">{{ countedTo.time }}</span>
+            </template>
+          </i18n-t>
+        </div>
       </div>
     </div>
   </div>

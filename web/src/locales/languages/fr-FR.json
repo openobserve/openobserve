@@ -17098,17 +17098,17 @@
       "alertMe": "M'alerter",
       "columnHints": {
         "qps": "Appels par seconde — les appels de cette fenêtre divisés par sa durée, de sorte qu'une vue de 15 minutes et une vue de 4 heures restent comparables.",
-        "p50": "La moitié de tous les appels se sont terminés plus vite que cela. Ne compte que les appels terminés — une requête encore en cours, ou une qui n'est jamais revenue, n'est pas mesurée ici.",
-        "p95": "La queue lente — 1 appel sur 20 a pris au moins ce temps. Ne compte que les appels terminés — une requête encore en cours, ou une qui n'est jamais revenue, n'est pas mesurée ici.",
-        "p99": "Le 1 % des appels les plus lents a pris au moins ce temps. Ne compte que les appels terminés — une requête encore en cours, ou une qui n'est jamais revenue, n'est pas mesurée ici.",
-        "load": "Temps total que vos applications ont passé à attendre sur cette base de données. Mesuré côté client, il reflète donc le trafic servi par cette base de données — pas la charge du serveur.",
+        "p50": "La moitié des appels se sont terminés plus rapidement que cette valeur. Mesuré à partir des appels terminés dans les traces de votre application.",
+        "p95": "La queue lente — 1 appel sur 20 a pris au moins ce temps. Mesuré à partir des appels terminés dans les traces de votre application.",
+        "p99": "Le pire 1 % des appels a pris au moins ce temps. Mesuré à partir des appels terminés dans les traces de votre application.",
+        "load": "Temps total que vos applications ont consacré aux appels vers cette base de données, mesuré à partir des traces de votre application. Il indique le volume de trafic que cette base de données a servi pour vos applications.",
         "attention": "À quel point cette instance est proche d'une limite publiée par son propre moteur — aujourd'hui, les connexions par rapport à max_connections. Le pire ratio de ce type, pas un score pondéré. Trié du plus élevé au plus bas, avec les instances dont la santé ne peut pas être lue en haut, car une instance que vous ne pouvez pas voir n'est pas une instance dont vous savez qu'elle est saine. Mesuré sur le serveur de base de données, il n'est donc pas comparable avec le temps de base de données à côté."
       },
       "failedChip": "{count} échoués",
       "columnSubLabels": {
-        "attention": "serveur",
-        "load": "client",
-        "calls": "client"
+        "attention": "depuis la base de données",
+        "load": "depuis vos applications",
+        "calls": "depuis vos applications"
       },
       "attention": {
         "connections": "connexions",
@@ -17170,14 +17170,14 @@
         "failed": "Échec"
       },
       "columnHints": {
-        "calls": "Combien de fois cette requête a été exécutée. Le compteur propre à votre base de données lorsqu'elle en fournit un — il couvre tous les clients, pas seulement les parties de votre système qui envoient des traces. Les lignes marquées « observé par le client » sont comptées à partir des traces à la place, car votre base de données ne les a pas rapportées.",
-        "p50": "La moitié de tous les appels se sont terminés plus rapidement que ceci. Compte uniquement les appels terminés — une requête encore en cours, ou qui n'est jamais revenue, n'est pas mesurée ici.",
-        "p95": "La traîne lente — 1 appel sur 20 a pris au moins ce temps. Compte uniquement les appels terminés — une requête encore en cours, ou qui n'est jamais revenue, n'est pas mesurée ici.",
-        "p99": "Les 1% des appels les plus lents ont pris au moins ce temps. Compte uniquement les appels terminés — une requête encore en cours, ou qui n'est jamais revenue, n'est pas mesurée ici.",
+        "calls": "Nombre de fois où cette requête a été exécutée, tel que compté par votre base de données — toutes les applications qui se connectent sont incluses. Lorsque votre base de données n'a pas de comptage pour une requête, l'icône de traces signale une mesure issue des traces de votre application.",
+        "p50": "La moitié des appels se sont terminés plus rapidement que cette valeur. Mesuré à partir des appels terminés dans les traces de votre application.",
+        "p95": "La queue lente — 1 appel sur 20 a pris au moins ce temps. Mesuré à partir des appels terminés dans les traces de votre application.",
+        "p99": "Le pire 1 % des appels a pris au moins ce temps. Mesuré à partir des appels terminés dans les traces de votre application.",
         "max": "L'appel le plus lent de cette fenêtre — un appel réel, pas une moyenne.",
         "errors": "Combien de ces appels sont revenus avec une erreur.",
         "perTrace": "Combien de fois cela s'exécute dans une seule requête. Un nombre élevé signifie généralement une boucle.",
-        "load": "Temps total que cette requête a passé dans la base de données. Le chiffre propre à votre base de données lorsqu'elle en fournit un : temps d'exécution sur Postgres, mais temps d'attente sur MySQL et MariaDB — chaque ligne indique lequel. Les lignes marquées « observé par le client » sont mesurées à partir des traces, elles incluent donc l'aller-retour réseau."
+        "load": "Temps total que cette requête a passé dans la base de données, tel que rapporté par votre base de données : temps d'exécution sur Postgres, temps d'attente sur MySQL et MariaDB — chaque ligne précise lequel. Les lignes avec l'icône de traces sont mesurées à partir des traces de votre application et incluent donc aussi l'aller-retour vers la base de données."
       },
       "errorsNone": "Aucun",
       "errorsAll": "Tous",
@@ -17441,8 +17441,7 @@
       "overlap": {
         "serverExecution": "Temps passé par {engine} à l'exécuter",
         "serverWait": "Temps passé par {engine} à attendre — temps d'attente, pas temps d'exécution",
-        "serverCounted": "Compté par {engine}, sur chaque client",
-        "clientObserved": "Observé par des appelants instrumentés — votre base de données n'a pas signalé celui-ci"
+        "serverCounted": "Compté par {engine}, sur chaque client"
       },
       "endpointsConcentrated": "Un point de terminaison représente {percent} du temps de cette requête. Corrigez {endpoint} et vous avez corrigé cette requête.",
       "typicalMarker": "appels lents {value}",
@@ -17469,8 +17468,8 @@
       },
       "serverMetrics": {
         "title": "Ce que la base de données elle-même a enregistré",
-        "subtitle": "Côté serveur — tous les clients",
-        "clientSubtitle": "Observé par le client — uniquement les appelants instrumentés, uniquement les appels terminés. Une requête encore en cours, ou qui est restée bloquée, n'est pas dans ces chiffres.",
+        "subtitle": "Depuis votre base de données — toutes les applications qui se connectent",
+        "clientSubtitle": "Les valeurs marquées sont mesurées à partir des traces de votre application — les appels que vos applications ont terminés dans cette fenêtre",
         "instance": "Signalé par {instance}",
         "instanceWide": "Toutes les bases de données sur cette instance",
         "calls": "Exécutions",
@@ -17516,9 +17515,13 @@
         "serverExecution": "temps d'exécution",
         "serverWait": "temps d'attente",
         "serverCounted": "nombre de serveurs",
-        "clientObserved": "observé par le client",
         "serverReported": "signalé par vos bases de données"
       }
+    },
+    "appSource": {
+      "marker": "Mesuré à partir des traces de votre application",
+      "markerHint": "Mesuré à partir des traces de votre application, en ajoutant la vision de vos applications à ce que rapporte votre base de données.",
+      "legend": "Depuis les traces de votre application"
     },
     "page": {
       "tabs": {
@@ -17527,7 +17530,7 @@
         "metricsHint": "Charge de la base de données par événement d'attente, et chaque métrique collectée par vos récepteurs de base de données.",
         "queries": "Requêtes principales",
         "samples": "Appels les plus lents",
-        "samplesHintClient": "Appels terminés que vos services instrumentés ont observés dans cette fenêtre — les appelants sans traçage ne sont pas comptés, donc il s'agit d'un minimum, pas du total. Le tableau montre les plus lents d'entre eux.",
+        "samplesHintClient": "Appels mesurés à partir des traces de votre application dans cette fenêtre, en ajoutant la vision de vos applications à ce que rapporte votre base de données. Le tableau affiche les plus lents d'entre eux.",
         "samplesHintServer": "Instructions que vos bases de données ont signalées comme terminées dans cette fenêtre, comptées dans la base de données. Le tableau montre les plus lentes d'entre elles.",
         "samplesHintUnknown": "Les appels de base de données individuels les plus lents dans cette fenêtre.",
         "deadlocks": "Interblocages",
@@ -17683,7 +17686,7 @@
         "status": "Statut"
       },
       "columnHints": {
-        "duration": "Combien de temps cet appel a pris, mesuré par l'appelant. Ne compte que les appels terminés — une requête encore en cours, ou qui n'est jamais revenue, n'est pas mesurée ici."
+        "duration": "Durée de cet appel, telle que chronométrée par votre application du début à la fin."
       },
       "failed": "Échec",
       "failedWithCode": "Échec · {code}",
