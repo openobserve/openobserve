@@ -85,7 +85,10 @@ describe("defaultJobMappingValue", () => {
     expect(defaultJobMappingValue("spans", "trace")).toBe("{{spans}}");
     expect(defaultJobMappingValue("statistics", "session")).toBe("{{statistics}}");
     expect(defaultJobMappingValue("steps", "session")).toBe("{{steps}}");
-    expect(defaultJobMappingValue("input", "session")).toBe("{{gen_ai_input_messages}}");
+    expect(defaultJobMappingValue("input", "session")).toBe("{{input}}");
+    expect(defaultJobMappingValue("output", "session")).toBe("{{output}}");
+    expect(defaultJobMappingValue("tool_calls", "trace")).toBe("{{tool_calls}}");
+    expect(defaultJobMappingValue("tool_calls", "session")).toBe("{{tool_calls}}");
   });
 });
 

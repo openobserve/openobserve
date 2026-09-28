@@ -1739,7 +1739,7 @@ async fn process_enrichment_table_url(
 async fn save_enrichment_batch(
     org_id: &str,
     table_name: &str,
-    payload: Vec<json::Map<String, json::Value>>,
+    mut payload: Vec<json::Map<String, json::Value>>,
     append_data: bool,
     is_first_batch: bool,
 ) -> Result<(arrow_schema::Schema, i64)> {
@@ -1807,6 +1807,8 @@ async fn save_enrichment_batch(
         )
         .await;
     }
+
+    super::apply_redaction(org_id, &stream_name, &mut payload).await;
 
     // Prepare records with timestamp
     let mut records = vec![];

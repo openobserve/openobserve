@@ -1474,6 +1474,8 @@
     "sessionReplay": "Rediffusion de la session",
     "viewSessionReplay": "Afficher la rediffusion de la session",
     "playSessionReplay": "Replay de la session",
+    "noReplayRecordedTitle": "Aucun replay n'a été enregistré pour cette session",
+    "noReplayRecordedMessage": "La session {id} n'a aucun segment de replay à lire.",
     "discoverSessionTitle": "Découvrez Session Replay pour comprendre en détail les interactions des utilisateurs",
     "discoverSessionMessage": "Session Replay capture et rejoue les interactions des utilisateurs sur votre site Web ou votre application. Cela vous permet d'examiner visuellement la façon dont les utilisateurs naviguent, où ils cliquent, ce qu'ils saisissent et comment ils interagissent avec votre contenu",
     "loadingErrorDetails": "Attendez, nous sommes en train de récupérer les détails de l'erreur.",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "Commencer l'essai gratuit"
   },
   "login": {
+    "lockedOut": "Trop de tentatives de connexion échouées. Réessayez dans {duration} ou contactez votre administrateur.",
     "redirectingToSsoMessage": "Redirection vers la page de connexion SSO. Si vous n'êtes pas redirigé, veuillez",
     "clickHere": "cliquez ici",
     "loginWithSso": "Se connecter avec SSO",
@@ -1963,6 +1966,15 @@
     "fieldRequired": "Ce champ est obligatoire",
     "passwordRequired": "Le mot de passe est obligatoire.",
     "passwordPolicyHint": "Le mot de passe doit être composé de 8 à 128 caractères et contenir au moins une lettre minuscule, une lettre majuscule, un chiffre et un caractère spécial.",
+    "lockout": {
+      "locked": "Compte verrouillé",
+      "autoUnlock": "Déverrouillage automatique dans {duration}.",
+      "staged": "Sera déverrouillé lorsque vous enregistrerez.",
+      "unlock": "Déverrouiller",
+      "undo": "Garder verrouillé",
+      "confirmTitle": "Déverrouiller {email} ?",
+      "confirmMessage": "Cela réinitialise leur nombre de tentatives échouées et leur permet de se reconnecter immédiatement. Cela ne modifie pas leur mot de passe."
+    },
     "currentPasswordRequired": "Le mot de passe actuel est requis.",
     "newPasswordRequired": "Un nouveau mot de passe est requis.",
     "otherOrgInvalid": "Le nom de l'organisation doit commencer par une lettre et être alphanumérique, _ ou -.",
@@ -2029,11 +2041,11 @@
       "addToGroup": "Ajouter à un groupe d'utilisateurs",
       "addToRole": "Attribuer un rôle",
       "step1Title": "Copiez votre jeton",
-      "copyHint": "Copiez ce jeton maintenant, vous ne pourrez plus le voir.",
+      "copyHint": "C'est la seule fois où vous verrez ce jeton. Copiez-le ou téléchargez-le maintenant, il ne pourra plus être récupéré.",
       "done": "Terminé",
       "applying": "Application des autorisations d'accès...",
-      "grantedRoles": "Rôles attribués : {roles}",
-      "grantedGroups": "Ajouté aux groupes d'utilisateurs : {groups}",
+      "rolesAssignedLabel": "Rôles attribués",
+      "groupsAssignedLabel": "Ajouté aux groupes d'utilisateurs",
       "failedRoles": "Impossible d'attribuer les rôles : {roles}",
       "failedGroups": "Impossible d'ajouter aux groupes d'utilisateurs : {groups}",
       "failedHint": "Vous pouvez les accorder ultérieurement depuis les pages Rôles et Groupes d'utilisateurs."
@@ -2043,6 +2055,9 @@
         "label": "Nom du compte de service",
         "placeholder": "ex. ingest-bot",
         "help": "Lettres minuscules, chiffres et traits d'union. Enregistré sous name{suffix}"
+      },
+      "identifier": {
+        "label": "Identifiant"
       },
       "roles": {
         "label": "Attribuer des rôles",
@@ -2057,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Identifiant",
+        "roles": "Rôles",
         "token": "Jeton",
         "created": "Créé"
       }
@@ -2184,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Tous les utilisateurs et comptes de service liés à ces rôles perdront l'accès."
-      }
+      },
+      "assignColumn": "Attribuer",
+      "assignBtn": "Ajouter",
+      "assignedBadge": "Attribué",
+      "assignBannerText": "Ajoutez {member} à un rôle — cliquez sur Ajouter à côté d'un rôle ci-dessous.",
+      "assignBannerDone": "Terminé",
+      "assignSuccess": "Ajout de {member} au rôle \"{role}\".",
+      "assignError": "Impossible d'ajouter le compte à ce rôle. Veuillez réessayer."
     },
     "group": {
       "name": {
@@ -2215,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Les membres de ces groupes perdront les rôles qu'ils leur ont attribués."
-      }
+      },
+      "assignColumn": "Attribuer",
+      "assignBtn": "Ajouter",
+      "assignedBadge": "Attribué",
+      "assignBannerText": "Ajoutez {member} à un groupe d'utilisateurs — cliquez sur Ajouter à côté d'un groupe ci-dessous.",
+      "assignBannerDone": "Terminé",
+      "assignSuccess": "Ajout de {member} au groupe \"{group}\".",
+      "assignError": "Impossible d'ajouter le compte à ce groupe. Veuillez réessayer."
     },
     "appGroups": {
       "deleteGroupTitle": "Supprimer le groupe",
@@ -3585,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Erreur lors de la copie du contenu.",
+    "passcodeForbiddenMessage": "Le rôle Admin ou Root est nécessaire pour voir le jeton d'ingestion. Demandez à un administrateur la commande de configuration, ou le rôle requis pour le voir ici.",
     "updateRUMTokenMessage": "Êtes-vous sûr de vouloir mettre à jour le jeton RUM pour cette organisation ?",
     "completeAwsIntegration": "Terminer l'intégration AWS",
     "deployAwsServicesOneClick": "Déployez tous les services AWS sélectionnés en un clic à l'aide d'une seule pile CloudFormation.",
@@ -4966,7 +4997,7 @@
     "colorLightToDarkBlue": "Bleu clair à bleu foncé (par valeur)",
     "colorPaletteClassicBySeries": "Palette-Classic (par série)",
     "drilldown": "Drill down",
-    "drilldownTooltip": "Accédez à un autre tableau de bord ou à une URL spécifiée, en reprenant toutes les variables actuelles pour une exploration fluide des données.",
+    "drilldownTooltip": "Naviguez vers un autre tableau de bord ou une URL spécifiée, en conservant toutes les variables actuelles pour une exploration fluide des données.",
     "colorBySeriesTitle": "Couleur par série",
     "colorBySeriesTooltip": "Appliquez des couleurs aux séries pour une meilleure distinction visuelle dans les graphiques. Personnalisez les couleurs de chaque série afin d'améliorer la visualisation des données.",
     "editColorBySeries": " Modifier la couleur par série",
@@ -5825,7 +5856,36 @@
     "variableNameAlreadyExists": "Une variable portant le même nom existe déjà",
     "pivotTotal": "Total",
     "pivotOthers": "Autres",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Afficher les exemplaires (échantillons de traces)",
+      "hide": "Masquer les exemplaires · {count} affichés",
+      "empty": "Aucun exemplaire dans cette plage temporelle",
+      "emptyShort": "0 exemplaire",
+      "loadFailed": "Impossible de charger les exemplaires",
+      "loadFailedHint": "Le graphique n'est pas affecté. Réessayer ne récupère que les exemplaires.",
+      "retry": "Réessayer",
+      "cardTitle": "Exemplaire",
+      "query": "Requête {name}",
+      "returnedBy": "Retourné par {count} requête | Retourné par {count} requêtes",
+      "series": "Série",
+      "aboveRange": "Au-dessus de la plage du graphique ; dessiné sur le bord supérieur",
+      "belowRange": "En dessous de la plage du graphique ; dessiné sur le bord inférieur",
+      "checkingTrace": "Vérification de la trace…",
+      "openTrace": "Ouvrir la trace",
+      "openTraceHint": "Ou cliquez sur le marqueur. Retour vous ramène ici.",
+      "traceNotAvailable": "Trace indisponible — exclue par l'échantillonnage ou au-delà de la rétention",
+      "openTraceUnverified": "Ouvrir la trace (non vérifiée)",
+      "unverifiedTimeout": "La recherche de la trace a expiré ; cette trace est peut-être absente.",
+      "unverifiedForbidden": "Impossible de confirmer cette trace — vous n'avez peut-être pas accès aux traces.",
+      "unverifiedPartial": "Seule une partie de la fenêtre de rétention a été recherchée.",
+      "unverifiedError": "Impossible de vérifier cette trace.",
+      "noTraceId": "Aucun {label} sur cet exemplaire, il n'y a donc aucune trace à ouvrir.",
+      "markersAria": "Marqueurs d'exemplaires",
+      "markerAria": "Exemplaire {value} à {time}"
+    },
+    "showExemplarsLabel": "Afficher les exemplaires",
+    "showExemplarsHelp": "Dessine les échantillons de traces sur ce graphique pour toute personne qui ouvre le tableau de bord. Les spectateurs peuvent toujours les masquer depuis l'en-tête du panneau."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7500,7 +7560,10 @@
       "lastError": "Dernière erreur",
       "lastTrained": "Dernier entraînement",
       "lookBackWindow": "Fenêtre Look Back",
-      "lookBackWindowTooltip": "Depuis combien de temps chaque détection exécute les requêtes. Permet de fermer la fenêtre même après une longue pause. La valeur par défaut est Check Every Interval.",
+      "lookBackWindowFloor": "La Fenêtre d'analyse rétrospective doit être d'au moins {min} — Intervalle de vérification plus une Résolution de détection. Une fenêtre plus courte ne peut pas contenir un bucket complet au moment où une exécution se déclenche, les buckets seraient donc ignorés.",
+      "lookBackWindowLegacy": "Cette fenêtre enregistrée est inférieure au minimum de {min} (Intervalle de vérification plus une Résolution de détection). Elle sera enregistrée sans modification, mais les exécutions peuvent ignorer des buckets tant que la fenêtre n'est pas augmentée.",
+      "lookBackWindowMinimum": "Minimum {min}. Recommandé : {recommended} ou plus — soit deux fois (Intervalle de vérification + Résolution de détection) — plus 10 minutes lorsque la détection d'absence est activée.",
+      "lookBackWindowTooltip": "Profondeur sur laquelle chaque exécution de détection interroge les données. Plafonne la fenêtre même après une longue pause. Elle doit couvrir au moins l'Intervalle de vérification plus une Résolution de détection, sinon des buckets complets sortent de la fenêtre avant qu'une exécution puisse les évaluer.",
       "metricChart": "Métrique et anomalies",
       "metricChartHint": "Un point par intervalle de détection",
       "model": "Modèle",
@@ -7508,6 +7571,15 @@
       "nDays": "{days} jour | {days} jours",
       "noDestinationsFound": "Aucune destination trouvée",
       "noFieldsFound": "Aucun champ n'a été trouvé",
+      "noticeHybridFallback": "Détection de repli",
+      "noticeHybridFallbackTooltip": "Le seuil hybride était indisponible lors des exécutions récentes, la détection s'est donc rabattue sur le seuil figé. Le scoring se poursuit sur le seuil figé jusqu'au réentraînement du modèle.",
+      "noticeRetrain": "Réentraînement automatique",
+      "noticeRetrainTooltip": "Le modèle enregistré n'a pas pu être lu après une mise à niveau ; il a donc été écarté et la configuration a été mise en file d'attente pour un réentraînement automatique. Aucune action n'est requise ; la détection reprend une fois l'entraînement terminé.",
+      "noticeSkipAbsence": "L'évaluation des absences a pris du retard sur la Fenêtre d'analyse rétrospective ; le span qui ne pouvait plus être récupéré a été ignoré et enregistré.",
+      "noticeSkipScored": "Les exécutions de détection sont arrivées plus espacées que ne le couvre la Fenêtre d'analyse rétrospective ; des buckets clôturés sont donc sortis de la fenêtre avant qu'une exécution puisse les évaluer.",
+      "noticeWindowFloor": "Fenêtre trop étroite",
+      "noticeWindowFloorTooltip": "La Fenêtre d'analyse rétrospective est inférieure à l'Intervalle de vérification plus une Résolution de détection ; les exécutions ne peuvent donc évaluer aucun bucket. Augmentez la fenêtre pour rétablir la détection.",
+      "noticeWindowSkip": "Buckets ignorés",
       "notifications": "Notifications",
       "notificationsTooltip": "Lorsqu'elle est activée, une notification sera envoyée à la destination sélectionnée chaque fois qu'une anomalie est détectée.",
       "percentile": "Niveau",
@@ -7604,7 +7676,9 @@
       "usernameRequired": "Le nom d'utilisateur est requis",
       "passwordRequired": "Le mot de passe est requis",
       "emailRecipients": "Adresses e-mail des destinataires",
-      "emailRecipientsHelp": "Adresses e-mail séparées par des virgules",
+      "emailRecipientsHelp": "Sélectionnez les utilisateurs de l'organisation ou les comptes de service qui doivent recevoir les e-mails d'alerte",
+      "emailRecipientsGroupUsers": "Utilisateurs",
+      "emailRecipientsGroupServiceAccounts": "Comptes de service",
       "invalidEmailAddresses": "Adresses e-mail invalides : {emails}",
       "opsgenieApiKey": "Clé API Opsgenie",
       "opsgenieApiKeyHelp": "Obtenez votre clé API depuis les paramètres d'intégration Opsgenie",
@@ -7921,7 +7995,18 @@
     "enabled": "Activé",
     "paused": "En pause",
     "impactTemplate": "Utilisé par {destinations} · {alerts}",
-    "impactDestination": "Utilisé par {alerts}"
+    "impactDestination": "Utilisé par {consumers}",
+    "impactUnused": "Non utilisé",
+    "noConsumers": "Aucun consommateur.",
+    "countCompositeAlert": "{count} alerte composite | {count} alertes composites",
+    "countPipeline": "{count} canalisation | {count} canalisations",
+    "countSyntheticCheck": "{count} contrôle synthétique | {count} contrôles synthétiques",
+    "countOncallPolicy": "{count} politique d'escalade | {count} politiques d'escalade",
+    "countOncallTeamChannel": "{count} canal d'équipe | {count} canaux d'équipe",
+    "countWorkflow": "{count} workflow | {count} workflows",
+    "countAnomalyDetection": "{count} détecteur d'anomalies | {count} détecteurs d'anomalies",
+    "countIncidentIntegration": "{count} intégration d'incident | {count} intégrations d'incident",
+    "sectionOtherConsumers": "Aussi utilisé par"
   },
   "alert_library": {
     "header": "Bibliothèque d'alertes",
@@ -8605,7 +8690,9 @@
         "staleCopyAria": "Copier les détails de l'échec d'actualisation pour {name}",
         "stalePreamble": "Échec de l'actualisation — affichage du dernier résultat réussi.",
         "staleClickToCopy": "Cliquez pour copier les détails.",
-        "lastRefreshedPrefix": "Dernière actualisation à : "
+        "lastRefreshedPrefix": "Dernière actualisation à : ",
+        "exemplarsShowHeatmap": "Afficher les exemplaires (échantillons de traces). Bascule cette carte en percentiles tant que l'option est active.",
+        "exemplarsHideHeatmap": "Masquer les exemplaires · {count} affichés. Rétablit cette carte en carte de chaleur."
       },
       "fn": {
         "subtitle": "Choisissez comment cette métrique est agrégée",
@@ -8789,6 +8876,8 @@
     "cipherKeysDesc": "Clés de chiffrement pour les champs sensibles",
     "regexPatternsDesc": "Modèles regex réutilisables pour le masquage",
     "domainManagementDesc": "Restreindre la connexion aux domaines SSO autorisés",
+    "passwordPolicy": "Politique de mots de passe",
+    "passwordPolicyDesc": "Politiques d'authentification pour les comptes natifs e-mail/mot de passe, appliquées à l'ensemble de l'instance.",
     "pipelineDestinationsDesc": "Cibles externes pour la sortie du pipeline",
     "templatesDesc": "Modèles de messages d'alerte réutilisables",
     "storageSettingsDesc": "Configuration du stockage par organisation",
@@ -13041,10 +13130,12 @@
           },
           "variables": {
             "input": {
-              "trace": "Entrée provenant du span racine de la trace."
+              "trace": "Entrée provenant du span de chat racine de la trace.",
+              "session": "La question d'ouverture : entrée provenant du span de chat racine de la première trace."
             },
             "output": {
-              "trace": "Sortie provenant du span racine de la trace."
+              "trace": "Sortie provenant du span de chat racine de la trace.",
+              "session": "La réponse finale : sortie provenant du span de chat racine de la dernière trace."
             },
             "statistics": {
               "trace": "Métriques de trace : nombre de spans, durée, appels LLM et d'outils, erreurs, tokens et coût.",
@@ -13056,6 +13147,10 @@
             "steps": {
               "trace": "Spans dans l'ordre chronologique ; le milieu est replié lorsque la trace est très longue.",
               "session": "Traces dans l'ordre chronologique, représentées comme des tours de conversation."
+            },
+            "tool_calls": {
+              "trace": "Chaque appel d'outil dans la trace, par ordre chronologique, avec son nom, son entrée, sa sortie et son statut.",
+              "session": "Chaque appel d'outil dans les traces de la session, par ordre chronologique, avec son nom, son entrée, sa sortie et son statut."
             }
           }
         }
@@ -13375,6 +13470,7 @@
       "searchHistoryNotEnabled": "L'historique de recherche n'est pas activé.",
       "enableUsageReporting": "Définissez ZO_USAGE_REPORTING_ENABLED sur true pour activer le rapport d'utilisation.",
       "selectStreamToExtractPatterns": "Veuillez sélectionner un flux pour extraire les motifs",
+      "patternsUnavailableForMultiStream": "Les motifs ne sont pas disponibles lorsque plusieurs flux sont sélectionnés. Veuillez sélectionner un seul flux.",
       "errorExtractingPatterns": "Erreur lors de l'extraction des motifs. Veuillez réessayer.",
       "nameOfPanelRequired": "Le nom du panneau est requis",
       "errorsFixAndTryAgain": "Il y a des erreurs, veuillez les corriger et réessayer",
@@ -15164,7 +15260,6 @@
       "syntheticsTokensRefresh": "Actualiser la liste des jetons",
       "aiChatToggle": "Activer/désactiver le chat IA",
       "aiChatClose": "Fermer le chat IA",
-      "aiChatExpand": "Développer/réduire le chat IA",
       "logsSaveView": "Enregistrer en tant que vue enregistrée",
       "logsExport": "Exporter les résultats au format CSV",
       "tracesCopyUrl": "Copier l'URL de partage de la trace",
@@ -15291,6 +15386,9 @@
       "noOptionsFound": "Aucune option trouvée",
       "multiSelect": "Sélection multiple",
       "singleSelect": "Sélection unique"
+    },
+    "templateInput": {
+      "suggestions": "Suggestions de variables"
     },
     "time": {
       "openTimePicker": "Ouvrir le sélecteur d'heure",
@@ -15777,7 +15875,8 @@
         "destinations": "Destinations",
         "templates": "Modèles",
         "reports": "Rapports",
-        "llmModelPricing": "Tarification des modèles LLM"
+        "llmModelPricing": "Tarification des modèles LLM",
+        "passcode": "Jeton d'ingestion"
       },
       "noPermissionToChangeFavorites": "Vous n'avez pas la permission de modifier les favoris",
       "couldNotUpdateFavoriteDashboards": "Impossible de mettre à jour les tableaux de bord favoris"
@@ -16015,6 +16114,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "Vous n'avez pas encore initié le processus d'ingestion des données. Pour explorer d'autres pages, veuillez démarrer l'ingestion des données."
+    },
+    "iam": {
+      "userSaveFailed": "Impossible d'enregistrer l'utilisateur"
     }
   },
   "cipherKeys": {
@@ -16432,7 +16534,106 @@
       "exponentName": "Exposant"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Complexité",
+    "minLength": "Longueur minimale",
+    "minLengthDesc": "Mot de passe le plus court accepté",
+    "maxLength": "Longueur maximale",
+    "maxLengthDesc": "0 = sans limite",
+    "requireUppercase": "Exiger une lettre majuscule",
+    "requireUppercaseDesc": "Au moins un A–Z",
+    "requireLowercase": "Exiger une lettre minuscule",
+    "requireLowercaseDesc": "Au moins un a–z",
+    "requireDigit": "Exiger un chiffre",
+    "requireDigitDesc": "Au moins un 0–9",
+    "requireSpecial": "Exiger un caractère spécial",
+    "requireSpecialDesc": "Au moins un caractère de l'ensemble autorisé",
+    "specialCharSet": "Caractères spéciaux autorisés",
+    "specialCharSetDesc": "Laisser vide pour accepter tout caractère non alphanumérique",
+    "maxLengthTooSmall": "La longueur maximale doit être au moins égale à la longueur minimale, ou 0 pour aucune limite.",
+    "confirmTitle": "Enregistrer la politique de mots de passe ?",
+    "confirmMessage": "L'enregistrement peut forcer chaque utilisateur natif à définir un nouveau mot de passe avant de pouvoir continuer. Les comptes root, les utilisateurs externes et les comptes de service en sont exemptés — y compris vous, sauf si vous êtes le compte root. Cette action est irréversible.",
+    "saved": "Politique de mots de passe enregistrée. | Politique de mots de passe enregistrée. {count} utilisateur doit réinitialiser son mot de passe. | Politique de mots de passe enregistrée. {count} utilisateurs doivent réinitialiser leur mot de passe.",
+    "saveFailed": "Impossible d'enregistrer la politique de mots de passe.",
+    "notAdminTitle": "Accès administrateur requis",
+    "notAdmin": "La configuration de la politique de mots de passe nécessite un administrateur de l'organisation meta.",
+    "loadFailedTitle": "Impossible de charger la politique de mots de passe",
+    "loadFailed": "Une erreur s'est produite lors de la lecture de la politique actuelle.",
+    "rotation": "Rotation",
+    "rotationDays": "Période de rotation",
+    "rotationDaysDesc": "Nombre de jours avant l'expiration d'un mot de passe. 0 = n'expire jamais",
+    "rotationWarningDays": "Avertir avant l'expiration",
+    "rotationWarningDaysDesc": "Nombre de jours de préavis à la connexion. 0 = aucun avertissement",
+    "warningDaysTooLong": "La fenêtre d'avertissement ne peut pas être plus longue que la période de rotation.",
+    "rotationPreview": "Un mot de passe défini aujourd'hui expire {expires}. L'avertissement à la connexion commence {warns}.",
+    "rotationPreviewNoWarning": "Un mot de passe défini aujourd'hui expire {expires}. Aucun avertissement n'est affiché avant cette date.",
+    "reuse": "Prévention de la réutilisation",
+    "historyCount": "Mots de passe mémorisés",
+    "historyCountDesc": "Un nouveau mot de passe ne peut pas correspondre à ce nombre de mots de passe précédents. 0 = aucune vérification",
+    "historyMaxRetained": "Historique conservé",
+    "historyMaxRetainedDesc": "Nombre de mots de passe passés conservés par utilisateur",
+    "historyRetainedTooSmall": "L'historique conservé doit être au moins égal au nombre de mots de passe mémorisés.",
+    "reuseExplainer": "Le mot de passe actuel compte parmi l'ensemble mémorisé — sa réutilisation est refusée par cette règle, et non par une vérification distincte.",
+    "lockout": "Verrouillage du compte",
+    "lockoutThreshold": "Tentatives échouées avant verrouillage",
+    "lockoutThresholdDesc": "0 = verrouillage désactivé",
+    "lockoutBucketSize": "Tentatives avant chaque verrouillage supplémentaire",
+    "lockoutBucketSizeDesc": "0 = réutiliser la valeur ci-dessus",
+    "lockoutStartSecs": "Durée du premier verrouillage",
+    "lockoutStartSecsDesc": "Secondes",
+    "lockoutMaxSecs": "Durée maximale du verrouillage",
+    "lockoutMaxSecsDesc": "Secondes — le plafond auquel l'escalade est limitée",
+    "lockoutStartTooLong": "Le premier verrouillage ne peut pas être plus long que le verrouillage maximal.",
+    "lockoutBackoff": "Escalade",
+    "lockoutBackoffDesc": "Comment chaque verrouillage augmente par rapport au précédent",
+    "backoffExponential": "Exponentielle",
+    "backoffLinear": "Linéaire",
+    "lockoutPreview": "{threshold} échecs → {first} · puis tous les {bucket} → {rest} · plafonné à {max}. Une connexion réussie réinitialise tout.",
+    "sessionEnforcement": "Session et application",
+    "cookieMaxAge": "Durée de vie de la session",
+    "cookieMaxAgeDesc": "Durée en secondes pendant laquelle une session connectée reste valide. 0 = utiliser la valeur par défaut de l'instance définie par {envVar}",
+    "applyToRoot": "Appliquer au compte root",
+    "applyToRootDesc": "Root est exempté de toutes les règles ci-dessus, sauf si cette option est activée",
+    "rootWarning": "Verrouiller root pourrait placer le système dans un état irrécupérable.",
+    "rootDialogTitle": "Appliquer la politique à root ?",
+    "rootDialogMessage": "Root sera soumis au verrouillage, à la rotation et aux réinitialisations forcées comme tout autre compte natif. Si root est votre seul compte d'administration, un verrouillage ou une expiration qu'il ne peut satisfaire ne laissera aucun moyen de revenir dans cette instance.",
+    "rootDialogAck": "Je comprends que root peut être définitivement exclu de cette instance.",
+    "rootDialogConfirm": "Appliquer à root"
+  },
+  "passwordReset": {
+    "title": "Mettez à jour votre mot de passe",
+    "signedInAs": "Connecté en tant que {email}",
+    "reasonPolicyTightened": "La politique de mots de passe a changé. Mettez à jour votre mot de passe pour continuer à utiliser OpenObserve.",
+    "reasonRotationExpired": "Votre mot de passe a expiré. Définissez-en un nouveau pour continuer à utiliser OpenObserve.",
+    "reasonRotationWarning": "Votre mot de passe expire bientôt. Définissez-en un nouveau dès maintenant pour éviter d'être bloqué dans votre travail.",
+    "reused": "Ce mot de passe a été utilisé récemment. Choisissez-en un que vous n'avez pas utilisé parmi vos {count} derniers mots de passe.",
+    "expiryBanner": "Votre mot de passe expire dans {count} jour. Mettez-le à jour maintenant pour éviter d'être bloqué dans votre travail. | Votre mot de passe expire dans {count} jours. Mettez-le à jour maintenant pour éviter d'être bloqué dans votre travail.",
+    "expiryBannerAction": "Mettre à jour maintenant",
+    "expiryBannerDismiss": "Ignorer",
+    "currentPassword": "Mot de passe actuel",
+    "newPassword": "Nouveau mot de passe",
+    "confirmPassword": "Confirmer le nouveau mot de passe",
+    "currentPasswordRequired": "Le mot de passe actuel est obligatoire.",
+    "newPasswordRequired": "Le nouveau mot de passe est obligatoire.",
+    "confirmPasswordRequired": "Veuillez saisir à nouveau le nouveau mot de passe.",
+    "mismatch": "Les mots de passe ne correspondent pas.",
+    "signOut": "Déconnectez-vous",
+    "submit": "Mettre à jour le mot de passe",
+    "updated": "Votre mot de passe a été mis à jour. Veuillez vous reconnecter.",
+    "updateFailed": "Impossible de mettre à jour votre mot de passe.",
+    "req": {
+      "minLength": "Au moins {count} caractères",
+      "maxLength": "Pas plus de {count} caractères",
+      "uppercase": "Une lettre majuscule",
+      "lowercase": "Une lettre minuscule",
+      "digit": "Un chiffre",
+      "special": "Un caractère spécial",
+      "specialFromSet": "Un caractère spécial parmi {set}",
+      "unmet": "Le mot de passe doit contenir : {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Politique de mot de passe",
     "loginCallback": "Rappel de connexion",
     "slackOAuthCallback": "Connexion à Slack",
     "emptyStateDemo": "Démo d'état vide",
@@ -16898,17 +17099,17 @@
       "alertMe": "M'alerter",
       "columnHints": {
         "qps": "Appels par seconde — les appels de cette fenêtre divisés par sa durée, de sorte qu'une vue de 15 minutes et une vue de 4 heures restent comparables.",
-        "p50": "La moitié de tous les appels se sont terminés plus vite que cela. Ne compte que les appels terminés — une requête encore en cours, ou une qui n'est jamais revenue, n'est pas mesurée ici.",
-        "p95": "La queue lente — 1 appel sur 20 a pris au moins ce temps. Ne compte que les appels terminés — une requête encore en cours, ou une qui n'est jamais revenue, n'est pas mesurée ici.",
-        "p99": "Le 1 % des appels les plus lents a pris au moins ce temps. Ne compte que les appels terminés — une requête encore en cours, ou une qui n'est jamais revenue, n'est pas mesurée ici.",
-        "load": "Temps total que vos applications ont passé à attendre sur cette base de données. Mesuré côté client, il reflète donc le trafic servi par cette base de données — pas la charge du serveur.",
+        "p50": "La moitié des appels se sont terminés plus rapidement que cette valeur. Mesuré à partir des appels terminés dans les traces de votre application.",
+        "p95": "La queue lente — 1 appel sur 20 a pris au moins ce temps. Mesuré à partir des appels terminés dans les traces de votre application.",
+        "p99": "Le pire 1 % des appels a pris au moins ce temps. Mesuré à partir des appels terminés dans les traces de votre application.",
+        "load": "Temps total que vos applications ont consacré aux appels vers cette base de données, mesuré à partir des traces de votre application. Il indique le volume de trafic que cette base de données a servi pour vos applications.",
         "attention": "À quel point cette instance est proche d'une limite publiée par son propre moteur — aujourd'hui, les connexions par rapport à max_connections. Le pire ratio de ce type, pas un score pondéré. Trié du plus élevé au plus bas, avec les instances dont la santé ne peut pas être lue en haut, car une instance que vous ne pouvez pas voir n'est pas une instance dont vous savez qu'elle est saine. Mesuré sur le serveur de base de données, il n'est donc pas comparable avec le temps de base de données à côté."
       },
       "failedChip": "{count} échoués",
       "columnSubLabels": {
-        "attention": "serveur",
-        "load": "client",
-        "calls": "client"
+        "attention": "depuis la base de données",
+        "load": "depuis vos applications",
+        "calls": "depuis vos applications"
       },
       "attention": {
         "connections": "connexions",
@@ -16970,14 +17171,14 @@
         "failed": "Échec"
       },
       "columnHints": {
-        "calls": "Combien de fois cette requête a été exécutée. Le compteur propre à votre base de données lorsqu'elle en fournit un — il couvre tous les clients, pas seulement les parties de votre système qui envoient des traces. Les lignes marquées « observé par le client » sont comptées à partir des traces à la place, car votre base de données ne les a pas rapportées.",
-        "p50": "La moitié de tous les appels se sont terminés plus rapidement que ceci. Compte uniquement les appels terminés — une requête encore en cours, ou qui n'est jamais revenue, n'est pas mesurée ici.",
-        "p95": "La traîne lente — 1 appel sur 20 a pris au moins ce temps. Compte uniquement les appels terminés — une requête encore en cours, ou qui n'est jamais revenue, n'est pas mesurée ici.",
-        "p99": "Les 1% des appels les plus lents ont pris au moins ce temps. Compte uniquement les appels terminés — une requête encore en cours, ou qui n'est jamais revenue, n'est pas mesurée ici.",
+        "calls": "Nombre de fois où cette requête a été exécutée, tel que compté par votre base de données — toutes les applications qui se connectent sont incluses. Lorsque votre base de données n'a pas de comptage pour une requête, l'icône de traces signale une mesure issue des traces de votre application.",
+        "p50": "La moitié des appels se sont terminés plus rapidement que cette valeur. Mesuré à partir des appels terminés dans les traces de votre application.",
+        "p95": "La queue lente — 1 appel sur 20 a pris au moins ce temps. Mesuré à partir des appels terminés dans les traces de votre application.",
+        "p99": "Le pire 1 % des appels a pris au moins ce temps. Mesuré à partir des appels terminés dans les traces de votre application.",
         "max": "L'appel le plus lent de cette fenêtre — un appel réel, pas une moyenne.",
         "errors": "Combien de ces appels sont revenus avec une erreur.",
         "perTrace": "Combien de fois cela s'exécute dans une seule requête. Un nombre élevé signifie généralement une boucle.",
-        "load": "Temps total que cette requête a passé dans la base de données. Le chiffre propre à votre base de données lorsqu'elle en fournit un : temps d'exécution sur Postgres, mais temps d'attente sur MySQL et MariaDB — chaque ligne indique lequel. Les lignes marquées « observé par le client » sont mesurées à partir des traces, elles incluent donc l'aller-retour réseau."
+        "load": "Temps total que cette requête a passé dans la base de données, tel que rapporté par votre base de données : temps d'exécution sur Postgres, temps d'attente sur MySQL et MariaDB — chaque ligne précise lequel. Les lignes avec l'icône de traces sont mesurées à partir des traces de votre application et incluent donc aussi l'aller-retour vers la base de données."
       },
       "errorsNone": "Aucun",
       "errorsAll": "Tous",
@@ -17241,8 +17442,7 @@
       "overlap": {
         "serverExecution": "Temps passé par {engine} à l'exécuter",
         "serverWait": "Temps passé par {engine} à attendre — temps d'attente, pas temps d'exécution",
-        "serverCounted": "Compté par {engine}, sur chaque client",
-        "clientObserved": "Observé par des appelants instrumentés — votre base de données n'a pas signalé celui-ci"
+        "serverCounted": "Compté par {engine}, sur chaque client"
       },
       "endpointsConcentrated": "Un point de terminaison représente {percent} du temps de cette requête. Corrigez {endpoint} et vous avez corrigé cette requête.",
       "typicalMarker": "appels lents {value}",
@@ -17269,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "Ce que la base de données elle-même a enregistré",
-        "subtitle": "Côté serveur — tous les clients",
-        "clientSubtitle": "Observé par le client — uniquement les appelants instrumentés, uniquement les appels terminés. Une requête encore en cours, ou qui est restée bloquée, n'est pas dans ces chiffres.",
+        "subtitle": "Depuis votre base de données — toutes les applications qui se connectent",
+        "clientSubtitle": "Les valeurs marquées sont mesurées à partir des traces de votre application — les appels que vos applications ont terminés dans cette fenêtre",
         "instance": "Signalé par {instance}",
         "instanceWide": "Toutes les bases de données sur cette instance",
         "calls": "Exécutions",
@@ -17316,9 +17516,13 @@
         "serverExecution": "temps d'exécution",
         "serverWait": "temps d'attente",
         "serverCounted": "nombre de serveurs",
-        "clientObserved": "observé par le client",
         "serverReported": "signalé par vos bases de données"
       }
+    },
+    "appSource": {
+      "marker": "Mesuré à partir des traces de votre application",
+      "markerHint": "Mesuré à partir des traces de votre application, en ajoutant la vision de vos applications à ce que rapporte votre base de données.",
+      "legend": "Depuis les traces de votre application"
     },
     "page": {
       "tabs": {
@@ -17327,7 +17531,7 @@
         "metricsHint": "Charge de la base de données par événement d'attente, et chaque métrique collectée par vos récepteurs de base de données.",
         "queries": "Requêtes principales",
         "samples": "Appels les plus lents",
-        "samplesHintClient": "Appels terminés que vos services instrumentés ont observés dans cette fenêtre — les appelants sans traçage ne sont pas comptés, donc il s'agit d'un minimum, pas du total. Le tableau montre les plus lents d'entre eux.",
+        "samplesHintClient": "Appels mesurés à partir des traces de votre application dans cette fenêtre, en ajoutant la vision de vos applications à ce que rapporte votre base de données. Le tableau affiche les plus lents d'entre eux.",
         "samplesHintServer": "Instructions que vos bases de données ont signalées comme terminées dans cette fenêtre, comptées dans la base de données. Le tableau montre les plus lentes d'entre elles.",
         "samplesHintUnknown": "Les appels de base de données individuels les plus lents dans cette fenêtre.",
         "deadlocks": "Interblocages",
@@ -17364,6 +17568,11 @@
       "explore": "Ouvrir dans l'explorateur de métriques",
       "railLabel": "Sections de métriques",
       "noAccess": "Vous n'avez pas la permission de lire {stream}. Demandez à un administrateur l'accès en lecture à ce flux.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "par requête",
         "database": "par base de données",
@@ -17478,7 +17687,7 @@
         "status": "Statut"
       },
       "columnHints": {
-        "duration": "Combien de temps cet appel a pris, mesuré par l'appelant. Ne compte que les appels terminés — une requête encore en cours, ou qui n'est jamais revenue, n'est pas mesurée ici."
+        "duration": "Durée de cet appel, telle que chronométrée par votre application du début à la fin."
       },
       "failed": "Échec",
       "failedWithCode": "Échec · {code}",
@@ -18987,6 +19196,8 @@
     "rotationNobody": "Personne en astreinte",
     "edit": "Modifier",
     "timelineLoadFailed": "Impossible de charger le planning pour cette fenêtre",
+    "editorReadFailed": "Impossible de charger la dernière copie à modifier. Réessayez.",
+    "refreshFailed": "Impossible d'actualiser. Ce qui est affiché peut être obsolète.",
     "scheduleDoneEditing": "Retour au planning",
     "coverWhoRequired": "Choisissez qui est d'astreinte",
     "timelineCoverAria": "{who} couvre {rotation}, de {from} à {to}",

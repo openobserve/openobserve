@@ -25,6 +25,7 @@ import {
   connectDataPopupSettled,
   connectDataPromptSessionKey,
   getCommunitySlackUrl,
+  markSlackInviteDismissed,
   markSlackInviteResolved,
   shouldShowStandaloneSlackInvite,
 } from "@/utils/slackCommunityInvite";
@@ -122,10 +123,12 @@ const avatarBgClasses = [
   "bg-avatar-tint-4",
 ];
 
-// × / overlay / Escape / Maybe later: closes the dialog only. Only joinSlack()
-// resolves the invite for good — "Maybe later" means the day-2 popup can show
-// again on a later session.
+// × / overlay / Escape / Maybe later: snoozes the next ask (see
+// markSlackInviteDismissed) instead of leaving it permanently due — without
+// this, shouldShowStandaloneSlackInvite() stays true forever once the day-2
+// delay elapses and the popup would reopen on every refresh.
 const dismiss = () => {
+  markSlackInviteDismissed(userEmail);
   track("community_slack_prompt_dismissed");
   isOpen.value = false;
 };

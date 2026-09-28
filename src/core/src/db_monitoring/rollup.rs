@@ -44,6 +44,11 @@ use futures::StreamExt;
 use infra::cluster::get_node_by_uuid;
 use serde_json::{Value, json};
 
+use crate::traces::service_graph::v4::{
+    schedule::{align_down, window_ends},
+    writer::{ReplyClass, chunk, classify, max_request_bytes},
+};
+
 /// The summary stream written by this job. Declared as
 /// `StreamType::ServiceGraph` in the internal ingestion request (the stream
 /// NAME separates the data), read back as Logs — the exact mechanics of
@@ -99,33 +104,108 @@ pub fn rollup_interval_secs() -> u64 {
 /// for a wider span of raw spans than the rollup would process in one go.
 pub(crate) const MAX_DELTA_INTERVALS: i64 = 4;
 
-/// The earliest instant a delta may read from, given the caller's window.
-///
-/// `[max(offset, q_start, q_end − MAX_DELTA_INTERVALS × interval), q_end]`.
-/// The first two terms are the honest answer — start where the rollup stopped,
-/// but never before what was asked for. The third is the guard rail: whatever
-/// the rollup's state, one read never spans more than the catch-up budget.
-pub fn delta_start(offset: i64, q_start: i64, q_end: i64) -> i64 {
-    let budget = MAX_DELTA_INTERVALS.saturating_mul(rollup_interval_secs() as i64 * 1_000_000);
+/// Where the rollup stopped, clamped to the request and to at most `budget` before its end.
+pub fn delta_start(offset: i64, q_start: i64, q_end: i64, budget: i64) -> i64 {
     offset
         .max(q_start)
         .max(q_end.saturating_sub(budget))
         .min(q_end)
 }
 
-/// Floor `t` (µs) to the rollup interval grid.
-///
-/// The grid is what makes a DELTA row and a ROLLUP row the same kind of thing:
-/// both are a per-fingerprint aggregate stamped at a window boundary, so the
-/// result cache can slice them on aligned boundaries (`calculate_deltas` takes
-/// its no-`+1` branch only for grid-aligned aggregates) and a delta row for a
-/// window is later SUPERSEDED by the rollup's own row for that window rather
-/// than double-counted beside it.
-///
-/// Stamping raw `now` would put every execution on its own boundary: the cache
-/// could never match two entries, and two overlapping deltas for the same window
-/// would both survive the merge — the double-counting shape `stats_read_range`
-/// documents.
+/// The live tail's budget: [`MAX_DELTA_INTERVALS`] windows plus the settle delay the job waits.
+pub fn delta_budget(window_micros: i64, cache_delay_micros: i64) -> i64 {
+    MAX_DELTA_INTERVALS
+        .saturating_mul(window_micros)
+        .saturating_add(cache_delay_micros)
+}
+
+/// A fresh stream starts one grid window behind the settle horizon.
+fn seed_offset(horizon: i64, window_micros: i64) -> i64 {
+    align_down(horizon, window_micros) - window_micros
+}
+
+/// An off-grid offset gets one short window to realign; an on-grid one never gets an empty one.
+fn rollup_windows(offset: i64, horizon: i64, window_micros: i64) -> Vec<(i64, i64)> {
+    let first_end = align_down(offset, window_micros) + window_micros;
+    if first_end > horizon {
+        return Vec::new();
+    }
+    let mut ends = vec![first_end];
+    ends.extend(window_ends(
+        first_end,
+        horizon,
+        window_micros,
+        MAX_CATCHUP_WINDOWS - 1,
+    ));
+    let mut start = offset;
+    ends.into_iter()
+        .map(|end| (std::mem::replace(&mut start, end), end))
+        .collect()
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Backlog {
+    Walk,
+    /// The oldest pending window is already too old to ingest, and no later window is settled.
+    WalkStale,
+    Jump(i64),
+}
+
+/// The oldest window end still worth writing: older rows are rejected by `ingest_allowed_upto`.
+fn keep_from(now: i64, horizon: i64, upto_micros: i64) -> i64 {
+    const DAY: i64 = 24 * 3_600 * 1_000_000;
+    now.saturating_sub(upto_micros)
+        .max(horizon.saturating_sub(DAY))
+}
+
+/// Skips only windows whose end is older than `keep_from`, never past the last settled window.
+fn backlog_jump(offset: i64, window_micros: i64, keep_from: i64, horizon: i64) -> Backlog {
+    if align_down(offset, window_micros) + window_micros >= keep_from {
+        return Backlog::Walk;
+    }
+    let target = align_down(keep_from - 1, window_micros)
+        .min(align_down(horizon, window_micros) - window_micros);
+    if target > offset {
+        Backlog::Jump(target)
+    } else {
+        Backlog::WalkStale
+    }
+}
+
+/// Sends every chunk in order and fails on the first one the offset must not advance past.
+async fn send_chunks<F, Fut>(
+    org_id: &str,
+    trace_stream_name: &str,
+    chunks: Vec<Vec<u8>>,
+    mut send: F,
+) -> Result<(), anyhow::Error>
+where
+    F: FnMut(Vec<u8>) -> Fut,
+    Fut: std::future::Future<Output = Result<proto::cluster_rpc::IngestionResponse, anyhow::Error>>,
+{
+    let total = chunks.len();
+    for (i, data) in chunks.into_iter().enumerate() {
+        let resp = send(data).await?;
+        match classify(resp.status_code) {
+            ReplyClass::Ok => {}
+            // Rejected rows would fail on every retry, and a retry re-appends the rows that landed.
+            ReplyClass::Partial => log::warn!(
+                "[DbMonitoring] {org_id}/{trace_stream_name} chunk {}/{total} partially written: {}",
+                i + 1,
+                resp.message
+            ),
+            ReplyClass::Rejected | ReplyClass::Retry => anyhow::bail!(
+                "chunk {}/{total} replied {} {}",
+                i + 1,
+                resp.status_code,
+                resp.message
+            ),
+        }
+    }
+    Ok(())
+}
+
+/// Floor `t` (µs) to the rollup grid, so live-tail rows carry the window ends rollup rows do.
 pub fn floor_to_grid(t: i64) -> i64 {
     let w = rollup_interval_secs() as i64 * 1_000_000;
     if w <= 0 { t } else { t - t.rem_euclid(w) }
@@ -164,7 +244,7 @@ struct RecentIngestedTraceStream {
 // and nothing parses the window back out of the WHERE clause, so inline text can
 // never narrow the scan.
 //
-// The stats family wants `(start, end)` over rows stamped at the window END,
+// The stats family wants rows stamped at a window END `E ∈ (start, end]`,
 // which is not the payload's interval; that shift is applied to the PAYLOAD, in
 // `stats_read_range` (openobserve-api-management:
 // request/db_monitoring/service/common.rs).
@@ -501,6 +581,7 @@ fn to_record(
     mut row: Value,
     record_type: &str,
     window_end: i64,
+    window_start: i64,
     org_id: &str,
     trace_stream_name: &str,
     truncated: bool,
@@ -509,6 +590,8 @@ fn to_record(
         obj.remove("rnk");
         obj.remove("fp_total");
         obj.insert("_timestamp".into(), json!(window_end));
+        // Windows are not all one interval wide (realign, interval change), so reads need it.
+        obj.insert("window_start".into(), json!(window_start));
         obj.insert("org_id".into(), json!(org_id));
         obj.insert("trace_stream_name".into(), json!(trace_stream_name));
         obj.insert("record_type".into(), json!(record_type));
@@ -529,6 +612,7 @@ fn build_records(
     other_rows: Vec<Value>,
     totals_rows: Vec<Value>,
     error_rows: Vec<Value>,
+    window_start: i64,
     window_end: i64,
     org_id: &str,
     trace_stream_name: &str,
@@ -542,6 +626,7 @@ fn build_records(
             row,
             "query_stats",
             window_end,
+            window_start,
             org_id,
             trace_stream_name,
             truncated,
@@ -552,6 +637,7 @@ fn build_records(
             row,
             "db_totals",
             window_end,
+            window_start,
             org_id,
             trace_stream_name,
             truncated,
@@ -562,6 +648,7 @@ fn build_records(
             row,
             "error_class",
             window_end,
+            window_start,
             org_id,
             trace_stream_name,
             truncated,
@@ -706,19 +793,10 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
 /// What the meta store must still hold for this node's offset advance to be
 /// legitimate — the `expected` half of the compare-and-swap.
 ///
-/// It is the window's `start_time` on every iteration BUT the first of a fresh
-/// stream: a fresh stream seeds its in-memory offset to `now - window` without
-/// writing it, so the stored value is still `0` while `start_time` is the seed.
-/// Comparing against the seed there fails the CAS forever and the stream never
-/// advances; `0` is what "nobody has written this stream yet" looks like on disk.
-///
-/// `stored_before` is the value read from the store this tick, and `processed`
-/// the number of windows already advanced in this loop — after the first
-/// advance the stored value IS the previous `end_time`, which is this
-/// iteration's `start_time`.
+/// The first advance expects what was read this tick, so it also persists a seed or a backlog jump.
 fn expected_stored_offset(start_time: i64, stored_before: i64, processed: usize) -> i64 {
-    if processed == 0 && stored_before == 0 {
-        0
+    if processed == 0 {
+        stored_before
     } else {
         start_time
     }
@@ -726,7 +804,7 @@ fn expected_stored_offset(start_time: i64, stored_before: i64, processed: usize)
 
 /// Process one stream's pending windows against its own offset.
 ///
-/// First run (offset 0) starts one window back from now. On each successful
+/// First run (offset 0) starts one grid window behind the settle horizon. On each successful
 /// window the offset advances and persists; on failure it does NOT advance —
 /// the same window is retried next tick. At most [`MAX_CATCHUP_WINDOWS`]
 /// windows are scanned per tick.
@@ -782,20 +860,36 @@ async fn process_stream(
         }
     }
 
-    // First run: begin one window back — never a full-history backfill. The
-    // STORED value is still 0 here (nothing has written the seeded offset), so
-    // the first advance compares against 0, not the seed — see
-    // [`expected_stored_offset`].
+    // Late spans land after their window's end, so roll up only what has settled.
+    let cfg = get_config();
+    let cache_delay_micros = cfg.limit.cache_delay_secs * 1_000_000;
+    let horizon = now - cache_delay_micros;
     let stored_before = offset;
     if offset == 0 {
-        offset = now - window_micros;
+        offset = seed_offset(horizon, window_micros);
+    } else {
+        let oldest_kept = keep_from(now, horizon, cfg.limit.ingest_allowed_upto_micro);
+        match backlog_jump(offset, window_micros, oldest_kept, horizon) {
+            Backlog::Walk => {}
+            Backlog::WalkStale => log::warn!(
+                "[DbMonitoring] {org_id}/{stream_name} is {}s behind but ZO_INGEST_ALLOWED_UPTO leaves no settled window to skip to; windows older than it roll up to nothing",
+                (now - offset) / 1_000_000
+            ),
+            Backlog::Jump(target) => {
+                log::warn!(
+                    "[DbMonitoring] {org_id}/{stream_name} is too far behind to ingest; skipping [{offset},{target}), which will read as zero traffic"
+                );
+                offset = target;
+            }
+        }
     }
 
-    let mut processed = 0;
-    while offset + window_micros <= now && processed < MAX_CATCHUP_WINDOWS {
-        let (start_time, end_time) = (offset, offset + window_micros);
+    for (processed, (start_time, end_time)) in rollup_windows(offset, horizon, window_micros)
+        .into_iter()
+        .enumerate()
+    {
         let expected = expected_stored_offset(start_time, stored_before, processed);
-        // Any window failure propagates WITHOUT advancing the offset.
+        // Ingest then advance: a partial failure re-sends landed rows; a duplicate beats a loss.
         process_window(org_id, stream_name, start_time, end_time, has_rows_col).await?;
         // Advance ONLY IF the offset is still the one this node processed from
         // and this node still holds the lock. The window's records are already
@@ -817,8 +911,6 @@ async fn process_stream(
             );
             return Ok(());
         }
-        offset = end_time;
-        processed += 1;
     }
     Ok(())
 }
@@ -873,6 +965,7 @@ async fn process_window(
         other_rows,
         totals_rows,
         error_rows,
+        start_time,
         end_time,
         org_id,
         stream_name,
@@ -985,41 +1078,64 @@ pub async fn run_dbm_search(
     super::hits_or_partial_error(resp, "db_monitoring rollup")
 }
 
-/// Write the window's records to `_o2_db_stats` via the internal ingestion
-/// path the aggregators use: `StreamType::ServiceGraph` declared in the
-/// request (the gRPC handler funnels it into the logs pipeline with the
-/// internal-writer/`is_derived` flags set, passing the `_o2_` write guard's
-/// internal exemption), distinct stream name, read back as Logs.
+/// Written as `StreamType::ServiceGraph`, which passes the `_o2_` guard only as a `SystemJob` user.
 async fn write_db_stats(
     org_id: &str,
     trace_stream_name: &str,
     records: Vec<Value>,
 ) -> Result<(), anyhow::Error> {
+    use proto::cluster_rpc;
+    write_chunked(
+        org_id,
+        trace_stream_name,
+        records,
+        max_request_bytes(),
+        |data| {
+            let req = cluster_rpc::IngestionRequest {
+                org_id: org_id.to_string(),
+                stream_type: StreamType::ServiceGraph.as_str().to_string(),
+                stream_name: O2_DB_STATS_STREAM.to_string(),
+                data: Some(cluster_rpc::IngestionData { data }),
+                ingestion_type: Some(cluster_rpc::IngestionType::Json as i32),
+                metadata: None,
+            };
+            async move {
+                crate::ingestion::ingestion_service::ingest(req)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{e}"))
+            }
+        },
+    )
+    .await
+}
+
+async fn write_chunked<F, Fut>(
+    org_id: &str,
+    trace_stream_name: &str,
+    records: Vec<Value>,
+    max_bytes: usize,
+    send: F,
+) -> Result<(), anyhow::Error>
+where
+    F: FnMut(Vec<u8>) -> Fut,
+    Fut: std::future::Future<Output = Result<proto::cluster_rpc::IngestionResponse, anyhow::Error>>,
+{
     if records.is_empty() {
         return Ok(());
     }
     let record_count = records.len();
-
-    use proto::cluster_rpc;
-    let req = cluster_rpc::IngestionRequest {
-        org_id: org_id.to_string(),
-        stream_type: StreamType::ServiceGraph.as_str().to_string(),
-        stream_name: O2_DB_STATS_STREAM.to_string(),
-        data: Some(cluster_rpc::IngestionData {
-            data: serde_json::to_vec(&records)?,
-        }),
-        ingestion_type: Some(cluster_rpc::IngestionType::Json as i32),
-        metadata: None,
-    };
-    crate::ingestion::ingestion_service::ingest(req)
-        .await
-        .map(|_| ())
-        .map_err(|e| anyhow::anyhow!("{e}"))
-        .inspect_err(|e| {
-            log::error!(
-                "[DbMonitoring] Failed to write {record_count} records for {org_id}/{trace_stream_name}: {e}"
-            );
-        })?;
+    send_chunks(
+        org_id,
+        trace_stream_name,
+        chunk(&records, max_bytes),
+        send,
+    )
+    .await
+    .inspect_err(|e| {
+        log::error!(
+            "[DbMonitoring] Failed to write {record_count} records for {org_id}/{trace_stream_name}: {e}"
+        );
+    })?;
 
     log::info!(
         "[DbMonitoring] Wrote {record_count} _o2_db_stats records for {org_id}/{trace_stream_name}"
@@ -1044,7 +1160,7 @@ mod tests {
         let q_start = q_end - 10 * w;
         // Offset within one interval of the request end — the normal state.
         let offset = q_end - w / 2;
-        assert_eq!(delta_start(offset, q_start, q_end), offset);
+        assert_eq!(delta_start(offset, q_start, q_end, 4 * w), offset);
     }
 
     /// Pins that a rollup stalled for days does not make the delta read days of
@@ -1056,14 +1172,15 @@ mod tests {
         let q_end = 1_000 * w;
         let q_start = 0;
         let stalled_offset = q_end - 500 * w; // ~5 days behind at 900 s
-        let start = delta_start(stalled_offset, q_start, q_end);
-        assert_eq!(start, q_end - MAX_DELTA_INTERVALS * w);
+        let budget = delta_budget(w, 300 * 1_000_000);
+        let start = delta_start(stalled_offset, q_start, q_end, budget);
+        assert_eq!(start, q_end - MAX_DELTA_INTERVALS * w - 300 * 1_000_000);
         assert!(
             start > stalled_offset,
             "a bound that does not bind is not a bound; the gap \
              (offset, start) is the staleness the response must report"
         );
-        assert!((q_end - start) <= MAX_DELTA_INTERVALS * w);
+        assert!((q_end - start) <= budget);
     }
 
     /// The caller's own window still wins when it is NARROWER than the budget:
@@ -1074,7 +1191,7 @@ mod tests {
         let q_end = 100 * w;
         let q_start = q_end - w / 10; // a narrow, recent window
         // Offset far behind AND budget wider than the request: q_start wins.
-        assert_eq!(delta_start(q_end - 900 * w, q_start, q_end), q_start);
+        assert_eq!(delta_start(q_end - 900 * w, q_start, q_end, 4 * w), q_start);
     }
 
     /// A window already fully rolled up leaves nothing to do, and the window
@@ -1085,10 +1202,10 @@ mod tests {
         let q_end = 100 * w;
         let q_start = q_end - 10 * w;
         // Rollup is AHEAD of the requested end — historical, fully covered.
-        assert_eq!(delta_start(q_end + 50 * w, q_start, q_end), q_end);
+        assert_eq!(delta_start(q_end + 50 * w, q_start, q_end, 4 * w), q_end);
         // Degenerate bounds must not panic or wrap.
-        assert!(delta_start(i64::MIN, i64::MIN, q_end) <= q_end);
-        assert!(delta_start(0, 0, 0) == 0);
+        assert!(delta_start(i64::MIN, i64::MIN, q_end, i64::MAX) <= q_end);
+        assert!(delta_start(0, 0, 0, 4 * w) == 0);
     }
 
     // ── Grid alignment (delta caching) ──────────────────────────────────────
@@ -1459,6 +1576,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
             other,
             totals,
             errors,
+            1_700_000_000_000_000,
             1_700_000_900_000_000,
             "org1",
             "traces_a",
@@ -1489,6 +1607,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
             vec![],
             vec![json!({"db_system": "s"})],
             vec![],
+            0,
             10,
             "o",
             "s",
@@ -1524,7 +1643,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
     }
 
     /// Pins that the first advance of a FRESH stream expects 0: the seeded
-    /// in-memory offset (`now - window`) is never written, so expecting the seed
+    /// in-memory offset (`seed_offset`) is never written, so expecting the seed
     /// would fail the CAS every tick and the stream would never roll up.
     #[test]
     fn test_expected_stored_offset_first_window_of_a_fresh_stream_is_zero() {
@@ -1536,5 +1655,237 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
             expected_stored_offset(seeded_start + 1_000, 0, 1),
             seeded_start + 1_000
         );
+    }
+
+    // ── Settle horizon, grid windows, backlog, reply handling ───────────────
+
+    const MIN: i64 = 60 * 1_000_000;
+    const HOUR: i64 = 60 * MIN;
+
+    /// Without the settle delay a short interval leaves a gap between rollup and tail.
+    #[test]
+    fn delta_budget_covers_the_settle_delay() {
+        let w = MIN;
+        let delay = 5 * MIN;
+        let budget = delta_budget(w, delay);
+        assert_eq!(budget, MAX_DELTA_INTERVALS * w + delay);
+        // The job lags `now` by up to 2w + delay; the tail must still start at the offset.
+        let q_end = 1_000 * w;
+        let last_stamp = q_end - 2 * w - delay;
+        assert_eq!(delta_start(last_stamp, 0, q_end, budget), last_stamp);
+    }
+
+    /// A window ending past the horizon would miss its late spans.
+    #[test]
+    fn rollup_windows_never_pass_the_horizon() {
+        let w = 15 * MIN;
+        let horizon = 1_000 * w + 7 * MIN;
+        let windows = rollup_windows(horizon - 10 * w, horizon, w);
+        assert!(!windows.is_empty());
+        assert!(windows.iter().all(|(_, end)| *end <= horizon));
+        // The grid window containing the horizon has not settled yet.
+        assert!(rollup_windows(1_000 * w, horizon, w).is_empty());
+    }
+
+    /// A gap or overlap between windows would lose or double-count spans.
+    #[test]
+    fn unaligned_offset_realigns_with_one_short_window() {
+        let w = 15 * MIN;
+        let offset = 100 * w + 123_456;
+        let windows = rollup_windows(offset, 200 * w, w);
+        assert_eq!(windows.len(), MAX_CATCHUP_WINDOWS);
+        assert_eq!(windows[0], (offset, 101 * w));
+        for pair in windows.windows(2) {
+            assert_eq!(
+                pair[0].1, pair[1].0,
+                "windows must tile: no gap, no overlap"
+            );
+        }
+        for (start, end) in &windows[1..] {
+            assert_eq!(start % w, 0);
+            assert_eq!(end - start, w);
+        }
+    }
+
+    #[test]
+    fn aligned_offset_yields_a_full_window() {
+        let w = 15 * MIN;
+        let windows = rollup_windows(100 * w, 200 * w, w);
+        assert_eq!(windows[0], (100 * w, 101 * w));
+    }
+
+    #[test]
+    fn fresh_stream_seeds_on_the_grid() {
+        let w = 15 * MIN;
+        let horizon = 100 * w + 4 * MIN;
+        let seed = seed_offset(horizon, w);
+        assert_eq!(seed, 99 * w);
+        assert_eq!(rollup_windows(seed, horizon, w), vec![(99 * w, 100 * w)]);
+    }
+
+    /// After a jump `start_time` was never stored, so the CAS must expect the value read.
+    #[test]
+    fn test_expected_stored_offset_after_a_jump_is_the_stored_value() {
+        let stored = 1_000;
+        let jumped_start = 50_000;
+        assert_eq!(expected_stored_offset(jumped_start, stored, 0), stored);
+        assert_eq!(
+            expected_stored_offset(jumped_start + 900, stored, 1),
+            jumped_start + 900
+        );
+    }
+
+    #[test]
+    fn keep_from_is_the_ingest_limit_bounded_by_a_day() {
+        let now = 1_000 * HOUR;
+        let horizon = now - 5 * MIN;
+        assert_eq!(keep_from(now, horizon, 5 * HOUR), now - 5 * HOUR);
+        assert_eq!(keep_from(now, horizon, 48 * HOUR), horizon - 24 * HOUR);
+    }
+
+    #[test]
+    fn backlog_jump_never_lands_past_the_horizon() {
+        let w = MIN;
+        let delay = 2 * HOUR;
+        let now = 100_000 * w + 17 * 1_000_000;
+        let Backlog::Jump(target) = decide(now - 10 * HOUR, now, w, 1, delay) else {
+            panic!("a 10h backlog over a 1h ingest limit must jump");
+        };
+        assert!(!rollup_windows(target, now - delay, w).is_empty());
+        let caught_up = align_down(now - delay, w);
+        assert_eq!(decide(caught_up, now, w, 0, delay), Backlog::WalkStale);
+    }
+
+    fn decide(offset: i64, now: i64, w: i64, upto_hours: i64, delay: i64) -> Backlog {
+        let horizon = now - delay;
+        backlog_jump(
+            offset,
+            w,
+            keep_from(now, horizon, upto_hours * HOUR),
+            horizon,
+        )
+    }
+
+    #[test]
+    fn caught_up_stream_with_a_tiny_cap_neither_warns_nor_jumps() {
+        let w = HOUR;
+        let now = 100 * HOUR + 20 * MIN;
+        assert_eq!(decide(100 * HOUR, now, w, 1, 5 * MIN), Backlog::Walk);
+    }
+
+    #[test]
+    fn slow_tick_never_jumps_over_an_ingestible_window() {
+        let w = 15 * MIN;
+        let offset = 1_000 * w;
+        for late in [30 * MIN, 41 * MIN, 50 * MIN] {
+            assert_eq!(
+                decide(offset, offset + late, w, 1, 5 * MIN),
+                Backlog::Walk,
+                "{late}µs late: the window ending at {} is still ingestable",
+                offset + w
+            );
+        }
+    }
+
+    #[test]
+    fn genuine_backlog_jumps_to_the_oldest_ingestable_window() {
+        for (w, upto_hours) in [(15 * MIN, 1), (HOUR, 1), (15 * MIN, 5)] {
+            let offset = 1_000 * HOUR;
+            let now = offset + 3 * upto_hours * HOUR + 7 * MIN;
+            let oldest_ok = now - upto_hours * HOUR;
+            let Backlog::Jump(target) = decide(offset, now, w, upto_hours, 5 * MIN) else {
+                panic!("w={w} upto={upto_hours}h: a backlog of 3x upto must jump");
+            };
+            assert_eq!(target % w, 0);
+            assert!(
+                target < oldest_ok,
+                "the skipped windows are already too old"
+            );
+            assert!(
+                target + w >= oldest_ok,
+                "w={w} upto={upto_hours}h: skipped the ingestable window ending at {}",
+                target + w
+            );
+        }
+    }
+
+    fn reply(code: i32) -> Result<proto::cluster_rpc::IngestionResponse, anyhow::Error> {
+        Ok(proto::cluster_rpc::IngestionResponse {
+            status_code: code,
+            message: String::new(),
+        })
+    }
+
+    async fn run_send(
+        chunks: usize,
+        replies: Vec<Result<proto::cluster_rpc::IngestionResponse, anyhow::Error>>,
+    ) -> (Result<(), anyhow::Error>, usize) {
+        let replies = std::sync::Mutex::new(replies.into_iter());
+        let sent = std::sync::atomic::AtomicUsize::new(0);
+        let res = send_chunks("org", "traces", vec![b"[]".to_vec(); chunks], |_| {
+            sent.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let next = replies.lock().unwrap().next().unwrap_or_else(|| reply(200));
+            async move { next }
+        })
+        .await;
+        (res, sent.load(std::sync::atomic::Ordering::SeqCst))
+    }
+
+    #[tokio::test]
+    async fn write_advances_on_200_and_207() {
+        assert!(run_send(2, vec![reply(200), reply(200)]).await.0.is_ok());
+        assert!(run_send(2, vec![reply(207), reply(200)]).await.0.is_ok());
+    }
+
+    #[tokio::test]
+    async fn write_holds_on_500_429_503_and_transport_errors() {
+        for code in [500, 429, 503] {
+            let (res, sent) = run_send(3, vec![reply(200), reply(code)]).await;
+            assert!(res.is_err(), "{code} must hold the offset");
+            assert_eq!(sent, 2, "{code}: later chunks must not be sent");
+        }
+        let (res, _) = run_send(1, vec![Err(anyhow::anyhow!("transport"))]).await;
+        assert!(res.is_err(), "a transport error must hold the offset");
+    }
+
+    #[tokio::test]
+    async fn oversized_window_is_split() {
+        let records: Vec<Value> = (0..100)
+            .map(|i| json!({"fingerprint": format!("fp{i}"), "query_norm": "x".repeat(1_000)}))
+            .collect();
+        let sent = std::sync::Mutex::new(Vec::new());
+        let res = write_chunked("org", "traces", records.clone(), 10_000, |data| {
+            sent.lock().unwrap().push(data);
+            async { reply(200) }
+        })
+        .await;
+        assert!(res.is_ok());
+        let sent = sent.into_inner().unwrap();
+        assert!(
+            sent.len() > 1,
+            "100 KB of records must not go as one 10 KB message"
+        );
+        assert!(sent.iter().all(|c| c.len() <= 10_000));
+        let rows: usize = sent
+            .iter()
+            .map(|c| serde_json::from_slice::<Vec<Value>>(c).unwrap().len())
+            .sum();
+        assert_eq!(rows, records.len());
+    }
+
+    /// History backfill reads a short realign window's real width from this.
+    #[test]
+    fn records_carry_their_window_start() {
+        let row = to_record(
+            json!({"calls": 1}),
+            "db_totals",
+            2_000,
+            1_500,
+            "o",
+            "s",
+            false,
+        );
+        assert_eq!(row["window_start"], json!(1_500));
+        assert_eq!(row["_timestamp"], json!(2_000));
     }
 }

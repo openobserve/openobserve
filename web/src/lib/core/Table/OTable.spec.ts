@@ -2215,6 +2215,36 @@ describe("OTable", () => {
       await nextTick();
       expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
     });
+
+    it("restorePage lands on the requested page when it exists, without touching the parent", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(20), columns: makeColumns(), pagination: "client", pageSize: 5 },
+      });
+      (wrapper.vm as any).restorePage(3);
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(2);
+      expect(wrapper.emitted("update:currentPage")).toBeUndefined();
+    });
+
+    it("restorePage falls back to page 1 and tells the parent when the page is past the end", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(7), columns: makeColumns(), pagination: "client", pageSize: 5 },
+      });
+      (wrapper.vm as any).restorePage(3);
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+      expect(wrapper.emitted("update:currentPage")).toEqual([[1]]);
+    });
+
+    it("restorePage treats a page below 1 like one past the end", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(7), columns: makeColumns(), pagination: "client", pageSize: 5 },
+      });
+      (wrapper.vm as any).restorePage(0);
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+      expect(wrapper.emitted("update:currentPage")).toEqual([[1]]);
+    });
   });
 });
 

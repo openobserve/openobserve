@@ -460,6 +460,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
+import { resolveTraceStream } from "@/utils/traces/streamSelection";
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
@@ -481,8 +482,9 @@ const P99_WARN_NS = 1_000_000_000;
 // Stream filter — synced from traces page selected stream
 const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
 const storedStreamFilter = localStorage.getItem("servicesCatalog_streamFilter");
-const streamFilter = ref(tracesStream || storedStreamFilter || "default");
+const streamFilter = ref(tracesStream || storedStreamFilter || "");
 const availableStreams = ref<string[]>([]);
+const streamsLoaded = ref(false);
 
 interface ServiceRow {
   id: string;
@@ -935,10 +937,16 @@ function getTimeRange(): { start_time: number; end_time: number } {
 const loadAvailableStreams = async () => {
   try {
     const res: any = await getStreams("traces", false, false);
-    if (res?.list?.length > 0) {
-      availableStreams.value = res.list.map((stream: any) => stream.name);
-    }
+    const streams = res?.list ?? [];
+    availableStreams.value = streams.map((stream: any) => stream.name);
+    streamFilter.value = resolveTraceStream(streams, [
+      searchObj.data.stream.selectedStream.value,
+      storedStreamFilter,
+      streamFilter.value,
+    ]);
   } catch (e) {
+    availableStreams.value = [];
+    streamFilter.value = "";
     console.error("Error loading trace streams:", e);
   }
 };
@@ -1122,7 +1130,6 @@ watch(
       streamFilter.value = newStream;
       localStorage.setItem("servicesCatalog_streamFilter", newStream);
       hasInferColumns.value = null;
-      loadServicesCatalog();
     }
   },
 );
@@ -1135,6 +1142,7 @@ watch(
     searchObj.data.datetime.relativeTimePeriod,
   ],
   () => {
+    if (!streamsLoaded.value) return;
     // This component only renders on its own route now, so no search-mode
     // guard is needed — if it is mounted, it is the visible view.
     loadServicesCatalog();
@@ -1143,6 +1151,7 @@ watch(
 
 onMounted(async () => {
   await loadAvailableStreams();
+  streamsLoaded.value = true;
   loadServicesCatalog();
 });
 

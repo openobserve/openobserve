@@ -1474,6 +1474,8 @@
     "sessionReplay": "セッションリプレイ",
     "viewSessionReplay": "セッションリプレイを表示",
     "playSessionReplay": "セッションリプレイを再生",
+    "noReplayRecordedTitle": "このセッションのリプレイは記録されていません",
+    "noReplayRecordedMessage": "セッション {id} には再生できるリプレイセグメントがありません。",
     "discoverSessionTitle": "ユーザーインタラクションを詳細に理解するためのセッションリプレイをご覧ください",
     "discoverSessionMessage": "セッションリプレイは、ウェブサイトまたはアプリケーションでのユーザーインタラクションをキャプチャして再生します。これにより、ユーザーがどのようにナビゲートしたか、どこをクリックしたか、何を入力したか、コンテンツにどのように反応したかを視覚的に確認できます。",
     "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。",
@@ -1904,6 +1906,7 @@
     "startFreeTrial": "無料トライアルを開始"
   },
   "login": {
+    "lockedOut": "サインインの失敗回数が多すぎます。{duration}後に再試行するか、管理者にお問い合わせください。",
     "redirectingToSsoMessage": "SSOログインページにリダイレクトしています。リダイレクトされない場合は、",
     "clickHere": "ここをクリック",
     "loginWithSso": "SSOでログイン",
@@ -1963,6 +1966,15 @@
     "fieldRequired": "フィールドは必須です",
     "passwordRequired": "パスワードが必要です。",
     "passwordPolicyHint": "パスワードは 8 ～ 128 文字で、少なくとも 1 つの小文字、1 つの大文字、1 つの数字、1 つの特殊文字を含む必要があります。",
+    "lockout": {
+      "locked": "アカウントがロックされています",
+      "autoUnlock": "{duration}後に自動的にロックが解除されます。",
+      "staged": "保存するとロックが解除されます。",
+      "unlock": "ロックを解除",
+      "undo": "ロックを維持",
+      "confirmTitle": "{email} のロックを解除しますか？",
+      "confirmMessage": "失敗回数がクリアされ、すぐに再度サインインできるようになります。パスワードは変更されません。"
+    },
     "currentPasswordRequired": "現在のパスワードが必要です。",
     "newPasswordRequired": "新しいパスワードが必要です。",
     "otherOrgInvalid": "組織名は文字で始まり、英数字、_ または-でなければなりません。",
@@ -2029,11 +2041,11 @@
       "addToGroup": "ユーザーグループに追加する",
       "addToRole": "役割を割り当てる",
       "step1Title": "トークンをコピーする",
-      "copyHint": "このトークンを今すぐコピーしてください。今後表示することはできません。",
+      "copyHint": "このトークンが表示されるのは今回だけです。今すぐコピーまたはダウンロードしてください。後から再取得することはできません。",
       "done": "完了",
       "applying": "アクセス権限を適用中...",
-      "grantedRoles": "割り当てられたロール: {roles}",
-      "grantedGroups": "ユーザーグループに追加: {groups}",
+      "rolesAssignedLabel": "割り当てられたロール",
+      "groupsAssignedLabel": "ユーザーグループに追加済み",
       "failedRoles": "ロールを割り当てられませんでした: {roles}",
       "failedGroups": "ユーザーグループに追加できませんでした: {groups}",
       "failedHint": "これらは後でロールとユーザーグループのページから付与できます。"
@@ -2043,6 +2055,9 @@
         "label": "サービスアカウント名",
         "placeholder": "例: ingest-bot",
         "help": "小文字、数字、ハイフン。名前{suffix}として保存"
+      },
+      "identifier": {
+        "label": "識別子"
       },
       "roles": {
         "label": "ロールを割り当て",
@@ -2057,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "識別子",
+        "roles": "ロール",
         "token": "トークン",
         "created": "作成されました"
       }
@@ -2184,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "これらのロールにバインドされているユーザーおよびサービスアカウントはすべてアクセスできなくなります。"
-      }
+      },
+      "assignColumn": "割り当て",
+      "assignBtn": "追加",
+      "assignedBadge": "割り当て済み",
+      "assignBannerText": "{member} をロールに追加します — 下のロールの横にある [追加] をクリックしてください。",
+      "assignBannerDone": "完了",
+      "assignSuccess": "{member} をロール \"{role}\" に追加しました。",
+      "assignError": "そのロールにアカウントを追加できませんでした。もう一度お試しください。"
     },
     "group": {
       "name": {
@@ -2215,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "これらのグループのメンバーは、付与された役割を失います。"
-      }
+      },
+      "assignColumn": "割り当て",
+      "assignBtn": "追加",
+      "assignedBadge": "割り当て済み",
+      "assignBannerText": "{member} をユーザーグループに追加します — 下のグループの横にある [追加] をクリックしてください。",
+      "assignBannerDone": "完了",
+      "assignSuccess": "{member} をグループ \"{group}\" に追加しました。",
+      "assignError": "そのグループにアカウントを追加できませんでした。もう一度お試しください。"
     },
     "appGroups": {
       "deleteGroupTitle": "グループを削除",
@@ -3585,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "コンテンツのコピー中にエラーが発生しました。",
+    "passcodeForbiddenMessage": "取り込みトークンを表示するには管理者または Root ロールが必要です。セットアップコマンド、またはこの画面で表示するために必要なロールについて、管理者にお問い合わせください。",
     "updateRUMTokenMessage": "この組織のRUMトークンを更新してもよろしいですか？",
     "completeAwsIntegration": "AWSインテグレーションを完了",
     "deployAwsServicesOneClick": "単一のCloudFormationスタックを使用して、選択したすべてのAWSサービスをワンクリックでデプロイします。",
@@ -4966,7 +4997,7 @@
     "colorLightToDarkBlue": "ライトブルーからダークブルー (値別)",
     "colorPaletteClassicBySeries": "パレット-クラシック (シリーズ別)",
     "drilldown": "ドリルダウン",
-    "drilldownTooltip": "別のダッシュボードまたは指定した URL に移動し、現在の変数をすべて引き継いでシームレスにデータを探索できます。",
+    "drilldownTooltip": "別のダッシュボードまたは指定した URL に移動し、現在のすべての変数を引き継いでシームレスにデータを探索できます。",
     "colorBySeriesTitle": "シリーズ別カラー",
     "colorBySeriesTooltip": "系列に色を適用すると、グラフが見やすくなります。各系列の色をカスタマイズして、データの視覚化を強化します。",
     "editColorBySeries": " シリーズ別に色を編集",
@@ -5825,7 +5856,36 @@
     "variableNameAlreadyExists": "同じ名前の変数が既に存在します。",
     "pivotTotal": "合計",
     "pivotOthers": "その他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "エグザンプラー（トレースサンプル）を表示",
+      "hide": "エグザンプラーを非表示 · {count} 件表示",
+      "empty": "この期間にエグザンプラーはありません",
+      "emptyShort": "エグザンプラー 0 件",
+      "loadFailed": "エグザンプラーを読み込めませんでした",
+      "loadFailedHint": "グラフは影響を受けません。再試行ではエグザンプラーのみを取得します。",
+      "retry": "再試行",
+      "cardTitle": "エグザンプラー",
+      "query": "クエリ {name}",
+      "returnedBy": "{count} 件のクエリから返されました | {count} 件のクエリから返されました",
+      "series": "シリーズ",
+      "aboveRange": "グラフの範囲より上。上端に描画されます",
+      "belowRange": "グラフの範囲より下。下端に描画されます",
+      "checkingTrace": "トレースを確認中…",
+      "openTrace": "トレースを開く",
+      "openTraceHint": "またはマーカーをクリックします。戻るとここに戻ります。",
+      "traceNotAvailable": "トレースを利用できません — サンプリング対象外、または保持期間を過ぎています",
+      "openTraceUnverified": "トレースを開く（未確認）",
+      "unverifiedTimeout": "トレースの検索がタイムアウトしたため、このトレースは存在しない可能性があります。",
+      "unverifiedForbidden": "このトレースを確認できませんでした — トレースへのアクセス権がない可能性があります。",
+      "unverifiedPartial": "保持期間の一部のみが検索されました。",
+      "unverifiedError": "このトレースを確認できませんでした。",
+      "noTraceId": "このエグザンプラーに {label} がないため、開くトレースがありません。",
+      "markersAria": "エグザンプラーマーカー",
+      "markerAria": "{time} のエグザンプラー {value}"
+    },
+    "showExemplarsLabel": "エグザンプラーを表示",
+    "showExemplarsHelp": "このダッシュボードを開くすべてのユーザーに対して、このグラフにトレースサンプルを描画します。閲覧者はパネルヘッダーから非表示にできます。"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7500,7 +7560,10 @@
       "lastError": "最終エラー",
       "lastTrained": "最終トレーニング",
       "lookBackWindow": "ルックバックウィンドウ",
-      "lookBackWindowTooltip": "各検出でクエリが実行されるまでの時間。しばらく待ってもウィンドウをキャップします。デフォルトは [間隔ごとにチェック] です。",
+      "lookBackWindowFloor": "ルックバックウィンドウは少なくとも {min}（チェック間隔 + 検出解像度1つ分）である必要があります。より短いウィンドウでは、実行が発火する時点で完全なバケットを保持できないため、バケットがスキップされます。",
+      "lookBackWindowLegacy": "この保存済みウィンドウは最小値 {min}（チェック間隔 + 検出解像度1つ分）を下回っています。そのまま保存されますが、ウィンドウを引き上げるまで実行でバケットがスキップされる可能性があります。",
+      "lookBackWindowMinimum": "最小 {min}。推奨は {recommended} 以上 —（チェック間隔 + 検出解像度）の2倍 — に、欠落検出が有効な場合は10分を加えた値です。",
+      "lookBackWindowTooltip": "各検出実行がクエリする遡及範囲です。長時間停止した後でもウィンドウを上限で制限します。少なくともチェック間隔 + 検出解像度1つ分をカバーする必要があり、そうでないと実行が判定する前に完全なバケットがウィンドウから外れてしまいます。",
       "metricChart": "メトリクスと異常",
       "metricChartHint": "検出間隔ごとに 1 点",
       "model": "モデル",
@@ -7508,6 +7571,15 @@
       "nDays": "{days} 日 | {days} 日",
       "noDestinationsFound": "宛先が見つかりません",
       "noFieldsFound": "フィールドが見つかりません",
+      "noticeHybridFallback": "フォールバック検出",
+      "noticeHybridFallbackTooltip": "最近の実行でハイブリッドしきい値が利用できなかったため、検出は凍結しきい値にフォールバックしました。モデルが再トレーニングされるまで、スコアリングは凍結しきい値で継続されます。",
+      "noticeRetrain": "自動再トレーニング",
+      "noticeRetrainTooltip": "アップグレード後に保存済みモデルを読み取れなかったため、モデルは破棄され、設定は自動的に再トレーニングのキューに追加されました。操作は不要です。トレーニングが完了すると検出が再開されます。",
+      "noticeSkipAbsence": "欠落の評価がルックバックウィンドウに間に合わなくなり、取得できなくなったスパンはスキップされ、記録されました。",
+      "noticeSkipScored": "検出実行の間隔がルックバックウィンドウがカバーする範囲より長かったため、クローズ済みのバケットが実行の判定前にウィンドウから外れてしまいました。",
+      "noticeWindowFloor": "ウィンドウが狭すぎます",
+      "noticeWindowFloorTooltip": "ルックバックウィンドウがチェック間隔 + 検出解像度1つ分を下回っているため、実行はどのバケットも判定できません。検出を復元するにはウィンドウを引き上げてください。",
+      "noticeWindowSkip": "バケットがスキップされました",
       "notifications": "通知",
       "notificationsTooltip": "有効にすると、異常が検出されるたびに、選択した宛先に通知が送信されます。",
       "percentile": "レベル",
@@ -7604,7 +7676,9 @@
       "usernameRequired": "ユーザー名は必須です",
       "passwordRequired": "パスワードは必須です",
       "emailRecipients": "受信者メールアドレス",
-      "emailRecipientsHelp": "カンマ区切りのメールアドレス",
+      "emailRecipientsHelp": "アラートメールを受信する組織のユーザーまたはサービスアカウントを選択します",
+      "emailRecipientsGroupUsers": "ユーザー",
+      "emailRecipientsGroupServiceAccounts": "サービスアカウント",
       "invalidEmailAddresses": "無効なメールアドレス: {emails}",
       "opsgenieApiKey": "Opsgenie APIキー",
       "opsgenieApiKeyHelp": "Opsgenie統合設定からAPIキーを取得してください",
@@ -7921,7 +7995,18 @@
     "enabled": "有効",
     "paused": "一時停止",
     "impactTemplate": "使用中: {destinations} · {alerts}",
-    "impactDestination": "使用元 {alerts}"
+    "impactDestination": "{consumers} が使用中",
+    "impactUnused": "未使用",
+    "noConsumers": "コンシューマーがありません。",
+    "countCompositeAlert": "{count} 件の複合アラート | {count} 件の複合アラート",
+    "countPipeline": "{count} 件のパイプライン | {count} 件のパイプライン",
+    "countSyntheticCheck": "{count} 件の合成チェック | {count} 件の合成チェック",
+    "countOncallPolicy": "{count} 件のエスカレーションポリシー | {count} 件のエスカレーションポリシー",
+    "countOncallTeamChannel": "{count} 件のチームチャネル | {count} 件のチームチャネル",
+    "countWorkflow": "{count} 件のワークフロー | {count} 件のワークフロー",
+    "countAnomalyDetection": "{count} 件の異常検知器 | {count} 件の異常検知器",
+    "countIncidentIntegration": "{count} 件のインシデント連携 | {count} 件のインシデント連携",
+    "sectionOtherConsumers": "その他の使用元"
   },
   "alert_library": {
     "header": "アラートライブラリ",
@@ -8605,7 +8690,9 @@
         "staleCopyAria": "{name} の更新失敗詳細をコピー",
         "stalePreamble": "更新に失敗しました — 最後に成功した結果を表示しています。",
         "staleClickToCopy": "クリックして詳細をコピーします。",
-        "lastRefreshedPrefix": "最終更新日時: "
+        "lastRefreshedPrefix": "最終更新日時: ",
+        "exemplarsShowHeatmap": "エグザンプラー（トレースサンプル）を表示します。オンの間、このカードはパーセンタイルに切り替わります。",
+        "exemplarsHideHeatmap": "エグザンプラーを非表示 · {count} 件表示。このカードをヒートマップに戻します。"
       },
       "fn": {
         "subtitle": "このメトリクスの集計方法を選択",
@@ -8789,6 +8876,8 @@
     "cipherKeysDesc": "機密フィールドの暗号化キー",
     "regexPatternsDesc": "墨消し用の再利用可能なregexパターン",
     "domainManagementDesc": "サインインを許可されたSSOドメインに制限",
+    "passwordPolicy": "パスワードポリシー",
+    "passwordPolicyDesc": "ネイティブのメールアドレス/パスワードアカウント向けの認証ポリシーです。インスタンス全体に適用されます。",
     "pipelineDestinationsDesc": "パイプライン出力の外部ターゲット",
     "templatesDesc": "再利用可能なアラートメッセージテンプレート",
     "storageSettingsDesc": "組織ごとのストレージ設定",
@@ -13041,10 +13130,12 @@
           },
           "variables": {
             "input": {
-              "trace": "トレースのルートスパンからの入力。"
+              "trace": "トレースのルートチャット Span からの入力。",
+              "session": "最初の質問: 最初のトレースのルートチャット Span からの入力。"
             },
             "output": {
-              "trace": "トレースのルートスパンからの出力。"
+              "trace": "トレースのルートチャット Span からの出力。",
+              "session": "最終回答: 最後のトレースのルートチャット Span からの出力。"
             },
             "statistics": {
               "trace": "トレースメトリクス: スパン数、期間、LLM とツール呼び出し、エラー、トークン、コスト。",
@@ -13056,6 +13147,10 @@
             "steps": {
               "trace": "時間順のスパン。トレースが非常に長い場合は中間が折りたたまれます。",
               "session": "時間順のトレース。会話のターンとして表現されます。"
+            },
+            "tool_calls": {
+              "trace": "トレース内のすべてのツール呼び出しを、名前、入力、出力、ステータスとともに時系列順に示します。",
+              "session": "セッションのトレース全体にわたるすべてのツール呼び出しを、名前、入力、出力、ステータスとともに時系列順に示します。"
             }
           }
         }
@@ -13375,6 +13470,7 @@
       "searchHistoryNotEnabled": "検索履歴が有効になっていません。",
       "enableUsageReporting": "使用状況レポートを有効にするには、ZO_USAGE_REPORTING_ENABLED を true に設定してください。",
       "selectStreamToExtractPatterns": "パターンを抽出するストリームを選択してください",
+      "patternsUnavailableForMultiStream": "複数のストリームが選択されている場合、パターンは利用できません。ストリームを1つだけ選択してください。",
       "errorExtractingPatterns": "パターンの抽出中にエラーが発生しました。もう一度お試しください。",
       "nameOfPanelRequired": "パネルの名前が必要です",
       "errorsFixAndTryAgain": "いくつかのエラーがあります。修正してからもう一度お試しください。",
@@ -15164,7 +15260,6 @@
       "syntheticsTokensRefresh": "トークンリストを更新",
       "aiChatToggle": "AI チャットを切り替える",
       "aiChatClose": "AI チャットを閉じる",
-      "aiChatExpand": "AI チャットを展開/折りたたむ",
       "logsSaveView": "保存済みビューとして保存",
       "logsExport": "結果を CSV としてエクスポート",
       "tracesCopyUrl": "トレース共有URLをコピー",
@@ -15291,6 +15386,9 @@
       "noOptionsFound": "オプションが見つかりません",
       "multiSelect": "複数選択",
       "singleSelect": "単一選択"
+    },
+    "templateInput": {
+      "suggestions": "変数の候補"
     },
     "time": {
       "openTimePicker": "時刻ピッカーを開く",
@@ -15777,7 +15875,8 @@
         "destinations": "宛先",
         "templates": "テンプレート",
         "reports": "レポート",
-        "llmModelPricing": "LLMモデルの価格設定"
+        "llmModelPricing": "LLMモデルの価格設定",
+        "passcode": "取り込みトークン"
       },
       "noPermissionToChangeFavorites": "お気に入りを変更する権限がありません",
       "couldNotUpdateFavoriteDashboards": "お気に入りのダッシュボードを更新できませんでした"
@@ -16015,6 +16114,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "まだデータ取り込みプロセスを開始していません。他のページを探索するには、データ取り込みを開始してください。"
+    },
+    "iam": {
+      "userSaveFailed": "ユーザーを保存できませんでした"
     }
   },
   "cipherKeys": {
@@ -16432,7 +16534,106 @@
       "exponentName": "指数"
     }
   },
+  "passwordPolicy": {
+    "complexity": "複雑さ",
+    "minLength": "最小文字数",
+    "minLengthDesc": "受け付けるパスワードの最短文字数",
+    "maxLength": "最大文字数",
+    "maxLengthDesc": "0 = 無制限",
+    "requireUppercase": "大文字を必須にする",
+    "requireUppercaseDesc": "A–Z を少なくとも1文字",
+    "requireLowercase": "小文字を必須にする",
+    "requireLowercaseDesc": "a–z を少なくとも1文字",
+    "requireDigit": "数字を必須にする",
+    "requireDigitDesc": "0–9 を少なくとも1文字",
+    "requireSpecial": "特殊文字を必須にする",
+    "requireSpecialDesc": "許可された文字セットから少なくとも1文字",
+    "specialCharSet": "許可する特殊文字",
+    "specialCharSetDesc": "空欄にすると、英数字以外のすべての文字を許可します",
+    "maxLengthTooSmall": "最大文字数は最小文字数以上、または無制限の場合は0にする必要があります。",
+    "confirmTitle": "パスワードポリシーを保存しますか？",
+    "confirmMessage": "保存すると、すべてのネイティブユーザーが続行前に新しいパスワードを設定する必要がある場合があります。root、外部ユーザー、サービスアカウントは対象外です。root アカウントでない限り、あなたも対象です。この操作は元に戻せません。",
+    "saved": "パスワードポリシーを保存しました。 | パスワードポリシーを保存しました。{count} 人のユーザーがパスワードをリセットする必要があります。 | パスワードポリシーを保存しました。{count} 人のユーザーがパスワードをリセットする必要があります。",
+    "saveFailed": "パスワードポリシーを保存できませんでした。",
+    "notAdminTitle": "管理者権限が必要です",
+    "notAdmin": "パスワードポリシーの設定には、メタ組織の管理者権限が必要です。",
+    "loadFailedTitle": "パスワードポリシーを読み込めませんでした",
+    "loadFailed": "現在のポリシーの読み取り中にエラーが発生しました。",
+    "rotation": "ローテーション",
+    "rotationDays": "ローテーション期間",
+    "rotationDaysDesc": "パスワードが有効期限切れになるまでの日数。0 = 無期限",
+    "rotationWarningDays": "有効期限前の警告",
+    "rotationWarningDaysDesc": "サインイン時の通知日数。0 = 警告なし",
+    "warningDaysTooLong": "警告期間はローテーション期間より長くできません。",
+    "rotationPreview": "今日設定したパスワードは {expires} に有効期限が切れます。サインイン時の警告は {warns} から始まります。",
+    "rotationPreviewNoWarning": "今日設定したパスワードは {expires} に有効期限が切れます。それまで警告は表示されません。",
+    "reuse": "再利用の防止",
+    "historyCount": "記憶するパスワード数",
+    "historyCountDesc": "新しいパスワードは、この数の過去のパスワードと一致してはいけません。0 = チェックなし",
+    "historyMaxRetained": "保持する履歴",
+    "historyMaxRetainedDesc": "ユーザーごとに保持される過去のパスワード数",
+    "historyRetainedTooSmall": "保持する履歴は、記憶するパスワード数以上である必要があります。",
+    "reuseExplainer": "現在のパスワードは記憶されるセットの1つとして数えられます。再利用が拒否されるのはこのルールによるもので、別のチェックによるものではありません。",
+    "lockout": "アカウントのロックアウト",
+    "lockoutThreshold": "ロックアウトまでの失敗回数",
+    "lockoutThresholdDesc": "0 = ロックアウト無効",
+    "lockoutBucketSize": "以降の各ロックアウトまでの試行回数",
+    "lockoutBucketSizeDesc": "0 = 上記の値を使用",
+    "lockoutStartSecs": "最初のロックアウト期間",
+    "lockoutStartSecsDesc": "秒",
+    "lockoutMaxSecs": "最大ロックアウト期間",
+    "lockoutMaxSecsDesc": "秒 — エスカレーションが上限とする値",
+    "lockoutStartTooLong": "最初のロックアウトは最大ロックアウトより長くできません。",
+    "lockoutBackoff": "エスカレーション",
+    "lockoutBackoffDesc": "各ロックアウトが前回からどのように延びるか",
+    "backoffExponential": "指数関数的",
+    "backoffLinear": "線形",
+    "lockoutPreview": "{threshold} 回失敗 → {first} · {bucket} 回ごとに → {rest} · 上限 {max}。サインインに成功するとすべてリセットされます。",
+    "sessionEnforcement": "セッションと適用",
+    "cookieMaxAge": "セッションの有効期間",
+    "cookieMaxAgeDesc": "サインイン済みセッションが有効な秒数。0 = {envVar} のインスタンスデフォルトを使用",
+    "applyToRoot": "root アカウントに適用",
+    "applyToRootDesc": "これがオンの場合を除き、root は上記すべてのルールから除外されます",
+    "rootWarning": "root をロックすると、システムが復旧不能な状態になる可能性があります。",
+    "rootDialogTitle": "ポリシーを root に適用しますか？",
+    "rootDialogMessage": "root は他のネイティブアカウントと同様に、ロックアウト、ローテーション、強制リセットの対象になります。root が唯一の管理アカウントである場合、ロックアウトや満たすことのできない有効期限により、このインスタンスに戻る手段がなくなる可能性があります。",
+    "rootDialogAck": "root がこのインスタンスから恒久的にロックアウトされる可能性があることを理解しました。",
+    "rootDialogConfirm": "root に適用"
+  },
+  "passwordReset": {
+    "title": "パスワードを更新",
+    "signedInAs": "{email} としてサインイン中",
+    "reasonPolicyTightened": "パスワードポリシーが変更されました。OpenObserve の使用を続けるにはパスワードを更新してください。",
+    "reasonRotationExpired": "パスワードの有効期限が切れました。OpenObserve の使用を続けるには新しいパスワードを設定してください。",
+    "reasonRotationWarning": "パスワードの有効期限がまもなく切れます。作業からロックアウトされないよう、今すぐ新しいパスワードを設定してください。",
+    "reused": "このパスワードは最近使用されています。直近 {count} 個のパスワードで使用していないものを選択してください。",
+    "expiryBanner": "{count} 日後にパスワードの有効期限が切れます。作業からロックアウトされないよう、今すぐ更新してください。 | {count} 日後にパスワードの有効期限が切れます。作業からロックアウトされないよう、今すぐ更新してください。",
+    "expiryBannerAction": "今すぐ更新",
+    "expiryBannerDismiss": "閉じる",
+    "currentPassword": "現在のパスワード",
+    "newPassword": "新しいパスワード",
+    "confirmPassword": "新しいパスワードの確認",
+    "currentPasswordRequired": "現在のパスワードは必須です。",
+    "newPasswordRequired": "新しいパスワードは必須です。",
+    "confirmPasswordRequired": "新しいパスワードを再入力してください。",
+    "mismatch": "パスワードが一致しません。",
+    "signOut": "サインアウト",
+    "submit": "パスワードを更新",
+    "updated": "パスワードを更新しました。もう一度サインインしてください。",
+    "updateFailed": "パスワードを更新できませんでした。",
+    "req": {
+      "minLength": "{count} 文字以上",
+      "maxLength": "{count} 文字以内",
+      "uppercase": "大文字 1 文字",
+      "lowercase": "小文字 1 文字",
+      "digit": "数字 1 文字",
+      "special": "特殊文字を1文字",
+      "specialFromSet": "{set} の特殊文字を1文字",
+      "unmet": "パスワードには以下が必要です: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "パスワードポリシー",
     "loginCallback": "ログインコールバック",
     "slackOAuthCallback": "Slackに接続中",
     "emptyStateDemo": "空状態デモ",
@@ -16898,17 +17099,17 @@
       "alertMe": "アラートを受け取る",
       "columnHints": {
         "qps": "1秒あたりの呼び出し — このウィンドウの呼び出し数をその長さで割ったもので、15分ビューと4時間ビューを比較しやすくします。",
-        "p50": "すべての呼び出しの半数がこれより速く完了しました。完了した呼び出しのみをカウントします — 実行中のクエリや戻ってこないクエリはここでは測定されません。",
-        "p95": "遅いテール — 20回に1回の呼び出しが少なくともこの時間かかりました。完了した呼び出しのみをカウントします — 実行中のクエリや戻ってこないクエリはここでは測定されません。",
-        "p99": "最悪の1%の呼び出しは少なくともこの時間かかりました。完了した呼び出しのみをカウントします — 実行中のクエリや戻ってこないクエリはここでは測定されません。",
-        "load": "アプリケーションがこのデータベースの待機に費やした合計時間。クライアント側から測定されるため、このデータベースが処理したトラフィックの量を反映します — サーバーの負荷を示すものではありません。",
+        "p50": "すべての呼び出しの半数はこれより速く完了しています。アプリケーションのトレース内の完了した呼び出しから測定しています。",
+        "p95": "遅い側のテール — 呼び出し20回に1回は少なくともこれだけの時間がかかりました。アプリケーションのトレース内の完了した呼び出しから測定しています。",
+        "p99": "ワースト1%の呼び出しは少なくともこれだけの時間がかかりました。アプリケーションのトレース内の完了した呼び出しから測定しています。",
+        "load": "アプリがこのデータベースへの呼び出しに費やした合計時間。アプリケーションのトレースから測定しています。このデータベースがアプリのために処理したトラフィック量を示します。",
         "attention": "このインスタンスが、自身のエンジンが公開する制限にどの程度近いか — 現在は、max_connections に対する接続数。そのような比率の中で最悪の値を示し、ブレンドされたスコアではありません。降順にソートされ、健全性を読み取れないインスタンスが先頭に表示されます。見えないものは健全であるとは言えないからです。データベースサーバー上で測定されるため、隣のデータベース時間とは比較できません。"
       },
       "failedChip": "{count} 失敗",
       "columnSubLabels": {
-        "attention": "サーバー",
-        "load": "クライアント",
-        "calls": "クライアント"
+        "attention": "データベースから",
+        "load": "アプリから",
+        "calls": "アプリから"
       },
       "attention": {
         "connections": "接続",
@@ -16970,14 +17171,14 @@
         "failed": "失敗"
       },
       "columnHints": {
-        "calls": "このクエリが実行された回数。データベースが報告する場合はその値を使用します。それはすべてのクライアントをカバーし、トレースを送信しているシステムの一部だけではありません。クライアント観測とマークされた行は、データベースが報告しなかったため、トレースからカウントされます。",
-        "p50": "すべてのコールの半分がこれよりも速く完了しました。完了したコールのみをカウントします — まだ実行中のクエリや、戻ってこなかったクエリはここでは測定されません。",
-        "p95": "遅いテール — 20回に1回のコールが少なくともこの時間かかりました。完了したコールのみをカウントします — まだ実行中のクエリや、戻ってこなかったクエリはここでは測定されません。",
-        "p99": "最悪の1%のコールが少なくともこの時間かかりました。完了したコールのみをカウントします — まだ実行中のクエリや、戻ってこなかったクエリはここでは測定されません。",
+        "calls": "データベースが集計した、このクエリの実行回数 — 接続しているすべてのアプリが含まれます。データベースにクエリのカウントがない場合、トレースアイコンはアプリケーションのトレースから測定したものを示します。",
+        "p50": "すべての呼び出しの半数はこれより速く完了しています。アプリケーションのトレース内の完了した呼び出しから測定しています。",
+        "p95": "遅い側のテール — 呼び出し20回に1回は少なくともこれだけの時間がかかりました。アプリケーションのトレース内の完了した呼び出しから測定しています。",
+        "p99": "ワースト1%の呼び出しは少なくともこれだけの時間がかかりました。アプリケーションのトレース内の完了した呼び出しから測定しています。",
         "max": "この時間枠内で最も遅い単一のコール — 実測の1回のコールであり、平均ではありません。",
         "errors": "これらのコールのうち、エラーで返ってきたものの数。",
         "perTrace": "これが単一のリクエスト内で実行される回数。数値が高い場合は通常ループを意味します。",
-        "load": "このクエリがデータベースで費やした合計時間。データベースが報告する場合はその値を使用します。Postgresでは実行時間、MySQLとMariaDBでは待機時間です。各行にどちらかが示されます。クライアント観測とマークされた行はトレースから測定されるため、ネットワークの往復時間が含まれます。"
+        "load": "データベースの報告による、このクエリがデータベース内で費やした合計時間: Postgres では実行時間、MySQL と MariaDB では待機時間 — どちらかが各行に表示されます。トレースアイコンの付いた行はアプリケーションのトレースから測定されているため、データベースへの往復も含まれます。"
       },
       "errorsNone": "なし",
       "errorsAll": "すべて",
@@ -17241,8 +17442,7 @@
       "overlap": {
         "serverExecution": "{engine}が実行に費やした時間",
         "serverWait": "{engine}が待機に費やした時間 — 待機時間であり、実行時間ではありません",
-        "serverCounted": "すべてのクライアントにわたって{engine}によってカウント",
-        "clientObserved": "計測された呼び出し元によって観測 — データベースはこれを報告しませんでした"
+        "serverCounted": "すべてのクライアントにわたって{engine}によってカウント"
       },
       "endpointsConcentrated": "1つのエンドポイントがこのクエリの時間の{percent}を占めています。{endpoint}を修正すれば、このクエリも修正されます。",
       "typicalMarker": "遅い呼び出し {value}",
@@ -17269,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "データベース自体が記録したもの",
-        "subtitle": "サーバー側 — すべてのクライアント",
-        "clientSubtitle": "クライアント側で観測されたもの — 計装された呼び出し元のみ、完了した呼び出しのみ。まだ実行中のクエリやハングしたクエリはこの数値には含まれません。",
+        "subtitle": "データベースから — 接続しているすべてのアプリ",
+        "clientSubtitle": "マークされた数値はアプリケーションのトレースから測定されています — このウィンドウでアプリが完了した呼び出しです",
         "instance": "{instance} から報告",
         "instanceWide": "このインスタンス上のすべてのデータベース",
         "calls": "実行",
@@ -17316,9 +17516,13 @@
         "serverExecution": "実行時間",
         "serverWait": "待機時間",
         "serverCounted": "サーバー数",
-        "clientObserved": "クライアント観測",
         "serverReported": "データベースから報告"
       }
+    },
+    "appSource": {
+      "marker": "アプリケーションのトレースから測定",
+      "markerHint": "アプリケーションのトレースから測定し、データベースの報告にアプリ側の視点を加えています。",
+      "legend": "アプリのトレースから"
     },
     "page": {
       "tabs": {
@@ -17327,7 +17531,7 @@
         "metricsHint": "待機イベント別のデータベース負荷と、データベースレシーバーが収集するすべてのメトリクスを表示します。",
         "queries": "トップクエリ",
         "samples": "最も遅い呼び出し",
-        "samplesHintClient": "このウィンドウで計装されたサービスが観測した完了した呼び出し — トレースなしの呼び出し元はカウントされないため、これは下限であり、合計ではありません。テーブルにはその中で最も遅いものが表示されます。",
+        "samplesHintClient": "このウィンドウでアプリケーションのトレースから測定された呼び出しで、データベースの報告にアプリ側の視点を加えています。テーブルには最も遅いものが表示されます。",
         "samplesHintServer": "このウィンドウ内でデータベースが完了を報告したステートメントで、データベース内でカウントされます。テーブルにはその中で最も遅いものが表示されます。",
         "samplesHintUnknown": "このウィンドウ内で最も遅い個々のデータベース呼び出し。",
         "deadlocks": "デッドロック",
@@ -17364,6 +17568,11 @@
       "explore": "メトリクスエクスプローラーで開く",
       "railLabel": "メトリクスセクション",
       "noAccess": "{stream} を読み取る権限がありません。このストリームへの読み取りアクセスについて管理者に問い合わせてください。",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "クエリ別",
         "database": "データベース別",
@@ -17478,7 +17687,7 @@
         "status": "ステータス"
       },
       "columnHints": {
-        "duration": "この1つのコールにかかった時間（呼び出し元による測定）。完了したコールのみをカウントします — まだ実行中のクエリや、応答が返らなかったクエリはここでは測定されません。"
+        "duration": "この1回の呼び出しにかかった時間。アプリケーションが開始から終了まで計測したもの。"
       },
       "failed": "失敗",
       "failedWithCode": "失敗 · {code}",
@@ -18987,6 +19196,8 @@
     "rotationNobody": "オンコール担当者はいません",
     "edit": "編集",
     "timelineLoadFailed": "この期間のスケジュールを解決できませんでした",
+    "editorReadFailed": "最新のコピーを読み込めませんでした。もう一度お試しください。",
+    "refreshFailed": "更新できませんでした。表示されている内容は古い可能性があります。",
     "scheduleDoneEditing": "スケジュールに戻る",
     "coverWhoRequired": "カバーする人を選択してください",
     "timelineCoverAria": "{who} は {rotation} を {from} から {to} までカバーしています",

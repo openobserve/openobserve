@@ -20,7 +20,7 @@ use std::{
 
 use arrow::datatypes::Schema;
 use config::{
-    PARQUET_MAX_ROW_GROUP_SIZE, get_config,
+    get_config,
     meta::{
         promql::is_metrics_hash_excluded_label,
         stream::{FileKey, FileSelection},
@@ -35,12 +35,12 @@ use datafusion::{
     physical_plan::PhysicalExpr,
 };
 use futures::{StreamExt, stream};
-use promql_parser::label::Matchers;
+use promql_parser::label::{MatchOp, Matchers};
 
 use crate::{
     cache::METRICS_INDEX_SELECTION_CACHE,
     layout::MetricsFileLayout,
-    reader::{evaluate_metrics_index, load_metrics_index_file},
+    reader::{IndexLabels, evaluate_metrics_index, load_metrics_index_file},
 };
 
 /// Apply the `.midx` metrics indexes of indexed metrics files in `files` before
@@ -74,9 +74,10 @@ pub async fn search(
     let selection_cache_enabled = get_config().search.metrics_index_selection_cache_enabled;
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
-        // only indexed metrics files own a sidecar; other layouts stay as they are
+        // Zero size means this finalized file was published without a sidecar.
         if index_files.contains_key(&file.key)
             || MetricsFileLayout::of(&file.key) != Some(MetricsFileLayout::Indexed)
+            || file.meta.mindex_size <= 0
         {
             continue;
         }
@@ -108,7 +109,14 @@ pub async fn search(
         };
         index_files.insert(
             file.key.clone(),
-            (file.account.clone(), sidecar_path, cache_key, expected_rows),
+            (
+                file.account.clone(),
+                sidecar_path,
+                cache_key,
+                expected_rows,
+                file.meta.compressed_size,
+                file.meta.mindex_size,
+            ),
         );
     }
     if index_files.is_empty() {
@@ -123,45 +131,94 @@ pub async fn search(
         let mut cache = METRICS_INDEX_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for (data_path, (account, sidecar_path, cache_key, expected_rows)) in index_files {
-            metrics::METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL
+        for (
+            data_path,
+            (account, sidecar_path, cache_key, expected_rows, compressed_size, mindex_size),
+        ) in index_files
+        {
+            metrics::promql::INDEX_SELECTION_CACHE_REQUESTS_TOTAL
                 .with_label_values::<&str>(&[])
                 .inc();
             if let Some((ranges, row_group_size)) = cache.get(&cache_key) {
-                metrics::METRICS_INDEX_SELECTION_CACHE_HITS_TOTAL
+                metrics::promql::INDEX_SELECTION_CACHE_HITS_TOTAL
                     .with_label_values::<&str>(&[])
                     .inc();
                 // only complete selections are cached, so a hit implies exactness
                 evaluated.push((data_path, ranges, true, row_group_size));
             } else {
-                misses.push((data_path, account, sidecar_path, cache_key, expected_rows));
+                misses.push((
+                    data_path,
+                    account,
+                    sidecar_path,
+                    cache_key,
+                    expected_rows,
+                    compressed_size,
+                    mindex_size,
+                ));
             }
         }
     } else {
         misses.extend(index_files.into_iter().map(
-            |(data_path, (account, sidecar_path, cache_key, expected_rows))| {
-                (data_path, account, sidecar_path, cache_key, expected_rows)
+            |(
+                data_path,
+                (account, sidecar_path, cache_key, expected_rows, compressed_size, mindex_size),
+            )| {
+                (
+                    data_path,
+                    account,
+                    sidecar_path,
+                    cache_key,
+                    expected_rows,
+                    compressed_size,
+                    mindex_size,
+                )
             },
         ));
     }
     let cache_hits = evaluated.len();
     let concurrency = target_partitions.max(1).saturating_mul(2).min(64);
+    let regex_labels = Arc::new(
+        matchers
+            .matchers
+            .iter()
+            .filter(|matcher| matches!(&matcher.op, MatchOp::Re(_) | MatchOp::NotRe(_)))
+            .map(|matcher| matcher.name.clone())
+            .collect::<Vec<_>>(),
+    );
     let matchers = Arc::new(matchers.clone());
     let mut evaluations = stream::iter(misses.into_iter().map(
-        |(data_path, account, sidecar_path, cache_key, expected_rows)| {
+        |(
+            data_path,
+            account,
+            sidecar_path,
+            cache_key,
+            expected_rows,
+            compressed_size,
+            mindex_size,
+        )| {
             let labels = Arc::clone(&matcher_labels);
+            let regex_labels = Arc::clone(&regex_labels);
             let matchers = Arc::clone(&matchers);
             async move {
                 let result = async {
-                    let data =
-                        load_metrics_index_file(&account, &sidecar_path, Arc::clone(&labels))
-                            .await?;
+                    let data = load_metrics_index_file(
+                        &account,
+                        &sidecar_path,
+                        config::FileFormat::from_extension(&data_path).ok_or_else(|| {
+                            DataFusionError::Execution("Unsupported metrics source format".into())
+                        })?,
+                        expected_rows,
+                        compressed_size,
+                        mindex_size,
+                        IndexLabels {
+                            requested: Arc::clone(&labels),
+                            flat: regex_labels,
+                        },
+                    )
+                    .await?;
                     tokio::task::spawn_blocking(move || {
                         let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
-                        // indexes without the key predate it: written with the fixed size
-                        let row_group_size = data
-                            .row_group_size
-                            .unwrap_or(PARQUET_MAX_ROW_GROUP_SIZE as u32);
+                        let row_group_size = data.row_group_size;
                         let physical_filter =
                             create_physical_filter(data.schema.as_ref(), &matchers)?;
                         evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
@@ -231,7 +288,7 @@ pub async fn search(
         if ranges.is_empty() {
             return false;
         }
-        file.with_selection(FileSelection::RowRanges(ranges), Some(row_group_size));
+        file.with_selection(FileSelection::RowRanges(ranges), row_group_size);
         true
     });
 

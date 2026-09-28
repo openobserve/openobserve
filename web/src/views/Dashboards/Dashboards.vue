@@ -951,10 +951,15 @@ export default defineComponent({
 
     watch(
       activeFolderId,
-      async () => {
+      async (_folder, previousFolder) => {
         //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder
         //the selected dashboards are not shown
         selectedIds.value = [];
+        // A folder switch starts a new list (page 1 in table and URL alike); the landing run has no previous folder and is the Back restore, which keeps the page.
+        const switching = previousFolder !== null;
+        if (switching) currentPage.value = 1;
+        const { page: _page, ...carriedQuery } = route.query;
+        const baseQuery = switching ? carriedQuery : route.query;
         // The Favorites pseudo-folder has no backend list. Rows render
         // immediately from the stored favorites; fetch the involved folders'
         // lists in the background purely to enrich them (owner/created/fresh
@@ -972,7 +977,7 @@ export default defineComponent({
           router.push({
             path: "/dashboards",
             query: {
-              ...route.query,
+              ...baseQuery,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -1005,7 +1010,7 @@ export default defineComponent({
           router.push({
             path: "/dashboards",
             query: {
-              ...route.query,
+              ...baseQuery,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -1244,7 +1249,7 @@ export default defineComponent({
       (isLoading) => {
         if (isLoading) return;
         setTimeout(() => {
-          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+          oTableRef.value?.restorePage?.(currentPage.value);
         }, 0);
       },
       { once: true },

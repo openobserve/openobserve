@@ -34,14 +34,14 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from typing import Any
 
 import pytest
 
 from support.client import OpenObserveClient
 from support.factories import unique_name
-from support.wait import wait_until
+from support.wait import WaitTimeout, wait_until
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +143,37 @@ def _alert_payload(
         "description": "rewritten alert test",
         "folderId": folder_id,
     }
+
+
+def _get_alert_until(
+    client: OpenObserveClient,
+    alert_id: str,
+    predicate: Callable[[dict[str, Any]], bool],
+    *,
+    msg: str,
+    timeout: float = 30.0,
+) -> dict[str, Any]:
+    """GET the alert, polling until `predicate` holds over the response body.
+
+    A write does not update the server's in-memory alert cache directly: it
+    writes the row and emits a coordinator watch event, and `get_by_id` serves
+    the cached copy until the watcher applies that event. So a GET issued right
+    after a PUT/PATCH can still return the pre-update alert. Every assertion
+    about a value a test just wrote has to poll for it.
+    """
+    seen: dict[str, Any] = {}
+
+    def _matches() -> bool:
+        resp = client.get(f"alerts/{alert_id}", prefix="api/v2/")
+        assert resp.status_code == 200, f"{resp.status_code}: {resp.text}"
+        seen["body"] = resp.json()
+        return predicate(seen["body"])
+
+    try:
+        wait_until(_matches, timeout=timeout, interval=0.5, msg=msg)
+    except WaitTimeout as e:
+        raise AssertionError(f"{e}; last alert body: {seen.get('body')!r}") from e
+    return seen["body"]
 
 
 # ----- fixtures -----
@@ -310,10 +341,12 @@ def test_update_alert_description_field(
     )
     assert resp.status_code == 200, f"update failed: {resp.status_code} {resp.text}"
 
-    # Verify the change persisted
-    resp_get = client.get(f"alerts/{temp_alert['alert_id']}", prefix="api/v2/")
-    assert resp_get.json().get("description") == new_description, \
-        "description should be persisted after update"
+    _get_alert_until(
+        client,
+        temp_alert["alert_id"],
+        lambda body: body.get("description") == new_description,
+        msg=f"description should be persisted after update: {new_description!r}",
+    )
 
 
 # ----- enable / disable -----
@@ -332,13 +365,15 @@ def test_disable_alert_via_enable_endpoint(
     )
     assert resp.status_code == 200, f"disable failed: {resp.status_code} {resp.text}"
 
-    resp_get = client.get(f"alerts/{alert_id}", prefix="api/v2/")
-    assert resp_get.status_code == 200
-    enabled = resp_get.json().get("enabled")
     # OO returns boolean False (not the string 'False' — the original test
     # had that bug AND the assertion was unreachable due to an indentation
     # error inside an else block that never ran).
-    assert enabled is False, f"alert should be disabled (enabled=False), got: {enabled!r}"
+    _get_alert_until(
+        client,
+        alert_id,
+        lambda body: body.get("enabled") is False,
+        msg="alert should be disabled (enabled=False)",
+    )
 
 
 def test_enable_alert_via_enable_endpoint(
@@ -358,9 +393,12 @@ def test_enable_alert_via_enable_endpoint(
     )
     assert resp.status_code == 200, f"enable failed: {resp.status_code} {resp.text}"
 
-    resp_get = client.get(f"alerts/{alert_id}", prefix="api/v2/")
-    enabled = resp_get.json().get("enabled")
-    assert enabled is True, f"alert should be enabled (enabled=True), got: {enabled!r}"
+    _get_alert_until(
+        client,
+        alert_id,
+        lambda body: body.get("enabled") is True,
+        msg="alert should be enabled (enabled=True)",
+    )
 
 
 # ----- trigger -----
@@ -587,12 +625,13 @@ def test_alert_vrl_function_can_be_updated(
         assert resp_update.status_code == 200, f"update failed: {resp_update.status_code} {resp_update.text}"
 
         # Verify both VRL change AND description change persisted
-        resp_get = client.get(f"alerts/{alert_id}", prefix="api/v2/")
-        body = resp_get.json()
-        assert body.get("query_condition", {}).get("vrl_function") == vrl_updated, \
-            "VRL should be updated to the new base64 string"
-        assert body.get("description") == "VRL update test - UPDATED", \
-            "description should be updated"
+        _get_alert_until(
+            client,
+            alert_id,
+            lambda body: body.get("query_condition", {}).get("vrl_function") == vrl_updated
+            and body.get("description") == "VRL update test - UPDATED",
+            msg="VRL and description should both be updated after PUT",
+        )
     finally:
         for a in client.alerts.list():
             if a.get("name") == alert_name:

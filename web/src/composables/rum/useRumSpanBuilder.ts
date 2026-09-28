@@ -174,6 +174,9 @@ export default function useRumSpanBuilder(
     }
   };
 
+  // The RUM Session Replay page only lists sessions whose events carry this flag.
+  const hasReplay = (event: any): boolean => event?.session_has_replay === true;
+
   /** Fetches the browser request and its page view for a trace with a dangling parent, searching only around the window its spans span. */
   const fetchRumEventsForTrace = async (traceId: string, spans: any[]) => {
     const empty = {
@@ -316,6 +319,7 @@ export default function useRumSpanBuilder(
       span_kind: event.type === "resource" ? SPAN_KIND_CLIENT : SPAN_KIND_UNSPECIFIED,
       rum_event_type: event.type,
       rum_session_id: event.session_id,
+      rum_session_has_replay: hasReplay(event),
       _is_trace_bridge: isTraced,
     };
   };
@@ -374,6 +378,7 @@ export default function useRumSpanBuilder(
         span_kind: SPAN_KIND_UNSPECIFIED,
         rum_event_type: "view",
         rum_session_id: view.session_id,
+        rum_session_has_replay: hasReplay(view),
       };
     });
   };
@@ -424,6 +429,7 @@ export default function useRumSpanBuilder(
         span_kind: SPAN_KIND_UNSPECIFIED,
         rum_event_type: "action",
         rum_session_id: action.session_id,
+        rum_session_has_replay: hasReplay(action),
       });
     }
 
@@ -438,6 +444,7 @@ export default function useRumSpanBuilder(
           {
             rum_event_type: "collapsed_actions",
             rum_session_id: firstTracedResource?.session_id,
+            rum_session_has_replay: hasReplay(firstTracedResource),
           },
         ),
       );
