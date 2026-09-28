@@ -5,7 +5,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-import { computed, readonly, ref } from "vue";
+import { computed, onUnmounted, readonly, ref, watch } from "vue";
 import paidOverage, {
   type PaidOverageFeature,
   type PaidOverageStatus,
@@ -21,8 +21,12 @@ interface ConsentRequest {
   orgId: string;
   feature: PaidOverageFeature;
   status: PaidOverageStatus;
+  surface: ConsentSurface;
   resolve: (accepted: boolean) => void;
 }
+
+/** Where a prompt renders. "chat" falls back to the dialog while no chat is open. */
+export type ConsentSurface = "dialog" | "chat";
 
 interface SharedConsentRequest {
   promise: Promise<boolean>;
@@ -36,6 +40,25 @@ const sharedRequests = new Map<string, SharedConsentRequest>();
 const acknowledgementChecked = ref(false);
 const isSubmitting = ref(false);
 const errorMessage = ref("");
+const openChats = ref(0);
+
+const showInChat = computed(
+  () => activeRequest.value?.surface === "chat" && openChats.value > 0,
+);
+const showInDialog = computed(() => !!activeRequest.value && !showInChat.value);
+
+/** Lets an open chat render chat-surface prompts inline while `isOpen()` holds. */
+export function useChatConsentSurface(isOpen: () => boolean) {
+  let registered = false;
+  const sync = (open: boolean) => {
+    if (open === registered) return;
+    registered = open;
+    openChats.value += open ? 1 : -1;
+  };
+  watch(isOpen, sync, { immediate: true });
+  onUnmounted(() => sync(false));
+  return { showInChat };
+}
 
 function showNextRequest() {
   activeRequest.value = pendingRequests.shift() ?? null;
@@ -108,6 +131,7 @@ export function usePaidOverageConsent() {
     feature: PaidOverageFeature,
     status: PaidOverageStatus,
     signal?: AbortSignal,
+    surface: ConsentSurface = "dialog",
   ): Promise<boolean> => {
     if (signal?.aborted) return Promise.resolve(false);
 
@@ -130,6 +154,7 @@ export function usePaidOverageConsent() {
       orgId,
       feature,
       status,
+      surface,
       resolve: resolveRequest,
     };
 
@@ -200,6 +225,8 @@ export function usePaidOverageConsent() {
     errorMessage: readonly(errorMessage),
     missingOrganizations,
     canEnable,
+    showInChat,
+    showInDialog,
     promptForConsent,
     accept,
     decline,

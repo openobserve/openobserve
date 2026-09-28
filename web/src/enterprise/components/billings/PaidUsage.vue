@@ -1,13 +1,8 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <template>
-  <OPageLayout
-    :title="t('paidUsage.settingsTitle')"
-    :subtitle="t('paidUsage.settingsDescription')"
-    icon="paid"
-    bleed
-    data-test="paid-usage-settings"
-  >
-    <div class="px-page-edge py-4">
+  <div data-test="paid-usage-settings" class="px-3 py-2">
+    <p class="text-text-secondary mb-4 text-sm">{{ t("paidUsage.settingsDescription") }}</p>
+    <div>
       <div v-if="loading" class="flex justify-center py-8">
         <OSpinner size="md" />
       </div>
@@ -103,14 +98,13 @@
         </p>
       </div>
     </div>
-  </OPageLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import type { SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";

@@ -72,6 +72,8 @@ vi.mock("@/composables/useAiChat", () => ({
   })),
 }));
 
+const { ref: vueRef } = await vi.importActual<typeof import("vue")>("vue");
+
 vi.mock("@/composables/usePaidOverageConsent", () => ({
   isPaidOverageConsentError: (status: number, body: unknown) =>
     status === 412 &&
@@ -80,6 +82,7 @@ vi.mock("@/composables/usePaidOverageConsent", () => ({
     "error_type" in body &&
     body.error_type === "paid_overage_consent_required",
   usePaidOverageConsent: () => ({ promptForConsent: mockPromptForConsent }),
+  useChatConsentSurface: () => ({ showInChat: vueRef(false) }),
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {

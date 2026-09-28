@@ -1,7 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { flushPromises } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, nextTick, ref } from "vue";
 import type { PaidOverageStatus } from "@/services/paidOverage";
 
 const service = vi.hoisted(() => ({
@@ -13,7 +14,7 @@ vi.mock("@/services/paidOverage", () => ({
   default: service,
 }));
 
-import { usePaidOverageConsent } from "./usePaidOverageConsent";
+import { useChatConsentSurface, usePaidOverageConsent } from "./usePaidOverageConsent";
 
 function status(overrides: Partial<PaidOverageStatus> = {}): PaidOverageStatus {
   return {
@@ -125,5 +126,46 @@ describe("usePaidOverageConsent", () => {
     await flushPromises();
     expect(consent.activeRequest.value).toBeNull();
     expect(service.update).not.toHaveBeenCalled();
+  });
+
+  it("shows chat prompts inline only while a chat is open, else in the dialog", async () => {
+    void consent.promptForConsent("member", "ai_credits", status(), undefined, "chat");
+    expect(consent.showInDialog.value).toBe(true);
+
+    const open = ref(true);
+    const chat = mount(
+      defineComponent({
+        setup() {
+          useChatConsentSurface(() => open.value);
+          return () => null;
+        },
+      }),
+    );
+    expect(consent.showInChat.value).toBe(true);
+    expect(consent.showInDialog.value).toBe(false);
+
+    open.value = false;
+    await nextTick();
+    expect(consent.showInDialog.value).toBe(true);
+
+    open.value = true;
+    await nextTick();
+    chat.unmount();
+    expect(consent.showInDialog.value).toBe(true);
+  });
+
+  it("keeps dialog prompts in the dialog even while a chat is open", () => {
+    const chat = mount(
+      defineComponent({
+        setup() {
+          useChatConsentSurface(() => true);
+          return () => null;
+        },
+      }),
+    );
+    void consent.promptForConsent("member", "ai_credits", status());
+    expect(consent.showInChat.value).toBe(false);
+    expect(consent.showInDialog.value).toBe(true);
+    chat.unmount();
   });
 });

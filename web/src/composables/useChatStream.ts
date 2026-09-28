@@ -853,6 +853,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             "ai_credits",
             errorBody.consent,
             turnController.signal,
+            "chat",
           );
           // The denied request never started on the server, so a decline or a
           // superseded turn simply stops: nothing was metered to unwind.

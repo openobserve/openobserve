@@ -28,7 +28,7 @@ vi.mock("@/composables/usePaidOverageConsent", () => ({
   usePaidOverageConsent: () => ({ promptForConsent: services.promptForConsent }),
 }));
 
-import PaidUsageSettings from "./PaidUsageSettings.vue";
+import PaidUsage from "./PaidUsage.vue";
 
 function consentStatus(overrides: Partial<PaidOverageStatus> = {}): PaidOverageStatus {
   return {
@@ -42,11 +42,10 @@ function consentStatus(overrides: Partial<PaidOverageStatus> = {}): PaidOverageS
 }
 
 function mountSettings() {
-  return mount(PaidUsageSettings, {
+  return mount(PaidUsage, {
     global: {
       plugins: [store, i18n],
       stubs: {
-        OPageLayout: { template: "<main><slot /></main>" },
         OSpinner: { template: '<div data-test="spinner" />' },
         OSwitch: {
           name: "OSwitch",
@@ -60,7 +59,7 @@ function mountSettings() {
   });
 }
 
-describe("PaidUsageSettings", () => {
+describe("PaidUsage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store.state.selectedOrganization.identifier = "default";

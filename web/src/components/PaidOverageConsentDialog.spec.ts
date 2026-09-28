@@ -23,6 +23,7 @@ vi.mock("@/composables/usePaidOverageConsent", () => ({
     isSubmitting: ref(false),
     errorMessage: ref(""),
     canEnable,
+    showInDialog: ref(true),
     accept: controller.accept,
     decline: controller.decline,
   }),
