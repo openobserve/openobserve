@@ -102,6 +102,9 @@ export const alertSettingsCreatesIncidentSchema = z.boolean().optional();
 
 export const alertSettingsNotifyOnRecoverySchema = z.boolean().optional();
 
+/** recovery_destinations: optional. Empty = the recovery follows the firing's destinations. */
+export const alertSettingsRecoveryDestinationsSchema = z.array(z.string()).optional();
+
 // Seconds the condition must stay clear before recovering; 0 recovers immediately.
 export const makeKeepFiringForSchema = (t: Translator) =>
   z.coerce
@@ -127,6 +130,7 @@ export const makeAlertSettingsShape = (t: Translator) =>
     destinations: makeDestinationsSchema(t),
     creates_incident: alertSettingsCreatesIncidentSchema,
     notify_on_recovery: alertSettingsNotifyOnRecoverySchema,
+    recovery_destinations: alertSettingsRecoveryDestinationsSchema,
     keep_firing_for: makeKeepFiringForSchema(t),
   }) as const;
 
@@ -160,6 +164,7 @@ export const createAlertSettingsSchema = (
     workflows: z.array(z.string()).optional(),
     creates_incident: alertSettingsCreatesIncidentSchema,
     notify_on_recovery: alertSettingsNotifyOnRecoverySchema,
+    recovery_destinations: alertSettingsRecoveryDestinationsSchema,
     keep_firing_for: makeKeepFiringForSchema(t),
   });
 

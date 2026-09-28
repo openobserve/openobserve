@@ -201,6 +201,7 @@ mod m20260922_000001_add_password_policy_columns_to_users;
 mod m20260922_000002_create_user_password_history_table;
 mod m20260922_000003_create_user_auth_state_table;
 mod m20260924_000001_add_recovery_episode_columns;
+mod m20260928_000001_add_alert_recovery_destinations;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -487,6 +488,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260922_000003_create_user_auth_state_table::Migration),
             Box::new(m20260920_000001_add_anomaly_level_half_width::Migration),
             Box::new(m20260924_000001_add_recovery_episode_columns::Migration),
+            Box::new(m20260928_000001_add_alert_recovery_destinations::Migration),
         ]
     }
 }
@@ -536,6 +538,7 @@ mod tests {
         (88, "m20260922_000003_create_user_auth_state_table"),
         (89, "m20260920_000001_add_anomaly_level_half_width"),
         (90, "m20260924_000001_add_recovery_episode_columns"),
+        (91, "m20260928_000001_add_alert_recovery_destinations"),
     ];
 
     #[test]

@@ -307,7 +307,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
         <template v-if="isRealTime === 'false'">
-          <!-- The recovery goes to the firing's destinations, not a list of its own. -->
           <div class="mb-4! flex items-start max-md:gap-3">
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.alertSettings.notifyOnRecovery") }}
@@ -335,6 +334,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </div>
           </div>
+
+          <AlertDestinationsField
+            v-if="formData?.notify_on_recovery"
+            class="me-2 mb-4!"
+            :destinations="recoveryDestinations"
+            :workflows="[]"
+            :destination-options="formattedDestinations"
+            :label="t('alerts.alertSettings.recoveryDestinations')"
+            :required="false"
+            :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
+            :supports-workflows="false"
+            @update:destinations="$emit('update:recoveryDestinations', $event)"
+            @refresh="$emit('refresh:destinations')"
+          />
 
           <!-- The hold delays on-call and incident closure too, not only the message. -->
           <div class="mb-4! flex items-start max-md:flex-col max-md:gap-1">
@@ -432,12 +445,18 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    // Empty = the recovery follows the firing's destinations.
+    recoveryDestinations: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
   },
   emits: [
     "update:trigger",
     "update:aggregation",
     "update:isAggregationEnabled",
     "update:destinations",
+    "update:recoveryDestinations",
     "refresh:destinations",
     "update:workflows",
     "update:promqlCondition",
@@ -637,17 +656,34 @@ export default defineComponent({
     const platformOf = (destination: any): string =>
       destination?.destination_type_name || detectPrebuiltType(destination) || "";
 
-    const recoveryPlan = computed(() =>
-      props.destinations.map((name: any) => {
-        const destination = props.destinationObjects.find((d: any) => d?.name === name);
-        const platformKey = destination ? platformRecoveryKeys[platformOf(destination)] : undefined;
-        return {
+    const platformKeyFor = (name: any): string | undefined => {
+      const destination = props.destinationObjects.find((d: any) => d?.name === name);
+      return destination ? platformRecoveryKeys[platformOf(destination)] : undefined;
+    };
+
+    // Ticket closes always go to the firing's own destinations; only the message can be
+    // redirected, so an override lists both halves rather than replacing the first.
+    const recoveryPlan = computed(() => {
+      const redirected = props.recoveryDestinations.length > 0;
+      const rows = props.destinations
+        .filter((name: any) => !redirected || platformKeyFor(name))
+        .map((name: any) => {
+          const platformKey = platformKeyFor(name);
+          return {
+            name: String(name),
+            isPlatform: !!platformKey,
+            action: t(platformKey ?? "alerts.alertSettings.recoveryChatMessage"),
+          };
+        });
+      if (!redirected) return rows;
+      return rows.concat(
+        props.recoveryDestinations.map((name: any) => ({
           name: String(name),
-          isPlatform: !!platformKey,
-          action: t(platformKey ?? "alerts.alertSettings.recoveryChatMessage"),
-        };
-      }),
-    );
+          isPlatform: false,
+          action: t("alerts.alertSettings.recoveryChatMessage"),
+        })),
+      );
+    });
     const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.isPlatform));
 
     return {

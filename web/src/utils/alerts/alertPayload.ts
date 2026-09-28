@@ -56,6 +56,7 @@ export interface PayloadFormData {
   row_template_type?: string;
   creates_incident?: boolean;
   notify_on_recovery?: boolean;
+  recovery_destinations?: string[];
   keep_firing_for?: number;
   /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
   priority?: number | string | null;
@@ -178,6 +179,10 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     ? 0
     : parseInt(formData.keep_firing_for as any, 10) || 0;
   payload.notify_on_recovery = payload.is_real_time ? false : !!formData.notify_on_recovery;
+  // Dropped with the switch off, or the API refuses a list nothing would use.
+  payload.recovery_destinations = payload.notify_on_recovery
+    ? (formData.recovery_destinations ?? [])
+    : [];
 
   // Minutes on the form, seconds on the wire. Forced to 0 for realtime even
   // though the field is unreachable in that template — same belt-and-suspenders

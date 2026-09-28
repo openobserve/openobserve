@@ -85,6 +85,8 @@ pub struct Model {
     /// Send a recovery notification when this alert stops firing. NULL means
     /// the alert predates the feature, which is the same as `false`.
     pub notify_on_recovery: Option<bool>,
+    /// JSON array of destination names. NULL = the recovery follows the firing's own destinations.
+    pub recovery_destinations: Option<Json>,
     /// How long the condition must stay clear before the episode recovers.
     /// NULL or 0 recovers on the first clear evaluation.
     pub keep_firing_for_seconds: Option<i64>,
@@ -171,6 +173,7 @@ mod tests {
             workflows: serde_json::json!(vec!["abc123"]),
             pending_period_sec: 0,
             notify_on_recovery: None,
+            recovery_destinations: None,
             keep_firing_for_seconds: None,
         };
         assert_eq!(m.id, "alert-1");

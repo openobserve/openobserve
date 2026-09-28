@@ -7455,6 +7455,8 @@
       "notifyOnRecovery": "Notify on recovery",
       "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
       "notifyOnRecoveryTemplateHint": "Destinations that reuse your template must include {'{'}alert_status{'}'}, or the recovery message will look like a new alert.",
+      "recoveryDestinations": "Recovery destination",
+      "recoveryDestinationsTooltip": "Leave empty to announce the recovery wherever the alert fired. Pick destinations here to send it somewhere else instead. PagerDuty, Opsgenie and ServiceNow still close the ticket their own firing opened.",
       "recoveryResolvesIncident": "resolves the incident",
       "recoveryClosesAlert": "closes the alert",
       "recoveryChatMessage": "new \"Resolved\" message",

@@ -93,6 +93,8 @@ impl From<AlertError> for Response {
             | AlertError::NegativePendingPeriod
             | AlertError::KeepFiringForOutOfRange
             | AlertError::RecoveryOnRealtimeAlert
+            | AlertError::RecoveryDestinationsWithoutRecovery
+            | AlertError::RecoveryDestinationIsPlatform { .. }
             | AlertError::RecoveryOnMultiAlert
             | AlertError::RecoveryWithNotificationGrouping
             | AlertError::RecoveryNeedsJsonPayload { .. }

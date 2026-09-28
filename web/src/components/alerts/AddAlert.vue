@@ -356,6 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :columns="filteredColumns"
                     :isAggregationEnabled="isAggregationEnabled"
                     :destinations="formData.destinations"
+                    :recoveryDestinations="formData.recovery_destinations"
                     :formattedDestinations="getFormattedDestinations"
                     :destinationObjects="destinations"
                     :workflows="formData.workflows"
@@ -364,6 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
                     @update:promqlCondition="updatePromqlCondition"
                     @update:destinations="updateDestinations"
+                    @update:recoveryDestinations="updateRecoveryDestinations"
                     @refresh:destinations="refreshDestinations"
                     @update:workflows="updateWorkflows"
                   />

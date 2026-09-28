@@ -78,6 +78,11 @@ impl TryFrom<alerts::Model> for MetaAlert {
         // Transform database JSON values into intermediate types which can be
         // directly translated into service layer types.
         let destinations: Vec<String> = serde_json::from_value(value.destinations)?;
+        let recovery_destinations: Vec<String> = value
+            .recovery_destinations
+            .map(serde_json::from_value)
+            .transpose()?
+            .unwrap_or_default();
         let context_attributes: Option<HashMap<String, String>> = value
             .context_attributes
             .map(serde_json::from_value)
@@ -218,6 +223,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.pending_period_sec = value.pending_period_sec;
         // NULL predates the feature, which is the same as off / no hold.
         alert.notify_on_recovery = value.notify_on_recovery.unwrap_or(false);
+        alert.recovery_destinations = recovery_destinations;
         alert.keep_firing_for = value.keep_firing_for_seconds.unwrap_or(0);
 
         Ok(alert)
@@ -978,6 +984,11 @@ fn update_mutable_fields(
     let workflows = serde_json::to_value(alert.workflows)?;
     let pending_periond_sec = alert.pending_period_sec;
     let notify_on_recovery = alert.notify_on_recovery;
+    let recovery_destinations = if alert.recovery_destinations.is_empty() {
+        None
+    } else {
+        Some(serde_json::to_value(alert.recovery_destinations)?)
+    };
     let keep_firing_for_seconds = alert.keep_firing_for;
 
     // Handle deduplication configuration
@@ -1052,6 +1063,7 @@ fn update_mutable_fields(
     alert_am.workflows = Set(workflows);
     alert_am.pending_period_sec = Set(pending_periond_sec);
     alert_am.notify_on_recovery = Set(Some(notify_on_recovery));
+    alert_am.recovery_destinations = Set(recovery_destinations);
     alert_am.keep_firing_for_seconds = Set(Some(keep_firing_for_seconds));
     Ok(())
 }
@@ -1135,6 +1147,7 @@ pub(super) mod tests {
             workflows: serde_json::json!(["abc123"]),
             pending_period_sec: 0,
             notify_on_recovery: None,
+            recovery_destinations: None,
             keep_firing_for_seconds: None,
         }
     }

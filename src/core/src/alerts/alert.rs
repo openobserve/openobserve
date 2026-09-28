@@ -307,6 +307,15 @@ pub enum AlertError {
     KeepFiringForOutOfRange,
     #[error("Realtime alerts cannot notify on recovery or keep firing")]
     RecoveryOnRealtimeAlert,
+    #[error("recovery destinations were set without notify_on_recovery, so nothing would use them")]
+    RecoveryDestinationsWithoutRecovery,
+    #[error(
+        "recovery destination '{destination}' is {platform}, which recovers by closing the ticket its own firing opened — add it to the alert's destinations instead"
+    )]
+    RecoveryDestinationIsPlatform {
+        destination: String,
+        platform: String,
+    },
     #[error(
         "Multi-alerts keep per-group state and open no recovery episode, so notify_on_recovery would never fire"
     )]
@@ -430,7 +439,30 @@ fn platform_body_is_addressable(kind: TemplateKind, body: &str) -> bool {
 /// Refuse a recovery that could not be delivered as one, at save rather than at 3am.
 async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), AlertError> {
     if !alert.notify_on_recovery {
+        // Stored without the switch it would silently do nothing, and read as if it would.
+        if !alert.recovery_destinations.is_empty() {
+            return Err(AlertError::RecoveryDestinationsWithoutRecovery);
+        }
         return Ok(());
+    }
+
+    // A resolve carries the key of the trigger that opened the ticket, so it can only be sent where
+    // the firing went; a platform here would be selected and then never used.
+    for dest_name in alert.recovery_destinations.iter() {
+        if alert.destinations.contains(dest_name) {
+            continue;
+        }
+        if let Ok((destination, _)) = destinations::get_with_template(org_id, dest_name).await
+            && let Module::Alert {
+                destination_type, ..
+            } = &destination.module
+            && let Some(platform) = platform_of(destination_type)
+        {
+            return Err(AlertError::RecoveryDestinationIsPlatform {
+                destination: dest_name.clone(),
+                platform: format!("{platform:?}"),
+            });
+        }
     }
 
     // Both keep the alert out of the single-row path that owns the episode, so recovery would be
@@ -2788,8 +2820,9 @@ async fn build_send_context(
     .await
 }
 
-/// Sends to the alert's CURRENT destinations, so an edit while firing retargets the resolve;
-/// `skip_destinations` is absent because the firing's ledger is per-attempt, not per-episode.
+/// The MESSAGE goes to `recovery_destinations` when set, otherwise to the firing's own. A ticket
+/// close is not a message: it must quote the key of the trigger that opened it, so it is never
+/// redirected and always visits the firing's destinations.
 pub async fn send_recovery_notification(
     alert: &Alert,
     event: &config::meta::alerts::recovery::RecoveryEvent,
@@ -2814,8 +2847,18 @@ pub async fn send_recovery_notification(
         None => None,
     };
 
+    let message_destinations = if alert.recovery_destinations.is_empty() {
+        &alert.destinations
+    } else {
+        &alert.recovery_destinations
+    };
+
     let mut failures = String::new();
-    for dest_name in alert.destinations.iter() {
+    let mut visited = hashbrown::HashSet::new();
+    for dest_name in alert.destinations.iter().chain(message_destinations) {
+        if !visited.insert(dest_name) {
+            continue;
+        }
         let (destination_type, dest_template) =
             match destinations::get_with_template(&alert.org_id, dest_name).await {
                 Ok((dest, tpl)) => match dest.module {
@@ -2833,6 +2876,17 @@ pub async fn send_recovery_notification(
         if let (Some(platform), DestinationType::Http(endpoint)) =
             (platform_of(&destination_type), &destination_type)
         {
+            // Only the firing's own: a resolve quotes the key of the trigger that opened the
+            // ticket, so sending one somewhere that never got a trigger closes nothing.
+            if !alert.destinations.contains(dest_name) {
+                log::warn!(
+                    "[RECOVERY] {}/{} recovery destination {dest_name} is {platform:?}, which has \
+                     no ticket from this alert to close",
+                    alert.org_id,
+                    alert.name
+                );
+                continue;
+            }
             match platform::send_resolve(platform, endpoint, &event.episode_id).await {
                 Ok(resp) => {
                     log::info!(
@@ -2847,6 +2901,11 @@ pub async fn send_recovery_notification(
                 }
                 Err(e) => failures = format!("{failures} destination {dest_name}: {e};"),
             }
+            continue;
+        }
+
+        // Redirected away by `recovery_destinations`: it got the firing, not the recovery.
+        if !message_destinations.contains(dest_name) {
             continue;
         }
 
