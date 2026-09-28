@@ -65,7 +65,11 @@ pub(crate) fn absent_labels(expr: &Expr) -> Labels {
         if matcher.name == NAME_LABEL {
             continue;
         }
-        if matches!(matcher.op, MatchOp::Equal) && seen.insert(matcher.name.as_str()) {
+        // an empty value unsets the label, as Prometheus' labels.Builder does
+        if matches!(matcher.op, MatchOp::Equal)
+            && seen.insert(matcher.name.as_str())
+            && !matcher.value.is_empty()
+        {
             labels.insert(matcher.name.as_str(), matcher.value.as_str());
         } else {
             labels.remove(matcher.name.as_str());
@@ -265,6 +269,11 @@ mod tests {
             pairs(&[("job", "x")])
         );
         assert!(labels_of(r#"absent(sum(up{job="x"}))"#).is_empty());
+        assert_eq!(
+            labels_of(r#"absent(up{job="",env="a"})"#),
+            pairs(&[("env", "a")])
+        );
+        assert!(labels_of(r#"absent(up{job="",job="x"})"#).is_empty());
         assert!(labels_of(r#"absent_over_time(up{job="x"}[5m:1m])"#).is_empty());
     }
 }

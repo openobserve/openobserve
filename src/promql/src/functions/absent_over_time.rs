@@ -36,7 +36,11 @@ pub(crate) fn absent_over_time(
     };
     let timestamps = eval_ctx.timestamps();
     let mut present = vec![false; timestamps.len()];
+    let mut missing = timestamps.len();
     for series in &matrix {
+        if missing == 0 {
+            return Ok(Value::None);
+        }
         let range = series
             .time_window
             .as_ref()
@@ -51,7 +55,10 @@ pub(crate) fn absent_over_time(
             eval_ctx,
             &timestamps,
         ) {
-            present[slot] = true;
+            if !present[slot] {
+                present[slot] = true;
+                missing -= 1;
+            }
         }
     }
     Ok(absent_series(

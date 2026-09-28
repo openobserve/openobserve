@@ -17,7 +17,10 @@ use std::collections::{HashMap, HashSet, hash_map::Entry};
 
 use config::meta::promql::{
     NAME_LABEL,
-    value::{Labels, LabelsExt, RangeValue, Sample, Value},
+    value::{
+        Labels, LabelsExt, RangeValue, Sample, Value, signature_with_labels,
+        signature_without_labels,
+    },
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
@@ -181,7 +184,8 @@ fn vector_or(expr: &BinaryExpr, left: Vec<RangeValue>, right: Vec<RangeValue>) -
     let unmatched = filter_set_series(right, &left, false, match_signature(expr));
     let mut output = left;
     output.extend(unmatched);
-    Ok(Value::Matrix(output))
+    // equal labels imply an equal signature, so left and right fragments never share a step
+    Ok(Value::Matrix(merge_same_labelset(output)?))
 }
 
 /// matrix1 unless matrix2 results in a matrix consisting of the elements of
@@ -244,48 +248,49 @@ fn filter_set_series(
     keep_matches: bool,
     signature: impl Fn(&Labels) -> u64 + Sync,
 ) -> Vec<RangeValue> {
-    let mut other_steps: HashMap<u64, Vec<i64>> = HashMap::with_capacity(other.len());
+    let mut other_steps: HashMap<u64, HashSet<i64>> = HashMap::with_capacity(other.len());
     for range in other {
         other_steps
             .entry(signature(&range.labels))
             .or_default()
             .extend(range.samples.iter().map(|sample| sample.timestamp));
     }
-    other_steps.par_iter_mut().for_each(|(_, steps)| {
-        steps.sort_unstable();
-        steps.dedup();
-    });
     input
         .into_par_iter()
         .filter_map(|mut range| {
-            let steps = other_steps
-                .get(&signature(&range.labels))
-                .map_or(&[][..], Vec::as_slice);
-            range
-                .samples
-                .retain(|sample| steps.binary_search(&sample.timestamp).is_ok() == keep_matches);
+            let steps = other_steps.get(&signature(&range.labels));
+            range.samples.retain(|sample| {
+                steps.is_some_and(|steps| steps.contains(&sample.timestamp)) == keep_matches
+            });
             (!range.samples.is_empty()).then_some(range)
         })
         .collect()
 }
 
 /// Signature of the labels `on`/`ignoring` compare; without `on`, `__name__` is never compared.
-fn match_signature(expr: &BinaryExpr) -> impl Fn(&Labels) -> u64 + Sync + use<> {
+fn match_signature(expr: &BinaryExpr) -> impl Fn(&Labels) -> u64 + Sync + '_ {
     let on = expr.is_matching_on();
-    let mut names: Vec<String> = expr
+    let mut names: Vec<&str> = expr
         .modifier
         .as_ref()
         .and_then(|modifier| modifier.matching.as_ref())
-        .map(|matching| matching.labels().labels.clone())
+        .map(|matching| {
+            matching
+                .labels()
+                .labels
+                .iter()
+                .map(String::as_str)
+                .collect()
+        })
         .unwrap_or_default();
     if !on {
-        names.push(NAME_LABEL.to_string());
+        names.push(NAME_LABEL);
     }
     move |labels: &Labels| {
         if on {
-            labels.keep(&names).signature()
+            signature_with_labels(labels, &names)
         } else {
-            labels.delete(&names).signature()
+            signature_without_labels(labels, &names)
         }
     }
 }
@@ -1495,5 +1500,14 @@ mod tests {
             samples("a or b"),
             vec![(1, 1.0), (2, 2.0), (3, 3.0), (4, 40.0)]
         );
+    }
+
+    #[test]
+    fn test_or_merges_fragments_with_the_same_labels() {
+        let left = vec![range_at(&[(1, 1.0)], vec![])];
+        let right = vec![range_at(&[(1, 2.0), (2, 2.0)], vec![])];
+        let result = eval_bin_op("a or b", left, right);
+        assert_eq!(result.len(), 1);
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 1.0), (2, 2.0)]);
     }
 }
