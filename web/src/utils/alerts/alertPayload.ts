@@ -55,6 +55,9 @@ export interface PayloadFormData {
   row_template?: string;
   row_template_type?: string;
   creates_incident?: boolean;
+  notify_on_recovery?: boolean;
+  recovery_destinations?: string[];
+  keep_firing_for?: number;
   /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
   priority?: number | string | null;
   tags?: string[];
@@ -164,6 +167,22 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   payload.trigger_condition.frequency = parseInt(formData.trigger_condition.frequency as any);
 
   payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
+
+  // A `type="number"` input hands back a STRING, and the API takes an i64 — an
+  // uncoerced "60" is rejected by serde before any validation runs, so the user
+  // sees a deserialization error instead of the field's own rule.
+  //
+  // Both are forced off for realtime, same belt-and-suspenders as
+  // pending_period_sec below: a realtime alert persists no state, so it never
+  // opens an episode and neither field could ever act.
+  payload.keep_firing_for = payload.is_real_time
+    ? 0
+    : parseInt(formData.keep_firing_for as any, 10) || 0;
+  payload.notify_on_recovery = payload.is_real_time ? false : !!formData.notify_on_recovery;
+  // Dropped with the switch off, or the API refuses a list nothing would use.
+  payload.recovery_destinations = payload.notify_on_recovery
+    ? (formData.recovery_destinations ?? [])
+    : [];
 
   // Minutes on the form, seconds on the wire. Forced to 0 for realtime even
   // though the field is unreachable in that template — same belt-and-suspenders

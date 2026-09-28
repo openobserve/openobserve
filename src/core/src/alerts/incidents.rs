@@ -953,6 +953,69 @@ pub async fn correlate_external_event(
     Ok(Some(outcome))
 }
 
+/// Narrow on purpose: one member recovering is not the incident being over, and an acknowledged or
+/// assigned incident is a human's to close. `auto_resolve_after_minutes` stays as the backstop.
+pub async fn resolve_alert_firing(
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+) -> Result<(), anyhow::Error> {
+    let Some(incident_id) = event.incident_id.as_deref() else {
+        return Ok(());
+    };
+    infra::table::alert_incidents::resolve_alert_firings(
+        incident_id,
+        &event.alert_id,
+        event.recovered_at,
+    )
+    .await?;
+
+    // Published even when this region updated no rows: the receiver runs the same idempotent update
+    // against its own replica, which may still be behind.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_resolve_alert(
+            &event.org_id,
+            incident_id,
+            &event.alert_id,
+            event.recovered_at,
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish incident resolve_alert: {e}");
+    }
+
+    let Some(incident) = infra::table::alert_incidents::get(&event.org_id, incident_id).await?
+    else {
+        return Ok(());
+    };
+    if incident.status == "resolved" {
+        return Ok(());
+    }
+    if incident.acknowledged_by.is_some() || incident.assigned_to.is_some() {
+        return Ok(());
+    }
+
+    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+    if links.is_empty() || links.iter().any(|l| l.resolved_at.is_none()) {
+        return Ok(());
+    }
+
+    update_status(
+        &event.org_id,
+        incident_id,
+        "resolved",
+        "system@openobserve.ai",
+    )
+    .await?;
+    log::info!(
+        "[incidents] Auto-resolved incident {incident_id} — all {} contributing alert(s) recovered",
+        links.len()
+    );
+    Ok(())
+}
+
 /// Auto-resolve the open incident containing `external.id`, but only once every
 /// other `External`-kind alert already linked to that incident is also resolved
 /// in `external_alerts` — a single source clearing shouldn't close an incident

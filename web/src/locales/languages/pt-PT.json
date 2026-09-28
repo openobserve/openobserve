@@ -354,6 +354,10 @@
       "title": "Nenhum rastro encontrado",
       "description": "Nenhum rastro corresponde ao serviço e ao intervalo de tempo selecionados. Tente um intervalo de tempo maior ou um serviço diferente."
     },
+    "noProfiles": {
+      "title": "Nenhum perfil encontrado",
+      "description": "Seu intervalo de tempo não contém dados de perfil deste stream. Tente um intervalo de tempo maior ou um serviço diferente."
+    },
     "noServiceGraph": {
       "title": "Sem dados do gráfico de serviço",
       "description": "Tente consultar um intervalo de tempo maior ou verifique se seus serviços estão emitindo métricas de span."
@@ -421,6 +425,7 @@
       "alerts": "alertas",
       "incidents": "incidentes",
       "traces": "rastros",
+      "profiles": "perfis",
       "discoveryItems": "itens não saudáveis",
       "datasetItems": "itens",
       "searches": "pesquisa",
@@ -1306,6 +1311,8 @@
     "tagKey": "Chave da tag",
     "tagValue": "Valor da tag",
     "addFilter": "Adicionar filtro",
+    "removeFilter": "Remover filtro {key}={value}",
+    "searchFrames": "Pesquisar frames",
     "runQuery": "Executar consulta",
     "timeSeriesTitle": "Valores de perfil ao longo do tempo",
     "resultTitle": "Resultado do perfil",
@@ -1314,14 +1321,28 @@
     "viewTree": "Árvore de pilha",
     "self": "Próprio",
     "total": "Total",
+    "share": "Compartilhar",
     "cpuDuration": "Duração de CPU",
     "percent": "%",
+    "sortBySelf": "Classificar por próprio",
+    "sortByTotal": "Classificar por total",
     "noStreams": "Nenhum stream de perfil disponível",
-    "noSeries": "Nenhum dado de série temporal neste intervalo",
-    "noResults": "Nenhum resultado de perfil neste intervalo",
+    "noSeries": "Sem dados",
+    "noResults": "Nenhum perfil encontrado",
+    "noProfilesFound": "Nenhum perfil encontrado",
+    "noProfilesFoundDesc": "Seu intervalo de tempo não contém dados de perfil deste stream. Tente um intervalo de tempo maior ou um serviço diferente.",
+    "loading": "Carregando perfis…",
     "filters": "Filtros",
     "expand": "Expandir",
     "collapse": "Recolher",
+    "resetFocus": "Redefinir foco",
+    "labelAlign": "Alinhamento do rótulo",
+    "alignLeft": "Alinhar à esquerda",
+    "alignRight": "Alinhar à direita",
+    "inverted": "Invertido",
+    "copyFunctionName": "Copiar nome da função",
+    "focusBlock": "Focar bloco",
+    "focusOfTotal": "{percent}% do total",
     "errors": {
       "loadFailed": "Falha ao carregar os dados de perfil"
     }
@@ -2771,6 +2792,13 @@
         "node": "Gatilho de alerta",
         "desc": "Executar quando um alerta disparar",
         "intro": "Quando um alerta vinculado dispara, cada passo a jusante recebe este payload."
+      },
+      "alertResolved": {
+        "label": "Alerta resolvido",
+        "tab": "Resolvido",
+        "node": "Gatilho de alerta resolvido",
+        "desc": "Executar quando um alerta em disparo se recuperar",
+        "intro": "Quando um alerta que disparou se recupera, cada etapa subsequente recebe este payload."
       },
       "incidentEvent": {
         "label": "Evento de incidente",
@@ -7435,6 +7463,8 @@
         "streamName": "Nome do stream que o alerta monitora",
         "alertName": "Nome do alerta",
         "alertType": "Tipo de alerta (ex.: agendado, tempo real)",
+        "alertStatus": "disparando ou resolvido — permite que uma mensagem de recuperação seja lida de forma diferente de um novo alerta",
+        "episodeId": "ID exclusivo deste disparo, compartilhado com sua recuperação. Enviado automaticamente ao PagerDuty, Opsgenie e ServiceNow para que o alerta possa ser resolvido.",
         "alertPeriod": "Janela de avaliação, em minutos",
         "alertOperator": "Operador de comparação de limite (>, <, =)",
         "alertThreshold": "O valor de limite configurado",
@@ -7449,7 +7479,19 @@
         "alertTriggerTimeSeconds": "Horário de acionamento em epoch segundos",
         "alertTriggerTimeStr": "Horário de acionamento, legível para humanos",
         "rows": "Todas as linhas correspondentes, formatadas pelo modelo de linha"
-      }
+      },
+      "notifyOnRecovery": "Notificar na recuperação",
+      "notifyOnRecoveryTooltip": "Enviar uma mensagem aos destinos acima quando este alerta parar de disparar.",
+      "notifyOnRecoveryTemplateHint": "Os destinos que reutilizam seu modelo devem incluir {'{'}alert_status{'}'}, caso contrário a mensagem de recuperação parecerá um novo alerta.",
+      "recoveryDestinations": "Destino de recuperação",
+      "recoveryDestinationsTooltip": "Deixe vazio para anunciar a recuperação onde o alerta disparou. Escolha destinos aqui para enviá-la a outro lugar. PagerDuty, Opsgenie e ServiceNow ainda fecham o ticket que seu próprio disparo abriu.",
+      "recoveryResolvesIncident": "resolve o incidente",
+      "recoveryClosesAlert": "fecha o alerta",
+      "recoveryChatMessage": "nova mensagem \"Resolvido\"",
+      "keepFiringFor": "Continuar disparando por",
+      "keepFiringForTooltip": "Aguarde esse tempo após a condição se encerrar antes de recuperar. 0 recupera imediatamente.",
+      "keepFiringForInvalid": "Insira 0 ou mais segundos",
+      "keepFiringForTooLong": "Insira no máximo 86400 segundos (24 horas)"
     },
     "advanced": {
       "addVariable": "Adicionar variável",
@@ -7680,6 +7722,8 @@
       "servicenowPasswordHelp": "Senha ou token de API do ServiceNow",
       "servicenowAssignmentGroup": "Grupo de atribuição (opcional)",
       "servicenowAssignmentGroupHelp": "Grupo para atribuir incidentes (ex.: Operações de TI)",
+      "servicenowResolutionCode": "Código de resolução (opcional)",
+      "servicenowResolutionCodeHelp": "Deve corresponder a um código de resolução válido na sua instância do ServiceNow. Usado quando o OpenObserve resolve o incidente. O padrão é Solved (Permanently).",
       "usernameRequired": "Nome de usuário é obrigatório",
       "passwordRequired": "Senha é obrigatória",
       "emailRecipients": "Endereços de e-mail do destinatário",
@@ -7976,7 +8020,8 @@
     "sloKind": "Tipo de condição",
     "sloLongWindow": "Janela longa",
     "sloShortWindow": "Janela curta",
-    "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui."
+    "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui.",
+    "seconds": "Segundos"
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",
@@ -8174,6 +8219,7 @@
     "filterPrebuilt": "Pré-construído",
     "filterCustom": "Personalizado",
     "variableRowsDescription": "várias linhas do template de linha",
+    "variableEpisodeIdDescription": "ID exclusivo deste disparo. Adicionado automaticamente aos payloads do PagerDuty, Opsgenie e ServiceNow para que o alerta possa ser resolvido.",
     "variableStreamFields": "Todos os campos do stream são variáveis.",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} usado para limitar linhas ou comprimento da string.",
     "variableTimezoneNote": "As variáveis de timestamp ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) são renderizadas no fuso horário local do servidor.",
