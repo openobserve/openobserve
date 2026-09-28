@@ -50,13 +50,15 @@ pub(crate) fn days_in_month(data: Value) -> Result<Value> {
 }
 
 pub(crate) fn timestamp(data: Value) -> Result<Value> {
-    super::map_samples(data, "timestamp", |sample| seconds(sample.timestamp))
+    super::map_samples(data, "timestamp", |sample| {
+        timestamp_seconds(sample.timestamp)
+    })
 }
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#time
 pub(crate) fn time(eval_ctx: &EvalContext) -> Value {
     if eval_ctx.is_instant() {
-        return Value::Float(seconds(eval_ctx.start));
+        return Value::Float(timestamp_seconds(eval_ctx.start));
     }
     // a range-evaluated scalar is one label-less series with a sample per step
     Value::Matrix(vec![RangeValue::new(
@@ -64,12 +66,12 @@ pub(crate) fn time(eval_ctx: &EvalContext) -> Value {
         eval_ctx
             .timestamps()
             .into_iter()
-            .map(|timestamp| Sample::new(timestamp, seconds(timestamp))),
+            .map(|timestamp| Sample::new(timestamp, timestamp_seconds(timestamp))),
     )])
 }
 
-// Prometheus timestamps are whole milliseconds, so the microseconds below that are dropped
-fn seconds(micros: i64) -> f64 {
+/// A microsecond timestamp in seconds, at the millisecond precision Prometheus keeps.
+pub(crate) fn timestamp_seconds(micros: i64) -> f64 {
     micros.div_euclid(1_000) as f64 / 1_000.0
 }
 
