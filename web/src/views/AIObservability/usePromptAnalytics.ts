@@ -111,6 +111,7 @@ export function usePromptAnalytics(
   version: Ref<PromptVersion>,
   streamName: Ref<string>,
   window: Ref<PromptAnalyticsWindow>,
+  isLlmStream: Ref<boolean>,
 ) {
   const { executeQuery, executeQueryOnce, cancelAll } = useLLMStreamQuery();
   const loading = ref(false);
@@ -134,6 +135,13 @@ export function usePromptAnalytics(
 
   async function loadTraffic() {
     if (!streamName.value || !prompt.value?.name || !version.value?.version) return;
+    // Only LLM streams are guaranteed to carry the gen_ai_* columns queried below;
+    // any other stream would fail with "No field named gen_ai_...".
+    if (!isLlmStream.value) {
+      error.value = null;
+      resetTraffic();
+      return;
+    }
     loading.value = true;
     error.value = null;
     const stream = sqlIdentifier(streamName.value);
@@ -206,18 +214,22 @@ export function usePromptAnalytics(
       recent.value = await mergeLatestScores(rows, startUs, endUs);
     } catch (caught: unknown) {
       error.value = caught instanceof Error ? caught.message : "Prompt traffic query failed.";
-      kpis.value = {
-        calls: 0,
-        errorRate: null,
-        p50LatencyMs: null,
-        p95LatencyMs: null,
-        cost: null,
-      };
-      breakdown.value = [];
-      recent.value = [];
+      resetTraffic();
     } finally {
       loading.value = false;
     }
+  }
+
+  function resetTraffic() {
+    kpis.value = {
+      calls: 0,
+      errorRate: null,
+      p50LatencyMs: null,
+      p95LatencyMs: null,
+      cost: null,
+    };
+    breakdown.value = [];
+    recent.value = [];
   }
 
   async function mergeLatestScores(
@@ -266,9 +278,11 @@ export function usePromptAnalytics(
     ];
   }
 
-  watch([streamName, window, () => prompt.value.name, () => version.value.version], loadTraffic, {
-    immediate: true,
-  });
+  watch(
+    [streamName, window, isLlmStream, () => prompt.value.name, () => version.value.version],
+    loadTraffic,
+    { immediate: true },
+  );
   onUnmounted(cancelAll);
 
   return {

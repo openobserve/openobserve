@@ -25,7 +25,7 @@ describe("usePromptAnalytics", () => {
   it("queries trace streams that do not contain error_type", async () => {
     const prompt = ref({ name: "qa_prompt", entityId: "prompt-1" } as Prompt);
     const version = ref({ version: 2, contentHash: "hash" } as PromptVersion);
-    const analytics = usePromptAnalytics(prompt, version, ref("default"), ref("24h"));
+    const analytics = usePromptAnalytics(prompt, version, ref("default"), ref("24h"), ref(true));
 
     await vi.waitFor(() => expect(queryMocks.executeQuery).toHaveBeenCalledTimes(3));
     const sql = queryMocks.executeQuery.mock.calls.map(([query]) => query).join("\n");
@@ -33,6 +33,19 @@ describe("usePromptAnalytics", () => {
     expect(sql).not.toContain("error_type");
     expect(sql).toContain("span_status = 'ERROR'");
     expect(analytics.error.value).toBeNull();
+  });
+
+  it("does not search streams that are not LLM streams", async () => {
+    const prompt = ref({ name: "qa_prompt", entityId: "prompt-1" } as Prompt);
+    const version = ref({ version: 2, contentHash: "hash" } as PromptVersion);
+    const isLlmStream = ref(false);
+    usePromptAnalytics(prompt, version, ref("default"), ref("24h"), isLlmStream);
+
+    await Promise.resolve();
+    expect(queryMocks.executeQuery).not.toHaveBeenCalled();
+
+    isLlmStream.value = true;
+    await vi.waitFor(() => expect(queryMocks.executeQuery).toHaveBeenCalledTimes(3));
   });
 
   it("converts microsecond trace durations to milliseconds", async () => {
@@ -51,7 +64,7 @@ describe("usePromptAnalytics", () => {
     });
     const prompt = ref({ name: "qa_prompt", entityId: "prompt-1" } as Prompt);
     const version = ref({ version: 2, contentHash: "hash" } as PromptVersion);
-    const analytics = usePromptAnalytics(prompt, version, ref("default"), ref("24h"));
+    const analytics = usePromptAnalytics(prompt, version, ref("default"), ref("24h"), ref(true));
 
     await vi.waitFor(() => expect(analytics.recent.value).toHaveLength(1));
     const sql = queryMocks.executeQuery.mock.calls.map(([query]) => query).join("\n");

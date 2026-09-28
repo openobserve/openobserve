@@ -157,8 +157,14 @@ const streamName = ref("");
 const window = ref<PromptAnalyticsWindow>("24h");
 const promptRef = toRef(props, "prompt");
 const versionRef = toRef(props, "version");
+const isLlmStream = computed(() =>
+  (store.state.streams?.traces?.list ?? []).some(
+    (stream: { name: string; settings?: { is_llm_stream?: boolean } }) =>
+      stream.name === streamName.value && stream.settings?.is_llm_stream === true,
+  ),
+);
 const { kpis, breakdown, recent, evidence, loading, error, loadTraffic, loadExperimentEvidence } =
-  usePromptAnalytics(promptRef, versionRef, streamName, window);
+  usePromptAnalytics(promptRef, versionRef, streamName, window, isLlmStream);
 
 const streamOptions = computed(() =>
   (store.state.streams?.traces?.list ?? []).map((stream: { name: string }) => ({
