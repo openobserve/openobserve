@@ -17111,17 +17111,17 @@
       "alertMe": "Waarschuw mij",
       "columnHints": {
         "qps": "Aanroepen per seconde — de aanroepen van dit venster gedeeld door de lengte ervan, zodat een weergave van 15 minuten en een van 4 uur vergelijkbaar blijven.",
-        "p50": "De helft van alle aanroepen was sneller dan dit. Telt alleen voltooide aanroepen — een query die nog draait of nooit terugkwam, wordt hier niet gemeten.",
-        "p95": "De trage staart — 1 op de 20 aanroepen duurde minstens zo lang. Telt alleen voltooide aanroepen — een query die nog draait of nooit terugkwam, wordt hier niet gemeten.",
-        "p99": "De slechtste 1% van de aanroepen duurde minstens zo lang. Telt alleen voltooide aanroepen — een query die nog draait of nooit terugkwam, wordt hier niet gemeten.",
-        "load": "Totale tijd die je applicaties wachtten op deze database. Gemeten aan de clientkant, dus het weerspiegelt hoeveel verkeer deze database bediende — niet hoe belast de server is.",
+        "p50": "De helft van alle calls was sneller dan dit. Gemeten op basis van voltooide calls in de traces van je applicatie.",
+        "p95": "De trage staart — 1 op de 20 calls duurde minstens zo lang. Gemeten op basis van voltooide calls in de traces van je applicatie.",
+        "p99": "De slechtste 1% van de calls duurde minstens zo lang. Gemeten op basis van voltooide calls in de traces van je applicatie.",
+        "load": "Totale tijd die je apps besteedden aan calls naar deze database, gemeten op basis van de traces van je applicatie. Het toont hoeveel verkeer deze database voor je apps verwerkte.",
         "attention": "Hoe dicht deze instantie bij een limiet zit die de eigen engine publiceert — vandaag, verbindingen ten opzichte van max_connections. De slechtste dergelijke ratio, geen samengestelde score. Gesorteerd van hoog naar laag, met instanties waarvan de gezondheid niet kan worden uitgelezen bovenaan, want van een instantie die je niet kunt zien weet je niet of ze gezond is. Gemeten op de databaseserver, dus het is niet vergelijkbaar met de Databasetijd ernaast."
       },
       "failedChip": "{count} mislukt",
       "columnSubLabels": {
-        "attention": "server",
-        "load": "client",
-        "calls": "client"
+        "attention": "vanuit de database",
+        "load": "vanuit je apps",
+        "calls": "vanuit je apps"
       },
       "attention": {
         "connections": "verbindingen",
@@ -17183,14 +17183,14 @@
         "failed": "Mislukt"
       },
       "columnHints": {
-        "calls": "Hoe vaak deze query is uitgevoerd. De eigen telling van je database waar die er een rapporteert — dat dekt elke client, niet alleen de delen van je systeem die traces verzenden. Rijen die als client-waargenomen zijn gemarkeerd, worden in plaats daarvan uit traces geteld, omdat je database ze niet heeft gerapporteerd.",
-        "p50": "De helft van alle aanroepen was sneller dan dit. Telt alleen voltooide aanroepen — een query die nog draait, of die nooit is teruggekomen, wordt hier niet gemeten.",
-        "p95": "De langzame staart — 1 op de 20 aanroepen duurde minimaal zo lang. Telt alleen voltooide aanroepen — een query die nog draait, of die nooit is teruggekomen, wordt hier niet gemeten.",
-        "p99": "De slechtste 1% van de aanroepen duurde minimaal zo lang. Telt alleen voltooide aanroepen — een query die nog draait, of die nooit is teruggekomen, wordt hier niet gemeten.",
+        "calls": "Hoe vaak deze query is uitgevoerd, geteld door je database — elke app die verbinding maakt, is inbegrepen. Waar je database geen telling voor een query heeft, markeert het traces-pictogram een telling die is gemeten op basis van de traces van je applicatie.",
+        "p50": "De helft van alle calls was sneller dan dit. Gemeten op basis van voltooide calls in de traces van je applicatie.",
+        "p95": "De trage staart — 1 op de 20 calls duurde minstens zo lang. Gemeten op basis van voltooide calls in de traces van je applicatie.",
+        "p99": "De slechtste 1% van de calls duurde minstens zo lang. Gemeten op basis van voltooide calls in de traces van je applicatie.",
         "max": "De langzaamste afzonderlijke aanroep in dit venster — één echte aanroep, geen gemiddelde.",
         "errors": "Hoeveel van deze aanroepen eindigden in een fout.",
         "perTrace": "Hoe vaak dit wordt uitgevoerd binnen één verzoek. Een hoog getal duidt meestal op een lus.",
-        "load": "De totale tijd die deze query in de database heeft doorgebracht. Het eigen cijfer van je database waar die er een rapporteert: uitvoertijd op Postgres, maar WAIT-tijd op MySQL en MariaDB — elke rij geeft aan welke. Rijen die als client-waargenomen zijn gemarkeerd, worden gemeten op basis van traces, dus ze omvatten de netwerk-round-trip."
+        "load": "Totale tijd die deze query in de database doorbracht, zoals je database die rapporteert: uitvoeringstijd op Postgres, wachttijd op MySQL en MariaDB — elke rij geeft aan welke. Rijen met het traces-pictogram zijn gemeten op basis van de traces van je applicatie, dus ze bevatten ook de heenreis naar de database en terug."
       },
       "errorsNone": "geen",
       "errorsAll": "alle",
@@ -17454,8 +17454,7 @@
       "overlap": {
         "serverExecution": "Tijd die {engine} besteedde aan het uitvoeren ervan",
         "serverWait": "Tijd die {engine} besteedde aan wachten erop — wachttijd, niet uitvoeringstijd",
-        "serverCounted": "Geteld door {engine}, voor elke client",
-        "clientObserved": "Waargenomen door geïnstrumenteerde aanroepers — je database heeft deze niet gerapporteerd"
+        "serverCounted": "Geteld door {engine}, voor elke client"
       },
       "endpointsConcentrated": "Eén endpoint is verantwoordelijk voor {percent} van de tijd van deze query. Los {endpoint} op en je hebt deze query opgelost.",
       "typicalMarker": "trage aanroepen {value}",
@@ -17482,8 +17481,8 @@
       },
       "serverMetrics": {
         "title": "Wat de database zelf heeft geregistreerd",
-        "subtitle": "Serverzijde — alle clients",
-        "clientSubtitle": "Door de client waargenomen — alleen geïnstrumenteerde aanroepers, alleen voltooide aanroepen. Een query die nog loopt, of die is vastgelopen, zit niet in deze cijfers.",
+        "subtitle": "Vanuit je database — elke app die verbinding maakt",
+        "clientSubtitle": "Gemarkeerde cijfers zijn gemeten op basis van de traces van je applicatie — de calls die je apps in dit venster hebben voltooid",
         "instance": "Gerapporteerd door {instance}",
         "instanceWide": "Alle databases op deze instantie",
         "calls": "Uitvoeringen",
@@ -17529,9 +17528,13 @@
         "serverExecution": "uitvoeringstijd",
         "serverWait": "wachttijd",
         "serverCounted": "serveraantal",
-        "clientObserved": "client-waargenomen",
         "serverReported": "gerapporteerd door uw databases"
       }
+    },
+    "appSource": {
+      "marker": "Gemeten op basis van de traces van je applicatie",
+      "markerHint": "Gemeten op basis van de traces van je applicatie, waarmee het perspectief van je apps wordt toegevoegd aan wat je database rapporteert.",
+      "legend": "Vanuit de traces van je app"
     },
     "page": {
       "tabs": {
@@ -17540,7 +17543,7 @@
         "metricsHint": "Databaseload per wachtgebeurtenis, en elke metriek die je databasereceivers verzamelen.",
         "queries": "Top queries",
         "samples": "Langzaamste aanroepen",
-        "samplesHintClient": "Voltooide aanroepen die uw geïnstrumenteerde services in dit venster hebben waargenomen — aanroepers zonder tracing worden niet meegeteld, dus dit is een ondergrens, niet het totaal. De tabel toont de langzaamste daarvan.",
+        "samplesHintClient": "Calls gemeten op basis van de traces van je applicatie in dit venster, waarmee het perspectief van je apps wordt toegevoegd aan wat je database rapporteert. De tabel toont de traagste ervan.",
         "samplesHintServer": "Statements die uw databases in dit venster als voltooid hebben gerapporteerd, geteld in de database. De tabel toont de langzaamste daarvan.",
         "samplesHintUnknown": "De langzaamste individuele database-aanroepen in dit venster.",
         "deadlocks": "Deadlocks",
@@ -17696,7 +17699,7 @@
         "status": "Status"
       },
       "columnHints": {
-        "duration": "Hoe lang deze ene aanroep duurde, gemeten door de aanroeper. Telt alleen voltooide aanroepen — een query die nog draait, of een die nooit terugkwam, wordt hier niet gemeten."
+        "duration": "Hoe lang deze ene call duurde, zoals je applicatie die van begin tot eind heeft gemeten."
       },
       "failed": "Mislukt",
       "failedWithCode": "Mislukt · {code}",

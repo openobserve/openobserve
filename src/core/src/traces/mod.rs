@@ -58,6 +58,8 @@ pub mod inferred;
 pub mod otel;
 pub mod service_graph;
 pub mod session;
+#[cfg(test)]
+mod tests_enrich_golden;
 pub mod time_index;
 
 #[cfg(feature = "cloud")]
@@ -295,6 +297,13 @@ async fn queue_gen_ai_agent_observations(org_id: &str, observations: AgentObserv
 /// enrichment re-derive identically from the raw `db_*` / peer attributes that
 /// are still on the record (the derivations are deterministic).
 fn strip_client_supplied_derived_fields(record_val: &mut Map<String, json::Value>) {
+    // one key scan instead of 20 map removals: a record almost never carries a derived key
+    if !record_val
+        .keys()
+        .any(|k| k.starts_with(DB_FIELD_PREFIX) || k.starts_with(INFER_FIELD_PREFIX))
+    {
+        return;
+    }
     for field in crate::db_monitoring::ALL_DB_FIELDS {
         record_val.remove(field);
     }
@@ -302,6 +311,9 @@ fn strip_client_supplied_derived_fields(record_val: &mut Map<String, json::Value
         record_val.remove(field);
     }
 }
+
+const DB_FIELD_PREFIX: &str = "o2_db_";
+const INFER_FIELD_PREFIX: &str = "infer_";
 
 /// Save the derived identity columns a UDS list omits; they are keys, not user attrs (D1 cond. 2).
 fn save_derived_fields_for_uds(
@@ -325,10 +337,114 @@ fn restore_derived_fields(
     }
 }
 
+/// Derived identity columns of one OTLP span; true when DBM stamped it.
+pub fn enrich_otlp_span(
+    span_kind: i32,
+    span_att_map: &mut HashMap<String, json::Value>,
+    service_att_map: &HashMap<String, json::Value>,
+    db_monitoring_enabled: bool,
+    db_enrich_opts: &crate::db_monitoring::EnrichOptions,
+) -> bool {
+    // uninstrumented dependencies (databases, queues, APIs) show up only as client peer attributes
+    if let Some(inferred_svc) = inferred::derive_inferred_service(span_kind, |key| {
+        span_att_map
+            .get(key)
+            .and_then(|v| v.as_str())
+            .map(String::from)
+    }) {
+        span_att_map.insert(
+            inferred::INFER_SERVICE_NAME.to_string(),
+            inferred_svc.name.into(),
+        );
+        span_att_map.insert(
+            inferred::INFER_SERVICE_TYPE.to_string(),
+            inferred_svc.service_type.into(),
+        );
+        if let Some(system) = inferred_svc.system {
+            span_att_map.insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
+        }
+    }
+
+    // the self side needs resource attributes too: `k8s.pod.ip` is one
+    let graph_fields = derive_service_graph_fields(span_kind, |key| {
+        span_graph_attr(key, &*span_att_map, service_att_map)
+    });
+    for (field, value) in graph_fields {
+        span_att_map.insert(field.to_string(), value);
+    }
+
+    // resource overlaid because o2_db_env comes from the resource `deployment.environment`
+    if db_monitoring_enabled
+        && let Some(db_fields) = crate::db_monitoring::enrich_with_opts(
+            &crate::db_monitoring::SpanWithResource {
+                span: &*span_att_map,
+                resource: service_att_map,
+            },
+            span_kind,
+            db_enrich_opts,
+        )
+    {
+        for (field, value) in db_fields {
+            span_att_map.insert(field, value);
+        }
+        return true;
+    }
+    false
+}
+
+/// Derived identity columns of one flattened JSON-path record; true when DBM stamped it.
+pub fn enrich_json_record(
+    record_val: &mut Map<String, json::Value>,
+    db_monitoring_enabled: bool,
+    db_enrich_opts: &crate::db_monitoring::EnrichOptions,
+) -> bool {
+    // RESERVED_SPAN_FIELDS protects OTLP only, so client-supplied derived keys go (D1 cond. 1)
+    strip_client_supplied_derived_fields(record_val);
+
+    let span_kind = normalize_span_kind(record_val);
+
+    if let Some(inferred_svc) = inferred::derive_inferred_service(span_kind, |key| {
+        record_val
+            .get(key)
+            .and_then(|v| v.as_str())
+            .map(String::from)
+    }) {
+        record_val.insert(
+            inferred::INFER_SERVICE_NAME.to_string(),
+            inferred_svc.name.into(),
+        );
+        record_val.insert(
+            inferred::INFER_SERVICE_TYPE.to_string(),
+            inferred_svc.service_type.into(),
+        );
+        if let Some(system) = inferred_svc.system {
+            record_val.insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
+        }
+    }
+
+    // resource attributes are already `service_`-prefixed and flattened on this path
+    let graph_fields =
+        derive_service_graph_fields(span_kind, |key| record_graph_attr(key, record_val));
+    for (field, value) in graph_fields {
+        record_val.insert(field.to_string(), value);
+    }
+
+    if db_monitoring_enabled
+        && let Some(db_fields) =
+            crate::db_monitoring::enrich_with_opts(&*record_val, span_kind, db_enrich_opts)
+    {
+        for (field, value) in db_fields {
+            record_val.insert(field, value);
+        }
+        return true;
+    }
+    false
+}
+
 /// Service-graph join keys of one span, as columns; an absent value yields no column at all.
 fn derive_service_graph_fields<F>(span_kind: i32, get_attr: F) -> Vec<(&'static str, json::Value)>
 where
-    F: Fn(&str) -> Option<String>,
+    F: Fn(&inferred::AttrKey) -> Option<String>,
 {
     let mut fields: Vec<(&'static str, json::Value)> = Vec::new();
     if let Some(peer) = inferred::derive_peer_keys(span_kind, &get_attr) {
@@ -358,30 +474,42 @@ where
 
 /// Span attributes win over resource attributes; both spellings are tried in each map.
 fn span_graph_attr(
-    key: &str,
+    key: &inferred::AttrKey,
     span_att_map: &HashMap<String, json::Value>,
     service_att_map: &HashMap<String, json::Value>,
 ) -> Option<String> {
-    let flat = key.replace('.', "_");
-    span_att_map
-        .get(key)
-        .or_else(|| span_att_map.get(&flat))
-        .or_else(|| service_att_map.get(key))
-        .or_else(|| service_att_map.get(&flat))
-        .or_else(|| service_att_map.get(&format!("{SERVICE}_{key}")))
-        .or_else(|| service_att_map.get(&format!("{SERVICE}_{flat}")))
-        .and_then(attr_string)
+    let found = span_att_map
+        .get(key.dotted)
+        .or_else(|| span_att_map.get(key.flat))
+        .or_else(|| service_att_map.get(key.dotted))
+        .or_else(|| service_att_map.get(key.flat))
+        .or_else(|| service_att_map.get(key.service_dotted))
+        .or_else(|| service_att_map.get(key.service_flat))?;
+    attr_string(found).or_else(|| {
+        span_att_map
+            .get(key.flat)
+            .or_else(|| service_att_map.get(key.flat))
+            .or_else(|| service_att_map.get(key.service_flat))
+            .and_then(attr_string)
+    })
 }
 
 /// Same precedence as [`span_graph_attr`], on the already-flattened JSON record.
-fn record_graph_attr(key: &str, record_val: &Map<String, json::Value>) -> Option<String> {
-    let flat = key.replace('.', "_");
-    record_val
-        .get(key)
-        .or_else(|| record_val.get(&flat))
-        .or_else(|| record_val.get(&format!("{SERVICE}_{key}")))
-        .or_else(|| record_val.get(&format!("{SERVICE}_{flat}")))
-        .and_then(attr_string)
+fn record_graph_attr(
+    key: &inferred::AttrKey,
+    record_val: &Map<String, json::Value>,
+) -> Option<String> {
+    let found = record_val
+        .get(key.dotted)
+        .or_else(|| record_val.get(key.flat))
+        .or_else(|| record_val.get(key.service_dotted))
+        .or_else(|| record_val.get(key.service_flat))?;
+    attr_string(found).or_else(|| {
+        record_val
+            .get(key.flat)
+            .or_else(|| record_val.get(key.service_flat))
+            .and_then(attr_string)
+    })
 }
 
 /// Attribute value as a lookup string; JSON-path clients send ports as numbers.
@@ -809,57 +937,13 @@ pub async fn handle_otlp_request(
                     partial_success.rejected_spans += 1;
                     continue;
                 }
-                // Derive inferred service identity (uninstrumented dependencies
-                // like databases, queues, external APIs) from peer attributes of
-                // client/producer spans. Powers dotted "inferred service" nodes
-                // in trace views and the service graph.
-                if let Some(inferred_svc) = inferred::derive_inferred_service(span.kind, |key| {
-                    span_att_map
-                        .get(key)
-                        .and_then(|v| v.as_str())
-                        .map(String::from)
-                }) {
-                    span_att_map.insert(
-                        inferred::INFER_SERVICE_NAME.to_string(),
-                        inferred_svc.name.into(),
-                    );
-                    span_att_map.insert(
-                        inferred::INFER_SERVICE_TYPE.to_string(),
-                        inferred_svc.service_type.into(),
-                    );
-                    if let Some(system) = inferred_svc.system {
-                        span_att_map
-                            .insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
-                    }
-                }
-
-                // the self side needs resource attributes too: `k8s.pod.ip` is one
-                let graph_fields = derive_service_graph_fields(span.kind, |key| {
-                    span_graph_attr(key, &span_att_map, &service_att_map)
-                });
-                for (field, value) in graph_fields {
-                    span_att_map.insert(field.to_string(), value);
-                }
-
-                // Database Monitoring: canonical dual-semconv identity + stable
-                // query fingerprint for db CLIENT/PRODUCER spans (o2_db_*,
-                // design §3.1). enrich itself gates on span kind and db-attr
-                // presence (negative stamping). Resource attrs are overlaid so
-                // resource-level dimensions resolve (o2_db_env lives on
-                // `deployment.environment[.name]`, a resource attribute).
-                if cfg.db_monitoring.enabled
-                    && let Some(db_fields) = crate::db_monitoring::enrich_with_opts(
-                        &crate::db_monitoring::SpanWithResource {
-                            span: &span_att_map,
-                            resource: &service_att_map,
-                        },
-                        span.kind,
-                        &db_enrich_opts,
-                    )
-                {
-                    for (field, value) in db_fields {
-                        span_att_map.insert(field, value);
-                    }
+                if enrich_otlp_span(
+                    span.kind,
+                    &mut span_att_map,
+                    &service_att_map,
+                    cfg.db_monitoring.enabled,
+                    &db_enrich_opts,
+                ) {
                     has_db_spans = true;
                 }
 
@@ -1378,52 +1462,7 @@ pub async fn ingest_json(
         };
         normalize_llm_field_types(&mut record_val);
 
-        // The JSON path flattens the caller's record keys directly —
-        // RESERVED_SPAN_FIELDS protects OTLP only. Drop any client-supplied
-        // o2_db_* / infer_service_* keys and re-derive both identities from
-        // the raw attributes still on the record (design D1 condition 1).
-        strip_client_supplied_derived_fields(&mut record_val);
-
-        let span_kind = normalize_span_kind(&mut record_val);
-
-        // Derive inferred service fields (data from sources that did not run
-        // the OTLP-side derivation, e.g. older versions or pipeline re-ingest —
-        // any incoming values were stripped above, so this always re-derives).
-        if let Some(inferred_svc) = inferred::derive_inferred_service(span_kind, |key| {
-            record_val
-                .get(key)
-                .and_then(|v| v.as_str())
-                .map(String::from)
-        }) {
-            record_val.insert(
-                inferred::INFER_SERVICE_NAME.to_string(),
-                inferred_svc.name.into(),
-            );
-            record_val.insert(
-                inferred::INFER_SERVICE_TYPE.to_string(),
-                inferred_svc.service_type.into(),
-            );
-            if let Some(system) = inferred_svc.system {
-                record_val.insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
-            }
-        }
-
-        // resource attributes are already `service_`-prefixed and flattened on this path
-        let graph_fields =
-            derive_service_graph_fields(span_kind, |key| record_graph_attr(key, &record_val));
-        for (field, value) in graph_fields {
-            record_val.insert(field.to_string(), value);
-        }
-
-        // Database Monitoring identity (design §3.1) — same re-derivation
-        // reasoning as above; enrich gates on span kind + db-attr presence.
-        if cfg.db_monitoring.enabled
-            && let Some(db_fields) =
-                crate::db_monitoring::enrich_with_opts(&record_val, span_kind, &db_enrich_opts)
-        {
-            for (field, value) in db_fields {
-                record_val.insert(field, value);
-            }
+        if enrich_json_record(&mut record_val, cfg.db_monitoring.enabled, &db_enrich_opts) {
             has_db_spans = true;
         }
 
@@ -2796,6 +2835,35 @@ mod tests {
     }
 
     #[test]
+    fn test_strip_prefix_gate_covers_every_derived_field() {
+        // the strip's pre-check skips a record with no key under these prefixes
+        for field in crate::db_monitoring::ALL_DB_FIELDS {
+            assert!(field.starts_with(super::DB_FIELD_PREFIX), "{field}");
+        }
+        for field in super::inferred::ALL_INFER_FIELDS {
+            assert!(field.starts_with(super::INFER_FIELD_PREFIX), "{field}");
+        }
+    }
+
+    #[test]
+    fn test_strip_leaves_a_record_without_derived_keys_untouched() {
+        use config::utils::json;
+
+        let mut record_val: json::Map<String, json::Value> = json::Map::new();
+        record_val.insert("span_kind".to_string(), json::json!("3"));
+        record_val.insert("db_system".to_string(), json::json!("postgresql"));
+        record_val.insert("o2_db".to_string(), json::json!("not derived"));
+        record_val.insert("infer".to_string(), json::json!("not derived"));
+        let before = record_val.clone();
+        super::strip_client_supplied_derived_fields(&mut record_val);
+        assert_eq!(record_val, before);
+
+        record_val.insert("infer_self_ip".to_string(), json::json!("10.0.0.2"));
+        super::strip_client_supplied_derived_fields(&mut record_val);
+        assert_eq!(record_val, before);
+    }
+
+    #[test]
     fn test_finalize_keeps_o2_db_fields_under_uds() {
         // A user-defined schema that doesn't list the o2_db_* columns must not
         // strip them — they are DBM aggregation keys (same guarantee
@@ -3322,12 +3390,13 @@ mod tests {
             ("net.peer.ip".to_string(), json::json!("10.0.0.8")),
             ("service_k8s.pod.ip".to_string(), json::json!("10.42.0.7")),
         ]);
-        let lookup = |key: &str| {
+        let probe = |key: &str| {
             attrs
                 .get(key)
                 .or_else(|| attrs.get(&format!("service_{key}")))
                 .and_then(super::attr_string)
         };
+        let lookup = |key: &super::inferred::AttrKey| probe(key.dotted).or_else(|| probe(key.flat));
 
         let client: HashMap<&str, json::Value> = super::derive_service_graph_fields(3, lookup)
             .into_iter()

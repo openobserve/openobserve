@@ -127,6 +127,12 @@
   --color-syntax-addition-bg: #033a16;
   --color-syntax-deletion-fg: #ffdcd7;
   --color-syntax-deletion-bg: #67060c;
+  /* Colorized queries — the query editor's vs-dark hues, lifted to clear 4.5:1 on surface-subtle */
+  --color-query-syntax-keyword: #569cd6;
+  --color-query-syntax-function: #ff2bff;
+  --color-query-syntax-string: #ce9178;
+  --color-query-syntax-number: #b5cea8;
+  --color-query-syntax-comment: #71a35a;
   /* AI idle washes are denser in dark for legibility */
   --color-gradient-ai-subtle: linear-gradient(
     135deg,
