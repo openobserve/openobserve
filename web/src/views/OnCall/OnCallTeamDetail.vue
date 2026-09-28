@@ -180,8 +180,13 @@
       </OTabs>
 
       <!-- `scroll` defaults to overflow-hidden, which silently clipped the
-           escalation policy so its lower priorities were unreachable. -->
-      <OTabPanels :key="tabsKey" v-model="activeTab" grow scroll="y">
+           escalation policy so its lower priorities were unreachable.
+           `grow` alone only sets flex-1 — without min-h-0 a flex item still
+           refuses to shrink below its content, so this never actually hit
+           its own scrollbar: the whole page grew and shrank with whichever
+           tab was open instead, and Covers' `sticky bottom-0` below had no
+           bounded viewport to pin itself against. -->
+      <OTabPanels :key="tabsKey" v-model="activeTab" grow scroll="y" class="min-h-0">
         <OTabPanel name="overview">
           <!-- Two blocks in one column. The demo read as a wall: five sortable
                columns of history beside a rail restating reach and readiness that
