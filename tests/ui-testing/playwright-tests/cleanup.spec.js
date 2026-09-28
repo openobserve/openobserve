@@ -232,6 +232,7 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupFileEnrichmentTables([
       /^e2e_2937_/,                                                                          // enrichment-lifecycle.spec.js (#2937)
       /^e2e_2067_/,                                                                          // enrichment-lifecycle.spec.js (#2067)
+      /^e2e_enrich_/,                                                                        // enrichment-explore-context.spec.js (#7346, #6645)
       /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // protocols_<uuid>_csv (VRL test)
       /^enrichment_info_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/, // enrichment_info_<uuid>_csv (upload test)
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
