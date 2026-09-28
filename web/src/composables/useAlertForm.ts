@@ -189,6 +189,11 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    // Off by default: a recovery is a new outbound message class, so it is opted into.
+    notify_on_recovery: false,
+    recovery_destinations: [],
+    // Seconds the condition must stay clear before recovering. 0 = immediately.
+    keep_firing_for: 0,
     // Feature 2 (PT-1/PT-6). `null` (not 0) is unset — 0 is not a valid
     // priority id, and the payload layer drops null so pre-Feature-2 alerts
     // serialize unchanged.
@@ -1564,6 +1569,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     setF("destinations", destinations);
   };
 
+  const updateRecoveryDestinations = (destinations: any[]) => {
+    setF("recovery_destinations", destinations);
+  };
+
   const updateWorkflows = (workflows: any[]) => {
     setF("workflows", workflows);
   };
@@ -2419,6 +2428,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // silently wipe existing links. Must run AFTER the swap above, which
       // replaces every key on `data`.
       if (!Array.isArray(data.workflows)) data.workflows = [];
+      // Same guard: the full swap above drops any key the GET omitted, and an undefined list
+      // would make the edit-save wipe the override.
+      if (!Array.isArray(data.recovery_destinations)) data.recovery_destinations = [];
       // BE stores seconds; the form field displays minutes (mirrors the
       // frequency field's display unit). Falls back to 0 for any alert type
       // where the field is absent from the GET response (older cached
@@ -3173,6 +3185,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     refreshDestinations,
     refreshTemplates,
     updateDestinations,
+    updateRecoveryDestinations,
     updateWorkflows,
     updateTab,
     handleGoToSqlEditor,

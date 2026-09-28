@@ -59,7 +59,7 @@ export const servicenowTemplate = {
   name: "prebuilt_servicenow",
   body: JSON.stringify(
     {
-      short_description: "OpenObserve Alert: {alert_name}",
+      short_description: "OpenObserve [{alert_status}]: {alert_name}",
       description:
         "Alert Details:\n\nStream: {stream_name}\nType: {stream_type}\nCount: {alert_count}\nThreshold: {alert_operator} {alert_threshold}\nTime: {alert_time}\n\nView in OpenObserve: {alert_url}",
       category: "Software",
@@ -128,6 +128,14 @@ export const servicenowConfig: PrebuiltConfig = {
       type: "text",
       required: false,
       hintKey: "alerts.prebuiltDestinations.servicenowAssignmentGroupHelp",
+      persistInMetadata: true,
+    },
+    {
+      key: "resolutionCode",
+      labelKey: "alerts.prebuiltDestinations.servicenowResolutionCode",
+      type: "text",
+      required: false,
+      hintKey: "alerts.prebuiltDestinations.servicenowResolutionCodeHelp",
       persistInMetadata: true,
     },
   ],

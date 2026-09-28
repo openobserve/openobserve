@@ -354,6 +354,10 @@
       "title": "トレースが見つかりません",
       "description": "選択したサービスと時間範囲に一致するトレースがありません。時間範囲を広げるか、別のサービスを試してください。"
     },
+    "noProfiles": {
+      "title": "プロファイルが見つかりません",
+      "description": "指定した時間範囲には、このストリームのプロファイルデータが含まれていません。より広い時間範囲または別のサービスをお試しください。"
+    },
     "noServiceGraph": {
       "title": "サービスグラフデータなし",
       "description": "より長い時間範囲でクエリしてみるか、サービスがスパンメトリクスを出力していることを確認してください。"
@@ -421,6 +425,7 @@
       "alerts": "アラート",
       "incidents": "事件",
       "traces": "トレース",
+      "profiles": "プロファイル",
       "discoveryItems": "問題のあるアイテム",
       "datasetItems": "アイテム",
       "searches": "検索",
@@ -1306,6 +1311,8 @@
     "tagKey": "タグキー",
     "tagValue": "タグ値",
     "addFilter": "フィルターを追加",
+    "removeFilter": "フィルター {key}={value} を削除",
+    "searchFrames": "フレームを検索",
     "runQuery": "クエリを実行",
     "timeSeriesTitle": "プロファイル値の推移",
     "resultTitle": "プロファイル結果",
@@ -1314,14 +1321,28 @@
     "viewTree": "スタックツリー",
     "self": "セルフ",
     "total": "合計",
+    "share": "共有",
     "cpuDuration": "CPU 時間",
     "percent": "%",
+    "sortBySelf": "Self で並べ替え",
+    "sortByTotal": "Total で並べ替え",
     "noStreams": "利用可能なプロファイルストリームがありません",
-    "noSeries": "この期間に時系列データがありません",
-    "noResults": "この期間にプロファイル結果がありません",
+    "noSeries": "データなし",
+    "noResults": "プロファイルが見つかりません",
+    "noProfilesFound": "プロファイルが見つかりません",
+    "noProfilesFoundDesc": "指定した時間範囲には、このストリームのプロファイルデータが含まれていません。より広い時間範囲または別のサービスをお試しください。",
+    "loading": "プロファイルを読み込み中…",
     "filters": "フィルター",
     "expand": "展開",
     "collapse": "折りたたむ",
+    "resetFocus": "フォーカスをリセット",
+    "labelAlign": "ラベルの配置",
+    "alignLeft": "左揃え",
+    "alignRight": "右揃え",
+    "inverted": "反転",
+    "copyFunctionName": "関数名をコピー",
+    "focusBlock": "ブロックにフォーカス",
+    "focusOfTotal": "合計の {percent}%",
     "errors": {
       "loadFailed": "プロファイルデータの読み込みに失敗しました"
     }
@@ -2771,6 +2792,13 @@
         "node": "アラートトリガー",
         "desc": "アラート発火時に実行",
         "intro": "リンクされたアラートが発火すると、後続の各ステップがこのペイロードを受け取ります。"
+      },
+      "alertResolved": {
+        "label": "アラート解決",
+        "tab": "解決済み",
+        "node": "アラート解決トリガー",
+        "desc": "発火中のアラートが復旧したときに実行",
+        "intro": "発火したアラートが復旧すると、すべての後続ステップがこのペイロードを受け取ります。"
       },
       "incidentEvent": {
         "label": "インシデントイベント",
@@ -7435,6 +7463,8 @@
         "streamName": "アラートが監視するストリーム名",
         "alertName": "アラートの名前",
         "alertType": "アラートタイプ（例: スケジュール、リアルタイム）",
+        "alertStatus": "firing または resolved — 復旧メッセージを新規アラートとは異なる内容にできます",
+        "episodeId": "この発火の一意な ID で、その復旧にも共有されます。アラートを解決できるよう、PagerDuty、Opsgenie、ServiceNow に自動的に送信されます。",
         "alertPeriod": "評価ウィンドウ（分）",
         "alertOperator": "しきい値比較演算子（>、<、=）",
         "alertThreshold": "設定されたしきい値",
@@ -7449,7 +7479,19 @@
         "alertTriggerTimeSeconds": "トリガー時刻（エポック秒）",
         "alertTriggerTimeStr": "トリガー時刻（人間が読める形式）",
         "rows": "行テンプレートでフォーマットされたすべての一致行"
-      }
+      },
+      "notifyOnRecovery": "復旧時に通知",
+      "notifyOnRecoveryTooltip": "このアラートが発火を停止したときに、上記の宛先へ 1 通のメッセージを送信します。",
+      "notifyOnRecoveryTemplateHint": "テンプレートを再利用する宛先には {'{'}alert_status{'}'} を含める必要があります。含めない場合、復旧メッセージは新規アラートのように見えます。",
+      "recoveryDestinations": "復旧先",
+      "recoveryDestinationsTooltip": "空のままにすると、アラートが発火した場所と同じ宛先に復旧を通知します。ここで宛先を選択すると、代わりに別の場所へ送信します。PagerDuty、Opsgenie、ServiceNow は、自身の発火で作成したチケットを引き続きクローズします。",
+      "recoveryResolvesIncident": "インシデントを解決します",
+      "recoveryClosesAlert": "アラートをクローズします",
+      "recoveryChatMessage": "新しい「解決済み」メッセージ",
+      "keepFiringFor": "発火継続時間",
+      "keepFiringForTooltip": "条件が解消してから復旧するまで、この時間だけ待機します。0 にすると即座に復旧します。",
+      "keepFiringForInvalid": "0 以上の秒数を入力してください",
+      "keepFiringForTooLong": "最大 86400 秒（24 時間）を入力してください"
     },
     "advanced": {
       "addVariable": "[変数を追加]",
@@ -7680,6 +7722,8 @@
       "servicenowPasswordHelp": "ServiceNowパスワードまたはAPIトークン",
       "servicenowAssignmentGroup": "割り当てグループ (オプション)",
       "servicenowAssignmentGroupHelp": "インシデントを割り当てるグループ (例: IT運用)",
+      "servicenowResolutionCode": "解決コード（任意）",
+      "servicenowResolutionCodeHelp": "ServiceNow インスタンスの有効な解決コードと一致する必要があります。OpenObserve がインシデントを解決するときに使用されます。デフォルトは Solved (Permanently) です。",
       "usernameRequired": "ユーザー名は必須です",
       "passwordRequired": "パスワードは必須です",
       "emailRecipients": "受信者メールアドレス",
@@ -7976,7 +8020,8 @@
     "sloKind": "条件タイプ",
     "sloLongWindow": "長期ウィンドウ",
     "sloShortWindow": "短期ウィンドウ",
-    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。"
+    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
+    "seconds": "秒"
   },
   "alert_dependencies": {
     "actionOpen": "開く",
@@ -8174,6 +8219,7 @@
     "filterPrebuilt": "構築済み",
     "filterCustom": "カスタム",
     "variableRowsDescription": "行テンプレートの複数行",
+    "variableEpisodeIdDescription": "この発火の一意な ID。アラートを解決できるよう、PagerDuty、Opsgenie、ServiceNow のペイロードに自動的に追加されます。",
     "variableStreamFields": "すべてのストリームフィールドは変数です。",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} は行数や文字列長を制限するために使用されます。",
     "variableTimezoneNote": "タイムスタンプ変数 ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) はサーバーのローカルタイムゾーンで表示されます。",
