@@ -73,11 +73,13 @@
         <OTab name="configuration" :label="t('aiObservability.promptManagement.configuration')" />
         <OTab name="labels" :label="t('aiObservability.promptManagement.labels')" />
         <OTab name="versions" :label="t('aiObservability.promptManagement.versions')" />
-        <OTab name="compare" :label="t('aiObservability.promptManagement.compare')" />
         <OTab name="traffic" :label="t('aiObservability.promptManagement.traffic')" />
       </OTabs>
 
-      <div class="min-h-0 flex-1 overflow-auto p-5">
+      <div
+        class="min-h-0 flex-1 overflow-auto"
+        :class="activeTab === 'versions' || activeTab === 'labels' ? '' : 'px-5 py-3'"
+      >
         <div v-if="loading" class="text-text-secondary py-10 text-center">
           {{ t("aiObservability.promptManagement.loadingPrompt") }}
         </div>
@@ -89,51 +91,60 @@
           @action="load"
         />
         <template v-else-if="activeVersion && activeTab === 'configuration'">
-          <div class="flex flex-col gap-5">
-            <section>
-              <h4 class="text-text-heading mb-2 text-sm font-semibold">
-                {{ t("aiObservability.promptManagement.prompt") }}
+          <!-- No "Configuration" heading: the tab label already names this block. -->
+          <div class="flex flex-col gap-4.5">
+            <dl
+              class="[&_dd]:text-text-heading [&_dt]:text-text-secondary [&_dd]:text-compact m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3.5 gap-y-1.5 [&_dd]:m-0 [&_dt]:text-xs [&_dt]:font-semibold"
+            >
+              <dt>{{ t("aiObservability.promptManagement.status") }}</dt>
+              <dd>
+                <OTag :variant="prompt.status === 'active' ? 'success-soft' : 'default-soft'">{{
+                  prompt.status === "active"
+                    ? t("aiObservability.promptManagement.active")
+                    : t("aiObservability.promptManagement.archived")
+                }}</OTag>
+              </dd>
+              <dt>{{ t("aiObservability.promptManagement.model") }}</dt>
+              <dd>{{ activeVersion.config.model || raw("—") }}</dd>
+              <dt>{{ t("aiObservability.promptManagement.promptId") }}</dt>
+              <dd class="font-mono break-all">{{ prompt.entityId }}</dd>
+              <dt>{{ t("aiObservability.promptManagement.versionId") }}</dt>
+              <dd class="font-mono break-all">{{ activeVersion.id }}</dd>
+            </dl>
+            <section class="flex flex-col gap-2">
+              <h4
+                class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
+              >
+                {{ t("aiObservability.promptManagement.form.promptText") }}
               </h4>
               <pre
-                class="rounded-default border-border-default bg-surface-base max-h-96 overflow-auto border p-3 font-mono text-xs whitespace-pre-wrap"
+                class="rounded-default border-code-border bg-code-block-bg text-code-block-text m-0 max-h-96 overflow-auto border px-3 py-2 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap"
+                data-test="prompt-detail-payload"
                 >{{ payloadText(activeVersion.payload) }}</pre>
             </section>
-            <section>
-              <h4 class="text-text-heading mb-2 text-sm font-semibold">
-                {{ t("aiObservability.promptManagement.configuration") }}
+            <section v-if="activeVersion.config.params != null" class="flex flex-col gap-2">
+              <h4
+                class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
+              >
+                {{ t("aiObservability.promptManagement.parameters") }}
               </h4>
-              <dl class="grid grid-cols-[9rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
-                <dt class="text-text-secondary">
-                  {{ t("aiObservability.promptManagement.promptId") }}
-                </dt>
-                <dd class="font-mono break-all">{{ prompt.entityId }}</dd>
-                <dt class="text-text-secondary">
-                  {{ t("aiObservability.promptManagement.versionId") }}
-                </dt>
-                <dd class="font-mono break-all">{{ activeVersion.id }}</dd>
-                <dt class="text-text-secondary">
-                  {{ t("aiObservability.promptManagement.model") }}
-                </dt>
-                <dd>{{ activeVersion.config.model || raw("—") }}</dd>
-                <dt class="text-text-secondary">
-                  {{ t("aiObservability.promptManagement.parameters") }}
-                </dt>
-                <dd>
-                  <OCode block>{{ jsonText(activeVersion.config.params) }}</OCode>
-                </dd>
-                <dt class="text-text-secondary">
-                  {{ t("aiObservability.promptManagement.tools") }}
-                </dt>
-                <dd>
-                  <OCode block>{{ jsonText(activeVersion.config.tools) }}</OCode>
-                </dd>
-                <dt class="text-text-secondary">
-                  {{ t("aiObservability.promptManagement.responseFormat") }}
-                </dt>
-                <dd>
-                  <OCode block>{{ jsonText(activeVersion.config.responseFormat) }}</OCode>
-                </dd>
-              </dl>
+              <OCode block>{{ jsonText(activeVersion.config.params) }}</OCode>
+            </section>
+            <section v-if="activeVersion.config.tools != null" class="flex flex-col gap-2">
+              <h4
+                class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
+              >
+                {{ t("aiObservability.promptManagement.tools") }}
+              </h4>
+              <OCode block>{{ jsonText(activeVersion.config.tools) }}</OCode>
+            </section>
+            <section v-if="activeVersion.config.responseFormat != null" class="flex flex-col gap-2">
+              <h4
+                class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
+              >
+                {{ t("aiObservability.promptManagement.responseFormat") }}
+              </h4>
+              <OCode block>{{ jsonText(activeVersion.config.responseFormat) }}</OCode>
             </section>
           </div>
         </template>
@@ -149,118 +160,170 @@
             :read-only="prompt.status !== 'active'"
             :save-label="moveLabel"
             @remove="deleteLabel"
-            @view-version="viewVersion"
           />
-          <div class="mt-6">
-            <section>
-              <h4 class="text-text-heading mb-2 text-sm font-semibold">
-                {{ t("aiObservability.promptManagement.activity") }}
-              </h4>
-              <div v-if="!activity.length" class="text-text-secondary text-xs">
-                {{ t("aiObservability.promptManagement.noLabelActivity") }}
-              </div>
-              <div
-                v-for="entry in activity"
-                :key="entry.id"
-                class="border-b-border-default flex gap-2 border-b py-2 text-xs"
-              >
-                <span class="font-medium">{{ entry.label }}</span>
-                <span class="text-text-secondary">{{ activityTransition(entry) }}</span>
-                <span class="text-text-secondary ms-auto truncate" :title="entry.actor">{{
-                  entry.actor
-                }}</span>
-                <OTimeCell :value="entry.createdAt" unit="ms" mode="relative" />
-              </div>
-            </section>
-          </div>
         </template>
 
         <template v-else-if="activeTab === 'versions'">
-          <div class="mb-3 flex justify-end">
-            <OSelect
-              v-model="sourceFilter"
-              :options="sourceOptions"
-              label-key="label"
-              value-key="value"
-              width="sm"
-              :label="t('aiObservability.promptManagement.source')"
-              label-position="inside"
-            />
-          </div>
-          <OEmptyState
-            v-if="!filteredVersions.length"
-            size="block"
-            :title="t('aiObservability.promptManagement.noVersionsForSource')"
-          />
-          <div class="flex flex-col gap-2">
-            <article
-              v-for="version in filteredVersions"
-              :key="version.id"
-              class="rounded-default border-border-default bg-surface-base flex items-start gap-3 border p-3"
+          <div v-if="comparing && compared.length === 2" data-test="prompt-version-compare">
+            <OPageHeader
+              :title="t('aiObservability.promptManagement.form.compareVersions')"
+              :back="{
+                label: t('aiObservability.promptManagement.versions'),
+                onClick: () => (comparing = false),
+                dataTest: 'prompt-version-compare-back',
+              }"
             >
-              <OButton variant="ghost" size="sm" @click="viewVersion(version.version)">
-                {{
-                  t("aiObservability.promptManagement.versionNumber", { version: version.version })
-                }}
-              </OButton>
-              <div class="min-w-0 flex-1">
-                <OTimeCell :value="version.createdAt" unit="ms" mode="relative" />
-                <div class="text-text-heading text-sm">{{ version.commitMessage }}</div>
-                <div class="text-text-secondary mt-1 text-xs">
-                  {{ version.source }}{{ raw(" · ") }}{{ version.createdBy
-                  }}<template v-if="version.baseVersion">{{
-                    t("aiObservability.promptManagement.fromVersion", {
-                      version: version.baseVersion,
+              <template #actions>
+                <OSelect
+                  :model-value="compared[0].version"
+                  :options="versionOptions.filter((option) => option.value !== compared[1].version)"
+                  size="sm"
+                  width="xs"
+                  :aria-label="t('aiObservability.promptManagement.form.baseVersion')"
+                  data-test="prompt-version-compare-base"
+                  @update:model-value="(value) => setCompared(0, Number(value))"
+                />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="swap-horiz"
+                  data-test="prompt-version-compare-swap"
+                  @click="swapCompared"
+                >
+                  <OTooltip :content="t('aiObservability.promptManagement.form.swapVersions')" />
+                </OButton>
+                <OSelect
+                  :model-value="compared[1].version"
+                  :options="versionOptions.filter((option) => option.value !== compared[0].version)"
+                  size="sm"
+                  width="xs"
+                  :aria-label="t('aiObservability.promptManagement.form.targetVersion')"
+                  data-test="prompt-version-compare-target"
+                  @update:model-value="(value) => setCompared(1, Number(value))"
+                />
+                <OToggleGroup
+                  :model-value="diffMode"
+                  type="single"
+                  data-test="prompt-version-compare-mode"
+                  @update:model-value="(value) => value && (diffMode = value as typeof diffMode)"
+                >
+                  <OToggleGroupItem value="split" size="sm">{{
+                    t("aiObservability.promptManagement.form.split")
+                  }}</OToggleGroupItem>
+                  <OToggleGroupItem value="unified" size="sm">{{
+                    t("aiObservability.promptManagement.form.unified")
+                  }}</OToggleGroupItem>
+                </OToggleGroup>
+              </template>
+            </OPageHeader>
+            <OContent y class="flex flex-col gap-4">
+              <PromptVersionDiff :left="compared[0]" :right="compared[1]" :mode="diffMode" />
+              <PromptVersionScoreComparison
+                :org-id="orgId"
+                :prompt-id="prompt.entityId"
+                :versions="[compared[0].version, compared[1].version]"
+              />
+            </OContent>
+          </div>
+          <OTable
+            :data="filteredVersions"
+            :columns="versionColumns"
+            row-key="id"
+            pagination="none"
+            :fill-height="false"
+            :default-columns="false"
+            :show-global-filter="false"
+            :show-footer="false"
+            :empty-message="t('aiObservability.promptManagement.form.noMatchingVersions')"
+            v-else
+            :frame="false"
+            selection="multiple"
+            :show-select-all="false"
+            :selected-ids="compareIds"
+            :is-row-selectable="canCompare"
+            data-test="prompt-version-table"
+            @update:selected-ids="(ids: string[]) => (compareIds = ids)"
+            @row-click="(row) => viewVersion(row.version)"
+          >
+            <template #toolbar>
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <OSearchInput
+                  v-model="versionSearch"
+                  class="min-w-0 flex-1"
+                  :placeholder="t('aiObservability.promptManagement.form.searchCommitMessage')"
+                  clearable
+                  data-test="prompt-version-search"
+                />
+                <OSelect
+                  v-model="sourceFilter"
+                  :options="sourceOptions"
+                  label-key="label"
+                  value-key="value"
+                  width="sm"
+                  size="sm"
+                  :aria-label="t('aiObservability.promptManagement.source')"
+                  data-test="prompt-version-source-filter"
+                />
+                <span
+                  class="text-text-secondary text-xs whitespace-nowrap max-md:hidden"
+                  data-test="prompt-version-selection-count"
+                  >{{
+                    t("aiObservability.promptManagement.form.selectionCount", {
+                      count: compareIds.length,
                     })
-                  }}</template>
-                </div>
+                  }}</span
+                >
+                <OTooltip :content="compareReason" :disabled="compareIds.length === 2">
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    :disabled="compareIds.length !== 2"
+                    data-test="prompt-version-compare-btn"
+                    @click="openCompare"
+                  >
+                    {{ t("aiObservability.promptManagement.compare") }}
+                  </OButton>
+                </OTooltip>
               </div>
-              <div class="flex flex-wrap justify-end gap-1">
+            </template>
+            <template #cell-version="{ row }">
+              <span class="tabular-nums">{{
+                t("aiObservability.promptManagement.versionNumber", { version: row.version })
+              }}</span>
+            </template>
+            <template #cell-commitMessage="{ row }">
+              <span class="truncate">{{ row.commitMessage || raw("—") }}</span>
+            </template>
+            <template #cell-labels="{ row }">
+              <div v-if="labelsForVersion(row.version).length" class="flex flex-wrap gap-1">
                 <OTag
-                  v-for="label in labelsForVersion(version.version)"
+                  v-for="label in labelsForVersion(row.version)"
                   :key="label"
                   variant="default-soft"
+                  shape="rounded"
                   >{{ label }}</OTag
                 >
-                <OButton variant="ghost" size="xs" @click="emit('open-playground', version)">
-                  {{ t("aiObservability.promptManagement.playground") }}
-                </OButton>
               </div>
-            </article>
-          </div>
-        </template>
-
-        <template v-else-if="activeTab === 'compare'">
-          <OEmptyState
-            v-if="versions.length < 2"
-            size="block"
-            :title="t('aiObservability.promptManagement.compareNeedsVersions')"
-          />
-          <div v-else class="mb-4 grid grid-cols-2 gap-3 max-md:grid-cols-1">
-            <OSelect
-              v-model="compareFrom"
-              :label="t('aiObservability.promptManagement.compareFrom')"
-              :options="versionOptions"
-              data-test="prompt-compare-from"
-            />
-            <OSelect
-              v-model="compareTo"
-              :label="t('aiObservability.promptManagement.compareTo')"
-              :options="versionOptions.filter((option) => option.value !== compareFrom)"
-              data-test="prompt-compare-to"
-            />
-          </div>
-          <PromptVersionDiff
-            v-if="compared[0] && compared[1]"
-            :left="compared[0]"
-            :right="compared[1]"
-          />
-          <PromptVersionScoreComparison
-            v-if="comparisonVersionNumbers"
-            :org-id="orgId"
-            :prompt-id="prompt.entityId"
-            :versions="comparisonVersionNumbers"
-          />
+              <span v-else class="text-text-secondary">{{ raw("—") }}</span>
+            </template>
+            <template #cell-createdBy="{ row }">
+              <span class="text-text-secondary truncate">{{ row.createdBy || raw("—") }}</span>
+            </template>
+            <template #cell-createdAt="{ row }">
+              <OTimeCell :value="row.createdAt" unit="ms" mode="relative" />
+            </template>
+            <template #cell-actions="{ row }">
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="play-arrow"
+                :data-test="`prompt-version-playground-${row.version}`"
+                @click.stop="emit('open-playground', row)"
+              >
+                <OTooltip :content="t('aiObservability.promptManagement.openInPlayground')" />
+              </OButton>
+            </template>
+          </OTable>
         </template>
 
         <template v-else-if="activeTab === 'traffic'">
@@ -268,24 +331,6 @@
         </template>
       </div>
     </div>
-
-    <template v-if="prompt" #footer>
-      <div class="flex w-full items-center justify-between">
-        <OTag variant="default-soft">{{
-          prompt.status === "active"
-            ? t("aiObservability.promptManagement.active")
-            : t("aiObservability.promptManagement.archived")
-        }}</OTag>
-        <OButton
-          v-if="prompt.status === 'active'"
-          variant="outline"
-          size="sm"
-          @click="emit('archive')"
-        >
-          {{ t("aiObservability.promptManagement.archivePrompt") }}
-        </OButton>
-      </div>
-    </template>
   </ODrawer>
 </template>
 
@@ -297,12 +342,20 @@ import {
 } from "@/services/llm-prompts.service.queries";
 import { computed, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import PromptLabelsPanel from "./PromptLabelsPanel.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -311,7 +364,6 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import llmPromptsService, {
   type Prompt,
-  type PromptActivity,
   type PromptLabel,
   type PromptSource,
   type PromptVersion,
@@ -341,19 +393,21 @@ const emit = defineEmits<{
   "update:open": [open: boolean];
   updated: [prompt: Prompt];
   edit: [version: PromptVersion | null];
-  archive: [];
   "open-playground": [version: PromptVersion];
 }>();
 
 const versions = ref<PromptVersion[]>([]);
-const activity = ref<PromptActivity[]>([]);
 const loading = ref(false);
 const loadError = ref<I18nText>();
 const activeTab = ref("configuration");
 const selectedVersion = ref<number | null>(null);
 const sourceFilter = ref<PromptSource | "all">("all");
-const compareFrom = ref<number | null>(null);
-const compareTo = ref<number | null>(null);
+const versionSearch = ref("");
+const compareIds = ref<string[]>([]);
+const comparing = ref(false);
+const compareBaseId = ref("");
+const compareHeadId = ref("");
+const diffMode = ref<"split" | "unified">("split");
 const labelBusy = ref(false);
 let loadGeneration = 0;
 
@@ -369,21 +423,48 @@ const versionOptions = computed(() =>
 const activeVersion = computed(
   () => versions.value.find((version) => version.version === selectedVersion.value) ?? null,
 );
-const filteredVersions = computed(() =>
-  sourceFilter.value === "all"
-    ? versions.value
-    : versions.value.filter((version) => version.source === sourceFilter.value),
-);
+const filteredVersions = computed(() => {
+  const needle = versionSearch.value.trim().toLowerCase();
+  return versions.value.filter(
+    (version) =>
+      (sourceFilter.value === "all" || version.source === sourceFilter.value) &&
+      (!needle || version.commitMessage.toLowerCase().includes(needle)),
+  );
+});
 const compared = computed(() =>
-  compareFrom.value !== compareTo.value
-    ? [compareFrom.value, compareTo.value]
-        .map((number) => versions.value.find((version) => version.version === number))
-        .filter((version): version is PromptVersion => Boolean(version))
-    : [],
+  [compareBaseId.value, compareHeadId.value]
+    .map((id) => versions.value.find((version) => version.id === id))
+    .filter((version): version is PromptVersion => Boolean(version)),
 );
-const comparisonVersionNumbers = computed<[number, number] | null>(() =>
-  compared.value.length === 2 ? [compared.value[0].version, compared.value[1].version] : null,
+const compareReason = computed(() =>
+  versions.value.length < 2
+    ? t("aiObservability.promptManagement.compareNeedsVersions")
+    : t("aiObservability.promptManagement.selectTwoVersions"),
 );
+// Older version starts as the base so the diff reads as a change forward in time.
+function openCompare() {
+  const [base, head] = versions.value
+    .filter((version) => compareIds.value.includes(version.id))
+    .sort((left, right) => left.version - right.version);
+  if (!base || !head) return;
+  compareBaseId.value = base.id;
+  compareHeadId.value = head.id;
+  comparing.value = true;
+}
+function setCompared(side: 0 | 1, versionNumber: number) {
+  const picked = versions.value.find((version) => version.version === versionNumber);
+  const other = side === 0 ? compareHeadId.value : compareBaseId.value;
+  if (!picked || picked.id === other) return;
+  if (side === 0) compareBaseId.value = picked.id;
+  else compareHeadId.value = picked.id;
+  compareIds.value = [compareBaseId.value, compareHeadId.value];
+}
+function swapCompared() {
+  [compareBaseId.value, compareHeadId.value] = [compareHeadId.value, compareBaseId.value];
+}
+function canCompare(row: PromptVersion) {
+  return compareIds.value.includes(row.id) || compareIds.value.length < 2;
+}
 const sourceOptions = [
   { label: t("aiObservability.promptManagement.allSources"), value: "all" },
   ...(["ui", "sdk", "playground", "ci", "agent"] as PromptSource[]).map((value) => ({
@@ -396,18 +477,41 @@ const payloadText = (payload: unknown) =>
   typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
 const jsonText = (value: unknown) => (value == null ? "—" : JSON.stringify(value, null, 2));
 
-function activityTransition(entry: PromptActivity) {
-  if (entry.toVersion === null)
-    return t("aiObservability.promptManagement.labelRemovedFrom", {
-      version: entry.fromVersion ?? raw("—"),
-    });
-  if (entry.fromVersion === null)
-    return t("aiObservability.promptManagement.labelAssignedTo", { version: entry.toVersion });
-  return t("aiObservability.promptManagement.versionTransition", {
-    from: entry.fromVersion,
-    to: entry.toVersion,
-  });
-}
+const versionColumns: OTableColumnDef<PromptVersion>[] = [
+  {
+    id: "version",
+    accessorKey: "version",
+    header: t("aiObservability.promptManagement.version"),
+    size: 90,
+  },
+  {
+    id: "commitMessage",
+    accessorKey: "commitMessage",
+    header: t("aiObservability.promptManagement.commitMessage"),
+    size: 220,
+    meta: { flex: true },
+  },
+  { id: "labels", header: t("aiObservability.promptManagement.labels"), size: 150 },
+  {
+    id: "source",
+    accessorKey: "source",
+    header: t("aiObservability.promptManagement.source"),
+    size: 100,
+  },
+  {
+    id: "createdBy",
+    accessorKey: "createdBy",
+    header: t("aiObservability.promptManagement.form.createdBy"),
+    size: 180,
+  },
+  {
+    id: "createdAt",
+    accessorKey: "createdAt",
+    header: t("aiObservability.promptManagement.form.created"),
+    size: 120,
+  },
+  { id: "actions", isAction: true, header: raw(""), accessorKey: "id", size: 56 },
+];
 
 function viewVersion(version: number) {
   selectedVersion.value = version;
@@ -452,21 +556,14 @@ async function load() {
   loading.value = true;
   loadError.value = undefined;
   versions.value = [];
-  activity.value = [];
   try {
-    const [loadedVersions, loadedActivity] = await Promise.all([
-      llmPromptsService.listVersions(props.orgId, prompt.entityId),
-      llmPromptsService.listActivity(props.orgId, prompt.entityId),
-    ]);
+    const loadedVersions = await llmPromptsService.listVersions(props.orgId, prompt.entityId);
     if (generation !== loadGeneration) return;
     versions.value = loadedVersions.sort((left, right) => right.version - left.version);
-    activity.value = loadedActivity;
     const requested = props.initialVersion;
     selectedVersion.value = versions.value.some((version) => version.version === requested)
       ? requested
       : prompt.latestVersion;
-    compareFrom.value = versions.value[1]?.version ?? null;
-    compareTo.value = versions.value[0]?.version ?? null;
   } catch (error: unknown) {
     if (generation !== loadGeneration) return;
     loadError.value = promptErrorText(error, t("aiObservability.promptManagement.loadPromptError"));
@@ -476,13 +573,9 @@ async function load() {
 }
 
 async function refreshLabels(orgId: string, entityId: string) {
-  const [prompt, entries] = await Promise.all([
-    llmPromptsService.get(orgId, entityId),
-    llmPromptsService.listActivity(orgId, entityId),
-  ]);
+  const prompt = await llmPromptsService.get(orgId, entityId);
   if (props.orgId !== orgId || props.prompt?.entityId !== entityId) return;
   emit("updated", prompt);
-  activity.value = entries;
 }
 
 async function moveLabel(name: string, version: number): Promise<boolean> {
@@ -570,6 +663,9 @@ watch(
   () => {
     activeTab.value = props.initialTab;
     sourceFilter.value = "all";
+    versionSearch.value = "";
+    compareIds.value = [];
+    comparing.value = false;
   },
   { immediate: true },
 );
@@ -584,8 +680,4 @@ watch(
   load,
   { immediate: true },
 );
-watch(compareFrom, (from) => {
-  if (compareTo.value === from)
-    compareTo.value = versions.value.find((version) => version.version !== from)?.version ?? null;
-});
 </script>

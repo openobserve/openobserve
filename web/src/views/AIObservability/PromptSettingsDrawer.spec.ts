@@ -7,28 +7,24 @@ const mocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
   rotateSecret: vi.fn(),
-  confirm: vi.fn(),
 }));
 vi.mock("@/services/llm-prompts.service", () => ({ default: mocks }));
 vi.mock("@/types/i18n", () => ({
   useI18nTyped: () => ({ t: (key: string) => key }),
   raw: (value: string) => value,
 }));
-vi.mock("@/composables/useConfirmDialog", () => ({
-  useConfirmDialog: () => ({ confirm: mocks.confirm }),
-}));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
-import PromptSettingsDialog from "./PromptSettingsDialog.vue";
+import PromptSettingsDrawer from "./PromptSettingsDrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 const settings = { protectedLabels: ["production"], webhook: null };
 function mountSettings() {
-  return shallowMount(PromptSettingsDialog, {
+  return shallowMount(PromptSettingsDrawer, {
     props: { open: true, orgId: "org-a" },
     global: {
       renderStubDefaultSlot: true,
-      stubs: { ODialog: { template: "<div><slot /></div>" } },
+      stubs: { ODrawer: { template: "<div><slot /></div>" } },
     },
   });
 }

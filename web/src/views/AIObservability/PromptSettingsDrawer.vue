@@ -1,13 +1,14 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <template>
-  <ODialog
+  <ODrawer
     :open="open"
+    side="right"
     size="lg"
     :title="t('aiObservability.promptManagement.promptSettings')"
     :primary-button-label="ready ? t('aiObservability.promptManagement.saveSettings') : undefined"
     :secondary-button-label="t('aiObservability.promptManagement.cancel')"
     form-id="prompt-settings-form"
-    data-test="prompt-settings-dialog"
+    data-test="prompt-settings-drawer"
     @update:open="requestClose"
     @click:secondary="requestClose(false)"
   >
@@ -99,7 +100,7 @@
         {{ saveError }}
       </p>
     </OForm>
-  </ODialog>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -113,9 +114,8 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { promptErrorText } from "./promptUx";
 import { isPromptLabelName } from "./PromptLabel.schema";
@@ -134,7 +134,6 @@ import llmPromptsService, {
 } from "@/services/llm-prompts.service";
 
 const { t } = useI18nTyped();
-const { confirm } = useConfirmDialog();
 const props = defineProps<{ open: boolean; orgId: string }>();
 const emit = defineEmits<{ "update:open": [open: boolean]; updated: [settings: PromptSettings] }>();
 const form = useOForm<PromptSettingsForm>({
@@ -144,7 +143,6 @@ const form = useOForm<PromptSettingsForm>({
 });
 const values = form.useStore((state) => state.values);
 const saving = form.useStore((state) => state.isSubmitting);
-const dirty = form.useStore((state) => state.isDirty);
 const loading = ref(false);
 const ready = ref(false);
 const loadError = ref<I18nText>();
@@ -213,18 +211,8 @@ async function load() {
   }
 }
 
-async function requestClose(open: boolean) {
+function requestClose(open: boolean) {
   if (open || saving.value) return;
-  if (
-    ready.value &&
-    dirty.value &&
-    !(await confirm({
-      title: t("aiObservability.promptManagement.discardChangesTitle"),
-      message: t("aiObservability.promptManagement.discardChangesMessage"),
-      confirmLabel: t("aiObservability.promptManagement.discardChanges"),
-    }))
-  )
-    return;
   emit("update:open", false);
 }
 

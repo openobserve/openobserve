@@ -20,6 +20,18 @@ export const promptRoutes: RouteRecordRaw[] = [
     component: () => import("@/views/AIObservability/PromptsPage.vue"),
     meta: { titleKey: "aiObservability.nav.prompts", keepAlive: false },
   },
+  {
+    path: "prompts/new",
+    name: "aiPromptCreate",
+    component: () => import("@/views/AIObservability/PromptEditorPage.vue"),
+    meta: { titleKey: "routeTitles.aiPromptCreate", keepAlive: false },
+  },
+  {
+    path: "prompts/:entityId/versions/new",
+    name: "aiPromptVersionCreate",
+    component: () => import("@/views/AIObservability/PromptEditorPage.vue"),
+    meta: { titleKey: "routeTitles.aiPromptVersionCreate", keepAlive: false },
+  },
 ];
 
 export function aiPromptsRoute(
@@ -35,4 +47,17 @@ export function aiPromptsRoute(
       ...(options.version == null ? {} : { version: String(options.version) }),
     },
   };
+}
+
+/** New prompt page, or a new version of `entityId` based on `baseVersion` (default: latest). */
+export function aiPromptEditorRoute(
+  orgIdentifier: string,
+  options: { entityId?: string; baseVersion?: number; folder?: string } = {},
+): RouteLocationRaw {
+  const query: LocationQueryRaw = { org_identifier: orgIdentifier };
+  if (options.folder) query.folder = options.folder;
+  if (options.baseVersion != null) query.base_version = String(options.baseVersion);
+  return options.entityId
+    ? { name: "aiPromptVersionCreate", params: { entityId: options.entityId }, query }
+    : { name: "aiPromptCreate", query };
 }

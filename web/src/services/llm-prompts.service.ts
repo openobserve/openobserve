@@ -59,17 +59,6 @@ export interface PromptVersion {
   createdAt: number;
 }
 
-export interface PromptActivity {
-  id: string;
-  entityId: string;
-  label: string;
-  fromVersion: number | null;
-  toVersion: number | null;
-  actor: string;
-  via: PromptSource;
-  createdAt: number;
-}
-
 export interface PromptMutationResult {
   prompt: Prompt;
   version: PromptVersion;
@@ -208,11 +197,6 @@ const llmPromptsService = {
       ...(options.idempotencyKey ? { headers: { "Idempotency-Key": options.idempotencyKey } } : {}),
     });
     return response.data;
-  },
-
-  async listActivity(orgId: string, entityId: string): Promise<PromptActivity[]> {
-    const response = await http().get(`${entityBase(orgId, entityId)}/activity`);
-    return response.data?.activity ?? [];
   },
 
   async moveLabel(
