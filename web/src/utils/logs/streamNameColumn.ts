@@ -15,8 +15,7 @@
 
 import { raw } from "@/types/i18n";
 
-// A multi-stream logs search projects `'<stream>' as _stream_name` in every
-// per-stream query, so each merged hit says which stream it came from.
+// Multi-stream search projects `'<stream>' as _stream_name`, tagging each hit with its stream.
 export const STREAM_NAME_FIELD = "_stream_name";
 
 const STREAM_NAME_PATTERN = new RegExp(`\\b${STREAM_NAME_FIELD}\\b`);
@@ -29,10 +28,7 @@ const columnName = (node: any): string | null => {
   return col?.expr?.value != null ? String(col.expr.value) : null;
 };
 
-// `_stream_name` is a SELECT alias, so a per-stream WHERE cannot reference it.
-// Each per-stream query knows its own stream, so the column becomes that
-// stream's name as a literal: `_stream_name = 'a'` turns into `'b' = 'a'` in
-// stream b's query and matches nothing there.
+// A per-stream WHERE cannot use the alias, so stream b's `_stream_name = 'a'` becomes `'b' = 'a'`.
 export const replaceStreamNameRefsInWhere = (node: any, stream: string): any => {
   if (Array.isArray(node)) {
     return node.map((child) => replaceStreamNameRefsInWhere(child, stream));
@@ -52,6 +48,14 @@ export const replaceStreamNameRefsInWhere = (node: any, stream: string): any => 
   return node;
 };
 
+// Include/exclude gate: schema fields, plus `_stream_name`, which is in no schema.
+export const isFilterableLogField = (
+  name: string | number | undefined,
+  streamFields: Array<{ name: string; isSchemaField?: boolean }> | undefined,
+): boolean =>
+  name === STREAM_NAME_FIELD ||
+  (streamFields?.find((field) => field.name === name)?.isSchemaField ?? false);
+
 export const shouldShowStreamNameColumn = (
   selectedStreams: string[],
   hits: any[] | undefined,
@@ -63,7 +67,7 @@ export const shouldShowStreamNameColumn = (
 
 export const formatStreamName = (stream: string): string => stream;
 
-// Closable, so the cell offers include/exclude; those filter on the raw value.
+// Closable, so the cell gets its actions; include/exclude filter on the raw value.
 export const buildStreamNameColumn = () => ({
   name: STREAM_NAME_FIELD,
   id: STREAM_NAME_FIELD,

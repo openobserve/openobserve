@@ -18,6 +18,7 @@ import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import {
   STREAM_NAME_FIELD,
   buildStreamNameColumn,
+  isFilterableLogField,
   referencesStreamName,
   replaceStreamNameRefsInWhere,
   shouldShowStreamNameColumn,
@@ -92,5 +93,24 @@ describe("buildStreamNameColumn", () => {
     expect(column.sortable).toBe(false);
     expect(column.accessorFn({ _stream_name: "app" })).toBe("app");
     expect(column.accessorFn({})).toBe("");
+  });
+});
+
+describe("isFilterableLogField", () => {
+  const fields = [
+    { name: "status", isSchemaField: true },
+    { name: "message", isSchemaField: false },
+  ];
+
+  it("allows schema fields and the stream name, which is in no schema", () => {
+    expect(isFilterableLogField("status", fields)).toBe(true);
+    expect(isFilterableLogField(STREAM_NAME_FIELD, fields)).toBe(true);
+    expect(isFilterableLogField(STREAM_NAME_FIELD, undefined)).toBe(true);
+  });
+
+  it("rejects non-schema and unknown fields", () => {
+    expect(isFilterableLogField("message", fields)).toBe(false);
+    expect(isFilterableLogField("unknown", fields)).toBe(false);
+    expect(isFilterableLogField("status", undefined)).toBe(false);
   });
 });
