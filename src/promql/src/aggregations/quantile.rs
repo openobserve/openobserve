@@ -70,9 +70,15 @@ impl AggFunc for Quantile {
     }
 
     fn build(&self, slots: usize) -> Self::Accumulator {
+        let slots = match self.qtile {
+            ScalarParam::Const(phi) if !(0.0..=1.0).contains(&phi) => {
+                Slots::Occupied(vec![false; slots])
+            }
+            _ => Slots::Values(vec![Vec::new(); slots]),
+        };
         QuantileAccumulate {
             qtile: self.qtile.clone(),
-            values: vec![Vec::new(); slots],
+            slots,
         }
     }
 
@@ -84,13 +90,7 @@ impl AggFunc for Quantile {
 
 pub(crate) struct QuantileAccumulate {
     qtile: ScalarParam,
-    values: Vec<Vec<f64>>,
-}
-
-impl QuantileAccumulate {
-    fn push(&mut self, slot: usize, value: f64) {
-        self.values[slot].push(value);
-    }
+    slots: Slots,
 }
 
 impl Accumulate for QuantileAccumulate {
@@ -99,32 +99,70 @@ impl Accumulate for QuantileAccumulate {
         values: impl Iterator<Item = (usize, f64)>,
         _labels: impl FnOnce() -> Labels,
     ) {
-        for (slot, value) in values {
-            self.push(slot, value);
+        match &mut self.slots {
+            Slots::Values(slots) => {
+                for (slot, value) in values {
+                    slots[slot].push(value);
+                }
+            }
+            Slots::Occupied(slots) => {
+                for (slot, _) in values {
+                    slots[slot] = true;
+                }
+            }
         }
     }
 
     fn merge(&mut self, other: Self) {
-        for (values, other) in self.values.iter_mut().zip(other.values) {
-            values.extend(other);
+        match (&mut self.slots, other.slots) {
+            (Slots::Values(slots), Slots::Values(other)) => {
+                for (values, other) in slots.iter_mut().zip(other) {
+                    values.extend(other);
+                }
+            }
+            (Slots::Occupied(slots), Slots::Occupied(other)) => {
+                for (occupied, other) in slots.iter_mut().zip(other) {
+                    *occupied |= other;
+                }
+            }
+            _ => unreachable!("accumulators built by the same Quantile share one slot kind"),
         }
     }
 
     fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
-        let samples = self
-            .values
-            .into_iter()
-            .enumerate()
-            .filter_map(|(slot, mut values)| {
-                if values.is_empty() {
-                    return None;
-                }
-                quantile_in_place(&mut values, self.qtile.at_slot(slot))
-                    .map(|quantile_val| Sample::new(timestamps[slot], quantile_val))
-            })
-            .collect();
+        let qtile = self.qtile;
+        let samples = match self.slots {
+            Slots::Values(slots) => slots
+                .into_iter()
+                .enumerate()
+                .filter_map(|(slot, mut values)| {
+                    if values.is_empty() {
+                        return None;
+                    }
+                    quantile_in_place(&mut values, qtile.at_slot(slot))
+                        .map(|quantile_val| Sample::new(timestamps[slot], quantile_val))
+                })
+                .collect(),
+            Slots::Occupied(slots) => slots
+                .into_iter()
+                .enumerate()
+                .filter_map(|(slot, occupied)| {
+                    if !occupied {
+                        return None;
+                    }
+                    quantile_in_place(&mut [], qtile.at_slot(slot))
+                        .map(|quantile_val| Sample::new(timestamps[slot], quantile_val))
+                })
+                .collect(),
+        };
         group_series(group_labels, samples)
     }
+}
+
+enum Slots {
+    Values(Vec<Vec<f64>>),
+    /// A constant φ outside `[0, 1]` (or NaN) fixes the result, so only occupancy matters.
+    Occupied(Vec<bool>),
 }
 
 #[cfg(test)]
@@ -278,6 +316,23 @@ mod tests {
         }
         let result = quantile(ScalarParam::Const(1.5), &None, Value::None, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_quantile_out_of_range_phi_merges_occupancy() {
+        let func = Quantile::new(ScalarParam::Const(2.0));
+        let mut acc = func.build(3);
+        acc.push_series([(0, 1.0)].into_iter(), Vec::new);
+        let mut other = func.build(3);
+        other.push_series([(2, 5.0)].into_iter(), Vec::new);
+        acc.merge(other);
+        let result = acc.evaluate(Vec::new(), &[10, 20, 30]);
+        let samples: Vec<_> = result[0]
+            .samples
+            .iter()
+            .map(|s| (s.timestamp, s.value))
+            .collect();
+        assert_eq!(samples, vec![(10, f64::INFINITY), (30, f64::INFINITY)]);
     }
 
     #[test]
