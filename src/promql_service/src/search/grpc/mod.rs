@@ -178,8 +178,16 @@ pub async fn search(
             None
         };
         let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
-        let group = match generate_search_groups(memory_limit, plan.files, start, end, step, cut)
-            .await
+        let group_step = grouping_step(step, query.query_exemplars);
+        let group = match generate_search_groups(
+            memory_limit,
+            plan.files,
+            start,
+            end,
+            group_step,
+            cut,
+        )
+        .await
         {
             Ok(v) => v,
             Err(e) => {
@@ -305,7 +313,9 @@ pub async fn data(
     // 2. generate search group with max records stream
     let start_ts = std::time::Instant::now();
     let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
-    let group = match generate_search_group(memory_limit, plan.files, start, end, step).await {
+    let group_step = grouping_step(step, query.query_exemplars);
+    let group = match generate_search_group(memory_limit, plan.files, start, end, group_step).await
+    {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -472,13 +482,23 @@ fn wal_floor() -> i64 {
 fn wal_cut(start: i64, end: i64, step: i64, ahead: i64, wal_floor: i64) -> Option<i64> {
     // a group ending before the cut still reads `ahead` past its end, which must stay off the WAL
     let cut = wal_floor - ahead;
-    if cut <= start || cut > end {
+    if step <= 0 || cut <= start || cut > end {
         return None;
     }
     // groups evaluate on the query's own grid
     let cut = start + (cut - start + step - 1) / step * step;
     // a lone point evaluates as an instant vector the leader cannot merge: both pieces keep two
     (cut >= start + 2 * step && cut + step <= end).then_some(cut)
+}
+
+/// Exemplars are off the step grid, so their groups must abut without a step gap.
+fn grouping_step(step: i64, query_exemplars: bool) -> i64 {
+    // grouping takes `% step`, and a sender may forward a zero step
+    if query_exemplars || step <= 0 {
+        1
+    } else {
+        step
+    }
 }
 
 /// Sizes the groups by memory on each side of the cut, so no group straddles it.
@@ -739,6 +759,66 @@ mod tests {
         assert_eq!(wal_cut(0, 3000, 30, 0, 31), Some(60));
         // a negative offset reads past the group end, so the cut moves that far earlier
         assert_eq!(wal_cut(0, 3000, 30, 100, 2000), Some(1920));
+    }
+
+    #[tokio::test]
+    async fn test_exemplar_groups_abut_so_no_exemplar_falls_between_them() {
+        let files: Vec<FileKey> = (0..5)
+            .map(|i| FileKey {
+                meta: FileMeta {
+                    records: 100,
+                    min_ts: i * 100,
+                    max_ts: (i + 1) * 100,
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .collect();
+        let step = 30;
+
+        let samples = generate_search_group(200, files.clone(), 0, 500, grouping_step(step, false))
+            .await
+            .unwrap();
+        assert!(samples.windows(2).any(|w| w[1].0 > w[0].1 + 1));
+
+        let exemplars = generate_search_group(200, files, 0, 500, grouping_step(step, true))
+            .await
+            .unwrap();
+        assert!(exemplars.len() > 1);
+        assert_eq!(exemplars.first().unwrap().0, 0);
+        assert_eq!(exemplars.last().unwrap().1, 500);
+        assert!(exemplars.windows(2).all(|w| w[1].0 == w[0].1 + 1));
+    }
+
+    #[test]
+    fn test_grouping_step_is_never_zero_for_exemplars() {
+        assert_eq!(grouping_step(0, true), 1);
+        assert_eq!(grouping_step(300_000_000, true), 1);
+        assert_eq!(grouping_step(30, false), 30);
+    }
+
+    #[tokio::test]
+    async fn test_non_positive_step_from_a_sender_groups_without_panicking() {
+        assert_eq!(grouping_step(0, false), 1);
+        assert_eq!(grouping_step(-30, false), 1);
+        assert_eq!(wal_cut(0, 3000, 0, 0, 2000), None);
+        assert_eq!(wal_cut(0, 3000, -30, 0, 2000), None);
+        let files: Vec<FileKey> = (0..5).map(|i| file(i * 100, (i + 1) * 100, 100)).collect();
+        for step in [0, -30] {
+            let groups = generate_search_groups(
+                200,
+                files.clone(),
+                0,
+                500,
+                grouping_step(step, false),
+                None,
+            )
+            .await
+            .unwrap();
+            assert!(groups.len() > 1);
+            assert_eq!(groups.first().unwrap().0, 0);
+            assert_eq!(groups.last().unwrap().1, 500);
+        }
     }
 
     #[tokio::test]

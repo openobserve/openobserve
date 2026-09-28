@@ -5856,7 +5856,36 @@
     "variableNameAlreadyExists": "已存在同名变量",
     "pivotTotal": "总计",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "显示示例（追踪样本）",
+      "hide": "隐藏示例 · 已显示 {count} 个",
+      "empty": "此时间范围内没有示例",
+      "emptyShort": "0 个示例",
+      "loadFailed": "无法加载示例",
+      "loadFailedHint": "图表不受影响。重试仅重新获取示例。",
+      "retry": "重试",
+      "cardTitle": "示例",
+      "query": "查询 {name}",
+      "returnedBy": "由 {count} 个查询返回 | 由 {count} 个查询返回",
+      "series": "序列",
+      "aboveRange": "超出图表范围；绘制在顶部边缘",
+      "belowRange": "低于图表范围；绘制在底部边缘",
+      "checkingTrace": "正在检查追踪…",
+      "openTrace": "打开追踪",
+      "openTraceHint": "或点击标记。返回后回到此处。",
+      "traceNotAvailable": "追踪不可用 — 已被采样丢弃或超出保留期",
+      "openTraceUnverified": "打开追踪（未验证）",
+      "unverifiedTimeout": "追踪查找超时，因此该追踪可能不存在。",
+      "unverifiedForbidden": "无法确认该追踪 — 您可能没有追踪的访问权限。",
+      "unverifiedPartial": "仅搜索了部分保留期窗口。",
+      "unverifiedError": "无法检查该追踪。",
+      "noTraceId": "该示例上没有 {label}，因此没有可打开的追踪。",
+      "markersAria": "示例标记",
+      "markerAria": "示例 {value}，时间 {time}"
+    },
+    "showExemplarsLabel": "显示示例",
+    "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8661,7 +8690,9 @@
         "staleCopyAria": "复制{name}刷新失败的详情",
         "stalePreamble": "刷新失败——显示上次成功的结果。",
         "staleClickToCopy": "点击复制详情。",
-        "lastRefreshedPrefix": "上次刷新时间："
+        "lastRefreshedPrefix": "上次刷新时间：",
+        "exemplarsShowHeatmap": "显示示例（追踪样本）。开启时将此卡片切换为百分位数。",
+        "exemplarsHideHeatmap": "隐藏示例 · 已显示 {count} 个。将此卡片恢复为热力图。"
       },
       "fn": {
         "subtitle": "选择此指标的聚合方式",
@@ -17065,17 +17096,17 @@
       "alertMe": "提醒我",
       "columnHints": {
         "qps": "每秒调用次数——此窗口内的调用数除以其时长，因此 15 分钟视图和 4 小时视图具有可比性。",
-        "p50": "所有调用中有一半完成速度快于该值。仅统计已完成的调用——仍在运行的查询或从未返回的查询不计入此列。",
-        "p95": "慢尾——每 20 个调用中有 1 个耗时至少这么长。仅统计已完成的调用——仍在运行的查询或从未返回的查询不计入此列。",
-        "p99": "最差的 1% 调用耗时至少这么长。仅统计已完成的调用——仍在运行的查询或从未返回的查询不计入此列。",
-        "load": "您的应用程序等待此数据库所花费的总时间。从客户端测量，因此反映的是此数据库所服务的流量大小——而非服务器负载。",
+        "p50": "一半的调用比此更快完成。根据应用程序追踪中已完成的调用测得。",
+        "p95": "慢速尾部——每 20 次调用中就有 1 次至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
+        "p99": "最慢的 1% 调用至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
+        "load": "你的应用调用此数据库所花费的总时间，根据应用程序的追踪测得。它反映了此数据库为你的应用承载了多少流量。",
         "attention": "该实例与其自身引擎发布的上限之间的接近程度——目前为连接数与 max_connections 的比值。取最差值而非综合得分。按从高到低排序，健康状况无法读取的实例排在顶部，因为看不见的实例无法确认是健康的。在数据库服务器上测量，因此与旁边的数据库耗时不可比。"
       },
       "failedChip": "{count} 次失败",
       "columnSubLabels": {
-        "attention": "服务端",
-        "load": "客户端",
-        "calls": "客户端"
+        "attention": "来自数据库",
+        "load": "来自你的应用",
+        "calls": "来自你的应用"
       },
       "attention": {
         "connections": "连接数",
@@ -17137,14 +17168,14 @@
         "failed": "失败"
       },
       "columnHints": {
-        "calls": "此查询运行了多少次。您的数据库在报告时使用其自身的计数——该计数涵盖所有客户端，而不仅仅是发送追踪的系统部分。标记为“客户端观测”的行改为从追踪中计数，因为您的数据库未报告它们。",
-        "p50": "一半的调用完成时间快于此值。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。",
-        "p95": "慢尾——每 20 次调用中有 1 次耗时至少这么长。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。",
-        "p99": "最差的 1% 的调用耗时至少这么长。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。",
+        "calls": "此查询运行了多少次，由你的数据库统计——包含所有连接的应用程序。当你的数据库没有某个查询的计数时，追踪图标会标记该计数是根据应用程序的追踪测得的。",
+        "p50": "一半的调用比此更快完成。根据应用程序追踪中已完成的调用测得。",
+        "p95": "慢速尾部——每 20 次调用中就有 1 次至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
+        "p99": "最慢的 1% 调用至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
         "max": "此时间窗口中最慢的一次真实调用——不是平均值。",
         "errors": "这些调用中有多少返回错误。",
         "perTrace": "在单个请求中运行了多少次。较高的数字通常意味着循环。",
-        "load": "此查询在数据库中花费的总时间。您的数据库在报告时使用其自身的数据：Postgres 上为执行时间，而 MySQL 和 MariaDB 上为等待时间——每行会标明。标记为“客户端观测”的行从追踪中测量，因此包含网络往返时间。"
+        "load": "此查询在数据库中花费的总时间，由你的数据库报告：Postgres 上为执行时间，MySQL 和 MariaDB 上为等待时间——每一行都会标明是哪种。带追踪图标的行是根据应用程序的追踪测得的，因此还包含往返数据库的时间。"
       },
       "errorsNone": "无",
       "errorsAll": "全部",
@@ -17408,8 +17439,7 @@
       "overlap": {
         "serverExecution": "{engine} 执行它所花费的时间",
         "serverWait": "{engine} 等待它所花费的时间——等待时间，而非执行时间",
-        "serverCounted": "由{engine}统计，涵盖每个客户端",
-        "clientObserved": "由已埋点的调用方观察到——您的数据库未报告此项"
+        "serverCounted": "由{engine}统计，涵盖每个客户端"
       },
       "endpointsConcentrated": "一个端点占用此查询时间的{percent}。修复{endpoint}即可修复此查询。",
       "typicalMarker": "慢调用 {value}",
@@ -17436,8 +17466,8 @@
       },
       "serverMetrics": {
         "title": "数据库自身记录的内容",
-        "subtitle": "服务端 — 所有客户端",
-        "clientSubtitle": "客户端观测 — 仅限已埋点的调用方，且仅限已完成的调用。仍在运行或挂起的查询不包含在这些数字中。",
+        "subtitle": "来自你的数据库——所有连接的应用程序",
+        "clientSubtitle": "标记的数字是根据应用程序的追踪测得的——你的应用在此时间窗口内完成的调用",
         "instance": "由 {instance} 上报",
         "instanceWide": "此实例上的所有数据库",
         "calls": "执行次数",
@@ -17483,9 +17513,13 @@
         "serverExecution": "执行时间",
         "serverWait": "等待时间",
         "serverCounted": "服务器数量",
-        "clientObserved": "客户端观测",
         "serverReported": "由您的数据库报告"
       }
+    },
+    "appSource": {
+      "marker": "根据应用程序的追踪测得",
+      "markerHint": "根据应用程序的追踪测得，在数据库报告的基础上补充了应用的视角。",
+      "legend": "来自应用的追踪"
     },
     "page": {
       "tabs": {
@@ -17494,7 +17528,7 @@
         "metricsHint": "按等待事件划分的数据库负载，以及数据库接收器收集的所有指标。",
         "queries": "Top 查询",
         "samples": "最慢的调用",
-        "samplesHintClient": "您的已埋点服务在此时间窗口内观测到的已完成调用 — 未追踪的调用方不计入，因此这是下限而非总数。表格显示了其中最慢的调用。",
+        "samplesHintClient": "在此时间窗口内根据应用程序的追踪测得的调用，在数据库报告的基础上补充了应用的视角。表格显示其中最慢的。",
         "samplesHintServer": "您的数据库报告在此时间窗口内完成的语句，由数据库内部统计。表格显示了其中最慢的语句。",
         "samplesHintUnknown": "此时间窗口内最慢的单次数据库调用。",
         "deadlocks": "死锁",
@@ -17531,6 +17565,11 @@
       "explore": "在指标浏览器中打开",
       "railLabel": "指标分区",
       "noAccess": "你没有权限读取 {stream}。请联系管理员获取此数据流的读取权限。",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "按查询",
         "database": "按数据库",
@@ -17645,7 +17684,7 @@
         "status": "状态"
       },
       "columnHints": {
-        "duration": "这次调用的耗时，由调用方测量。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。"
+        "duration": "此次调用耗时多久，由你的应用程序从头到尾计时。"
       },
       "failed": "失败",
       "failedWithCode": "失败 · {code}",
@@ -19154,6 +19193,8 @@
     "rotationNobody": "无人值班",
     "edit": "编辑",
     "timelineLoadFailed": "无法解析此时间范围的值班安排",
+    "editorReadFailed": "无法加载最新副本进行编辑。请重试。",
+    "refreshFailed": "无法刷新。显示的内容可能已过期。",
     "scheduleDoneEditing": "返回值班安排",
     "coverWhoRequired": "选择谁来代班",
     "timelineCoverAria": "{who} 在 {from} 至 {to} 期间为 {rotation} 代班",

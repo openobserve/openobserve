@@ -112,8 +112,19 @@ impl Engine {
         let eval_timestamps = self.eval_ctx.timestamps();
 
         let lookback_delta = self.ctx.lookback_delta;
-        // exemplar series carry no samples, so they must survive an empty selection
-        let keep_sampleless = self.ctx.query_ctx.query_exemplars;
+        // Exemplar series carry no samples, so there is nothing to select at each timestamp.
+        if self.ctx.query_ctx.query_exemplars {
+            return Ok(metrics_cache
+                .into_iter()
+                .map(|metric| RangeValue {
+                    labels: metric.labels,
+                    samples: Vec::new(),
+                    exemplars: metric.exemplars,
+                    time_window: metric.time_window,
+                })
+                .collect());
+        }
+
         // every series selects independently, so fan the selection out
         let result = metrics_cache.into_par_iter().filter_map(|metric| {
             let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
@@ -149,7 +160,7 @@ impl Engine {
                 }
             }
 
-            (keep_sampleless || !selected_samples.is_empty()).then_some(RangeValue {
+            (!selected_samples.is_empty()).then_some(RangeValue {
                 labels: metric.labels,
                 samples: selected_samples,
                 exemplars: metric.exemplars,
