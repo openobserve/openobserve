@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Four subsystems used to decide independently that an alert had got better; they are consumers
-//! now. Best effort in a fixed order: the episode is already committed, so a failure costs one
-//! outbound message, not the record that it happened.
+//! Subsystems used to decide independently that an alert had got better; they are consumers now.
+//! Best effort: the episode is already committed, so a failure costs a message, not the record.
 
 use config::meta::alerts::{alert::Alert, recovery::RecoveryEvent};
 
@@ -63,11 +62,5 @@ pub async fn dispatch_recovery(alert: &Alert, event: &RecoveryEvent) {
         );
     }
 
-    #[cfg(feature = "enterprise")]
-    if let Err(e) = crate::workflows::send_alert_resolved(alert, event).await {
-        log::error!(
-            "[RECOVERY] workflow consumer failed for {}: {e}",
-            event.alert_id
-        );
-    }
+    // TODO: a workflow consumer, once a link can carry AlertResolved (see that variant).
 }

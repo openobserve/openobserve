@@ -152,7 +152,8 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
   {
     kind: "alert_resolved",
     triggerType: "AlertResolved",
-    // Hidden until wiring works: linking writes an AlertFired association, so it runs on the firing.
+    // TODO: hidden until linking can write an AlertResolved association — it hardcodes AlertFired,
+    // so this trigger would run on the firing instead. Backend consumer removed until then.
     enabled: false,
     icon: "check-circle",
     labelKey: "workflow.triggerKind.alertResolved.label",

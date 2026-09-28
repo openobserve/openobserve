@@ -57,9 +57,11 @@ pub enum AssociationDeleteEvent {
 pub enum WorkflowTriggerType {
     #[default]
     AlertFired,
-    /// One firing episode recovered. Its own type rather than an event_type on
-    /// AlertFired, or every workflow built to page on a firing would page on
-    /// the recovery too.
+    /// Its own type rather than an event_type on AlertFired, or every workflow built to page on a
+    /// firing would page on the recovery too.
+    // TODO: not reachable yet — associating a workflow with an alert hardcodes AlertFired, so no
+    // row is ever written with this type. Needs a trigger-type choice on the link, then a consumer
+    // in `alerts::recovery::dispatch_recovery`, then `enabled: true` on the UI card.
     AlertResolved,
     IncidentEvent,
     Webhook,
