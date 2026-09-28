@@ -3683,6 +3683,7 @@
       "overridden": "Function - {index}: \"{name}\" overridden",
       "skipped": "Function - {index}: \"{name}\" skipped, the existing function was kept",
       "alreadyImported": "Function - {index}: \"{name}\" was already imported by this run",
+      "reimported": "Function - {index}: \"{name}\" re-imported with your change",
       "createFailed": "Function - {index}: \"{name}\" failed - {reason}",
       "jsonStringEmpty": "JSON string is empty",
       "invalidJsonFormat": "Invalid JSON format",
@@ -16515,7 +16516,8 @@
       "enrichmentCreationFailed": "Enrichment Table creation failed",
       "functionDeletionAssociatedPipelines": "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
       "successfullyExportedFunctions": "Successfully exported {count} function | Successfully exported {count} functions",
-      "errorExportingFunctions": "Error exporting functions. Please try again."
+      "errorExportingFunctions": "Error exporting functions. Please try again.",
+      "functionsMissingFromExport": "{names} is no longer in the list and was left out of the export | {names} are no longer in the list and were left out of the export"
     },
     "recommended": {
       "failedToImportDashboard": "Failed to import dashboard: {error}",

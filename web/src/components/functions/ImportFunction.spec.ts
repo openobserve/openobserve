@@ -433,6 +433,79 @@ describe("ImportFunction", () => {
     );
   });
 
+  // A run rarely goes in on one press: something fails, the user fixes it in the
+  // editor, and presses again. The fix is a different document, so everything
+  // keyed to the document is dropped — but what the first press WROTE is not.
+  describe("fixing one item and pressing again", () => {
+    // A server that remembers, so a second create of the same name is rejected
+    // the way the real one rejects it.
+    const useRememberingServer = () => {
+      const created: any[] = [];
+      mockCreate.mockImplementation(async (_org: string, payload: any) => {
+        if (payload.function === "nope(") {
+          throw { response: { data: { message: "compile error" } } };
+        }
+        if (created.some((fn) => fn.name === payload.name)) {
+          throw { response: { data: { message: "Function already exist" } } };
+        }
+        created.push({ ...payload });
+        return { data: { code: 200 } };
+      });
+      mockUpdate.mockImplementation(async (_org: string, payload: any) => {
+        const at = created.findIndex((fn) => fn.name === payload.name);
+        if (at >= 0) created[at] = { ...payload };
+        return { data: { code: 200 } };
+      });
+      mockList.mockImplementation(async () => ({ data: { list: [...existing, ...created] } }));
+      return created;
+    };
+
+    it("leaves alone the function it created while the other item was failing", async () => {
+      useRememberingServer();
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, [
+        { name: "a_fn", function: ".a = 1" },
+        { name: "b_fn", function: "nope(" },
+      ]);
+      expect(wrapper.text()).toContain("compile error");
+
+      // The user repairs b_fn in the editor: a different document.
+      await importJson(wrapper, [
+        { name: "a_fn", function: ".a = 1" },
+        { name: "b_fn", function: ".b = 2" },
+      ]);
+
+      // a_fn is neither re-sent nor held up for a clash it caused itself.
+      expect(wrapper.text()).not.toContain('"a_fn" already exists');
+      expect(wrapper.find('[data-test="function-import-result-0"]').text()).toContain(
+        "already imported by this run",
+      );
+      expect(mockCreate).toHaveBeenCalledTimes(3);
+      expect(mockCreate.mock.calls[2][1]).toMatchObject({ name: "b_fn", function: ".b = 2" });
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    // The other half of owning what it wrote: an edit to that function is this
+    // run's own change, so it goes back as an update with nothing to confirm.
+    it("sends its own function again when the user changes it", async () => {
+      useRememberingServer();
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "a_fn", function: ".a = 1" });
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+
+      await importJson(wrapper, { name: "a_fn", function: ".a = 2" });
+
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockUpdate.mock.calls[0][1]).toMatchObject({ name: "a_fn", function: ".a = 2" });
+      expect(wrapper.text()).toContain("re-imported with your change");
+      expect(wrapper.text()).not.toContain('"a_fn" already exists');
+    });
+  });
+
   it("reports a failed item instead of navigating away", async () => {
     mockCreate.mockRejectedValueOnce({ response: { data: { message: "invalid VRL" } } });
     const wrapper = mountScreen();

@@ -222,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="function-list-export-functions-btn"
                     variant="outline"
                     size="sm"
+                    :loading="exportLoading"
                     @click="exportSelectedFunctions"
                     icon-left="download"
                   >
@@ -778,15 +779,30 @@ export default defineComponent({
         await functions.refetch();
         payloads = names.map(exportPayload);
       }
-      return payloads.filter(Boolean) as Record<string, unknown>[];
+      return {
+        payloads: payloads.filter(Boolean) as Record<string, unknown>[],
+        missing: names.filter((_, i) => !payloads[i]),
+      };
     };
 
     const openExportDialog = async (names: string[]) => {
       if (exportLoading.value) return;
       exportLoading.value = true;
       try {
-        const payloads = await collectForExport(names);
+        const { payloads, missing } = await collectForExport(names);
         if (!payloads.length) throw new Error("no exportable function");
+        // A selection can outlive its rows. Exporting the rest is right, but
+        // the file would otherwise be short by names nobody mentioned.
+        if (missing.length) {
+          toast({
+            variant: "info",
+            message: t(
+              "toastMessages.functions.functionsMissingFromExport",
+              { names: raw(missing.join(", ")) },
+              missing.length,
+            ),
+          });
+        }
         functionsToExport.value = payloads;
         showExportDialog.value = true;
       } catch (error) {
@@ -801,8 +817,7 @@ export default defineComponent({
 
     const exportFunction = (row: any) => openExportDialog([row.name]);
 
-    const exportSelectedFunctions = () =>
-      openExportDialog(selectedFunctions.value.map((row: any) => row.name));
+    const exportSelectedFunctions = () => openExportDialog([...selectedFunctionIds.value]);
 
     const onExportDownloaded = ({ count }: { format: string; count: number }) => {
       toast({
@@ -984,6 +999,7 @@ export default defineComponent({
       showExportDialog,
       functionsToExport,
       functionsTerraform,
+      exportLoading,
       exportFunction,
       exportSelectedFunctions,
       onExportDownloaded,

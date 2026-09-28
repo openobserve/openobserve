@@ -23,13 +23,26 @@ import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-const { mockJsTransformList, mockJsTransformDelete, mockBulkDelete, mockGetAssociatedPipelines } =
-  vi.hoisted(() => ({
-    mockJsTransformList: vi.fn(),
-    mockJsTransformDelete: vi.fn(),
-    mockBulkDelete: vi.fn(),
-    mockGetAssociatedPipelines: vi.fn(),
-  }));
+const {
+  mockJsTransformList,
+  mockJsTransformDelete,
+  mockBulkDelete,
+  mockGetAssociatedPipelines,
+  mockToastFn,
+} = vi.hoisted(() => ({
+  mockJsTransformList: vi.fn(),
+  mockJsTransformDelete: vi.fn(),
+  mockBulkDelete: vi.fn(),
+  mockGetAssociatedPipelines: vi.fn(),
+  mockToastFn: vi.fn(() => () => {}),
+}));
+
+// Only `toast` is spied on; everything else in the module stays real, since the
+// components under this tree reach for the rest of it.
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return { ...actual, toast: (...args: any[]) => mockToastFn(...args) };
+});
 
 // A plain module mock. The query declarations live in `jstransform.queries.ts`
 // and reach the transport through a normal import, so this replacement is what
@@ -1144,6 +1157,42 @@ describe("FunctionList", () => {
       expect(mockJsTransformList.mock.calls.length).toBe(callsBefore + 1);
       expect(vm.showExportDialog).toBe(true);
       expect(vm.functionsToExport[0]).toMatchObject({ name: "late_fn" });
+    });
+
+    // The selection outlives the rows: selectedFunctions is filtered against the
+    // loaded list, so a function deleted elsewhere used to fall out of the file
+    // with nothing said. Export asks for the ids the user actually ticked.
+    it("names the rows it could not find instead of quietly shortening the file", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      vm.selectedFunctionIds = ["func1", "gone_fn"];
+      await nextTick();
+      await vm.exportSelectedFunctions();
+      await flushPromises();
+
+      expect(vm.showExportDialog).toBe(true);
+      expect(vm.functionsToExport.map((fn: any) => fn.name)).toEqual(["func1"]);
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "info",
+          message: expect.stringContaining("gone_fn"),
+        }),
+      );
+    });
+
+    it("shows the bulk button busy while the list is being re-read", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      expect(vm.exportLoading).toBe(false);
+      vm.selectedFunctionIds = ["func1"];
+      await nextTick();
+      const done = vm.exportSelectedFunctions();
+      expect(vm.exportLoading).toBe(true);
+      await done;
+      await flushPromises();
+      expect(vm.exportLoading).toBe(false);
     });
 
     it("reports a row the re-read cannot find instead of opening an empty dialog", async () => {

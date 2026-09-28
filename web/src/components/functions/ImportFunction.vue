@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, onBeforeUnmount, ref } from "vue";
+import { defineAsyncComponent, defineComponent, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
@@ -229,9 +229,14 @@ export default defineComponent({
     // that have never been confirmed and must be prompted for in their own right.
     const conflictsSurfaced = ref<Set<string>>(new Set());
 
-    // Written by this run. Without it the press after a partial failure reports
-    // what the previous press created as "skipped, the existing function was kept".
-    const writtenNames = ref<Set<string>>(new Set());
+    // What this run has written: name -> the payload that was sent. NOT reset
+    // with the rest, because it describes the server rather than the editor —
+    // a function created by the first press exists whatever the user does to
+    // the document next. Fixing one item's VRL and pressing again must not
+    // re-prompt for the item that already went in, nor write it twice; it is
+    // re-sent only if its own definition changed, which is an update of this
+    // run's own work and needs no permission. Only the org owns it.
+    const writtenByThisRun = ref<Map<string, string>>(new Map());
 
     const conflictOptions = [
       { label: t("function.import.useExisting"), value: USE_EXISTING },
@@ -278,6 +283,12 @@ export default defineComponent({
       (existingFunctions.data.value ?? []).some((fn: any) => fn.name === name) ||
       serverReportedExisting.value.has(name);
 
+    // Both caches describe one org's functions and mean nothing in the next.
+    watch(orgId, () => {
+      writtenByThisRun.value = new Map();
+      serverReportedExisting.value = new Set();
+    });
+
     // ── Document identity ──────────────────────────────────────────────────
     // Every choice above belongs to the document that produced it. BaseImport
     // re-emits for our own writes too (a rename restringifies the array), so the
@@ -292,7 +303,6 @@ export default defineComponent({
       conflictChoice.value = {};
       dependentPipelines.value = {};
       conflictsSurfaced.value = new Set();
-      writtenNames.value = new Set();
     };
 
     // Compared on CONTENT, not on the text: BaseImport reformats what it holds
@@ -375,7 +385,7 @@ export default defineComponent({
         errors.push(
           nameError(t("function.import.duplicateName", { index, name }), itemIndex, name),
         );
-      } else if (!writtenNames.value.has(name) && nameExists(name)) {
+      } else if (!writtenByThisRun.value.has(name) && nameExists(name)) {
         errors.push({
           field: "name_exists",
           message: t("function.import.nameExists", { index, name }),
@@ -422,23 +432,33 @@ export default defineComponent({
       }
     };
 
+    // Built once: it is both what is sent and what is remembered, so "did this
+    // item change since we wrote it?" compares like with like.
+    const payloadFor = (item: any) => ({
+      name: item.name as string,
+      function: String(item.function).trim(),
+      params: typeof item.params === "string" && item.params.trim() ? item.params : "row",
+      transType: parseInt(String(item.transType ?? 0)),
+    });
+
     const writeFunction = async (item: any, index: number) => {
       const name: string = item.name;
-      const override = nameExists(name) && conflictChoice.value[name] === OVERRIDE;
+      const payload = payloadFor(item);
+      // Ours already: it exists because this run created it, so a changed
+      // definition goes back as an update and needs no conflict prompt.
+      const ours = writtenByThisRun.value.has(name);
+      const override = ours || (nameExists(name) && conflictChoice.value[name] === OVERRIDE);
       isOverride.value = override;
 
       try {
-        await saveFunction.mutateAsync({
-          name,
-          function: item.function.trim(),
-          params: typeof item.params === "string" && item.params.trim() ? item.params : "row",
-          transType: parseInt(String(item.transType ?? 0)),
-        });
-        writtenNames.value.add(name);
+        await saveFunction.mutateAsync(payload);
+        writtenByThisRun.value.set(name, JSON.stringify(payload));
         importResults.value.push({
-          message: override
-            ? t("function.import.overridden", { index, name })
-            : t("function.import.createSuccess", { index, name }),
+          message: ours
+            ? t("function.import.reimported", { index, name })
+            : override
+              ? t("function.import.overridden", { index, name })
+              : t("function.import.createSuccess", { index, name }),
           status: override ? "overridden" : "created",
         });
         return override ? "overridden" : "created";
@@ -516,9 +536,11 @@ export default defineComponent({
       for (const [itemIndex, item] of items.entries()) {
         const index = itemIndex + 1;
         const name: string = item.name;
-        // Created by an earlier press of this same file, so it exists now
-        // because of this import — not because the user is keeping an older one.
-        if (writtenNames.value.has(name)) {
+        // Written by an earlier press, so it exists now because of this import
+        // — not because the user is keeping an older one. Unchanged since, so
+        // there is nothing to send; a changed definition falls through and is
+        // updated below without a prompt.
+        if (writtenByThisRun.value.get(name) === JSON.stringify(payloadFor(item))) {
           importResults.value.push({
             message: t("function.import.alreadyImported", { index, name }),
             status: "skipped",
@@ -526,7 +548,11 @@ export default defineComponent({
           skipped++;
           continue;
         }
-        if (nameExists(name) && conflictChoice.value[name] !== OVERRIDE) {
+        if (
+          !writtenByThisRun.value.has(name) &&
+          nameExists(name) &&
+          conflictChoice.value[name] !== OVERRIDE
+        ) {
           importResults.value.push({
             message: t("function.import.skipped", { index, name }),
             status: "skipped",
