@@ -26,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #actions>
-      <div class="w-50 flex-none max-md:w-auto max-md:min-w-36 max-md:flex-1">
+      <!-- A fixed phone width lets the title, search and token button share one row. -->
+      <div class="w-50 flex-none max-md:w-40">
         <OSearchInput
           v-model="globalSearchQuery"
           :placeholder="t('common.search')"
