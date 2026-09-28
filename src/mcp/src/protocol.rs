@@ -451,12 +451,12 @@ fn encode_path_parameters(
     Ok(())
 }
 
-/// Encode only what can move a request off its route; permission checks read the raw path.
+/// Encode only what can reroute or re-substitute a value; permission checks read the raw path.
 fn encode_path_segment(value: &str) -> String {
     let mut encoded = String::with_capacity(value.len());
     for c in value.chars() {
         // The URL parser drops tab/LF/CR and trailing spaces, which can leave a bare `..`.
-        if matches!(c, '%' | '/' | '\\' | '?' | '#' | ' ') || c.is_ascii_control() {
+        if matches!(c, '%' | '/' | '\\' | '?' | '#' | ' ' | '{' | '}') || c.is_ascii_control() {
             encoded.push_str(&format!("%{:02X}", c as u32));
         } else {
             encoded.push(c);
@@ -674,13 +674,20 @@ mod tests {
         let base = url::Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
         let server = tokio::spawn(async move {
             let (mut socket, _) = listener.accept().await.unwrap();
-            let mut buf = vec![0u8; 4096];
-            let n = socket.read(&mut buf).await.unwrap();
+            let mut buf = Vec::new();
+            let mut chunk = [0u8; 1024];
+            while !buf.windows(2).any(|w| w == b"\r\n") {
+                let n = socket.read(&mut chunk).await.unwrap();
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&chunk[..n]);
+            }
             socket
                 .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")
                 .await
                 .unwrap();
-            String::from_utf8_lossy(&buf[..n])
+            String::from_utf8_lossy(&buf)
                 .lines()
                 .next()
                 .unwrap()
@@ -708,6 +715,7 @@ mod tests {
             (".\t.", ".%09."),
             ("\\..\\x", "%5C..%5Cx"),
             (".. ", "..%20"),
+            ("{org_id}", "%7Borg_id%7D"),
         ] {
             let mut arguments = json!({"org_id": "acme", "dashboard_id": raw});
             encode_path_parameters(&dashboard_tool(), &mut arguments).unwrap();
@@ -756,6 +764,17 @@ mod tests {
                 loopback_request_line(raw).await,
                 format!("GET {expected} HTTP/1.1"),
                 "{raw:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn placeholder_argument_is_not_substituted_twice() {
+        // rmcp-openapi substitutes in HashMap order, so only some runs expose the bug.
+        for _ in 0..32 {
+            assert_eq!(
+                loopback_request_line("{org_id}").await,
+                "GET /api/acme/dashboards/%7Borg_id%7D HTTP/1.1"
             );
         }
     }
