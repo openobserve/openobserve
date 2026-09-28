@@ -294,9 +294,13 @@
             <!-- Under the calendar, because a cover is an exception to what
                  the calendar draws — and until now the only trace of one was
                  an "· override" annotation on a cell, with no reason, no whose
-                 shift, and no way to take it back. -->
+                 shift, and no way to take it back. Pinned to the tab's own
+                 floor rather than left in flow: whether anyone is currently
+                 overriding the schedule is exactly the kind of fact that
+                 should not depend on how far the reader happened to scroll. -->
             <OnCallCoverList
               ref="coverListRef"
+              class="sticky bottom-0 z-1"
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
               :viewer-timezone="store.state.timezone"
