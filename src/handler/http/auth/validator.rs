@@ -509,8 +509,8 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
     if path_columns.len() < 2 || path_columns.first().eq(&Some(&"license")) {
         return Ok(());
     }
-    // node is a special prefix, it does not need to create org
-    if path_columns[0].eq("node") {
+    // node and config are special prefixes, they do not need to create org
+    if path_columns[0].eq("node") || path_columns[0].eq("config") {
         return Ok(());
     }
     // Hack for v2 apis
