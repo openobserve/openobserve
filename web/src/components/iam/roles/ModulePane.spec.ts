@@ -410,6 +410,19 @@ describe("ModulePane - empty module", () => {
     expect(note.text()).toContain(String(i18n.global.t("iam.editRole.moduleHasNoResourcesHint")));
   });
 
+  it("shows no empty state for a module that never lists resources", async () => {
+    const wrapper = await mountPane(
+      [makeScope("search_jobs", [], ["search_jobs"])],
+      [],
+      undefined,
+      {
+        listsResources: false,
+      },
+    );
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-resources"]').exists()).toBe(false);
+  });
+
   it("still draws the scope row so the type level grant stays editable", async () => {
     const wrapper = await mountPane([makeScope("enrichment_table", [], ["enrichment_table"])], []);
 

@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- One table for scopes and resources: two tables size their columns independently and drift out of line. -->
-    <div class="min-h-0 flex-1" data-test="edit-role-module-pane-resources">
+    <div class="flex min-h-0 flex-1 flex-col" data-test="edit-role-module-pane-resources">
       <OTable
         :data="tableRows"
         :columns="columns"
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         :row-class="(row: PaneRow) => (row.kind === 'scope' ? 'bg-surface-subtle' : '')"
         dense
-        fill-height
+        :fill-height="!noResources"
         :key="paginationMode"
         :pagination="paginationMode"
         :current-page="currentPage"
@@ -160,20 +160,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
       </OTable>
+      <!-- The scope rows above stay editable, so the empty state names what they still cover. -->
+      <OEmptyState
+        v-if="noResources"
+        class="flex-1"
+        size="block"
+        preset="no-data"
+        hide-action
+        :title="t('iam.editRole.moduleHasNoResources')"
+        :description="t('iam.editRole.moduleHasNoResourcesHint')"
+        data-test="edit-role-module-pane-no-resources"
+      />
     </div>
 
-    <!-- A module with nothing to list still says what the scope above it covers. -->
     <div
-      v-if="!loading && !entities.length"
-      class="border-border-default text-text-secondary flex shrink-0 items-center gap-1 border-t px-3 py-2 text-xs"
-      data-test="edit-role-module-pane-no-resources"
-    >
-      <OIcon name="info" size="sm" class="shrink-0" />
-      <span>{{ t("iam.editRole.moduleHasNoResources") }}</span>
-      <span>{{ t("iam.editRole.moduleHasNoResourcesHint") }}</span>
-    </div>
-    <div
-      v-else-if="entities.length && !filteredEntities.length"
+      v-if="entities.length && !filteredEntities.length"
       class="border-border-default text-text-secondary flex shrink-0 items-center gap-2 border-t px-3 py-2 text-xs"
       data-test="edit-role-module-pane-no-match"
     >
@@ -195,7 +196,7 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -410,6 +411,11 @@ const checkboxTest = (row: PaneRow, action: string) =>
 // OTable snapshots `pagination` at mount, so the mode change is keyed to remount the table.
 const paginationMode = computed(() =>
   props.listsResources && props.entities.length ? "server" : "none",
+);
+
+// Modules without entities (Search Jobs, Settings) have nothing to list, so "no resources yet" would mislead there.
+const noResources = computed(
+  () => !props.loading && props.listsResources && !props.entities.length,
 );
 
 const clearFilter = () => setFilter("", "all");
