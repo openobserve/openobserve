@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The payload one recovered firing hands downstream steps.
-//
-// No `data` rows: the query that produced them no longer matches. `episode_id` is
-// the key the firing sent to PagerDuty, so a workflow can join the two runs.
+// No `data` rows: the query that produced them no longer matches.
 
 import { raw } from "@/types/i18n";
 

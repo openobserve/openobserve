@@ -953,19 +953,8 @@ pub async fn correlate_external_event(
     Ok(Some(outcome))
 }
 
-/// Record that one of an incident's alerts recovered, and close the incident
-/// once they all have.
-///
-/// The measured recovery, not the staleness clock, is what should end an
-/// incident: `auto_resolve_after_minutes` only knows that nothing has fired
-/// lately, which is also true of an alert whose delivery is being suppressed.
-/// It stays as the backstop for a source that went silent entirely.
-///
-/// Deliberately narrow about which incidents close this way. One member alert
-/// recovering is not the incident being over, so every linked alert must be
-/// clear; and an incident somebody has acknowledged or assigned is theirs to
-/// close, because by then it is an organisational object with a postmortem
-/// attached, not just a correlation.
+/// Narrow on purpose: one member recovering is not the incident being over, and an acknowledged or
+/// assigned incident is a human's to close. `auto_resolve_after_minutes` stays as the backstop.
 pub async fn resolve_alert_firing(
     event: &config::meta::alerts::recovery::RecoveryEvent,
 ) -> Result<(), anyhow::Error> {
@@ -979,6 +968,8 @@ pub async fn resolve_alert_firing(
     )
     .await?;
 
+    // Published even when this region updated no rows: the receiver runs the same idempotent update
+    // against its own replica, which may still be behind.
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster

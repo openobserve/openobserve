@@ -732,13 +732,8 @@ mod tests {
         }
     }
 
-    /// Every template OpenObserve ships must be able to say a recovery IS one.
-    ///
-    /// These are CUSTOM bodies: nothing can be injected into the author's raw
-    /// JSON safely, so a body without `{alert_status}` renders a resolve
-    /// byte-identical to the firing. A user who picks a prebuilt destination
-    /// and turns recovery on would be refused at save for something they did
-    /// not write.
+    /// CUSTOM bodies: nothing can be injected into the author's raw JSON, so one without
+    /// `{alert_status}` would render a resolve byte-identical to the firing.
     #[test]
     fn every_shipped_prebuilt_template_can_announce_a_recovery() {
         let path = concat!(

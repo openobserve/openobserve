@@ -152,8 +152,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
   {
     kind: "alert_resolved",
     triggerType: "AlertResolved",
-    // Hidden until a workflow can be wired to a recovery: linking one to an alert writes an
-    // AlertFired association, so it would run on the firing and never on the recovery.
+    // Hidden until wiring works: linking writes an AlertFired association, so it runs on the firing.
     enabled: false,
     icon: "check-circle",
     labelKey: "workflow.triggerKind.alertResolved.label",

@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The resolve OpenObserve sends for itself.
-//!
-//! On PagerDuty, Opsgenie and ServiceNow a resolve carries no user-authored
-//! content — it is protocol, not a message. So the template describes the
-//! firing and this module writes the recovery, and a custom template of any
-//! shape is harmless because it is never rendered for the resolve. The firing
-//! only has to carry the correlation key, which [`stamp_key`] sets.
+//! A platform resolve is protocol, not a message, so the template is never rendered for it.
 
 use anyhow::Result;
 use common::utils::ssrf_guard::SsrfGuard;
@@ -28,12 +22,18 @@ use serde_json::{Value, json};
 
 use super::format::{ChannelFormat, derive_channel_format};
 
-/// ServiceNow refuses a state change to Resolved without a resolution code, and
-/// the valid values are per-instance. This is the out-of-box one.
+/// ServiceNow refuses a resolve without a resolution code, and valid values are per-instance.
 const DEFAULT_CLOSE_CODE: &str = "Solved (Permanently)";
 
 /// Destination metadata key holding an operator's override for the above.
 const CLOSE_CODE_KEY: &str = "credential_resolutionCode";
+
+/// ServiceNow incident states: the one a resolve sets, and the terminal one it must skip.
+const STATE_RESOLVED: &str = "6";
+const STATE_CLOSED: &str = "7";
+
+/// Bounded: unlimited would fall back to the instance row cap and PATCH thousands.
+const LOOKUP_LIMIT: usize = 100;
 
 /// A destination whose resolve protocol we know well enough to speak ourselves.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,15 +65,7 @@ impl Platform {
     }
 }
 
-/// Put the episode id on a rendered firing body.
-///
-/// Overwrites rather than merges: the resolve quotes the episode id back, so a
-/// key the template supplied would not match it.
-///
-/// PagerDuty's routing key is overwritten for the same reason. The resolve
-/// reads it off the destination, and Events v2 discards a resolve whose routing
-/// key differs from its trigger's — answering 202 either way, so a template
-/// that hardcoded a different key would page and then never resolve, silently.
+/// Overwrites, routing key included: a template's own key would page and then never resolve.
 pub fn stamp_key(
     platform: Platform,
     body: &str,
@@ -93,11 +85,7 @@ pub fn stamp_key(
     Ok(value.to_string())
 }
 
-/// Close whatever the firing opened.
-///
-/// One request for PagerDuty and Opsgenie. Two for ServiceNow, whose Table API
-/// can only update by `sys_id`, so the incident is found by its correlation id
-/// first — which is why nothing has to be stored between the two halves.
+/// Close whatever the firing opened; ServiceNow needs two, updating only by `sys_id`.
 pub async fn send_resolve(
     platform: Platform,
     endpoint: &Endpoint,
@@ -140,14 +128,24 @@ pub async fn send_resolve(
 
 async fn resolve_servicenow(endpoint: &Endpoint, episode_id: &str) -> Result<String> {
     let base = endpoint.url.trim_end_matches('/');
+    // No dedup, so one episode leaves several records; closed ones reject a PATCH.
     let lookup = format!(
-        "{base}?sysparm_query=correlation_id={episode_id}&sysparm_fields=sys_id&sysparm_limit=1"
+        "{base}?sysparm_query=correlation_id={episode_id}^state!={STATE_RESOLVED}^state!={STATE_CLOSED}\
+         &sysparm_fields=sys_id&sysparm_limit={LOOKUP_LIMIT}"
     );
     let found = request(endpoint, reqwest::Method::GET, &lookup, None).await?;
-    let sys_id = serde_json::from_str::<Value>(&found)
+    let sys_ids: Vec<String> = serde_json::from_str::<Value>(&found)
         .ok()
-        .and_then(|v| v["result"][0]["sys_id"].as_str().map(str::to_string))
-        .ok_or_else(|| anyhow::anyhow!("no incident carries correlation_id {episode_id}"))?;
+        .and_then(|v| v["result"].as_array().cloned())
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|row| row["sys_id"].as_str().map(str::to_string))
+        .collect();
+    if sys_ids.is_empty() {
+        return Err(anyhow::anyhow!(
+            "no open incident carries correlation_id {episode_id}"
+        ));
+    }
 
     let close_code = endpoint
         .metadata
@@ -156,21 +154,38 @@ async fn resolve_servicenow(endpoint: &Endpoint, episode_id: &str) -> Result<Str
         .cloned()
         .unwrap_or_else(|| DEFAULT_CLOSE_CODE.to_string());
     let body = json!({
-        "state": "6",
+        "state": STATE_RESOLVED,
         "close_code": close_code,
         "close_notes": "Recovered automatically by OpenObserve",
-    });
-    request(
-        endpoint,
-        reqwest::Method::PATCH,
-        &format!("{base}/{sys_id}"),
-        Some(body.to_string()),
-    )
-    .await
+    })
+    .to_string();
+
+    // Runs to the end: one failure must not strand the records after it.
+    let (mut closed, mut failures) = (0usize, String::new());
+    for sys_id in &sys_ids {
+        match request(
+            endpoint,
+            reqwest::Method::PATCH,
+            &format!("{base}/{sys_id}"),
+            Some(body.clone()),
+        )
+        .await
+        {
+            Ok(_) => closed += 1,
+            Err(e) => failures = format!("{failures} {sys_id}: {e};"),
+        }
+    }
+    if failures.is_empty() {
+        Ok(format!("closed {closed} incident(s)"))
+    } else {
+        Err(anyhow::anyhow!(
+            "closed {closed} of {}, failed:{failures}",
+            sys_ids.len()
+        ))
+    }
 }
 
-/// The destination's own auth and TLS settings, against a URL this module built
-/// rather than one the operator typed — so the guard runs on the joined result.
+/// Guards the URL this module built rather than the one the operator typed.
 async fn request(
     endpoint: &Endpoint,
     method: reqwest::Method,

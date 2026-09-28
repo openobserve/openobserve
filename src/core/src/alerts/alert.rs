@@ -305,6 +305,16 @@ pub enum AlertError {
     NegativePendingPeriod,
     #[error("Alert keep_firing_for must be between 0 and {KEEP_FIRING_FOR_MAX_SECS} seconds")]
     KeepFiringForOutOfRange,
+    #[error("Realtime alerts cannot notify on recovery or keep firing")]
+    RecoveryOnRealtimeAlert,
+    #[error(
+        "Multi-alerts keep per-group state and open no recovery episode, so notify_on_recovery would never fire"
+    )]
+    RecoveryOnMultiAlert,
+    #[error(
+        "notification grouping batches several alerts into one message, which cannot carry this alert's correlation key — turn off one of grouping or notify_on_recovery"
+    )]
+    RecoveryWithNotificationGrouping,
     #[error(
         "destination '{destination}' is {platform}, which is resolved by updating the alert the firing opened. That needs the firing payload to be a JSON object, and template '{template}' does not render one"
     )]
@@ -387,19 +397,54 @@ pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder,
 // Sync (unlike its async AlertError-returning neighbours, whose futures hide
 // the size from this lint); boxing the error is not worth the churn here.
 #[allow(clippy::result_large_err)]
-/// Refuse a recovery that could not be delivered as one.
-///
-/// Only platform destinations are checked. PagerDuty, Opsgenie and ServiceNow
-/// are resolved by updating the record the firing opened, which means the
-/// firing payload has to be a JSON object with room for the correlation key.
-/// Everything else — chat, email, generic webhooks — gets an ordinary rendered
-/// message and cannot fail this way.
-///
-/// Refused at save rather than stored, for the same reason a malformed runbook
-/// link is: the moment it is read is the one moment nobody can debug it.
+fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
+    config::meta::alerts::grouping::validate_multi_alert(
+        &alert.query_condition,
+        &alert.trigger_condition,
+        alert.creates_incident,
+    )
+    .map_err(AlertError::InvalidMultiAlert)?;
+
+    // Checked here, not in `validate_multi_alert`, because the grouping
+    // config is a sibling of the query condition rather than part of it.
+    // Same shape as MN-11's incidents rule.
+    let notification_grouping = alert
+        .deduplication
+        .as_ref()
+        .and_then(|d| d.grouping.as_ref())
+        .is_some_and(|g| g.enabled);
+    if alert.query_condition.multi_alert_enabled() && notification_grouping {
+        return Err(AlertError::InvalidMultiAlert(
+            config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported,
+        ));
+    }
+    Ok(())
+}
+
+/// Structural half only: `{var}` tokens are unresolved until send time, so a body shaped right but
+/// malformed still fails at send. A CONTENT template always renders an object.
+fn platform_body_is_addressable(kind: TemplateKind, body: &str) -> bool {
+    kind != TemplateKind::Custom || body.trim_start().starts_with('{')
+}
+
+/// Refuse a recovery that could not be delivered as one, at save rather than at 3am.
 async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), AlertError> {
     if !alert.notify_on_recovery {
         return Ok(());
+    }
+
+    // Both keep the alert out of the single-row path that owns the episode, so recovery would be
+    // stored and then silently never sent.
+    if alert.query_condition.multi_alert_enabled() {
+        return Err(AlertError::RecoveryOnMultiAlert);
+    }
+    if alert
+        .deduplication
+        .as_ref()
+        .and_then(|d| d.grouping.as_ref())
+        .is_some_and(|g| g.enabled)
+    {
+        return Err(AlertError::RecoveryWithNotificationGrouping);
     }
 
     let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
@@ -441,42 +486,13 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
         else {
             continue;
         };
-        // A CONTENT template always renders a JSON object; only a raw body can
-        // be something else. It cannot be parsed here — the `{var}` tokens are
-        // unresolved until send time — so this is the structural half of the
-        // question, which is the half that catches a plain-text or array body.
-        // A body that is shaped right but malformed still fails loudly at send.
-        if template.kind == TemplateKind::Custom && !template.body.trim_start().starts_with('{') {
+        if !platform_body_is_addressable(template.kind, &template.body) {
             return Err(AlertError::RecoveryNeedsJsonPayload {
                 destination: dest_name.clone(),
                 platform: format!("{platform:?}"),
                 template: template.name.clone(),
             });
         }
-    }
-    Ok(())
-}
-
-fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
-    config::meta::alerts::grouping::validate_multi_alert(
-        &alert.query_condition,
-        &alert.trigger_condition,
-        alert.creates_incident,
-    )
-    .map_err(AlertError::InvalidMultiAlert)?;
-
-    // Checked here, not in `validate_multi_alert`, because the grouping
-    // config is a sibling of the query condition rather than part of it.
-    // Same shape as MN-11's incidents rule.
-    let notification_grouping = alert
-        .deduplication
-        .as_ref()
-        .and_then(|d| d.grouping.as_ref())
-        .is_some_and(|g| g.enabled);
-    if alert.query_condition.multi_alert_enabled() && notification_grouping {
-        return Err(AlertError::InvalidMultiAlert(
-            config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported,
-        ));
     }
     Ok(())
 }
@@ -775,6 +791,13 @@ async fn prepare_alert(
     // cannot recover, cannot close its on-call record, and so cannot page again.
     if !(0..=KEEP_FIRING_FOR_MAX_SECS).contains(&alert.keep_firing_for) {
         return Err(AlertError::KeepFiringForOutOfRange);
+    }
+
+    // A realtime alert persists no state (D12), so it never opens an episode and
+    // neither field can ever act — stored, they would only promise a recovery
+    // that cannot arrive.
+    if alert.is_real_time && (alert.notify_on_recovery || alert.keep_firing_for != 0) {
+        return Err(AlertError::RecoveryOnRealtimeAlert);
     }
 
     // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
@@ -2765,16 +2788,8 @@ async fn build_send_context(
     .await
 }
 
-/// Send the resolve half of a firing, to the destinations its trigger went to.
-///
-/// Destinations are not re-chosen: a resolve that lands somewhere the trigger
-/// did not is the mis-pairing PagerDuty drops and a Slack channel reads as an
-/// outage nobody reported. `skip_destinations` is therefore absent by design —
-/// the firing's ledger is about retries within one attempt, not about which
-/// destinations own this episode.
-///
-/// There are no rows: the query that would produce them no longer matches.
-/// `{alert_count}` renders 0 and `{rows}` renders empty, which is the truth.
+/// Sends to the alert's CURRENT destinations, so an edit while firing retargets the resolve;
+/// `skip_destinations` is absent because the firing's ledger is per-attempt, not per-episode.
 pub async fn send_recovery_notification(
     alert: &Alert,
     event: &config::meta::alerts::recovery::RecoveryEvent,
@@ -2794,6 +2809,11 @@ pub async fn send_recovery_notification(
     )
     .await;
 
+    let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
+        Some(name) => db::alerts::templates::get(&alert.org_id, name).await.ok(),
+        None => None,
+    };
+
     let mut failures = String::new();
     for dest_name in alert.destinations.iter() {
         let (destination_type, dest_template) =
@@ -2809,48 +2829,45 @@ pub async fn send_recovery_notification(
                     continue;
                 }
             };
-        // A platform resolve is protocol, not a message: it carries no
-        // author-written content, so the template is not rendered at all and
-        // whatever shape it has cannot break the resolve.
+        // A platform resolve is protocol, not a message, so the template is never rendered for it.
         if let (Some(platform), DestinationType::Http(endpoint)) =
             (platform_of(&destination_type), &destination_type)
         {
             match platform::send_resolve(platform, endpoint, &event.episode_id).await {
-                Ok(resp) => log::info!(
-                    "[RECOVERY] {}/{} episode {} destination {dest_name} closed on {platform:?} {resp}",
-                    alert.org_id,
-                    alert.name,
-                    event.episode_id
-                ),
+                Ok(resp) => {
+                    log::info!(
+                        "[RECOVERY] {}/{} episode {} destination {dest_name} closed on {platform:?}",
+                        alert.org_id,
+                        alert.name,
+                        event.episode_id
+                    );
+                    // Body only at debug: a ServiceNow close returns the whole incident record,
+                    // caller and assignee included.
+                    log::debug!("[RECOVERY] destination {dest_name} responded: {resp}");
+                }
                 Err(e) => failures = format!("{failures} destination {dest_name}: {e};"),
             }
             continue;
         }
 
-        let explicit = choose_template(
-            match alert.template.as_ref() {
-                Some(name) => db::alerts::templates::get(&alert.org_id, name).await.ok(),
-                None => None,
-            }
-            .as_ref(),
-            dest_template.as_ref(),
-        )
-        .cloned();
+        let explicit = choose_template(alert_template.as_ref(), dest_template.as_ref()).cloned();
         let effective = crate::alerts::notifications::org_default::resolve_effective_template(
             &alert.org_id,
             explicit,
         )
         .await;
-        // Logged, not discarded: the firing half records its per-destination
-        // status on the trigger row, and a resolve nobody can see landing is
-        // the hard one to debug — PagerDuty answers 202 even when it drops one.
+        // Logged because a resolve nobody sees land is the hard one to debug — a vendor can answer
+        // 202 to one it drops. Body at debug only: it can carry recipient data.
         match send_to_destination(alert, &destination_type, effective.template(), &mut ctx).await {
-            Ok(resp) => log::info!(
-                "[RECOVERY] {}/{} episode {} destination {dest_name} {resp}",
-                alert.org_id,
-                alert.name,
-                event.episode_id
-            ),
+            Ok(resp) => {
+                log::info!(
+                    "[RECOVERY] {}/{} episode {} destination {dest_name} sent",
+                    alert.org_id,
+                    alert.name,
+                    event.episode_id
+                );
+                log::debug!("[RECOVERY] destination {dest_name} responded: {resp}");
+            }
             Err(e) => failures = format!("{failures} destination {dest_name}: {e};"),
         }
     }
@@ -4605,62 +4622,49 @@ mod send_path_tests {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::DataType;
+    use serde_json::json;
 
-    /// A platform is resolved by updating the record its firing opened, so the
-    /// firing payload has to have somewhere to carry the correlation key.
-    ///
-    /// This is the only shape a platform destination can refuse. What the body
-    /// *says* no longer matters — the resolve is protocol we send ourselves and
-    /// never renders the template at all.
+    use super::*;
+
+    /// Calls the production predicate, not a copy of it: a resolve updates the record the firing
+    /// opened, so the firing body must have somewhere to carry the correlation key.
     #[test]
     fn a_platform_firing_payload_must_be_a_json_object() {
-        let accepted = [
+        for body in [
             r#"{"payload": {"summary": "{alert_name}"}}"#,
             "\n  {\"message\": \"{alert_name}\"}",
             // No `{alert_status}` anywhere, and still fine: the resolve does
             // not come from this body.
             r#"{"short_description": "{alert_name}"}"#,
-        ];
-        for body in accepted {
+        ] {
             assert!(
-                body.trim_start().starts_with('{'),
+                platform_body_is_addressable(TemplateKind::Custom, body),
                 "{body} is a JSON object and must be accepted"
             );
         }
 
         for body in ["Alert: {alert_name}", r#"[{"message": "x"}]"#] {
             assert!(
-                !body.trim_start().starts_with('{'),
+                !platform_body_is_addressable(TemplateKind::Custom, body),
                 "{body} has nowhere to put a correlation key"
             );
         }
+
+        // A content template is rendered into an object by the renderer, so its own body shape is
+        // never the question.
+        assert!(platform_body_is_addressable(
+            TemplateKind::Content,
+            "Alert: {alert_name}"
+        ));
     }
 
-    /// The ceiling exists for a units mistake, not a policy one.
-    ///
-    /// `keep_firing_for` is seconds. Typing 300000 for "5 minutes in
-    /// milliseconds" is three and a half days during which the alert cannot
-    /// recover, its on-call record cannot close, and so it cannot page again.
+    /// `keep_firing_for` is seconds, so 300000 typed for "5 minutes in milliseconds" would be three
+    /// and a half days an alert cannot recover, close its on-call record, or page again.
     #[test]
     fn keep_firing_for_is_capped_at_a_day() {
         assert_eq!(KEEP_FIRING_FOR_MAX_SECS, 86_400);
-        for ok in [0, 1, 300, KEEP_FIRING_FOR_MAX_SECS] {
-            assert!(
-                (0..=KEEP_FIRING_FOR_MAX_SECS).contains(&ok),
-                "{ok} is a real hold"
-            );
-        }
-        for rejected in [-1, KEEP_FIRING_FOR_MAX_SECS + 1, 300_000] {
-            assert!(
-                !(0..=KEEP_FIRING_FOR_MAX_SECS).contains(&rejected),
-                "{rejected} must be refused at save rather than stored"
-            );
-        }
     }
-    use arrow_schema::DataType;
-    use serde_json::json;
-
-    use super::*;
 
     /// Live proof of the Slack image fallback: posts a payload whose image
     /// URL Slack's proxy cannot fetch (private IP), expects Slack's

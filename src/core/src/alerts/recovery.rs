@@ -13,18 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Hand one recovery to everything that cared about the firing.
-//!
-//! Four subsystems used to decide independently that an alert had got better,
-//! from four different inputs, at four different times. They are consumers now:
-//! the evaluation that observed the recovery is its only author, and this is
-//! the only place that fans it out.
-//!
-//! Best effort, in a fixed order, each consumer logging its own failure. A
-//! consumer that cannot be told must not stop the others, and none of them may
-//! fail the evaluation — the episode is already closed in the database by the
-//! time this runs, so what a failure costs is one outbound message, not the
-//! record that it happened.
+//! Four subsystems used to decide independently that an alert had got better; they are consumers
+//! now. Best effort in a fixed order: the episode is already committed, so a failure costs one
+//! outbound message, not the record that it happened.
 
 use config::meta::alerts::{alert::Alert, recovery::RecoveryEvent};
 

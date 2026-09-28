@@ -92,6 +92,9 @@ impl From<AlertError> for Response {
             | AlertError::PendingPeriodOnRealtimeAlert
             | AlertError::NegativePendingPeriod
             | AlertError::KeepFiringForOutOfRange
+            | AlertError::RecoveryOnRealtimeAlert
+            | AlertError::RecoveryOnMultiAlert
+            | AlertError::RecoveryWithNotificationGrouping
             | AlertError::RecoveryNeedsJsonPayload { .. }
             | AlertError::RecoveryNeedsRoutingKey { .. }
             | AlertError::MultiAlertGroupingError(_) => MetaHttpResponse::bad_request(value),

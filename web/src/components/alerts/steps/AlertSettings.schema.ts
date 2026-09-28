@@ -102,8 +102,7 @@ export const alertSettingsCreatesIncidentSchema = z.boolean().optional();
 
 export const alertSettingsNotifyOnRecoverySchema = z.boolean().optional();
 
-// Seconds the condition must stay clear before recovering. Same shape as the
-// silence field: a non-negative integer, 0 meaning "recover immediately".
+// Seconds the condition must stay clear before recovering; 0 recovers immediately.
 export const makeKeepFiringForSchema = (t: Translator) =>
   z.coerce
     .number({ message: t("alerts.alertSettings.keepFiringForInvalid") })

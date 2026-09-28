@@ -68,21 +68,18 @@ pub fn render_pagerduty(c: &RenderedContent, ctx: &NotificationContext) -> Value
         })
         .collect();
 
-    // Sent without a `dedup_key` a resolve is dropped, and still answers 202.
-    let mut event = if ctx.alert_status == super::super::STATUS_RESOLVED {
-        json!({ "event_action": "resolve" })
-    } else {
-        json!({
-            "event_action": "trigger",
-            "payload": {
-                "summary": super::clamp(&c.title, SUMMARY_MAX),
-                "source": ctx.stream_name,
-                "severity": pagerduty_severity(c.severity),
-                "custom_details": custom_details,
-            },
-            "links": links,
-        })
-    };
+    // Only ever a trigger: `platform::send_resolve` writes the resolve without a template.
+    let mut event = json!({
+        "event_action": "trigger",
+        "payload": {
+            "summary": super::clamp(&c.title, SUMMARY_MAX),
+            "source": ctx.stream_name,
+            "severity": pagerduty_severity(c.severity),
+            "custom_details": custom_details,
+        },
+        "links": links,
+    });
+    // Without it the resolve has nothing to match, and PagerDuty answers 202 to a resolve it drops.
     if let Some(episode_id) = &ctx.episode_id {
         event["dedup_key"] = json!(episode_id);
     }

@@ -305,61 +305,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFormSwitch name="creates_incident" data-test="alert-creates-incident-toggle" />
         </div>
 
-        <!-- Recovery: one message when the alert stops firing, to the same
-             destinations the firing went to. Off by default. -->
-        <div class="mb-4! flex items-start max-md:gap-3">
-          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-            {{ t("alerts.alertSettings.notifyOnRecovery") }}
-            <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-            <OTooltip :content="t('alerts.alertSettings.notifyOnRecoveryTooltip')" side="right" />
+        <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
+        <template v-if="isRealTime === 'false'">
+          <!-- The recovery goes to the firing's destinations, not a list of its own. -->
+          <div class="mb-4! flex items-start max-md:gap-3">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.alertSettings.notifyOnRecovery") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.alertSettings.notifyOnRecoveryTooltip')" side="right" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <OFormSwitch name="notify_on_recovery" data-test="alert-notify-on-recovery-toggle" />
+              <template v-if="formData?.notify_on_recovery">
+                <div
+                  v-for="row in recoveryPlan"
+                  :key="row.name"
+                  class="text-text-secondary text-xs"
+                  :data-test="`alert-notify-on-recovery-plan-${row.name}`"
+                >
+                  {{ row.name }} — {{ row.action }}
+                </div>
+                <div
+                  v-if="hasChatRecovery"
+                  class="text-text-secondary text-xs"
+                  data-test="alert-notify-on-recovery-hint"
+                >
+                  {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
+                </div>
+              </template>
+            </div>
           </div>
-          <div class="flex flex-col gap-1">
-            <OFormSwitch name="notify_on_recovery" data-test="alert-notify-on-recovery-toggle" />
-            <template v-if="formData?.notify_on_recovery">
-              <div
-                v-for="row in recoveryPlan"
-                :key="row.name"
-                class="text-text-secondary text-xs"
-                :data-test="`alert-notify-on-recovery-plan-${row.name}`"
-              >
-                {{ row.name }} — {{ row.action }}
-              </div>
-              <div
-                v-if="hasChatRecovery"
-                class="text-text-secondary text-xs"
-                data-test="alert-notify-on-recovery-hint"
-              >
-                {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
-              </div>
-            </template>
-          </div>
-        </div>
 
-        <!-- Always shown: the hold delays on-call and incident closure too, not
-             only the message `notify_on_recovery` gates. -->
-        <div class="mb-4! flex items-start max-md:flex-col max-md:gap-1">
-          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-            {{ t("alerts.alertSettings.keepFiringFor") }}
-            <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-            <OTooltip :content="t('alerts.alertSettings.keepFiringForTooltip')" side="right" />
-          </div>
-          <div class="flex items-center">
-            <div class="w-21.75">
-              <OFormInput
-                name="keep_firing_for"
-                type="number"
-                min="0"
-                :debounce="300"
-                data-test="alert-settings-keep-firing-for-input"
-              />
+          <!-- The hold delays on-call and incident closure too, not only the message. -->
+          <div class="mb-4! flex items-start max-md:flex-col max-md:gap-1">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.alertSettings.keepFiringFor") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.alertSettings.keepFiringForTooltip')" side="right" />
             </div>
-            <div
-              class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
-            >
-              {{ t("alerts.seconds") }}
+            <div class="flex items-center">
+              <div class="w-21.75">
+                <OFormInput
+                  name="keep_firing_for"
+                  type="number"
+                  min="0"
+                  :debounce="300"
+                  data-test="alert-settings-keep-firing-for-input"
+                />
+              </div>
+              <div
+                class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+              >
+                {{ t("alerts.seconds") }}
+              </div>
             </div>
           </div>
-        </div>
+        </template>
       </div>
     </div>
   </div>

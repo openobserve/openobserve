@@ -13,21 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The firing episode, and the one recovery it can produce.
-//!
-//! An alert getting better is a state transition, not a level. Asking "is it Ok
-//! right now?" answers yes on every evaluation after the first, which is how
-//! on-call came to write 11,616 recovery entries for one firing. The episode is
-//! the anchor that turns the question into "did it just become Ok?": it opens
-//! on the first notification that was actually delivered and is cleared by the
-//! same write that emits the recovery, so a second emit has nothing left to
-//! reference. Exactly-once is then structural rather than guarded.
-//!
-//! Opening on the first *delivered* notification rather than the first firing
-//! is what answers the suppressed cases without a check in every consumer: a
-//! firing held back by the silence window, by `notify_on_warning`, or by the
-//! pending period never paged anybody, so there is nothing to recover from and
-//! no episode exists to say otherwise.
+//! Recovery is a transition, not a level — "is it Ok now?" answers yes forever, which is how
+//! on-call wrote 11,616 entries for one firing. The episode anchors it: opened by the first
+//! DELIVERED notification, cleared by the write that emits the recovery, so exactly-once is
+//! structural and a suppressed firing needs no check in any consumer.
 
 use serde::{Deserialize, Serialize};
 
@@ -37,12 +26,8 @@ use crate::meta::alerts::level::AlertLevel;
 /// Microseconds in a second, for `keep_firing_for`.
 const MICROS_PER_SECOND: i64 = 1_000_000;
 
-/// A recovery, emitted once per episode by the evaluation that observed it.
-///
-/// Carries what its consumers need after the state row has already forgotten
-/// it: `episode_id` is the PagerDuty `dedup_key` that pairs the resolve with
-/// its trigger, and `incident_id` says who owned firing delivery so the resolve
-/// goes back to whoever sent it.
+/// Carries what consumers need after the state row has forgotten it: the correlation key, and who
+/// owned firing delivery.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RecoveryEvent {
     pub org_id: String,
@@ -95,11 +80,7 @@ impl EpisodeInput {
     }
 }
 
-/// The episode a recovery closed, for the caller to turn into a [`RecoveryEvent`].
-///
-/// Separate from the event because the state row does not know its own
-/// `org_id`, and because closing an episode is a decision the caller may make
-/// without an org in hand (the reaper).
+/// Separate from [`RecoveryEvent`] because the state row does not know its own `org_id`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClosedEpisode {
     pub episode_id: String,
@@ -108,16 +89,8 @@ pub struct ClosedEpisode {
     pub recovered_at: i64,
 }
 
-/// Advance the episode axis of `state`, and say whether that closed one.
-///
-/// Runs after [`super::state::apply_outcome`] has folded in the outcome and
-/// level axes, so `state` already carries this evaluation's verdict. Pure: the
-/// id is minted by `new_episode_id`, which is only called when an episode
-/// actually opens.
-///
-/// `firing` is the *recorded* level's verdict, not the raw match: a frozen
-/// evaluation carries the previous level forward and so stays firing, which is
-/// what stops a search outage from reading as a recovery.
+/// `firing` is the RECORDED level's verdict, not the raw match, so a frozen evaluation stays firing
+/// and a search outage cannot read as a recovery.
 pub fn apply_episode(
     state: &mut AlertState,
     firing: bool,

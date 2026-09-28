@@ -64,17 +64,7 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
-/// Fold this evaluation's outcome into the alert's durable state (Part IV of
-/// `alerts.md`).
-///
-/// Best-effort by design: state persistence must never fail an evaluation that
-/// has already run and notified. Failures are logged, not propagated.
-/// Returns `false` when a write was attempted and failed. Best-effort for the
-/// single-row path (a state write must never fail an evaluation that already
-/// notified), but the per-group caller MUST check it: dispatching against
-/// stale state would send a group's page under the previous episode, and its
-/// delivery callback would then be rejected as stale — a page with no record
-/// that it happened.
+/// Returns `false` on a failed write; the per-group caller MUST check it or it dispatches stale.
 #[must_use]
 async fn persist_alert_run_state(
     alert: &config::meta::alerts::alert::Alert,
@@ -175,9 +165,7 @@ async fn persist_alert_run_state(
         now,
     );
 
-    // Applied after the outcome and level axes, and emitted only once `persist`
-    // has committed: an event that outlived a rolled-back write would tell four
-    // consumers about a recovery the database does not record.
+    // Emitted only once `persist` committed, or consumers hear of an unrecorded recovery.
     let recovered = update.state.as_mut().and_then(|state| {
         let firing = state.level.is_some_and(|l| l.is_firing());
         config::meta::alerts::recovery::apply_episode(state, firing, episode, now, || {
@@ -2323,15 +2311,9 @@ async fn handle_alert_triggers(
         matched_level,
     );
 
-    // Grouped alerts keep the pre-episode recovery path, because they have no
-    // episode: a group's delivery is recorded after the send, not by this
-    // evaluation, so nothing here can open one. Dropping this call for them
-    // would leave the on-call record open for ever — and an open record is what
-    // stops the alert paging again, so the alert would page once and then never
-    // again. Noisy until the idempotency guard lands; a paging outage without.
+    // Every clear run: on-call pages BEFORE the send, so an undelivered page leaves it open.
     #[cfg(feature = "enterprise")]
-    if alert.query_condition.multi_alert_enabled()
-        && matched_level.is_none()
+    if matched_level.is_none()
         && o2_enterprise::enterprise::oncall::is_enabled()
         && let Some(alert_id) = alert.id.as_ref()
         && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
@@ -2512,16 +2494,12 @@ async fn handle_alert_triggers(
     let condition_matched = trigger_results.data.is_some();
     let payload_empty = trigger_results.data.as_ref().is_none_or(|d| d.is_empty());
 
-    // The firing episode opens on a notification that actually landed, so these
-    // record what this evaluation delivered rather than what it decided to.
+    // What this evaluation DELIVERED, not what it decided to: the episode opens on a landed send.
     let mut episode_delivered = false;
     // Only the enterprise correlation block assigns this.
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
     let mut episode_incident_id: Option<String> = None;
-    // Read-or-mint BEFORE the send: a resolve only matches a key PagerDuty saw
-    // on the trigger, and the episode is not stored until this evaluation ends.
-    // A minted key the send never uses is simply discarded — nothing records it
-    // unless `episode_delivered` says a notification landed.
+    // Read-or-mint BEFORE the send: a resolve only matches a key the vendor saw on the trigger.
     let episode_key: Option<String> = if alert.notify_on_recovery
         && delivery.should_deliver()
         && let Some(alert_id) = alert.id.as_ref()
@@ -2806,7 +2784,6 @@ async fn handle_alert_triggers(
                 // Alert added to batch, don't send individual notification.
                 if grouped_delivery_ok {
                     record_delivery(&mut trigger_data);
-                    episode_delivered = true;
                 }
                 trigger_data.period_end_time = if should_store_last_end_time {
                     Some(trigger_results.end_time)
@@ -2815,8 +2792,7 @@ async fn handle_alert_triggers(
                 };
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                // The alert fired; grouping only batches the delivery. State
-                // must reflect the firing (Part IV write-coverage).
+                // No episode: a batch holds several alerts, so no per-alert key can ride it.
                 if let Some(alert_id) = alert.id.as_ref() {
                     let _ = persist_alert_run_state(
                         &alert,
@@ -2824,12 +2800,9 @@ async fn handle_alert_triggers(
                         &trigger_data_stream.status,
                         eval_level,
                         trigger_results.group_classification.as_ref(),
-                        &config::meta::alerts::recovery::EpisodeInput {
-                            delivered: episode_delivered,
-                            incident_id: None,
-                            keep_firing_for_secs: alert.keep_firing_for,
-                            episode_id: episode_key.clone(),
-                        },
+                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                            alert.keep_firing_for,
+                        ),
                     )
                     .await;
                 }

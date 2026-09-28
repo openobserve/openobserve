@@ -1524,26 +1524,6 @@ mod tests {
         w("sns.txt", &(sns_message + "\n"));
     }
 
-    /// The resolve half is the dedup key and nothing else: PagerDuty matches it
-    /// against the open alert and drops any resolve it cannot key — with a
-    /// `202 success`, so a missing key fails silently.
-    #[test]
-    fn a_pagerduty_resolve_carries_the_key_and_no_payload() {
-        let mut ctx = fixture_ctx();
-        ctx.alert_status = super::super::STATUS_RESOLVED.to_string();
-        ctx.episode_id = Some("ep_1".into());
-
-        let RenderedMessage::Http { body } =
-            render(ChannelFormat::PagerDuty, &hostile_content(), &ctx).unwrap()
-        else {
-            panic!("PagerDuty renders an HTTP body");
-        };
-        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
-        assert_eq!(v["event_action"], "resolve");
-        assert_eq!(v["dedup_key"], "ep_1");
-        assert!(v.get("payload").is_none(), "a resolve carries no payload");
-    }
-
     /// The trigger must carry the SAME key, or there is nothing for the resolve
     /// to match. Without one PagerDuty invents a UUID per event, which is why
     /// every re-firing opens a fresh incident today.
