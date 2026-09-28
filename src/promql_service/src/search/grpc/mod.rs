@@ -63,22 +63,18 @@ struct StorageProvider {
     need_wal: bool,
 }
 
-impl StorageProvider {
-    async fn create_context_inner(
+#[async_trait]
+impl TableProvider for StorageProvider {
+    async fn create_context(
         &self,
-        request: ProviderContextRequest<'_>,
+        org_id: &str,
+        stream_name: &str,
+        time_range: (i64, i64),
+        matchers: Matchers,
+        label_selector: HashSet<String>,
+        filters: &mut [(String, Vec<String>)],
     ) -> datafusion::error::Result<Vec<Context>> {
-        let ProviderContextRequest {
-            org_id,
-            stream_name,
-            time_range,
-            matchers,
-            label_selector,
-            filters,
-            prefer_blocks,
-        } = request;
         let mut ctxs = Vec::new();
-        // register storage table
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
         let ctx = storage::create_context(
             &trace_id,
@@ -88,7 +84,7 @@ impl StorageProvider {
             matchers.clone(),
             filters,
             storage::BlockPreference {
-                enabled: prefer_blocks,
+                enabled: false,
                 output_labels: &label_selector,
             },
         )
@@ -96,8 +92,6 @@ impl StorageProvider {
         if let Some(ctx) = ctx {
             ctxs.push(ctx);
         }
-
-        // register Wal table
         if self.need_wal {
             let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
             let wal_ctx_list = wal::create_context(
@@ -115,40 +109,6 @@ impl StorageProvider {
         }
         Ok(ctxs)
     }
-}
-
-struct ProviderContextRequest<'a> {
-    org_id: &'a str,
-    stream_name: &'a str,
-    time_range: (i64, i64),
-    matchers: Matchers,
-    label_selector: HashSet<String>,
-    filters: &'a mut [(String, Vec<String>)],
-    prefer_blocks: bool,
-}
-
-#[async_trait]
-impl TableProvider for StorageProvider {
-    async fn create_context(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        time_range: (i64, i64),
-        matchers: Matchers,
-        label_selector: HashSet<String>,
-        filters: &mut [(String, Vec<String>)],
-    ) -> datafusion::error::Result<Vec<Context>> {
-        self.create_context_inner(ProviderContextRequest {
-            org_id,
-            stream_name,
-            time_range,
-            matchers,
-            label_selector,
-            filters,
-            prefer_blocks: false,
-        })
-        .await
-    }
 
     async fn create_context_prefer_blocks(
         &self,
@@ -159,16 +119,40 @@ impl TableProvider for StorageProvider {
         label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
     ) -> datafusion::error::Result<Vec<Context>> {
-        self.create_context_inner(ProviderContextRequest {
+        let mut ctxs = Vec::new();
+        let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
+        let ctx = storage::create_context(
+            &trace_id,
             org_id,
             stream_name,
             time_range,
-            matchers,
-            label_selector,
+            matchers.clone(),
             filters,
-            prefer_blocks: true,
-        })
-        .await
+            storage::BlockPreference {
+                enabled: true,
+                output_labels: &label_selector,
+            },
+        )
+        .await?;
+        if let Some(ctx) = ctx {
+            ctxs.push(ctx);
+        }
+        if self.need_wal {
+            let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
+            let wal_ctx_list = wal::create_context(
+                &trace_id,
+                org_id,
+                stream_name,
+                time_range,
+                matchers,
+                label_selector,
+            )
+            .await?;
+            for ctx in wal_ctx_list {
+                ctxs.push(ctx);
+            }
+        }
+        Ok(ctxs)
     }
 
     #[cfg(feature = "enterprise")]
