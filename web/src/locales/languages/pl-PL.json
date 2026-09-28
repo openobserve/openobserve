@@ -17085,17 +17085,17 @@
       "alertMe": "Powiadom mnie",
       "columnHints": {
         "qps": "Wywołania na sekundę — wywołania w tym oknie podzielone przez jego długość, dzięki czemu widok 15-minutowy i 4-godzinny pozostają porównywalne.",
-        "p50": "Połowa wszystkich wywołań zakończyła się szybciej niż to. Liczą się tylko zakończone wywołania — zapytanie wciąż działające lub to, które nigdy nie wróciło, nie jest tutaj mierzone.",
-        "p95": "Wolny ogon — 1 na 20 wywołań trwało co najmniej tyle. Liczą się tylko zakończone wywołania — zapytanie wciąż działające lub to, które nigdy nie wróciło, nie jest tutaj mierzone.",
-        "p99": "Najgorszy 1% wywołań trwał co najmniej tyle. Liczą się tylko zakończone wywołania — zapytanie wciąż działające lub to, które nigdy nie wróciło, nie jest tutaj mierzone.",
-        "load": "Całkowity czas, jaki Twoje aplikacje spędziły na czekaniu na tę bazę danych. Mierzone po stronie klienta, więc odzwierciedla, jak dużo ruchu obsłużyła ta baza danych — nie jak bardzo obciążony jest serwer.",
+        "p50": "Połowa wszystkich wywołań zakończyła się szybciej niż ten czas. Mierzone na podstawie zakończonych wywołań w trace'ach Twojej aplikacji.",
+        "p95": "Wolny ogon — 1 wywołanie na 20 trwało co najmniej tyle. Mierzone na podstawie zakończonych wywołań w trace'ach Twojej aplikacji.",
+        "p99": "Najgorszy 1% wywołań trwał co najmniej tyle. Mierzone na podstawie zakończonych wywołań w trace'ach Twojej aplikacji.",
+        "load": "Łączny czas, jaki Twoje aplikacje spędziły na wywołaniach do tej bazy danych, mierzony na podstawie trace'ów Twojej aplikacji. Pokazuje, jak duży ruch ta baza danych obsłużyła na rzecz Twoich aplikacji.",
         "attention": "Jak blisko limitu opublikowanego przez własny silnik jest ta instancja — obecnie połączenia względem max_connections. Najgorszy taki wskaźnik, a nie wynik mieszany. Sortowane od najwyższego, z instancjami, których kondycji nie można odczytać, na górze, ponieważ tej, której nie widzisz, nie możesz uznać za zdrową. Mierzone na serwerze bazy danych, więc nie jest porównywalne z czasem bazy danych obok."
       },
       "failedChip": "{count} nieudanych",
       "columnSubLabels": {
-        "attention": "serwer",
-        "load": "klient",
-        "calls": "klient"
+        "attention": "z bazy danych",
+        "load": "z Twoich aplikacji",
+        "calls": "z Twoich aplikacji"
       },
       "attention": {
         "connections": "połączenia",
@@ -17157,14 +17157,14 @@
         "failed": "Nieudane"
       },
       "columnHints": {
-        "calls": "Ile razy to zapytanie zostało wykonane. Własna liczba bazy danych, jeśli ją raportuje — obejmuje wszystkich klientów, nie tylko części systemu wysyłające ślady. Wiersze oznaczone jako obserwowane przez klienta są liczone na podstawie śladów, ponieważ baza danych ich nie raportowała.",
-        "p50": "Połowa wszystkich wywołań zakończyła się szybciej. Liczą się tylko ukończone wywołania — zapytanie wciąż działające lub takie, które nigdy nie wróciło, nie jest tutaj mierzone.",
-        "p95": "Wolny ogon — 1 wywołanie na 20 trwało co najmniej tak długo. Liczą się tylko ukończone wywołania — zapytanie wciąż działające lub takie, które nigdy nie wróciło, nie jest tutaj mierzone.",
-        "p99": "Najgorsze 1% wywołań trwało co najmniej tak długo. Liczą się tylko ukończone wywołania — zapytanie wciąż działające lub takie, które nigdy nie wróciło, nie jest tutaj mierzone.",
+        "calls": "Ile razy wykonano to zapytanie, według licznika Twojej bazy danych — uwzględniane są wszystkie aplikacje, które się łączą. Jeśli Twoja baza danych nie zlicza danego zapytania, ikona trace'ów oznacza wartość zmierzoną na podstawie trace'ów Twojej aplikacji.",
+        "p50": "Połowa wszystkich wywołań zakończyła się szybciej niż ten czas. Mierzone na podstawie zakończonych wywołań w trace'ach Twojej aplikacji.",
+        "p95": "Wolny ogon — 1 wywołanie na 20 trwało co najmniej tyle. Mierzone na podstawie zakończonych wywołań w trace'ach Twojej aplikacji.",
+        "p99": "Najgorszy 1% wywołań trwał co najmniej tyle. Mierzone na podstawie zakończonych wywołań w trace'ach Twojej aplikacji.",
         "max": "Najwolniejsze pojedyncze wywołanie w tym oknie — jedno prawdziwe wywołanie, a nie średnia.",
         "errors": "Ile z tych wywołań zakończyło się błędem.",
         "perTrace": "Ile razy to wykonuje się w ramach jednego żądania. Wysoka liczba zwykle oznacza pętlę.",
-        "load": "Całkowity czas, jaki to zapytanie spędziło w bazie danych. Własna wartość bazy danych, jeśli ją raportuje: czas wykonania w Postgres, ale czas oczekiwania w MySQL i MariaDB — każdy wiersz wskazuje, który. Wiersze oznaczone jako obserwowane przez klienta są mierzone na podstawie śladów, więc obejmują podróż w obie strony po sieci."
+        "load": "Łączny czas, jaki to zapytanie spędziło w bazie danych, zgodnie z tym, co raportuje Twoja baza danych: czas wykonania w Postgresie, czas oczekiwania w MySQL i MariaDB — każdy wiersz mówi, który to. Wiersze z ikoną trace'ów są mierzone na podstawie trace'ów Twojej aplikacji, więc obejmują także drogę do bazy danych i z powrotem."
       },
       "errorsNone": "brak",
       "errorsAll": "wszystkie",
@@ -17428,8 +17428,7 @@
       "overlap": {
         "serverExecution": "Czas, jaki {engine} spędził na jego wykonywaniu",
         "serverWait": "Czas, jaki {engine} spędził na czekaniu na nie — czas oczekiwania, nie czas wykonywania",
-        "serverCounted": "Zliczane przez {engine} dla wszystkich klientów",
-        "clientObserved": "Zaobserwowane przez wywołujących z instrumentacją — twoja baza danych tego nie zgłosiła."
+        "serverCounted": "Zliczane przez {engine} dla wszystkich klientów"
       },
       "endpointsConcentrated": "Jeden endpoint odpowiada za {percent} czasu tego zapytania. Napraw {endpoint}, a naprawisz to zapytanie.",
       "typicalMarker": "wolne wywołania {value}",
@@ -17456,8 +17455,8 @@
       },
       "serverMetrics": {
         "title": "Co zarejestrowała sama baza danych",
-        "subtitle": "Po stronie serwera — wszyscy klienci",
-        "clientSubtitle": "Zaobserwowane przez klienta — tylko instrumentowani wywołujący, tylko zakończone wywołania. Zapytanie wciąż działające lub takie, które zawisło, nie jest uwzględnione w tych liczbach.",
+        "subtitle": "Z Twojej bazy danych — każda aplikacja, która się łączy",
+        "clientSubtitle": "Oznaczone wartości są mierzone na podstawie trace'ów Twojej aplikacji — wywołania, które Twoje aplikacje zakończyły w tym oknie czasowym",
         "instance": "Zgłoszone przez {instance}",
         "instanceWide": "Wszystkie bazy danych na tej instancji",
         "calls": "Wykonania",
@@ -17503,9 +17502,13 @@
         "serverExecution": "czas wykonania",
         "serverWait": "czas oczekiwania",
         "serverCounted": "liczba serwerów",
-        "clientObserved": "zaobserwowane przez klienta",
         "serverReported": "raportowane przez Twoje bazy danych"
       }
+    },
+    "appSource": {
+      "marker": "Mierzone na podstawie trace'ów Twojej aplikacji",
+      "markerHint": "Mierzone na podstawie trace'ów Twojej aplikacji, co dodaje perspektywę Twoich aplikacji do tego, co raportuje Twoja baza danych.",
+      "legend": "Z trace'ów Twojej aplikacji"
     },
     "page": {
       "tabs": {
@@ -17514,7 +17517,7 @@
         "metricsHint": "Obciążenie bazy danych według zdarzeń oczekiwania oraz wszystkie metryki zbierane przez odbiorniki bazy danych.",
         "queries": "Najczęstsze zapytania",
         "samples": "Najwolniejsze wywołania",
-        "samplesHintClient": "Zakończone wywołania zaobserwowane przez Twoje instrumentowane usługi w tym oknie — wywołujący bez śledzenia nie są liczeni, więc to minimum, a nie suma. Tabela pokazuje najwolniejsze z nich.",
+        "samplesHintClient": "Wywołania zmierzone na podstawie trace'ów Twojej aplikacji w tym oknie czasowym, co dodaje perspektywę Twoich aplikacji do tego, co raportuje Twoja baza danych. Tabela pokazuje najwolniejsze z nich.",
         "samplesHintServer": "Instrukcje, które Twoje bazy danych zgłosiły jako zakończone w tym oknie, liczone wewnątrz bazy danych. Tabela pokazuje najwolniejsze z nich.",
         "samplesHintUnknown": "Najwolniejsze pojedyncze wywołania baz danych w tym oknie.",
         "deadlocks": "Zakleszczenia",
@@ -17670,7 +17673,7 @@
         "status": "Status"
       },
       "columnHints": {
-        "duration": "Ile trwało to jedno wywołanie, zmierzone przez wywołującego. Liczą się tylko zakończone wywołania — zapytanie wciąż działające lub takie, które nigdy nie wróciło, nie jest tu mierzone."
+        "duration": "Jak długo trwało to jedno wywołanie, mierzone przez Twoją aplikację od początku do końca."
       },
       "failed": "Nieudane",
       "failedWithCode": "Nieudane · {code}",

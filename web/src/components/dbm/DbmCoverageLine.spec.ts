@@ -222,4 +222,20 @@ describe("DbmCoverageLine", () => {
       expect(trailer(wrapper)).toContain("5 minutes behind");
     });
   });
+
+  describe("the legend slot", () => {
+    it("renders a legend on the line, beside the counted-up-to note", () => {
+      const wrapper = mount(DbmCoverageLine, {
+        props: { freshness: freshness(), hits: [{ total_time_ns: 1_000 }] },
+        slots: { legend: '<span data-test="probe-legend">key</span>' },
+        global: { plugins: [i18n] },
+      });
+      const line = wrapper.get("[data-test='dbm-coverage-line']");
+      expect(line.find("[data-test='probe-legend']").exists()).toBe(true);
+    });
+
+    it("renders nothing extra without one", () => {
+      expect(mountLine().find("[data-test='probe-legend']").exists()).toBe(false);
+    });
+  });
 });

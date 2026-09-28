@@ -454,6 +454,11 @@
   --color-syntax-addition-bg: var(--color-syntax-addition-bg);
   --color-syntax-deletion-fg: var(--color-syntax-deletion-fg);
   --color-syntax-deletion-bg: var(--color-syntax-deletion-bg);
+  --color-query-syntax-keyword: var(--color-query-syntax-keyword);
+  --color-query-syntax-function: var(--color-query-syntax-function);
+  --color-query-syntax-string: var(--color-query-syntax-string);
+  --color-query-syntax-number: var(--color-query-syntax-number);
+  --color-query-syntax-comment: var(--color-query-syntax-comment);
 
   /* The --color-gradient-* family is deliberately NOT registered here: it would
      generate `bg-gradient-ai` as `background-color: <linear-gradient()>` — invalid
