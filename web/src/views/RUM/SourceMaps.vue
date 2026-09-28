@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="source-maps-container bg-card-glass-bg flex h-full flex-col overflow-hidden">
     <!-- Filters Section -->
     <div class="px-page-edge bg-surface-base py-3">
-      <div class="flex items-end justify-between">
-        <div class="flex items-end gap-4">
+      <!-- Phones wrap the filters two to a row, with the table actions on the row after. -->
+      <div class="flex items-end justify-between max-md:flex-wrap max-md:gap-2">
+        <div class="flex items-end gap-4 max-md:w-full max-md:flex-wrap max-md:gap-2">
           <!-- Version Filter -->
           <OSelect
             v-model="filters.version"
@@ -29,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             creatable
             style="width: 12.5rem"
-            class="o2-custom-select-dashboard"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Service Filter -->
@@ -41,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             creatable
             style="width: 12.5rem"
-            class="o2-custom-select-dashboard"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Environment Filter -->
@@ -53,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             creatable
             style="width: 12.5rem"
-            class="o2-custom-select-dashboard"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Apply Button -->
@@ -63,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Columns + Refresh + Upload Buttons -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 max-md:ms-auto">
           <OTableColumnToggle
             :columns="columns"
             :column-visibility="columnVisibility"

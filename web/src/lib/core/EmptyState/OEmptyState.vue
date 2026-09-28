@@ -359,7 +359,7 @@ const SIZE_MAP: Record<
     iconWrap: "",
   },
   inline: {
-    root: "w-full min-h-40 px-4 py-8",
+    root: "w-full min-h-40 px-4 py-8 max-md:min-h-0 max-md:py-5",
     stack: "gap-3",
     copy: "gap-1",
     actions: "gap-2 pt-1",

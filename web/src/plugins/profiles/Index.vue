@@ -16,10 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="bg-card-glass-bg flex h-full min-h-0 flex-col">
+    <!-- Below lg the bar wraps instead of scrolling, so the date picker and Run query stay on screen. -->
     <div
-      class="border-border-default flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b p-1.5"
+      class="border-border-default flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b p-1.5 max-lg:flex-wrap max-lg:overflow-x-visible"
     >
-      <div class="w-60 shrink-0">
+      <div class="w-60 shrink-0 max-md:basis-[calc(50%-0.25rem)]">
         <OSelect
           v-model="selectedStream"
           :label="t('profiles.stream')"
@@ -30,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-stream-select"
         />
       </div>
-      <div class="w-60 shrink-0">
+      <div class="w-60 shrink-0 max-md:basis-[calc(50%-0.25rem)]">
         <OSelect
           v-model="selectedService"
           :label="t('profiles.service')"
@@ -40,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-service-select"
         />
       </div>
-      <div class="w-72 shrink-0">
+      <div class="w-72 shrink-0 max-md:w-full">
         <OSelect
           v-model="selectedProfileType"
           :label="t('profiles.profileType')"
