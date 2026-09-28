@@ -58,6 +58,7 @@ pub mod oncall_user_contacts;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;
 pub mod org_cleanup_tasks;
+pub mod org_domain_ownership;
 pub mod org_ingestion_tokens;
 pub mod org_storage_providers;
 pub mod org_users;

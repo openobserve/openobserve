@@ -73,3 +73,6 @@ pub mod trial_quota;
 pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
+
+#[cfg(feature = "cloud")]
+pub mod org_domain_ownership;
