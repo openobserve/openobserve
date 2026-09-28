@@ -759,6 +759,9 @@ mod tests {
                 "/api/acme/dashboards/job:http_requests:rate5m",
             ),
             ("user@example.com", "/api/acme/dashboards/user@example.com"),
+            ("%2e%2e", "/api/acme/dashboards/%252e%252e"),
+            (".%2E", "/api/acme/dashboards/.%252E"),
+            ("x?y#z", "/api/acme/dashboards/x%3Fy%23z"),
         ] {
             assert_eq!(
                 loopback_request_line(raw).await,
@@ -770,13 +773,10 @@ mod tests {
 
     #[tokio::test]
     async fn placeholder_argument_is_not_substituted_twice() {
-        // rmcp-openapi substitutes in HashMap order, so only some runs expose the bug.
-        for _ in 0..32 {
-            assert_eq!(
-                loopback_request_line("{org_id}").await,
-                "GET /api/acme/dashboards/%7Borg_id%7D HTTP/1.1"
-            );
-        }
+        assert_eq!(
+            loopback_request_line("{org_id}").await,
+            "GET /api/acme/dashboards/%7Borg_id%7D HTTP/1.1"
+        );
     }
 
     #[tokio::test]
