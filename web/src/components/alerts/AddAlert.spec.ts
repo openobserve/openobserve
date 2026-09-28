@@ -631,11 +631,12 @@ describe("AddAlert (OForm owner)", () => {
       // it is a real backend field, not a form-only leak. Enterprise/cloud link
       // alerts to workflows through it; in OSS it ships as [].
       //
-      // `notify_on_recovery` / `keep_firing_for` were checked against the same
-      // rule and BELONG: both are columns on the alerts table
-      // (entity/alerts.rs `notify_on_recovery` / `keep_firing_for_seconds`),
-      // both are on the HTTP model, and both round-trip — save then GET returns
-      // them. They are not form-only state.
+      // `notify_on_recovery` / `keep_firing_for` / `recovery_destinations` were
+      // checked against the same rule and BELONG: all three are columns on the
+      // alerts table (entity/alerts.rs `notify_on_recovery` /
+      // `keep_firing_for_seconds` / `recovery_destinations`), all three are on
+      // the HTTP model, and all three round-trip — save then GET returns them.
+      // They are not form-only state.
       expect(Object.keys(payload).sort()).toEqual(
         [
           "context_attributes",
@@ -661,6 +662,7 @@ describe("AddAlert (OForm owner)", () => {
           "workflows",
           "pending_period_sec",
           "notify_on_recovery",
+          "recovery_destinations",
           "keep_firing_for",
         ].sort(),
       );
