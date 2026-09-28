@@ -84,34 +84,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the toolbar, and a chip strip that grows must not shove the refresh and
          column controls off the right edge. -->
     <div class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
-      <ODimensionChip
-        v-for="filter in activeFilters"
-        :key="filter.key"
-        :dim-key="filter.key"
-        :key-label="filter.dimension"
-        :value="filter.value ?? ''"
-        removable
-        :remove-label="t('dbm.filters.removeScope')"
-        :remove-data-test="`dbm-queries-scope-chip-${filter.key}-remove`"
-        class="shrink-0"
-        :data-test="`dbm-queries-scope-chip-${filter.key}`"
-        @remove="filter.onChange(null)"
-      />
+      <!-- The wrapper keeps each chip at full width so a crowded strip scrolls instead of truncating it. -->
+      <span v-for="filter in activeFilters" :key="filter.key" class="inline-flex shrink-0">
+        <ODimensionChip
+          :dim-key="filter.key"
+          :key-label="filter.dimension"
+          :value="filter.value ?? ''"
+          removable
+          :remove-label="t('dbm.filters.removeScope')"
+          :remove-data-test="`dbm-queries-scope-chip-${filter.key}-remove`"
+          :data-test="`dbm-queries-scope-chip-${filter.key}`"
+          @remove="filter.onChange(null)"
+        />
+      </span>
 
       <!-- Amber, not a dimension colour: the insight is a lens the reader applied, not a dimension they picked. -->
-      <ODimensionChip
-        v-if="insightChip"
-        dim-key="insight"
-        :key-label="insightChip.dimension"
-        :value="insightChip.label"
-        variant="warning-soft"
-        removable
-        :remove-label="t('dbm.filters.removeScope')"
-        remove-data-test="dbm-queries-scope-chip-insight-remove"
-        class="shrink-0"
-        data-test="dbm-queries-scope-chip-insight"
-        @remove="emit('clearInsight')"
-      />
+      <span v-if="insightChip" class="inline-flex shrink-0">
+        <ODimensionChip
+          dim-key="insight"
+          :key-label="insightChip.dimension"
+          :value="insightChip.label"
+          variant="warning-soft"
+          removable
+          :remove-label="t('dbm.filters.removeScope')"
+          remove-data-test="dbm-queries-scope-chip-insight-remove"
+          data-test="dbm-queries-scope-chip-insight"
+          @remove="emit('clearInsight')"
+        />
+      </span>
 
       <!-- Clear all, INLINE beside the chips.
            The same action already exists inside the popover, but only there:
