@@ -27,6 +27,9 @@ pub static LOCAL_NODE_ID: AtomicI32 = AtomicI32::new(0);
 pub static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
 pub static LOCAL_NODE_STATUS: AtomicI32 = AtomicI32::new(NodeStatus::Prepare as _);
 pub static LOCAL_NODE: Lazy<Node> = Lazy::new(load_local_node);
+/// Per-process `x-o2-mcp` value that marks the MCP server's own loopback calls.
+pub static MCP_LOOPBACK_SECRET: Lazy<String> =
+    Lazy::new(|| hex::encode(crate::utils::rand::random_bytes(32)));
 
 fn load_local_node() -> Node {
     let cfg = get_config();

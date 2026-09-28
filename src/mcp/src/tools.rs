@@ -397,9 +397,11 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     ))
     .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
 
-    // Set default headers including x-o2-mcp for MCP-initiated calls
+    let mut mcp_marker =
+        reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
+    mcp_marker.set_sensitive(true);
     let mut default_headers = reqwest::header::HeaderMap::new();
-    default_headers.insert("x-o2-mcp", "true".parse().unwrap());
+    default_headers.insert("x-o2-mcp", mcp_marker);
 
     let mut client_builder = reqwest::Client::builder()
         .user_agent(format!("openobserve/{}", config::VERSION))
