@@ -185,7 +185,7 @@ impl Serialize for Sample {
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(2))?;
-        seq.serialize_element(&(self.timestamp / 1_000_000))?;
+        seq.serialize_element(&SampleTimestamp(self.timestamp))?;
         seq.serialize_element(&SampleValueDisplay(self.value))?;
         seq.end()
     }
@@ -223,7 +223,7 @@ impl<'de> Deserialize<'de> for Sample {
                 let value = value_str.parse::<f64>().map_err(serde::de::Error::custom)?;
 
                 // Convert timestamp from seconds to microseconds
-                let timestamp = (timestamp * 1_000_000.0) as i64;
+                let timestamp = (timestamp * 1_000_000.0).round() as i64;
 
                 Ok(Sample { timestamp, value })
             }
@@ -306,6 +306,24 @@ impl fmt::Write for FloatText {
     }
 }
 
+/// A microsecond timestamp as the Unix seconds, to the millisecond, that Prometheus'
+/// `jsonutil.MarshalTimestamp` writes.
+struct SampleTimestamp(i64);
+
+impl Serialize for SampleTimestamp {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let millis = self.0 / 1_000;
+        if millis % 1_000 == 0 {
+            serializer.serialize_i64(millis / 1_000)
+        } else {
+            serializer.serialize_f64(millis as f64 / 1_000.0)
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Exemplar {
     /// Time in microseconds
@@ -325,7 +343,7 @@ impl Serialize for Exemplar {
             .iter()
             .map(|l| (l.name.as_str(), l.value.as_str()))
             .collect::<FxIndexMap<_, _>>();
-        seq.serialize_field("timestamp", &(self.timestamp / 1_000_000))?;
+        seq.serialize_field("timestamp", &SampleTimestamp(self.timestamp))?;
         seq.serialize_field("value", &SampleValueDisplay(self.value))?;
         seq.serialize_field("labels", &labels_map)?;
         seq.end()
@@ -357,8 +375,8 @@ impl<'de> Deserialize<'de> for Exemplar {
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
                         "timestamp" => {
-                            let ts = map.next_value::<i64>()?;
-                            timestamp = Some(ts * 1_000_000); // Convert seconds to microseconds
+                            let ts = map.next_value::<f64>()?;
+                            timestamp = Some((ts * 1_000_000.0).round() as i64); // Convert seconds to microseconds
                         }
                         "value" => {
                             let val_str = map.next_value::<String>()?;
@@ -855,7 +873,6 @@ fn extrapolate_from_delta(
             .checked_sub(range_plus_offset)
             .expect("BUG: overflow")
     };
-    assert!(start > 0);
     let end = eval_ts
         .checked_sub(
             offset
@@ -864,7 +881,6 @@ fn extrapolate_from_delta(
                 .expect("BUG: integer conversion failed"),
         )
         .expect("BUG: overflow");
-    assert!(end > 0);
     assert!(start <= end);
 
     let first = &samples[0];
@@ -880,11 +896,19 @@ fn extrapolate_from_delta(
 
     // Duration between first/last samples and boundary of range.
     let mut duration_to_start = (first.timestamp - start) as f64 / 1_000.0;
-    let duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
+    let mut duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
 
     let sampled_interval = (last.timestamp - first.timestamp) as f64 / 1_000.0;
     let avg_duration_between_samples = sampled_interval / (samples.len() - 1) as f64;
 
+    // If the first/last samples are close to the boundaries of the range,
+    // extrapolate the result. This is as we expect that another sample
+    // will exist given the spacing between samples we've seen thus far,
+    // with an allowance for noise.
+    let extrapolation_threshold = avg_duration_between_samples * 1.1;
+    if duration_to_start >= extrapolation_threshold {
+        duration_to_start = avg_duration_between_samples / 2.0;
+    }
     if is_counter && result > 0.0 && first.value >= 0.0 {
         // Counters cannot be negative. If we have any slope at all
         // (i.e. `result` went up), we can extrapolate the zero point
@@ -898,24 +922,10 @@ fn extrapolate_from_delta(
         }
     }
 
-    // If the first/last samples are close to the boundaries of the range,
-    // extrapolate the result. This is as we expect that another sample
-    // will exist given the spacing between samples we've seen thus far,
-    // with an allowance for noise.
-    let extrapolation_threshold = avg_duration_between_samples * 1.1;
-    let mut extrapolate_to_interval = sampled_interval;
-
-    if duration_to_start < extrapolation_threshold {
-        extrapolate_to_interval += duration_to_start;
-    } else {
-        extrapolate_to_interval += avg_duration_between_samples / 2.0;
+    if duration_to_end >= extrapolation_threshold {
+        duration_to_end = avg_duration_between_samples / 2.0;
     }
-    if duration_to_end < extrapolation_threshold {
-        extrapolate_to_interval += duration_to_end;
-    } else {
-        extrapolate_to_interval += avg_duration_between_samples / 2.0;
-    }
-    let factor = extrapolate_to_interval / sampled_interval;
+    let factor = (sampled_interval + duration_to_start + duration_to_end) / sampled_interval;
     if matches!(kind, ExtrapolationKind::Rate) {
         result *= factor / range.as_secs_f64();
     } else {
@@ -1107,7 +1117,7 @@ mod tests {
             S: Serializer,
         {
             let mut seq = serializer.serialize_seq(Some(2))?;
-            seq.serialize_element(&(self.0.timestamp / 1_000_000))?;
+            seq.serialize_element(&SampleTimestamp(self.0.timestamp))?;
             seq.serialize_element(&self.0.value.to_string())?;
             seq.end()
         }
@@ -1518,6 +1528,19 @@ mod tests {
         let sample = Sample::new(1_609_459_200_000_000, 42.5); // 2021-01-01 00:00:00 UTC in microseconds
         let json = serde_json::to_string(&sample).unwrap();
         assert_eq!(json, "[1609459200,\"42.5\"]");
+
+        // milliseconds survive and microseconds are dropped, as Prometheus stores milliseconds
+        for (timestamp, text) in [
+            (1_700_000_000_500_000, "1700000000.5"),
+            (1_700_000_000_123_456, "1700000000.123"),
+            (1_700_000_000_000_999, "1700000000"),
+            (-1_500_000, "-1.5"),
+        ] {
+            let json = serde_json::to_string(&Sample::new(timestamp, 1.0)).unwrap();
+            assert_eq!(json, format!("[{text},\"1\"]"));
+            let sample: Sample = serde_json::from_str(&json).unwrap();
+            assert_eq!(sample.timestamp, timestamp / 1_000 * 1_000);
+        }
     }
 
     /// Plain decimals keep the legacy text; infinities and exponent forms follow Prometheus.
@@ -1529,8 +1552,8 @@ mod tests {
         );
         let text = serde_json::to_string(&sample).unwrap();
         let legacy = serde_json::to_string(&LegacySample(&sample)).unwrap();
-        let (timestamp, value): (i64, String) = serde_json::from_str(&text).unwrap();
-        let (legacy_timestamp, legacy_value): (i64, String) =
+        let (timestamp, value): (f64, String) = serde_json::from_str(&text).unwrap();
+        let (legacy_timestamp, legacy_value): (f64, String) =
             serde_json::from_str(&legacy).unwrap();
         assert_eq!(timestamp, legacy_timestamp, "{context}");
         let abs = sample.value.abs();
@@ -2035,6 +2058,15 @@ mod tests {
 
         let json = serde_json::to_string(&exemplar).unwrap();
         assert!(json.contains("\"timestamp\":1609459200"));
+
+        let exemplar = Exemplar {
+            timestamp: 1_609_459_200_250_000,
+            ..exemplar
+        };
+        let json = serde_json::to_string(&exemplar).unwrap();
+        assert!(json.contains("\"timestamp\":1609459200.25"), "{json}");
+        let decoded: Exemplar = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.timestamp, exemplar.timestamp);
         assert!(json.contains("\"value\":\"42.5\""));
         assert!(json.contains("\"trace_id\":\"abc123\""));
     }
@@ -2062,6 +2094,37 @@ mod tests {
             ExtrapolationKind::Rate,
         );
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extrapolated_rate_caps_start_before_the_counter_zero_point() {
+        let second = 1_000_000;
+        let samples: Vec<_> = [(70, 1.0), (80, 2.0), (90, 3.0), (100, 4.0)]
+            .into_iter()
+            .map(|(ts, value)| Sample::new(ts * second, value))
+            .collect();
+        let increase = extrapolated_rate(
+            &samples,
+            100 * second,
+            Duration::from_secs(60),
+            Duration::ZERO,
+            ExtrapolationKind::Increase,
+        );
+        assert_eq!(increase, Some(3.5));
+
+        // a window reaching back before epoch 0 is still a window
+        let samples: Vec<_> = [(15, 1.0), (30, 2.0), (45, 3.0), (60, 4.0)]
+            .into_iter()
+            .map(|(ts, value)| Sample::new(ts * second, value))
+            .collect();
+        let rate = extrapolated_rate(
+            &samples,
+            60 * second,
+            Duration::from_secs(300),
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        );
+        assert!((rate.unwrap() - 3.5 / 300.0).abs() < 1e-15);
     }
 
     #[test]

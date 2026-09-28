@@ -126,6 +126,7 @@ impl Engine {
                         Value::Matrix(matrix)
                     }
                     Value::Float(f) => Value::Float(-f),
+                    Value::None => Value::None,
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported Unary: {expr:?}"
@@ -706,6 +707,29 @@ pub(crate) mod tests {
         assert_eq!(series.len(), 1);
         assert!(series[0].labels.is_empty());
         assert_eq!(series[0].samples[0].value, 2.0);
+    }
+
+    #[tokio::test]
+    async fn test_unary_minus_of_nothing_is_nothing() {
+        assert!(matches!(
+            eval_on_empty("-up", 3).await.unwrap(),
+            Value::None
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_rank_rejects_k_outside_int64_only_where_input_exists() {
+        for query in ["topk(scalar(up), vector(1))", "bottomk(1e20, vector(1))"] {
+            let err = eval_on_empty(query, 3).await.unwrap_err().to_string();
+            assert!(err.contains("overflows int64"), "{query}: {err}");
+        }
+        assert!(matches!(
+            eval_on_empty("topk(scalar(up), up)", 3).await.unwrap(),
+            Value::None
+        ));
+        let series = matrix(eval_on_empty("topk(2, vector(1))", 3).await.unwrap());
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].samples.len(), 3);
     }
 
     fn single_value(value: Value) -> f64 {

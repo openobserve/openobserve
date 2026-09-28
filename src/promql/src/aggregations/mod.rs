@@ -228,6 +228,41 @@ impl AggOp {
         matches!(self, Self::Topk(_) | Self::Bottomk(_))
     }
 
+    /// Whether k is NaN or outside int64 at some step, which Prometheus rejects where input exists.
+    pub(crate) fn has_invalid_k(&self) -> bool {
+        match self {
+            Self::Topk(ScalarParam::Const(k)) | Self::Bottomk(ScalarParam::Const(k)) => {
+                !fits_int64(*k)
+            }
+            Self::Topk(ScalarParam::PerStep { values, .. })
+            | Self::Bottomk(ScalarParam::PerStep { values, .. }) => {
+                values.iter().any(|k| !fits_int64(*k))
+            }
+            _ => false,
+        }
+    }
+
+    /// The error Prometheus raises for a k that is NaN or outside int64 at a step with input.
+    pub(crate) fn check_k(&self, input: &Value) -> Result<()> {
+        let (Self::Topk(k) | Self::Bottomk(k)) = self else {
+            return Ok(());
+        };
+        let Value::Matrix(matrix) = input else {
+            return Ok(());
+        };
+        match matrix
+            .iter()
+            .flat_map(|series| &series.samples)
+            .map(|sample| k.at(sample.timestamp))
+            .find(|k| !fits_int64(*k))
+        {
+            Some(k) => Err(DataFusionError::Plan(format!(
+                "Scalar value {k} overflows int64"
+            ))),
+            None => Ok(()),
+        }
+    }
+
     /// The generic fold over a materialized matrix.
     pub(crate) fn eval_aggregate(
         self,
@@ -469,6 +504,11 @@ where
     Ok(Value::Matrix(results))
 }
 
+// Go's `convertibleToInt64`; NaN fails both comparisons
+fn fits_int64(value: f64) -> bool {
+    (i64::MIN as f64..-(i64::MIN as f64)).contains(&value)
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::promql::value::LabelsExt;
@@ -683,7 +723,7 @@ mod tests {
         }
         for (values, avg, variance) in [
             (vec![1.0, 2.0, 3.0], 2.0, 2.0 / 3.0),
-            (vec![1e308, 1e308], f64::INFINITY, f64::INFINITY),
+            (vec![1e308, 1e308], f64::INFINITY, 0.0),
             (vec![f64::INFINITY, f64::INFINITY], f64::INFINITY, f64::NAN),
             (vec![f64::INFINITY, f64::NEG_INFINITY], f64::NAN, f64::NAN),
             (vec![f64::NAN, 1.0], f64::NAN, f64::NAN),

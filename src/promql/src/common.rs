@@ -23,21 +23,19 @@ pub fn std_variance(data: &[f64]) -> Option<f64> {
     variance(data.iter().copied())
 }
 
-pub(crate) fn variance(values: impl ExactSizeIterator<Item = f64> + Clone) -> Option<f64> {
-    let count = values.len() as i64;
-    if count == 0 {
+/// Population variance by Welford's method with Kahan summation, as Prometheus computes it.
+pub(crate) fn variance(values: impl ExactSizeIterator<Item = f64>) -> Option<f64> {
+    if values.len() == 0 {
         return None;
     }
-    let mean = values.clone().sum::<f64>() / count as f64;
-    Some(
-        values
-            .map(|value| {
-                let diff = mean - value;
-                diff * diff
-            })
-            .sum::<f64>()
-            / count as f64,
-    )
+    let (mut count, mut mean, mut c_mean, mut aux, mut c_aux) = (0.0, 0.0, 0.0, 0.0, 0.0);
+    for value in values {
+        count += 1.0;
+        let delta = value - (mean + c_mean);
+        (mean, c_mean) = kahan_sum_increment(delta / count, mean, c_mean);
+        (aux, c_aux) = kahan_sum_increment(delta * (value - (mean + c_mean)), aux, c_aux);
+    }
+    Some((aux + c_aux) / count)
 }
 
 pub fn quantile(data: &[f64], quantile: f64) -> Option<f64> {
@@ -73,9 +71,7 @@ pub(crate) fn quantile_in_place(data: &mut [f64], quantile: f64) -> Option<f64> 
     let upper = data[index + 1];
 
     let fraction = quantile * (n - 1) as f64 - index as f64;
-    let quantile_value = lower + (upper - lower) * fraction;
-
-    Some(quantile_value)
+    Some(lower * (1.0 - fraction) + upper * fraction)
 }
 
 pub fn calculate_trend(
@@ -97,10 +93,10 @@ pub fn calculate_trend(
 
 pub fn linear_regression(samples: &[Sample], intercept_time: i64) -> Option<(f64, f64)> {
     let mut num_samples = 0.0;
-    let mut sum_x = 0.0;
-    let mut sum_y = 0.0;
-    let mut sum_xy = 0.0;
-    let mut sum_x2 = 0.0;
+    let (mut sum_x, mut c_x) = (0.0, 0.0);
+    let (mut sum_y, mut c_y) = (0.0, 0.0);
+    let (mut sum_xy, mut c_xy) = (0.0, 0.0);
+    let (mut sum_x2, mut c_x2) = (0.0, 0.0);
     let initial_y = samples.first()?.value;
     let mut constant_y = true;
 
@@ -110,18 +106,22 @@ pub fn linear_regression(samples: &[Sample], intercept_time: i64) -> Option<(f64
         }
         num_samples += 1.0;
         let x = (sample.timestamp / 1000 - intercept_time) as f64 / 1e3;
-        sum_x += x;
-        sum_y += sample.value;
-        sum_xy += x * sample.value;
-        sum_x2 += x * x;
+        (sum_x, c_x) = kahan_sum_increment(x, sum_x, c_x);
+        (sum_y, c_y) = kahan_sum_increment(sample.value, sum_y, c_y);
+        (sum_xy, c_xy) = kahan_sum_increment(x * sample.value, sum_xy, c_xy);
+        (sum_x2, c_x2) = kahan_sum_increment(x * x, sum_x2, c_x2);
     }
 
     if constant_y {
         if initial_y.is_infinite() {
-            return None;
+            return Some((f64::NAN, f64::NAN));
         }
         return Some((0.0, initial_y));
     }
+    sum_x += c_x;
+    sum_y += c_y;
+    sum_xy += c_xy;
+    sum_x2 += c_x2;
 
     let cov_xy = sum_xy - (sum_x * sum_y) / num_samples;
     let var_x = sum_x2 - (sum_x * sum_x) / num_samples;
@@ -155,7 +155,8 @@ mod tests {
             (vec![], None),
             (vec![5.0], Some(0.0)),
             (vec![1.0, 5.0], Some(4.0)),
-            (vec![f64::MAX, f64::MAX], Some(f64::INFINITY)),
+            (vec![f64::MAX, f64::MAX], Some(0.0)),
+            (vec![1e308, 1e308], Some(0.0)),
             (vec![f64::INFINITY, 1.0], Some(f64::NAN)),
             (vec![f64::NAN, 1.0], Some(f64::NAN)),
         ] {
@@ -181,6 +182,8 @@ mod tests {
         assert_eq!(quantile_in_place(&mut [], -1.0), Some(f64::NEG_INFINITY));
         assert_eq!(quantile_in_place(&mut [], 2.0), Some(f64::INFINITY));
         assert!(quantile_in_place(&mut [], f64::NAN).unwrap().is_nan());
+        let infinite = [1.0, f64::INFINITY, f64::INFINITY];
+        assert_eq!(quantile(&infinite, 0.75), Some(f64::INFINITY));
     }
 
     #[test]
@@ -297,7 +300,8 @@ mod tests {
             Sample::new(1000, f64::INFINITY),
             Sample::new(2000, f64::INFINITY),
         ];
-        assert!(linear_regression(&samples, 0).is_none());
+        let (slope, intercept) = linear_regression(&samples, 0).unwrap();
+        assert!(slope.is_nan() && intercept.is_nan());
 
         // Test negative slope
         let samples = vec![
@@ -443,8 +447,8 @@ mod tests {
             Sample::new(1000, f64::INFINITY),
             Sample::new(2000, f64::INFINITY),
         ];
-        let result = linear_regression(&samples, 0);
-        assert!(result.is_none());
+        let (slope, intercept) = linear_regression(&samples, 0).unwrap();
+        assert!(slope.is_nan() && intercept.is_nan());
 
         // Test with empty samples
         let samples: Vec<Sample> = vec![];

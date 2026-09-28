@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use config::meta::promql::value::Sample;
 
-use crate::functions::RangeFunc;
+use crate::{common::kahan_sum_increment, functions::RangeFunc};
 
 pub struct SumOverTimeFunc;
 
@@ -30,7 +30,10 @@ impl RangeFunc for SumOverTimeFunc {
         if samples.is_empty() {
             return None;
         }
-        Some(samples.iter().map(|s| s.value).sum())
+        let (sum, c) = samples.iter().fold((0.0, 0.0), |(sum, c), s| {
+            kahan_sum_increment(s.value, sum, c)
+        });
+        Some(if sum.is_infinite() { sum } else { sum + c })
     }
 }
 
@@ -72,5 +75,14 @@ mod tests {
         let func = SumOverTimeFunc;
         let samples = make_samples(&[1.0, 2.0, 3.0]);
         assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(6.0));
+    }
+
+    #[test]
+    fn test_sum_over_time_uses_kahan_summation() {
+        let func = SumOverTimeFunc;
+        let samples = make_samples(&[1e100, 1.0, -1e100]);
+        assert_eq!(func.exec(&samples, 0, &Duration::ZERO), Some(1.0));
+        let samples = make_samples(&[f64::INFINITY, 1.0]);
+        assert_eq!(func.exec(&samples, 0, &Duration::ZERO), Some(f64::INFINITY));
     }
 }

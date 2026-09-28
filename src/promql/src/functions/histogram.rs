@@ -25,6 +25,9 @@ use hashbrown::HashMap;
 
 use crate::scalar_param::ScalarParam;
 
+// https://github.com/prometheus/prometheus/blob/v3.5.0/promql/quantile.go#L28-L45
+const SMALL_DELTA_TOLERANCE: f64 = 1e-12;
+
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
 #[derive(Debug, Clone, PartialEq)]
 struct Bucket {
@@ -229,20 +232,39 @@ fn coalesce_buckets(mut buckets: Vec<Bucket>) -> Vec<Bucket> {
 }
 
 // For the rationale behind this function, see
-// https://github.com/prometheus/prometheus/blob/0bf707e288eaa8694105e53c81a102017529793d/promql/quantile.go#L314-L347
+// https://github.com/prometheus/prometheus/blob/v3.5.0/promql/quantile.go#L602-L655
 fn ensure_monotonic(buckets: &mut [Bucket]) {
-    let mut max = buckets[0].count;
+    let mut prev = buckets[0].count;
     for bucket in &mut buckets[1..] {
-        if bucket.count > max {
-            max = bucket.count;
-        } else if bucket.count < max {
-            bucket.count = max;
+        let curr = bucket.count;
+        if curr == prev {
+            continue;
         }
+        if curr < prev || almost_equal(prev, curr, SMALL_DELTA_TOLERANCE) {
+            bucket.count = prev;
+            continue;
+        }
+        // a NaN count also lands here and restarts the running maximum, as in Prometheus
+        prev = curr;
     }
+}
+
+// cf. https://github.com/prometheus/prometheus/blob/v3.5.0/util/almost/almost.go
+fn almost_equal(a: f64, b: f64, epsilon: f64) -> bool {
+    if (a.is_nan() && b.is_nan()) || a == b {
+        return true;
+    }
+    let abs_sum = a.abs() + b.abs();
+    let diff = (a - b).abs();
+    if a == 0.0 || b == 0.0 || abs_sum < f64::MIN_POSITIVE {
+        return diff < epsilon * f64::MIN_POSITIVE;
+    }
+    diff / abs_sum.min(f64::MAX) < epsilon
 }
 
 #[cfg(test)]
 mod tests {
+    // shares the production `ensure_monotonic`, whose rule is not frozen
     mod legacy {
         use super::*;
         pub(super) fn histogram_quantile(
@@ -414,17 +436,6 @@ mod tests {
                 }
             }
             merged
-        }
-
-        pub(super) fn ensure_monotonic(buckets: &mut [Bucket]) {
-            let mut max = buckets[0].count;
-            for bucket in &mut buckets[1..] {
-                if bucket.count > max {
-                    max = bucket.count;
-                } else if bucket.count < max {
-                    bucket.count = max;
-                }
-            }
         }
     }
 
@@ -611,12 +622,9 @@ mod tests {
         for source in cases {
             raw.clear();
             raw.extend(source.iter().cloned());
-            let mut expected = legacy::coalesce_buckets(source);
+            let expected = legacy::coalesce_buckets(source);
             coalesce_buckets_into(&mut raw, &mut merged);
             assert!(raw.is_empty());
-            assert_eq!(bits(&merged), bits(&expected));
-            ensure_monotonic(&mut merged);
-            legacy::ensure_monotonic(&mut expected);
             assert_eq!(bits(&merged), bits(&expected));
         }
     }
@@ -981,5 +989,30 @@ mod tests {
                 Bucket::new(4.0, 7.0),
             ]
         );
+    }
+
+    #[test]
+    fn test_ensure_monotonic_ignores_small_deltas_and_restarts_after_nan() {
+        let noisy = 10.0 + 5e-12;
+        let mut buckets = vec![
+            Bucket::new(1.0, 10.0),
+            Bucket::new(2.0, noisy),
+            Bucket::new(f64::INFINITY, noisy),
+        ];
+        assert_eq!(
+            bucket_quantile_sorted(1.0, &mut buckets.clone(), &mut Vec::new()),
+            1.0
+        );
+        ensure_monotonic(&mut buckets);
+        assert!(buckets.iter().all(|bucket| bucket.count == 10.0));
+
+        let mut buckets = vec![
+            Bucket::new(1.0, 5.0),
+            Bucket::new(2.0, f64::NAN),
+            Bucket::new(3.0, 3.0),
+        ];
+        ensure_monotonic(&mut buckets);
+        assert!(buckets[1].count.is_nan());
+        assert_eq!(buckets[2].count, 3.0);
     }
 }

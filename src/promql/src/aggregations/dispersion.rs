@@ -98,7 +98,7 @@ mod tests {
             assert_eq!(samples[1].value, 0.0);
             assert!(samples[2].value.is_nan());
             assert!(samples[3].value.is_nan());
-            assert_eq!(samples[4].value, f64::INFINITY);
+            assert_eq!(samples[4].value, 0.0);
             let empty =
                 DispersionAccumulator::<STDDEV>::new(2).evaluate(Labels::default(), &[1, 2]);
             assert!(empty[0].samples.is_empty());

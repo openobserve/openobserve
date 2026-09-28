@@ -578,6 +578,16 @@ async fn query_range(
             }
         },
     };
+    if let Err(e) = check_range_query(req.query.as_deref().unwrap_or_default(), start, end) {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                e,
+                Some(trace_id),
+            )),
+        )
+            .into_response();
+    }
     let mut step = match req.step {
         None => 0,
         Some(v) => match parse_milliseconds(&v) {
@@ -1341,6 +1351,22 @@ fn format_query(query: &str) -> Response {
         .into_response()
 }
 
+/// The 400s Prometheus' `queryRange` gives for an end before the start or a non-instant query.
+fn check_range_query(query: &str, start: i64, end: i64) -> Result<(), String> {
+    if end < start {
+        return Err("end timestamp must not be before start time".to_string());
+    }
+    let kind = match parser::parse(query).map(|expr| expr.value_type()) {
+        Ok(parser::value::ValueType::Matrix) => "range vector",
+        Ok(parser::value::ValueType::String) => "string",
+        // a parse error is reported by the search itself
+        _ => return Ok(()),
+    };
+    Err(format!(
+        "invalid expression type \"{kind}\" for range query, must be Scalar or instant Vector"
+    ))
+}
+
 fn search_timeout(timeout: Option<String>) -> i64 {
     match timeout {
         None => 0,
@@ -1735,6 +1761,20 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_check_range_query() {
+        assert!(check_range_query("up", 10, 10).is_ok());
+        assert!(check_range_query("sum(rate(up[5m]))", 10, 20).is_ok());
+        assert!(check_range_query("1 + 1", 10, 20).is_ok());
+        assert!(check_range_query("up{", 10, 20).is_ok());
+        let err = check_range_query("up", 20, 10).unwrap_err();
+        assert!(err.contains("end timestamp"), "{err}");
+        for (query, kind) in [("up[5m]", "range vector"), (r#""foo""#, "string")] {
+            let err = check_range_query(query, 10, 20).unwrap_err();
+            assert!(err.contains(&format!("\"{kind}\"")), "{query}: {err}");
+        }
+    }
 
     #[test]
     fn test_validate_label_values_params() {
