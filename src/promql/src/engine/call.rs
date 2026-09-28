@@ -230,7 +230,7 @@ impl Engine {
                     .eval_ctx
                     .timestamps()
                     .into_iter()
-                    .map(|ts| Sample::new(ts, ts as f64))
+                    .map(|ts| Sample::new(ts, ts.div_euclid(1_000_000) as f64))
                     .collect(),
                 exemplars: None,
                 time_window: None,
@@ -389,7 +389,7 @@ mod tests {
         let eval_ctx = EvalContext::new(1_000_000, 1_000_000, 1_000_000, "test".into());
         for (query, expected) in [
             ("time()", 1.0),
-            ("day_of_month()", 12.0),
+            ("day_of_month()", 1.0),
             ("day_of_month(vector(1000000))", 12.0),
             ("clamp(vector(5), 1, 3)", 3.0),
             ("clamp_min(vector(5), 7)", 7.0),
