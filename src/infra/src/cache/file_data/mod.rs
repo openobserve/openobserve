@@ -23,7 +23,10 @@ use std::{
 };
 
 use bytes::Bytes;
-use config::utils::time::{HourFormat, get_ymdh_from_micros};
+use config::{
+    meta::promql::midx::{MIDX_TRAILER_LEN, MidxTrailer},
+    utils::time::{HourFormat, get_ymdh_from_micros},
+};
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 use object_store::{GetOptions, GetResult};
@@ -232,19 +235,10 @@ async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Erro
             }
         }
         FileType::Midx => {
-            // Arrow IPC file: 8-byte leading magic, footer, i32 footer length, 6-byte magic
-            const ARROW_MAGIC: &[u8; 6] = b"ARROW1";
-            if bytes.len() < 18 {
+            if bytes.len() < MIDX_TRAILER_LEN {
                 return Err(anyhow::anyhow!("invalid metrics index file"));
             }
-            if &bytes[..6] != ARROW_MAGIC || &bytes[bytes.len() - 6..] != ARROW_MAGIC {
-                return Err(anyhow::anyhow!("arrow ipc magic bytes mismatch"));
-            }
-            let footer_len =
-                i32::from_le_bytes(bytes[bytes.len() - 10..bytes.len() - 6].try_into().unwrap());
-            if footer_len < 0 || 8 + footer_len as usize + 10 > bytes.len() {
-                return Err(anyhow::anyhow!("arrow ipc footer size mismatch"));
-            }
+            MidxTrailer::read(&bytes[bytes.len() - MIDX_TRAILER_LEN..], bytes.len() as u64)?;
         }
     }
     Ok(())
@@ -315,8 +309,7 @@ async fn download_from_storage(
                 // so we check if the footer is valid. If it is, then the db entry is invalid
                 // and we reset it. If footer is invalid, the store has a corrupted file
                 // so we mark it as deleted, and return error.
-                // data files (parquet/vortex) are tracked in file_list, ttv/midx index files are
-                // not
+                // Only data files have standalone file-list rows whose size can be corrected.
                 let is_data_file = file.ends_with(".parquet") || file.ends_with(".vortex");
                 let valid_parquet = file.ends_with(".parquet")
                     && validate_file(&data_bytes, FileType::Parquet).await.is_ok();
@@ -533,40 +526,32 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn validate_midx_checks_arrow_ipc_magic_and_footer() {
-        use arrow::{
-            array::{RecordBatch, UInt32Array},
-            datatypes::{DataType, Field, Schema},
-            ipc::writer::FileWriter,
-        };
-        let schema = std::sync::Arc::new(Schema::new(vec![Field::new(
-            "__oo_midx_row_count",
-            DataType::UInt32,
-            false,
-        )]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![std::sync::Arc::new(UInt32Array::from(vec![3, 2]))],
-        )
-        .unwrap();
-        let mut writer = FileWriter::try_new(Vec::new(), &schema).unwrap();
-        writer.write(&batch).unwrap();
-        let bytes = writer.into_inner().unwrap();
+    async fn validate_midx_checks_current_trailer() {
+        let mut bytes = b"sample-block{\"header\":1}".to_vec();
+        bytes.extend_from_slice(
+            &MidxTrailer {
+                label_len: 2,
+                directory_len: 4,
+                header_len: 13,
+            }
+            .encode(),
+        );
 
         assert!(validate_file(&bytes, FileType::Midx).await.is_ok());
-        // truncated: trailing magic gone
         assert!(
             validate_file(&bytes[..bytes.len() - 3], FileType::Midx)
                 .await
                 .is_err()
         );
-        // footer length claims more bytes than the file has
         let mut oversized = bytes.clone();
         let len = oversized.len();
-        oversized[len - 10..len - 6].copy_from_slice(&i32::MAX.to_le_bytes());
+        oversized[len - 16..len - 12].copy_from_slice(&u32::MAX.to_le_bytes());
         assert!(validate_file(&oversized, FileType::Midx).await.is_err());
+        let mut previous = bytes.clone();
+        previous[len - 8..].copy_from_slice(b"O2MIDX02");
+        assert!(validate_file(&previous, FileType::Midx).await.is_err());
         assert!(
-            validate_file(b"not an arrow file", FileType::Midx)
+            validate_file(b"not a MIDX file", FileType::Midx)
                 .await
                 .is_err()
         );

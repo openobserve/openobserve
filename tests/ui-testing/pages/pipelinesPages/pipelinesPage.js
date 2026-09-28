@@ -2303,6 +2303,10 @@ export class PipelinesPage {
         };
 
         testLogger.info('Metrics ingestion response', { streamName, status: response.status, data: response.data });
+        // Ingestion is only usable once the READ path lists the stream, so wait for that rather than for a fixed delay.
+        if (!(await this.waitForStreamListed(streamName, 'metrics'))) {
+            testLogger.warn('Metrics stream not listed by the streams API before the timeout', { streamName });
+        }
         return response;
     }
 
@@ -2415,7 +2419,32 @@ export class PipelinesPage {
         };
 
         testLogger.info('Traces ingestion response', { serviceName, streamName: streamName || 'default', status: response.status, data: response.data });
+        // Ingestion is only usable once the READ path lists the stream, so wait for that rather than for a fixed delay.
+        if (streamName && !(await this.waitForStreamListed(streamName, 'traces'))) {
+            testLogger.warn('Traces stream not listed by the streams API before the timeout', { streamName });
+        }
         return response;
+    }
+
+    /**
+     * Resolve once the streams API lists `streamName` for `streamType`.
+     * @returns {Promise<boolean>} whether the stream was listed before the timeout
+     */
+    async waitForStreamListed(streamName, streamType, { timeoutMs = 60000, pollMs = 1000 } = {}) {
+        // The node form reads its options from a cached query of this same list, so a stream the list has not got can never appear.
+        const orgId = process.env["ORGNAME"];
+        const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
+        const url = `${baseUrl}/api/${orgId}/streams?type=${streamType}`;
+        const deadline = Date.now() + timeoutMs;
+        for (;;) {
+            const listed = await fetchWithRetry(url, { method: 'GET', headers: getAuthHeaders() })
+                .then((res) => (res.ok ? res.json() : { list: [] }))
+                .then((body) => (body.list || []).some((stream) => stream.name === streamName))
+                .catch(() => false);
+            if (listed) return true;
+            if (Date.now() >= deadline) return false;
+            await this.page.waitForTimeout(pollMs);
+        }
     }
 
     /**

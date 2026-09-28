@@ -1906,6 +1906,7 @@
     "startFreeTrial": "Kostenlose Testversion starten"
   },
   "login": {
+    "lockedOut": "Zu viele fehlgeschlagene Anmeldeversuche. Versuchen Sie es in {duration} erneut, oder wenden Sie sich an Ihren Administrator.",
     "redirectingToSsoMessage": "Weiterleitung zur SSO-Anmeldeseite. Wenn Sie nicht weitergeleitet werden, bitte",
     "clickHere": "klicken Sie hier",
     "loginWithSso": "Mit SSO anmelden",
@@ -1965,6 +1966,15 @@
     "fieldRequired": "Feld ist erforderlich",
     "passwordRequired": "Passwort ist erforderlich.",
     "passwordPolicyHint": "Das Passwort muss aus 8 bis 128 Zeichen bestehen und mindestens einen Kleinbuchstaben, einen Großbuchstaben, eine Ziffer und ein Sonderzeichen enthalten.",
+    "lockout": {
+      "locked": "Konto gesperrt",
+      "autoUnlock": "Wird automatisch in {duration} entsperrt.",
+      "staged": "Wird beim Speichern entsperrt.",
+      "unlock": "Entsperren",
+      "undo": "Gesperrt lassen",
+      "confirmTitle": "{email} entsperren?",
+      "confirmMessage": "Dies setzt den Zähler der fehlgeschlagenen Versuche zurück und ermöglicht die sofortige erneute Anmeldung. Das Passwort wird dabei nicht geändert."
+    },
     "currentPasswordRequired": "Das aktuelle Passwort ist erforderlich.",
     "newPasswordRequired": "Ein neues Passwort ist erforderlich.",
     "otherOrgInvalid": "Der Name der Organisation muss mit einem Buchstaben beginnen und alphanumerisch, _ oder -, sein.",
@@ -2031,11 +2041,11 @@
       "addToGroup": "Zu einer Benutzergruppe hinzufügen",
       "addToRole": "Eine Rolle zuweisen",
       "step1Title": "Kopiere dein Token",
-      "copyHint": "Kopieren Sie dieses Token jetzt — Sie werden es nicht mehr sehen können.",
+      "copyHint": "Dies ist das einzige Mal, dass Sie dieses Token sehen. Kopieren oder laden Sie es jetzt herunter – es kann nicht erneut abgerufen werden.",
       "done": "Erledigt",
       "applying": "Zugriffsberechtigungen werden angewendet…",
-      "grantedRoles": "Rollen zugewiesen: {roles}",
-      "grantedGroups": "Zu Benutzergruppen hinzugefügt: {groups}",
+      "rolesAssignedLabel": "Zugewiesene Rollen",
+      "groupsAssignedLabel": "Zu Benutzergruppen hinzugefügt",
       "failedRoles": "Rollen konnten nicht zugewiesen werden: {roles}",
       "failedGroups": "Konnte nicht zu Benutzergruppen hinzugefügt werden: {groups}",
       "failedHint": "Sie können diese später auf den Seiten 'Rollen' und 'Benutzergruppen' gewähren."
@@ -2045,6 +2055,9 @@
         "label": "Dienstkontoname",
         "placeholder": "z.B. ingest-bot",
         "help": "Kleinbuchstaben, Zahlen und Bindestriche. Gespeichert als name{suffix}"
+      },
+      "identifier": {
+        "label": "Bezeichner"
       },
       "roles": {
         "label": "Rollen zuweisen",
@@ -2059,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Kennung",
+        "roles": "Rollen",
         "token": "Wertmarke",
         "created": "Erstellt"
       }
@@ -2186,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Alle Benutzer und Dienstkonten, die an diese Rollen gebunden sind, verlieren den Zugriff."
-      }
+      },
+      "assignColumn": "Zuweisen",
+      "assignBtn": "Hinzufügen",
+      "assignedBadge": "Zugewiesen",
+      "assignBannerText": "Fügen Sie {member} einer Rolle hinzu – klicken Sie unten neben einer Rolle auf Hinzufügen.",
+      "assignBannerDone": "Fertig",
+      "assignSuccess": "{member} wurde zur Rolle \"{role}\" hinzugefügt.",
+      "assignError": "Das Konto konnte dieser Rolle nicht hinzugefügt werden. Bitte versuchen Sie es erneut."
     },
     "group": {
       "name": {
@@ -2217,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Mitglieder dieser Gruppen verlieren die von ihnen gewährten Rollen."
-      }
+      },
+      "assignColumn": "Zuweisen",
+      "assignBtn": "Hinzufügen",
+      "assignedBadge": "Zugewiesen",
+      "assignBannerText": "Fügen Sie {member} einer Benutzergruppe hinzu – klicken Sie unten neben einer Gruppe auf Hinzufügen.",
+      "assignBannerDone": "Fertig",
+      "assignSuccess": "{member} wurde zur Gruppe \"{group}\" hinzugefügt.",
+      "assignError": "Das Konto konnte dieser Gruppe nicht hinzugefügt werden. Bitte versuchen Sie es erneut."
     },
     "appGroups": {
       "deleteGroupTitle": "Gruppe löschen",
@@ -3587,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Fehler beim Kopieren des Inhalts.",
+    "passcodeForbiddenMessage": "Administrator- oder Root-Rolle erforderlich, um das Datenerfassungs-Token anzuzeigen. Fragen Sie einen Administrator nach dem Einrichtungsbefehl oder nach der Rolle, die erforderlich ist, um es hier zu sehen.",
     "updateRUMTokenMessage": "Sind Sie sicher, dass Sie das RUM-Token für diese Organisation aktualisieren möchten?",
     "completeAwsIntegration": "AWS-Integration abschließen",
     "deployAwsServicesOneClick": "Stellen Sie alle ausgewählten AWS-Dienste mit einem Klick mithilfe eines einzigen CloudFormation-Stacks bereit.",
@@ -5827,7 +5856,36 @@
     "variableNameAlreadyExists": "Variable mit demselben Namen existiert bereits",
     "pivotTotal": "Gesamt",
     "pivotOthers": "Andere",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Exemplare anzeigen (Trace-Stichproben)",
+      "hide": "Exemplare ausblenden · {count} angezeigt",
+      "empty": "Keine Exemplare in diesem Zeitraum",
+      "emptyShort": "0 Exemplare",
+      "loadFailed": "Exemplare konnten nicht geladen werden",
+      "loadFailedHint": "Das Diagramm ist nicht betroffen. Erneut versuchen lädt nur die Exemplare.",
+      "retry": "Erneut versuchen",
+      "cardTitle": "Exemplar",
+      "query": "Abfrage {name}",
+      "returnedBy": "Von {count} Abfrage zurückgegeben | Von {count} Abfragen zurückgegeben",
+      "series": "Reihe",
+      "aboveRange": "Überhalb des Diagrammbereichs; an der oberen Kante gezeichnet",
+      "belowRange": "Unterhalb des Diagrammbereichs; an der unteren Kante gezeichnet",
+      "checkingTrace": "Trace wird geprüft…",
+      "openTrace": "Trace öffnen",
+      "openTraceHint": "Oder klicken Sie auf die Markierung. Zurück führt hierher.",
+      "traceNotAvailable": "Trace nicht verfügbar – herausgesampelt oder außerhalb der Aufbewahrungsfrist",
+      "openTraceUnverified": "Trace öffnen (unbestätigt)",
+      "unverifiedTimeout": "Die Trace-Suche hat das Zeitlimit überschritten, daher fehlt dieser Trace möglicherweise.",
+      "unverifiedForbidden": "Dieser Trace konnte nicht bestätigt werden – möglicherweise haben Sie keinen Zugriff auf Traces.",
+      "unverifiedPartial": "Es wurde nur ein Teil des Aufbewahrungszeitraums durchsucht.",
+      "unverifiedError": "Dieser Trace konnte nicht geprüft werden.",
+      "noTraceId": "Kein {label} bei diesem Exemplar, daher gibt es keinen Trace zum Öffnen.",
+      "markersAria": "Exemplar-Markierungen",
+      "markerAria": "Exemplar {value} um {time}"
+    },
+    "showExemplarsLabel": "Exemplare anzeigen",
+    "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7502,7 +7560,10 @@
       "lastError": "Letzter Fehler",
       "lastTrained": "Zuletzt trainiert",
       "lookBackWindow": "Fenster „Blick zurück“",
-      "lookBackWindowTooltip": "Gibt an, wie weit die einzelnen Erkennungsvorgänge zurückliegen. Verschließt das Fenster auch nach einer langen Pause. Die Standardeinstellung ist Jedes Intervall überprüfen.",
+      "lookBackWindowFloor": "Das Look-Back-Fenster muss mindestens {min} betragen — Check Every plus eine Detection Resolution. Ein kürzeres Fenster kann keinen vollständigen Bucket fassen, wenn ein Lauf ausgelöst wird, sodass Buckets übersprungen würden.",
+      "lookBackWindowLegacy": "Dieses gespeicherte Fenster liegt unter dem Minimum von {min} (Check Every plus eine Detection Resolution). Es wird unverändert gespeichert, aber Läufe können Buckets überspringen, bis das Fenster erhöht wird.",
+      "lookBackWindowMinimum": "Minimum {min}. Empfohlen {recommended} oder mehr — das Doppelte von (Check Every + Detection Resolution) — plus 10 Minuten, wenn die Abwesenheitserkennung aktiviert ist.",
+      "lookBackWindowTooltip": "Wie weit zurück jeder Erkennungslauf abfragt. Begrenzt das Fenster auch nach einer langen Pause. Es muss mindestens Check Every plus eine Detection Resolution abdecken, sonst fallen vollständige Buckets aus dem Fenster, bevor ein Lauf sie bewerten kann.",
       "metricChart": "Metrik und Anomalien",
       "metricChartHint": "Ein Punkt pro Erkennungsintervall",
       "model": "Modell",
@@ -7510,6 +7571,15 @@
       "nDays": "{days} Tag | {days} Tage",
       "noDestinationsFound": "Keine Ziele gefunden",
       "noFieldsFound": "Keine Felder gefunden",
+      "noticeHybridFallback": "Fallback-Erkennung",
+      "noticeHybridFallbackTooltip": "Der hybride Schwellenwert war bei den letzten Läufen nicht verfügbar, daher ist die Erkennung auf den eingefrorenen Schwellenwert zurückgefallen. Die Bewertung läuft weiter mit dem eingefrorenen Schwellenwert, bis das Modell neu trainiert wird.",
+      "noticeRetrain": "Automatisches Neutraining",
+      "noticeRetrainTooltip": "Das gespeicherte Modell konnte nach einem Upgrade nicht gelesen werden, daher wurde es verworfen und die Konfiguration automatisch für ein Neutraining vorgemerkt. Es ist keine Aktion erforderlich; die Erkennung wird fortgesetzt, sobald das Training abgeschlossen ist.",
+      "noticeSkipAbsence": "Die Abwesenheitsbewertung ist hinter das Look-Back-Fenster zurückgefallen; der Span, der nicht mehr abgerufen werden konnte, wurde übersprungen und protokolliert.",
+      "noticeSkipScored": "Die Erkennungsläufe lagen weiter auseinander, als das Look-Back-Fenster abdeckt, sodass geschlossene Buckets das Fenster verließen, bevor ein Lauf sie bewerten konnte.",
+      "noticeWindowFloor": "Fenster zu klein",
+      "noticeWindowFloorTooltip": "Das Look-Back-Fenster liegt unter Check Every plus einer Detection Resolution, sodass Läufe keinen Bucket bewerten können. Erhöhen Sie das Fenster, um die Erkennung wiederherzustellen.",
+      "noticeWindowSkip": "Buckets übersprungen",
       "notifications": "Benachrichtigungen",
       "notificationsTooltip": "Wenn aktiviert, wird eine Benachrichtigung an das ausgewählte Ziel gesendet, sobald eine Anomalie erkannt wird.",
       "percentile": "Stufe",
@@ -7606,7 +7676,9 @@
       "usernameRequired": "Benutzername ist erforderlich",
       "passwordRequired": "Passwort ist erforderlich",
       "emailRecipients": "E-Mail-Adressen der Empfänger",
-      "emailRecipientsHelp": "Durch Kommas getrennte E-Mail-Adressen",
+      "emailRecipientsHelp": "Wählen Sie die Benutzer der Organisation oder Dienstkonten aus, die Warnmeldungs-E-Mails erhalten sollen",
+      "emailRecipientsGroupUsers": "Benutzer",
+      "emailRecipientsGroupServiceAccounts": "Dienstkonten",
       "invalidEmailAddresses": "Ungültige E-Mail-Adressen: {emails}",
       "opsgenieApiKey": "Opsgenie-API-Schlüssel",
       "opsgenieApiKeyHelp": "Holen Sie sich Ihren API-Schlüssel aus den Opsgenie-Integrationseinstellungen",
@@ -7923,7 +7995,18 @@
     "enabled": "Aktiviert",
     "paused": "Pausiert",
     "impactTemplate": "Verwendet von {destinations} · {alerts}",
-    "impactDestination": "Verwendet von {alerts}"
+    "impactDestination": "Verwendet von {consumers}",
+    "impactUnused": "Nicht verwendet",
+    "noConsumers": "Keine Konsumenten.",
+    "countCompositeAlert": "{count} zusammengesetzte Warnmeldung | {count} zusammengesetzte Warnmeldungen",
+    "countPipeline": "{count} Rohrleitung | {count} Rohrleitungen",
+    "countSyntheticCheck": "{count} synthetische Prüfung | {count} synthetische Prüfungen",
+    "countOncallPolicy": "{count} Eskalationsrichtlinie | {count} Eskalationsrichtlinien",
+    "countOncallTeamChannel": "{count} Team-Kanal | {count} Team-Kanäle",
+    "countWorkflow": "{count} Workflow | {count} Workflows",
+    "countAnomalyDetection": "{count} Anomalie-Detektor | {count} Anomalie-Detektoren",
+    "countIncidentIntegration": "{count} Vorfall-Integration | {count} Vorfall-Integrationen",
+    "sectionOtherConsumers": "Wird auch verwendet von"
   },
   "alert_library": {
     "header": "Alarm-Bibliothek",
@@ -8607,7 +8690,9 @@
         "staleCopyAria": "Details der fehlgeschlagenen Aktualisierung für {name} kopieren",
         "stalePreamble": "Aktualisierung fehlgeschlagen — zeige das letzte erfolgreiche Ergebnis.",
         "staleClickToCopy": "Klicken Sie, um die Details zu kopieren.",
-        "lastRefreshedPrefix": "Zuletzt aktualisiert um: "
+        "lastRefreshedPrefix": "Zuletzt aktualisiert um: ",
+        "exemplarsShowHeatmap": "Exemplare anzeigen (Trace-Stichproben). Schaltet diese Karte währenddessen auf Perzentile um.",
+        "exemplarsHideHeatmap": "Exemplare ausblenden · {count} angezeigt. Setzt diese Karte auf die Heatmap zurück."
       },
       "fn": {
         "subtitle": "Wählen Sie, wie diese Metrik aggregiert wird",
@@ -8791,6 +8876,8 @@
     "cipherKeysDesc": "Verschlüsselungsschlüssel für sensible Felder",
     "regexPatternsDesc": "Wiederverwendbare regex-Muster zur Schwärzung",
     "domainManagementDesc": "Anmeldung auf zulässige SSO-Domänen beschränken",
+    "passwordPolicy": "Passwortrichtlinie",
+    "passwordPolicyDesc": "Authentifizierungsrichtlinien für native E-Mail-/Passwort-Konten, instanzweit angewendet.",
     "pipelineDestinationsDesc": "Externe Ziele für die Pipeline-Ausgabe",
     "templatesDesc": "Wiederverwendbare Vorlagen für Alarmmeldungen",
     "storageSettingsDesc": "Speicherkonfiguration pro Organisation",
@@ -13383,6 +13470,7 @@
       "searchHistoryNotEnabled": "Suchverlauf ist nicht aktiviert.",
       "enableUsageReporting": "Setzen Sie ZO_USAGE_REPORTING_ENABLED auf true, um die Nutzungsberichterstattung zu aktivieren.",
       "selectStreamToExtractPatterns": "Bitte wählen Sie einen Stream aus, um Muster zu extrahieren",
+      "patternsUnavailableForMultiStream": "Muster sind nicht verfügbar, wenn mehrere Streams ausgewählt sind. Bitte wählen Sie einen einzelnen Stream aus.",
       "errorExtractingPatterns": "Fehler beim Extrahieren von Mustern. Bitte versuchen Sie es erneut.",
       "nameOfPanelRequired": "Name des Panels ist erforderlich",
       "errorsFixAndTryAgain": "Es gibt einige Fehler, bitte beheben Sie diese und versuchen Sie es erneut",
@@ -15299,6 +15387,9 @@
       "multiSelect": "Mehrfachauswahl",
       "singleSelect": "Einzelauswahl"
     },
+    "templateInput": {
+      "suggestions": "Variablenvorschläge"
+    },
     "time": {
       "openTimePicker": "Zeitauswahl öffnen",
       "clear": "Löschen",
@@ -15784,7 +15875,8 @@
         "destinations": "Ziele",
         "templates": "Vorlagen",
         "reports": "Berichte",
-        "llmModelPricing": "LLM-Modellpreise"
+        "llmModelPricing": "LLM-Modellpreise",
+        "passcode": "Datenerfassungs-Token"
       },
       "noPermissionToChangeFavorites": "Sie haben keine Berechtigung, Favoriten zu ändern",
       "couldNotUpdateFavoriteDashboards": "Favoriten-Dashboards konnten nicht aktualisiert werden"
@@ -16022,6 +16114,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "Sie haben den Datenaufnahmeprozess noch nicht gestartet. Um andere Seiten zu erkunden, starten Sie bitte die Datenaufnahme."
+    },
+    "iam": {
+      "userSaveFailed": "Der Benutzer konnte nicht gespeichert werden"
     }
   },
   "cipherKeys": {
@@ -16439,7 +16534,106 @@
       "exponentName": "Exponent"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Komplexität",
+    "minLength": "Minimale Länge",
+    "minLengthDesc": "Kürzestes akzeptiertes Passwort",
+    "maxLength": "Maximale Länge",
+    "maxLengthDesc": "0 = unbegrenzt",
+    "requireUppercase": "Großbuchstabe erforderlich",
+    "requireUppercaseDesc": "Mindestens ein A–Z",
+    "requireLowercase": "Kleinbuchstabe erforderlich",
+    "requireLowercaseDesc": "Mindestens ein a–z",
+    "requireDigit": "Ziffer erforderlich",
+    "requireDigitDesc": "Mindestens eine 0–9",
+    "requireSpecial": "Sonderzeichen erforderlich",
+    "requireSpecialDesc": "Mindestens eines aus der erlaubten Menge",
+    "specialCharSet": "Erlaubte Sonderzeichen",
+    "specialCharSetDesc": "Leer lassen, um beliebige nicht-alphanumerische Zeichen zu akzeptieren",
+    "maxLengthTooSmall": "Die maximale Länge muss mindestens der minimalen Länge entsprechen, oder 0 für unbegrenzt.",
+    "confirmTitle": "Passwortrichtlinie speichern?",
+    "confirmMessage": "Beim Speichern müssen möglicherweise alle nativen Benutzer ein neues Passwort festlegen, bevor sie fortfahren können. Root, externe Benutzer und Dienstkonten sind ausgenommen — das gilt auch für Sie, es sei denn, Sie sind das Root-Konto. Dies kann nicht rückgängig gemacht werden.",
+    "saved": "Passwortrichtlinie gespeichert. | Passwortrichtlinie gespeichert. {count} Benutzer muss sein Passwort zurücksetzen. | Passwortrichtlinie gespeichert. {count} Benutzer müssen ihr Passwort zurücksetzen.",
+    "saveFailed": "Die Passwortrichtlinie konnte nicht gespeichert werden.",
+    "notAdminTitle": "Administratorzugriff erforderlich",
+    "notAdmin": "Die Konfiguration der Passwortrichtlinie erfordert einen Administrator der Meta-Organisation.",
+    "loadFailedTitle": "Die Passwortrichtlinie konnte nicht geladen werden",
+    "loadFailed": "Beim Lesen der aktuellen Richtlinie ist ein Fehler aufgetreten.",
+    "rotation": "Rotation",
+    "rotationDays": "Rotationszeitraum",
+    "rotationDaysDesc": "Tage, bevor ein Passwort abläuft. 0 = läuft nie ab",
+    "rotationWarningDays": "Vor Ablauf warnen",
+    "rotationWarningDaysDesc": "Tage Vorlaufzeit bei der Anmeldung. 0 = keine Warnung",
+    "warningDaysTooLong": "Der Warnzeitraum darf nicht länger als der Rotationszeitraum sein.",
+    "rotationPreview": "Ein heute festgelegtes Passwort läuft am {expires} ab. Die Anmeldewarnung beginnt am {warns}.",
+    "rotationPreviewNoWarning": "Ein heute festgelegtes Passwort läuft am {expires} ab. Vorher wird keine Warnung angezeigt.",
+    "reuse": "Wiederverwendung verhindern",
+    "historyCount": "Gemerkte Passwörter",
+    "historyCountDesc": "Ein neues Passwort darf nicht mit so vielen vorherigen übereinstimmen. 0 = keine Prüfung",
+    "historyMaxRetained": "Verlauf beibehalten",
+    "historyMaxRetainedDesc": "Wie viele frühere Passwörter pro Benutzer gespeichert werden",
+    "historyRetainedTooSmall": "Der beibehaltene Verlauf muss mindestens der Anzahl der gemerkten Passwörter entsprechen.",
+    "reuseExplainer": "Das aktuelle Passwort zählt zur gemerkten Menge — seine Wiederverwendung wird durch diese Regel abgelehnt, nicht durch eine separate Prüfung.",
+    "lockout": "Kontosperrung",
+    "lockoutThreshold": "Fehlgeschlagene Versuche vor der Sperrung",
+    "lockoutThresholdDesc": "0 = Sperrung deaktiviert",
+    "lockoutBucketSize": "Versuche vor jeder weiteren Sperrung",
+    "lockoutBucketSizeDesc": "0 = Wert oben wiederverwenden",
+    "lockoutStartSecs": "Dauer der ersten Sperrung",
+    "lockoutStartSecsDesc": "Sekunden",
+    "lockoutMaxSecs": "Maximale Sperrdauer",
+    "lockoutMaxSecsDesc": "Sekunden — die Obergrenze, auf die die Eskalation begrenzt wird",
+    "lockoutStartTooLong": "Die erste Sperrung darf nicht länger als die maximale Sperrung sein.",
+    "lockoutBackoff": "Eskalation",
+    "lockoutBackoffDesc": "Wie jede Sperrung gegenüber der vorherigen anwächst",
+    "backoffExponential": "Exponentiell",
+    "backoffLinear": "Linear",
+    "lockoutPreview": "{threshold} Fehlversuche → {first} · alle {bucket} weiteren → {rest} · begrenzt auf {max}. Eine erfolgreiche Anmeldung setzt alles zurück.",
+    "sessionEnforcement": "Sitzung & Durchsetzung",
+    "cookieMaxAge": "Sitzungsdauer",
+    "cookieMaxAgeDesc": "Sekunden, die eine angemeldete Sitzung gültig bleibt. 0 = Instanz-Standard aus {envVar} verwenden",
+    "applyToRoot": "Auf das Root-Konto anwenden",
+    "applyToRootDesc": "Root ist von allen oben genannten Regeln ausgenommen, sofern dies nicht aktiviert ist",
+    "rootWarning": "Eine Sperrung von Root kann das System in einen nicht wiederherstellbaren Zustand versetzen.",
+    "rootDialogTitle": "Richtlinie auf Root anwenden?",
+    "rootDialogMessage": "Root unterliegt dann wie jedes andere native Konto Sperrungen, Rotation und erzwungenen Zurücksetzungen. Wenn Root Ihr einziges Administratorkonto ist, kann eine Sperrung oder ein Ablauf, den es nicht erfüllen kann, jeden Zugang zu dieser Instanz versperren.",
+    "rootDialogAck": "Mir ist bewusst, dass Root dauerhaft aus dieser Instanz ausgesperrt werden kann.",
+    "rootDialogConfirm": "Auf Root anwenden"
+  },
+  "passwordReset": {
+    "title": "Aktualisieren Sie Ihr Passwort",
+    "signedInAs": "Angemeldet als {email}",
+    "reasonPolicyTightened": "Die Passwortrichtlinie wurde geändert. Aktualisieren Sie Ihr Passwort, um OpenObserve weiter zu verwenden.",
+    "reasonRotationExpired": "Ihr Passwort ist abgelaufen. Legen Sie ein neues fest, um OpenObserve weiter zu verwenden.",
+    "reasonRotationWarning": "Ihr Passwort läuft bald ab. Legen Sie jetzt ein neues fest, um nicht von Ihrer Arbeit ausgesperrt zu werden.",
+    "reused": "Dieses Passwort wurde kürzlich verwendet. Wählen Sie eines, das Sie nicht unter Ihren letzten {count} Passwörtern verwendet haben.",
+    "expiryBanner": "Ihr Passwort läuft in {count} Tag ab. Aktualisieren Sie es jetzt, um nicht von Ihrer Arbeit ausgesperrt zu werden. | Ihr Passwort läuft in {count} Tagen ab. Aktualisieren Sie es jetzt, um nicht von Ihrer Arbeit ausgesperrt zu werden.",
+    "expiryBannerAction": "Jetzt aktualisieren",
+    "expiryBannerDismiss": "Ausblenden",
+    "currentPassword": "Aktuelles Passwort",
+    "newPassword": "Neues Passwort",
+    "confirmPassword": "Neues Passwort bestätigen",
+    "currentPasswordRequired": "Aktuelles Passwort ist erforderlich.",
+    "newPasswordRequired": "Neues Passwort ist erforderlich.",
+    "confirmPasswordRequired": "Bitte geben Sie das neue Passwort erneut ein.",
+    "mismatch": "Passwörter stimmen nicht überein.",
+    "signOut": "Abmelden",
+    "submit": "Passwort aktualisieren",
+    "updated": "Ihr Passwort wurde aktualisiert. Bitte melden Sie sich erneut an.",
+    "updateFailed": "Ihr Passwort konnte nicht aktualisiert werden.",
+    "req": {
+      "minLength": "Mindestens {count} Zeichen",
+      "maxLength": "Höchstens {count} Zeichen",
+      "uppercase": "Ein Großbuchstabe",
+      "lowercase": "Ein Kleinbuchstabe",
+      "digit": "Eine Ziffer",
+      "special": "Ein Sonderzeichen",
+      "specialFromSet": "Ein Sonderzeichen aus {set}",
+      "unmet": "Das Passwort muss enthalten: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Passwortrichtlinie",
     "loginCallback": "Anmelde-Rückruf",
     "slackOAuthCallback": "Slack wird verbunden",
     "emptyStateDemo": "Demo für leeren Zustand",
@@ -16905,17 +17099,17 @@
       "alertMe": "Benachrichtige mich",
       "columnHints": {
         "qps": "Aufrufe pro Sekunde — die Aufrufe dieses Zeitfensters geteilt durch dessen Länge, damit eine 15-Minuten-Ansicht und eine 4-Stunden-Ansicht vergleichbar bleiben.",
-        "p50": "Die Hälfte aller Aufrufe war schneller als dieser Wert. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
-        "p95": "Das langsame Ende — 1 von 20 Aufrufen dauerte mindestens so lange. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
-        "p99": "Die langsamsten 1 % der Aufrufe dauerten mindestens so lange. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
-        "load": "Gesamtzeit, die Ihre Anwendungen auf diese Datenbank gewartet haben. Vom Client aus gemessen, spiegelt sie also wider, wie viel Verkehr diese Datenbank bedient hat — nicht, wie stark der Server ausgelastet ist.",
+        "p50": "Die Hälfte aller Aufrufe war schneller als dies. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
+        "p95": "Der langsame Ausläufer – 1 von 20 Aufrufen dauerte mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
+        "p99": "Die schlechtesten 1 % der Aufrufe dauerten mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
+        "load": "Gesamtzeit, die Ihre Apps für Aufrufe an diese Datenbank aufgewendet haben, gemessen an den Traces Ihrer Anwendung. Sie zeigt, wie viel Verkehr diese Datenbank für Ihre Apps abgewickelt hat.",
         "attention": "Wie nah diese Instanz an einem Limit ist, das ihre eigene Engine veröffentlicht — heute Verbindungen gegen max_connections. Das schlechteste Verhältnis, kein Mischwert. Absteigend sortiert, wobei Instanzen, deren Zustand nicht lesbar ist, oben stehen, denn eine, die man nicht sehen kann, ist keine, von der man weiß, dass sie gesund ist. Auf dem Datenbankserver gemessen, daher nicht vergleichbar mit der Datenbankzeit daneben."
       },
       "failedChip": "{count} fehlgeschlagen",
       "columnSubLabels": {
-        "attention": "Server",
-        "load": "Client",
-        "calls": "Client"
+        "attention": "aus der Datenbank",
+        "load": "aus Ihren Apps",
+        "calls": "aus Ihren Apps"
       },
       "attention": {
         "connections": "Verbindungen",
@@ -16977,14 +17171,14 @@
         "failed": "Fehlgeschlagen"
       },
       "columnHints": {
-        "calls": "Wie oft diese Abfrage ausgeführt wurde. Die eigene Zählung Ihrer Datenbank, sofern sie eine meldet – das umfasst jeden Client, nicht nur die Teile Ihres Systems, die Traces senden. Zeilen, die als clientbeobachtet markiert sind, werden stattdessen aus Traces gezählt, da Ihre Datenbank sie nicht gemeldet hat.",
-        "p50": "Die Hälfte aller Aufrufe war schneller als dieser Wert. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
-        "p95": "Der langsame Schwanz — 1 von 20 Aufrufen dauerte mindestens so lange. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
-        "p99": "Die schlechtesten 1% der Aufrufe dauerten mindestens so lange. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückkam, wird hier nicht gemessen.",
+        "calls": "Wie oft diese Abfrage ausgeführt wurde, gezählt von Ihrer Datenbank – jede App, die sich verbindet, ist enthalten. Wo Ihre Datenbank keine Zählung für eine Abfrage hat, kennzeichnet das Traces-Symbol eine anhand der Traces Ihrer Anwendung gemessene Zählung.",
+        "p50": "Die Hälfte aller Aufrufe war schneller als dies. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
+        "p95": "Der langsame Ausläufer – 1 von 20 Aufrufen dauerte mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
+        "p99": "Die schlechtesten 1 % der Aufrufe dauerten mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
         "max": "Der langsamste einzelne Aufruf in diesem Zeitraum — ein echter Aufruf, kein Durchschnitt.",
         "errors": "Wie viele dieser Aufrufe mit einem Fehler zurückkamen.",
         "perTrace": "Wie oft dies innerhalb einer einzelnen Anfrage ausgeführt wird. Eine hohe Zahl bedeutet normalerweise eine Schleife.",
-        "load": "Gesamtzeit, die diese Abfrage in der Datenbank verbracht hat. Die eigene Angabe Ihrer Datenbank, sofern sie eine meldet: Ausführungszeit bei Postgres, aber WARTEZEIT bei MySQL und MariaDB – jede Zeile gibt an, welches. Zeilen, die als clientbeobachtet markiert sind, werden aus Traces gemessen und umfassen daher den Netzwerk-Roundtrip."
+        "load": "Gesamtzeit, die diese Abfrage in der Datenbank verbracht hat, gemäß den Angaben Ihrer Datenbank: Ausführungszeit auf Postgres, Wartezeit auf MySQL und MariaDB – jede Zeile gibt an, was gilt. Zeilen mit dem Traces-Symbol werden anhand der Traces Ihrer Anwendung gemessen und enthalten daher auch den Hin- und Rückweg zur Datenbank."
       },
       "errorsNone": "keine",
       "errorsAll": "alle",
@@ -17248,8 +17442,7 @@
       "overlap": {
         "serverExecution": "Zeit, die {engine} für die Ausführung aufgewendet hat",
         "serverWait": "Zeit, die {engine} darauf gewartet hat — Wartezeit, nicht Ausführungszeit",
-        "serverCounted": "Gezählt von {engine}, über alle Clients hinweg",
-        "clientObserved": "Beobachtet von instrumentierten Aufrufern — Ihre Datenbank hat diese nicht gemeldet."
+        "serverCounted": "Gezählt von {engine}, über alle Clients hinweg"
       },
       "endpointsConcentrated": "Ein Endpunkt macht {percent} der Zeit dieser Abfrage aus. Beheben Sie {endpoint}, und Sie haben diese Abfrage behoben.",
       "typicalMarker": "Langsame Aufrufe {value}",
@@ -17276,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "Was die Datenbank selbst aufgezeichnet hat",
-        "subtitle": "Serverseitig — alle Clients",
-        "clientSubtitle": "Clientseitig beobachtet — nur instrumentierte Aufrufer, nur abgeschlossene Aufrufe. Eine noch laufende oder hängende Abfrage ist in diesen Zahlen nicht enthalten.",
+        "subtitle": "Aus Ihrer Datenbank – jede App, die sich verbindet",
+        "clientSubtitle": "Markierte Werte werden anhand der Traces Ihrer Anwendung gemessen – die Aufrufe, die Ihre Apps in diesem Zeitfenster abgeschlossen haben",
         "instance": "Gemeldet von {instance}",
         "instanceWide": "Alle Datenbanken auf dieser Instanz",
         "calls": "Ausführungen",
@@ -17323,9 +17516,13 @@
         "serverExecution": "Ausführungszeit",
         "serverWait": "Wartezeit",
         "serverCounted": "Serveranzahl",
-        "clientObserved": "clientseitig beobachtet",
         "serverReported": "von Ihren Datenbanken gemeldet"
       }
+    },
+    "appSource": {
+      "marker": "Anhand der Traces Ihrer Anwendung gemessen",
+      "markerHint": "Anhand der Traces Ihrer Anwendung gemessen; ergänzt die Sicht Ihrer Apps zu den Angaben Ihrer Datenbank.",
+      "legend": "Aus den Traces Ihrer App"
     },
     "page": {
       "tabs": {
@@ -17334,7 +17531,7 @@
         "metricsHint": "Datenbanklast nach Warteereignis und jede Metrik, die Ihre Datenbank-Receiver erfassen.",
         "queries": "Top-Abfragen",
         "samples": "Langsamste Aufrufe",
-        "samplesHintClient": "Abgeschlossene Aufrufe, die Ihre instrumentierten Dienste in diesem Fenster beobachtet haben – Aufrufer ohne Tracing werden nicht gezählt, dies ist also eine Untergrenze, nicht die Gesamtzahl. Die Tabelle zeigt die langsamsten davon.",
+        "samplesHintClient": "Aufrufe, die in diesem Zeitfenster anhand der Traces Ihrer Anwendung gemessen wurden; ergänzt die Sicht Ihrer Apps zu den Angaben Ihrer Datenbank. Die Tabelle zeigt die langsamsten davon.",
         "samplesHintServer": "Anweisungen, die Ihre Datenbanken als abgeschlossen in diesem Fenster gemeldet haben, innerhalb der Datenbank gezählt. Die Tabelle zeigt die langsamsten davon.",
         "samplesHintUnknown": "Die langsamsten einzelnen Datenbankaufrufe in diesem Fenster.",
         "deadlocks": "Deadlocks",
@@ -17371,6 +17568,11 @@
       "explore": "Im Metriken-Explorer öffnen",
       "railLabel": "Metriken-Bereiche",
       "noAccess": "Sie haben keine Berechtigung, {stream} zu lesen. Bitten Sie einen Administrator um Lesezugriff auf diesen Stream.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "nach Abfrage",
         "database": "nach Datenbank",
@@ -17485,7 +17687,7 @@
         "status": "Status"
       },
       "columnHints": {
-        "duration": "Wie lange dieser eine Aufruf gedauert hat, gemessen vom Aufrufer. Zählt nur abgeschlossene Aufrufe — eine noch laufende Abfrage oder eine, die nie zurückgekehrt ist, wird hier nicht gemessen."
+        "duration": "Wie lange dieser eine Aufruf gedauert hat, gemessen von Ihrer Anwendung von Anfang bis Ende."
       },
       "failed": "Fehlgeschlagen",
       "failedWithCode": "Fehlgeschlagen · {code}",
@@ -18994,6 +19196,8 @@
     "rotationNobody": "Niemand in Bereitschaft",
     "edit": "Bearbeiten",
     "timelineLoadFailed": "Der Dienstplan für dieses Zeitfenster konnte nicht ermittelt werden.",
+    "editorReadFailed": "Die neueste Version zum Bearbeiten konnte nicht geladen werden. Versuchen Sie es erneut.",
+    "refreshFailed": "Die Aktualisierung ist fehlgeschlagen. Die Anzeige ist möglicherweise veraltet.",
     "scheduleDoneEditing": "Zurück zum Dienstplan",
     "coverWhoRequired": "Wählen Sie aus, wer die Vertretung übernimmt",
     "timelineCoverAria": "{who} übernimmt {rotation} von {from} bis {to}",

@@ -327,6 +327,26 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     Ok(out)
 }
 
+/// Every synthetic in an org, fully decoded; fails closed on a bad row, unlike `list`.
+pub async fn list_fully_decoded<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Vec<Synthetic>, errors::Error> {
+    let models = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .all(conn)
+        .await?;
+    let mut out = Vec::with_capacity(models.len());
+    for m in models {
+        let id = m.id.clone();
+        let s = Synthetic::try_from(m).map_err(|e| {
+            errors::Error::Message(format!("synthetic check {id} is unreadable: {e}"))
+        })?;
+        out.push(s);
+    }
+    Ok(out)
+}
+
 /// How many checks in an org are pinned to each environment, keyed by environment id.
 pub async fn count_by_environment<C: ConnectionTrait>(
     conn: &C,

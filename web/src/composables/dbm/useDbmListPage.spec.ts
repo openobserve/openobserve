@@ -21,6 +21,7 @@ import { contextRegistry, DBM_CONTEXT_KEY } from "@/composables/contextProviders
 import type { ContextProvider } from "@/composables/contextProviders";
 
 import { provideDbmTabCounts, type DbmTabCountsContext } from "./dbmTabCounts";
+import { refreshDbmFleet } from "./useDbmFleetInstances";
 import { clearDbmAnchors } from "./useDbmScope";
 import { emptyDbmTabCounts } from "./useDbmTabCounts";
 import { useDbmListPage, type DbmListPageOptions } from "./useDbmListPage";
@@ -29,6 +30,11 @@ import { useDbmListPage, type DbmListPageOptions } from "./useDbmListPage";
 
 const replace = vi.fn(() => Promise.resolve());
 let routeQuery: Record<string, unknown> = {};
+
+vi.mock("./useDbmFleetInstances", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./useDbmFleetInstances")>()),
+  refreshDbmFleet: vi.fn(),
+}));
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ name: "dbmActivity", query: routeQuery }),
@@ -126,9 +132,12 @@ describe("useDbmListPage", () => {
       { counts: shallowReadonly(shallowRef(emptyDbmTabCounts())), refresh },
     );
     load.mockClear();
+    vi.mocked(refreshDbmFleet).mockClear();
     page.onRefresh();
     expect(load).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenCalledWith({ force: true });
+    // The picker's options are a read of their own; the refresh rule reaches them too.
+    expect(refreshDbmFleet).toHaveBeenCalledTimes(1);
   });
 
   // ── date changes ──────────────────────────────────────────────────────────

@@ -38,7 +38,7 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::sampling::execution::generate_row_group_access_plan;
+use o2_enterprise::enterprise::search::sampling::execution::generate_row_group_row_selection;
 use rayon::prelude::*;
 
 use crate::{
@@ -87,14 +87,13 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
             }
             #[cfg(feature = "enterprise")]
             FileSelection::RowGroups(row_group_ids) => {
-                if let Some((num_rows, row_group_size)) = parquet_file_layout(file, row_group_size)
-                {
-                    let access_plan = generate_row_group_access_plan(
+                if let Some(num_rows) = exact_num_rows(file) {
+                    let selection = generate_row_group_row_selection(
                         &row_group_ids,
-                        num_rows.div_ceil(row_group_size),
+                        num_rows,
                         file.path().as_ref(),
                     );
-                    file.extensions.insert_arc(access_plan);
+                    file.extensions.insert(selection);
                 }
             }
             #[cfg(not(feature = "enterprise"))]
@@ -237,14 +236,18 @@ fn parquet_file_layout(
     file: &PartitionedFile,
     row_group_size: Option<u32>,
 ) -> Option<(usize, usize)> {
-    let stats = file.statistics.as_ref()?;
-    let Precision::Exact(num_rows) = stats.num_rows else {
-        return None;
-    };
+    let num_rows = exact_num_rows(file)?;
     let row_group_size = row_group_size
         .map(|v| v as usize)
         .unwrap_or(LEGACY_ROW_GROUP_SIZE);
     Some((num_rows, row_group_size))
+}
+
+fn exact_num_rows(file: &PartitionedFile) -> Option<usize> {
+    match file.statistics.as_ref()?.num_rows {
+        Precision::Exact(num_rows) => Some(num_rows),
+        _ => None,
+    }
 }
 
 pub fn apply_projection(

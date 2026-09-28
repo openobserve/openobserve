@@ -81,7 +81,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true",
         params.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -111,7 +111,9 @@ describe("Search Service", () => {
         "&tab_id=tab-1" +
         "&tab_name=Test%20Tab";
 
-      expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query, undefined);
+      expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query, {
+        transformResponse: [expect.any(Function)],
+      });
     });
 
     it("should add is_ui_histogram parameter when provided", async () => {
@@ -127,7 +129,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true&is_ui_histogram=true",
         params.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -143,7 +145,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true&is_multi_stream_search=true",
         params.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -161,7 +163,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search_multi?type=logs&search_type=ui&use_cache=true",
         params.query.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -180,7 +182,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search_multi?type=logs&search_type=ui&use_cache=true",
         { ...params.query.query, aggs: params.query.aggs },
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -213,7 +215,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=false",
         params.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -232,7 +234,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true",
         params.query,
-        undefined,
+        { transformResponse: [expect.any(Function)] },
       );
     });
 
@@ -275,7 +277,7 @@ describe("Search Service", () => {
       expect(result._start_time_ns).toBe("1700000000123456789");
     });
 
-    it("should not pass transformResponse config when page_type is not traces", async () => {
+    it("should also pass transformResponse config when page_type is logs", async () => {
       const params = {
         org_identifier: "org",
         query: { query: { sql: "SELECT 1" } },
@@ -285,8 +287,25 @@ describe("Search Service", () => {
       await search.search(params);
 
       const postCall = mockHttp.post.mock.calls[0];
-      // axiosConfig is undefined for non-traces page types
-      expect(postCall[2]).toBeUndefined();
+      expect(Array.isArray(postCall[2]?.transformResponse)).toBe(true);
+    });
+
+    it("should quote an unsafe-integer field (e.g. userid, #14376) regardless of page_type", async () => {
+      const params = {
+        org_identifier: "org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "logs",
+      };
+
+      await search.search(params);
+
+      const postCall = mockHttp.post.mock.calls[0];
+      const transformFn = postCall[2].transformResponse[0];
+
+      const rawJson = '{"hits":[{"userid":646586703926004764}]}';
+      const parsed = transformFn(rawJson);
+
+      expect(parsed.hits[0].userid).toBe("646586703926004764");
     });
 
     it("should not throw when transformResponse receives invalid JSON", async () => {
@@ -673,6 +692,66 @@ describe("Search Service", () => {
 
       expect(mockHttp.get).toHaveBeenCalledWith(
         `/api/test-org/traces/time_range?trace_id=${T1}&start_time=0&end_time=0`,
+      );
+    });
+  });
+
+  describe("get_trace_time_ranges signal", () => {
+    it("passes an abort signal through to the request", async () => {
+      const controller = new AbortController();
+      await search.get_trace_time_ranges({
+        org_identifier: "test-org",
+        trace_ids: ["abc"],
+        hint_ts: 1500,
+        signal: controller.signal,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/time_range?trace_id=abc&hint_ts=1500",
+        { signal: controller.signal },
+      );
+    });
+  });
+
+  describe("metrics_query_exemplars", () => {
+    it("builds the query_exemplars URL with the query's window and no step", async () => {
+      await search.metrics_query_exemplars({
+        org_identifier: "test-org",
+        query: 'histogram_quantile(0.99, rate(http_bucket{job="api"}[5m]))',
+        start_time: 1609459200000000,
+        end_time: 1609545600000000,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/test-org/prometheus/api/v1/query_exemplars?start=1609459200000000&end=1609545600000000&query=" +
+          encodeURIComponent('histogram_quantile(0.99, rate(http_bucket{job="api"}[5m]))'),
+      );
+    });
+
+    it("forwards the dashboard attribution params and the abort signal", async () => {
+      const controller = new AbortController();
+      await search.metrics_query_exemplars({
+        org_identifier: "test-org",
+        query: "up",
+        start_time: 1,
+        end_time: 2,
+        dashboard_id: "dash-1",
+        dashboard_name: "My Dash",
+        folder_id: "f-1",
+        folder_name: "Ops",
+        panel_id: "p-1",
+        panel_name: "Latency",
+        run_id: "run-1",
+        tab_id: "t-1",
+        tab_name: "Main Tab",
+        signal: controller.signal,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/test-org/prometheus/api/v1/query_exemplars?start=1&end=2&query=up" +
+          "&dashboard_id=dash-1&dashboard_name=My%20Dash&folder_id=f-1&folder_name=Ops" +
+          "&panel_id=p-1&panel_name=Latency&run_id=run-1&tab_id=t-1&tab_name=Main%20Tab",
+        { signal: controller.signal },
       );
     });
   });

@@ -1906,6 +1906,7 @@
     "startFreeTrial": "Start free trial"
   },
   "login": {
+    "lockedOut": "Too many failed sign-in attempts. Try again in {duration}, or contact your administrator.",
     "redirectingToSsoMessage": "Redirecting to SSO login page. If you are not redirected, please",
     "clickHere": "click here",
     "loginWithSso": "Login with SSO",
@@ -1965,6 +1966,15 @@
     "fieldRequired": "Field is required",
     "passwordRequired": "Password is required.",
     "passwordPolicyHint": "Password must be 8-128 characters and contain at least one lowercase letter, one uppercase letter, one digit, and one special character.",
+    "lockout": {
+      "locked": "Account locked",
+      "autoUnlock": "Unlocks automatically in {duration}.",
+      "staged": "Will be unlocked when you save.",
+      "unlock": "Unlock",
+      "undo": "Keep locked",
+      "confirmTitle": "Unlock {email}?",
+      "confirmMessage": "This clears their failed attempt count and lets them sign in again immediately. It does not change their password."
+    },
     "currentPasswordRequired": "Current password is required.",
     "newPasswordRequired": "New password is required.",
     "otherOrgInvalid": "Organization name must start with a letter and be alphanumeric, _ or -.",
@@ -2031,11 +2041,11 @@
       "addToGroup": "Add to a user group",
       "addToRole": "Assign a role",
       "step1Title": "Copy your token",
-      "copyHint": "Copy this token now — you won't be able to see it again.",
+      "copyHint": "This is the only time you'll see this token. Copy or download it now, it can't be retrieved again.",
       "done": "Done",
       "applying": "Applying access grants…",
-      "grantedRoles": "Roles assigned: {roles}",
-      "grantedGroups": "Added to user groups: {groups}",
+      "rolesAssignedLabel": "Roles assigned",
+      "groupsAssignedLabel": "Added to user groups",
       "failedRoles": "Could not assign roles: {roles}",
       "failedGroups": "Could not add to user groups: {groups}",
       "failedHint": "You can grant these later from the Roles and User Groups pages."
@@ -2045,6 +2055,9 @@
         "label": "Service account name",
         "placeholder": "e.g. ingest-bot",
         "help": "Lowercase letters, numbers and hyphens. Saved as name{suffix}"
+      },
+      "identifier": {
+        "label": "Identifier"
       },
       "roles": {
         "label": "Assign roles",
@@ -2059,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Identifier",
+        "roles": "Roles",
         "token": "Token",
         "created": "Created"
       }
@@ -2186,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Any users and service accounts bound to these roles will lose access."
-      }
+      },
+      "assignColumn": "Assign",
+      "assignBtn": "Add",
+      "assignedBadge": "Assigned",
+      "assignBannerText": "Add {member} to a role — click Add next to a role below.",
+      "assignBannerDone": "Done",
+      "assignSuccess": "Added {member} to role \"{role}\".",
+      "assignError": "Could not add the account to that role. Please try again."
     },
     "group": {
       "name": {
@@ -2217,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Members of these groups will lose the roles granted by them."
-      }
+      },
+      "assignColumn": "Assign",
+      "assignBtn": "Add",
+      "assignedBadge": "Assigned",
+      "assignBannerText": "Add {member} to a user group — click Add next to a group below.",
+      "assignBannerDone": "Done",
+      "assignSuccess": "Added {member} to group \"{group}\".",
+      "assignError": "Could not add the account to that group. Please try again."
     },
     "appGroups": {
       "deleteGroupTitle": "Delete Group",
@@ -3587,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Error while copy content.",
+    "passcodeForbiddenMessage": "Admin or Root role required to view the ingestion token. Ask an administrator for the setup command, or for the role needed to see it here.",
     "updateRUMTokenMessage": "Are you sure you want to update rum token for this organization?",
     "completeAwsIntegration": "Complete AWS Integration",
     "deployAwsServicesOneClick": "Deploy all selected AWS services in one click using a single CloudFormation stack.",
@@ -4968,7 +4997,7 @@
     "colorLightToDarkBlue": "Light To Dark Blue (By Value)",
     "colorPaletteClassicBySeries": "Palette-Classic (By Series)",
     "drilldown": "Drilldown",
-    "drilldownTooltip": "Navigate to a another dashboard or specified URL, carrying over all current variables for seamless data exploration.",
+    "drilldownTooltip": "Navigate to another dashboard or specified URL, carrying over all current variables for seamless data exploration.",
     "colorBySeriesTitle": "Color by series",
     "colorBySeriesTooltip": "Apply colors to series for better visual distinction in charts. Customize colors for each series to enhance data visualization.",
     "editColorBySeries": " Edit color by series",
@@ -5827,7 +5856,36 @@
     "variableNameAlreadyExists": "Variable with same name already exists",
     "pivotTotal": "Total",
     "pivotOthers": "Others",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Show exemplars (trace samples)",
+      "hide": "Hide exemplars · {count} shown",
+      "empty": "No exemplars in this time range",
+      "emptyShort": "0 exemplars",
+      "loadFailed": "Couldn't load exemplars",
+      "loadFailedHint": "The chart is unaffected. Retry fetches exemplars only.",
+      "retry": "Retry",
+      "cardTitle": "Exemplar",
+      "query": "Query {name}",
+      "returnedBy": "Returned by {count} query | Returned by {count} queries",
+      "series": "Series",
+      "aboveRange": "Above the chart range; drawn at the top edge",
+      "belowRange": "Below the chart range; drawn at the bottom edge",
+      "checkingTrace": "Checking trace…",
+      "openTrace": "Open trace",
+      "openTraceHint": "Or click the marker. Back returns here.",
+      "traceNotAvailable": "Trace not available — sampled out or past retention",
+      "openTraceUnverified": "Open trace (unverified)",
+      "unverifiedTimeout": "The trace lookup timed out, so this trace may be missing.",
+      "unverifiedForbidden": "Couldn't confirm this trace — you may not have access to traces.",
+      "unverifiedPartial": "Only part of the retention window was searched.",
+      "unverifiedError": "Couldn't check this trace.",
+      "noTraceId": "No {label} on this exemplar, so there is no trace to open.",
+      "markersAria": "Exemplar markers",
+      "markerAria": "Exemplar {value} at {time}"
+    },
+    "showExemplarsLabel": "Show exemplars",
+    "showExemplarsHelp": "Draws trace samples on this chart for everyone who opens the dashboard. Viewers can still hide them from the panel header."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7748,7 +7806,10 @@
       "lastError": "Last error",
       "lastTrained": "Last trained",
       "lookBackWindow": "Look Back Window",
-      "lookBackWindowTooltip": "How far back each detection run queries. Caps the window even after a long pause. Defaults to Check Every interval.",
+      "lookBackWindowFloor": "Look Back Window must be at least {min} — Check Every plus one Detection Resolution. A shorter window cannot hold a complete bucket by the time a run fires, so buckets would be skipped.",
+      "lookBackWindowLegacy": "This saved window is below the {min} minimum (Check Every plus one Detection Resolution). It will save unchanged, but runs can skip buckets until the window is raised.",
+      "lookBackWindowMinimum": "Minimum {min}. Recommended {recommended} or more — twice (Check Every + Detection Resolution) — plus 10 minutes where absence detection is enabled.",
+      "lookBackWindowTooltip": "How far back each detection run queries. Caps the window even after a long pause. It must cover at least Check Every plus one Detection Resolution, or complete buckets fall out of the window before a run can judge them.",
       "metricChart": "Metric and anomalies",
       "metricChartHint": "One point per detection bucket",
       "model": "Model",
@@ -7756,6 +7817,15 @@
       "nDays": "{days} day | {days} days",
       "noDestinationsFound": "No destinations found",
       "noFieldsFound": "No fields found",
+      "noticeHybridFallback": "Fallback detection",
+      "noticeHybridFallbackTooltip": "The hybrid threshold was unavailable on recent runs, so detection fell back to the frozen threshold. Scoring continues on the frozen threshold until the model is retrained.",
+      "noticeRetrain": "Auto-retraining",
+      "noticeRetrainTooltip": "The saved model could not be read after an upgrade, so it was discarded and the config was queued for retraining automatically. No action is required; detection resumes once training completes.",
+      "noticeSkipAbsence": "Absence grading fell behind the Look Back Window; the span that could no longer be fetched was skipped and recorded.",
+      "noticeSkipScored": "Detection runs arrived further apart than the Look Back Window covers, so closed buckets left the window before a run could judge them.",
+      "noticeWindowFloor": "Window too narrow",
+      "noticeWindowFloorTooltip": "The Look Back Window is below Check Every plus one Detection Resolution, so runs cannot judge any bucket. Raise the window to restore detection.",
+      "noticeWindowSkip": "Buckets skipped",
       "notifications": "Notifications",
       "notificationsTooltip": "When enabled, a notification will be sent to the selected destination whenever an anomaly is detected.",
       "percentile": "Level",
@@ -7852,7 +7922,9 @@
       "usernameRequired": "Username is required",
       "passwordRequired": "Password is required",
       "emailRecipients": "Recipient Email Addresses",
-      "emailRecipientsHelp": "Comma-separated email addresses",
+      "emailRecipientsHelp": "Select the organization users or service accounts that should receive alert emails",
+      "emailRecipientsGroupUsers": "Users",
+      "emailRecipientsGroupServiceAccounts": "Service Accounts",
       "invalidEmailAddresses": "Invalid email addresses: {emails}",
       "opsgenieApiKey": "Opsgenie API Key",
       "opsgenieApiKeyHelp": "Get your API key from Opsgenie integration settings",
@@ -8169,7 +8241,18 @@
     "enabled": "Enabled",
     "paused": "Paused",
     "impactTemplate": "Used by {destinations} · {alerts}",
-    "impactDestination": "Used by {alerts}"
+    "impactDestination": "Used by {consumers}",
+    "impactUnused": "Not used",
+    "noConsumers": "No consumers.",
+    "countCompositeAlert": "{count} composite alert | {count} composite alerts",
+    "countPipeline": "{count} pipeline | {count} pipelines",
+    "countSyntheticCheck": "{count} synthetic check | {count} synthetic checks",
+    "countOncallPolicy": "{count} escalation policy | {count} escalation policies",
+    "countOncallTeamChannel": "{count} team channel | {count} team channels",
+    "countWorkflow": "{count} workflow | {count} workflows",
+    "countAnomalyDetection": "{count} anomaly detector | {count} anomaly detectors",
+    "countIncidentIntegration": "{count} incident integration | {count} incident integrations",
+    "sectionOtherConsumers": "Also used by"
   },
   "alert_library": {
     "header": "Alert Library",
@@ -8853,7 +8936,9 @@
         "staleCopyAria": "Copy the failed-refresh details for {name}",
         "stalePreamble": "Refresh failed — showing the last successful result.",
         "staleClickToCopy": "Click to copy the details.",
-        "lastRefreshedPrefix": "Last Refreshed At: "
+        "lastRefreshedPrefix": "Last Refreshed At: ",
+        "exemplarsShowHeatmap": "Show exemplars (trace samples). Switches this card to percentiles while on.",
+        "exemplarsHideHeatmap": "Hide exemplars · {count} shown. Returns this card to heatmap."
       },
       "fn": {
         "subtitle": "Choose how this metric is aggregated",
@@ -9037,6 +9122,8 @@
     "cipherKeysDesc": "Encryption keys for sensitive fields",
     "regexPatternsDesc": "Reusable regex patterns for redaction",
     "domainManagementDesc": "Restrict sign-in to allowed SSO domains",
+    "passwordPolicy": "Password Policy",
+    "passwordPolicyDesc": "Authentication policies for native email/password accounts, applied instance-wide.",
     "pipelineDestinationsDesc": "External targets for pipeline output",
     "templatesDesc": "Reusable alert message templates",
     "storageSettingsDesc": "Per-organization storage configuration",
@@ -13629,6 +13716,7 @@
       "searchHistoryNotEnabled": "Search history is not enabled.",
       "enableUsageReporting": "Set ZO_USAGE_REPORTING_ENABLED to true to enable usage reporting.",
       "selectStreamToExtractPatterns": "Please select a stream to extract patterns",
+      "patternsUnavailableForMultiStream": "Patterns are not available when multiple streams are selected. Please select a single stream.",
       "errorExtractingPatterns": "Error extracting patterns. Please try again.",
       "nameOfPanelRequired": "Name of Panel is required",
       "errorsFixAndTryAgain": "There are some errors, please fix them and try again",
@@ -15221,8 +15309,8 @@
       "serving": "Verified. This domain now serves your status page, as long as its CNAME points at this app's host."
     },
     "preview": {
-      "title": "Live preview",
-      "subtitle": "How your public page looks as you edit",
+      "title": "Preview",
+      "subtitle": "Updates as you edit. Uptime shown is sample data.",
       "sampleBadge": "Sample data",
       "eyebrow": "Service status",
       "untitled": "Your status page",
@@ -15544,6 +15632,9 @@
       "noOptionsFound": "No options found",
       "multiSelect": "Multi select",
       "singleSelect": "Single select"
+    },
+    "templateInput": {
+      "suggestions": "Variable suggestions"
     },
     "time": {
       "openTimePicker": "Open time picker",
@@ -16030,7 +16121,8 @@
         "destinations": "Destinations",
         "templates": "Templates",
         "reports": "Reports",
-        "llmModelPricing": "LLM Model Pricing"
+        "llmModelPricing": "LLM Model Pricing",
+        "passcode": "Ingestion Token"
       },
       "noPermissionToChangeFavorites": "You don't have permission to change favorites",
       "couldNotUpdateFavoriteDashboards": "Couldn't update favorite dashboards"
@@ -16268,6 +16360,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion."
+    },
+    "iam": {
+      "userSaveFailed": "Could not save the user"
     }
   },
   "cipherKeys": {
@@ -16685,7 +16780,106 @@
       "exponentName": "Exponent"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Complexity",
+    "minLength": "Minimum length",
+    "minLengthDesc": "Shortest password accepted",
+    "maxLength": "Maximum length",
+    "maxLengthDesc": "0 = unbounded",
+    "requireUppercase": "Require uppercase letter",
+    "requireUppercaseDesc": "At least one A–Z",
+    "requireLowercase": "Require lowercase letter",
+    "requireLowercaseDesc": "At least one a–z",
+    "requireDigit": "Require digit",
+    "requireDigitDesc": "At least one 0–9",
+    "requireSpecial": "Require special character",
+    "requireSpecialDesc": "At least one from the allowed set",
+    "specialCharSet": "Allowed special characters",
+    "specialCharSetDesc": "Leave empty to accept any non-alphanumeric character",
+    "maxLengthTooSmall": "Maximum length must be at least the minimum length, or 0 for unbounded.",
+    "confirmTitle": "Save password policy?",
+    "confirmMessage": "Saving may force every native user to set a new password before they can continue. Root, external users and service accounts are exempt — this includes you unless you are the root account. It cannot be undone.",
+    "saved": "Password policy saved. | Password policy saved. {count} user must reset their password. | Password policy saved. {count} users must reset their password.",
+    "saveFailed": "Could not save the password policy.",
+    "notAdminTitle": "Administrator access required",
+    "notAdmin": "Configuring the password policy requires an administrator of the meta organization.",
+    "loadFailedTitle": "Could not load the password policy",
+    "loadFailed": "Something went wrong while reading the current policy.",
+    "rotation": "Rotation",
+    "rotationDays": "Rotation period",
+    "rotationDaysDesc": "Days before a password expires. 0 = never expires",
+    "rotationWarningDays": "Warn before expiry",
+    "rotationWarningDaysDesc": "Days of notice at sign-in. 0 = no warning",
+    "warningDaysTooLong": "The warning window cannot be longer than the rotation period.",
+    "rotationPreview": "A password set today expires {expires}. The sign-in warning starts {warns}.",
+    "rotationPreviewNoWarning": "A password set today expires {expires}. No warning is shown before then.",
+    "reuse": "Reuse prevention",
+    "historyCount": "Passwords remembered",
+    "historyCountDesc": "A new password may not match this many previous ones. 0 = no check",
+    "historyMaxRetained": "History retained",
+    "historyMaxRetainedDesc": "How many past passwords are kept per user",
+    "historyRetainedTooSmall": "History retained must be at least the number of passwords remembered.",
+    "reuseExplainer": "The current password counts as one of the remembered set — reusing it is refused by this rule, not by a separate check.",
+    "lockout": "Account lockout",
+    "lockoutThreshold": "Failed attempts before lockout",
+    "lockoutThresholdDesc": "0 = lockout disabled",
+    "lockoutBucketSize": "Attempts before each further lockout",
+    "lockoutBucketSizeDesc": "0 = reuse the value above",
+    "lockoutStartSecs": "First lockout duration",
+    "lockoutStartSecsDesc": "Seconds",
+    "lockoutMaxSecs": "Maximum lockout duration",
+    "lockoutMaxSecsDesc": "Seconds — the ceiling escalation clamps to",
+    "lockoutStartTooLong": "The first lockout cannot be longer than the maximum lockout.",
+    "lockoutBackoff": "Escalation",
+    "lockoutBackoffDesc": "How each lockout grows from the one before",
+    "backoffExponential": "Exponential",
+    "backoffLinear": "Linear",
+    "lockoutPreview": "{threshold} failures → {first} · every {bucket} more → {rest} · capped at {max}. A successful sign-in resets everything.",
+    "sessionEnforcement": "Session & enforcement",
+    "cookieMaxAge": "Session lifetime",
+    "cookieMaxAgeDesc": "Seconds a signed-in session stays valid. 0 = use the instance default from {envVar}",
+    "applyToRoot": "Apply to the root account",
+    "applyToRootDesc": "Root is exempt from every rule above unless this is on",
+    "rootWarning": "Locking root might cause the system to go into an unrecoverable state.",
+    "rootDialogTitle": "Apply the policy to root?",
+    "rootDialogMessage": "Root will be subject to lockout, rotation and forced resets like any other native account. If root is your only administrative account, a lockout or an expiry it cannot satisfy will leave no way back into this instance.",
+    "rootDialogAck": "I understand root can be locked out of this instance permanently.",
+    "rootDialogConfirm": "Apply to root"
+  },
+  "passwordReset": {
+    "title": "Update your password",
+    "signedInAs": "Signed in as {email}",
+    "reasonPolicyTightened": "The password policy has changed. Update your password to continue using OpenObserve.",
+    "reasonRotationExpired": "Your password has expired. Set a new one to continue using OpenObserve.",
+    "reasonRotationWarning": "Your password expires soon. Set a new one now to avoid being locked out of your work.",
+    "reused": "This password was used recently. Choose one you have not used in your last {count} passwords.",
+    "expiryBanner": "Your password expires in {count} day. Update it now to avoid being locked out of your work. | Your password expires in {count} days. Update it now to avoid being locked out of your work.",
+    "expiryBannerAction": "Update now",
+    "expiryBannerDismiss": "Dismiss",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "currentPasswordRequired": "Current password is required.",
+    "newPasswordRequired": "New password is required.",
+    "confirmPasswordRequired": "Please re-enter the new password.",
+    "mismatch": "Passwords do not match.",
+    "signOut": "Sign out",
+    "submit": "Update password",
+    "updated": "Your password has been updated. Please sign in again.",
+    "updateFailed": "Could not update your password.",
+    "req": {
+      "minLength": "At least {count} characters",
+      "maxLength": "No more than {count} characters",
+      "uppercase": "One uppercase letter",
+      "lowercase": "One lowercase letter",
+      "digit": "One digit",
+      "special": "One special character",
+      "specialFromSet": "One special character from {set}",
+      "unmet": "Password must have: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Password Policy",
     "loginCallback": "Login Callback",
     "slackOAuthCallback": "Connecting Slack",
     "emptyStateDemo": "Empty State Demo",
@@ -17151,17 +17345,17 @@
       "alertMe": "Alert me",
       "columnHints": {
         "qps": "Calls per second — this window's calls divided by its length, so a 15-minute view and a 4-hour view stay comparable.",
-        "p50": "Half of all calls finished faster than this. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p95": "The slow tail — 1 call in 20 took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p99": "The worst 1% of calls took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "load": "Total time your applications spent waiting on this database. Measured from the client side, so it reflects how much traffic this database served — not how loaded the server is.",
+        "p50": "Half of all calls finished faster than this. Measured from completed calls in your application's traces.",
+        "p95": "The slow tail — 1 call in 20 took at least this long. Measured from completed calls in your application's traces.",
+        "p99": "The worst 1% of calls took at least this long. Measured from completed calls in your application's traces.",
+        "load": "Total time your apps spent on calls to this database, measured from your application's traces. It shows how much traffic this database served for your apps.",
         "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it."
       },
       "failedChip": "{count} failed",
       "columnSubLabels": {
-        "attention": "server",
-        "load": "client",
-        "calls": "client"
+        "attention": "from the database",
+        "load": "from your apps",
+        "calls": "from your apps"
       },
       "attention": {
         "connections": "connections",
@@ -17223,14 +17417,14 @@
         "failed": "Failed"
       },
       "columnHints": {
-        "calls": "How many times this query ran. Your database's own count where it reports one — that covers every client, not just the parts of your system sending traces. Rows marked client-observed are counted from traces instead, because your database didn't report them.",
-        "p50": "Half of all calls finished faster than this. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p95": "The slow tail — 1 call in 20 took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
-        "p99": "The worst 1% of calls took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
+        "calls": "How many times this query ran, as counted by your database — every app that connects is included. Where your database has no count for a query, the traces icon marks one measured from your application's traces.",
+        "p50": "Half of all calls finished faster than this. Measured from completed calls in your application's traces.",
+        "p95": "The slow tail — 1 call in 20 took at least this long. Measured from completed calls in your application's traces.",
+        "p99": "The worst 1% of calls took at least this long. Measured from completed calls in your application's traces.",
         "max": "The single slowest call in this window — one real call, not an average.",
         "errors": "How many of these calls came back with an error.",
         "perTrace": "How many times this runs inside a single request. A high number usually means a loop.",
-        "load": "Total time this query spent in the database. Your database's own figure where it reports one: execution time on Postgres, but WAIT time on MySQL and MariaDB — each row says which. Rows marked client-observed are measured from traces, so they include network round-trip."
+        "load": "Total time this query spent in the database, as your database reports it: execution time on Postgres, wait time on MySQL and MariaDB — each row says which. Rows with the traces icon are measured from your application's traces, so they also include the trip to the database and back."
       },
       "errorsNone": "none",
       "errorsAll": "all",
@@ -17494,8 +17688,7 @@
       "overlap": {
         "serverExecution": "Time {engine} spent executing it",
         "serverWait": "Time {engine} spent waiting on it — wait time, not execution time",
-        "serverCounted": "Counted by {engine}, across every client",
-        "clientObserved": "Observed by instrumented callers — your database didn't report this one"
+        "serverCounted": "Counted by {engine}, across every client"
       },
       "endpointsConcentrated": "One endpoint accounts for {percent} of this query's time. Fix {endpoint} and you've fixed this query.",
       "typicalMarker": "slow calls {value}",
@@ -17522,8 +17715,8 @@
       },
       "serverMetrics": {
         "title": "What the database itself recorded",
-        "subtitle": "Server-side — all clients",
-        "clientSubtitle": "Client-observed — instrumented callers only, finished calls only. A query still running, or one that hung, isn't in these numbers.",
+        "subtitle": "From your database — every app that connects",
+        "clientSubtitle": "Marked figures are measured from your application's traces — the calls your apps completed in this window",
         "instance": "Reported by {instance}",
         "instanceWide": "All databases on this instance",
         "calls": "Executions",
@@ -17569,9 +17762,13 @@
         "serverExecution": "exec time",
         "serverWait": "wait time",
         "serverCounted": "server count",
-        "clientObserved": "client-observed",
         "serverReported": "reported by your databases"
       }
+    },
+    "appSource": {
+      "marker": "Measured from your application's traces",
+      "markerHint": "Measured from your application's traces, adding your apps' view to what your database reports.",
+      "legend": "From your app's traces"
     },
     "page": {
       "tabs": {
@@ -17580,7 +17777,7 @@
         "metricsHint": "Database load by wait event, and every metric your database receivers collect.",
         "queries": "Top queries",
         "samples": "Slowest calls",
-        "samplesHintClient": "Finished calls your instrumented services observed in this window — callers without tracing are not counted, so this is a floor, not the total. The table shows the slowest of them.",
+        "samplesHintClient": "Calls measured from your application's traces in this window, adding your apps' view to what your database reports. The table shows the slowest of them.",
         "samplesHintServer": "Statements your databases reported completing in this window, counted inside the database. The table shows the slowest of them.",
         "samplesHintUnknown": "The slowest individual database calls in this window.",
         "deadlocks": "Deadlocks",
@@ -17617,6 +17814,11 @@
       "explore": "Open in Metrics Explorer",
       "railLabel": "Metrics sections",
       "noAccess": "You don't have permission to read {stream}. Ask an admin for read access to this stream.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "by query",
         "database": "by database",
@@ -17731,7 +17933,7 @@
         "status": "Status"
       },
       "columnHints": {
-        "duration": "How long this one call took, measured by the caller. Counts finished calls only — a query still running, or one that never came back, isn't measured here."
+        "duration": "How long this one call took, as your application timed it from start to finish."
       },
       "failed": "Failed",
       "failedWithCode": "Failed · {code}",
@@ -19240,6 +19442,8 @@
     "rotationNobody": "Nobody on call",
     "edit": "Edit",
     "timelineLoadFailed": "Could not resolve the schedule for this window",
+    "editorReadFailed": "Could not load the latest copy to edit. Try again.",
+    "refreshFailed": "Could not refresh. What is shown may be out of date.",
     "scheduleDoneEditing": "Back to schedule",
     "coverWhoRequired": "Choose who is covering",
     "timelineCoverAria": "{who} is covering {rotation}, {from} to {to}",

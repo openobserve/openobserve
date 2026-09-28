@@ -584,9 +584,17 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import destinationService from "@/services/alert_destination";
+import { destinationsQuery } from "@/services/alert_destination.queries";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
+import { queryClient } from "@/composables/query/queryClient";
 import oncallService from "@/services/oncall";
+import {
+  setTeamChannelMutation,
+  setTeamPolicyMutation,
+  teamMembersQuery,
+  whoIsOnCallQuery,
+} from "@/services/oncall.queries";
+import { useMutation } from "@tanstack/vue-query";
 import type {
   Channel,
   TeamChannel,
@@ -693,6 +701,9 @@ const destinationOptions = computed(() =>
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
+const savePolicyWrite = useMutation(() => setTeamPolicyMutation(orgId.value, props.teamId));
+const saveChannelWrite = useMutation(() => setTeamChannelMutation(orgId.value, props.teamId));
+
 /// The team's room, read whole with its provenance.
 const teamChannel = ref<TeamChannel | null>(null);
 const teamChannelDraft = ref<string[]>([]);
@@ -704,6 +715,7 @@ const teamChannelDirty = computed(
     JSON.stringify([...(teamChannel.value?.destinations ?? [])].sort()),
 );
 
+// Uncached read-modify-write: a stale entry would seed the draft and be saved back.
 async function fetchTeamChannel() {
   try {
     const res = await oncallService.getTeamChannel({
@@ -721,11 +733,8 @@ async function fetchTeamChannel() {
 async function saveTeamChannel(destinations: string[] | null) {
   savingChannel.value = true;
   try {
-    const res = await oncallService.setTeamChannel({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      data: { destinations },
-    });
+    const res = await saveChannelWrite.mutateAsync(destinations);
+    // The drawer stays open on this answer, and an invalidation cannot repaint a ref.
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
     toast({ variant: "success", message: t("oncall.teamChannelSaved") });
@@ -1056,17 +1065,8 @@ function openMembers() {
 // rest of the policy is still worth editing.
 async function fetchDestinations() {
   try {
-    const res = await destinationService.list({
-      org_identifier: orgId.value,
-      page_num: 1,
-      page_size: 1000,
-      sort_by: "name",
-      desc: false,
-      module: "alert",
-    });
-    availableDestinations.value = (res.data ?? [])
-      .map((d: { name: string }) => d.name)
-      .filter(Boolean);
+    const list = await queryClient.fetchQuery(destinationsQuery(orgId.value, "alert"));
+    availableDestinations.value = list.map((d: { name: string }) => d.name).filter(Boolean);
   } catch {
     availableDestinations.value = [];
   }
@@ -1077,11 +1077,8 @@ async function fetchDestinations() {
 /// editor.
 async function fetchMembers() {
   try {
-    const res = await oncallService.listMembers({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-    });
-    memberOptions.value = (res.data ?? []).map((m: { user_email: string }) => ({
+    const members = await queryClient.fetchQuery(teamMembersQuery(orgId.value, props.teamId));
+    memberOptions.value = members.map((m) => ({
       label: raw(m.user_email),
       value: m.user_email,
     }));
@@ -1094,11 +1091,7 @@ async function fetchMembers() {
 /// the preview says the step reaches nobody — which is what a gap means.
 async function fetchOnCallNow() {
   try {
-    const res = await oncallService.whoIsOnCall({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-    });
-    onCallNow.value = res.data ?? [];
+    onCallNow.value = await queryClient.fetchQuery(whoIsOnCallQuery(orgId.value, props.teamId));
   } catch {
     onCallNow.value = [];
   }
@@ -1138,16 +1131,12 @@ function onL0Update(value: L0Policy) {
 async function save() {
   saving.value = true;
   try {
-    await oncallService.setPolicy({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      data: {
-        rungs: draft.value,
-        destinations: destinations.value,
-        repeat_count: repeatCount.value,
-        final_action: finalAction.value,
-        ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
-      },
+    await savePolicyWrite.mutateAsync({
+      rungs: draft.value,
+      destinations: destinations.value,
+      repeat_count: repeatCount.value,
+      final_action: finalAction.value,
+      ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
     });
     toast({ variant: "success", message: t("oncall.policySaved") });
     emit("saved");

@@ -1906,6 +1906,7 @@
     "startFreeTrial": "Iniciar avaliação gratuita"
   },
   "login": {
+    "lockedOut": "Muitas tentativas de login falharam. Tente novamente em {duration} ou contate seu administrador.",
     "redirectingToSsoMessage": "Redirecionando para a página de login SSO. Se você não for redirecionado, por favor",
     "clickHere": "clique aqui",
     "loginWithSso": "Entrar com SSO",
@@ -1965,6 +1966,15 @@
     "fieldRequired": "O campo é obrigatório",
     "passwordRequired": "A senha é obrigatória.",
     "passwordPolicyHint": "A senha deve ter de 8 a 128 caracteres e conter pelo menos uma letra minúscula, uma letra maiúscula, um dígito e um caractere especial.",
+    "lockout": {
+      "locked": "Conta bloqueada",
+      "autoUnlock": "Desbloqueia automaticamente em {duration}.",
+      "staged": "Será desbloqueada quando você salvar.",
+      "unlock": "Desbloquear",
+      "undo": "Manter bloqueada",
+      "confirmTitle": "Desbloquear {email}?",
+      "confirmMessage": "Isso zera a contagem de tentativas falhas e permite que ele faça login novamente imediatamente. Não altera a senha."
+    },
     "currentPasswordRequired": "A senha atual é obrigatória.",
     "newPasswordRequired": "É necessária uma nova senha.",
     "otherOrgInvalid": "O nome da organização deve começar com uma letra e ser alfanumérico, _ ou -.",
@@ -2031,11 +2041,11 @@
       "addToGroup": "Adicionar a um grupo de usuários",
       "addToRole": "Atribuir uma função",
       "step1Title": "Copie seu token",
-      "copyHint": "Copie esse token agora — você não poderá vê-lo novamente.",
+      "copyHint": "Esta é a única vez que você verá este token. Copie-o ou baixe-o agora, ele não poderá ser recuperado novamente.",
       "done": "Feito",
       "applying": "Aplicando concessões de acesso…",
-      "grantedRoles": "Funções atribuídas: {roles}",
-      "grantedGroups": "Adicionado a grupos de usuários: {groups}",
+      "rolesAssignedLabel": "Funções atribuídas",
+      "groupsAssignedLabel": "Adicionado a grupos de usuários",
       "failedRoles": "Não foi possível atribuir funções: {roles}",
       "failedGroups": "Não foi possível adicionar a grupos de usuários: {groups}",
       "failedHint": "Você pode conceder isso posteriormente nas páginas de Funções e Grupos de Usuários."
@@ -2045,6 +2055,9 @@
         "label": "Nome da conta de serviço",
         "placeholder": "ex.: ingest-bot",
         "help": "Letras minúsculas, números e hífens. Salvo como nome{suffix}"
+      },
+      "identifier": {
+        "label": "Identificador"
       },
       "roles": {
         "label": "Atribuir funções",
@@ -2059,6 +2072,7 @@
     "list": {
       "col": {
         "identifier": "Identificador",
+        "roles": "Funções",
         "token": "Ficha",
         "created": "Criado"
       }
@@ -2186,7 +2200,14 @@
       },
       "bulkDelete": {
         "impact": "Todos os usuários e contas de serviço vinculados a essas funções perderão o acesso."
-      }
+      },
+      "assignColumn": "Atribuir",
+      "assignBtn": "Adicionar",
+      "assignedBadge": "Atribuído",
+      "assignBannerText": "Adicione {member} a uma função — clique em Adicionar ao lado de uma função abaixo.",
+      "assignBannerDone": "Concluído",
+      "assignSuccess": "Adicionado {member} à função \"{role}\".",
+      "assignError": "Não foi possível adicionar a conta a essa função. Tente novamente."
     },
     "group": {
       "name": {
@@ -2217,7 +2238,14 @@
       },
       "bulkDelete": {
         "impact": "Os membros desses grupos perderão as funções concedidas por eles."
-      }
+      },
+      "assignColumn": "Atribuir",
+      "assignBtn": "Adicionar",
+      "assignedBadge": "Atribuído",
+      "assignBannerText": "Adicione {member} a um grupo de usuários — clique em Adicionar ao lado de um grupo abaixo.",
+      "assignBannerDone": "Concluído",
+      "assignSuccess": "Adicionado {member} ao grupo \"{group}\".",
+      "assignError": "Não foi possível adicionar a conta a esse grupo. Tente novamente."
     },
     "appGroups": {
       "deleteGroupTitle": "Excluir Grupo",
@@ -3587,6 +3615,7 @@
   },
   "ingestion": {
     "copyContentError": "Erro ao copiar conteúdo.",
+    "passcodeForbiddenMessage": "É necessário ter a função de Administrador ou Root para visualizar o token de ingestão. Peça a um administrador o comando de configuração ou a função necessária para vê-lo aqui.",
     "updateRUMTokenMessage": "Tem certeza de que deseja atualizar o token RUM para esta organização?",
     "completeAwsIntegration": "Concluir Integração com AWS",
     "deployAwsServicesOneClick": "Implante todos os serviços AWS selecionados em um clique usando uma única pilha CloudFormation.",
@@ -4968,7 +4997,7 @@
     "colorLightToDarkBlue": "Azul claro a escuro (por valor)",
     "colorPaletteClassicBySeries": "Palette-Classic (por série)",
     "drilldown": "Detalhamento",
-    "drilldownTooltip": "Navegue até outro painel ou URL especificado, transferindo todas as variáveis atuais para uma exploração perfeita dos dados.",
+    "drilldownTooltip": "Navegue para outro painel ou URL especificado, transportando todas as variáveis atuais para uma exploração de dados contínua.",
     "colorBySeriesTitle": "Colorir por série",
     "colorBySeriesTooltip": "Aplique cores às séries para obter uma melhor distinção visual nos gráficos. Personalize as cores de cada série para aprimorar a visualização dos dados.",
     "editColorBySeries": " Editar cor por série",
@@ -5827,7 +5856,36 @@
     "variableNameAlreadyExists": "Já existe uma variável com o mesmo nome",
     "pivotTotal": "Total",
     "pivotOthers": "Outros",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "exemplars": {
+      "show": "Mostrar exemplares (amostras de rastros)",
+      "hide": "Ocultar exemplares · {count} exibidos",
+      "empty": "Nenhum exemplar neste intervalo de tempo",
+      "emptyShort": "0 exemplares",
+      "loadFailed": "Não foi possível carregar os exemplares",
+      "loadFailedHint": "O gráfico não é afetado. Tentar novamente busca apenas os exemplares.",
+      "retry": "Tentar novamente",
+      "cardTitle": "Exemplar",
+      "query": "Consulta {name}",
+      "returnedBy": "Retornado por {count} consulta | Retornado por {count} consultas",
+      "series": "Série",
+      "aboveRange": "Acima do intervalo do gráfico; desenhado na borda superior",
+      "belowRange": "Abaixo do intervalo do gráfico; desenhado na borda inferior",
+      "checkingTrace": "Verificando rastro…",
+      "openTrace": "Abrir rastro",
+      "openTraceHint": "Ou clique no marcador. Voltar retorna aqui.",
+      "traceNotAvailable": "Rastro não disponível — excluído pela amostragem ou além da retenção",
+      "openTraceUnverified": "Abrir rastro (não verificado)",
+      "unverifiedTimeout": "A busca do rastro expirou, então este rastro pode estar ausente.",
+      "unverifiedForbidden": "Não foi possível confirmar este rastro — talvez você não tenha acesso aos rastros.",
+      "unverifiedPartial": "Apenas parte da janela de retenção foi pesquisada.",
+      "unverifiedError": "Não foi possível verificar este rastro.",
+      "noTraceId": "Nenhum {label} neste exemplar, então não há rastro para abrir.",
+      "markersAria": "Marcadores de exemplares",
+      "markerAria": "Exemplar {value} em {time}"
+    },
+    "showExemplarsLabel": "Mostrar exemplares",
+    "showExemplarsHelp": "Desenha amostras de rastros neste gráfico para todos que abrirem o painel. Os visualizadores ainda podem ocultá-las no cabeçalho do painel."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7502,6 +7560,9 @@
       "lastError": "Último erro",
       "lastTrained": "Último treino",
       "lookBackWindow": "Janela Olhe para trás",
+      "lookBackWindowFloor": "A Janela de retrospectiva deve ser de pelo menos {min} — Verificar a cada mais uma Resolução de detecção. Uma janela mais curta não consegue conter um bucket completo no momento em que uma execução dispara, então buckets seriam ignorados.",
+      "lookBackWindowLegacy": "Esta janela salva está abaixo do mínimo de {min} (Verificar a cada mais uma Resolução de detecção). Ela será salva sem alterações, mas as execuções podem ignorar buckets até que a janela seja aumentada.",
+      "lookBackWindowMinimum": "Mínimo {min}. Recomendado {recommended} ou mais — duas vezes (Verificar a cada + Resolução de detecção) — mais 10 minutos onde a detecção de ausência está habilitada.",
       "lookBackWindowTooltip": "Há quanto tempo cada detecção executa consultas. Fecha a janela mesmo depois de uma longa pausa. O padrão é Verificar cada intervalo.",
       "metricChart": "Métrica e anomalias",
       "metricChartHint": "Um ponto por intervalo de deteção",
@@ -7510,6 +7571,15 @@
       "nDays": "{days} dia | {days} dias",
       "noDestinationsFound": "Nenhum destino encontrado",
       "noFieldsFound": "Nenhum campo encontrado",
+      "noticeHybridFallback": "Detecção de fallback",
+      "noticeHybridFallbackTooltip": "O limite híbrido não estava disponível nas execuções recentes, então a detecção recorreu ao limite congelado. A pontuação continua no limite congelado até que o modelo seja retreinado.",
+      "noticeRetrain": "Retreinamento automático",
+      "noticeRetrainTooltip": "O modelo salvo não pôde ser lido após uma atualização, então foi descartado e a configuração foi enfileirada para retreinamento automático. Nenhuma ação é necessária; a detecção é retomada assim que o treinamento for concluído.",
+      "noticeSkipAbsence": "A avaliação de ausência ficou atrás da Janela de retrospectiva; o intervalo que não pôde mais ser buscado foi ignorado e registrado.",
+      "noticeSkipScored": "As execuções de detecção chegaram mais espaçadas do que a Janela de retrospectiva abrange, então buckets fechados saíram da janela antes que uma execução pudesse avaliá-los.",
+      "noticeWindowFloor": "Janela muito estreita",
+      "noticeWindowFloorTooltip": "A Janela de retrospectiva está abaixo de Verificar a cada mais uma Resolução de detecção, então as execuções não conseguem avaliar nenhum bucket. Aumente a janela para restaurar a detecção.",
+      "noticeWindowSkip": "Buckets ignorados",
       "notifications": "Notificações",
       "notificationsTooltip": "Quando ativado, uma notificação será enviada ao destino selecionado sempre que uma anomalia for detectada.",
       "percentile": "Nível",
@@ -7606,7 +7676,9 @@
       "usernameRequired": "Nome de usuário é obrigatório",
       "passwordRequired": "Senha é obrigatória",
       "emailRecipients": "Endereços de e-mail do destinatário",
-      "emailRecipientsHelp": "Endereços de e-mail separados por vírgula",
+      "emailRecipientsHelp": "Selecione os usuários da organização ou contas de serviço que devem receber e-mails de alerta",
+      "emailRecipientsGroupUsers": "Usuários",
+      "emailRecipientsGroupServiceAccounts": "Contas de serviço",
       "invalidEmailAddresses": "Endereços de e-mail inválidos: {emails}",
       "opsgenieApiKey": "Chave de API do Opsgenie",
       "opsgenieApiKeyHelp": "Obtenha sua chave de API nas configurações de integração do Opsgenie",
@@ -7923,7 +7995,18 @@
     "enabled": "Ativado",
     "paused": "Pausado",
     "impactTemplate": "Usado por {destinations} · {alerts}",
-    "impactDestination": "Usado por {alerts}"
+    "impactDestination": "Usado por {consumers}",
+    "impactUnused": "Não usado",
+    "noConsumers": "Nenhum consumidor.",
+    "countCompositeAlert": "{count} alerta composto | {count} alertas compostos",
+    "countPipeline": "{count} oleoduto | {count} oleodutos",
+    "countSyntheticCheck": "{count} verificação sintética | {count} verificações sintéticas",
+    "countOncallPolicy": "{count} política de escalonamento | {count} políticas de escalonamento",
+    "countOncallTeamChannel": "{count} canal de equipe | {count} canais de equipe",
+    "countWorkflow": "{count} fluxo de trabalho | {count} fluxos de trabalho",
+    "countAnomalyDetection": "{count} detector de anomalias | {count} detectores de anomalias",
+    "countIncidentIntegration": "{count} integração de incidentes | {count} integrações de incidentes",
+    "sectionOtherConsumers": "Também usado por"
   },
   "alert_library": {
     "header": "Biblioteca de Alertas",
@@ -8607,7 +8690,9 @@
         "staleCopyAria": "Copiar os detalhes da falha de atualização para {name}",
         "stalePreamble": "Atualização falhou — mostrando o último resultado bem-sucedido.",
         "staleClickToCopy": "Clique para copiar os detalhes.",
-        "lastRefreshedPrefix": "Última atualização em: "
+        "lastRefreshedPrefix": "Última atualização em: ",
+        "exemplarsShowHeatmap": "Mostrar exemplares (amostras de rastros). Alterna este cartão para percentis enquanto ativado.",
+        "exemplarsHideHeatmap": "Ocultar exemplares · {count} exibidos. Retorna este cartão ao mapa de calor."
       },
       "fn": {
         "subtitle": "Escolha como esta métrica é agregada",
@@ -8791,6 +8876,8 @@
     "cipherKeysDesc": "Chaves de criptografia para campos sensíveis",
     "regexPatternsDesc": "Padrões regex reutilizáveis para redação",
     "domainManagementDesc": "Restringir o login a domínios SSO permitidos",
+    "passwordPolicy": "Política de senhas",
+    "passwordPolicyDesc": "Políticas de autenticação para contas nativas de e-mail/senha, aplicadas a toda a instância.",
     "pipelineDestinationsDesc": "Destinos externos para a saída do pipeline",
     "templatesDesc": "Modelos reutilizáveis de mensagens de alerta",
     "storageSettingsDesc": "Configuração de armazenamento por organização",
@@ -13383,6 +13470,7 @@
       "searchHistoryNotEnabled": "O histórico de pesquisa não está ativado.",
       "enableUsageReporting": "Defina ZO_USAGE_REPORTING_ENABLED como true para ativar o relatório de uso.",
       "selectStreamToExtractPatterns": "Selecione um stream para extrair padrões",
+      "patternsUnavailableForMultiStream": "Padrões não estão disponíveis quando vários streams são selecionados. Selecione um único stream.",
       "errorExtractingPatterns": "Erro ao extrair padrões. Tente novamente.",
       "nameOfPanelRequired": "O nome do painel é obrigatório",
       "errorsFixAndTryAgain": "Há alguns erros, corrija-os e tente novamente",
@@ -15299,6 +15387,9 @@
       "multiSelect": "Seleção múltipla",
       "singleSelect": "Seleção única"
     },
+    "templateInput": {
+      "suggestions": "Sugestões de variáveis"
+    },
     "time": {
       "openTimePicker": "Abrir seletor de hora",
       "clear": "Limpar",
@@ -15784,7 +15875,8 @@
         "destinations": "Destinos",
         "templates": "Modelos",
         "reports": "Relatórios",
-        "llmModelPricing": "Preços de Modelos LLM"
+        "llmModelPricing": "Preços de Modelos LLM",
+        "passcode": "Token de ingestão"
       },
       "noPermissionToChangeFavorites": "Você não tem permissão para alterar favoritos",
       "couldNotUpdateFavoriteDashboards": "Não foi possível atualizar os dashboards favoritos"
@@ -16022,6 +16114,9 @@
     },
     "layouts": {
       "ingestionNotStarted": "Você ainda não iniciou o processo de ingestão de dados. Para explorar outras páginas, inicie a ingestão de dados."
+    },
+    "iam": {
+      "userSaveFailed": "Não foi possível salvar o usuário"
     }
   },
   "cipherKeys": {
@@ -16439,7 +16534,106 @@
       "exponentName": "Expoente"
     }
   },
+  "passwordPolicy": {
+    "complexity": "Complexidade",
+    "minLength": "Comprimento mínimo",
+    "minLengthDesc": "Menor senha aceita",
+    "maxLength": "Comprimento máximo",
+    "maxLengthDesc": "0 = sem limite",
+    "requireUppercase": "Exigir letra maiúscula",
+    "requireUppercaseDesc": "Pelo menos um A–Z",
+    "requireLowercase": "Exigir letra minúscula",
+    "requireLowercaseDesc": "Pelo menos um a–z",
+    "requireDigit": "Exigir dígito",
+    "requireDigitDesc": "Pelo menos um 0–9",
+    "requireSpecial": "Exigir caractere especial",
+    "requireSpecialDesc": "Pelo menos um do conjunto permitido",
+    "specialCharSet": "Caracteres especiais permitidos",
+    "specialCharSetDesc": "Deixe vazio para aceitar qualquer caractere não alfanumérico",
+    "maxLengthTooSmall": "O comprimento máximo deve ser pelo menos o comprimento mínimo, ou 0 para sem limite.",
+    "confirmTitle": "Salvar política de senhas?",
+    "confirmMessage": "Salvar pode forçar todos os usuários nativos a definir uma nova senha antes de continuar. Usuários root, externos e contas de serviço estão isentos — isso inclui você, a menos que você seja a conta root. Não pode ser desfeito.",
+    "saved": "Política de senhas salva. | Política de senhas salva. {count} usuário deve redefinir a senha. | Política de senhas salva. {count} usuários devem redefinir a senha.",
+    "saveFailed": "Não foi possível salvar a política de senhas.",
+    "notAdminTitle": "Acesso de administrador necessário",
+    "notAdmin": "Configurar a política de senhas exige um administrador da meta organização.",
+    "loadFailedTitle": "Não foi possível carregar a política de senhas",
+    "loadFailed": "Algo deu errado ao ler a política atual.",
+    "rotation": "Rotação",
+    "rotationDays": "Período de rotação",
+    "rotationDaysDesc": "Dias antes de a senha expirar. 0 = nunca expira",
+    "rotationWarningDays": "Avisar antes da expiração",
+    "rotationWarningDaysDesc": "Dias de antecedência no login. 0 = sem aviso",
+    "warningDaysTooLong": "O período de aviso não pode ser maior que o período de rotação.",
+    "rotationPreview": "Uma senha definida hoje expira {expires}. O aviso no login começa {warns}.",
+    "rotationPreviewNoWarning": "Uma senha definida hoje expira {expires}. Nenhum aviso é exibido antes disso.",
+    "reuse": "Prevenção de reutilização",
+    "historyCount": "Senhas memorizadas",
+    "historyCountDesc": "Uma nova senha não pode ser igual a esta quantidade de senhas anteriores. 0 = sem verificação",
+    "historyMaxRetained": "Histórico retido",
+    "historyMaxRetainedDesc": "Quantas senhas anteriores são mantidas por usuário",
+    "historyRetainedTooSmall": "O histórico retido deve ser pelo menos igual ao número de senhas memorizadas.",
+    "reuseExplainer": "A senha atual conta como uma das senhas do conjunto memorizado — reutilizá-la é recusado por esta regra, não por uma verificação separada.",
+    "lockout": "Bloqueio de conta",
+    "lockoutThreshold": "Tentativas falhas antes do bloqueio",
+    "lockoutThresholdDesc": "0 = bloqueio desativado",
+    "lockoutBucketSize": "Tentativas antes de cada bloqueio adicional",
+    "lockoutBucketSizeDesc": "0 = reutiliza o valor acima",
+    "lockoutStartSecs": "Duração do primeiro bloqueio",
+    "lockoutStartSecsDesc": "Segundos",
+    "lockoutMaxSecs": "Duração máxima do bloqueio",
+    "lockoutMaxSecsDesc": "Segundos — o teto ao qual a escalada é limitada",
+    "lockoutStartTooLong": "O primeiro bloqueio não pode ser maior que o bloqueio máximo.",
+    "lockoutBackoff": "Escalada",
+    "lockoutBackoffDesc": "Como cada bloqueio cresce em relação ao anterior",
+    "backoffExponential": "Exponencial",
+    "backoffLinear": "Linear",
+    "lockoutPreview": "{threshold} falhas → {first} · a cada {bucket} adicionais → {rest} · limitado a {max}. Um login bem-sucedido redefine tudo.",
+    "sessionEnforcement": "Sessão e aplicação",
+    "cookieMaxAge": "Duração da sessão",
+    "cookieMaxAgeDesc": "Segundos durante os quais uma sessão autenticada permanece válida. 0 = usar o padrão da instância de {envVar}",
+    "applyToRoot": "Aplicar à conta root",
+    "applyToRootDesc": "O root está isento de todas as regras acima, a menos que isto esteja ativado",
+    "rootWarning": "Bloquear o root pode levar o sistema a um estado irrecuperável.",
+    "rootDialogTitle": "Aplicar a política ao root?",
+    "rootDialogMessage": "O root ficará sujeito a bloqueio, rotação e redefinições forçadas como qualquer outra conta nativa. Se o root for sua única conta administrativa, um bloqueio ou uma expiração que ele não consiga atender deixará você sem forma de voltar a esta instância.",
+    "rootDialogAck": "Entendo que o root pode ser bloqueado permanentemente desta instância.",
+    "rootDialogConfirm": "Aplicar ao root"
+  },
+  "passwordReset": {
+    "title": "Atualize sua senha",
+    "signedInAs": "Conectado como {email}",
+    "reasonPolicyTightened": "A política de senhas mudou. Atualize sua senha para continuar usando o OpenObserve.",
+    "reasonRotationExpired": "Sua senha expirou. Defina uma nova para continuar usando o OpenObserve.",
+    "reasonRotationWarning": "Sua senha expira em breve. Defina uma nova agora para não perder o acesso ao seu trabalho.",
+    "reused": "Esta senha foi usada recentemente. Escolha uma que você não tenha usado nas suas últimas {count} senhas.",
+    "expiryBanner": "Sua senha expira em {count} dia. Atualize-a agora para não perder o acesso ao seu trabalho. | Sua senha expira em {count} dias. Atualize-a agora para não perder o acesso ao seu trabalho.",
+    "expiryBannerAction": "Atualizar agora",
+    "expiryBannerDismiss": "Dispensar",
+    "currentPassword": "Senha atual",
+    "newPassword": "Nova senha",
+    "confirmPassword": "Confirme a nova senha",
+    "currentPasswordRequired": "A senha atual é obrigatória.",
+    "newPasswordRequired": "A nova senha é obrigatória.",
+    "confirmPasswordRequired": "Digite novamente a nova senha.",
+    "mismatch": "As senhas não coincidem.",
+    "signOut": "Sair",
+    "submit": "Atualizar senha",
+    "updated": "Sua senha foi atualizada. Faça login novamente.",
+    "updateFailed": "Não foi possível atualizar sua senha.",
+    "req": {
+      "minLength": "Pelo menos {count} caracteres",
+      "maxLength": "No máximo {count} caracteres",
+      "uppercase": "Uma letra maiúscula",
+      "lowercase": "Uma letra minúscula",
+      "digit": "Um dígito",
+      "special": "Um caractere especial",
+      "specialFromSet": "Um caractere especial de {set}",
+      "unmet": "A senha deve ter: {requirement}"
+    }
+  },
   "routeTitles": {
+    "passwordPolicy": "Política de senha",
     "loginCallback": "Callback de login",
     "slackOAuthCallback": "Conectando ao Slack",
     "emptyStateDemo": "Demonstração de estado vazio",
@@ -16905,17 +17099,17 @@
       "alertMe": "Alertar-me",
       "columnHints": {
         "qps": "Chamadas por segundo — as chamadas desta janela divididas pela sua duração, para que uma visão de 15 minutos e uma de 4 horas permaneçam comparáveis.",
-        "p50": "Metade de todas as chamadas terminou mais rápido do que isto. Conta apenas chamadas concluídas — uma consulta ainda em execução ou que nunca retornou não é medida aqui.",
-        "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução ou que nunca retornou não é medida aqui.",
-        "p99": "As 1% piores chamadas levaram pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução ou que nunca retornou não é medida aqui.",
-        "load": "Tempo total que suas aplicações passaram esperando por este banco de dados. Medido do lado do cliente, então reflete quanto tráfego este banco atendeu — não o quão carregado o servidor está.",
+        "p50": "Metade de todas as chamadas terminou mais rápido que isso. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
+        "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos esse tempo. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
+        "p99": "Os 1% piores de chamadas levaram pelo menos esse tempo. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
+        "load": "Tempo total que seus aplicativos gastaram em chamadas a este banco de dados, medido a partir dos rastros da sua aplicação. Mostra quanto tráfego este banco de dados atendeu para seus aplicativos.",
         "attention": "O quão perto esta instância está de um limite que seu próprio mecanismo publica — hoje, conexões em relação a max_connections. A pior dessas proporções, não uma pontuação combinada. Ordenado do maior para o menor, com as instâncias cuja saúde não pode ser lida no topo, porque uma que você não pode ver não é uma que você sabe que está saudável. Medido no servidor do banco de dados, portanto não é comparável com o Tempo de banco de dados ao lado."
       },
       "failedChip": "{count} falhas",
       "columnSubLabels": {
-        "attention": "servidor",
-        "load": "cliente",
-        "calls": "cliente"
+        "attention": "do banco de dados",
+        "load": "dos seus aplicativos",
+        "calls": "dos seus aplicativos"
       },
       "attention": {
         "connections": "conexões",
@@ -16977,14 +17171,14 @@
         "failed": "Falhas"
       },
       "columnHints": {
-        "calls": "Quantas vezes esta consulta foi executada. A contagem do próprio banco de dados, quando ele a reporta — isso cobre todos os clientes, não apenas as partes do seu sistema que enviam traces. Linhas marcadas como observadas pelo cliente são contadas a partir de traces, porque o banco de dados não as reportou.",
-        "p50": "Metade de todas as chamadas terminou mais rápido que isto. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
-        "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
-        "p99": "Os piores 1% das chamadas levaram pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
+        "calls": "Quantas vezes esta consulta foi executada, conforme contabilizado pelo seu banco de dados — todos os aplicativos que se conectam estão incluídos. Quando seu banco de dados não tem uma contagem para uma consulta, o ícone de rastros marca uma medida a partir dos rastros da sua aplicação.",
+        "p50": "Metade de todas as chamadas terminou mais rápido que isso. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
+        "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos esse tempo. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
+        "p99": "Os 1% piores de chamadas levaram pelo menos esse tempo. Medido a partir das chamadas concluídas nos rastros da sua aplicação.",
         "max": "A chamada individual mais lenta nesta janela — uma chamada real, não uma média.",
         "errors": "Quantas dessas chamadas voltaram com erro.",
         "perTrace": "Quantas vezes isso é executado dentro de uma única solicitação. Um número alto geralmente significa um loop.",
-        "load": "Tempo total que esta consulta passou no banco de dados. O próprio valor do banco de dados quando ele reporta um: tempo de execução no Postgres, mas tempo de espera no MySQL e MariaDB — cada linha indica qual. Linhas marcadas como observadas pelo cliente são medidas a partir de traces, então incluem a ida e volta da rede."
+        "load": "Tempo total que esta consulta passou no banco de dados, conforme relatado pelo seu banco de dados: tempo de execução no Postgres, tempo de espera no MySQL e MariaDB — cada linha indica qual. As linhas com o ícone de rastros são medidas a partir dos rastros da sua aplicação, portanto também incluem a ida e volta ao banco de dados."
       },
       "errorsNone": "nenhum",
       "errorsAll": "todos",
@@ -17248,8 +17442,7 @@
       "overlap": {
         "serverExecution": "Tempo que {engine} gastou executando",
         "serverWait": "Tempo que {engine} gastou esperando por ela — tempo de espera, não tempo de execução",
-        "serverCounted": "Contado por {engine}, em todos os clientes",
-        "clientObserved": "Observado por chamadores instrumentados — seu banco de dados não reportou isso"
+        "serverCounted": "Contado por {engine}, em todos os clientes"
       },
       "endpointsConcentrated": "Um endpoint é responsável por {percent} do tempo desta consulta. Corrija {endpoint} e você corrigiu esta consulta.",
       "typicalMarker": "chamadas lentas {value}",
@@ -17276,8 +17469,8 @@
       },
       "serverMetrics": {
         "title": "O que o próprio banco de dados registrou",
-        "subtitle": "Lado do servidor — todos os clientes",
-        "clientSubtitle": "Observado pelo cliente — apenas chamadores instrumentados, apenas chamadas concluídas. Uma consulta ainda em execução, ou que travou, não está nesses números.",
+        "subtitle": "Do seu banco de dados — todos os aplicativos que se conectam",
+        "clientSubtitle": "Os números marcados são medidos a partir dos rastros da sua aplicação — as chamadas que seus aplicativos concluíram nesta janela",
         "instance": "Relatado por {instance}",
         "instanceWide": "Todos os bancos de dados nesta instância",
         "calls": "Execuções",
@@ -17323,9 +17516,13 @@
         "serverExecution": "tempo de execução",
         "serverWait": "tempo de espera",
         "serverCounted": "contagem de servidores",
-        "clientObserved": "observado pelo cliente",
         "serverReported": "relatado pelos seus bancos de dados"
       }
+    },
+    "appSource": {
+      "marker": "Medido a partir dos rastros da sua aplicação",
+      "markerHint": "Medido a partir dos rastros da sua aplicação, adicionando a visão dos seus aplicativos ao que seu banco de dados relata.",
+      "legend": "Dos rastros do seu aplicativo"
     },
     "page": {
       "tabs": {
@@ -17334,7 +17531,7 @@
         "metricsHint": "Carga do banco de dados por evento de espera e todas as métricas que seus receptores de banco de dados coletam.",
         "queries": "Principais consultas",
         "samples": "Chamadas mais lentas",
-        "samplesHintClient": "Chamadas concluídas que seus serviços instrumentados observaram nesta janela — chamadores sem rastreamento não são contados, então este é um mínimo, não o total. A tabela mostra as mais lentas delas.",
+        "samplesHintClient": "Chamadas medidas a partir dos rastros da sua aplicação nesta janela, adicionando a visão dos seus aplicativos ao que seu banco de dados relata. A tabela mostra as mais lentas delas.",
         "samplesHintServer": "Declarações que seus bancos de dados relataram concluídas nesta janela, contadas dentro do banco de dados. A tabela mostra as mais lentas delas.",
         "samplesHintUnknown": "As chamadas individuais mais lentas ao banco de dados nesta janela.",
         "deadlocks": "Deadlocks",
@@ -17371,6 +17568,11 @@
       "explore": "Abrir no Explorador de métricas",
       "railLabel": "Seções de métricas",
       "noAccess": "Você não tem permissão para ler {stream}. Peça a um administrador acesso de leitura a este stream.",
+      "serverStreamMissing": {
+        "title": "No server activity collected yet",
+        "description": "This chart reads samples from {stream}, which a database receiver creates. Traces alone cannot fill it.",
+        "action": "Set up a database receiver"
+      },
       "byDims": {
         "query": "por consulta",
         "database": "por banco de dados",
@@ -17485,7 +17687,7 @@
         "status": "Status"
       },
       "columnHints": {
-        "duration": "Quanto tempo esta chamada levou, medido pelo chamador. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou uma que nunca retornou, não é medida aqui."
+        "duration": "Quanto tempo esta chamada levou, conforme cronometrado pela sua aplicação do início ao fim."
       },
       "failed": "Falhou",
       "failedWithCode": "Falhou · {code}",
@@ -18994,6 +19196,8 @@
     "rotationNobody": "Ninguém de plantão",
     "edit": "Editar",
     "timelineLoadFailed": "Não foi possível resolver a escala para este período",
+    "editorReadFailed": "Não foi possível carregar a cópia mais recente para edição. Tente novamente.",
+    "refreshFailed": "Não foi possível atualizar. O que é exibido pode estar desatualizado.",
     "scheduleDoneEditing": "Voltar para a escala",
     "coverWhoRequired": "Escolha quem está cobrindo",
     "timelineCoverAria": "{who} está cobrindo {rotation}, de {from} a {to}",

@@ -1293,6 +1293,7 @@ async fn create_anomaly_alert(
         retrain_interval_days: anomaly_fields.retrain_interval_days,
         percentile: anomaly_fields.percentile,
         alert_budget_per_day: anomaly_fields.alert_budget_per_day,
+        level_half_width_seconds: anomaly_fields.level_half_width_seconds,
         rcf_num_trees: anomaly_fields.rcf_num_trees,
         rcf_tree_size: anomaly_fields.rcf_tree_size,
         rcf_shingle_size: anomaly_fields.rcf_shingle_size,
@@ -2077,6 +2078,7 @@ async fn build_and_run_anomaly_update(
         percentile: fields.percentile,
         // Set-only mapping: this endpoint's partial semantics cannot express "clear".
         alert_budget_per_day: fields.alert_budget_per_day.map(Some),
+        level_half_width_seconds: fields.level_half_width_seconds.map(Some),
         retrain_interval_days: fields.retrain_interval_days,
         alert_enabled: fields.alert_enabled,
         alert_destinations: Some(alert.destinations),

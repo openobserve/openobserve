@@ -75,6 +75,13 @@ export class IamPage {
         this.toastMessages = page.locator('[data-test="o-toast-message"]');
 
         // ============================================================
+        // Selection gutter (OTable select cell / select-all)
+        // ============================================================
+        this.selectAllHeaderCell   = page.locator('th[data-test="o2-table-th-select"]');
+        this.selectAllCheckboxBtn  = page.locator('[data-test="o2-table-select-all"] button[role="checkbox"]');
+        this.deleteSelectedBtn     = page.locator('[data-test="service-accounts-list-delete-accounts-btn"]');
+
+        // ============================================================
         // Per-email runtime factories. Walks from the email-cell up to the
         // ancestor row, then drills back down to the action buttons that
         // share the row scope.
@@ -91,6 +98,10 @@ export class IamPage {
             this.rowByEmail(emailName).locator('[data-test="service-accounts-refresh"]');
         this.updateButtonByEmail = (emailName) =>
             this.rowByEmail(emailName).locator('[data-test="service-accounts-edit"]');
+        this.selectCellByEmail = (emailName) =>
+            this.rowByEmail(emailName).locator('td[data-test="o2-table-select-cell"]');
+        this.checkboxByEmail = (emailName) =>
+            this.selectCellByEmail(emailName).locator('button[role="checkbox"]');
 
         // System account row (resolved via the static system-account label).
         this.systemAccountRow = this.systemAccountLabel.locator(
@@ -319,6 +330,71 @@ export class IamPage {
     async enterDescriptionSA() {
         await this.descriptionInput.click();
         await this.descriptionInput.fill('Description Details for Service Account');
+    }
+
+    // ============================================================
+    // Selection gutter (OTable select cell / select-all)
+    // ============================================================
+
+    async waitForSelectCell(emailName) {
+        await expect(this.selectCellByEmail(emailName)).toBeVisible({ timeout: 15000 });
+    }
+
+    async clickCheckboxByEmail(emailName) {
+        await this.checkboxByEmail(emailName).click();
+    }
+
+    // Click near the right edge so the point lands on the empty padding, not the checkbox itself.
+    async clickSelectCellPadding(emailName) {
+        const cell = this.selectCellByEmail(emailName);
+        const box = await cell.boundingBox();
+        await cell.click({
+            position: { x: box ? box.width - 4 : 40, y: box ? box.height / 2 : 15 },
+        });
+    }
+
+    async clickSelectAllCellPadding() {
+        const cell = this.selectAllHeaderCell;
+        const box = await cell.boundingBox();
+        await cell.click({
+            position: { x: box ? box.width - 4 : 40, y: box ? box.height / 2 : 15 },
+        });
+    }
+
+    async expectRowCheckboxChecked(emailName) {
+        await expect(this.checkboxByEmail(emailName)).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
+    }
+
+    async expectRowCheckboxUnchecked(emailName) {
+        await expect(this.checkboxByEmail(emailName)).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
+    }
+
+    async expectSelectAllCheckboxChecked() {
+        await expect(this.selectAllCheckboxBtn).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
+    }
+
+    async expectSelectAllCheckboxUnchecked() {
+        await expect(this.selectAllCheckboxBtn).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
+    }
+
+    async expectDeleteSelectedBtnVisible() {
+        await expect(this.deleteSelectedBtn).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectDeleteSelectedBtnHidden() {
+        await expect(this.deleteSelectedBtn).toBeHidden({ timeout: 10000 });
+    }
+
+    // Excludes system-managed rows (SRE Agent), which "select all" never selects.
+    async expectAllSelectableRowsSelected() {
+        const selectableRowCount = await this.page
+            .locator('tbody tr[data-test^="o2-table-row-"]')
+            .filter({ hasNot: this.systemAccountLabel })
+            .count();
+        const checkedCount = await this.page
+            .locator('tbody button[role="checkbox"][data-state="checked"]')
+            .count();
+        expect(checkedCount).toBe(selectableRowCount);
     }
 
     // ============================================================

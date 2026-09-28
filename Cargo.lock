@@ -2609,6 +2609,7 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "opentelemetry",
+ "opentelemetry-proto",
  "parking_lot 0.12.5",
  "prost 0.14.4",
  "reqwest 0.13.4",
@@ -4601,6 +4602,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "transform",
+ "usage_reporting",
  "vrl",
 ]
 
@@ -6936,6 +6938,7 @@ dependencies = [
 name = "metrics_index"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arrow",
  "arrow-schema",
  "bytes",
@@ -6945,10 +6948,16 @@ dependencies = [
  "hashlink 0.11.1",
  "infra",
  "log",
+ "object_store",
+ "parquet",
  "promql",
  "promql-parser",
  "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
  "tokio",
+ "zstd",
 ]
 
 [[package]]
@@ -8032,6 +8041,7 @@ dependencies = [
  "axum-tracing-opentelemetry",
  "base64 0.22.1",
  "bytes",
+ "chrono",
  "common",
  "config",
  "db",
@@ -8039,6 +8049,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.17.1",
  "http 1.5.0",
+ "http-body 1.1.0",
  "http-body-util",
  "infra",
  "ingestion-common",
@@ -8060,6 +8071,7 @@ dependencies = [
  "search",
  "serde",
  "serde_json",
+ "snap",
  "stream",
  "time",
  "tokio",
@@ -8335,7 +8347,9 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "snap",
+ "sqlparser",
  "stream",
+ "strum 0.28.0",
  "svix-ksuid",
  "thiserror 2.0.19",
  "tiktoken-rs",

@@ -69,8 +69,25 @@ export default class DashboardFolder {
     await expect(this.getFolderTitleByName(folderName)).toHaveCount(0);
   }
 
+  // The rail's ONavGroup flyout is anchored over the folder sidebar and only
+  // closes on mouseleave, so park the pointer clear of it before clicking a
+  // folder — otherwise the flyout overlay intercepts the click.
+  async dismissNavFlyout() {
+    const flyout = this.page
+      .locator('[data-test^="nav-group-flyout-"]')
+      .first();
+    if (!(await flyout.isVisible().catch(() => false))) return;
+    const viewport = this.page.viewportSize();
+    await this.page.mouse.move(
+      Math.floor((viewport?.width ?? 1280) * 0.75),
+      Math.floor((viewport?.height ?? 720) / 2)
+    );
+    await flyout.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+  }
+
   // Click on a folder row by name to open it
   async openFolderByName(folderName) {
+    await this.dismissNavFlyout();
     const folderCard = this.getFolderCardByName(folderName);
     await folderCard.waitFor({ state: "visible", timeout: 10000 });
     await folderCard.click();

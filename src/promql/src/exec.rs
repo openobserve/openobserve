@@ -144,6 +144,16 @@ impl PromqlContext {
         let cfg = config::get_config();
         self.start = micros_since_epoch(stmt.start);
         self.end = micros_since_epoch(stmt.end);
+        if stmt.lookback_delta > Duration::ZERO {
+            self.lookback_delta = micros(stmt.lookback_delta);
+        }
+        let (window_start, window_end) = (self.start, self.end);
+        // A range needs a positive step; the exemplar loader ignores it and scans contiguously.
+        let step = if window_start == window_end {
+            0
+        } else {
+            self.lookback_delta
+        };
 
         // pick all selectors from stmt
         let mut visitor = MetricSelectorVisitor::default();
@@ -158,11 +168,10 @@ impl PromqlContext {
         let mut tasks = Vec::new();
         let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
         for expr in visitor.exprs {
-            let time = self.start;
             let expr = Arc::new(expr);
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            // Use EvalContext::new for instant query (start == end)
-            let eval_ctx = EvalContext::new(time, time, 0, trace_id.to_string());
+            // Exemplars are wanted over the whole range, not only the lookback at `start`.
+            let eval_ctx = EvalContext::new(window_start, window_end, step, trace_id.to_string());
             let mut engine = Engine::new(trace_id, ctx.clone(), eval_ctx);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {
@@ -208,7 +217,15 @@ impl PromqlContext {
         }
         let merged_data = merged_data
             .into_values()
-            .map(|(labels, exemplars)| RangeValue::new_with_exemplars(labels, exemplars))
+            .filter_map(|(labels, exemplars)| {
+                // An instant request keeps its lookback answer; a range keeps its own bounds.
+                let exemplars = if window_start == window_end {
+                    exemplars
+                } else {
+                    exemplars_in_window(exemplars, window_start, window_end)
+                };
+                (!exemplars.is_empty()).then(|| RangeValue::new_with_exemplars(labels, exemplars))
+            })
             .collect::<Vec<_>>();
 
         // sort data
@@ -216,6 +233,29 @@ impl PromqlContext {
         value.sort();
         Ok((value, result_type, *self.scan_stats.read().await))
     }
+}
+
+/// Exemplars timestamped in `[start, end]`, sorted, with rolling-array repeats removed.
+fn exemplars_in_window(
+    mut exemplars: Vec<Arc<Exemplar>>,
+    start: i64,
+    end: i64,
+) -> Vec<Arc<Exemplar>> {
+    exemplars.retain(|e| e.timestamp >= start && e.timestamp <= end);
+    exemplars.sort_by(|a, b| {
+        a.timestamp
+            .cmp(&b.timestamp)
+            .then(a.value.total_cmp(&b.value))
+            .then_with(|| {
+                a.labels
+                    .partial_cmp(&b.labels)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    });
+    exemplars.dedup_by(|a, b| {
+        a.timestamp == b.timestamp && a.value.to_bits() == b.value.to_bits() && a.labels == b.labels
+    });
+    exemplars
 }
 
 /// The shape an instant query answers with, given what evaluation produced.
@@ -257,9 +297,123 @@ fn shape_instant_result(
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL};
     use promql_parser::parser;
 
     use super::*;
+
+    const MINUTE: i64 = 60_000_000;
+    const WINDOW_START: i64 = 1_640_995_200_000_000;
+
+    /// One series whose rows each carry the rolling exemplar array an OTLP exporter sends.
+    struct SpreadExemplarProvider {
+        /// `(row timestamp, exemplars as (timestamp, trace_id))`
+        rows: Vec<(i64, Vec<(i64, &'static str)>)>,
+    }
+
+    #[async_trait::async_trait]
+    impl TableProvider for SpreadExemplarProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            stream_name: &str,
+            _time_range: (i64, i64),
+            _matchers: promql_parser::label::Matchers,
+            _label_selector: hashbrown::HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+        ) -> Result<
+            Vec<(
+                datafusion::prelude::SessionContext,
+                Arc<datafusion::arrow::datatypes::Schema>,
+                ScanStats,
+                bool,
+            )>,
+        > {
+            use datafusion::arrow::{
+                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+                datatypes::{DataType, Field, Schema},
+            };
+            let schema = Arc::new(Schema::new(vec![
+                Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(VALUE_LABEL, DataType::Float64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+                Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+                Field::new("env", DataType::Utf8, false),
+            ]));
+            let exemplars = |list: &[(i64, &str)]| {
+                let items: Vec<String> = list
+                    .iter()
+                    .map(|(ts, trace)| {
+                        format!(r#"{{"_timestamp":{ts},"value":1.5,"trace_id":"{trace}"}}"#)
+                    })
+                    .collect();
+                format!("[{}]", items.join(","))
+            };
+            let n = self.rows.len();
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(
+                        self.rows.iter().map(|r| r.0).collect::<Vec<_>>(),
+                    )),
+                    Arc::new(Float64Array::from(vec![1.0; n])),
+                    Arc::new(UInt64Array::from(vec![7; n])),
+                    Arc::new(StringArray::from(
+                        self.rows
+                            .iter()
+                            .map(|r| Some(exemplars(&r.1)))
+                            .collect::<Vec<_>>(),
+                    )),
+                    Arc::new(StringArray::from(vec!["prod"; n])),
+                ],
+            )
+            .unwrap();
+            let ctx = datafusion::prelude::SessionContext::new();
+            ctx.register_batch(stream_name, batch).unwrap();
+            Ok(vec![(ctx, schema, ScanStats::default(), true)])
+        }
+    }
+
+    async fn exemplar_timestamps(
+        query: &str,
+        rows: Vec<(i64, Vec<(i64, &'static str)>)>,
+    ) -> Vec<i64> {
+        let trace_id = "test_exemplar_window";
+        let query_ctx = Arc::new(QueryContext {
+            trace_id: trace_id.to_string(),
+            org_id: "org".to_string(),
+            query_exemplars: true,
+            query_data: false,
+            need_wal: false,
+            use_cache: false,
+            timeout: 30,
+            search_event_type: None,
+            regions: vec![],
+            clusters: vec![],
+            is_super_cluster: false,
+            search_event_context: None,
+        });
+        let mut ctx = PromqlContext::new(query_ctx, SpreadExemplarProvider { rows }, vec![]);
+        let at = |us: i64| std::time::UNIX_EPOCH + Duration::from_micros(us as u64);
+        let stmt = EvalStmt {
+            expr: parser::parse(query).unwrap(),
+            start: at(WINDOW_START),
+            end: at(WINDOW_START + 60 * MINUTE),
+            interval: Duration::from_secs(15),
+            lookback_delta: DEFAULT_LOOKBACK,
+        };
+        let (value, result_type, _) = ctx.query_exemplars(trace_id, stmt).await.unwrap();
+        assert_eq!(result_type.as_deref(), Some("exemplars"));
+        match value {
+            Value::Matrix(series) => series
+                .iter()
+                .flat_map(|s| s.exemplars.iter().flatten())
+                .map(|e| e.timestamp)
+                .collect(),
+            Value::None => vec![],
+            other => panic!("expected a matrix, got {other:?}"),
+        }
+    }
 
     fn shaped(query: &str, value: Value) -> (Value, Option<String>) {
         let expr = parser::parse(query).unwrap();
@@ -347,5 +501,35 @@ mod tests {
             Value::Sample(sample) => assert_eq!((sample.timestamp, sample.value), (3000, 2.0)),
             other => panic!("unexpected result: {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_query_exemplars_returns_the_whole_window_not_just_the_lookback_at_start() {
+        let (before, t10, t40, t55) = (
+            WINDOW_START - 2 * MINUTE,
+            WINDOW_START + 10 * MINUTE,
+            WINDOW_START + 40 * MINUTE,
+            WINDOW_START + 55 * MINUTE,
+        );
+        let rows = vec![
+            (before, vec![(before, "before")]),
+            (t10, vec![(t10, "t10")]),
+            (t40, vec![(t10, "t10"), (t40, "t40")]),
+            (t55, vec![(t55, "t55")]),
+        ];
+
+        let timestamps = exemplar_timestamps("test_metric", rows).await;
+
+        assert_eq!(timestamps, vec![t10, t40, t55]);
+    }
+
+    #[tokio::test]
+    async fn test_query_exemplars_scans_the_whole_window_for_a_short_range_selector() {
+        let times = [1, 2, 3, 7].map(|m| WINDOW_START + m * MINUTE);
+        let rows = times.iter().map(|&ts| (ts, vec![(ts, "t")])).collect();
+
+        let timestamps = exemplar_timestamps("rate(test_metric[1m])", rows).await;
+
+        assert_eq!(timestamps, times.to_vec());
     }
 }

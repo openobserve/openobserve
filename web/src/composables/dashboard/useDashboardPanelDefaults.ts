@@ -109,6 +109,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
       hidden_columns: [],
       sticky_columns: [],
       sticky_first_column: false,
+      show_exemplars: false,
       column_order: [],
       table_pagination: false,
       table_pagination_rows_per_page: null,
