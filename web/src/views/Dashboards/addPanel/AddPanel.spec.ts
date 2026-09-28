@@ -70,7 +70,7 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
     resetDashboardPanelData: vi.fn(),
     resetDashboardPanelDataAndAddTimeField: vi.fn(),
     resetAggregationFunction: vi.fn(),
-    validatePanel: vi.fn(),
+    validatePanel: validatePanelMock,
     makeAutoSQLQuery: vi.fn(),
   })),
 }));
@@ -82,12 +82,19 @@ vi.mock("@/composables/useLoading", () => ({
   })),
 }));
 
+// One stable object, so a test can assert on what the view actually notified.
+// Stable across the mock factory, so a test can make `validatePanel` fail the
+// way a real query/field error does.
+const validatePanelMock = vi.hoisted(() => vi.fn());
+
+const notificationMocks = vi.hoisted(() => ({
+  showErrorNotification: vi.fn(),
+  showPositiveNotification: vi.fn(),
+  showConfictErrorNotificationWithRefreshBtn: vi.fn(),
+}));
+
 vi.mock("@/composables/useNotifications", () => ({
-  default: vi.fn(() => ({
-    showErrorNotification: vi.fn(),
-    showPositiveNotification: vi.fn(),
-    showConfictErrorNotificationWithRefreshBtn: vi.fn(),
-  })),
+  default: vi.fn(() => notificationMocks),
 }));
 
 vi.mock("@/composables/useAiChat", () => ({
@@ -4727,6 +4734,88 @@ describe("AddPanel.vue", () => {
       expect(updatePanel).toHaveBeenCalled();
       expect(window.sessionStorage.getItem(key)).toBeNull();
       vi.mocked(useRoute).mockReset();
+    });
+  });
+
+  describe("Save validation reporting", () => {
+    const mountForValidation = async () => {
+      const w = mount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { dashboard: "test-dashboard" }, params: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: {
+            OPageHeader: true,
+            PanelEditor: true,
+            DateTimePickerDashboard: true,
+            QueryInspector: true,
+            AddSettingVariable: true,
+            ConfigDrawer: true,
+          },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      return w;
+    };
+
+    const lastErrorMessage = () => {
+      const calls = notificationMocks.showErrorNotification.mock.calls;
+      return calls.length ? calls[calls.length - 1][0] : undefined;
+    };
+
+    it("names the failing checks instead of the generic message", async () => {
+      // A query/field failure is what actually reaches this path: the OForm
+      // schema already blocks an empty title before submit.
+      validatePanelMock.mockImplementation((errors: string[]) => {
+        errors.push("There should be at least one field on Y-Axis");
+        errors.push("Add one field on X-Axis");
+      });
+      wrapper = await mountForValidation();
+      wrapper.vm.dashboardPanelData.data.title = "A panel";
+
+      try {
+        await wrapper.vm.savePanelChangesToDashboard("dash-1");
+      } catch (e) {
+        /* ignore: the save deps are mocked and may reject */
+      }
+
+      expect(lastErrorMessage()).toBe(
+        "There should be at least one field on Y-Axis, Add one field on X-Axis",
+      );
+    });
+
+    it("keeps the generic message for a custom chart, whose errors may be stale", async () => {
+      // `errorData.errors` is not cleared before that guard, so a leftover
+      // chart/save error must not be presented as the reason Save failed.
+      wrapper = await mountForValidation();
+      wrapper.vm.dashboardPanelData.data.type = "custom_chart";
+      wrapper.vm.errorData.errors.splice(0);
+      wrapper.vm.errorData.errors.push("a stale chart error");
+
+      try {
+        await wrapper.vm.savePanelChangesToDashboard("dash-1");
+      } catch (e) {
+        /* ignore: the save deps are mocked and may reject */
+      }
+
+      expect(lastErrorMessage()).toBe("dashboard.addPanel.fixErrors");
+    });
+
+    it("does not toast on Apply, where PanelEditor already reports the errors", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementationOnce((errors: string[]) => {
+        errors.push("Add one field for the X-Axis");
+      });
+      notificationMocks.showErrorNotification.mockClear();
+
+      wrapper.vm.runQuery();
+
+      expect(validatePanelMock).toHaveBeenCalled();
+      expect(notificationMocks.showErrorNotification).not.toHaveBeenCalled();
+      expect(wrapper.vm.errorData.errors).toEqual(["Add one field for the X-Axis"]);
     });
   });
 });
