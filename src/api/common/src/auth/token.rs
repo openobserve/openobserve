@@ -54,10 +54,10 @@ fn may_skip_permission_check(
     is_list_invite_call || is_reject_invite_call || is_member_subscription || is_org_list_call
 }
 
-/// Skip the `aud` check only on `/{org}/mcp` or for this process's MCP loopback calls.
+/// Dynamic MCP clients carry a foreign `aud`, so only their entry points may skip it.
 #[cfg(any(feature = "enterprise", test))]
 fn relaxes_audience_check(path_columns: &[&str], mcp_marker: Option<&[u8]>) -> bool {
-    let is_mcp_endpoint = path_columns.get(1).is_some_and(|s| *s == "mcp");
+    let is_mcp_endpoint = path_columns.len() == 2 && path_columns[1] == "mcp";
     is_mcp_endpoint
         || mcp_marker
             .is_some_and(|v| constant_time_eq(v, config::cluster::MCP_LOOPBACK_SECRET.as_bytes()))
@@ -336,6 +336,12 @@ mod tests {
     #[test]
     fn mcp_endpoint_relaxes_audience_check() {
         assert!(relaxes_audience_check(&["default", "mcp"], None));
+    }
+
+    #[test]
+    fn paths_below_mcp_keep_audience_check() {
+        assert!(!relaxes_audience_check(&["default", "mcp", "_json"], None));
+        assert!(!relaxes_audience_check(&["default", "mcp", "x"], None));
     }
 
     #[test]

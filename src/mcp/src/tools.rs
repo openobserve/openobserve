@@ -405,7 +405,8 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
 
     let mut client_builder = reqwest::Client::builder()
         .user_agent(format!("openobserve/{}", config::VERSION))
-        .timeout(std::time::Duration::from_secs(30));
+        .timeout(std::time::Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::none());
     if zo_config.http.tls_enabled {
         // Loopback to our own listener, whose cert is issued for the service name, not localhost
         client_builder = client_builder.danger_accept_invalid_certs(true);
