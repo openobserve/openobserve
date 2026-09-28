@@ -973,7 +973,7 @@ describe("useRumSpanBuilder", () => {
   // =========================================================================
 
   describe("formatRumEventsAsSpans — view spans", () => {
-    it("should return empty array when allViewEvents is empty", () => {
+    it("should return empty array when there are no RUM events at all", () => {
       const { formatRumEventsAsSpans } = buildComposable();
 
       const result = formatRumEventsAsSpans([], [], [], []);
@@ -1300,6 +1300,17 @@ describe("useRumSpanBuilder", () => {
       const requestSpans = spans.filter((s) => s.rum_event_type === "resource");
       expect(requestSpans.map((s) => s.span_id)).toEqual(["span-root"]);
       expect(spans.find((s) => s.rum_event_type === "collapsed_requests")).toBeDefined();
+    });
+
+    it("should still show the traced request when the view's page came back empty", () => {
+      const traced = makeTracedResource();
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [], [], []);
+
+      const requestSpans = spans.filter((s) => s.rum_event_type === "resource");
+      expect(requestSpans.map((s) => s.span_id)).toEqual(["span-root"]);
+      expect(spans.find((s) => s.rum_event_type === "collapsed_requests")).toBeUndefined();
     });
 
     it("should add no collapsed row when the view made no other requests", () => {

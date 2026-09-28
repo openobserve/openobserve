@@ -629,7 +629,8 @@ export default function useRumSpanBuilder(
     actionEvents: any[],
     allViewEvents: any[],
   ) => {
-    if (!allViewEvents.length) return [];
+    // An empty view page still shows the traced request, via the fallback in splitRequestsByTrace.
+    if (!allViewEvents.length && !tracedResources.length) return [];
 
     const firstTracedResource = tracedResources[0];
     const rawTraceId = rumField<string>(firstTracedResource, "trace_id") || "";
