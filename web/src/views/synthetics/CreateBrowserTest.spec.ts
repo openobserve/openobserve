@@ -200,6 +200,12 @@ const baseStubs = {
     props: ["modelValue", "placeholder", "error", "errorMessage", "id", "label"],
     emits: ["update:modelValue", "blur"],
   },
+  OTemplateInput: {
+    template:
+      '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" @blur="$emit(\'blur\')" />',
+    props: ["modelValue", "placeholder", "error", "errorMessage", "id", "label", "suggestions"],
+    emits: ["update:modelValue", "blur"],
+  },
   OIcon: {
     template: "<span />",
     props: ["name", "size", "class", "ariaHidden"],
@@ -255,6 +261,7 @@ const baseStubs = {
       "blockedReason",
       "blockedDetail",
       "variablesPanelOpen",
+      "variableSuggestions",
       "class",
     ],
   },
@@ -270,6 +277,7 @@ const baseStubs = {
       "folders",
       "foldersLoading",
       "validationErrors",
+      "variableSuggestions",
       "class",
     ],
   },
@@ -994,6 +1002,69 @@ describe("CreateBrowserTest", () => {
       wrapper = await mountTemplatedCheck(["stg"]);
 
       expect(journeyStub(wrapper).props("startUrl")).toBe("https://stg.test/login");
+    });
+  });
+
+  describe("Journey step — variable suggestions", () => {
+    const journeyStub = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-browser-journey"]');
+
+    it("offers nothing until the shared tiers load", async () => {
+      // Once-only: clearAllMocks keeps implementations, and a pending promise must not leak.
+      mockServiceListEnvironments.mockReturnValueOnce(new Promise(() => {}));
+      mockServiceListGlobalVariables.mockReturnValueOnce(new Promise(() => {}));
+      mockServiceGet.mockResolvedValue({
+        data: { name: "Login", url: "https://example.com", environments: [], journey: [] },
+      });
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      expect(journeyStub(wrapper).props("variableSuggestions")).toBeUndefined();
+    });
+
+    it("lists the check's own rows before the inherited ones once loaded", async () => {
+      mockServiceListEnvironments.mockResolvedValue({
+        data: [
+          {
+            id: "prod",
+            name: "prod",
+            description: "",
+            is_global: false,
+            created_at: 0,
+            updated_at: 0,
+            checks_count: 0,
+            variables: [
+              {
+                id: "BASE_URL",
+                name: "BASE_URL",
+                kind: "plain",
+                value: "https://prod.test",
+                has_value: true,
+                description: "",
+                example: "",
+                tags: [],
+                used_by_checks: 0,
+                created_at: 0,
+                updated_at: 0,
+              },
+            ],
+          },
+        ],
+      });
+      mockServiceGet.mockResolvedValue({
+        data: {
+          name: "Login",
+          url: "{{BASE_URL}}/login",
+          environments: ["prod"],
+          variables: [{ name: "USER", value: "me" }],
+          journey: [],
+        },
+      });
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      const rows = journeyStub(wrapper).props("variableSuggestions") as { name: string }[];
+      expect(rows.map((r) => r.name)).toEqual(["USER", "BASE_URL"]);
     });
   });
 

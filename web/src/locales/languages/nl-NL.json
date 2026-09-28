@@ -15387,6 +15387,9 @@
       "multiSelect": "Meervoudige selectie",
       "singleSelect": "Enkele selectie"
     },
+    "templateInput": {
+      "suggestions": "Suggesties voor variabelen"
+    },
     "time": {
       "openTimePicker": "Tijdkiezer openen",
       "clear": "Wissen",

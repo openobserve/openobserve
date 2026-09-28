@@ -15387,6 +15387,9 @@
       "multiSelect": "Selezione multipla",
       "singleSelect": "Selezione singola"
     },
+    "templateInput": {
+      "suggestions": "Suggerimenti variabili"
+    },
     "time": {
       "openTimePicker": "Apri selettore ora",
       "clear": "Cancella",
