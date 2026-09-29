@@ -1368,7 +1368,7 @@
     "sessionReplayGapTooltip": "Эту часть не удалось загрузить",
     "sessionReplayRetry": "Повторить",
     "sessionReplayLiveBadge": "В РЕАЛЬНОМ ВРЕМЕНИ",
-    "sessionReplayLiveChip": "В реальном времени · новая активность загружается автоматически",
+    "sessionReplayLiveChip": "В реальном времени",
     "sessionReplayLateRows": "Более ранняя активность появилась после загрузки записи. Перезагрузите, чтобы включить её.",
     "sessionReplayReload": "Перезагрузить",
     "seek": "Перейти",

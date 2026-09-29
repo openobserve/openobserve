@@ -1368,7 +1368,7 @@
     "sessionReplayGapTooltip": "此部分無法載入",
     "sessionReplayRetry": "重試",
     "sessionReplayLiveBadge": "即時",
-    "sessionReplayLiveChip": "即時 · 新活動會自動載入",
+    "sessionReplayLiveChip": "即時",
     "sessionReplayLateRows": "較早的活動在重播載入後才送達。請重新載入以納入。",
     "sessionReplayReload": "重新載入",
     "seek": "跳轉",

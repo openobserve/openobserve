@@ -1368,7 +1368,7 @@
     "sessionReplayGapTooltip": "Dit deel kon niet worden geladen",
     "sessionReplayRetry": "Opnieuw proberen",
     "sessionReplayLiveBadge": "LIVE",
-    "sessionReplayLiveChip": "Live · nieuwe activiteit wordt automatisch geladen",
+    "sessionReplayLiveChip": "Live",
     "sessionReplayLateRows": "Eerdere activiteit kwam binnen nadat de replay was geladen. Herlaad om deze op te nemen.",
     "sessionReplayReload": "Herladen",
     "seek": "Zoeken",

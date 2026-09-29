@@ -1368,7 +1368,7 @@
     "sessionReplayGapTooltip": "Impossibile caricare questa parte",
     "sessionReplayRetry": "Riprova",
     "sessionReplayLiveBadge": "LIVE",
-    "sessionReplayLiveChip": "Live · le nuove attività vengono caricate automaticamente",
+    "sessionReplayLiveChip": "Live",
     "sessionReplayLateRows": "Un'attività precedente è arrivata dopo il caricamento della riproduzione. Ricarica per includerla.",
     "sessionReplayReload": "Ricarica",
     "seek": "Cerca",

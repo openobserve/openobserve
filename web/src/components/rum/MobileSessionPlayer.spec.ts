@@ -200,9 +200,7 @@ describe("MobileSessionPlayer", () => {
     vi.advanceTimersByTime(6_000);
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.playbackState).toBe("ended");
-    expect(wrapper.find('[data-test="replay-status-chip"]').text()).toBe(
-      "Live · new activity loads automatically",
-    );
+    expect(wrapper.find('[data-test="replay-status-chip"]').text()).toBe("Live");
     expect(wrapper.emitted("seek-request")).toBeUndefined();
 
     await wrapper.setProps({ segments: [segmentA, segmentB] });

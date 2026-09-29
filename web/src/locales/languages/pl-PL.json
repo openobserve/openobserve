@@ -1368,7 +1368,7 @@
     "sessionReplayGapTooltip": "Nie udało się załadować tej części",
     "sessionReplayRetry": "Ponów",
     "sessionReplayLiveBadge": "NA ŻYWO",
-    "sessionReplayLiveChip": "Na żywo · nowa aktywność ładuje się automatycznie",
+    "sessionReplayLiveChip": "Na żywo",
     "sessionReplayLateRows": "Wcześniejsza aktywność pojawiła się po załadowaniu odtwarzania. Odśwież, aby ją uwzględnić.",
     "sessionReplayReload": "Odśwież",
     "seek": "Przewiń",

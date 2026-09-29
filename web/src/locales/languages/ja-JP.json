@@ -1368,7 +1368,7 @@
     "sessionReplayGapTooltip": "この部分を読み込めませんでした",
     "sessionReplayRetry": "再試行",
     "sessionReplayLiveBadge": "ライブ",
-    "sessionReplayLiveChip": "ライブ · 新しいアクティビティは自動的に読み込まれます",
+    "sessionReplayLiveChip": "ライブ",
     "sessionReplayLateRows": "リプレイの読み込み後に、それより前のアクティビティが届きました。含めるには再読み込みしてください。",
     "sessionReplayReload": "再読み込み",
     "seek": "シーク",

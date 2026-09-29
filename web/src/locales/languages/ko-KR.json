@@ -1368,7 +1368,7 @@
     "sessionReplayGapTooltip": "이 부분을 로드할 수 없습니다",
     "sessionReplayRetry": "다시 시도",
     "sessionReplayLiveBadge": "실시간",
-    "sessionReplayLiveChip": "실시간 · 새 활동이 자동으로 로드됩니다",
+    "sessionReplayLiveChip": "실시간",
     "sessionReplayLateRows": "리플레이가 로드된 후 이전 활동이 도착했습니다. 포함하려면 다시 로드하세요.",
     "sessionReplayReload": "다시 로드",
     "seek": "탐색",

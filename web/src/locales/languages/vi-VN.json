@@ -1368,7 +1368,7 @@
     "sessionReplayGapTooltip": "Phần này không tải được",
     "sessionReplayRetry": "Thử lại",
     "sessionReplayLiveBadge": "LIVE",
-    "sessionReplayLiveChip": "Trực tiếp · hoạt động mới tự động tải",
+    "sessionReplayLiveChip": "Trực tiếp",
     "sessionReplayLateRows": "Hoạt động trước đó đến sau khi bản phát lại đã tải. Tải lại để bao gồm hoạt động đó.",
     "sessionReplayReload": "Tải lại",
     "seek": "Tua",

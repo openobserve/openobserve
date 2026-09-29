@@ -1368,7 +1368,7 @@
     "sessionReplayGapTooltip": "This part couldn't load",
     "sessionReplayRetry": "Retry",
     "sessionReplayLiveBadge": "LIVE",
-    "sessionReplayLiveChip": "Live · new activity loads automatically",
+    "sessionReplayLiveChip": "Live",
     "sessionReplayLateRows": "Earlier activity arrived after the replay loaded. Reload to include it.",
     "sessionReplayReload": "Reload",
     "seek": "Seek",

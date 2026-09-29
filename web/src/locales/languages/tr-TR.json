@@ -1368,7 +1368,7 @@
     "sessionReplayGapTooltip": "Bu bölüm yüklenemedi",
     "sessionReplayRetry": "Yeniden dene",
     "sessionReplayLiveBadge": "CANLI",
-    "sessionReplayLiveChip": "Canlı · yeni etkinlik otomatik yüklenir",
+    "sessionReplayLiveChip": "Canlı",
     "sessionReplayLateRows": "Daha önceki etkinlik, tekrar yüklendikten sonra geldi. Dahil etmek için yeniden yükleyin.",
     "sessionReplayReload": "Yeniden yükle",
     "seek": "Atla",
