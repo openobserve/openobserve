@@ -246,7 +246,7 @@ const form = useOForm<ProviderForm>({
 });
 const formValues = form.useStore((s: any) => s.values as ProviderForm);
 const apiKeyRequired = computed(() =>
-  ["openai", "deepseek", "anthropic"].includes(formValues.value.providerType),
+  ["openai", "deepseek", "anthropic", "systemone"].includes(formValues.value.providerType),
 );
 
 const providerTypeOptions = computed(() => [
@@ -256,6 +256,7 @@ const providerTypeOptions = computed(() => [
   { label: raw("Ollama"), value: "ollama" },
   { label: raw("vLLM"), value: "vllm" },
   { label: raw("OpenAI-compatible"), value: "openai_compatible" },
+  { label: raw("System One (TypeSafe Jev)"), value: "systemone" },
 ]);
 
 const endpointPlaceholder = computed(

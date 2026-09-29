@@ -101,9 +101,8 @@ function evalLink(tab: EvalTab) {
 const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
 
 // Only Monitor's LLM Insights + Sessions have OSS-registered routes (see
-// web/src/composables/router.ts) — the rest of Monitor (Agent Graph/Behavior)
-// and every other group need the real enterprise/cloud backend, so on a true
-// OSS build the rail must not link anywhere else; it would 404.
+// web/src/composables/router.ts). The remaining sections require the
+// enterprise/cloud backend, so true OSS builds must not link to them.
 const OSS_AVAILABLE_KEYS = new Set(["llmInsights", "sessions"]);
 const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
 
@@ -166,6 +165,14 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: { name: "aiDatasets", query: orgQuery.value },
       dataTest: "ai-secondary-nav-datasets",
       group: "Annotate",
+    },
+    {
+      key: "prompts",
+      label: t("aiObservability.nav.prompts"),
+      icon: "edit",
+      to: { name: "aiPrompts", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-prompts",
+      group: "Experiment",
     },
     {
       key: "playground",

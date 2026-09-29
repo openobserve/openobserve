@@ -16,14 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { saveMonitorMutation } from "@/services/synthetics.queries";
+import { syntheticsKeys } from "@/services/synthetics.querykeys";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { cloneDeep } from "lodash-es";
-import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
-import { raw, useI18nTyped } from "@/types/i18n";
+import {
+  useRouter,
+  useRoute,
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  type NavigationGuard,
+} from "vue-router";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   BrowserCheck,
@@ -31,12 +38,14 @@ import type {
   SyntheticsLocation,
   SyntheticsDevice,
   SyntheticsFolder,
+  SyntheticsEnvironment,
   AgentSetup,
   BlockedReason,
   ReplayResponse,
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { fetchChildJourney } from "@/utils/synthetics/fetchChildJourney";
 import type { WireStep } from "@/types/synthetics";
 import {
   buildResolvedGrouped,
@@ -44,24 +53,53 @@ import {
 } from "@/components/synthetics/variables/resolved";
 import { buildVariableSuggestions } from "@/components/synthetics/variables/suggestions";
 import {
+  classifyReplayNames,
   defaultReplayEnvironmentId,
+  GLOBAL_ONLY,
+  replayEnvironmentOptions,
   replayInputs,
   sharedPlainValues,
+  type ReplayNameStatus,
 } from "@/components/synthetics/variables/replayInputs";
+import { serverMessage } from "@/components/synthetics/variables/serverMessage";
 import { useSharedVariables } from "@/components/synthetics/variables/useSharedVariables";
-import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
+import {
+  expandJourney,
+  loadChildren,
+  opensStartingUrl,
+  placeholdersIn,
+  translateStepId,
+  type ChildJourney,
+  type ExpansionMap,
+} from "@/utils/synthetics/expandJourney";
+import {
+  browserMaxSteps,
+  computeRunBudget,
+  formatBudgetDuration,
+  JOB_LEASE_MS,
+} from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
   buildCreateBrowserTestPayload,
   mapResponseToBrowserCheck,
 } from "@/utils/synthetics/buildPayload";
+import { browserCheckChanged } from "@/utils/synthetics/payloadChanged";
+import {
+  extractEligibility,
+  type ExtractEligibility,
+  type ReferencedByState,
+} from "@/utils/synthetics/extractEligibility";
+import {
+  buildExtractedChildCheck,
+  splitVariablesForChild,
+} from "@/utils/synthetics/buildExtractedChild";
 import {
   makeBrowserCheckGateSchema,
   makeBrowserCheckSaveSchema,
 } from "@/components/synthetics/CreateBrowserTest.schema";
 import { CHROME_UI_LABELS, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
-import { syntheticsListRoute } from "@/utils/synthetics/routes";
+import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -75,7 +113,17 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
+import ExtractSubtestDialog from "@/components/synthetics/journey/ExtractSubtestDialog.vue";
+import MissingValueDialog from "@/components/synthetics/journey/MissingValueDialog.vue";
+import JourneyStartPill from "@/components/synthetics/journey/JourneyStartPill.vue";
+import JourneyStepCount from "@/components/synthetics/journey/JourneyStepCount.vue";
+import ReplayEnvironmentMenu from "@/components/synthetics/journey/ReplayEnvironmentMenu.vue";
+import ReplaySecretsDialog from "@/components/synthetics/journey/ReplaySecretsDialog.vue";
+import JourneyUsedByPopover from "@/components/synthetics/journey/JourneyUsedByPopover.vue";
+import { useReplaySecrets } from "@/components/synthetics/journey/useReplaySecrets";
+import type { ExtractForm } from "@/components/synthetics/journey/ExtractSubtestDialog.schema";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import CheckVariablesPanel from "@/components/synthetics/configure/CheckVariablesPanel.vue";
 import useCheckWizardUi, {
@@ -86,6 +134,7 @@ import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTest
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const router = useRouter();
 const route = useRoute();
@@ -103,11 +152,14 @@ const { t } = useI18nTyped();
 // Shared with CheckConfigure so a drag on either page carries to the other.
 const { variablesSplitter } = useCheckWizardUi();
 
-// Journey-only: the toggle lives in the journey toolbar, so sharing the flag
-// would hide the panel on Configure with no control there to bring it back.
-// Collapsed by default — the journey is the point of this page, and the
-// labelled toolbar button is there to bring the panel in when it is needed.
+// One flag for both steps: the header toggle is on both, so the panel follows the author across them.
 const variablesPanelOpen = ref(false);
+const variablesToggleRef = ref<InstanceType<typeof OButton> | null>(null);
+const variablesToggleLabel = computed(() =>
+  variablesPanelOpen.value
+    ? t("synthetics.variablesPanel.collapsePanel")
+    : t("synthetics.variablesPanel.openPanel"),
+);
 const journeySplitter = computed({
   get: () => (variablesPanelOpen.value ? variablesSplitter.value : 100),
   set: (v: number) => (variablesSplitter.value = v),
@@ -115,6 +167,11 @@ const journeySplitter = computed({
 const journeySplitterLimits = computed<[number, number]>(() =>
   variablesPanelOpen.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
 );
+
+function closeVariablesPanel() {
+  variablesPanelOpen.value = false;
+  nextTick(() => (variablesToggleRef.value?.$el as HTMLElement | undefined)?.focus());
+}
 
 const variablesHintParams = computed(() => ({
   variables: "{{variables}}",
@@ -138,6 +195,14 @@ const folderName = computed(() => {
   if (!fid || fid === "default") return "";
   return folders.value.find((f) => f.folderId === fid)?.name ?? "";
 });
+const { isMobile } = useBreakpoint();
+/** A phone has no room for the header's Used by button, so the count joins the subtitle. */
+const headerSubtitle = computed(() => {
+  const count = referencedByCount.value;
+  if (!isMobile.value || count === 0) return raw(folderName.value);
+  if (!folderName.value) return t("synthetics.journey.usedBy.subtitleNoFolder", { count }, count);
+  return t("synthetics.journey.usedBy.subtitle", { folder: folderName.value, count }, count);
+});
 /**
  * Where every exit from this wizard lands.
  *
@@ -156,6 +221,13 @@ const startUrl = ref("");
 const props = defineProps<{ editId?: string | null }>();
 const isLoadingEdit = ref(false);
 const loadError = ref(false);
+/** Header controls for the check's start show only once there is a loaded check to edit. */
+const showStartControls = computed(
+  () => phase.value === "editor" && !isLoadingEdit.value && !loadError.value,
+);
+/** Reported by BrowserJourney; it only exists on the Journey step, so elsewhere nothing is running. */
+const journeyLocked = ref(false);
+const startControlsLocked = computed(() => currentStep.value === 1 && journeyLocked.value);
 const urlError = ref("");
 const validationErrors = ref<Record<string, string>>({});
 
@@ -390,9 +462,12 @@ async function loadForEdit(id: string) {
     const mapped = mapResponseToBrowserCheck(res.data as Record<string, unknown>);
     check.value = mapped;
     savedCheck.value = cloneDeep(mapped);
+    // Not on `BrowserCheck`: `buildCreateBrowserTestPayload` spreads it, and the form never sends it.
+    journeyBudgetMs.value = (res.data as any).config?.journey_budget_ms;
     checkName.value = mapped.name;
     startUrl.value = mapped.url;
     journeyStepDone.value = true;
+    void loadReferencedBy(id);
   } catch (err) {
     console.error("[synthetics] failed to load check for edit", err);
     if ((err as any)?.response?.status === 404) {
@@ -514,6 +589,69 @@ const check = ref<BrowserCheck>({
   variables: [],
 });
 
+/** The one child-journey cache, shared with `BrowserJourney` so preview and count never drift. */
+const childrenCache = ref<Map<string, ChildJourney>>(new Map());
+
+/** Child ids the prefetch was refused (403) — the journey marks them without a second GET. */
+const refusedChildIds = ref<Set<string>>(new Set());
+
+/** Child ids the prefetch found deleted (404), with the same life cycle as `refusedChildIds`. */
+const missingChildIds = ref<Set<string>>(new Set());
+
+/** The saved check's run-time allowance; undefined in create mode means the server default. */
+const journeyBudgetMs = ref<number | undefined>();
+
+/** Every name a `{{placeholder}}` can resolve to: the server accepts variables and secrets alike. */
+const definedNames = computed(() =>
+  [...(check.value.variables ?? []), ...(check.value.secrets ?? [])].map((v) => v.name.trim()),
+);
+
+/** Composed-child id to reference row for the run on screen, so child results fold back. */
+const expansionMap = ref<ExpansionMap | undefined>(undefined);
+
+/** Steps the journey runs with every reference expanded: the unit of the warning and the cap. */
+const executedStepCount = computed(() => {
+  try {
+    return expandJourney(check.value.journey, childrenCache.value).steps.length;
+  } catch {
+    // `journey.length` is an AUTHORED count and cannot answer a question asked in executed steps.
+    return undefined;
+  }
+});
+
+/** Under Configure's Starting URL, only while the run would not open it (skip rule A1). */
+const targetHint = computed(() =>
+  opensStartingUrl(check.value.journey, childrenCache.value)
+    ? undefined
+    : t("synthetics.checkDetails.startingUrlNotOpened"),
+);
+
+/** Referenced ids as a stable string, so the watcher refetches only when the set changes. */
+const subtestIdsSignature = computed(() =>
+  [
+    ...new Set(
+      check.value.journey.filter((s) => s.action === "subtest").map((s) => s.subtest?.id ?? ""),
+    ),
+  ]
+    .filter(Boolean)
+    .sort()
+    .join(","),
+);
+
+/** Loads children once named: the usage count, warning and preview render before any replay. */
+watch(
+  subtestIdsSignature,
+  async () => {
+    try {
+      const loaded = await loadChildren(check.value.journey, loadChild);
+      for (const [id, child] of loaded) childrenCache.value.set(id, child);
+    } catch (err) {
+      console.error("[synthetics] failed to load referenced check(s)", err);
+    }
+  },
+  { immediate: true },
+);
+
 /**
  * Reconcile the selected folder against the folders this org actually has.
  *
@@ -536,6 +674,10 @@ watch(
     const folderId = check.value.folder;
     if (!folderId || folders.value.some((f) => f.folderId === folderId)) return;
     check.value = { ...check.value, folder: "default" };
+    // The unreachable folder could never be saved back, so the fallback is the baseline, not an edit.
+    if (savedCheck.value?.folder === folderId) {
+      savedCheck.value = { ...savedCheck.value, folder: "default" };
+    }
     validationErrors.value = {
       ...validationErrors.value,
       folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
@@ -615,12 +757,20 @@ const showUnsavedDialog = ref(false);
 let pendingLeavePath: string | null = null;
 let forceLeave = false;
 
+// Create mode only: edit mode compares against the saved check instead.
 watch(
   () => check.value.journey.length,
   (len) => {
-    if (len > 0) isDirty.value = true;
+    if (len > 0 && !props.editId) isDirty.value = true;
   },
 );
+
+/** Edit mode compares against the saved check, so a load is clean and an undone edit clears. */
+const hasUnsavedChanges = computed(() => {
+  if (!props.editId) return isDirty.value;
+  if (!savedCheck.value) return false;
+  return browserCheckChanged(check.value, savedCheck.value);
+});
 
 function onConfigureUpdate(val: BrowserCheck) {
   check.value = val;
@@ -659,13 +809,14 @@ onBeforeUnmount(() => {
   recorder.cleanup();
 });
 
-onBeforeRouteLeave((to, from, next) => {
+// Registered for updates too: opening a child is a param-only push on this same route record.
+const guardUnsavedChanges: NavigationGuard = (to, from, next) => {
   if (forceLeave) {
     forceLeave = false;
     next();
     return;
   }
-  if (!isDirty.value) {
+  if (!hasUnsavedChanges.value) {
     next();
     return;
   }
@@ -673,13 +824,37 @@ onBeforeRouteLeave((to, from, next) => {
   next(false);
   pendingLeavePath = to.fullPath;
   showUnsavedDialog.value = true;
-});
+};
+onBeforeRouteLeave(guardUnsavedChanges);
+// Only an id change leaves this check: a query-only update (the setup `router.replace`) must pass.
+onBeforeRouteUpdate((to, from, next) =>
+  to.params.id === from.params.id ? next() : guardUnsavedChanges(to, from, next),
+);
 
 function beforeUnloadHandler(e: BeforeUnloadEvent) {
-  if (!isDirty.value) return;
+  if (!hasUnsavedChanges.value) return;
   // Sync stop the extension before the page goes away
   stopActiveExtension();
   e.preventDefault();
+}
+
+function urlHost(url: string | undefined): string | null {
+  try {
+    return new URL(url ?? "").host || null;
+  } catch {
+    return null;
+  }
+}
+
+/** The hosts the journey's navigates go to, when none of them is the Starting URL's; null otherwise. */
+function startUrlHostMismatch(): { host: string; other: string } | null {
+  const host = urlHost(check.value.url);
+  const navigateHosts = check.value.journey
+    .filter((step) => step.action === "navigate")
+    .map((step) => urlHost(step.value))
+    .filter((h): h is string => !!h);
+  if (!host || navigateHosts.length === 0 || navigateHosts.includes(host)) return null;
+  return { host, other: navigateHosts[0] };
 }
 
 /**
@@ -754,6 +929,15 @@ async function persist(): Promise<boolean> {
     return false;
   }
 
+  // A warning, not a block: the journey may leave the Starting URL on purpose.
+  const mismatch = startUrlHostMismatch();
+  if (mismatch) {
+    toast({
+      variant: "warning",
+      message: t("synthetics.validation.startUrlHostMismatch", mismatch),
+    });
+  }
+
   isSaving.value = true;
   validationErrors.value = {};
   // The parse just succeeded, so any message a previous failed save left on a
@@ -795,6 +979,8 @@ async function persist(): Promise<boolean> {
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return false;
     }
+    if (mapReferencedSaveConflict(err)) return false;
+    if (mapCompositionSaveError(err)) return false;
     toast({
       variant: "error",
       message: err?.response?.data?.message || t("synthetics.newCheck.saveFailed"),
@@ -804,6 +990,66 @@ async function persist(): Promise<boolean> {
   } finally {
     isSaving.value = false;
   }
+}
+
+/** The server's step index points into the expanded journey, so failures map by child name. */
+function mapCompositionSaveError(err: any): boolean {
+  const message: string = err?.response?.data?.message ?? "";
+  if (
+    err?.response?.status !== 400 ||
+    !(
+      message.startsWith("validation: config.steps") ||
+      message.startsWith("validation: expanded journey")
+    )
+  ) {
+    return false;
+  }
+  const matched = check.value.journey.find((step) => {
+    if (step.action !== "subtest") return false;
+    const name = step.subtest?.name || childrenCache.value.get(step.subtest?.id ?? "")?.name;
+    return !!name && message.includes(name);
+  });
+  if (matched) {
+    const idx = check.value.journey.indexOf(matched);
+    journeyFieldIssues.value = [{ path: ["journey", idx], message }];
+    toast({
+      variant: "error",
+      message: t("synthetics.validation.compositionChildFailed", {
+        name: matched.subtest?.name || matched.name || "",
+      }),
+    });
+  } else {
+    toast({
+      variant: "error",
+      message: message ? raw(message) : t("synthetics.newCheck.saveFailed"),
+    });
+  }
+  return true;
+}
+
+// A save-time 409 only occurs in a race: something referenced this check after it was loaded.
+const saveBlockedInfo = ref<{ references: UsedByReference[]; hidden: number } | null>(null);
+const saveBlockedOpen = computed({
+  get: () => saveBlockedInfo.value !== null,
+  set: (open: boolean) => {
+    if (!open) saveBlockedInfo.value = null;
+  },
+});
+
+/** Renders the 409 body's references through the delete flow's used-by presentation. */
+function mapReferencedSaveConflict(err: any): boolean {
+  const data = err?.response?.data;
+  if (
+    err?.response?.status !== 409 ||
+    (data?.code !== "child_referenced" && data?.code !== "referenced_check_cannot_hold_subtest")
+  ) {
+    return false;
+  }
+  saveBlockedInfo.value = {
+    references: (data.references ?? []) as UsedByReference[],
+    hidden: data.hidden_reference_count ?? 0,
+  };
+  return true;
 }
 
 // ── Selection state (synced from BrowserJourney) ───────────────────────────
@@ -817,8 +1063,136 @@ const journeyRef = ref<InstanceType<typeof BrowserJourney>>();
  * assignment in `persist`.
  */
 const journeyFieldIssues = ref<{ path: PropertyKey[]; message: string }[]>([]);
-const journeySelectionState = ref({ count: 0, isRecording: false });
+const journeySelectionState = ref<{ count: number; isRecording: boolean; ids: string[] }>({
+  count: 0,
+  isRecording: false,
+  ids: [],
+});
 const showBulkDeleteDialog = ref(false);
+
+// `=== true` so an unknown flag hides the action, as the journey editor does.
+const isCompositionEnabled = computed(
+  () => store.state.zoConfig?.synthetics_subtests_enabled === true,
+);
+const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
+
+/** Load-time lookup only; the save-time `checkUsageThenSave` asks again on its own. */
+const referencedByState = ref<ReferencedByState>("none");
+/** The header's number; the tri-state above cannot carry it. */
+const referencedByCount = ref(0);
+const referencedByList = ref<{ id: string; name: string; folder_id: string }[]>([]);
+const referencedByHidden = ref(0);
+const showExtractDialog = ref(false);
+
+async function loadReferencedBy(id: string) {
+  referencedByState.value = "pending";
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.referencedBy(org, id);
+    referencedByList.value = res.data?.references ?? [];
+    referencedByHidden.value = res.data?.hidden_reference_count ?? 0;
+    const count = referencedByList.value.length + referencedByHidden.value;
+    referencedByCount.value = count;
+    referencedByState.value = count > 0 ? "some" : "none";
+  } catch (err) {
+    console.error("[synthetics] referencedBy lookup failed", err);
+    referencedByCount.value = 0;
+    referencedByList.value = [];
+    referencedByHidden.value = 0;
+    referencedByState.value = "unknown";
+  }
+}
+
+function retryReferencedBy() {
+  if (props.editId) void loadReferencedBy(props.editId);
+}
+
+const extractEligibilityResult = computed<ExtractEligibility>(() =>
+  extractEligibility({
+    steps: check.value.journey,
+    selectedIds: new Set(journeySelectionState.value.ids),
+    filterActive: journeyRef.value?.filterActive ?? false,
+    referencedBy: props.editId ? referencedByState.value : "none",
+    definedNames: new Set(definedNames.value),
+  }),
+);
+const extractRange = computed(() =>
+  extractEligibilityResult.value.ok ? extractEligibilityResult.value.range : [],
+);
+const extractAnchor = computed(() =>
+  extractEligibilityResult.value.ok ? extractEligibilityResult.value.anchor : 0,
+);
+const extractVariables = computed(() => splitVariablesForChild(check.value, extractRange.value));
+
+function openExtractDialog() {
+  if (extractEligibilityResult.value.ok) showExtractDialog.value = true;
+}
+
+function extractCreateError(err: unknown, folderId: string): Error {
+  const response = (err as { response?: { status?: number; data?: { message?: string } } })
+    .response;
+  if (response?.status === 403) {
+    const folder = folders.value.find((f) => f.folderId === folderId)?.name ?? folderId;
+    return new Error(t("synthetics.journey.extract.folderForbidden", { folder }));
+  }
+  return new Error(raw(response?.data?.message) || t("synthetics.newCheck.saveFailed"));
+}
+
+/** Rejects so the dialog shows the message and stays open; the parent is only touched after the child exists. */
+async function onExtractSubmit(values: ExtractForm) {
+  const elig = extractEligibilityResult.value;
+  if (!elig.ok) return;
+  const org = store.state.selectedOrganization.identifier;
+  const child = buildExtractedChildCheck({
+    parent: check.value,
+    range: elig.range,
+    name: values.name,
+    folder: values.folder,
+    locations: values.locations ?? check.value.locations,
+    schedule: values.schedule ?? check.value.schedule,
+  });
+  let id: string;
+  try {
+    const res = await saveMonitor.mutateAsync({
+      payload: buildCreateBrowserTestPayload(child),
+      folderId: values.folder,
+    });
+    id = res.data.id;
+  } catch (err) {
+    throw extractCreateError(err, values.folder);
+  }
+  childrenCache.value.set(id, {
+    id,
+    name: child.name,
+    folderId: values.folder,
+    steps: child.journey,
+  });
+  try {
+    journeyRef.value!.replaceRangeWithSubtest(
+      { anchor: elig.anchor, count: elig.range.length },
+      { id, name: child.name },
+    );
+  } catch (err) {
+    // The cache entry must roll back with the child, or it would serve steps for a deleted check.
+    childrenCache.value.delete(id);
+    await syntheticsService.delete(org, id, values.folder).catch(() => {
+      toast({
+        variant: "error",
+        message: t("synthetics.journey.extract.orphan", { name: child.name }),
+      });
+    });
+    // The create's own invalidation already ran, so the list would keep the deleted child.
+    await queryClient.invalidateQueries({ queryKey: syntheticsKeys.monitorsAll(org) });
+    throw err;
+  }
+  // The length watcher misses a one-step range, whose splice keeps the length.
+  isDirty.value = true;
+  toast({
+    variant: "success",
+    message: t("synthetics.journey.extract.created", { name: child.name }),
+  });
+  showExtractDialog.value = false;
+}
 
 function onDeleteSelected() {
   journeyRef.value?.deleteSelectedSteps();
@@ -833,17 +1207,94 @@ function onContinueToConfigure() {
   currentStep.value = 2;
 }
 
+// Saving a referenced check can break its parents, so the author confirms that case first.
+interface UsedByReference {
+  id: string;
+  name: string;
+  folder_id: string;
+  undefined_placeholders?: string[];
+}
+const usedByInfo = ref<{
+  references: UsedByReference[];
+  hidden: number;
+  names: string[];
+} | null>(null);
+const usedByDialogOpen = computed({
+  get: () => usedByInfo.value !== null,
+  set: (open: boolean) => {
+    if (!open) {
+      usedByInfo.value = null;
+      pendingSaveAction = null;
+    }
+  },
+});
+/** Built here, not in the template: a `{{NAME}}` literal inside a mustache breaks the parser. */
+const usedByNames = computed(() =>
+  (usedByInfo.value?.names ?? []).map((name) => "{{" + name + "}}").join(", "),
+);
+let pendingSaveAction: (() => Promise<void>) | null = null;
+
+/** Only the names this edit adds; the full set would re-report parents that were already broken. */
+const addedPlaceholders = computed(() => {
+  const before = new Set(placeholdersIn(savedCheck.value?.journey ?? []));
+  return placeholdersIn(check.value.journey).filter((name) => !before.has(name));
+});
+
+/** A failed `referencedBy` lookup must not block the save; it proceeds as unreferenced. */
+async function checkUsageThenSave(afterPersist: () => Promise<void>) {
+  // Before the usage lookup, so an over-cap save sends no request at all.
+  if (executedStepCount.value !== undefined && executedStepCount.value > maxSteps.value) {
+    currentStep.value = 1;
+    toast({ variant: "error", message: t("synthetics.validation.subtestCap") });
+    nextTick(() => journeyRef.value?.revealCapNotice());
+    return;
+  }
+  const names = addedPlaceholders.value;
+  // An edit that adds no placeholder cannot break a parent, so it asks nothing.
+  if (!check.value.id || names.length === 0) {
+    await afterPersist();
+    return;
+  }
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.referencedBy(org, check.value.id, names);
+    const references = ((res.data?.references ?? []) as UsedByReference[]).filter(
+      (ref) => (ref.undefined_placeholders ?? []).length > 0,
+    );
+    const hidden = res.data?.hidden_reference_count ?? 0;
+    if (references.length > 0) {
+      usedByInfo.value = { references, hidden, names };
+      pendingSaveAction = afterPersist;
+      return;
+    }
+  } catch (err) {
+    console.error("[synthetics] referencedBy check failed", err);
+  }
+  await afterPersist();
+}
+
+async function confirmUsedBySave() {
+  const action = pendingSaveAction;
+  usedByInfo.value = null;
+  pendingSaveAction = null;
+  if (action) await action();
+}
+
 /** Edit mode, Journey step: persist, then move on to Configure. */
 async function onSaveAndContinue() {
-  if (!(await persist())) return;
-  journeyStepDone.value = true;
-  currentStep.value = 2;
+  await checkUsageThenSave(async () => {
+    if (!(await persist())) return;
+    journeyStepDone.value = true;
+    currentStep.value = 2;
+  });
 }
 
 /** Persist, then return to the checks list. */
 async function onSaveAndExit() {
-  if (!(await persist())) return;
-  router.push(backTo.value);
+  await checkUsageThenSave(async () => {
+    if (!(await persist())) return;
+    router.push(backTo.value);
+  });
 }
 
 // ── Replay — uses the composable's phase-based state machine ────────────────
@@ -899,21 +1350,19 @@ function onReplayUpTo(upTo: number) {
   runReplay(check.value.journey.slice(0, Math.max(1, upTo)));
 }
 
-/**
- * Block replay on the same target/first-step rules the Continue button uses.
- *
- * Deliberately the whole journey even for a prefix replay: `validateStepSelectors`
- * reports against the journey the editor is showing, and a partial pass would
- * leave the untouched later steps looking valid.
- */
+/** The whole journey even for a prefix replay, so untouched later steps do not look valid. */
 function validateJourneyBeforeReplay(): boolean {
-  return journeyRef.value?.validateStepSelectors?.() ?? true;
+  const valid = journeyRef.value?.validateStepSelectors?.() ?? true;
+  if (!valid) nextReplayEnvId = undefined;
+  return valid;
 }
 
 const {
   environments: sharedEnvironments,
   globals: sharedGlobals,
   loaded: sharedVariablesLoaded,
+  environmentsLoaded: sharedEnvironmentsLoaded,
+  refreshing: sharedVariablesRefreshing,
   refresh: fetchSharedVariables,
 } = useSharedVariables();
 onMounted(fetchSharedVariables);
@@ -928,22 +1377,61 @@ function onVariablePromoted(name: string) {
   };
 }
 
-/** Written by the environment selector when it lands; until then the default rule decides. */
+/** The Replay menu's choice for this session only: never written to the check. */
 const replayEnvironmentOverride = ref<string | undefined>();
-/** Replay resolves one environment: the override, else the check's first, else the org's first. */
-const replayEnvironmentId = computed(
-  () =>
-    replayEnvironmentOverride.value ??
-    defaultReplayEnvironmentId(check.value.environments ?? [], sharedEnvironments.value),
-);
+/** Replay resolves one environment: the menu's choice while it is still listed, else the default rule. */
+const replayEnvironmentId = computed(() => {
+  const chosen = replayEnvironmentOverride.value;
+  const fallback = defaultReplayEnvironmentId(
+    check.value.environments ?? [],
+    sharedEnvironments.value,
+  );
+  // Global is listed only while no readable environment is pinned, so only then can it stay chosen.
+  const listed =
+    chosen === GLOBAL_ONLY ? fallback === GLOBAL_ONLY : !!namedEnvironment(chosen ?? "");
+  return chosen !== undefined && listed ? chosen : fallback;
+});
 
-/** The url and variables replay and recording run with, resolved against that environment. */
-const replayInputsForCheck = computed(() =>
-  replayInputs(
+const replayMenuOptions = computed(() =>
+  replayEnvironmentOptions(
     check.value.url,
     check.value.variables ?? [],
-    sharedPlainValues(sharedEnvironments.value, sharedGlobals.value, replayEnvironmentId.value),
+    sharedEnvironments.value,
+    sharedGlobals.value,
+    check.value.environments ?? [],
+  ).map((option) =>
+    option.id === GLOBAL_ONLY
+      ? { ...option, name: t("synthetics.journey.replayValues.global") }
+      : option,
   ),
+);
+
+/** A readable named environment, or undefined for Global. */
+function namedEnvironment(id: string): SyntheticsEnvironment | undefined {
+  return sharedEnvironments.value.find((env) => env.id === id && !env.is_global);
+}
+
+function environmentLabel(id: string): I18nText {
+  const env = namedEnvironment(id);
+  return env ? raw(env.name) : t("synthetics.journey.replayValues.global");
+}
+
+const replayEnvironmentLabel = computed(() => environmentLabel(replayEnvironmentId.value));
+
+/** The url and variables one environment resolves, with `supplied` over its shared values. */
+function replayInputsFor(environmentId: string, supplied: Record<string, string>) {
+  return replayInputs(check.value.url, check.value.variables ?? [], {
+    ...sharedPlainValues(sharedEnvironments.value, sharedGlobals.value, environmentId),
+    ...supplied,
+  });
+}
+
+const secrets = useReplaySecrets();
+onBeforeUnmount(() => secrets.clear());
+
+/** The url and variables replay and recording run with: typed secrets over that environment's values. */
+const replayInputsForCheck = computed(() =>
+  replayInputsFor(replayEnvironmentId.value, secrets.valuesFor(replayEnvironmentId.value)),
 );
 
 /** The check's variables resolved across its tiers; undefined until the shared tiers load. */
@@ -969,19 +1457,363 @@ const variableSuggestions = computed(() =>
     : undefined,
 );
 
-function runReplay(journey: BrowserStep[]) {
-  const steps = journeyToWireSteps(journey);
-  if (steps.length === 0) return;
-  startReplay(steps);
+/** The texts replay substitutes, keyed by authored step number; 0 is the Starting URL. */
+function replayTexts(authored: BrowserStep[], wire: WireStep[], map: ExpansionMap) {
+  return [
+    { step: 0, texts: [check.value.url] },
+    ...wire.map((w) => ({
+      step: authored.findIndex((s) => s.id === translateStepId(map, w.id)) + 1,
+      texts: [w.url, w.value, w.text, w.key, w.selector, w.name],
+    })),
+  ];
 }
 
-function startReplay(steps: WireStep[]) {
-  const { url, variables } = replayInputsForCheck.value;
-  recorder
-    .replay(steps, url, variables, check.value.auth, check.value.headers, check.value.cookies)
-    .catch((err) => {
-      recorder.error.value = err instanceof Error ? err.message : String(err);
+/** The current journey's texts, expanded from the child cache; an unloaded child contributes none. */
+const journeyReplayTexts = computed(() => {
+  try {
+    const { steps, map } = expandJourney(check.value.journey, childrenCache.value);
+    return replayTexts(check.value.journey, journeyToWireSteps(steps), map);
+  } catch {
+    return replayTexts(check.value.journey, [], new Map());
+  }
+});
+
+function classifyFor(
+  texts: ReturnType<typeof replayTexts>,
+  environmentId: string,
+  supplied: Record<string, string>,
+): ReplayNameStatus[] {
+  return classifyReplayNames(
+    texts,
+    check.value.variables ?? [],
+    sharedEnvironments.value,
+    sharedGlobals.value,
+    environmentId,
+    supplied,
+  );
+}
+
+/** Stored secrets the current journey needs in an environment, typed or not. */
+function neededSecrets(envId: string): ReplayNameStatus[] {
+  return classifyFor(journeyReplayTexts.value, envId, {}).filter((s) => s.state === "secret");
+}
+
+const replayNeededSecrets = computed(() => neededSecrets(replayEnvironmentId.value));
+
+const typedSecretNames = computed(
+  () =>
+    new Set(
+      replayNeededSecrets.value
+        .map((s) => s.name)
+        .filter((name) => secrets.valueFor(replayEnvironmentId.value, name) !== undefined),
+    ),
+);
+
+/** Names recording can only reach through a stored secret, so its refusal can say so. */
+const replaySecretNames = computed(
+  () =>
+    new Set(
+      replayNeededSecrets.value
+        .map((s) => s.name)
+        .filter((name) => !typedSecretNames.value.has(name)),
+    ),
+);
+
+const lastReplayTypedSecrets = ref<{
+  envId: string;
+  names: string[];
+  stepByName: Record<string, number[]>;
+} | null>(null);
+
+const typedSecretReport = computed(() => {
+  const last = lastReplayTypedSecrets.value;
+  return last ? { names: last.names, stepByName: last.stepByName } : null;
+});
+
+/** One replay request, fixed when it is classified so an open dialog never follows the selector. */
+interface PendingReplay {
+  journey: BrowserStep[];
+  wire: WireStep[];
+  map: ExpansionMap;
+  envId: string;
+  supplied: Record<string, string>;
+}
+
+const missingPrompt = ref<{ pending: PendingReplay; status: ReplayNameStatus } | null>(null);
+const missingOpen = ref(false);
+
+const missingDialogProps = computed(() => {
+  const prompt = missingPrompt.value;
+  if (!prompt) return null;
+  const env = namedEnvironment(prompt.pending.envId);
+  const rows = env ? env.variables : sharedGlobals.value;
+  const { steps } = prompt.status;
+  return {
+    name: prompt.status.name,
+    environmentName: environmentLabel(prompt.pending.envId),
+    isGlobal: prompt.pending.envId === GLOBAL_ONLY,
+    steps,
+    sharedByChecks: env?.checks_count ?? 0,
+    canReplayAnyway: !steps.includes(0) && steps[0] > 1,
+    existingKind: rows.find((v) => v.name === prompt.status.name)?.kind ?? null,
+  };
+});
+
+/** A Global replay of a check pinned to an environment this user cannot read. */
+function pinsUnreadableForGlobal(envId: string): boolean {
+  return (
+    envId === GLOBAL_ONLY && (check.value.environments ?? []).some((id) => !namedEnvironment(id))
+  );
+}
+
+// The view's recorder error has no banner; a silent failure reads as a dead button.
+function toastReplayError(err: unknown) {
+  toast({ variant: "error", message: raw(err instanceof Error ? err.message : String(err)) });
+}
+
+/** Resolves once no shared-list refresh is in flight, so a gate never judges a half-loaded list. */
+function sharedListsSettled(): Promise<void> {
+  if (!sharedVariablesRefreshing.value) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const stop = watch(sharedVariablesRefreshing, (busy) => {
+      if (busy) return;
+      stop();
+      resolve();
     });
+  });
+}
+
+/** The environment of a replay a dialog re-runs, so it does not follow a selector change made meanwhile. */
+let nextReplayEnvId: string | undefined;
+
+/** Expanded before shipping, so the runner never sees `subtest`; `expansionMap` folds results back. */
+async function runReplay(journey: BrowserStep[]) {
+  const envOverride = nextReplayEnvId;
+  nextReplayEnvId = undefined;
+  expansionMap.value = undefined;
+  let wire: WireStep[];
+  let map: ExpansionMap;
+  try {
+    const children = await loadChildren(journey, loadChild);
+    const result = expandJourney(journey, children);
+    map = result.map;
+    expansionMap.value = result.map;
+    wire = journeyToWireSteps(result.steps);
+  } catch (err) {
+    toastReplayError(err);
+    return;
+  }
+  if (wire.length === 0) return;
+  await sharedListsSettled();
+  const envId = envOverride ?? replayEnvironmentId.value;
+  gateReplay({ journey, wire, map, envId, supplied: secrets.valuesFor(envId) });
+}
+
+/** Asks for what the replay cannot resolve, one dialog at a time, then replays. */
+function gateReplay(pending: PendingReplay) {
+  // Without the environment list, or with a pinned one hidden from this user, a verdict would be a guess.
+  if (!sharedEnvironmentsLoaded.value || pinsUnreadableForGlobal(pending.envId)) {
+    lastReplayTypedSecrets.value = null;
+    startReplay(pending);
+    return;
+  }
+  const statuses = classifyFor(
+    replayTexts(pending.journey, pending.wire, pending.map),
+    pending.envId,
+    pending.supplied,
+  );
+  const missing = statuses.find((s) => s.state === "missing");
+  if (missing) {
+    missingPrompt.value = { pending, status: missing };
+    missingOpen.value = true;
+    return;
+  }
+  const needed = statuses.filter((s) => s.state === "secret");
+  if (needed.length > 0) {
+    openSecretsDialog({
+      mode: "ask",
+      envId: pending.envId,
+      pending,
+      secrets: needed.map(({ name, steps }) => ({ name, steps })),
+    });
+    return;
+  }
+  lastReplayTypedSecrets.value = typedSecretsUsed(pending, statuses);
+  startReplay(pending);
+}
+
+/** The typed secrets a replay resolves through, keyed to the authored steps that use them. */
+function typedSecretsUsed(pending: PendingReplay, statuses: ReplayNameStatus[]) {
+  const typed = secrets.valuesFor(pending.envId);
+  const used = statuses.filter((s) => Object.prototype.hasOwnProperty.call(typed, s.name));
+  if (used.length === 0) return null;
+  return {
+    envId: pending.envId,
+    names: used.map((s) => s.name),
+    stepByName: Object.fromEntries(used.map((s) => [s.name, s.steps])),
+  };
+}
+
+function startReplay(pending: PendingReplay) {
+  const { url, variables } = replayInputsFor(pending.envId, pending.supplied);
+  recorder
+    .replay(
+      pending.wire,
+      url,
+      variables,
+      check.value.auth,
+      check.value.headers,
+      check.value.cookies,
+    )
+    .catch(toastReplayError);
+}
+
+async function onMissingValueSubmit(values: { value: string; secret: boolean }) {
+  const prompt = missingPrompt.value;
+  if (!prompt) return;
+  const { pending } = prompt;
+  const { name } = prompt.status;
+  const env = namedEnvironment(pending.envId);
+  // A named environment that left the list must not turn the write into a Global one.
+  if (pending.envId !== GLOBAL_ONLY && !env) {
+    toast({ variant: "error", message: t("synthetics.journey.replayValues.saveFailed") });
+    return;
+  }
+  try {
+    await saveReplayValue(env, name, values);
+  } catch (err) {
+    // Never logged: an axios error's `config.data` carries the typed value.
+    toast({
+      variant: "error",
+      message: serverMessage(err) ?? t("synthetics.journey.replayValues.saveFailed"),
+    });
+    return;
+  }
+  await fetchSharedVariables();
+  // The server never returns a secret, so the value is kept for this session or the re-run would ask.
+  if (values.secret) secrets.set(pending.envId, name, values.value);
+  pending.supplied = { ...pending.supplied, [name]: values.value };
+  missingOpen.value = false;
+  await nextTick();
+  gateReplay(pending);
+}
+
+/** An existing row keeps its metadata and kind; a new one takes the chosen kind (Global holds no secrets). */
+async function saveReplayValue(
+  env: SyntheticsEnvironment | undefined,
+  name: string,
+  { value, secret }: { value: string; secret: boolean },
+) {
+  const org = store.state.selectedOrganization.identifier;
+  const row = (env ? env.variables : sharedGlobals.value).find((v) => v.name === name);
+  if (row) {
+    const body = {
+      name,
+      value,
+      description: row.description,
+      example: row.example,
+      tags: row.tags,
+    };
+    if (env) await syntheticsService.updateEnvironmentVariable(org, env.name, row.id, body);
+    else await syntheticsService.updateGlobalVariable(org, row.id, body);
+    return;
+  }
+  if (env) {
+    const kind = secret ? "secret" : "plain";
+    await syntheticsService.createEnvironmentVariable(org, env.name, { name, value, kind });
+  } else {
+    await syntheticsService.createGlobalVariable(org, { name, value, kind: "plain" });
+  }
+}
+
+const secretsPrompt = ref<{
+  mode: "ask" | "change";
+  envId: string;
+  pending?: PendingReplay;
+  secrets: { name: string; steps: number[]; value?: string }[];
+  failedAtStep?: number;
+} | null>(null);
+const secretsOpen = ref(false);
+
+// A fresh dialog per open, so its fields and schema are built for the names asked for.
+const secretsPromptSerial = ref(0);
+
+function openSecretsDialog(prompt: NonNullable<typeof secretsPrompt.value>) {
+  secretsPromptSerial.value += 1;
+  secretsPrompt.value = prompt;
+  secretsOpen.value = true;
+}
+
+/** Change mode lists every secret the journey needs there, typed ones prefilled. */
+function openSecretsChange(envId: string, failedAtStep?: number) {
+  openSecretsDialog({
+    mode: "change",
+    envId,
+    failedAtStep,
+    secrets: neededSecrets(envId).map(({ name, steps }) => ({
+      name,
+      steps,
+      value: secrets.valueFor(envId, name),
+    })),
+  });
+}
+
+async function onSecretsSubmit(values: Record<string, string>) {
+  const prompt = secretsPrompt.value;
+  if (!prompt) return;
+  for (const [name, value] of Object.entries(values)) secrets.set(prompt.envId, name, value);
+  secretsOpen.value = false;
+  await nextTick();
+  if (!prompt.pending) {
+    nextReplayEnvId = prompt.envId;
+    journeyRef.value?.requestReplay();
+    return;
+  }
+  prompt.pending.supplied = { ...prompt.pending.supplied, ...values };
+  gateReplay(prompt.pending);
+}
+
+function onSecretsForget(names: string[]) {
+  const prompt = secretsPrompt.value;
+  if (!prompt) return;
+  for (const name of names) secrets.forget(prompt.envId, name);
+}
+
+async function onReplayAnyway() {
+  const prompt = missingPrompt.value;
+  if (!prompt) return;
+  const { steps } = prompt.status;
+  missingOpen.value = false;
+  await nextTick();
+  if (steps[0] <= 1) return;
+  nextReplayEnvId = prompt.pending.envId;
+  journeyRef.value?.replayUpTo(steps[0] - 1);
+}
+
+/** The `loadChildren` fetcher: throws on failure, after recording a refusal or a deletion for the rows. */
+async function loadChild(id: string): Promise<ChildJourney> {
+  const result = await fetchChildJourney(orgIdentifier.value, id, childrenCache.value);
+  const failure = result.ok ? undefined : result.failure;
+  // A reference re-added after access was granted, or the child restored, must not keep its mark.
+  refusedChildIds.value = withMember(refusedChildIds.value, id, failure === "refused");
+  missingChildIds.value = withMember(missingChildIds.value, id, failure === "missing");
+  if (!result.ok) throw result.error;
+  return result.child;
+}
+
+/** The same Set when membership already matches, so no dependent re-renders for nothing. */
+function withMember(set: Set<string>, id: string, member: boolean): Set<string> {
+  if (set.has(id) === member) return set;
+  const next = new Set(set);
+  if (member) next.add(id);
+  else next.delete(id);
+  return next;
+}
+
+function onOpenChild(child: ChildJourney) {
+  router.push(
+    syntheticsEditRoute({ orgIdentifier: orgIdentifier.value, folderId: child.folderId }, child.id),
+  );
 }
 
 function onStopReplay() {
@@ -1004,7 +1836,7 @@ function onClearResults() {
   <!-- ── Non-loading: shared wrapper with page header ── -->
   <OPageLayout
     class="bg-surface-base"
-    :subtitle="raw(folderName)"
+    :subtitle="headerSubtitle"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: backTo,
@@ -1017,6 +1849,39 @@ function onClearResults() {
         <span class="truncate">{{ headerTitle }}</span>
         <BetaBadge />
       </span>
+    </template>
+    <template v-if="referencedByCount > 0 || showStartControls" #actions>
+      <JourneyUsedByPopover
+        v-if="referencedByCount > 0"
+        :references="referencedByList"
+        :hidden="referencedByHidden"
+        :folders="folders"
+        :org-identifier="orgIdentifier"
+      />
+      <template v-if="showStartControls">
+        <JourneyStartPill
+          :url="check.url"
+          :environments="sharedEnvironments"
+          :selected-ids="check.environments ?? []"
+          :check-variables="check.variables ?? []"
+          :globals="sharedGlobals"
+          :disabled="startControlsLocked"
+          @update:url="onConfigureUpdate({ ...check, url: $event })"
+          @update:selected-ids="onConfigureUpdate({ ...check, environments: $event })"
+        />
+        <OButton
+          ref="variablesToggleRef"
+          :variant="variablesPanelOpen ? 'outline-primary' : 'outline'"
+          size="icon-xs-sq"
+          :aria-label="variablesToggleLabel"
+          :aria-pressed="variablesPanelOpen"
+          data-test="synthetics-journey-toggle-variables-btn"
+          @click="variablesPanelOpen = !variablesPanelOpen"
+        >
+          <OTooltip :content="variablesToggleLabel" side="bottom" />
+          <OIcon name="data-object" size="sm" aria-hidden="true" />
+        </OButton>
+      </template>
     </template>
     <!-- ── Gate phase: URL + name ── -->
     <main v-if="phase === 'gate'" class="flex flex-1 flex-col items-center justify-center">
@@ -1181,6 +2046,15 @@ function onClearResults() {
             :done="journeyStepDone"
             class="h-full!"
           >
+            <template #description>
+              <JourneyStepCount
+                :steps="check.journey"
+                :children="childrenCache"
+                :limit="maxSteps"
+                class="max-md:hidden"
+                data-test="synthetics-journey-stepper-step-count"
+              />
+            </template>
             <!-- Journey editor + Variables panel; the steps list scrolls in its
                  own region so the panel stays pinned. -->
             <OSplitter
@@ -1196,6 +2070,10 @@ function onClearResults() {
                     ref="journeyRef"
                     v-model="check.journey"
                     :start-url="replayInputsForCheck.url"
+                    :replay-environment-label="replayEnvironmentLabel"
+                    :secret-names="replaySecretNames"
+                    :uses-typed-secrets="typedSecretNames.size > 0"
+                    :typed-secret-report="typedSecretReport"
                     :known-variables="knownNames"
                     :variable-suggestions="variableSuggestions"
                     :extension-ready="extensionReady"
@@ -1209,16 +2087,47 @@ function onClearResults() {
                     :blocked-detail="blockedDetail"
                     :field-issues="journeyFieldIssues"
                     :variables-panel-open="variablesPanelOpen"
+                    :own-check-id="check.id"
+                    :own-step-count="executedStepCount"
+                    :journey-budget-ms="journeyBudgetMs"
+                    :defined-names="definedNames"
+                    :variables="replayInputsForCheck.variables"
+                    :children-cache="childrenCache"
+                    :refused-child-ids="refusedChildIds"
+                    :missing-child-ids="missingChildIds"
+                    :expansion-map="expansionMap"
                     class="h-full!"
                     @toggle-variables-panel="variablesPanelOpen = !variablesPanelOpen"
+                    @open-child="onOpenChild"
                     @replay="onReplay"
                     @verify-extension="reverifyExtension"
                     @replay-up-to="onReplayUpTo"
                     @stop-replay="onStopReplay"
+                    @edit-secrets="
+                      (step: number) =>
+                        openSecretsChange(
+                          lastReplayTypedSecrets?.envId ?? replayEnvironmentId,
+                          step,
+                        )
+                    "
                     @clear-results="onClearResults"
                     @auto-record-consumed="autoRecord = false"
                     @selection-changed="journeySelectionState = $event"
-                  />
+                    @locked-changed="journeyLocked = $event"
+                  >
+                    <template #replay-menu="{ disabled }">
+                      <ReplayEnvironmentMenu
+                        :options="replayMenuOptions"
+                        :selected-id="replayEnvironmentId"
+                        :disabled="disabled"
+                        :secrets-needed="replayNeededSecrets.length"
+                        :secrets-entered="typedSecretNames.size"
+                        :secret-failed="!!typedSecretReport && replayPhase === 'failed'"
+                        @update:selected-id="replayEnvironmentOverride = $event"
+                        @edit-secrets="openSecretsChange(replayEnvironmentId)"
+                      />
+                    </template>
+                  </BrowserJourney>
                 </div>
               </template>
               <template #separator>
@@ -1232,9 +2141,11 @@ function onClearResults() {
                   :check="check"
                   :check-id="check.id"
                   :saved="savedCheck"
+                  :child-journeys="childrenCache"
                   class="border-border-default border-t"
                   @update:check="onConfigureUpdate"
                   @promoted="onVariablePromoted"
+                  @close="closeVariablesPanel"
                 />
               </template>
             </OSplitter>
@@ -1259,12 +2170,15 @@ function onClearResults() {
               :validation-errors="validationErrors"
               :variable-suggestions="variableSuggestions"
               :allow-private-locations="privateLocationsEnabled"
+              :target-hint="targetHint"
+              :variables-panel-open="variablesPanelOpen"
               class="border-border-default w-full! border-t"
               @refresh:destinations="loadDestinations(true)"
               @update:check="onConfigureUpdate"
               @new-location="openAgentSetup()"
               @add-agent="(id: string) => openAgentSetup(id)"
               @refresh-locations="fetchLocations"
+              @close-variables-panel="closeVariablesPanel"
             />
           </OStep>
         </OStepper>
@@ -1312,7 +2226,47 @@ function onClearResults() {
                 <template #icon-left><OIcon name="delete" size="sm" /></template>
                 {{ t("synthetics.journey.delete") }}
               </OButton>
+              <template v-if="isCompositionEnabled">
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  :aria-disabled="!extractEligibilityResult.ok"
+                  data-test="synthetics-extract-open-btn"
+                  @click="openExtractDialog"
+                >
+                  <template #icon-left><OIcon name="git-branch" size="sm" /></template>
+                  {{ t("synthetics.journey.extract.action") }}
+                </OButton>
+                <span
+                  v-if="!extractEligibilityResult.ok"
+                  class="text-text-secondary text-xs"
+                  data-test="synthetics-extract-reason"
+                >
+                  {{
+                    t(`synthetics.journey.extract.reason.${extractEligibilityResult.reason}`, {
+                      name: extractEligibilityResult.placeholder,
+                    })
+                  }}
+                  <OButton
+                    v-if="extractEligibilityResult.reason === 'referenced-unknown'"
+                    variant="ghost"
+                    size="sm"
+                    data-test="synthetics-extract-retry-btn"
+                    @click="retryReferencedBy"
+                  >
+                    {{ t("common.retry") }}
+                  </OButton>
+                </span>
+              </template>
             </template>
+            <span
+              v-if="hasUnsavedChanges"
+              class="text-text-secondary flex items-center gap-2 text-sm"
+              data-test="synthetics-journey-unsaved-indicator"
+            >
+              <span class="bg-accent size-2 shrink-0 rounded-full" aria-hidden="true" />
+              {{ t("common.unsavedChanges") }}
+            </span>
             <span class="flex-1" aria-hidden="true" />
 
             <OButton
@@ -1357,6 +2311,14 @@ function onClearResults() {
 
           <!-- Configure step: Cancel | Back + Save -->
           <template v-else-if="currentStep === 2">
+            <span
+              v-if="hasUnsavedChanges"
+              class="text-text-secondary flex items-center gap-2 text-sm"
+              data-test="synthetics-journey-unsaved-indicator"
+            >
+              <span class="bg-accent size-2 shrink-0 rounded-full" aria-hidden="true" />
+              {{ t("common.unsavedChanges") }}
+            </span>
             <span class="flex-1" aria-hidden="true" />
             <OButton
               variant="ghost"
@@ -1386,6 +2348,25 @@ function onClearResults() {
           </template>
         </div>
 
+        <ExtractSubtestDialog
+          v-if="isCompositionEnabled && extractEligibilityResult.ok"
+          v-model:open="showExtractDialog"
+          :range="extractRange"
+          :anchor="extractAnchor"
+          :authored-count="check.journey.length"
+          :executed-count="executedStepCount"
+          :parent-name="check.name"
+          :parent-starting-url="check.url"
+          :default-folder="check.folder ?? 'default'"
+          :folders="folders"
+          :needs-schedule="check.locations.length === 0"
+          :parent-locations="check.locations"
+          :parent-schedule="check.schedule"
+          :location-options="locations"
+          :variables="extractVariables"
+          :on-submit="onExtractSubmit"
+        />
+
         <!-- Bulk delete confirmation dialog — moved from BrowserJourney -->
         <ODialog
           v-model:open="showBulkDeleteDialog"
@@ -1406,6 +2387,77 @@ function onClearResults() {
         </ODialog>
       </div>
     </template>
+
+    <!-- Only when this save leaves a parent with a placeholder it does not define. -->
+    <ODialog
+      v-model:open="usedByDialogOpen"
+      size="sm"
+      :title="
+        t('synthetics.save.usedByTitle', {
+          name: check.name,
+          count: usedByInfo?.references.length ?? 0,
+        })
+      "
+      :primary-button-label="t('common.save')"
+      :secondary-button-label="t('common.cancel')"
+      data-test="synthetics-create-used-by-dialog"
+      @click:primary="confirmUsedBySave"
+      @click:secondary="usedByDialogOpen = false"
+    >
+      <div class="flex flex-col gap-3 py-1">
+        <ul class="m-0 flex list-none flex-col gap-1 p-0">
+          <li v-for="ref in usedByInfo?.references ?? []" :key="ref.id">
+            <span class="text-sm">{{ ref.name }}</span>
+          </li>
+        </ul>
+        <p v-if="(usedByInfo?.hidden ?? 0) > 0" class="text-text-secondary m-0 text-xs">
+          {{ t("synthetics.delete.hiddenReferences", { count: usedByInfo?.hidden ?? 0 }) }}
+        </p>
+        <p class="m-0">{{ t("synthetics.save.usedByBody", { names: usedByNames }) }}</p>
+      </div>
+    </ODialog>
+
+    <!-- Save-time 409 (§5.3 race): something referenced this check after it was loaded. -->
+    <ODialog
+      v-model:open="saveBlockedOpen"
+      size="sm"
+      :title="t('synthetics.delete.blockedTitle', { name: check.name })"
+      :primary-button-label="t('common.close')"
+      data-test="synthetics-create-save-blocked-dialog"
+      @click:primary="saveBlockedOpen = false"
+    >
+      <div class="flex flex-col gap-3 py-1">
+        <ul class="m-0 flex list-none flex-col gap-1 p-0">
+          <li v-for="ref in saveBlockedInfo?.references ?? []" :key="ref.id">
+            <span class="text-sm">{{ ref.name }}</span>
+          </li>
+        </ul>
+        <p v-if="(saveBlockedInfo?.hidden ?? 0) > 0" class="text-text-secondary m-0 text-xs">
+          {{ t("synthetics.delete.hiddenReferences", { count: saveBlockedInfo?.hidden ?? 0 }) }}
+        </p>
+        <p class="m-0">{{ t("synthetics.save.blockedBody") }}</p>
+      </div>
+    </ODialog>
+
+    <ReplaySecretsDialog
+      v-if="secretsPrompt"
+      :key="secretsPromptSerial"
+      v-model:open="secretsOpen"
+      :mode="secretsPrompt.mode"
+      :environment-name="environmentLabel(secretsPrompt.envId)"
+      :secrets="secretsPrompt.secrets"
+      :failed-at-step="secretsPrompt.failedAtStep"
+      :on-submit="onSecretsSubmit"
+      @forget="onSecretsForget"
+    />
+
+    <MissingValueDialog
+      v-if="missingDialogProps"
+      v-model:open="missingOpen"
+      v-bind="missingDialogProps"
+      :on-submit="onMissingValueSubmit"
+      @replay-anyway="onReplayAnyway"
+    />
 
     <!-- Unsaved changes dialog (route leave) — rendered at top level so it's
        available in ALL phases (gate, extension-setup, editor), not just editor. -->

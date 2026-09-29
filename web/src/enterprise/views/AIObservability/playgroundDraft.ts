@@ -73,7 +73,7 @@ export interface PlaygroundSample {
 }
 
 export interface PlaygroundProvenance {
-  type: "experiment" | "dataset" | "trace";
+  type: "experiment" | "dataset" | "trace" | "prompt";
   label: I18nText;
 }
 

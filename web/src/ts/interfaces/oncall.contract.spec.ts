@@ -180,7 +180,7 @@ const _FINAL_ACTIONS = [
 ] as const satisfies readonly PolicyFinalAction[];
 const _c7: Complete<PolicyFinalAction, typeof _FINAL_ACTIONS> = true;
 
-const L0_MODES = ["parallel", "gate", "only"] as const satisfies readonly L0Mode[];
+const L0_MODES = ["parallel", "gate", "only", "off"] as const satisfies readonly L0Mode[];
 const _c8: Complete<L0Mode, typeof L0_MODES> = true;
 
 const ROUTING_DECISION_KINDS = [

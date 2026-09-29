@@ -100,6 +100,20 @@ export const makeDestinationsSchema = (t: Translator) =>
 /** creates_incident: optional boolean. */
 export const alertSettingsCreatesIncidentSchema = z.boolean().optional();
 
+export const alertSettingsNotifyOnRecoverySchema = z.boolean().optional();
+
+/** recovery_destinations: optional. Empty = the recovery follows the firing's destinations. */
+export const alertSettingsRecoveryDestinationsSchema = z.array(z.string()).optional();
+
+// Seconds the condition must stay clear before recovering; 0 recovers immediately.
+export const makeKeepFiringForSchema = (t: Translator) =>
+  z.coerce
+    .number({ message: t("alerts.alertSettings.keepFiringForInvalid") })
+    .int({ message: t("alerts.alertSettings.keepFiringForInvalid") })
+    .min(0, { message: t("alerts.alertSettings.keepFiringForInvalid") })
+    .max(86400, { message: t("alerts.alertSettings.keepFiringForTooLong") })
+    .optional();
+
 /**
  * Shape object for composition — spread into a bigger `z.object({ ... })` so the
  * alert schema reuses the EXACT same field rules. The period rule is
@@ -115,6 +129,9 @@ export const makeAlertSettingsShape = (t: Translator) =>
     _ui: z.object({ pendingPeriod: makePendingPeriodSchema(t) }).optional(),
     destinations: makeDestinationsSchema(t),
     creates_incident: alertSettingsCreatesIncidentSchema,
+    notify_on_recovery: alertSettingsNotifyOnRecoverySchema,
+    recovery_destinations: alertSettingsRecoveryDestinationsSchema,
+    keep_firing_for: makeKeepFiringForSchema(t),
   }) as const;
 
 // ── Mode-conditional composite ──────────────────────────────────────────────
@@ -146,6 +163,9 @@ export const createAlertSettingsSchema = (
     destinations: allowWorkflows ? z.array(z.string()).optional() : makeDestinationsSchema(t),
     workflows: z.array(z.string()).optional(),
     creates_incident: alertSettingsCreatesIncidentSchema,
+    notify_on_recovery: alertSettingsNotifyOnRecoverySchema,
+    recovery_destinations: alertSettingsRecoveryDestinationsSchema,
+    keep_firing_for: makeKeepFiringForSchema(t),
   });
 
   if (!allowWorkflows) return base;
