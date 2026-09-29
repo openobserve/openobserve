@@ -78,6 +78,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     ingestFromWindows: "ingestFromWindows",
     ingestFromLinux: "ingestFromLinux",
     ingestFromMacOS: "ingestFromMacOS",
+    ingestFromGpu: "ingestFromGpu",
     AWSConfig: "AWSConfig",
     GCPConfig: "GCPConfig",
     AzureConfig: "AzureConfig",

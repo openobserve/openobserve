@@ -23,9 +23,15 @@ import { ref } from "vue";
 import DataSourceSetupCard from "./DataSourceSetupCard.vue";
 import i18n from "@/locales";
 
-const { importHostMetricsDashboard, toastMock } = vi.hoisted(() => ({
+const { importHostMetricsDashboard, importSetupDashboard, toastMock } = vi.hoisted(() => ({
   importHostMetricsDashboard: vi.fn(),
+  importSetupDashboard: vi.fn(),
   toastMock: vi.fn(),
+}));
+
+vi.mock("@/composables/useSetupDashboardImport", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/useSetupDashboardImport")>()),
+  importSetupDashboard,
 }));
 
 vi.mock("@/composables/useHostMetricsDashboard", () => ({
@@ -229,6 +235,25 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
     );
   });
 
+  it("re-resolves the host dashboard after an org switch instead of opening the old org's id", async () => {
+    wrapper = mountCard("linux");
+    renderer().vm.$emit("detected", 4);
+    await flushPromises();
+    store.state.selectedOrganization = { identifier: "org-b" };
+    importHostMetricsDashboard.mockResolvedValue({
+      status: "exists",
+      dashboardId: "dash-b",
+      folderId: "default",
+    });
+    renderer().vm.$emit("step-action", "view-host-dashboard");
+    await flushPromises();
+    expect(importHostMetricsDashboard).toHaveBeenLastCalledWith("org-b");
+    expect(router.push).toHaveBeenLastCalledWith({
+      path: "/dashboards/view",
+      query: { org_identifier: "org-b", dashboard: "dash-b", folder: "default" },
+    });
+  });
+
   it("names the RBAC cause when the user-invoked step button hits a 403", async () => {
     importHostMetricsDashboard.mockResolvedValue({
       status: "error",
@@ -255,5 +280,131 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
     const opts = toastMock.mock.calls[0][0];
     expect(opts.message).toBe(t("ingestion.setupCard.hostDashboardImportFailed"));
     expect(router.push).not.toHaveBeenCalled();
+  });
+});
+
+describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () => {
+  let wrapper: VueWrapper<any>;
+  let router: any;
+
+  const mountCard = (slug: string) => {
+    const store = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        userInfo: { email: "t@e.com" },
+        organizationData: { organizationPasscode: "pc" },
+        theme: "light",
+      },
+    });
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: { template: "<div />" } },
+        { path: "/dashboards/view", name: "viewDashboard", component: { template: "<div />" } },
+      ],
+    });
+    vi.spyOn(router, "push");
+    return mount(DataSourceSetupCard, {
+      props: { slug },
+      global: { plugins: [store, router, i18n], stubs: { SetupCardRenderer: rendererStub } },
+    });
+  };
+  const renderer = () => wrapper.findComponent({ name: "SetupCardRenderer" });
+  const GPU_TITLE = "GPU Monitoring - NVIDIA";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    importSetupDashboard.mockResolvedValue({
+      status: "created",
+      dashboardId: "gpu-1",
+      folderId: "default",
+    });
+  });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  it("imports the GPU dashboard on detect and toasts with an Open dashboard action", async () => {
+    wrapper = mountCard("nvidiaDcgm");
+    renderer().vm.$emit("detected", 3);
+    await flushPromises();
+    expect(importSetupDashboard).toHaveBeenCalledWith(
+      "test-org",
+      expect.objectContaining({ title: GPU_TITLE }),
+    );
+    expect(importHostMetricsDashboard).not.toHaveBeenCalled();
+    const arg = toastMock.mock.calls[0][0];
+    expect(arg.variant).toBe("success");
+    expect(arg.message).toContain(GPU_TITLE);
+    arg.action.handler();
+    expect(router.push).toHaveBeenCalledWith({
+      path: "/dashboards/view",
+      query: { org_identifier: "test-org", dashboard: "gpu-1", folder: "default" },
+    });
+  });
+
+  it("stays silent when the detect-time import fails", async () => {
+    importSetupDashboard.mockResolvedValue({ status: "error", kind: "generic", message: "x" });
+    wrapper = mountCard("nvidiaDcgm");
+    renderer().vm.$emit("detected", 3);
+    await flushPromises();
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  it("imports then opens the dashboard from the step button, reusing the id afterwards", async () => {
+    wrapper = mountCard("nvidiaDcgm");
+    renderer().vm.$emit("step-action", "open-setup-dashboard");
+    await flushPromises();
+    renderer().vm.$emit("step-action", "open-setup-dashboard");
+    await flushPromises();
+    expect(importSetupDashboard).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledTimes(2);
+    expect(router.push).toHaveBeenLastCalledWith({
+      path: "/dashboards/view",
+      query: { org_identifier: "test-org", dashboard: "gpu-1", folder: "default" },
+    });
+  });
+
+  it("re-resolves the dashboard after an org switch instead of opening the old org's id", async () => {
+    wrapper = mountCard("nvidiaDcgm");
+    renderer().vm.$emit("step-action", "open-setup-dashboard");
+    await flushPromises();
+    (wrapper.vm.$store as any).state.selectedOrganization = { identifier: "org-b" };
+    importSetupDashboard.mockResolvedValue({
+      status: "exists",
+      dashboardId: "gpu-b",
+      folderId: "default",
+    });
+    renderer().vm.$emit("step-action", "open-setup-dashboard");
+    await flushPromises();
+    expect(importSetupDashboard).toHaveBeenLastCalledWith("org-b", expect.anything());
+    expect(router.push).toHaveBeenLastCalledWith({
+      path: "/dashboards/view",
+      query: { org_identifier: "org-b", dashboard: "gpu-b", folder: "default" },
+    });
+  });
+
+  it("names the RBAC cause when the step button hits a 403", async () => {
+    importSetupDashboard.mockResolvedValue({ status: "error", kind: "forbidden", message: "" });
+    wrapper = mountCard("nvidiaDcgm");
+    renderer().vm.$emit("step-action", "open-setup-dashboard");
+    await flushPromises();
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "error",
+        message: i18n.global.t("ingestion.setupCard.setupDashboardImportForbidden", {
+          name: GPU_TITLE,
+        }),
+      }),
+    );
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("ignores the dashboard action on a card without a companion dashboard", async () => {
+    wrapper = mountCard("linux");
+    renderer().vm.$emit("step-action", "open-setup-dashboard");
+    await flushPromises();
+    expect(importSetupDashboard).not.toHaveBeenCalled();
   });
 });

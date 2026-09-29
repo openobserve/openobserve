@@ -31,6 +31,10 @@ import { useRouter } from "vue-router";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import useIngestion from "@/composables/useIngestion";
 import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
+import {
+  SETUP_DASHBOARD_BY_SLUG,
+  importSetupDashboard,
+} from "@/composables/useSetupDashboardImport";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
@@ -83,17 +87,80 @@ const emit = defineEmits<{
 
 // Host Metrics auto-import (design 4.2) — host-agent slugs only, so the AWS EC2 embed comes free.
 const isHostAgentSlug = computed(() => HOST_AGENT_SLUGS.has(props.slug));
-const importedDashboard = ref<{ id: string; folderId: string } | null>(null);
+const importedDashboard = ref<{ org: string; id: string; folderId: string } | null>(null);
+
+// Companion dashboard (e.g. NVIDIA GPU) — same auto-import-on-detect, never-overwrite contract.
+const setupDashboard = computed(() => SETUP_DASHBOARD_BY_SLUG[props.slug]);
+// Keyed by org so a cached id is never opened under a different org.
+const importedSetupDashboard = ref<{ org: string; id: string; folderId: string } | null>(null);
+
+const openDashboard = (org: string, target: { id: string; folderId: string }) =>
+  router.push({
+    path: "/dashboards/view",
+    query: { org_identifier: org, dashboard: target.id, folder: target.folderId },
+  });
+
+const onSetupDashboardDetected = async () => {
+  const dash = setupDashboard.value;
+  if (!dash) return;
+  const org = store.state.selectedOrganization?.identifier ?? "";
+  const result = await importSetupDashboard(org, dash);
+  // The user didn't invoke the import, so a failure here stays silent.
+  if (result.status === "error") return;
+  const target = { org, id: result.dashboardId, folderId: result.folderId };
+  importedSetupDashboard.value = target;
+  toast({
+    variant: "success",
+    message: t(
+      result.status === "created"
+        ? "ingestion.setupCard.setupDashboardImported"
+        : "ingestion.setupCard.setupDashboardExists",
+      { name: dash.title },
+    ),
+    timeout: 5000,
+    action: {
+      label: t("ingestion.setupCard.openDashboard"),
+      handler: () => openDashboard(org, target),
+    },
+  });
+};
+
+const onOpenSetupDashboard = async () => {
+  const dash = setupDashboard.value;
+  if (!dash) return;
+  const org = store.state.selectedOrganization?.identifier ?? "";
+  let target = importedSetupDashboard.value?.org === org ? importedSetupDashboard.value : null;
+  if (!target) {
+    const result = await importSetupDashboard(org, dash);
+    if (result.status === "error") {
+      // User-invoked path: the failure must be visible and name its cause.
+      toast({
+        variant: "error",
+        message: t(
+          result.kind === "forbidden"
+            ? "ingestion.setupCard.setupDashboardImportForbidden"
+            : "ingestion.setupCard.setupDashboardImportFailed",
+          { name: dash.title },
+        ),
+      });
+      return;
+    }
+    target = { org, id: result.dashboardId, folderId: result.folderId };
+    importedSetupDashboard.value = target;
+  }
+  openDashboard(org, target);
+};
 
 const onDetected = async (count: number) => {
   emit("detected", count);
+  if (setupDashboard.value) return onSetupDashboardDetected();
   if (!isHostAgentSlug.value) return;
   // Captured at detect time — an org switch before the toast click must not retarget.
   const org = store.state.selectedOrganization?.identifier ?? "";
   const result = await importHostMetricsDashboard(org);
   // The user didn't invoke the import, so a failure here stays silent.
   if (result.status === "error") return;
-  importedDashboard.value = { id: result.dashboardId, folderId: result.folderId };
+  importedDashboard.value = { org, id: result.dashboardId, folderId: result.folderId };
   toast({
     variant: "success",
     message: t(
@@ -110,9 +177,10 @@ const onDetected = async (count: number) => {
 };
 
 const onStepAction = async (actionId: string) => {
+  if (actionId === "open-setup-dashboard") return onOpenSetupDashboard();
   if (actionId !== "view-host-dashboard" || !isHostAgentSlug.value) return;
   const org = store.state.selectedOrganization?.identifier ?? "";
-  let target = importedDashboard.value;
+  let target = importedDashboard.value?.org === org ? importedDashboard.value : null;
   if (!target) {
     const result = await importHostMetricsDashboard(org);
     if (result.status === "error") {
@@ -127,13 +195,10 @@ const onStepAction = async (actionId: string) => {
       });
       return;
     }
-    target = { id: result.dashboardId, folderId: result.folderId };
+    target = { org, id: result.dashboardId, folderId: result.folderId };
     importedDashboard.value = target;
   }
-  router.push({
-    path: "/dashboards/view",
-    query: { org_identifier: org, dashboard: target.id, folder: target.folderId },
-  });
+  openDashboard(org, target);
 };
 </script>
 
@@ -154,7 +219,11 @@ const onStepAction = async (actionId: string) => {
       data-test="data-source-setup-card"
       @detected="onDetected"
       @step-action="onStepAction"
-    />
+    >
+      <template v-if="$slots['hero-under-title']" #hero-under-title>
+        <slot name="hero-under-title" />
+      </template>
+    </SetupCardRenderer>
     <template v-else>
       <CopyContent v-if="fallbackContent" :content="raw(fallbackContent)" />
       <IngestionDocLink v-if="fallbackDocUrl" :href="fallbackDocUrl" />
