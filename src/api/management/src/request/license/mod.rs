@@ -110,13 +110,27 @@ fn redact(license: &str) -> String {
     )
 }
 
-// the instance id is also the default internal gRPC token
-fn visible_installation_id(user_id: &str) -> String {
-    if db::user::is_root_user(user_id) {
+// the instance id is the default internal gRPC token, and the key's payload carries it too
+fn viewer_license_fields(
+    is_root: bool,
+    redact_key: bool,
+    key: Option<String>,
+    mut license: Option<License>,
+) -> (Option<String>, Option<License>, String) {
+    if !is_root && let Some(license) = license.as_mut() {
+        license.installation_id.clear();
+    }
+    let key = if redact_key || !is_root {
+        key.map(|v| redact(&v))
+    } else {
+        key
+    };
+    let installation_id = if is_root {
         config::get_instance_id()
     } else {
         String::new()
-    }
+    };
+    (key, license, installation_id)
 }
 
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
@@ -129,16 +143,17 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         None => (None, None),
     };
 
-    let key = if o2_cfg.common.redact_license_key {
-        key.map(|v| redact(&v))
-    } else {
-        key
-    };
+    let (key, license, installation_id) = viewer_license_fields(
+        db::user::is_root_user(&email.user_id),
+        o2_cfg.common.redact_license_key,
+        key,
+        license,
+    );
 
     let res = LicenseResponse {
         key,
         license,
-        installation_id: visible_installation_id(&email.user_id),
+        installation_id,
         expired: license_expired().await,
         ingestion_exceeded: ingestion_limit_exceeded_count(),
         ingestion_used: ingestion_used() * 100.0, // convert to percentage
@@ -190,37 +205,77 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
 
 #[cfg(test)]
 mod tests {
-    use config::{DEFAULT_ORG, meta::user::UserRole};
-    use infra::table::org_users::OrgUserRecord;
+    use config::utils::{base64, json};
 
     use super::*;
 
-    fn join_default_org(email: &str, role: UserRole) {
-        common::infra::config::ORG_USERS.insert(
-            format!("{DEFAULT_ORG}/{email}"),
-            OrgUserRecord {
-                role,
-                token: "token".to_string(),
-                rum_token: None,
-                org_id: DEFAULT_ORG.to_string(),
-                email: email.to_string(),
-                created_at: 0,
-                allow_static_token: true,
-            },
-        );
+    const INSTANCE_ID: &str = "license-instance-7f3a";
+
+    fn stored_license() -> (String, License) {
+        let payload = json::json!({
+            "installation_id": INSTANCE_ID,
+            "license_id": "lic-1",
+            "active": true,
+            "created_at": 0,
+            "expires_at": 0,
+            "msv": "0.1.0",
+            "company": "acme",
+            "address": "",
+            "contact_name": "",
+            "contact_email": "",
+            "additional_emails": [],
+            "base_urls": [],
+            "limits": {},
+        });
+        let segment = base64::encode(&payload.to_string())
+            .replace('+', "-")
+            .replace('/', "_")
+            .replace('=', "");
+        let key = format!("eyJhbGciOiJFUzI1NiJ9.{segment}.c2lnbmF0dXJl");
+        (key, json::from_value(payload).unwrap())
+    }
+
+    fn response_json(is_root: bool) -> String {
+        config::cache_instance_id(INSTANCE_ID);
+        let (key, license) = stored_license();
+        let (key, license, installation_id) =
+            viewer_license_fields(is_root, false, Some(key), Some(license));
+        json::to_string(&LicenseResponse {
+            key,
+            license,
+            installation_id,
+            expired: false,
+            ingestion_used: 0.0,
+            ingestion_exceeded: 0,
+        })
+        .unwrap()
+    }
+
+    fn decoded_key_segments(response: &str) -> String {
+        let response: json::Value = json::from_str(response).unwrap();
+        let key = response["key"].as_str().unwrap_or_default();
+        key.split('.')
+            .filter_map(|segment| {
+                let padded = format!("{segment}{}", "=".repeat((4 - segment.len() % 4) % 4));
+                base64::decode_raw(padded.replace('-', "+").replace('_', "/")).ok()
+            })
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+            .collect()
     }
 
     #[test]
     fn test_installation_id_is_visible_to_root_only() {
-        config::cache_instance_id("license-instance");
-        join_default_org("license-root@example.com", UserRole::Root);
-        join_default_org("license-admin@example.com", UserRole::Admin);
+        let viewer = response_json(false);
+        assert!(!viewer.contains(INSTANCE_ID), "{viewer}");
+        assert!(!decoded_key_segments(&viewer).contains(INSTANCE_ID));
+        assert!(viewer.contains("lic-1"));
 
-        assert_eq!(
-            visible_installation_id("license-root@example.com"),
-            "license-instance"
-        );
-        assert_eq!(visible_installation_id("license-admin@example.com"), "");
-        assert_eq!(visible_installation_id("nobody@example.com"), "");
+        let root = response_json(true);
+        let (key, _) = stored_license();
+        assert!(root.contains(&key));
+        assert!(decoded_key_segments(&root).contains(INSTANCE_ID));
+        let root: json::Value = json::from_str(&root).unwrap();
+        assert_eq!(root["installation_id"], INSTANCE_ID);
+        assert_eq!(root["license"]["installation_id"], INSTANCE_ID);
     }
 }
