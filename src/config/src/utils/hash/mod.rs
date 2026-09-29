@@ -48,16 +48,23 @@ pub fn new_key_hasher() -> impl std::hash::Hasher {
 }
 
 pub fn get_passcode_hash(pass: &str, salt: &str) -> String {
+    try_get_passcode_hash(pass, salt).expect("salt length outside what argon2 accepts")
+}
+
+/// `None` when argon2 cannot use `salt`: shorter than 3 bytes (e.g. empty) or longer than 48.
+pub fn try_get_passcode_hash(pass: &str, salt: &str) -> Option<String> {
     let t_cost = 4;
     let m_cost = 2048;
     let p_cost = 2;
     let params = Params::new(m_cost, t_cost, p_cost, None).unwrap();
     let ctx = Argon2::new(Algorithm::Argon2d, Version::V0x10, params);
     let password = pass.as_bytes();
-    let salt_string = SaltString::encode_b64(salt.as_bytes()).unwrap();
+    let encoded = SaltString::encode_b64(salt.as_bytes()).ok()?;
+    // `encode_b64` skips the length check that `hash_password` later panics on.
+    let salt_string = SaltString::from_b64(encoded.as_str()).ok()?;
     ctx.hash_password(password, &salt_string)
-        .unwrap()
-        .to_string()
+        .ok()
+        .map(|hash| hash.to_string())
 }
 
 #[cfg(test)]

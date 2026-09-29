@@ -27,7 +27,10 @@ use common::meta::user::AuthTokensExt;
 use common::meta::user::{AuthTokens, UserOrgRole};
 use config::{
     meta::user::UserRole,
-    utils::{hash::get_passcode_hash, json},
+    utils::{
+        hash::{get_passcode_hash, try_get_passcode_hash},
+        json,
+    },
 };
 use lru::LruCache;
 use parking_lot::Mutex;
@@ -57,7 +60,7 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
     } else if auth_str.starts_with("{\"auth_ext\":") {
         let auth_tokens: AuthTokensExt =
             config::utils::json::from_str(auth_str).unwrap_or_default();
-        if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
+        if auth_tokens.has_expired() {
             return None;
         }
         let decoded =
@@ -123,13 +126,18 @@ pub fn is_ofga_object_visible(
 }
 
 pub fn get_hash(pass: &str, salt: &str) -> String {
+    try_get_hash(pass, salt).expect("salt length outside what argon2 accepts")
+}
+
+/// `None` when the salt cannot be hashed with, as for external users stored with an empty salt.
+pub fn try_get_hash(pass: &str, salt: &str) -> Option<String> {
     let key = password_hash_cache_key(pass, salt);
     if let Some(hash) = PASSWORD_HASH.lock().get(&key) {
-        return hash.clone();
+        return Some(hash.clone());
     }
-    let password_hash = get_passcode_hash(pass, salt);
+    let password_hash = try_get_passcode_hash(pass, salt)?;
     PASSWORD_HASH.lock().put(key, password_hash.clone());
-    password_hash
+    Some(password_hash)
 }
 
 #[cfg(feature = "enterprise")]
@@ -976,6 +984,19 @@ mod tests {
     }
 
     #[test]
+    fn unusable_salts_hash_to_none_instead_of_panicking() {
+        assert_eq!(try_get_hash("anything", ""), None);
+        assert_eq!(try_get_hash("anything", "ab"), None);
+        assert_eq!(try_get_hash("anything", &"s".repeat(49)), None);
+        assert_eq!(
+            try_get_hash("Pass#123", "TestSalt").as_deref(),
+            Some(
+                "$argon2d$v=16$m=2048,t=4,p=2$VGVzdFNhbHQ$CZzrFPtqjY4mIPYwoDztCJ3OGD5M0P37GH4QddwrbZk"
+            )
+        );
+    }
+
+    #[test]
     fn test_get_hash_caching() {
         let pass = "testpass";
         let salt = "testsalt";
@@ -1220,6 +1241,20 @@ mod tests {
                 "ordinary credentials must pass through unchanged"
             );
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn auth_ext_with_an_overflowing_request_time_is_expired() {
+        let auth_ext = format!(
+            "auth_ext {}",
+            config::utils::base64::encode("u@example.com:x")
+        );
+        let auth = format!(
+            r#"{{"auth_ext":"{auth_ext}","refresh_token":"","request_time":{},"expires_in":300}}"#,
+            i64::MIN
+        );
+        assert_eq!(get_user_email_from_auth_str(&auth).await, None);
     }
 
     #[cfg(feature = "enterprise")]
