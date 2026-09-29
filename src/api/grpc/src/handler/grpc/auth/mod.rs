@@ -19,7 +19,10 @@ use db::{org_users::get_cached_user_org, user::is_root_user};
 use http_auth_basic::Credentials;
 use infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX;
 use openobserve_core::auth::get_hash;
-use tonic::{Request, Status, metadata::MetadataValue};
+use tonic::{
+    Request, Status,
+    metadata::{MetadataMap, MetadataValue},
+};
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     check_auth_inner(req, false)
@@ -28,10 +31,19 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 /// Authenticate external OTLP ingestion requests.
 ///
 /// Org-level ingestion tokens are deliberately accepted only by the OTLP
-/// logs, metrics, and traces services. Internal cluster RPCs continue to use
-/// [`check_auth`], so an ingestion token cannot authorize query or node APIs.
+/// logs, metrics, and traces services. Internal cluster RPCs use
+/// [`check_internal_auth`], so an ingestion token cannot authorize query or node APIs.
 pub fn check_otlp_auth(req: Request<()>) -> Result<Request<()>, Status> {
     check_auth_inner(req, true)
+}
+
+/// Authenticate node-to-node RPCs, which accept only the internal or super-cluster token.
+pub fn check_internal_auth(req: Request<()>) -> Result<Request<()>, Status> {
+    if is_internal_token(auth_token(req.metadata())?) {
+        Ok(req)
+    } else {
+        Err(Status::unauthenticated("No valid auth token[6]"))
+    }
 }
 
 fn check_auth_inner(
@@ -40,24 +52,8 @@ fn check_auth_inner(
 ) -> Result<Request<()>, Status> {
     let cfg = config::get_config();
     let metadata = req.metadata();
-    let Some(token) = metadata.get("authorization").and_then(|v| v.to_str().ok()) else {
-        return Err(Status::unauthenticated("No valid auth token[1]"));
-    };
-    if token.is_empty() {
-        if get_internal_grpc_token().is_empty() {
-            log::error!("Internal grpc token is not set");
-        } else {
-            log::error!("Internal grpc token is set, but auth token is empty");
-        }
-        return Err(Status::unauthenticated("No valid auth token[2]"));
-    }
-
-    #[cfg(feature = "enterprise")]
-    let super_cluster_token =
-        o2_enterprise::enterprise::super_cluster::kv::cluster::get_grpc_token();
-    #[cfg(not(feature = "enterprise"))]
-    let super_cluster_token = get_internal_grpc_token();
-    if token.eq(get_internal_grpc_token().as_str()) || token.eq(super_cluster_token.as_str()) {
+    let token = auth_token(metadata)?;
+    if is_internal_token(token) {
         return Ok(req);
     }
 
@@ -105,14 +101,46 @@ fn check_auth_inner(
     if user.token.eq(&credentials.password) {
         return attach_user_id(req, &user_id);
     }
-    let in_pass = get_hash(&credentials.password, &user.salt);
-    if user_id.eq(&user.email)
-        && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
-    {
+    if user_id.eq(&user.email) && get_hash(&credentials.password, &user.salt).eq(&user.password) {
         attach_user_id(req, &user_id)
     } else {
         Err(Status::unauthenticated("No valid auth token[5]"))
     }
+}
+
+fn auth_token(metadata: &MetadataMap) -> Result<&str, Status> {
+    let Some(token) = metadata.get("authorization").and_then(|v| v.to_str().ok()) else {
+        return Err(Status::unauthenticated("No valid auth token[1]"));
+    };
+    if token.is_empty() {
+        if get_internal_grpc_token().is_empty() {
+            log::error!("Internal grpc token is not set");
+        } else {
+            log::error!("Internal grpc token is set, but auth token is empty");
+        }
+        return Err(Status::unauthenticated("No valid auth token[2]"));
+    }
+    Ok(token)
+}
+
+fn is_internal_token(token: &str) -> bool {
+    // get_grpc_token falls back to the instance id, so honor it only with super-cluster on
+    #[cfg(feature = "enterprise")]
+    let super_cluster_token = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        .then(o2_enterprise::enterprise::super_cluster::kv::cluster::get_grpc_token);
+    #[cfg(not(feature = "enterprise"))]
+    let super_cluster_token: Option<String> = None;
+    token_matches(
+        token,
+        &get_internal_grpc_token(),
+        super_cluster_token.as_deref(),
+    )
+}
+
+fn token_matches(token: &str, internal_token: &str, super_cluster_token: Option<&str>) -> bool {
+    token == internal_token || super_cluster_token.is_some_and(|t| t == token)
 }
 
 fn attach_user_id(mut req: Request<()>, user_id: &str) -> Result<Request<()>, Status> {
@@ -121,41 +149,100 @@ fn attach_user_id(mut req: Request<()>, user_id: &str) -> Result<Request<()>, St
             "user id is not a valid metadata value",
         ));
     };
-    req.metadata_mut().append("user_id", user_id);
+    req.metadata_mut().insert("user_id", user_id);
     Ok(req)
 }
 
 #[cfg(test)]
-mod tests {
-    use common::infra::config::{ORG_INGESTION_TOKENS, ORG_USERS};
+pub(crate) mod tests {
+    use common::infra::config::{ORG_INGESTION_TOKENS, ORG_USERS, USERS};
     use config::{
         cache_instance_id, get_config,
-        meta::user::{User, UserRole},
+        meta::user::{User, UserRole, UserType},
+        utils::base64,
     };
-    use infra::table::org_users::OrgUserRecord;
+    use infra::table::{org_users::OrgUserRecord, users::UserRecord};
     use tonic::metadata::AsciiMetadataValue;
 
     use super::*;
 
-    #[tokio::test]
-    async fn test_check_no_auth() {
+    const ROOT_PASSWORD: &str = "Complexpass#123";
+    const ROOT_SALT: &str = "Complexpass#123";
+
+    fn seed_root() {
         cache_instance_id("instance");
         ROOT_USER.insert(
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),
-                password: "Complexpass#123".to_string(),
+                password: get_hash(ROOT_PASSWORD, ROOT_SALT),
                 role: config::meta::user::UserRole::Root,
-                salt: "Complexpass#123".to_string(),
+                salt: ROOT_SALT.to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 token: "token".to_string(),
                 rum_token: Some("rum_token".to_string()),
-                org: "dummy".to_owned(),
+                org: "default".to_owned(),
                 is_external: false,
                 password_ext: Some("Complexpass#123".to_string()),
             },
         );
+    }
+
+    /// Caches a non-root member of `org_id` whose password is `password` and API token is `token`.
+    pub(crate) fn seed_org_user(org_id: &str, email: &str, password: &str, token: &str) {
+        cache_instance_id("instance");
+        let salt = "grpc-auth-test-salt";
+        USERS.insert(
+            email.to_string(),
+            UserRecord {
+                email: email.to_string(),
+                first_name: "".to_string(),
+                last_name: "".to_string(),
+                password: get_hash(password, salt),
+                salt: salt.to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        ORG_USERS.insert(
+            format!("{org_id}/{email}"),
+            OrgUserRecord {
+                role: UserRole::Admin,
+                token: token.to_string(),
+                rum_token: None,
+                org_id: org_id.to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+    }
+
+    pub(crate) fn basic_request(org_id: &str, user: &str, password: &str) -> tonic::Request<()> {
+        let credentials = base64::encode(&format!("{user}:{password}"));
+        org_token_request(org_id, &credentials)
+    }
+
+    fn user_ids(request: &tonic::Request<()>) -> Vec<String> {
+        request
+            .metadata()
+            .get_all("user_id")
+            .iter()
+            .map(|v| v.to_str().unwrap().to_string())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_check_no_auth() {
+        seed_root();
 
         let mut request = tonic::Request::new(());
         request.set_timeout(std::time::Duration::from_secs(
@@ -172,23 +259,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_check_auth() {
-        cache_instance_id("instance");
-        ROOT_USER.insert(
-            "root".to_string(),
-            User {
-                email: "root@example.com".to_string(),
-                password: "Complexpass#123".to_string(),
-                role: config::meta::user::UserRole::Root,
-                salt: "Complexpass#123".to_string(),
-                first_name: "root".to_owned(),
-                last_name: "".to_owned(),
-                token: "token".to_string(),
-                rum_token: Some("rum_token".to_string()),
-                org: "default".to_owned(),
-                is_external: false,
-                password_ext: Some("Complexpass#123".to_string()),
-            },
-        );
+        seed_root();
 
         ORG_USERS.insert(
             "default/root@example.com".to_string(),
@@ -219,23 +290,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_check_err_auth() {
-        cache_instance_id("instance");
-        ROOT_USER.insert(
-            "root".to_string(),
-            User {
-                email: "root@example.com".to_string(),
-                password: "Complexpass#123".to_string(),
-                role: config::meta::user::UserRole::Root,
-                salt: "Complexpass#123".to_string(),
-                first_name: "root".to_owned(),
-                last_name: "".to_owned(),
-                token: "token".to_string(),
-                rum_token: Some("rum_token".to_string()),
-                org: "dummy".to_owned(),
-                is_external: false,
-                password_ext: Some("Complexpass#123".to_string()),
-            },
-        );
+        seed_root();
         let mut request = tonic::Request::new(());
         request.set_timeout(std::time::Duration::from_secs(
             get_config().limit.query_timeout,
@@ -356,5 +411,110 @@ mod tests {
 
         assert_eq!(status.code(), tonic::Code::InvalidArgument);
         ORG_INGESTION_TOKENS.remove(&cache_key);
+    }
+
+    #[test]
+    fn test_internal_auth_rejects_valid_user_credentials() {
+        seed_org_user(
+            "auth-internal",
+            "member@example.com",
+            "Memberpass#123",
+            "member-token",
+        );
+        assert!(
+            check_auth(basic_request(
+                "auth-internal",
+                "member@example.com",
+                "Memberpass#123"
+            ))
+            .is_ok()
+        );
+
+        for password in ["Memberpass#123", "member-token"] {
+            let request = basic_request("auth-internal", "member@example.com", password);
+            let status = check_internal_auth(request).unwrap_err();
+            assert_eq!(status.code(), tonic::Code::Unauthenticated);
+        }
+    }
+
+    #[test]
+    fn test_internal_auth_accepts_internal_token() {
+        cache_instance_id("instance");
+        let mut request = tonic::Request::new(());
+        request
+            .metadata_mut()
+            .insert("authorization", get_internal_grpc_token().parse().unwrap());
+        assert!(check_internal_auth(request).is_ok());
+
+        let mut request = tonic::Request::new(());
+        request
+            .metadata_mut()
+            .insert("authorization", "not-the-token".parse().unwrap());
+        assert!(check_internal_auth(request).is_err());
+    }
+
+    #[test]
+    fn test_otlp_auth_still_accepts_user_credentials() {
+        seed_org_user(
+            "auth-otlp",
+            "otlp@example.com",
+            "Otlppass#123",
+            "otlp-token",
+        );
+        for password in ["Otlppass#123", "otlp-token"] {
+            let request = basic_request("auth-otlp", "otlp@example.com", password);
+            let request = check_otlp_auth(request).unwrap();
+            assert_eq!(user_ids(&request), ["otlp@example.com"]);
+        }
+    }
+
+    #[test]
+    fn test_super_cluster_token_only_counts_when_given() {
+        assert!(token_matches("internal", "internal", None));
+        assert!(token_matches("peer", "internal", Some("peer")));
+        assert!(!token_matches("peer", "internal", None));
+        assert!(!token_matches("other", "internal", Some("peer")));
+    }
+
+    #[test]
+    fn test_client_seeded_user_id_is_replaced() {
+        seed_org_user(
+            "auth-seeded",
+            "real@example.com",
+            "Realpass#123",
+            "real-token",
+        );
+        for check in [check_auth, check_otlp_auth] {
+            let mut request = basic_request("auth-seeded", "real@example.com", "Realpass#123");
+            request
+                .metadata_mut()
+                .insert("user_id", "victim@example.com".parse().unwrap());
+            let request = check(request).unwrap();
+            assert_eq!(user_ids(&request), ["real@example.com"]);
+        }
+    }
+
+    #[test]
+    fn test_stored_password_hash_is_not_a_password() {
+        seed_org_user(
+            "auth-hash",
+            "hash@example.com",
+            "Hashpass#123",
+            "hash-token",
+        );
+        let stored = USERS.get("hash@example.com").unwrap().password.clone();
+
+        let status =
+            check_auth(basic_request("auth-hash", "hash@example.com", &stored)).unwrap_err();
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
+        assert!(
+            check_auth(basic_request(
+                "auth-hash",
+                "hash@example.com",
+                "Hashpass#123"
+            ))
+            .is_ok()
+        );
+        assert!(check_auth(basic_request("auth-hash", "hash@example.com", "hash-token")).is_ok());
     }
 }
