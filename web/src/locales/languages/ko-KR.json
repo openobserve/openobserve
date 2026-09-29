@@ -354,6 +354,10 @@
       "title": "트레이스를 찾을 수 없습니다",
       "description": "선택한 서비스 및 시간 범위와 일치하는 트레이스가 없습니다. 더 넓은 시간 범위나 다른 서비스를 시도하세요."
     },
+    "noProfiles": {
+      "title": "프로파일을 찾을 수 없음",
+      "description": "선택한 시간 범위에 이 스트림의 프로파일 데이터가 없습니다. 더 넓은 시간 범위나 다른 서비스를 선택해 보세요."
+    },
     "noServiceGraph": {
       "title": "서비스 그래프 데이터 없음",
       "description": "더 긴 시간 범위를 쿼리하거나 서비스가 스팬 메트릭을 내보내고 있는지 확인하세요."
@@ -421,6 +425,7 @@
       "alerts": "민첩한",
       "incidents": "사건",
       "traces": "트레이스",
+      "profiles": "프로파일",
       "discoveryItems": "비정상 항목",
       "datasetItems": "항목",
       "searches": "검색을 수행합니다",
@@ -1306,6 +1311,8 @@
     "tagKey": "태그 키",
     "tagValue": "태그 값",
     "addFilter": "필터 추가",
+    "removeFilter": "필터 제거 {key}={value}",
+    "searchFrames": "프레임 검색",
     "runQuery": "쿼리 실행",
     "timeSeriesTitle": "시간 경과에 따른 프로파일 값",
     "resultTitle": "프로파일 결과",
@@ -1314,14 +1321,28 @@
     "viewTree": "스택 트리",
     "self": "자체",
     "total": "합계",
+    "share": "공유",
     "cpuDuration": "CPU 지속 시간",
     "percent": "%",
+    "sortBySelf": "Self 기준 정렬",
+    "sortByTotal": "Total 기준 정렬",
     "noStreams": "사용 가능한 프로파일 스트림이 없습니다",
-    "noSeries": "이 범위에 시계열 데이터가 없습니다",
-    "noResults": "이 범위에 프로파일 결과가 없습니다",
+    "noSeries": "데이터 없음",
+    "noResults": "프로파일을 찾을 수 없음",
+    "noProfilesFound": "프로파일을 찾을 수 없음",
+    "noProfilesFoundDesc": "선택한 시간 범위에 이 스트림의 프로파일 데이터가 없습니다. 더 넓은 시간 범위나 다른 서비스를 선택해 보세요.",
+    "loading": "프로파일 불러오는 중…",
     "filters": "필터",
     "expand": "펼치기",
     "collapse": "접기",
+    "resetFocus": "포커스 초기화",
+    "labelAlign": "레이블 정렬",
+    "alignLeft": "왼쪽 정렬",
+    "alignRight": "오른쪽 정렬",
+    "inverted": "반전",
+    "copyFunctionName": "함수 이름 복사",
+    "focusBlock": "블록 포커스",
+    "focusOfTotal": "전체의 {percent}%",
     "errors": {
       "loadFailed": "프로파일 데이터를 불러오지 못했습니다"
     }
@@ -2771,6 +2792,13 @@
         "node": "알림 트리거",
         "desc": "알림이 발생하면 실행",
         "intro": "연결된 알림이 발생하면 모든 다운스트림 단계가 이 페이로드를 받습니다."
+      },
+      "alertResolved": {
+        "label": "알림 해결됨",
+        "tab": "해결됨",
+        "node": "알림 해결됨 트리거",
+        "desc": "발생 중인 알림이 복구되면 실행",
+        "intro": "발생한 알림이 복구되면 모든 하위 단계에서 이 페이로드를 받습니다."
       },
       "incidentEvent": {
         "label": "인시던트 이벤트",
@@ -7435,6 +7463,8 @@
         "streamName": "알림이 감시하는 스트림 이름",
         "alertName": "알림 이름",
         "alertType": "알림 유형(예: 예약, 실시간)",
+        "alertStatus": "firing 또는 resolved — 복구 메시지를 새 알림과 다르게 표시할 수 있습니다",
+        "episodeId": "이번 발생에 대한 고유 ID로, 해당 복구 시에도 동일하게 사용됩니다. 알림을 해결할 수 있도록 PagerDuty, Opsgenie, ServiceNow로 자동 전송됩니다.",
         "alertPeriod": "평가 창(분)",
         "alertOperator": "임계값 비교 연산자 (>, <, =)",
         "alertThreshold": "구성된 임계값",
@@ -7449,7 +7479,19 @@
         "alertTriggerTimeSeconds": "에포크 초 단위의 트리거 시간",
         "alertTriggerTimeStr": "사람이 읽을 수 있는 트리거 시간",
         "rows": "행 템플릿으로 형식화된 모든 일치 행"
-      }
+      },
+      "notifyOnRecovery": "복구 시 알림",
+      "notifyOnRecoveryTooltip": "이 알림이 더 이상 발생하지 않으면 위 대상으로 메시지 하나를 전송합니다.",
+      "notifyOnRecoveryTemplateHint": "템플릿을 재사용하는 대상에는 {'{'}alert_status{'}'}가 포함되어야 합니다. 그렇지 않으면 복구 메시지가 새 알림처럼 보입니다.",
+      "recoveryDestinations": "복구 대상",
+      "recoveryDestinationsTooltip": "비워 두면 알림이 발생한 곳에서 복구를 알립니다. 여기서 대상을 선택하면 대신 다른 곳으로 전송합니다. PagerDuty, Opsgenie, ServiceNow는 자체적으로 발생시킨 티켓을 계속 닫습니다.",
+      "recoveryResolvesIncident": "인시던트를 해결합니다",
+      "recoveryClosesAlert": "알림을 종료합니다",
+      "recoveryChatMessage": "새 \"해결됨\" 메시지",
+      "keepFiringFor": "발생 유지 시간",
+      "keepFiringForTooltip": "조건이 해제된 후 이 시간만큼 기다린 뒤 복구합니다. 0이면 즉시 복구합니다.",
+      "keepFiringForInvalid": "0초 이상 입력하세요",
+      "keepFiringForTooLong": "최대 86400초(24시간)까지 입력하세요"
     },
     "advanced": {
       "addVariable": "변수 추가",
@@ -7680,6 +7722,8 @@
       "servicenowPasswordHelp": "ServiceNow 비밀번호 또는 API 토큰",
       "servicenowAssignmentGroup": "할당 그룹 (선택 사항)",
       "servicenowAssignmentGroupHelp": "인시던트를 할당할 그룹 (예: IT 운영)",
+      "servicenowResolutionCode": "해결 코드(선택 사항)",
+      "servicenowResolutionCodeHelp": "ServiceNow 인스턴스의 유효한 해결 코드와 일치해야 합니다. OpenObserve가 인시던트를 해결할 때 사용됩니다. 기본값은 Solved (Permanently)입니다.",
       "usernameRequired": "사용자 이름이 필요합니다.",
       "passwordRequired": "비밀번호가 필요합니다.",
       "emailRecipients": "수신자 이메일 주소",
@@ -7976,7 +8020,8 @@
     "sloKind": "조건 유형",
     "sloLongWindow": "긴 기간",
     "sloShortWindow": "짧은 기간",
-    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다."
+    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
+    "seconds": "초"
   },
   "alert_dependencies": {
     "actionOpen": "열기",
@@ -8174,6 +8219,7 @@
     "filterPrebuilt": "사전 구축",
     "filterCustom": "사용자 지정",
     "variableRowsDescription": "여러 줄의 행 템플릿",
+    "variableEpisodeIdDescription": "이번 발생에 대한 고유 ID입니다. 알림을 해결할 수 있도록 PagerDuty, Opsgenie, ServiceNow 페이로드에 자동으로 추가됩니다.",
     "variableStreamFields": "모든 스트림 필드가 변수입니다.",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'}은(는) 행 또는 문자열 길이를 제한하는 데 사용됩니다.",
     "variableTimezoneNote": "타임스탬프 변수 ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'})는 서버의 로컬 시간대로 렌더링됩니다.",
@@ -13096,6 +13142,7 @@
       "promptLabel": "판사 프롬프트",
       "includeReasoningLabel": "추론 포함",
       "includeReasoningHint": "판정자가 해당 점수를 부여한 이유를 설명하며, 각 결과와 함께 저장됩니다.",
+      "decisionProviderNote": "결정 모델은 점수와 근거만 반환하므로 추가 필드는 사용할 수 없습니다.",
       "extraFieldsLabel": "추가 메타데이터 필드(선택 사항)",
       "extraFieldsHint": "판정자에게 각 점수와 함께 추가 값을 반환하도록 요청하십시오 — 예를 들어 카테고리 또는 신뢰도.",
       "extraFields": {
@@ -19522,6 +19569,8 @@
     "unroutedDismissedTag": "무시됨",
     "notAvailableTitle": "이 배포 환경에서는 온콜을 사용할 수 없습니다.",
     "notAvailableDescription": "링크는 정상입니다. 이 빌드에서는 온콜을 제공하지 않습니다. 실패한 항목이 없으며 다시 시도할 필요가 없습니다.",
+    "teamNotFoundTitle": "팀을 찾을 수 없음",
+    "teamNotFoundDescription": "이 팀은 더 이상 존재하지 않습니다. 삭제되었을 수 있습니다.",
     "unroutedPagedNobody": "알림을 받은 사람이 없습니다.",
     "unroutedLoadFailed": "라우팅되지 않은 큐를 불러올 수 없습니다.",
     "routingLoadFailed": "할당 및 라우팅 구성을 불러올 수 없습니다.",
