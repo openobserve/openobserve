@@ -160,6 +160,7 @@ export default defineComponent({
     "mouseout",
     "contextmenu",
     "domcontextmenu",
+    "finished",
   ],
   props: {
     data: {
@@ -492,6 +493,10 @@ export default defineComponent({
 
       chart?.on("mouseover", function (params: any) {
         emit("mouseover", params);
+      });
+
+      chart?.on("finished", () => {
+        emit("finished");
       });
 
       window.removeEventListener("resize", windowResizeEventCallback);

@@ -122,6 +122,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OInput>
 
+        <OSwitch
+          v-if="promqlMode && exemplarsSwitchEligible"
+          v-show="isConfigOptionVisible('general', 'show-exemplars')"
+          v-model="dashboardPanelDataModel.data.config.show_exemplars"
+          :label="t('dashboard.showExemplarsLabel')"
+          data-test="dashboard-config-show-exemplars"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.showExemplarsHelp')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
+
         <!-- Panel Default Time Configuration -->
         <div v-show="isConfigOptionVisible('general', 'panel-default-time')">
           <div class="flex items-center">
@@ -1763,6 +1776,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -2555,6 +2569,8 @@ export default defineComponent({
       };
     };
 
+    const exemplarsSwitchEligible = computed(() => isExemplarEligible(dashboardPanelData.data));
+
     const {
       searchQuery,
       expandedSections,
@@ -2682,6 +2698,7 @@ export default defineComponent({
       expandedSections,
       isExpanded,
       isSectionVisible,
+      exemplarsSwitchEligible,
       isConfigOptionVisible,
       anySectionVisible,
       allSectionsExpanded,

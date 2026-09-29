@@ -498,6 +498,28 @@ describe("AddToDashboard — onSubmit validation", () => {
     );
   });
 
+  it("keeps show_exemplars on the panel it adds from Visualize", async () => {
+    const wrapper = createWrapper({
+      dashboardPanelData: {
+        ...defaultDashboardPanelData,
+        data: {
+          ...defaultDashboardPanelData.data,
+          queryType: "promql",
+          config: { show_exemplars: true },
+        },
+      },
+    });
+    await flushPromises();
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "Latency" });
+    await flushPromises();
+
+    const panel = mockAddPanel.mock.calls.at(-1)?.[2];
+    expect(panel.config.show_exemplars).toBe(true);
+  });
+
   it("multi-panel mode: adds one panel per `panels` entry (convert-to-dashboard)", async () => {
     // With a non-empty `panels` prop the component adds each as a separate panel
     // in one submit. The single-panel path (no `panels`) is unchanged — see above.

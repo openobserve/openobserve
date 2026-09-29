@@ -475,6 +475,12 @@
   --color-syntax-addition-bg: #f0fff4;
   --color-syntax-deletion-fg: #b31d28;
   --color-syntax-deletion-bg: #ffeef0;
+  /* Read-only colorized queries (colorizeQuery): the query editor's Monaco hues, nudged to clear 4.5:1 on surface-subtle. */
+  --color-query-syntax-keyword: #0000ff;
+  --color-query-syntax-function: #c700c7;
+  --color-query-syntax-string: #a31515;
+  --color-query-syntax-number: #097f53;
+  --color-query-syntax-comment: #008000;
   /* Brand gradients — theme-independent (same in light/dark) unless noted.
      One AI gradient reused widely; -subtle/-faint are its idle washes
      (dark alpha bumped in dark.css). */

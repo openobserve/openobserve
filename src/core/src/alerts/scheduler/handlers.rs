@@ -64,17 +64,7 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
-/// Fold this evaluation's outcome into the alert's durable state (Part IV of
-/// `alerts.md`).
-///
-/// Best-effort by design: state persistence must never fail an evaluation that
-/// has already run and notified. Failures are logged, not propagated.
-/// Returns `false` when a write was attempted and failed. Best-effort for the
-/// single-row path (a state write must never fail an evaluation that already
-/// notified), but the per-group caller MUST check it: dispatching against
-/// stale state would send a group's page under the previous episode, and its
-/// delivery callback would then be rejected as stale — a page with no record
-/// that it happened.
+/// Returns `false` on a failed write; the per-group caller MUST check it or it dispatches stale.
 #[must_use]
 async fn persist_alert_run_state(
     alert: &config::meta::alerts::alert::Alert,
@@ -82,6 +72,7 @@ async fn persist_alert_run_state(
     outcome: &RunOutcome,
     level: Option<config::meta::alerts::level::AlertLevel>,
     grouped: Option<&config::meta::alerts::grouping::GroupClassification>,
+    episode: &config::meta::alerts::recovery::EpisodeInput,
 ) -> bool {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
 
@@ -165,7 +156,7 @@ async fn persist_alert_run_state(
     // the same evaluation, and two `now_micros()` calls would let the coverage
     // record and the freshness clock disagree about when it happened.
     let now = now_micros();
-    let update = apply_outcome(
+    let mut update = apply_outcome(
         alert_id,
         ROLLUP_GROUP_KEY,
         prev.as_ref(),
@@ -173,6 +164,17 @@ async fn persist_alert_run_state(
         level,
         now,
     );
+
+    // Emitted only once `persist` committed, or consumers hear of an unrecorded recovery.
+    let recovered = update.state.as_mut().and_then(|state| {
+        let firing = state.level.is_some_and(|l| l.is_firing());
+        config::meta::alerts::recovery::apply_episode(state, firing, episode, now, || {
+            episode
+                .episode_id
+                .clone()
+                .unwrap_or_else(config::ider::uuid)
+        })
+    });
 
     // ── Availability ledger (S-16) ──────────────────────────────────────────
     // Fleet-wide from the day this ships, deliberately: a lazy
@@ -205,6 +207,14 @@ async fn persist_alert_run_state(
     if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
         log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
         return false;
+    }
+
+    if let Some(closed) = recovered
+        && let Some(state) = update.state.as_ref()
+    {
+        let event =
+            config::meta::alerts::recovery::recovery_event(&alert.org_id, state, closed, now);
+        crate::alerts::recovery::dispatch_recovery(alert, &event).await;
     }
 
     // Composite parents observe this rollup row. Nudge them on a level/outcome
@@ -333,6 +343,7 @@ async fn dispatch_per_group(
         &rollup_outcome,
         rollup_level,
         Some(classification),
+        &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
     )
     .await
     {
@@ -441,6 +452,7 @@ async fn dispatch_per_group(
                 // last so a label value containing `{...}` cannot expand.
                 Some(&item.labels),
                 &[],
+                None,
             )
             .await;
 
@@ -1052,6 +1064,7 @@ async fn handle_composite_alert_trigger(
                         Some(i32::from(evaluated.result) as f64),
                         None,
                         skip_destinations,
+                        None,
                     )
                     .await
             };
@@ -2263,6 +2276,7 @@ async fn handle_alert_triggers(
                 &trigger_data_stream.status,
                 None,
                 None,
+                &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
             )
             .await;
         }
@@ -2297,7 +2311,7 @@ async fn handle_alert_triggers(
         matched_level,
     );
 
-    // Outside the fired branch: that branch runs only while firing, when recovery must not.
+    // Every clear run: on-call pages BEFORE the send, so an undelivered page leaves it open.
     #[cfg(feature = "enterprise")]
     if matched_level.is_none()
         && o2_enterprise::enterprise::oncall::is_enabled()
@@ -2480,6 +2494,29 @@ async fn handle_alert_triggers(
     let condition_matched = trigger_results.data.is_some();
     let payload_empty = trigger_results.data.as_ref().is_none_or(|d| d.is_empty());
 
+    // What this evaluation DELIVERED, not what it decided to: the episode opens on a landed send.
+    let mut episode_delivered = false;
+    // Only the enterprise correlation block assigns this.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut episode_incident_id: Option<String> = None;
+    // Read-or-mint BEFORE the send: a resolve only matches a key the vendor saw on the trigger.
+    let episode_key: Option<String> = if alert.notify_on_recovery
+        && delivery.should_deliver()
+        && let Some(alert_id) = alert.id.as_ref()
+    {
+        let open = infra::table::alert_states::get(
+            &alert_id.to_string(),
+            config::meta::alerts::state::ROLLUP_GROUP_KEY,
+        )
+        .await
+        .ok()
+        .flatten()
+        .and_then(|state| state.episode_id);
+        Some(open.unwrap_or_else(config::ider::uuid))
+    } else {
+        None
+    };
+
     if let Some(data) = trigger_results.data
         && !data.is_empty()
         // Suppressed deliveries still record state and history; only the
@@ -2547,6 +2584,9 @@ async fn handle_alert_triggers(
                                 &trigger_data_stream.status,
                                 eval_level,
                                 trigger_results.group_classification.as_ref(),
+                                &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                                    alert.keep_firing_for,
+                                ),
                             )
                             .await;
                         }
@@ -2583,6 +2623,9 @@ async fn handle_alert_triggers(
                                     &trigger_data_stream.status,
                                     eval_level,
                                     trigger_results.group_classification.as_ref(),
+                                    &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                                        alert.keep_firing_for,
+                                    ),
                                 )
                                 .await;
                             }
@@ -2622,6 +2665,9 @@ async fn handle_alert_triggers(
                         &trigger_data_stream.status,
                         eval_level,
                         trigger_results.group_classification.as_ref(),
+                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                            alert.keep_firing_for,
+                        ),
                     )
                     .await;
                 }
@@ -2746,8 +2792,7 @@ async fn handle_alert_triggers(
                 };
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                // The alert fired; grouping only batches the delivery. State
-                // must reflect the firing (Part IV write-coverage).
+                // No episode: a batch holds several alerts, so no per-alert key can ride it.
                 if let Some(alert_id) = alert.id.as_ref() {
                     let _ = persist_alert_run_state(
                         &alert,
@@ -2755,6 +2800,9 @@ async fn handle_alert_triggers(
                         &trigger_data_stream.status,
                         eval_level,
                         trigger_results.group_classification.as_ref(),
+                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                            alert.keep_firing_for,
+                        ),
                     )
                     .await;
                 }
@@ -2815,6 +2863,9 @@ async fn handle_alert_triggers(
                                 &trigger_data_stream.status,
                                 eval_level,
                                 trigger_results.group_classification.as_ref(),
+                                &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                                    alert.keep_firing_for,
+                                ),
                             )
                             .await;
                         }
@@ -2887,6 +2938,8 @@ async fn handle_alert_triggers(
                     );
                     // Notification was handled inside correlate_alert_to_incident
                     // (sent for new incidents/alert types, suppressed for repeats).
+                    // The incident owns the resolve too, so the episode records it.
+                    episode_incident_id = Some(outcome.incident_id().to_string());
                     true
                 }
                 Ok(None) => {
@@ -2951,6 +3004,7 @@ async fn handle_alert_triggers(
             // Notification was handled (sent or suppressed) inside correlate_alert_to_incident.
             // Still advance the trigger state so the scheduler moves forward normally.
             record_delivery(&mut trigger_data);
+            episode_delivered = true;
             trigger_data.period_end_time = if should_store_last_end_time {
                 Some(trigger_results.end_time)
             } else {
@@ -3021,6 +3075,9 @@ async fn handle_alert_triggers(
                         &RunOutcome::NotifyFailed,
                         eval_level,
                         None,
+                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                            alert.keep_firing_for,
+                        ),
                     )
                     .await;
                 }
@@ -3042,6 +3099,9 @@ async fn handle_alert_triggers(
                         &RunOutcome::Pending,
                         eval_level,
                         None,
+                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                            alert.keep_firing_for,
+                        ),
                     )
                     .await;
                 }
@@ -3058,6 +3118,7 @@ async fn handle_alert_triggers(
                 .collect();
             confirm_dedup_reservations(&confirmable, !confirmable.is_empty()).await;
             record_delivery(&mut trigger_data);
+            episode_delivered = true;
             trigger_data.period_end_time = if should_store_last_end_time {
                 Some(trigger_results.end_time)
             } else {
@@ -3085,6 +3146,7 @@ async fn handle_alert_triggers(
                     trigger_results.actual_value,
                     None,
                     skip_destinations,
+                    episode_key.clone(),
                 )
                 .await
             {
@@ -3198,6 +3260,7 @@ async fn handle_alert_triggers(
                         // only here, on the terminal branch, so no retry can be
                         // suppressed by a window this same cycle opened.
                         record_delivery(&mut trigger_data);
+                        episode_delivered = true;
                         if partial_failure {
                             log::error!(
                                 "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{}: \
@@ -3345,6 +3408,12 @@ async fn handle_alert_triggers(
             &trigger_data_stream.status,
             eval_level,
             trigger_results.group_classification.as_ref(),
+            &config::meta::alerts::recovery::EpisodeInput {
+                delivered: episode_delivered,
+                incident_id: episode_incident_id,
+                keep_firing_for_secs: alert.keep_firing_for,
+                episode_id: episode_key,
+            },
         )
         .await;
     }

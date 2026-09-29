@@ -286,7 +286,7 @@ pub enum FileSelection {
     /// Sorted, non-overlapping physical row ranges selected by a compact
     /// secondary index. This avoids materializing one bitmap bit per row.
     RowRanges(Arc<Vec<Range<usize>>>),
-    /// Row group ids selected by row-group-level sampling.
+    /// Sampled row group ids in `PARQUET_MAX_ROW_GROUP_SIZE`-row units, not physical row groups.
     RowGroups(Arc<Vec<u32>>),
 }
 
@@ -384,6 +384,7 @@ pub struct FileListDeleted {
     pub account: String,
     pub file: String,
     pub index_file: bool,
+    pub mindex_file: bool,
     pub flattened: bool,
 }
 
