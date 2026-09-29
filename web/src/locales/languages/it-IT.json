@@ -18457,6 +18457,7 @@
       "never": "Mai",
       "countersCumulative": "I conteggi di scan e vacuum sono totali cumulativi dall'ultimo ripristino delle statistiche, non conteggi per l'intervallo di tempo selezionato.",
       "tuplesEstimated": "Il numero di righe e la percentuale di bloat sono stime statistiche del motore del database, non conteggi esatti.",
+      "aboutNumbers": "Informazioni su questi numeri",
       "notCollectingTitle": "Nessuna statistica di tabella ancora",
       "notCollectingDescription": "Nulla ha segnalato statistiche di tabella in questo intervallo di tempo. Questo segnale viene fornito come una ricetta del collector separata.",
       "engineUnsupportedTitle": "Non raccolto per questo motore",

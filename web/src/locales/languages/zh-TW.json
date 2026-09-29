@@ -18452,6 +18452,7 @@
       "never": "從未",
       "countersCumulative": "掃描和 vacuum 計數是自上次統計重設以來的生命週期總計，而非所選時間範圍內的計數。",
       "tuplesEstimated": "列數和膨脹百分比是資料庫引擎的統計估計值，而非精確計數。",
+      "aboutNumbers": "關於這些數字",
       "notCollectingTitle": "尚無資料表統計資料",
       "notCollectingDescription": "此時間範圍內沒有回報資料表統計資料。此訊號以獨立的收集器配方提供。",
       "engineUnsupportedTitle": "未對此引擎收集",

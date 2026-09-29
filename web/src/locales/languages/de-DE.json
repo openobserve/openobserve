@@ -18457,6 +18457,7 @@
       "never": "Nie",
       "countersCumulative": "Scan- und Vakuum-Zähler sind Gesamtwerte seit dem letzten Statistik-Reset, keine Zähler für den ausgewählten Zeitraum.",
       "tuplesEstimated": "Zeilenanzahl und Bloat-Prozentsatz sind statistische Schätzungen der Datenbank-Engine, keine exakten Zähler.",
+      "aboutNumbers": "Zu diesen Zahlen",
       "notCollectingTitle": "Noch keine Tabellenstatistik",
       "notCollectingDescription": "In diesem Zeitraum hat nichts Tabellenstatistik gemeldet. Dieses Signal wird als separates Collector-Rezept ausgeliefert.",
       "engineUnsupportedTitle": "Nicht für diese Engine erfasst",

@@ -18457,6 +18457,7 @@
       "never": "Never",
       "countersCumulative": "Scan and vacuum counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
       "tuplesEstimated": "Row counts and bloat percentage are statistics estimates from the database engine, not exact counts.",
+      "aboutNumbers": "About these numbers",
       "notCollectingTitle": "No table statistics yet",
       "notCollectingDescription": "Nothing has reported table statistics in this time range. This signal ships as a separate collector recipe.",
       "engineUnsupportedTitle": "Not collected for this engine",

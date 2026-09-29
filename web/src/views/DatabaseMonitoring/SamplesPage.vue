@@ -70,6 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :filters="dimensionFilters"
           @clear="clearScope"
         />
+        <DbmToolbarNote
+          v-if="!serverListShown"
+          class="ms-auto"
+          :text="t('dbm.samples.disclosureShort')"
+          :detail="t('dbm.samples.disclosureDetail')"
+          data-test="dbm-samples-disclosure"
+        />
         <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
         <OTableColumnToggle
           v-if="!serverListShown"
@@ -217,12 +224,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dbm.samples.partial") }}
             </span>
-            <div class="flex-1"></div>
-            <span class="text-text-secondary flex shrink-0 items-center gap-1">
-              <OIcon name="info-outline" class="shrink-0" size="sm" />
-              {{ t("dbm.samples.disclosureShort") }}
-              <OTooltip side="top" :content="t('dbm.samples.disclosureDetail')" />
-            </span>
           </div>
         </template>
 
@@ -355,6 +356,7 @@ import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import DbmLockEmptyState, {
   type DbmLockCheck,
   type DbmLockEmptyAction,
@@ -363,7 +365,6 @@ import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";

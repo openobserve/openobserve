@@ -18457,6 +18457,7 @@
       "never": "Asla",
       "countersCumulative": "Tarama ve vakum sayıları, son istatistik sıfırlamasından bu yana ömür boyu toplamlardır, seçilen zaman aralığı için sayılar değildir.",
       "tuplesEstimated": "Satır sayıları ve şişkinlik yüzdesi, veritabanı motorundan alınan istatistik tahminleridir, kesin sayılar değildir.",
+      "aboutNumbers": "Bu sayılar hakkında",
       "notCollectingTitle": "Henüz tablo istatistiği yok",
       "notCollectingDescription": "Bu zaman aralığında hiçbir şey tablo istatistiği bildirmedi. Bu sinyal ayrı bir toplayıcı tarifi olarak gelir.",
       "engineUnsupportedTitle": "Bu motor için toplanmadı",

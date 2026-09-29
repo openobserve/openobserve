@@ -18457,6 +18457,7 @@
       "never": "从未",
       "countersCumulative": "扫描和 vacuum 计数是自上次统计重置以来的累计总数，而不是所选时间范围内的计数。",
       "tuplesEstimated": "行数和膨胀百分比是数据库引擎的统计估算值，不是精确计数。",
+      "aboutNumbers": "关于这些数字",
       "notCollectingTitle": "尚无表统计信息",
       "notCollectingDescription": "在此时间范围内没有报告表统计信息。此信号作为单独的采集器配方提供。",
       "engineUnsupportedTitle": "未为此引擎收集",

@@ -18457,6 +18457,7 @@
       "never": "なし",
       "countersCumulative": "スキャン数とバキューム数は、最後の統計リセット以降の累計であり、選択した期間内の回数ではありません。",
       "tuplesEstimated": "行数と肥大化率はデータベースエンジンによる統計推定値であり、正確な数値ではありません。",
+      "aboutNumbers": "これらの数値について",
       "notCollectingTitle": "テーブル統計がまだありません",
       "notCollectingDescription": "この期間にテーブル統計を報告したものはありません。このシグナルは独立したコレクターレシピとして提供されます。",
       "engineUnsupportedTitle": "このエンジンでは収集されません",

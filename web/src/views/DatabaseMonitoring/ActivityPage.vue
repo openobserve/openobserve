@@ -72,6 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :filters="dimensionFilters"
               @clear="clearScope"
             />
+            <DbmToolbarNote
+              class="ms-auto"
+              :text="disclosureSummary"
+              :detail="disclosureDetail"
+              data-test="dbm-activity-disclosure"
+            />
           </DbmTableToolbar>
         </template>
 
@@ -117,13 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                Postgres reports sampled states while MySQL reports timed
                durations, so one shared bucket sums two incomparable things. -->
           <div
+            v-if="waitStrip.shown.length"
             class="px-page-edge border-table-row-divider flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-1.5"
             data-test="dbm-activity-wait-breakdown"
           >
-            <span
-              v-if="waitStrip.shown.length"
-              class="text-text-secondary text-3xs shrink-0 font-semibold"
-            >
+            <span class="text-text-secondary text-3xs shrink-0 font-semibold">
               {{ t("dbm.activity.columns.waitEvent") }}
             </span>
             <span
@@ -153,21 +157,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dbm-activity-wait-remainder"
             >
               {{ waitRemainderLabel }}
-            </span>
-
-            <div class="flex-1"></div>
-
-            <!-- The honesty requirement, on this band rather than a fourth one:
-                 the short form is always visible so the caveat cannot be
-                 missed, and the full three sentences ride in the tooltip so
-                 they cost the table no rows. -->
-            <span
-              class="text-text-secondary text-2xs flex shrink-0 items-center gap-1"
-              data-test="dbm-activity-disclosure"
-            >
-              <OIcon name="info-outline" class="size-3 shrink-0" />
-              {{ disclosureSummary }}
-              <OTooltip side="bottom" :content="disclosureDetail" />
             </span>
           </div>
         </template>
@@ -338,13 +327,12 @@ import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
+import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
   type ActivitySession,
   type ActivityStateBucket,

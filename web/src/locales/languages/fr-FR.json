@@ -18457,6 +18457,7 @@
       "never": "Jamais",
       "countersCumulative": "Les compteurs de scan et de vacuum sont des totaux cumulés depuis la dernière réinitialisation des statistiques, pas des compteurs pour la période sélectionnée.",
       "tuplesEstimated": "Les nombres de lignes et le pourcentage de bloat sont des estimations statistiques du moteur de base de données, pas des comptes exacts.",
+      "aboutNumbers": "À propos de ces chiffres",
       "notCollectingTitle": "Aucune statistique de table pour l'instant",
       "notCollectingDescription": "Rien n'a signalé de statistiques de table dans cette période. Ce signal est fourni comme une recette de collecteur distincte.",
       "engineUnsupportedTitle": "Non collecté pour ce moteur",

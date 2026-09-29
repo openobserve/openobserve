@@ -18457,6 +18457,7 @@
       "never": "Nunca",
       "countersCumulative": "Los recuentos de escaneo y vacuum son totales de por vida desde el último restablecimiento de estadísticas, no recuentos del rango de tiempo seleccionado.",
       "tuplesEstimated": "Los recuentos de filas y el porcentaje de bloat son estimaciones estadísticas del motor de la base de datos, no recuentos exactos.",
+      "aboutNumbers": "Sobre estas cifras",
       "notCollectingTitle": "Aún no hay estadísticas de tabla",
       "notCollectingDescription": "Nada ha informado estadísticas de tabla en este rango de tiempo. Esta señal se envía como una receta de recopilador separada.",
       "engineUnsupportedTitle": "No recopilado para este motor",

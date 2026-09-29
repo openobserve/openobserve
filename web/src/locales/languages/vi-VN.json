@@ -18457,6 +18457,7 @@
       "never": "Không bao giờ",
       "countersCumulative": "Số lần quét và vacuum là tổng tích lũy kể từ lần đặt lại số liệu thống kê gần nhất, không phải số đếm trong khoảng thời gian đã chọn.",
       "tuplesEstimated": "Số lượng hàng và phần trăm độ phình là ước tính thống kê từ công cụ cơ sở dữ liệu, không phải số đếm chính xác.",
+      "aboutNumbers": "Về các con số này",
       "notCollectingTitle": "Chưa có số liệu thống kê bảng",
       "notCollectingDescription": "Không có gì báo cáo số liệu thống kê bảng trong khoảng thời gian này. Tín hiệu này được cung cấp dưới dạng một công thức bộ thu thập riêng.",
       "engineUnsupportedTitle": "Không được thu thập cho công cụ này",

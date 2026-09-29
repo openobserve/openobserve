@@ -18457,6 +18457,7 @@
       "never": "Nunca",
       "countersCumulative": "As contagens de scan e vacuum são totais acumulados desde a última redefinição de estatísticas, não contagens para o intervalo de tempo selecionado.",
       "tuplesEstimated": "As contagens de linhas e a porcentagem de bloat são estimativas de estatísticas do mecanismo de banco de dados, não contagens exatas.",
+      "aboutNumbers": "Sobre estes números",
       "notCollectingTitle": "Nenhuma estatística de tabela ainda",
       "notCollectingDescription": "Nada relatou estatísticas de tabela neste intervalo de tempo. Este sinal é fornecido como uma receita de coletor separada.",
       "engineUnsupportedTitle": "Não coletado para este mecanismo",
