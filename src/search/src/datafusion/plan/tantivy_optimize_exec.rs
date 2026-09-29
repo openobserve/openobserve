@@ -35,11 +35,11 @@ use datafusion::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
         memory::MemoryStream,
-        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
+        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricBuilder, MetricsSet},
     },
 };
 
-use crate::tantivy::TantivyMultiResult;
+use crate::tantivy::{TantivyMultiResult, aggregate::IndexAggregate};
 
 #[derive(Debug)]
 pub struct TantivyOptimizeExec {
@@ -52,22 +52,28 @@ pub struct TantivyOptimizeExec {
 }
 
 impl TantivyOptimizeExec {
-    /// Create a TantivyOptimizeExec that emits `result` converted to `schema`.
-    pub fn try_new(
-        schema: SchemaRef,
-        file_list: Vec<FileKey>,
-        result: TantivyMultiResult,
-        index_optimize_mode: IndexOptimizeMode,
-    ) -> Result<Self> {
-        let batches = tantivy_result_batches(result, &schema, &index_optimize_mode)?;
+    /// Create a TantivyOptimizeExec that emits the index `aggregate` converted to `schema`.
+    pub fn try_new(schema: SchemaRef, aggregate: IndexAggregate) -> Result<Self> {
+        let IndexAggregate {
+            mode,
+            files,
+            result,
+            search_time,
+        } = aggregate;
+        let batches = tantivy_result_batches(result, &schema, &mode)?;
         let cache = Self::compute_properties(Arc::clone(&schema));
+        let metrics = ExecutionPlanMetricsSet::new();
+        // The search runs while planning, so EXPLAIN ANALYZE would not see it otherwise.
+        MetricBuilder::new(&metrics)
+            .subset_time("index_search_time", 0)
+            .add_duration(search_time);
         Ok(TantivyOptimizeExec {
             schema,
-            file_list,
+            file_list: files,
             batches,
             cache,
-            index_optimize_mode,
-            metrics: ExecutionPlanMetricsSet::new(),
+            index_optimize_mode: mode,
+            metrics,
         })
     }
 
@@ -602,6 +608,8 @@ fn parse_bool_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusio
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use arrow::array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema, TimeUnit};
     use config::meta::stream::FileMeta;
@@ -1049,9 +1057,12 @@ mod tests {
 
         let exec = TantivyOptimizeExec::try_new(
             schema.clone(),
-            file_list.clone(),
-            result.clone(),
-            index_optimize_mode.clone(),
+            IndexAggregate {
+                mode: index_optimize_mode.clone(),
+                files: file_list.clone(),
+                result: result.clone(),
+                search_time: Duration::ZERO,
+            },
         )
         .unwrap();
 
@@ -1126,7 +1137,16 @@ mod tests {
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
         let exec = Arc::new(
-            TantivyOptimizeExec::try_new(schema, file_list, result, index_optimize_mode).unwrap(),
+            TantivyOptimizeExec::try_new(
+                schema,
+                IndexAggregate {
+                    mode: index_optimize_mode,
+                    files: file_list,
+                    result,
+                    search_time: Duration::ZERO,
+                },
+            )
+            .unwrap(),
         );
 
         let display = format!(
@@ -1159,8 +1179,16 @@ mod tests {
         let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec =
-            TantivyOptimizeExec::try_new(schema, file_list, result, index_optimize_mode).unwrap();
+        let exec = TantivyOptimizeExec::try_new(
+            schema,
+            IndexAggregate {
+                mode: index_optimize_mode,
+                files: file_list,
+                result,
+                search_time: Duration::ZERO,
+            },
+        )
+        .unwrap();
 
         assert_eq!(exec.name(), "TantivyOptimizeExec");
         assert!(exec.children().is_empty());
@@ -1187,7 +1215,16 @@ mod tests {
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
         let exec = Arc::new(
-            TantivyOptimizeExec::try_new(schema, file_list, result, index_optimize_mode).unwrap(),
+            TantivyOptimizeExec::try_new(
+                schema,
+                IndexAggregate {
+                    mode: index_optimize_mode,
+                    files: file_list,
+                    result,
+                    search_time: Duration::ZERO,
+                },
+            )
+            .unwrap(),
         );
 
         let result = exec.replace_children(
@@ -1218,8 +1255,16 @@ mod tests {
         let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec =
-            TantivyOptimizeExec::try_new(schema, file_list, result, index_optimize_mode).unwrap();
+        let exec = TantivyOptimizeExec::try_new(
+            schema,
+            IndexAggregate {
+                mode: index_optimize_mode,
+                files: file_list,
+                result,
+                search_time: Duration::ZERO,
+            },
+        )
+        .unwrap();
 
         let stats = datafusion::physical_plan::StatisticsContext::new()
             .compute(&exec, &datafusion::physical_plan::StatisticsArgs::new());
@@ -1241,9 +1286,12 @@ mod tests {
         let exec = Arc::new(
             TantivyOptimizeExec::try_new(
                 schema,
-                vec![],
-                TantivyMultiResult::Count(7),
-                IndexOptimizeMode::SimpleCount,
+                IndexAggregate {
+                    mode: IndexOptimizeMode::SimpleCount,
+                    files: vec![],
+                    result: TantivyMultiResult::Count(7),
+                    search_time: Duration::from_millis(1500),
+                },
             )
             .unwrap(),
         );
@@ -1260,6 +1308,12 @@ mod tests {
                 .unwrap();
             assert_eq!(counts.value(0), 7);
         }
+        let search_time = exec
+            .metrics()
+            .unwrap()
+            .sum_by_name("index_search_time")
+            .unwrap();
+        assert_eq!(search_time.as_usize(), 1_500_000_000);
     }
 
     #[test]
@@ -1271,9 +1325,12 @@ mod tests {
         )]));
         let exec = TantivyOptimizeExec::try_new(
             schema,
-            vec![],
-            TantivyMultiResult::Count(7),
-            IndexOptimizeMode::SimpleCount,
+            IndexAggregate {
+                mode: IndexOptimizeMode::SimpleCount,
+                files: vec![],
+                result: TantivyMultiResult::Count(7),
+                search_time: Duration::ZERO,
+            },
         );
         assert!(exec.is_err());
     }

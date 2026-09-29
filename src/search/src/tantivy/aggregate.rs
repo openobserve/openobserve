@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use config::meta::{inverted_index::IndexOptimizeMode, stream::FileKey};
 
@@ -28,6 +28,8 @@ pub struct IndexAggregate {
     pub files: Vec<FileKey>,
     /// Final result over all of `files`, which are never scanned again.
     pub result: TantivyMultiResult,
+    /// Wall time of the index search, reported as the `index_search_time` plan metric.
+    pub search_time: Duration,
 }
 
 pub struct PreparedAggregate {
@@ -72,6 +74,7 @@ pub async fn prepare_aggregate(
                     mode,
                     files,
                     result,
+                    search_time: Duration::from_millis(took as u64),
                 }),
                 fallback_files,
                 took,

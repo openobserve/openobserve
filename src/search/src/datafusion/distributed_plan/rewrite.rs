@@ -90,12 +90,7 @@ impl AggregateOptimizeRewriter {
         }
 
         if let Some(aggregate) = self.index_aggregate.take() {
-            inputs.push(Arc::new(TantivyOptimizeExec::try_new(
-                schema,
-                aggregate.files,
-                aggregate.result,
-                aggregate.mode,
-            )?));
+            inputs.push(Arc::new(TantivyOptimizeExec::try_new(schema, aggregate)?));
         }
 
         Ok(inputs)
@@ -156,6 +151,7 @@ mod tests {
             mode: IndexOptimizeMode::SimpleCount,
             files: vec![FileKey::default()],
             result: TantivyMultiResult::Count(count),
+            search_time: std::time::Duration::ZERO,
         })
     }
 
