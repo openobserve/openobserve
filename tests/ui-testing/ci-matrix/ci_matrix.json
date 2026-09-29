@@ -255,7 +255,8 @@
       "theme.spec.js",
       "languageTranslation.spec.js",
       "edition-features.spec.js",
-      "onboarding-form-validation.spec.js"
+      "onboarding-form-validation.spec.js",
+      "status-pages-enterprise-gating.spec.js"
     ],
     "disabled": []
   },
