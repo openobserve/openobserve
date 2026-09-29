@@ -18,7 +18,10 @@ function selectPrompt(id: string) {
       {{ t("aiAssistant.welcome.tryOneOfThese") }}
     </div>
 
-    <div class="suggestions-grid grid w-full gap-2 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+    <!-- Phones show the first three so the whole welcome fits above the composer. -->
+    <div
+      class="suggestions-grid grid w-full gap-2 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-md:[&>button:nth-child(n+4)]:hidden"
+    >
       <button
         v-for="s in PROMPT_SUGGESTIONS"
         :key="s.id"
