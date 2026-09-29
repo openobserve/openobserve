@@ -41,7 +41,7 @@ use itertools::Itertools;
 use o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_files;
 use rayon::slice::ParallelSliceMut;
 
-use super::{index::IndexPlan, plan::ScanTarget};
+use super::{index::IndexPlan, plan::StreamSource};
 use crate::{
     grpc::{QueryParams, storage, wal},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -50,7 +50,7 @@ use crate::{
 };
 
 /// Stream settings narrowed to the fields that exist in the query schema.
-pub(super) struct StreamIndexSettings {
+pub(super) struct StreamSearchSettings {
     pub(super) settings: Option<StreamSettings>,
     pub(super) created_at: Option<i64>,
     pub(super) fts_fields: Vec<String>,
@@ -59,9 +59,9 @@ pub(super) struct StreamIndexSettings {
     pub(super) partition_keys: Vec<(String, String)>,
 }
 
-impl StreamIndexSettings {
-    pub(super) async fn load(req: &FlightSearchRequest, target: &ScanTarget) -> Self {
-        let schema_fields: HashMap<_, _> = target
+impl StreamSearchSettings {
+    pub(super) async fn load(req: &FlightSearchRequest, source: &StreamSource) -> Self {
+        let schema_fields: HashMap<_, _> = source
             .schema
             .fields()
             .iter()
@@ -69,8 +69,8 @@ impl StreamIndexSettings {
             .collect();
         let db_schema = infra::schema::get(
             &req.query_identifier.org_id,
-            &target.stream.stream_name(),
-            target.stream_type,
+            &source.stream.stream_name(),
+            source.stream_type,
         )
         .await
         .unwrap_or_else(|_| arrow_schema::Schema::empty());
@@ -142,8 +142,8 @@ impl StreamIndexSettings {
 
 /// Where each object-storage file of this partition is read from.
 #[derive(Default)]
-pub(super) struct FileRoute {
-    pub(super) metadata_count: Vec<FileKey>,
+pub(super) struct RoutedFiles {
+    pub(super) metadata_count_files: Vec<FileKey>,
     pub(super) index_aggregate: Option<IndexAggregate>,
     /// Parquet or vortex files left for the storage scan; `None` when the request has no file ids.
     pub(super) scan_files: Option<Vec<FileKey>>,
@@ -152,12 +152,12 @@ pub(super) struct FileRoute {
 pub(super) async fn route_files(
     query: &Arc<QueryParams>,
     req: &FlightSearchRequest,
-    stream: &StreamIndexSettings,
+    settings: &StreamSearchSettings,
     index: &IndexPlan,
     scan_stats: &mut ScanStats,
-) -> Result<FileRoute, Error> {
+) -> Result<RoutedFiles, Error> {
     if req.search_info.file_id_list.is_empty() {
-        return Ok(FileRoute::default());
+        return Ok(RoutedFiles::default());
     }
     let trace_id = query.trace_id.as_str();
     let (mut scan_files, file_list_took) = get_file_list_by_ids(
@@ -166,7 +166,7 @@ pub(super) async fn route_files(
         query.stream_type,
         &query.stream_name,
         Some(query.time_range),
-        &stream.partition_keys,
+        &settings.partition_keys,
         &req.search_info.file_id_list,
     )
     .await?;
@@ -188,13 +188,14 @@ pub(super) async fn route_files(
         )
     );
 
-    let mut metadata_count = Vec::new();
+    let mut metadata_count_files = Vec::new();
     if index.use_metadata_count() {
-        (metadata_count, scan_files) = split_metadata_count_files(scan_files, query.time_range);
-        if !metadata_count.is_empty() {
+        (metadata_count_files, scan_files) =
+            split_metadata_count_files(scan_files, query.time_range);
+        if !metadata_count_files.is_empty() {
             log::info!(
                 "[trace_id {trace_id}] flight->search: metadata count files: {}, remaining storage files: {}",
-                metadata_count.len(),
+                metadata_count_files.len(),
                 scan_files.len()
             );
         }
@@ -203,7 +204,7 @@ pub(super) async fn route_files(
     let mut index_aggregate = None;
     if let Some(mode) = index.aggregate_mode() {
         let start = std::time::Instant::now();
-        let index_updated_at = stream.index_updated_at(mode).await;
+        let index_updated_at = settings.index_updated_at(mode).await;
         // TODO: support IndexOptimizeMode::SimpleDistinct for add timestamp
         // filter to tantivy search
         let distinct_range =
@@ -264,8 +265,8 @@ pub(super) async fn route_files(
         );
     }
 
-    Ok(FileRoute {
-        metadata_count,
+    Ok(RoutedFiles {
+        metadata_count_files,
         index_aggregate,
         scan_files: Some(scan_files),
     })
@@ -274,8 +275,8 @@ pub(super) async fn route_files(
 pub(super) async fn search_tables(
     query: &Arc<QueryParams>,
     ctx: &SessionContext,
-    target: &ScanTarget,
-    stream: &StreamIndexSettings,
+    source: &StreamSource,
+    settings: &StreamSearchSettings,
     index: &IndexPlan,
     scan_files: Option<Vec<FileKey>>,
     scan_stats: &mut ScanStats,
@@ -288,14 +289,14 @@ pub(super) async fn search_tables(
         let start = std::time::Instant::now();
         let (tbls, stats, _) = storage::search(
             query.clone(),
-            target.schema.clone(),
+            source.schema.clone(),
             &files,
-            target.sort_order,
+            source.sort_order,
             file_stats_cache.clone(),
             index.condition.clone(),
-            stream.fts_fields.clone(),
-            stream.bloom_fields.clone(),
-            index.storage_mode(),
+            settings.fts_fields.clone(),
+            settings.bloom_fields.clone(),
+            index.scan_mode(),
         )
         .await
         .inspect_err(|e| {
@@ -328,11 +329,11 @@ pub(super) async fn search_tables(
     // search in WAL memory first to capture the snapshot_time
     let (tbls, stats, memtable_ids) = wal::search_memtable(
         query.clone(),
-        target.schema.clone(),
-        &stream.partition_keys,
-        target.sort_order,
+        source.schema.clone(),
+        &settings.partition_keys,
+        source.sort_order,
         index.condition.clone(),
-        stream.fts_fields.clone(),
+        settings.fts_fields.clone(),
     )
     .await
     .inspect_err(|e| {
@@ -344,12 +345,12 @@ pub(super) async fn search_tables(
     // Now search in WAL parquet with snapshot_time filter
     let (tbls, stats, _) = wal::search_parquet(
         query.clone(),
-        target.schema.clone(),
-        &stream.partition_keys,
-        target.sort_order,
+        source.schema.clone(),
+        &settings.partition_keys,
+        source.sort_order,
         file_stats_cache,
         index.condition.clone(),
-        stream.fts_fields.clone(),
+        settings.fts_fields.clone(),
         memtable_ids,
     )
     .await

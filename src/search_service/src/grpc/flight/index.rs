@@ -61,7 +61,7 @@ impl IndexPlan {
     }
 
     /// Mode handed to the storage scan; aggregate modes are answered before the scan.
-    pub(super) fn storage_mode(&self) -> Option<IndexOptimizeMode> {
+    pub(super) fn scan_mode(&self) -> Option<IndexOptimizeMode> {
         self.mode.clone().filter(|mode| !mode.is_aggregate())
     }
 }

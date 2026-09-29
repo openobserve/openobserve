@@ -40,7 +40,7 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::errors::{Error, ErrorCodes};
 
-use super::scan::{FileRoute, collect_stats};
+use super::scan::{RoutedFiles, collect_stats};
 use crate::{
     datafusion::{
         distributed_plan::{
@@ -56,8 +56,8 @@ use crate::{
     tantivy::aggregate::IndexAggregate,
 };
 
-/// The stream the leader plan reads, taken from its placeholder scan before any rewrite.
-pub(super) struct ScanTarget {
+/// The stream the leader plan reads, taken from its empty exec before any rewrite.
+pub(super) struct StreamSource {
     pub(super) stream: TableReference,
     pub(super) stream_type: StreamType,
     pub(super) schema: SchemaRef,
@@ -67,7 +67,7 @@ pub(super) struct ScanTarget {
 pub(super) async fn decode_plan(
     trace_id: &str,
     req: &FlightSearchRequest,
-) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, ScanTarget), Error> {
+) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, StreamSource), Error> {
     let cfg = get_config();
     let org_id = req.query_identifier.org_id.as_str();
     let stream_type = StreamType::from(req.query_identifier.stream_type.as_str());
@@ -93,7 +93,7 @@ pub(super) async fn decode_plan(
     )?;
 
     // replace empty table to real table
-    let visitor = find_placeholder(&physical_plan)?;
+    let visitor = find_empty_exec(&physical_plan)?;
     let empty_exec = visitor.plan();
 
     // here need reset the option because when init ctx we don't know this information
@@ -121,28 +121,28 @@ pub(super) async fn decode_plan(
         req.query_identifier.partition
     );
 
-    let target = ScanTarget {
+    let source = StreamSource {
         stream,
         stream_type,
         schema: empty_exec.full_schema(),
         sort_order: empty_exec.sort_order(),
     };
-    Ok((ctx, physical_plan, target))
+    Ok((ctx, physical_plan, source))
 }
 
-pub(super) async fn assemble_plan(
+pub(super) async fn finalize_plan(
     query: &QueryParams,
     req: &FlightSearchRequest,
     ctx: &SessionContext,
     physical_plan: Arc<dyn ExecutionPlan>,
     mut tables: Vec<Arc<dyn TableProvider>>,
-    route: FileRoute,
+    routed: RoutedFiles,
     scan_stats: &mut ScanStats,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
     let trace_id = query.trace_id.as_str();
 
     // due to we rewrite empty exec in rewrite match_all
-    let visitor = find_placeholder(&physical_plan)?;
+    let visitor = find_empty_exec(&physical_plan)?;
     let empty_exec = visitor.plan();
 
     // if the stream type is enrichment tables and the enrich mode is true, we need to load
@@ -221,8 +221,8 @@ pub(super) async fn assemble_plan(
         ctx,
         physical_plan,
         scan_stats,
-        route.metadata_count,
-        route.index_aggregate,
+        routed.metadata_count_files,
+        routed.index_aggregate,
     )?;
 
     log::info!(
@@ -310,7 +310,7 @@ fn apply_pushdowns_and_optimizations(
     Ok(physical_plan)
 }
 
-fn find_placeholder(plan: &Arc<dyn ExecutionPlan>) -> Result<NewEmptyExecVisitor, Error> {
+fn find_empty_exec(plan: &Arc<dyn ExecutionPlan>) -> Result<NewEmptyExecVisitor, Error> {
     let mut visitor = NewEmptyExecVisitor::default();
     if plan.visit(&mut visitor).is_err() || !visitor.has_empty_exec() {
         return Err(Error::Message(
