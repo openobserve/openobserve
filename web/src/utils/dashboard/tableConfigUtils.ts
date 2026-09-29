@@ -40,6 +40,8 @@ export const OVERRIDE_CONFIG_TYPES = {
 // Value-mapping regexes run synchronously on every table cell, so both sides are bounded.
 const MAX_VALUE_MAPPING_PATTERN_LENGTH = 256;
 const MAX_VALUE_MAPPING_TEST_LENGTH = 1024;
+// Upper brace bounds above this backtrack like an unbounded repeat once nested.
+const MAX_BOUNDED_REPEAT = 10;
 
 const REGEX_KEY_PREFIX = "__regex_";
 
@@ -66,7 +68,7 @@ export const parseRegexPattern = (input: string): { pattern: string; flags: stri
   return { pattern: input, flags: "" };
 };
 
-/** True when a group holding an unbounded quantifier is itself repeated without bound, e.g. `(a+)+` or `(.*)*`; `(\d+\.){3}` passes. */
+/** True when a group holding a repeating quantifier is itself repeated without bound, e.g. `(a+)+`, `(a{2,5})+`, `(a+){2,1000}`; `(\d+\.){3}` passes. */
 export const hasNestedQuantifier = (pattern: string): boolean => {
   const groupRepeats: boolean[] = [];
   let repeats = false;
@@ -86,7 +88,7 @@ export const hasNestedQuantifier = (pattern: string): boolean => {
       const inner: boolean = repeats;
       if (inner && isUnboundedRepetitionAt(pattern, i + 1)) return true;
       repeats = (groupRepeats.pop() ?? false) || inner;
-    } else if (isUnboundedRepetitionAt(pattern, i)) {
+    } else if (isRepeatingQuantifierAt(pattern, i)) {
       repeats = true;
     }
   }
@@ -509,9 +511,25 @@ export const resolveMetricValueStyle = (
   return { text, textColor, bgColor };
 };
 
+const braceBoundsAt = (pattern: string, index: number): { min: number; max: number } | null => {
+  const match = /^\{(\d+)(,(\d*))?\}/.exec(pattern.slice(index));
+  if (!match) return null;
+  const min = Number(match[1]);
+  if (match[2] === undefined) return { min, max: min };
+  return { min, max: match[3] === "" ? Infinity : Number(match[3]) };
+};
+
 const isUnboundedRepetitionAt = (pattern: string, index: number): boolean => {
   const ch = pattern[index];
-  return ch === "*" || ch === "+" || (ch === "{" && /^\{\d+,\}/.test(pattern.slice(index)));
+  if (ch === "*" || ch === "+") return true;
+  const bounds = ch === "{" ? braceBoundsAt(pattern, index) : null;
+  return bounds !== null && bounds.max > MAX_BOUNDED_REPEAT;
+};
+
+const isRepeatingQuantifierAt = (pattern: string, index: number): boolean => {
+  if (isUnboundedRepetitionAt(pattern, index)) return true;
+  const bounds = pattern[index] === "{" ? braceBoundsAt(pattern, index) : null;
+  return bounds !== null && bounds.max > bounds.min;
 };
 
 // g and y are dropped because a shared compiled regex with lastIndex state would alternate results.
