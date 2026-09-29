@@ -1589,6 +1589,7 @@
     "actionOperation": "アクション: {type}（{target} に対して）",
     "viewOperation": "ビュー: {page}",
     "collapsedOtherActions": "[他 {count} 件のアクション]",
+    "collapsedOtherRequests": "[このページの他 {count} 件のリクエスト]",
     "collapsedMoreErrors": "[さらに {count} 件のエラー]",
     "collapsedStaticAssets": "[静的アセット {count} 件]",
     "collapsedLongTasks": "[長いタスク {count} 件]",
