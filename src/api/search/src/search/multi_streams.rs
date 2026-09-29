@@ -2278,12 +2278,14 @@ mod tests {
         use openobserve_api_common::extractors::Headers;
         use openobserve_core::auth::UserEmail;
 
+        let caller = "partition-multi@example.com";
+        join_default_org_as_admin(caller);
         let resp = super::_search_partition_multi(
             Path("default".to_string()),
             HeaderMap::new(),
             Query(HashMap::new()),
             Headers(UserEmail {
-                user_id: "user@example.com".to_string(),
+                user_id: caller.to_string(),
             }),
             axum::Json(MultiSearchPartitionRequest {
                 sql: vec![sql],
@@ -2305,6 +2307,41 @@ mod tests {
         serde_json::from_slice::<config::meta::search::SearchPartitionResponse>(&body)
             .unwrap()
             .partitions
+    }
+
+    // Enterprise denies a caller that is not an org member before it authorizes the stream.
+    fn join_default_org_as_admin(email: &str) {
+        common::infra::config::USERS.insert(
+            email.to_string(),
+            infra::table::users::UserRecord {
+                email: email.to_string(),
+                first_name: "F".to_string(),
+                last_name: "L".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: config::meta::user::UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        common::infra::config::ORG_USERS.insert(
+            format!("default/{email}"),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Admin,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: "default".to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
     }
 
     #[tokio::test]
