@@ -167,6 +167,28 @@ def test_editor_cannot_unprotect_production(env, base_url):
     assert resp.status_code == 200, resp.text
 
 
+def test_generic_settings_api_cannot_touch_prompt_settings(env, base_url):
+    # Even root is refused: /prompts/settings is the only writer of this key.
+    key = f"prompt_settings/{ORG_ID}"
+    settings = f"{base_url}api/{ORG_ID}/settings/v2"
+    # Materialize the row so a missing guard would surface as 200, not 404.
+    resp = env["root"].put(
+        f"{base_url}api/{ORG_ID}/prompts/settings",
+        json={"protectedLabels": ["production"], "webhook": None},
+    )
+    assert resp.status_code == 200, resp.text
+    resp = env["root"].post(
+        settings,
+        json={"setting_key": key, "setting_value": {"protectedLabels": ["staging"], "webhook": None}},
+    )
+    assert resp.status_code == 403, resp.text
+    resp = env["root"].delete(f"{settings}/{key.replace('/', '%2F')}")
+    assert resp.status_code == 403, resp.text
+    resp = env["root"].get(f"{base_url}api/{ORG_ID}/prompts/settings")
+    assert resp.status_code == 200, resp.text
+    assert "production" in resp.json()["protectedLabels"], resp.text
+
+
 def test_scoped_user_sees_only_granted_prompt(env, base_url):
     s, prompts = env["scoped"], env["prompts"]
     resp = s.get(f"{base_url}api/{ORG_ID}/prompts")
