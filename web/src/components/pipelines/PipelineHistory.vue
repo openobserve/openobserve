@@ -35,38 +35,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="pipeline-history-date-picker"
         @on:date-change="updateDateTime"
       />
-      <OSelect
-        v-model="selectedPipeline"
-        :options="allPipelines"
-        labelKey="label"
-        valueKey="value"
-        searchable
-        @update:model-value="onPipelineSelected"
-        :placeholder="t('pipeline.searchHistory')"
-        data-test="pipeline-history-search-select"
-        class="min-w-62.5 max-md:min-w-0"
-        clearable
+    </Teleport>
+    <!-- A phone header only has room for the title and the date, so the filters become a toolbar row in the body. -->
+    <Teleport to="#o2-page-actions" defer :disabled="isMobile">
+      <div
+        :class="
+          isMobile
+            ? 'px-page-edge border-border-default flex items-center gap-2 border-b py-2'
+            : 'contents'
+        "
       >
-        <template #empty>
-          <span>{{ t("pipeline.noPipelinesFound") }}</span>
-        </template>
-      </OSelect>
-      <OTableColumnToggle
-        :columns="columns"
-        :column-visibility="columnVisibility"
-        :has-resized-columns="tableRef?.hasResizedColumns ?? false"
-        @update:column-visibility="setColumnVisibility"
-        @reset:column-sizes="tableRef?.resetColumnSizes()"
-      />
-      <ORefreshButton
-        layout="inline"
-        variant="outline"
-        class="shrink-0"
-        :last-run-at="lastUpdatedAt"
-        :loading="loading"
-        data-test="pipeline-history-refresh-btn"
-        @click="refreshData"
-      />
+        <OSelect
+          v-model="selectedPipeline"
+          :options="allPipelines"
+          labelKey="label"
+          valueKey="value"
+          searchable
+          @update:model-value="onPipelineSelected"
+          :placeholder="t('pipeline.searchHistory')"
+          data-test="pipeline-history-search-select"
+          class="min-w-62.5 max-md:min-w-0 max-md:flex-1"
+          clearable
+        >
+          <template #empty>
+            <span>{{ t("pipeline.noPipelinesFound") }}</span>
+          </template>
+        </OSelect>
+        <OTableColumnToggle
+          :columns="columns"
+          :column-visibility="columnVisibility"
+          :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+          @update:column-visibility="setColumnVisibility"
+          @reset:column-sizes="tableRef?.resetColumnSizes()"
+        />
+        <ORefreshButton
+          layout="inline"
+          variant="outline"
+          class="shrink-0"
+          :last-run-at="lastUpdatedAt"
+          :loading="loading"
+          data-test="pipeline-history-refresh-btn"
+          @click="refreshData"
+        />
+      </div>
     </Teleport>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div
@@ -456,6 +467,7 @@ import { useI18nTyped } from "@/types/i18n";
 import * as dateUtils from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -477,6 +489,7 @@ import type { OTableColumnDef, OTableExposed } from "@/lib/core/Table/OTable.typ
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { isMobile } = useBreakpoint();
 
 // Data
 const loading = ref(false);

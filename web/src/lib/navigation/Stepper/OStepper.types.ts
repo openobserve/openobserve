@@ -8,6 +8,7 @@ import type { I18nText } from "@/types/i18n";
 
 import type { Component } from "vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
+import type { OStepSlots } from "./OStep.types";
 
 /** Layout direction of the stepper */
 export type StepperOrientation = "horizontal" | "vertical";
@@ -63,6 +64,7 @@ export interface StepRegistration {
   error: boolean;
   description: string | undefined;
   navigable: boolean | undefined;
+  slots: OStepSlots;
 }
 
 /** API provided to OStep children for self-registration */
