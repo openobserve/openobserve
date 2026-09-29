@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::{TriggerCondition, level::DeliveryDecision},
+        alerts::{TriggerCondition, fixed_offset, level::DeliveryDecision},
         dashboards::reports::ReportFrequencyType,
         pipeline::components::NodeData,
         self_reporting::{
@@ -1538,26 +1538,17 @@ fn get_skipped_timestamps(
     let mut skipped_timestamps = Vec::new();
     let mut next_run_at;
     if !cron.is_empty() {
-        let cron = Schedule::from_str(cron).unwrap();
-        let suppposed_to_run_at_dt = DateTime::from_timestamp_micros(supposed_to_run_at).unwrap();
-        let suppposed_to_run_at_dt =
-            suppposed_to_run_at_dt.with_timezone(&FixedOffset::east_opt(tz_offset * 60).unwrap());
-        next_run_at = cron
-            .after(&suppposed_to_run_at_dt)
-            .next()
-            .unwrap()
-            .timestamp_micros();
-        while next_run_at <= supposed_to_run_at + delay {
-            skipped_timestamps.push(next_run_at);
-            let suppposed_to_run_at_dt = DateTime::from_timestamp_micros(next_run_at).unwrap();
-            let suppposed_to_run_at_dt = suppposed_to_run_at_dt
-                .with_timezone(&FixedOffset::east_opt(tz_offset * 60).unwrap());
-            next_run_at = cron
-                .after(&suppposed_to_run_at_dt)
-                .next()
-                .unwrap()
-                .timestamp_micros();
-        }
+        let Some((skipped, next)) =
+            skipped_cron_timestamps(supposed_to_run_at, cron, tz_offset, delay)
+        else {
+            log::warn!(
+                "[ALERT] cron '{cron}' with tz_offset {tz_offset} cannot be evaluated, skipping none"
+            );
+            let final_timestamp = if align_time { supposed_to_run_at } else { now };
+            return (skipped_timestamps, final_timestamp);
+        };
+        skipped_timestamps = skipped;
+        next_run_at = next;
     } else {
         next_run_at = if align_time {
             TriggerCondition::align_time(
@@ -1589,6 +1580,28 @@ fn get_skipped_timestamps(
         }
     };
     (skipped_timestamps, final_timestamp)
+}
+
+/// Cron runs within `delay` plus the next one, or `None` when the schedule cannot be evaluated.
+fn skipped_cron_timestamps(
+    supposed_to_run_at: i64,
+    cron: &str,
+    tz_offset: i32,
+    delay: i64,
+) -> Option<(Vec<i64>, i64)> {
+    let cron = Schedule::from_str(cron).ok()?;
+    let tz = fixed_offset(tz_offset)?;
+    let next_after = |ts: i64| {
+        let dt = DateTime::from_timestamp_micros(ts)?.with_timezone(&tz);
+        cron.after(&dt).next().map(|next| next.timestamp_micros())
+    };
+    let mut skipped = Vec::new();
+    let mut next_run_at = next_after(supposed_to_run_at)?;
+    while next_run_at <= supposed_to_run_at + delay {
+        skipped.push(next_run_at);
+        next_run_at = next_after(next_run_at)?;
+    }
+    Some((skipped, next_run_at))
 }
 
 /// Returns maximum considerable delay in microseconds - minimum of 1 hour or 20% of the frequency.
@@ -6752,6 +6765,41 @@ mod tests {
     }
 
     #[test]
+    fn get_skipped_timestamps_skips_nothing_for_a_schedule_it_cannot_evaluate() {
+        let supposed_to_run_at = 1640995200000000;
+        let now = 1640995800000000;
+        for (cron, tz_offset) in [
+            ("0 */5 * * * *", 1440),
+            ("0 */5 * * * *", i32::MAX),
+            ("0 0 0 1 1 * 2020", 0),
+            ("not a cron", 0),
+        ] {
+            let got = get_skipped_timestamps(
+                supposed_to_run_at,
+                cron,
+                tz_offset,
+                300,
+                600000000,
+                false,
+                now,
+                None,
+            );
+            assert_eq!(got, (vec![], now), "{cron} @ {tz_offset}");
+            let got = get_skipped_timestamps(
+                supposed_to_run_at,
+                cron,
+                tz_offset,
+                300,
+                600000000,
+                true,
+                now,
+                None,
+            );
+            assert_eq!(got, (vec![], supposed_to_run_at), "{cron} @ {tz_offset}");
+        }
+    }
+
+    #[test]
     fn test_get_skipped_timestamps_with_frequency() {
         // Test with frequency-based scheduling (no cron)
         let supposed_to_run_at = 1640995200000000; // 2022-01-01 00:00:00 UTC
@@ -6890,34 +6938,6 @@ mod tests {
         // Should have many skipped timestamps (60 minutes worth)
         assert!(skipped_timestamps.len() >= 50);
         assert_eq!(final_timestamp, now);
-    }
-
-    #[test]
-    fn test_get_skipped_timestamps_invalid_cron() {
-        // Test with invalid cron expression - should panic
-        let supposed_to_run_at = 1640995200000000;
-        let cron = "invalid cron";
-        let tz_offset = 0;
-        let frequency = 300;
-        let delay = 600000000;
-        let align_time = false;
-        let now = 1640995800000000;
-
-        // This should panic due to invalid cron expression
-        let result = std::panic::catch_unwind(|| {
-            get_skipped_timestamps(
-                supposed_to_run_at,
-                cron,
-                tz_offset,
-                frequency,
-                delay,
-                align_time,
-                now,
-                None,
-            )
-        });
-
-        assert!(result.is_err());
     }
 
     #[test]

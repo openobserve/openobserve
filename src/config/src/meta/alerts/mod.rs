@@ -124,7 +124,7 @@ fn get_offset_minutes_from_tz(tz: &Tz, at_time: chrono::DateTime<Utc>) -> i32 {
 }
 
 /// Returns `None` for an offset of a full day or more, which `FixedOffset` cannot represent.
-fn fixed_offset(offset_minutes: i32) -> Option<FixedOffset> {
+pub fn fixed_offset(offset_minutes: i32) -> Option<FixedOffset> {
     offset_minutes
         .checked_mul(60)
         .and_then(FixedOffset::east_opt)
