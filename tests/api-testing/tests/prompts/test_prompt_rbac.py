@@ -173,7 +173,9 @@ def test_scoped_user_sees_only_granted_prompt(env, base_url):
     assert resp.status_code == 200, resp.text
     ids = {p["entityId"] for p in resp.json()["list"]}
     assert prompts["a"] in ids
-    assert prompts["b"] not in ids
+    # Lists are only filtered per object with O2_OPENFGA_LIST_ONLY_PERMITTED=true (default false).
+    if os.environ.get("O2_OPENFGA_LIST_ONLY_PERMITTED", "").lower() == "true":
+        assert prompts["b"] not in ids
 
     assert s.get(f"{base_url}api/{ORG_ID}/prompts/{prompts['a']}").status_code == 200
     assert s.get(f"{base_url}api/{ORG_ID}/prompts/{prompts['b']}").status_code == 403
