@@ -128,7 +128,7 @@ describe("JourneySuggestions", () => {
 
     expect(chip.element.tagName).toBe("BUTTON");
     expect(button.props("variant")).toBe("outline");
-    expect(button.props("size")).toBe("icon-sm-split");
+    expect(button.props("size")).toBe("icon-xs-sq");
     const bulb = chip.find('[data-icon="lightbulb"]');
     expect(bulb.exists()).toBe(true);
     expect(bulb.classes()).toContain("text-status-warning-text");

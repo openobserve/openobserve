@@ -176,7 +176,7 @@ describe("ReplayEnvironmentMenu", () => {
       .findAllComponents(OButton)
       .find((b) => b.attributes("data-test") === "synthetics-journey-replay-menu-trigger");
     expect(trigger?.props("variant")).toBe("outline");
-    expect(trigger?.props("size")).toBe("sm");
+    expect(trigger?.props("size")).toBe("xs");
   });
 
   it("the trigger has a name and a tooltip, and follows disabled", async () => {

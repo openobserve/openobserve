@@ -80,7 +80,7 @@ function itemKey(option: ReplayEnvironmentOption) {
     <template #trigger>
       <OButton
         variant="outline"
-        size="sm"
+        size="xs"
         :disabled="disabled"
         :aria-label="t('synthetics.journey.replayEnv.triggerAria', { environment: selectedName })"
         data-test="synthetics-journey-replay-menu-trigger"

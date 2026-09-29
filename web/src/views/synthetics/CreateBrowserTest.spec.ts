@@ -3444,7 +3444,7 @@ describe("CreateBrowserTest", () => {
       expect(configureStub(wrapper).props("targetHint")).toBe(HINT);
     });
 
-    it("an Apply in the Starting URL popover updates the check's URL and marks it unsaved", async () => {
+    it("an edit in the Starting URL popover updates the check's URL and marks it unsaved", async () => {
       wrapper = await mountEditWith({});
       expect(leaveAsks()).toBe(false);
 

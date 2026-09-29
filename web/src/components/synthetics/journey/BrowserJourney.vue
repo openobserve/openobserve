@@ -1529,7 +1529,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
 
 <template>
   <div ref="journeyRootRef" class="flex min-h-0 w-full flex-col py-4">
-    <div class="ms-6.5 mb-3 flex items-center gap-2 px-3 max-lg:flex-wrap max-lg:gap-y-2">
+    <div class="ms-6.5 flex items-center gap-2 px-3 pb-3 max-lg:flex-wrap max-lg:gap-y-2">
       <div
         class="flex min-w-0 items-center gap-2 max-lg:basis-full max-md:flex-1 max-md:basis-auto"
       >
@@ -1541,6 +1541,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           data-test="synthetics-journey-select-all"
           @update:model-value="toggleSelectAll()"
         />
+        <OSeparator vertical class="me-2 h-6" data-test="synthetics-journey-select-all-separator" />
         <h3 class="sr-only">{{ t("synthetics.journey.steps") }}</h3>
         <JourneyStepCount
           :steps="modelValue"
@@ -1552,6 +1553,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OInput
           v-model="filterQuery"
           :placeholder="t('synthetics.journey.filterSteps')"
+          size="xs"
           class="w-52 max-md:w-auto max-md:min-w-0 max-md:flex-1"
           data-test="synthetics-journey-filter-input"
         >
@@ -1561,7 +1563,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </OInput>
         <OButton
           variant="outline"
-          size="sm"
+          size="xs"
           icon-left="add"
           :disabled="addDisabled"
           class="max-md:hidden"
@@ -1593,7 +1595,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OButton
           v-if="replayPhase === 'idle' || isReplayTerminal"
           variant="outline"
-          size="sm"
+          size="xs"
           :disabled="replayDisabled"
           class="max-md:hidden"
           data-test="synthetics-journey-replay-btn"
@@ -1608,7 +1610,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OButton
           v-else-if="replayPhase === 'running'"
           variant="destructive"
-          size="sm"
+          size="xs"
           data-test="synthetics-journey-stop-replay-btn"
           @click="emit('stop-replay')"
           icon-left="stop"
@@ -1620,7 +1622,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OButton
           v-else-if="isReplayStopping"
           variant="destructive"
-          size="sm"
+          size="xs"
           loading
           disabled
           data-test="synthetics-journey-stopping-replay-btn"
@@ -1632,7 +1634,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OButton
           v-if="isRecording"
           variant="outline"
-          size="sm"
+          size="xs"
           data-test="synthetics-journey-cancel-btn"
           @click="cancelRecording"
           icon-left="close"
@@ -1643,7 +1645,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OButton
           v-if="isRecording"
           variant="destructive"
-          size="sm"
+          size="xs"
           data-test="synthetics-journey-stop-btn"
           @click="stopRecording"
           icon-left="stop"
@@ -1653,7 +1655,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OButton
           v-else
           variant="primary"
-          size="sm"
+          size="xs"
           :disabled="readonly || isRecording || isReplayLocked || isRestoring"
           class="max-md:hidden"
           data-test="synthetics-journey-record-btn"
@@ -1668,7 +1670,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           <template #trigger>
             <OButton
               variant="ghost"
-              size="sm"
+              size="xs"
               icon-left="more-vert"
               class="md:hidden"
               :aria-label="t('synthetics.journey.moreActions')"

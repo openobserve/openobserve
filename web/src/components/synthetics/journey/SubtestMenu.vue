@@ -129,7 +129,7 @@ async function onPick(c: SubtestCandidate) {
     <template #trigger>
       <OButton
         variant="outline"
-        size="sm"
+        size="xs"
         :disabled="triggerDisabled"
         data-test="synthetics-journey-add-subtest-btn"
       >

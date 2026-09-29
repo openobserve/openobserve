@@ -114,11 +114,6 @@ async function openEnvs(w: VueWrapper) {
   await flushPromises();
 }
 
-async function click(w: VueWrapper, selector: string) {
-  await w.get(selector).trigger("click");
-  await flushPromises();
-}
-
 describe("JourneyStartPill", () => {
   let wrapper: VueWrapper;
 
@@ -193,7 +188,7 @@ describe("JourneyStartPill", () => {
     for (const span of labels) {
       expect(span.classes(), span.text()).toContain("max-md:hidden");
     }
-    expect(url.get('[data-icon="language"]').classes()).toContain("md:hidden");
+    expect(url.get('[data-icon="language"]').classes()).not.toContain("md:hidden");
     expect(envs.get('[data-icon="dns"]').classes()).not.toContain("max-md:hidden");
     expect(url.attributes("aria-label")).toBeTruthy();
     expect(envs.attributes("aria-label")).toBeTruthy();
@@ -288,48 +283,33 @@ describe("JourneyStartPill", () => {
     expect(text).not.toContain("https://prod.test/login");
   });
 
-  it("Apply emits the edited URL with its placeholder; Cancel emits nothing", async () => {
+  it("each valid edit emits the URL at once, placeholder kept and trimmed, with no Cancel or Apply", async () => {
     wrapper = mountPill();
     await openUrl(wrapper);
     expect((wrapper.get(URL_INPUT_FIELD).element as HTMLInputElement).value).toBe(
       "{{BASE_URL}}/login",
     );
+    expect(wrapper.find(sel("-url-apply")).exists()).toBe(false);
+    expect(wrapper.find(sel("-url-cancel")).exists()).toBe(false);
+    expect(wrapper.emitted("update:url")).toBeUndefined();
 
     await wrapper.get(URL_INPUT_FIELD).setValue("{{BASE_URL}}/checkout");
-    await click(wrapper, sel("-url-apply"));
-
     await vi.waitFor(() =>
       expect(wrapper.emitted("update:url")).toEqual([["{{BASE_URL}}/checkout"]]),
     );
-    await flushPromises();
-    expect(wrapper.find(URL_INPUT_FIELD).exists()).toBe(false);
-
-    await openUrl(wrapper);
-    await wrapper.get(URL_INPUT_FIELD).setValue("{{BASE_URL}}/discarded");
-    await click(wrapper, sel("-url-cancel"));
-
-    expect(wrapper.find(URL_INPUT_FIELD).exists()).toBe(false);
-    expect(wrapper.emitted("update:url")).toHaveLength(1);
-
-    await openUrl(wrapper);
-    expect((wrapper.get(URL_INPUT_FIELD).element as HTMLInputElement).value).toBe(
-      "{{BASE_URL}}/login",
-    );
+    expect(wrapper.find(URL_INPUT_FIELD).exists()).toBe(true);
 
     await wrapper.get(URL_INPUT_FIELD).setValue("  https://shop.test/checkout  ");
-    await click(wrapper, sel("-url-apply"));
-
     await vi.waitFor(() =>
       expect(wrapper.emitted("update:url")?.[1]).toEqual(["https://shop.test/checkout"]),
     );
   });
 
-  it("Apply with an invalid URL shows the reason and emits nothing", async () => {
+  it("an invalid URL shows the reason and emits nothing", async () => {
     wrapper = mountPill();
     await openUrl(wrapper);
 
     await wrapper.get(URL_INPUT_FIELD).setValue("not a url");
-    await click(wrapper, sel("-url-apply"));
 
     await vi.waitFor(() =>
       expect(wrapper.get(URL_INPUT_ERROR).text()).toBe(

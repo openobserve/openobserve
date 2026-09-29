@@ -62,7 +62,7 @@ function editRoute(reference: { id: string; folder_id: string }) {
     <template #trigger>
       <OButton
         variant="outline"
-        size="sm"
+        size="xs"
         icon-left="account-tree"
         aria-haspopup="dialog"
         class="max-md:hidden"

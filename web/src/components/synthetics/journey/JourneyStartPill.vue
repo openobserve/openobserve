@@ -118,13 +118,20 @@ const form = useOForm<StartUrlForm>({
   defaultValues: { url: props.url },
   schema: makeStartUrlSchema(t),
   onSubmit: (values) => {
-    emit("update:url", values.url.trim());
-    urlOpen.value = false;
+    const next = values.url.trim();
+    if (next !== props.url) emit("update:url", next);
   },
 });
 
+const urlDraft = form.useStore((state) => state.values.url);
+
 watch(urlOpen, (open) => {
   if (open) form.reset({ url: props.url });
+});
+
+// No Apply: every valid edit goes to the check at once and the page's Save persists it.
+watch(urlDraft, () => {
+  if (urlOpen.value) void form.handleSubmit();
 });
 
 function onToggleEnvironment(id: string) {
@@ -142,14 +149,14 @@ function onToggleEnvironment(id: string) {
       <template #trigger>
         <OButton
           variant="outline"
-          size="sm"
+          size="xs"
           :disabled="disabled"
           :aria-label="t('synthetics.journey.startPill.urlAria', { url })"
           data-test="synthetics-journey-start-pill-url"
         >
           <!-- First child so it anchors to the whole button rather than the URL text. -->
           <OTooltip :content="t('synthetics.journey.startPill.editUrl')" side="bottom" />
-          <OIcon name="language" size="sm" class="md:hidden" aria-hidden="true" />
+          <OIcon name="language" size="sm" aria-hidden="true" />
           <span v-if="url" class="max-w-72 truncate font-mono font-normal max-md:hidden">{{
             url
           }}</span>
@@ -188,24 +195,6 @@ function onToggleEnvironment(id: string) {
             <span class="text-text-secondary truncate font-mono">{{ row.url }}</span>
           </div>
         </div>
-        <div class="flex justify-end gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="synthetics-journey-start-pill-url-cancel"
-            @click="urlOpen = false"
-          >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            data-test="synthetics-journey-start-pill-url-apply"
-          >
-            {{ t("common.apply") }}
-          </OButton>
-        </div>
       </OForm>
     </OPopover>
 
@@ -217,7 +206,7 @@ function onToggleEnvironment(id: string) {
       <template #trigger>
         <OButton
           variant="outline"
-          size="sm"
+          size="xs"
           :disabled="disabled"
           :aria-label="
             t('synthetics.journey.startPill.envAria', { count: selectedCount }, selectedCount)

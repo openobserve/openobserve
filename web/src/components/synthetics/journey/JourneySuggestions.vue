@@ -94,7 +94,7 @@ function run(kind: JourneySuggestionActionKind) {
     <template #trigger>
       <OButton
         variant="outline"
-        size="icon-sm-split"
+        size="icon-xs-sq"
         :aria-label="label"
         data-test="synthetics-journey-suggestions-chip"
       >

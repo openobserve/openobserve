@@ -1859,7 +1859,7 @@ function onClearResults() {
         <OButton
           ref="variablesToggleRef"
           :variant="variablesPanelOpen ? 'outline-primary' : 'outline'"
-          size="icon-sm-split"
+          size="icon-xs-sq"
           :aria-label="variablesToggleLabel"
           :aria-pressed="variablesPanelOpen"
           data-test="synthetics-journey-toggle-variables-btn"
